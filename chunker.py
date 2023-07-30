@@ -3,7 +3,7 @@ from jinja2 import Template
 from pathlib import Path
 import json
 
-def chunk(filename, chunk_size = 1024*4, chunk_overlap = 0):
+def chunker(filename, chunk_size = 1024*4, chunk_overlap = 0):
     from langchain.text_splitter import RecursiveCharacterTextSplitter
 
     lines = open(filename).readlines()
@@ -18,7 +18,7 @@ def chunk(filename, chunk_size = 1024*4, chunk_overlap = 0):
 
 def main(text: str, template: str, chunk_size: int = 1024*4, chunk_overlap: int = 0):
     the_template = Template(open(template).read())
-    texts = chunk(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    texts = chunker(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
     prepare = []
     for idx, chunk in enumerate(texts):
