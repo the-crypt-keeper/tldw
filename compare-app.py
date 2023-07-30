@@ -35,7 +35,7 @@ def display_analysis_data(data):
 
             with columns[model_info['idx']]:
                 #st.subheader(f"{model_info['short_name']}")
-                st.write(model_result['answer'])
+                st.write(model_result['answer'], markdown=False)
                     
 st.set_page_config(page_title='Analysis Explorer', layout="wide")
 st.markdown("""

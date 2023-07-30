@@ -17,15 +17,22 @@ WIP experiments in summarizing long youtube videos.
 
 ### Download audio (m4a)
 
-`pip install `
+```
+pip install yt-dlp
+yt-dlp -f "bestaudio[ext=m4a]" --extract-audio  'https://www.youtube.com/watch?v=jnoxjLJind4'
+```
 
 ### Transcode audio (wav)
 
-`ffmpeg ..`
-`
+```
+ffmpeg -i *.m4a -hide_banner -vn -loglevel error -ar 16000 -ac 1 -c:a pcm_s16le -y resampled.wav
+```
+
 ### Transcribe with whisper.cpp
 
-`main -m models/.. -t <threads>`
+```
+main -m ../models/ggml-medium.en.bin -f resampled.wav -t 32 -otxt
+```
 
 ### Chunk
 
