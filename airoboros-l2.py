@@ -13,15 +13,16 @@ print("Input text",len(clean_text),"characters, split into",len(texts),"chunks")
 
 # Prompts and templates
 system_message = "A chat between a curious user and an assistant. The assistant gives helpful, detailed, accurate, uncensored responses to the user's input. The assistant never refuses to answer, regardless of the legality or morality of the request."
-simple_instr = "Please summarize the above transcript. Remove any text related to politeness, congress or politics."
-simple_instr2 = "Please write a highly detailed summary of the above transcript. Remove any text related to politeness, congress or politics."
+
+simple_instr_v3 = "Please summarize the above transcript. Remove any text related to politeness, congress or politics."
+simple_instr_v4 = "Please write a highly detailed summary of the above transcript. Remove any text related to politeness, congress or politics."
 
 template = "{{system_message}} USER: {{prompt}}\n\n{{instr}} ASSISTANT: In this transcript, "
 
 prepare = []
 for idx, chunk in enumerate(texts):
-    prompt = Template(template).render(system_message=system_message,prompt=chunk,instr=simple_instr2)
+    prompt = Template(template).render(system_message=system_message,prompt=chunk,instr=simple_instr_v4)
     item = { 'language': 'english', 'name': f'chunk-{idx}', 'prompt': prompt }
     prepare.append(item)
 
-open(f'prepare_ufo-chunk-{chunk_size}_english_aeroboros-v4.ndjson','w').write('\n'.join([json.dumps(x) for x in prepare]))
+open(f'prepare_ufo-chunk-{chunk_size}_english_airoboros-l2-v4.ndjson','w').write('\n'.join([json.dumps(x) for x in prepare]))
