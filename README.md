@@ -6,8 +6,9 @@ WIP experiments in summarizing long youtube videos.
 
 ## Whats going on here?
 
-1. Use whisper.cpp to transcribe audio to text (see `ufo-clean.txt`)
-2. Trim the relevant section of text (see `ufo-clean-parts.txt`)
-3. Break text into chunks
-4. Summarize each chunk
-5. Profit?
+1. Downloaded https://www.youtube.com/watch?v=KQ7Dw-739VY
+2. Used whisper.cpp to transcribe audio to text (see `ufo-clean.txt`)
+3. Trim the relevant section of text (see `ufo-clean-parts.txt`)
+4. Break text into chunks
+5. Summarize each chunk
+6. Profit?
