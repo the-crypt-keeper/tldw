@@ -49,7 +49,7 @@ st.markdown("""
         </style>
         """, unsafe_allow_html=True)
 
-files = sorted(glob.glob('*english.json'))
+files = sorted(glob.glob('compare/*.json'))
 data = [json.load(open(file,'r')) for file in files]
 titles = [x['config']['title'] for x in data]
 options = st.selectbox('Select Summary', titles)
