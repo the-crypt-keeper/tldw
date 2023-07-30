@@ -1,4 +1,4 @@
-title: Airoboros-L2 UFO Hearings
+title: UFO Hearings (7B vs 13B)
 models:
   - id: 7B
     eval: interview_ufo-chunk-4096_english_airoboros-l2-v3_none_summary_airoboros-l2-7b-gpt4-1.4.1.ggmlv3.q6-K_1690729663.ndjson
