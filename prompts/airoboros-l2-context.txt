@@ -4,5 +4,5 @@ ENDCONTEXT
 {{chunk}}
 ENDINPUT
 BEGININSTRUCTION
-Please write a highly detailed summary of the above transcript. Highlight interesting gameplay events and strategies.
+Please write a summary of the above transcript.
 ENDINSTRUCTION ASSISTANT:
