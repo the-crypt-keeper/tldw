@@ -11,7 +11,7 @@ def whisper_chunker(filename, chunk_size = 300):
     start_time = None
 
     if 'transcription' in lines:
-        sections = [ { 'text': x['text'], 'from': x['timestamps']['from']/1000.0, 'to': x['timestamps']['to']/1000.0  } for x in lines['transcription'] ]
+        sections = [ { 'text': x['text'], 'from': int(x['offsets']['from'])/1000.0, 'to': int(x['offsets']['to'])/1000.0  } for x in lines['transcription'] ]
     elif 'segments' in lines:
         sections = [ { 'text': x['text'], 'from': x['start'], 'to': x['end']  } for x in lines['segments'] ]
     else:
@@ -38,7 +38,7 @@ def main(text: str, template: str, chunk_size: int = 300):
         item = { 'language': 'english', 'name': f'chunk-{idx}', 'prompt': prompt }
         prepare.append(item)
 
-    text_clean = Path(template).stem.replace('.','-').replace('_','-')
+    text_clean = Path(text).stem.replace('.','-').replace('_','-')
     templateout_name = Path(template).stem 
     outfn = f'results/prepare_{text_clean}-{chunk_size}_english_{templateout_name}.ndjson'
     open(outfn,'w').write('\n'.join([json.dumps(x) for x in prepare]))
