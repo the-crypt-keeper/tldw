@@ -91,15 +91,16 @@ def speech_to_text(video_file_path, selected_source_lang = 'en', whisper_model =
         print("transcribe audio done with fast whisper")
 
         with open(out_file,'w') as f:
-            out_file.write(json.dumps(segments, indent=2))
+            f.write(json.dumps(segments, indent=2))
 
     except Exception as e:
         raise RuntimeError("Error transcribing.")
     
     return segments
 
-# embedding_model: "pyannote/embedding", embedding_size: 512
-def speaker_diarize(video_file_path, segments, embedding_model = "speechbrain/spkrec-ecapa-voxceleb", embedding_size=192, num_speakers=0):
+# embedding_model = "pyannote/embedding", embedding_size=512
+# embedding_model = "speechbrain/spkrec-ecapa-voxceleb", embedding_size=192
+def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embedding", embedding_size=512, num_speakers=0):
     """
     1. Generating speaker embeddings for each segments.
     2. Applying agglomerative clustering on the embeddings to identify the speaker for each segment.
@@ -116,15 +117,11 @@ def speaker_diarize(video_file_path, segments, embedding_model = "speechbrain/sp
         import pandas as pd
         from sklearn.cluster import AgglomerativeClustering
         from sklearn.metrics import silhouette_score
+        import tqdm
 
         _,file_ending = os.path.splitext(f'{video_file_path}')
         audio_file = video_file_path.replace(file_ending, ".wav")
         out_file = video_file_path.replace(file_ending, ".diarize.json")
-        if os.path.exists(out_file):
-            print("segments file already exists:", out_file)
-            with open(out_file) as f:
-                segments = json.load(f)
-            return segments
         
         # Get duration
         import wave
@@ -138,14 +135,24 @@ def speaker_diarize(video_file_path, segments, embedding_model = "speechbrain/sp
         def segment_embedding(segment):
             audio = Audio()
             start = segment["start"]
+            end = segment["end"]
+
+            # enforce a minimum segment length
+            if end-start < 0.3:
+                padding = 0.3-(end-start)
+                start -= padding/2
+                end += padding/2
+                print('Padded segment because it was too short:',segment)
+
             # Whisper overshoots the end timestamp in the last segment
-            end = min(duration, segment["end"])
+            end = min(duration, end)
+            # clip audio and embed
             clip = Segment(start, end)
             waveform, sample_rate = audio.crop(audio_file, clip)
             return embedding_model(waveform[None])
 
         embeddings = np.zeros(shape=(len(segments), embedding_size))
-        for i, segment in enumerate(segments):
+        for i, segment in enumerate(tqdm.tqdm(segments)):
             embeddings[i] = segment_embedding(segment)
         embeddings = np.nan_to_num(embeddings)
         print(f'Embedding shape: {embeddings.shape}')
