@@ -36,7 +36,7 @@ def get_youtube(video_url):
     return abs_video_path
 
 # Convert video .m4a into .wav
-def convert_to_wav(video_file_path):
+def convert_to_wav(video_file_path, offset = 0):
    
     out_path = video_file_path.replace("m4a","wav")
     if os.path.exists(out_path):
@@ -45,7 +45,8 @@ def convert_to_wav(video_file_path):
 
     try:
         print("starting conversion to wav")
-        os.system(f'ffmpeg -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
+        offset_args = f"-ss {offset}" if offset>0 else ''
+        os.system(f'ffmpeg {offset_args} -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
         print("conversion to wav ready:", out_path)
     except Exception as e:
         raise RuntimeError("Error converting.")
@@ -212,9 +213,9 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
     except Exception as e:
         raise RuntimeError("Error Running inference with local model", e)
 
-def main(youtube_url: str, num_speakers: int = 2, whisper_model: str = "small.en"):
+def main(youtube_url: str, num_speakers: int = 2, whisper_model: str = "small.en", offset: int = 0):
     video_path = get_youtube(youtube_url)
-    convert_to_wav(video_path)
+    convert_to_wav(video_path, offset)
     segments = speech_to_text(video_path, whisper_model=whisper_model)
     df_results, save_path = speaker_diarize(video_path, segments, num_speakers=num_speakers)
     print("diarize complete:", save_path)
