@@ -99,7 +99,7 @@ def speech_to_text(video_file_path, selected_source_lang = 'en', whisper_model =
     return segments
 
 # embedding_model: "pyannote/embedding", embedding_size: 512
-def speaker_diarize(video_file_path, segments, embedding_model = "speechbrain/spkrec-ecapa-voxceleb", embedding_size=192, num_speakers):
+def speaker_diarize(video_file_path, segments, embedding_model = "speechbrain/spkrec-ecapa-voxceleb", embedding_size=192, num_speakers=0):
     """
     1. Generating speaker embeddings for each segments.
     2. Applying agglomerative clustering on the embeddings to identify the speaker for each segment.
@@ -170,9 +170,9 @@ def speaker_diarize(video_file_path, segments, embedding_model = "speechbrain/sp
             segments[i]["speaker"] = 'SPEAKER ' + str(labels[i] + 1)
 
         with open(out_file,'w') as f:
-            out_file.write(json.dumps(segments, indent=2))
+            f.write(json.dumps(segments, indent=2))
 
-        # Make output
+        # Make CSV output
         def convert_time(secs):
             return datetime.timedelta(seconds=round(secs))
         
@@ -203,11 +203,11 @@ def speaker_diarize(video_file_path, segments, embedding_model = "speechbrain/sp
     except Exception as e:
         raise RuntimeError("Error Running inference with local model", e)
 
-def main(youtube_url: str):
-    video_path = youtube_url(youtube_url)
+def main(youtube_url: str, num_speakers: int = 2, whisper_model: str = "small.en"):
+    video_path = get_youtube(youtube_url)
     convert_to_wav(video_path)
-    segments = speech_to_text(video_path)
-    df_results, save_path = speaker_diarize(video_path, segments)
+    segments = speech_to_text(video_path, whisper_model=whisper_model)
+    df_results, save_path = speaker_diarize(video_path, segments, num_speakers=num_speakers)
     print("diarize complete:", save_path)
 
 if __name__ == "__main__":
