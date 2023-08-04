@@ -27,7 +27,7 @@ import contextlib
 from transformers import pipeline
 import psutil
 
-whisper_models = ["tiny", "base", "small", "medium", "large-v1", "large-v2"]
+whisper_models = ["small", "medium", "small.en","medium.en"]
 source_languages = {
     "en": "English",
     "zh": "Chinese",
@@ -35,166 +35,14 @@ source_languages = {
     "es": "Spanish",
     "ru": "Russian",
     "ko": "Korean",
-    "fr": "French",
-    "ja": "Japanese",
-    "pt": "Portuguese",
-    "tr": "Turkish",
-    "pl": "Polish",
-    "ca": "Catalan",
-    "nl": "Dutch",
-    "ar": "Arabic",
-    "sv": "Swedish",
-    "it": "Italian",
-    "id": "Indonesian",
-    "hi": "Hindi",
-    "fi": "Finnish",
-    "vi": "Vietnamese",
-    "he": "Hebrew",
-    "uk": "Ukrainian",
-    "el": "Greek",
-    "ms": "Malay",
-    "cs": "Czech",
-    "ro": "Romanian",
-    "da": "Danish",
-    "hu": "Hungarian",
-    "ta": "Tamil",
-    "no": "Norwegian",
-    "th": "Thai",
-    "ur": "Urdu",
-    "hr": "Croatian",
-    "bg": "Bulgarian",
-    "lt": "Lithuanian",
-    "la": "Latin",
-    "mi": "Maori",
-    "ml": "Malayalam",
-    "cy": "Welsh",
-    "sk": "Slovak",
-    "te": "Telugu",
-    "fa": "Persian",
-    "lv": "Latvian",
-    "bn": "Bengali",
-    "sr": "Serbian",
-    "az": "Azerbaijani",
-    "sl": "Slovenian",
-    "kn": "Kannada",
-    "et": "Estonian",
-    "mk": "Macedonian",
-    "br": "Breton",
-    "eu": "Basque",
-    "is": "Icelandic",
-    "hy": "Armenian",
-    "ne": "Nepali",
-    "mn": "Mongolian",
-    "bs": "Bosnian",
-    "kk": "Kazakh",
-    "sq": "Albanian",
-    "sw": "Swahili",
-    "gl": "Galician",
-    "mr": "Marathi",
-    "pa": "Punjabi",
-    "si": "Sinhala",
-    "km": "Khmer",
-    "sn": "Shona",
-    "yo": "Yoruba",
-    "so": "Somali",
-    "af": "Afrikaans",
-    "oc": "Occitan",
-    "ka": "Georgian",
-    "be": "Belarusian",
-    "tg": "Tajik",
-    "sd": "Sindhi",
-    "gu": "Gujarati",
-    "am": "Amharic",
-    "yi": "Yiddish",
-    "lo": "Lao",
-    "uz": "Uzbek",
-    "fo": "Faroese",
-    "ht": "Haitian creole",
-    "ps": "Pashto",
-    "tk": "Turkmen",
-    "nn": "Nynorsk",
-    "mt": "Maltese",
-    "sa": "Sanskrit",
-    "lb": "Luxembourgish",
-    "my": "Myanmar",
-    "bo": "Tibetan",
-    "tl": "Tagalog",
-    "mg": "Malagasy",
-    "as": "Assamese",
-    "tt": "Tatar",
-    "haw": "Hawaiian",
-    "ln": "Lingala",
-    "ha": "Hausa",
-    "ba": "Bashkir",
-    "jw": "Javanese",
-    "su": "Sundanese",
+    "fr": "French"
 }
 
 source_language_list = [key[0] for key in source_languages.items()]
 
-MODEL_NAME = "vumichien/whisper-medium-jp"
-lang = "ja"
-
-device = 0 if torch.cuda.is_available() else "cpu"
-pipe = pipeline(
-    task="automatic-speech-recognition",
-    model=MODEL_NAME,
-    chunk_length_s=30,
-    device=device,
-)
-os.makedirs('output', exist_ok=True)
-pipe.model.config.forced_decoder_ids = pipe.tokenizer.get_decoder_prompt_ids(language=lang, task="transcribe")
-
 embedding_model = PretrainedSpeakerEmbedding( 
     "speechbrain/spkrec-ecapa-voxceleb",
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-
-def transcribe(microphone, file_upload):
-    warn_output = ""
-    if (microphone is not None) and (file_upload is not None):
-        warn_output = (
-            "WARNING: You've uploaded an audio file and used the microphone. "
-            "The recorded file from the microphone will be used and the uploaded audio will be discarded.\n"
-        )
-
-    elif (microphone is None) and (file_upload is None):
-        return "ERROR: You have to either use the microphone or upload an audio file"
-
-    file = microphone if microphone is not None else file_upload
-
-    text = pipe(file)["text"]
-
-    return warn_output + text
-
-def _return_yt_html_embed(yt_url):
-    video_id = yt_url.split("?v=")[-1]
-    HTML_str = (
-        f'<center> <iframe width="500" height="320" src="https://www.youtube.com/embed/{video_id}"> </iframe>'
-        " </center>"
-    )
-    return HTML_str
-
-def yt_transcribe(yt_url):
-    # yt = YouTube(yt_url)
-    # html_embed_str = _return_yt_html_embed(yt_url)
-    # stream = yt.streams.filter(only_audio=True)[0]
-    # stream.download(filename="audio.mp3")
-
-    ydl_opts = {
-        'format': 'bestvideo*+bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'outtmpl':'audio.%(ext)s',
-    }
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([yt_url])
-        
-    text = pipe("audio.mp3")["text"]
-    return html_embed_str, text
 
 def convert_time(secs):
     return datetime.timedelta(seconds=round(secs))
@@ -202,7 +50,7 @@ def convert_time(secs):
 def get_youtube(video_url):
     # yt = YouTube(video_url)
     # abs_video_path = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first().download()
-    return "elon.m4a"
+    return "lex.m4a"
     
     ydl_opts = {
       'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
@@ -230,8 +78,7 @@ def speech_to_text(video_file_path, selected_source_lang, whisper_model, num_spe
     
     # model = whisper.load_model(whisper_model)
     print('loading whisper model..')
-    model = WhisperModel(whisper_model, device="cuda", compute_type="int8_float16")
-    #model = WhisperModel(whisper_model, compute_type="int8")
+    model = WhisperModel(whisper_model, device="cuda", compute_type="float16")
     time_start = time.time()
     if(video_file_path == None):
         raise ValueError("Error no video input")
@@ -355,7 +202,7 @@ youtube_url_in = gr.Textbox(label="Youtube url", lines=1, interactive=True)
 df_init = pd.DataFrame(columns=['Start', 'End', 'Speaker', 'Text'])
 memory = psutil.virtual_memory()
 selected_source_lang = gr.Dropdown(choices=source_language_list, type="value", value="en", label="Spoken language in video", interactive=True)
-selected_whisper_model = gr.Dropdown(choices=whisper_models, type="value", value="base", label="Selected Whisper model", interactive=True)
+selected_whisper_model = gr.Dropdown(choices=whisper_models, type="value", value="small.en", label="Selected Whisper model", interactive=True)
 number_speakers = gr.Number(precision=0, value=0, label="Input number of speakers for better results. If value=0, model will automatic find the best number of speakers", interactive=True)
 system_info = gr.Markdown(f"*Memory: {memory.total / (1024 * 1024 * 1024):.2f}GB, used: {memory.percent}%, available: {memory.available / (1024 * 1024 * 1024):.2f}GB*")
 download_transcript = gr.File(label="Download transcript")
@@ -366,110 +213,69 @@ demo.encrypt = False
 
 
 with demo:
-    with gr.Tab("Whisper speaker diarization"):
+    gr.Markdown('''
+        <div>
+        <h1 style='text-align: center'>Whisper speaker diarization</h1>
+        This space uses Whisper models from <a href='https://github.com/openai/whisper' target='_blank'><b>OpenAI</b></a> with <a href='https://github.com/guillaumekln/faster-whisper' target='_blank'><b>CTranslate2</b></a> which is a fast inference engine for Transformer models to recognize the speech (4 times faster than original openai model with same accuracy)
+        and ECAPA-TDNN model from <a href='https://github.com/speechbrain/speechbrain' target='_blank'><b>SpeechBrain</b></a> to encode and clasify speakers
+        </div>
+    ''')
+
+    with gr.Row():
         gr.Markdown('''
-            <div>
-            <h1 style='text-align: center'>Whisper speaker diarization</h1>
-            This space uses Whisper models from <a href='https://github.com/openai/whisper' target='_blank'><b>OpenAI</b></a> with <a href='https://github.com/guillaumekln/faster-whisper' target='_blank'><b>CTranslate2</b></a> which is a fast inference engine for Transformer models to recognize the speech (4 times faster than original openai model with same accuracy)
-            and ECAPA-TDNN model from <a href='https://github.com/speechbrain/speechbrain' target='_blank'><b>SpeechBrain</b></a> to encode and clasify speakers
-            </div>
+        ### Transcribe youtube link using OpenAI Whisper
+        ##### 1. Using Open AI's Whisper model to seperate audio into segments and generate transcripts.
+        ##### 2. Generating speaker embeddings for each segments.
+        ##### 3. Applying agglomerative clustering on the embeddings to identify the speaker for each segment.
         ''')
-
-        with gr.Row():
-            gr.Markdown('''
-            ### Transcribe youtube link using OpenAI Whisper
-            ##### 1. Using Open AI's Whisper model to seperate audio into segments and generate transcripts.
-            ##### 2. Generating speaker embeddings for each segments.
-            ##### 3. Applying agglomerative clustering on the embeddings to identify the speaker for each segment.
+        
+    with gr.Row():         
+        gr.Markdown('''
+            ### You can test by following examples:
             ''')
-            
-        with gr.Row():         
-            gr.Markdown('''
-                ### You can test by following examples:
-                ''')
-        examples = gr.Examples(examples=
-                [ "https://www.youtube.com/watch?v=j7BfEzAFuYc&t=32s", 
-                  "https://www.youtube.com/watch?v=-UX0X45sYe4", 
-                  "https://www.youtube.com/watch?v=7minSgqi-Gw"],
-              label="Examples", inputs=[youtube_url_in])
-              
-
-        with gr.Row():
-            with gr.Column():
-                youtube_url_in.render()
-                download_youtube_btn = gr.Button("Download Youtube video")
-                download_youtube_btn.click(get_youtube, [youtube_url_in], [video_in])
-                print(video_in)
-                
-
-        with gr.Row():
-            with gr.Column():
-                video_in.render()
-                with gr.Column():
-                    gr.Markdown('''
-                    ##### Here you can start the transcription process.
-                    ##### Please select the source language for transcription.
-                    ##### You can select a range of assumed numbers of speakers.
-                    ''')
-                selected_source_lang.render()
-                selected_whisper_model.render()
-                number_speakers.render()
-                transcribe_btn = gr.Button("Transcribe audio and diarization")
-                transcribe_btn.click(speech_to_text, 
-                                     [video_in, selected_source_lang, selected_whisper_model, number_speakers], 
-                                     [transcription_df, system_info, download_transcript]
-                                    )
-                
-        with gr.Row():
-            gr.Markdown('''
-            ##### Here you will get transcription  output
-            ##### ''')
+    examples = gr.Examples(examples=
+            [ "https://www.youtube.com/watch?v=j7BfEzAFuYc&t=32s", 
+                "https://www.youtube.com/watch?v=-UX0X45sYe4", 
+                "https://www.youtube.com/watch?v=7minSgqi-Gw"],
+            label="Examples", inputs=[youtube_url_in])
             
 
-        with gr.Row():
-            with gr.Column():
-                download_transcript.render()
-                transcription_df.render()
-                system_info.render()
-                gr.Markdown('''<center><img src='https://visitor-badge.glitch.me/badge?page_id=WhisperDiarizationSpeakers' alt='visitor badge'><a href="https://opensource.org/licenses/Apache-2.0"><img src='https://img.shields.io/badge/License-Apache_2.0-blue.svg' alt='License: Apache 2.0'></center>''')
+    with gr.Row():
+        with gr.Column():
+            youtube_url_in.render()
+            download_youtube_btn = gr.Button("Download Youtube video")
+            download_youtube_btn.click(get_youtube, [youtube_url_in], [video_in])
+            print(video_in)
+            
 
-                
-    
-    with gr.Tab("Whisper Transcribe Japanese Audio"):
-        gr.Markdown(f'''
-              <div>
-              <h1 style='text-align: center'>Whisper Transcribe Japanese Audio</h1>
-              </div>
-              Transcribe long-form microphone or audio inputs with the click of a button! The fine-tuned
-              checkpoint <a href='https://huggingface.co/{MODEL_NAME}' target='_blank'><b>{MODEL_NAME}</b></a> to transcribe audio files of arbitrary length.
-          ''')
-        microphone = gr.inputs.Audio(source="microphone", type="filepath", optional=True)
-        upload = gr.inputs.Audio(source="upload", type="filepath", optional=True)
-        transcribe_btn = gr.Button("Transcribe Audio")
-        text_output = gr.Textbox()
-        with gr.Row():         
-            gr.Markdown('''
-                ### You can test by following examples:
+    with gr.Row():
+        with gr.Column():
+            video_in.render()
+            with gr.Column():
+                gr.Markdown('''
+                ##### Here you can start the transcription process.
+                ##### Please select the source language for transcription.
+                ##### You can select a range of assumed numbers of speakers.
                 ''')
-        examples = gr.Examples(examples=
-              [ "sample1.wav", 
-                "sample2.wav", 
-                ],
-              label="Examples", inputs=[upload])
-        transcribe_btn.click(transcribe, [microphone, upload], outputs=text_output)
-    
-    with gr.Tab("Whisper Transcribe Japanese YouTube"):
-        gr.Markdown(f'''
-              <div>
-              <h1 style='text-align: center'>Whisper Transcribe Japanese YouTube</h1>
-              </div>
-                Transcribe long-form YouTube videos with the click of a button! The fine-tuned checkpoint:
-                <a href='https://huggingface.co/{MODEL_NAME}' target='_blank'><b>{MODEL_NAME}</b></a> to transcribe audio files of arbitrary length.
-            ''')
-        youtube_link = gr.Textbox(label="Youtube url", lines=1, interactive=True)
-        yt_transcribe_btn = gr.Button("Transcribe YouTube")
-        text_output2 = gr.Textbox()
-        html_output = gr.Markdown()
-        yt_transcribe_btn.click(yt_transcribe, [youtube_link], outputs=[html_output, text_output2])
+            selected_source_lang.render()
+            selected_whisper_model.render()
+            number_speakers.render()
+            transcribe_btn = gr.Button("Transcribe audio and diarization")
+            transcribe_btn.click(speech_to_text, 
+                                    [video_in, selected_source_lang, selected_whisper_model, number_speakers], 
+                                    [transcription_df, system_info, download_transcript]
+                                )
+            
+    with gr.Row():
+        gr.Markdown('''
+        ##### Here you will get transcription  output
+        ##### ''')
+        
+
+    with gr.Row():
+        with gr.Column():
+            download_transcript.render()
+            transcription_df.render()
+            system_info.render()
 
 demo.launch(debug=True, server_port=8888, share=True)
