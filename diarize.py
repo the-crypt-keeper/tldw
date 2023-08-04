@@ -41,7 +41,8 @@ source_languages = {
 source_language_list = [key[0] for key in source_languages.items()]
 
 embedding_model = PretrainedSpeakerEmbedding( 
-    "speechbrain/spkrec-ecapa-voxceleb",
+    #"speechbrain/spkrec-ecapa-voxceleb",
+    "pyannote/embedding",
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
 def convert_time(secs):
@@ -130,7 +131,7 @@ def speech_to_text(video_file_path, selected_source_lang, whisper_model, num_spe
             waveform, sample_rate = audio.crop(audio_file, clip)
             return embedding_model(waveform[None])
 
-        embeddings = np.zeros(shape=(len(segments), 192))
+        embeddings = np.zeros(shape=(len(segments), 512))
         for i, segment in enumerate(segments):
             embeddings[i] = segment_embedding(segment)
         embeddings = np.nan_to_num(embeddings)
