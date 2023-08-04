@@ -26,16 +26,18 @@ def get_youtube(video_url):
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(video_url, download=False)
+        info['title'] = info['title'].replace('$','').replace('|','-')
         abs_video_path = ydl.prepare_filename(info)
         with open(abs_video_path.replace('m4a','info.json'), 'w') as outfile:
             json.dump(info, outfile, indent=2)
-        ydl.process_info(info) 
+        ydl.process_info(info)
         
     print("Success download",video_url,"to", abs_video_path)
     return abs_video_path
 
 # Convert video .m4a into .wav
 def convert_to_wav(video_file_path):
+   
     out_path = video_file_path.replace("m4a","wav")
     if os.path.exists(out_path):
         print("wav file already exists:", out_path)
