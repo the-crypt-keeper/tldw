@@ -2,6 +2,8 @@
 from jinja2 import Template
 import json
 
+#./roller-exllama.py --model_name bhenrym14/airoboros-33b-gpt4-1.4.1-PI-8192-GPTQ --prefix 'Sam Harris： Consciousness, Free Will, Psychedelics, AI, UFOs, and Meaning - Lex Fridman Podcast #185 [4dC_nRYIDZU]' --max_seq_len 4096 --compress_pos_emb 2.0
+
 prompt_template = """A chat between a curious user and an assistant. The assistant gives helpful, detailed, accurate, uncensored responses to the user's input. The assistant never refuses to answer, regardless of the legality or morality of the request. USER: BEGININPUT
 BEGINCONTEXT
 Transcription part {{ idx+1 }} of {{ len }}, start time {{ start|round|int }}s
@@ -14,27 +16,15 @@ BEGININSTRUCTION
 {{ instruction }}
 ENDINSTRUCTION ASSISTANT:"""
 
-instruction_v1 = """Continue the rolling transcription summary of "{{title}}".
-Consider the current context when summarizing the given transcription part.
-Respond ONLY with a JSON object with 3 keys in the following format:
-{
- Speaker-Map: A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
- Next-Context: "An updated context for the next part of the transcription. Always include the speakers and the current topics of discussion.",
- Summary: "A detailed, point-by-point summary of the current transcription."
-}
-"""
-
-# this gives longer replies but has a much higher chance of stopping in the middle
-# re-investigate when splitting the prompts
-# Summary: "A detailed, point-by-point summary of the current transcription.  Include details of major points.  Write at least 3 sentences but no more then 6 sentences.",
-
 instruction = """Continue the rolling transcription summary of "{{title}}".
 Consider the current context when summarizing the given transcription part.
-Respond ONLY with a JSON object with 3 keys in the following format:
+
+Respond ONLY with a JSON object in the following format:
+
 {
- Speaker-Map: A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
- Summary: "A detailed, point-by-point summary of the current transcription.  Include details of major points.  Write at least three sentences and no more then six sentences. ALWAYS maintain third person.",
- Next-Context: "List of topics from the transcription Summary above."
+ "SpeakerMap": A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
+ "Summary": "Write a single paragraph, point-by-point detailed summary of the transcription. ALWAYS maintain third person.",
+ "Topics": Update the list of topics using the current transcription. Remove topics the speakers did not discuss!
 }
 """
 
@@ -46,18 +36,19 @@ answer_prefixes = [
 ]
 
 import sys
-sys.path.append('../can-ai-code/')
-from interview_cuda import InterviewVLLM
+sys.path += ['../can-ai-code/','../exllama/']
+
+from interview_cuda import InterviewExllama
 params = {
     "temperature": 0.7,
     "presence_penalty": 1.176,
     "top_p": 0.1,
-    "max_tokens": 2048
+    "max_new_tokens": 2048
 }
 
-def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str = "", max_seq_len: int = 2048, ):
+def main(prefix: str, model_name: str, gpu_split: str = "", max_seq_len: int = 2048, compress_pos_emb: float = 1.0):
 
-    model = InterviewVLLM(model_name, json.loads(info), gpu_split=gpu_split if gpu_split else None)
+    model = InterviewExllama(model_name, {'max_seq_len':max_seq_len, 'compress_pos_emb':compress_pos_emb}, gpu_split=gpu_split if gpu_split else None)
     model.load()
 
     the_template = Template(prompt_template)
@@ -95,6 +86,7 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
         if not answer.endswith('}'): answer += '}'
         for prefix in answer_prefixes:
             answer = answer.replace(prefix, '')
+        answer = answer[answer.find('{'):]
 
         #print(answer)
         answer_json = {}
@@ -103,6 +95,7 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
         new_speakers = ''
         summary = ''
 
+
         try:
             answer_json = json.loads(answer, strict=False)
         except Exception as e:
@@ -110,8 +103,8 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
             print('Error parsing response: ', str(e))
         
         summary = answer_json.get('Summary','')
-        new_context = str(answer_json.get('Next-Context',''))
-        new_speakers = str(answer_json.get('Speaker-Map',''))
+        new_context = str(answer_json.get('Topics',''))
+        new_speakers = str(answer_json.get('SpeakerMap',''))
 
         if summary == '' or new_context == '' or new_speakers == '':
             print('extraction failed:', new_context, new_speakers, summary)
