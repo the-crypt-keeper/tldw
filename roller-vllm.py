@@ -98,7 +98,7 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
         summary = ''
 
         try:
-            answer_json = json.loads(answer)
+            answer_json = json.loads(answer, strict=False)
         except Exception as e:
             print(answer)
             print('Error parsing response: ', str(e))
