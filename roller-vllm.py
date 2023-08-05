@@ -30,10 +30,15 @@ Consider the current context when summarizing the given transcription part.
 Respond ONLY with a JSON object with 3 keys in the following format:
 {
  Speaker-Map: A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
- Summary: "A detailed, point-by-point summary of the current transcription.  Write at least five sentences, including details of all major points.",
+ Summary: "A detailed, point-by-point summary of the current transcription.  Include details of major points.  Write at least 3 sentences but no more then 6 sentences.",
  Next-Context: "List of topics from the transcription Summary above."
 }
 """
+
+answer_prefixes = [
+   "In this part of the transcription, ",
+   "In this transcription part, " 
+]
 
 import sys
 sys.path.append('../can-ai-code/')
@@ -82,6 +87,8 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
 
         # the trailing } is sometimes lost
         if not answer.endswith('}'): answer += '}'
+        for prefix in answer_prefixes:
+            answer = answer.replace(prefix, '')
 
         #print(answer)
         answer_json = {}
@@ -96,9 +103,9 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
             print(answer)
             print('Error parsing response: ', str(e))
         
-        summary = answer_json.get('Summary')
-        new_context = str(answer_json.get('Next-Context'))
-        new_speakers = str(answer_json.get('Speaker-Map'))
+        summary = answer_json.get('Summary','')
+        new_context = str(answer_json.get('Next-Context',''))
+        new_speakers = str(answer_json.get('Speaker-Map',''))
 
         if summary == '' or new_context == '' or new_speakers == '':
             print('extraction failed:', new_context, new_speakers, summary)
