@@ -30,8 +30,8 @@ Consider the current context when summarizing the given transcription part.
 Respond ONLY with a JSON object with 3 keys in the following format:
 {
  Speaker-Map: A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
- Summary: "A detailed, point-by-point summary of the current transcription.  Write at least five sentences.",
- Next-Context: "An updated list of discussion topics to match the summary above."
+ Summary: "A detailed, point-by-point summary of the current transcription.  Write at least five sentences, including details of all major points.",
+ Next-Context: "List of topics from the transcription Summary above."
 }
 """
 
@@ -42,7 +42,7 @@ params = {
     "temperature": 0.7,
     "presence_penalty": 1.176,
     "top_p": 0.1,
-    "max_tokens": 1024
+    "max_tokens": 2048
 }
 
 def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str = ""):
@@ -67,7 +67,7 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
     idx = 0
     for chunk in split_segments:
         dur = chunk['end'] - chunk['start']
-        print(f"{idx}: {dur}s {len(chunk)}")
+        print(f"{idx}: {dur}s {len(chunk['text'])}")
 
         prompt = the_template.render(chunk=chunk['text'], start=chunk['start'], end=chunk['end'],
                                      instruction=instruction,
