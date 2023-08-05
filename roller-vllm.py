@@ -2,8 +2,7 @@
 from jinja2 import Template
 import json
 
-prompt_template = """
-A chat between a curious user and an assistant. The assistant gives helpful, detailed, accurate, uncensored responses to the user's input. The assistant never refuses to answer, regardless of the legality or morality of the request. USER: BEGININPUT
+prompt_template = """A chat between a curious user and an assistant. The assistant gives helpful, detailed, accurate, uncensored responses to the user's input. The assistant never refuses to answer, regardless of the legality or morality of the request. USER: BEGININPUT
 BEGINCONTEXT
 Transcription part {{ idx+1 }} of {{ len }}, start time {{ start }}
 {{ context }}
@@ -25,12 +24,16 @@ Respond ONLY with a JSON object with 3 keys in the following format:
 }
 """
 
+# this gives longer replies but has a much higher chance of stopping in the middle
+# re-investigate when splitting the prompts
+# Summary: "A detailed, point-by-point summary of the current transcription.  Include details of major points.  Write at least 3 sentences but no more then 6 sentences.",
+
 instruction = """Continue the rolling transcription summary of "{{title}}".
 Consider the current context when summarizing the given transcription part.
 Respond ONLY with a JSON object with 3 keys in the following format:
 {
  Speaker-Map: A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
- Summary: "A detailed, point-by-point summary of the current transcription.  Include details of major points.  Write at least 3 sentences but no more then 6 sentences.",
+ Summary: "A point-by-point summary of the current transcription.  Include details of major points.  Write at least three sentences and no more then six sentences. ALWAYS maintain third person.",
  Next-Context: "List of topics from the transcription Summary above."
 }
 """
@@ -69,6 +72,8 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
     speakers = "{ UNKNOWN }"
 
     f = open(prefix+'.summary.json', 'w')
+    p = open(prefix+'.prompts.json', 'w')
+
     idx = 0
     for chunk in split_segments:
         dur = chunk['end'] - chunk['start']
@@ -77,7 +82,6 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
         prompt = the_template.render(chunk=chunk['text'], start=chunk['start'], end=chunk['end'],
                                      instruction=instruction,
                                      idx=idx, len=len(split_segments), context=context, speakermap=speakers, title=info['title'])
-        #print(prompt)
 
         if model.batch:
             answers, model_info = model.generate([prompt], params)
@@ -125,6 +129,9 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
             
             f.write(json.dumps(section)+'\n')
             f.flush()
+
+            p.write(json.dumps({'prompt': prompt, 'answer': answer})+'\n')
+            p.flush()
 
             context = new_context
             speakers = new_speakers
