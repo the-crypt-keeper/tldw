@@ -23,8 +23,8 @@ Respond ONLY with a JSON object in the following format:
 
 {
  "SpeakerMap": A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
- "Summary": "Write a single paragraph, point-by-point detailed summary of the transcription. ALWAYS maintain third person.",
- "Topics": Update the list of topics using the current transcription. Remove topics the speakers did not discuss!
+ "Summary": "Write a long (five or more sentences), highly detailed, point-by-point summary of the current transcription.  Expand on all major points.",
+ "Topics": An updated list of current discussion topics, for example ["topic", "another topic"]
 }
 """
 
@@ -84,9 +84,14 @@ def main(prefix: str, model_name: str, gpu_split: str = "", max_seq_len: int = 2
 
         # the trailing } is sometimes lost
         if not answer.endswith('}'): answer += '}'
+        
+        # remove useless answer prefixes
         for prefix in answer_prefixes:
             answer = answer.replace(prefix, '')
-        answer = answer[answer.find('{'):]
+        
+        # remove any preamble
+        if answer.find('{') > -1:
+            answer = answer[answer.find('{'):]
 
         #print(answer)
         answer_json = {}
