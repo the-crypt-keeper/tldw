@@ -7,6 +7,7 @@ A chat between a curious user and an assistant. The assistant gives helpful, det
 BEGINCONTEXT
 Transcription part {{ idx+1 }} of {{ len }}, start time {{ start }}
 {{ context }}
+{{ speakermap }}
 ENDCONTEXT
 {{ chunk }}
 ENDINPUT
@@ -14,13 +15,23 @@ BEGININSTRUCTION
 {{ instruction }}
 ENDINSTRUCTION ASSISTANT:"""
 
-instruction = """Continue the rolling transcription summary of "{{title}}".
+instruction_v1 = """Continue the rolling transcription summary of "{{title}}".
 Consider the current context when summarizing the given transcription part.
 Respond ONLY with a JSON object with 3 keys in the following format:
 {
  Speaker-Map: A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
  Next-Context: "An updated context for the next part of the transcription. Always include the speakers and the current topics of discussion.",
  Summary: "A detailed, point-by-point summary of the current transcription."
+}
+"""
+
+instruction = """Continue the rolling transcription summary of "{{title}}".
+Consider the current context when summarizing the given transcription part.
+Respond ONLY with a JSON object with 3 keys in the following format:
+{
+ Speaker-Map: A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
+ Summary: "A detailed, point-by-point summary of the current transcription.  Write at least five sentences.",
+ Next-Context: "An updated list of discussion topics to match the summary above."
 }
 """
 
@@ -44,10 +55,10 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
     info = json.load(open(prefix+'.info.json'))
 
     context = f"""
-    SPEAKER 1: Not yet known
-    SPEAKER 2: Not yet known
-    Video Title: {info['title']}
-    Video Description: {info['description'][:1024]}
+    Speakers: [ "UNKNOWN" ]
+    Topics: [ "UNKNOWN" ]
+    Title: "{info['title']}"
+    Description: "{info['description'][:512]}"
     """
 
     speakers = "{ UNKNOWN }"
@@ -72,7 +83,7 @@ def main(prefix: str, model_name: str, gpu_split: str = "", init_speakers: str =
         # the trailing } is sometimes lost
         if not answer.endswith('}'): answer += '}'
 
-        print(answer)
+        #print(answer)
         answer_json = {}
 
         new_context = ''
