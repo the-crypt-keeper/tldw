@@ -56,9 +56,10 @@ def main(prefix: str, model_name: str = "TheBloke/airoboros-l2-13b-gpt4-2.0-GPTQ
             desc = info['description']
             if len(desc) > 500: desc = desc[0:500]
             speaker_prompts = f"Title: {info['title']}\nDescription: {desc}\nTranscript:\n---\n{chunk['text']}\n---\n"
-            speaker_prompts += f"Please identify the names of each SPEAKER from the {info['title']} transcript above\n"
+            speaker_prompts += f"Identify the names of each SPEAKER from the {info['title']} transcript above\n"
 
             answer, model_info = model.generate(speaker_prompts, params)
+            print(answer)
 
             for line in answer.strip().split('\n'):
                 for speaker, name in speaker_map.items():
