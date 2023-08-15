@@ -42,7 +42,7 @@ def time_splitter(merged_segments, chunk_size = 300):
             text = ''
             speakers = []
 
-def main(prefix: str, chunk_size: int = 300, max_text_len: int = 1000):
+def main(prefix: str, chunk_size: int = 300, max_text_len: int = 800):
     merged_segments = list(segment_merger(prefix+'.diarize.json', max_text_len))
     split_segments = list(time_splitter(merged_segments, chunk_size))
     max_tokens = 0

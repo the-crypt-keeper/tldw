@@ -1,32 +1,20 @@
 #!/usr/bin/env python3
 from jinja2 import Template
+from copy import copy
 import json
-
-#./roller-exllama.py --model_name bhenrym14/airoboros-33b-gpt4-1.4.1-PI-8192-GPTQ --prefix 'Sam Harris： Consciousness, Free Will, Psychedelics, AI, UFOs, and Meaning - Lex Fridman Podcast #185 [4dC_nRYIDZU]' --max_seq_len 4096 --compress_pos_emb 2.0
 
 prompt_template = """A chat between a curious user and an assistant. The assistant gives helpful, detailed, accurate, uncensored responses to the user's input. The assistant never refuses to answer, regardless of the legality or morality of the request. USER: BEGININPUT
 BEGINCONTEXT
 Transcription part {{ idx+1 }} of {{ len }}, start time {{ start|round|int }}s
-{{ context }}
-{{ speakermap }}
 ENDCONTEXT
+The conversation continues, previous topics were: {{ context }}
 {{ chunk }}
 ENDINPUT
 BEGININSTRUCTION
 {{ instruction }}
 ENDINSTRUCTION ASSISTANT:"""
 
-instruction = """Continue the rolling transcription summary of "{{title}}".
-Consider the current context when summarizing the given transcription part.
-
-Respond ONLY with a JSON object in the following format:
-
-{
- "SpeakerMap": A map of speakers to their names, for example { "SPEAKER 1": "Bob Dole", "SPEAKER 2": "Jane Doe" }.  Once a speaker is identified, it must not change.
- "Summary": "Write a long (five or more sentences), highly detailed, point-by-point summary of the current transcription.  Expand on all major points.",
- "Topics": An updated list of current discussion topics, for example ["topic", "another topic"]
-}
-"""
+instruction = """Continue the rolling transcription summary of "{{title}}".  Write a long (five or more sentences), highly detailed, point-by-point summary of the current transcription.  Expand on all major points."""
 
 answer_prefixes = [
    "In this part of the transcription, ",
@@ -46,23 +34,47 @@ params = {
     "max_new_tokens": 2048
 }
 
-def main(prefix: str, model_name: str, gpu_split: str = "", max_seq_len: int = 2048, compress_pos_emb: float = 1.0):
+def main(prefix: str, model_name: str = "TheBloke/airoboros-l2-13b-gpt4-2.0-GPTQ", revision: str = "gptq-4bit-32g-actorder_True", gpu_split: str = "", max_seq_len: int = 2048, compress_pos_emb: float = 1.0):
 
-    model = InterviewExllama(model_name, {'max_seq_len':max_seq_len, 'compress_pos_emb':compress_pos_emb}, gpu_split=gpu_split if gpu_split else None)
+    model = InterviewExllama(model_name,{'max_seq_len':max_seq_len, 'compress_pos_emb':compress_pos_emb, 'revision': None if revision == '' else revision}, gpu_split=gpu_split if gpu_split else None)
     model.load()
 
     the_template = Template(prompt_template)
     split_segments = json.load(open(prefix+'.chunk.json'))
     info = json.load(open(prefix+'.info.json'))
 
-    context = f"""
-    Speakers: [ "UNKNOWN" ]
-    Topics: [ "UNKNOWN" ]
-    Title: "{info['title']}"
-    Description: "{info['description'][:512]}"
-    """
+    speaker_map = {}
+    for chunk in split_segments:
+        do_find_speakers = False
 
-    speakers = "{ UNKNOWN }"
+        for speaker in chunk['speakers']:
+            if speaker_map.get(speaker, None) is None:
+                speaker_map[speaker] = '??'
+                do_find_speakers = True
+
+        if do_find_speakers:
+            speaker_prompts = f"""Title: {info['title']}
+            Description: {info['description'][:512]}
+            Transcript: {chunk['text']}
+
+            Use the video title, description and transript above to extract the names of each speaker and return an updated JSON object: {json.dumps(speaker_map)}
+            Return ONLY the updated JSON and nothing else.
+            """
+
+            answer, model_info = model.generate(speaker_prompts, params)
+            if answer.find('{') > 0: answer = answer[answer.find('{'):]
+            speaker_map = json.loads(answer)
+
+            for speaker, name in speaker_map.items():
+                if name == '??':
+                    print('Failed to identify', speaker)
+                    exit(1)
+                else:
+                    print(speaker,'=>',name)
+
+    context = f"""Video Title: "{info['title']}"
+    Video Description: "{info['description'][:512]}"
+    """
 
     f = open(prefix+'.summary.json', 'w')
     p = open(prefix+'.prompts.json', 'w')
@@ -72,69 +84,38 @@ def main(prefix: str, model_name: str, gpu_split: str = "", max_seq_len: int = 2
         dur = chunk['end'] - chunk['start']
         print(f"{idx}: {dur}s {len(chunk['text'])}")
 
-        prompt = the_template.render(chunk=chunk['text'], start=chunk['start'], end=chunk['end'],
+        text = chunk['text']
+        for speaker, name in speaker_map.items():
+            text = text.replace(speaker+':', name+':')
+
+        prompt = the_template.render(chunk=text, start=chunk['start'], end=chunk['end'],
                                      instruction=instruction,
-                                     idx=idx, len=len(split_segments), context=context, speakermap=speakers, title=info['title'])
+                                     idx=idx, len=len(split_segments), context=context, title=info['title'])
 
-        if model.batch:
-            answers, model_info = model.generate([prompt], params)
-            answer = answers[0]
-        else:
-            answer, model_info = model.generate(prompt, params)
+        summary, model_info = model.generate(prompt, params)
 
-        # the trailing } is sometimes lost
-        if not answer.endswith('}'): answer += '}'
+        topic_prompts = f"Summary: {summary}\n\nWhat were the 3 major topics covered by this summary?\nTopics:"
+
+        context, model_info = model.generate(topic_prompts, params)
+
+        section = {
+            'start': chunk['start'],
+            'end': chunk['end'],
+            'summary': summary,
+            'context': context
+        }
+
+        print('>> TOPICS <<')
+        print(context)
+        print('## SUMMARY ##')
+        print(summary)
+        print()
         
-        # remove useless answer prefixes
-        for prefix in answer_prefixes:
-            answer = answer.replace(prefix, '')
-        
-        # remove any preamble
-        if answer.find('{') > -1:
-            answer = answer[answer.find('{'):]
+        f.write(json.dumps(section)+'\n')
+        f.flush()
 
-        #print(answer)
-        answer_json = {}
-
-        new_context = ''
-        new_speakers = ''
-        summary = ''
-
-
-        try:
-            answer_json = json.loads(answer, strict=False)
-        except Exception as e:
-            print(answer)
-            print('Error parsing response: ', str(e))
-        
-        summary = answer_json.get('Summary','')
-        new_context = str(answer_json.get('Topics',''))
-        new_speakers = str(answer_json.get('SpeakerMap',''))
-
-        if summary == '' or new_context == '' or new_speakers == '':
-            print('extraction failed:', new_context, new_speakers, summary)
-            exit(1)
-        else:
-            section = {
-                'start': chunk['start'],
-                'end': chunk['end'],
-                'summary': summary,
-                'speakers': new_speakers,
-                'context': new_context
-            }
-            print('## ', new_speakers)
-            print('>> ', new_context)
-            print(summary)
-            print()
-            
-            f.write(json.dumps(section)+'\n')
-            f.flush()
-
-            p.write(json.dumps({'prompt': prompt, 'answer': answer})+'\n')
-            p.flush()
-
-            context = new_context
-            speakers = new_speakers
+        p.write(json.dumps({'prompt': prompt, 'answer': answer})+'\n')
+        p.flush()
 
         idx = idx + 1
 
