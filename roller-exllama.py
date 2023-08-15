@@ -53,17 +53,19 @@ def main(prefix: str, model_name: str = "TheBloke/airoboros-l2-13b-gpt4-2.0-GPTQ
                 do_find_speakers = True
 
         if do_find_speakers:
-            speaker_prompts = f"""Title: {info['title']}
-            Description: {info['description'][:512]}
-            Transcript: {chunk['text']}
-
-            Use the video title, description and transript above to extract the names of each speaker and return an updated JSON object: {json.dumps(speaker_map)}
-            Return ONLY the updated JSON and nothing else.
-            """
+            desc = info['description']
+            if len(desc) > 500: desc = desc[0:500]
+            speaker_prompts = f"Title: {info['title']}\nDescription: {desc}\nTranscript:\n---\n{chunk['text']}\n---\n"
+            speaker_prompts += f"Please identify the names of each SPEAKER from the {info['title']} transcript above\n"
 
             answer, model_info = model.generate(speaker_prompts, params)
-            if answer.find('{') > 0: answer = answer[answer.find('{'):]
-            speaker_map = json.loads(answer)
+
+            for line in answer.strip().split('\n'):
+                for speaker, name in speaker_map.items():
+                    if name == '??' and (speaker in line):
+                        found_name = line.split(speaker)[1]
+                        if found_name[0] == ':': found_name = found_name[1:]
+                        speaker_map[speaker] = found_name.strip()
 
             for speaker, name in speaker_map.items():
                 if name == '??':
@@ -114,7 +116,7 @@ def main(prefix: str, model_name: str = "TheBloke/airoboros-l2-13b-gpt4-2.0-GPTQ
         f.write(json.dumps(section)+'\n')
         f.flush()
 
-        p.write(json.dumps({'prompt': prompt, 'answer': answer})+'\n')
+        p.write(json.dumps({'prompt': prompt, 'answer': summary})+'\n')
         p.flush()
 
         idx = idx + 1
