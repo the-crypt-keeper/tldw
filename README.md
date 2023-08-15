@@ -20,6 +20,7 @@ This project is under active development and is not ready for production use.
 |--------|-----|-------------|---|
 |ufo.txt| Subcommittee on National Security, the Border, and Foreign Affairs Hearing | small.en | https://www.youtube.com/watch?v=KQ7Dw-739VY |
 |aoe-grand-finale.txt| GRAND FINAL $10,000 AoE2 Event (The Resurgence) | medium.en | https://www.youtube.com/watch?v=jnoxjLJind4 |
+|tim-dettmers | AI on your phone? Tim Dettmers on quantization of neural networks — #41 | small.en | https://www.youtube.com/watch?v=auw2hXywrU8 |
 
 ## Creating a Dataset
 
@@ -29,7 +30,7 @@ Download the audio track:
 
 ```
 pip install yt-dlp
-yt-dlp -f "bestaudio[ext=m4a]" --extract-audio  'https://www.youtube.com/watch?v=<video>'
+yt-dlp -f "bestaudio[ext=m4a]" --extract-audio  'https://www.youtube.com/watch?v=4dC_nRYIDZU'
 ```
 
 ### Transcode with ffmpeg

@@ -6,8 +6,6 @@ import fire
 import yaml
 from copy import copy
 
-task_prompt = "Write a {{language}} function {{Signature}} {{Input}} that returns {{Output}}"
-
 def prepare(TEST_LANGUAGE, path, files):
     out = {}
     models = []
@@ -29,9 +27,8 @@ def prepare(TEST_LANGUAGE, path, files):
                 continue
 
             testid = r['name']+'-'+r['language']
-            task = Template(task_prompt).render(**r)
             if testid not in out:
-                out[testid] = { 'results': {}, 'task': task, 'language': r['language'] }
+                out[testid] = { 'results': {}, 'task': '', 'language': r['language'] }
 
             check_summary = ''
             passing_tests = ''
