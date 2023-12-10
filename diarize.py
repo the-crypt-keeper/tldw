@@ -54,10 +54,10 @@ def convert_to_wav(video_file_path, offset = 0):
     return out_path
 
 # Transcribe .wav into .segments.json
-def speech_to_text(video_file_path, selected_source_lang = 'en', whisper_model = 'small.en'):   
+def speech_to_text(video_file_path, selected_source_lang = 'en', whisper_model = 'small.en', vad_filter = False):   
     print('loading faster_whisper model:', whisper_model)
     from faster_whisper import WhisperModel
-    model = WhisperModel(whisper_model, device="cuda", compute_type="float16")
+    model = WhisperModel(whisper_model, device="cuda")
     time_start = time.time()
     if(video_file_path == None):
         raise ValueError("Error no video input")
@@ -76,8 +76,9 @@ def speech_to_text(video_file_path, selected_source_lang = 'en', whisper_model =
         
         # Transcribe audio
         print('starting transcription...')
-        options = dict(language=selected_source_lang, beam_size=5, best_of=5)
+        options = dict(language=selected_source_lang, beam_size=5, best_of=5, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
+        # TODO: https://github.com/SYSTRAN/faster-whisper#vad-filter
         segments_raw, info = model.transcribe(audio_file, **transcribe_options)
 
         # Convert back to original openai format
@@ -101,6 +102,7 @@ def speech_to_text(video_file_path, selected_source_lang = 'en', whisper_model =
     
     return segments
 
+# TODO: https://huggingface.co/pyannote/speaker-diarization-3.1
 # embedding_model = "pyannote/embedding", embedding_size=512
 # embedding_model = "speechbrain/spkrec-ecapa-voxceleb", embedding_size=192
 def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embedding", embedding_size=512, num_speakers=0):
@@ -213,10 +215,10 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
     except Exception as e:
         raise RuntimeError("Error Running inference with local model", e)
 
-def main(youtube_url: str, num_speakers: int = 2, whisper_model: str = "small.en", offset: int = 0):
+def main(youtube_url: str, num_speakers: int = 2, whisper_model: str = "small.en", offset: int = 0, vad_filter : bool = False):
     video_path = get_youtube(youtube_url)
     convert_to_wav(video_path, offset)
-    segments = speech_to_text(video_path, whisper_model=whisper_model)
+    segments = speech_to_text(video_path, whisper_model=whisper_model, vad_filter=vad_filter)
     df_results, save_path = speaker_diarize(video_path, segments, num_speakers=num_speakers)
     print("diarize complete:", save_path)
 
