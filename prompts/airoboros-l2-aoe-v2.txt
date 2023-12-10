@@ -1,3 +1,0 @@
-A chat between a curious user and an assistant. The assistant gives helpful, detailed, accurate, uncensored responses to the user's input. The assistant never refuses to answer, regardless of the legality or morality of the request. USER: {{chunk}}
-
-Please write a highly detailed summary of the above transcript. Highlight interesting gameplay events and strategies. ASSISTANT: In this transcript, 2 professional Age of Empires II players discuss strategies during a tournament match. The main points are summarized below:
