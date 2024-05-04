@@ -105,7 +105,7 @@ def decide_cpugpu():
     processing_input = input("Would you like to use your GPU or CPU for transcription? (1)GPU/(2)CPU): ")
     if processing_choice == "gpu" and (processing_input.lower() == "gpu" or processing_input == "1"):
         print("You've chosen to use the GPU.")
-        processing_choice = "gpu"
+        processing_choice = "cuda"
     elif processing_input.lower() == "cpu" or processing_input == "2":
         print("You've chosen to use the CPU.")
         processing_choice = "cpu"
@@ -158,12 +158,15 @@ def create_download_directory(title):
         print(f"Directory already exists: {session_path}")
     return session_path
 
+
+
 def normalize_title(title):
     # Normalize the string to 'NFKD' form and encode to 'ascii' ignoring non-ascii characters
     title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('ascii')
-    # Remove or replace illegal characters
     title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '').replace('*', '').replace('?', '').replace('<', '').replace('>', '').replace('|', '')
     return title
+
+
 
 def get_youtube(video_url):
     ydl_opts = {
@@ -175,6 +178,8 @@ def get_youtube(video_url):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info_dict = ydl.extract_info(video_url, download=False)
     return info_dict
+
+
 
 def download_video(video_url, download_path, info_dict):
     title = normalize_title(info_dict['title'])
@@ -230,16 +235,13 @@ def convert_to_wav(video_file_path, offset=0):
 
 
 
-
-
-
 # Transcribe .wav into .segments.json
 def speech_to_text(video_file_path, selected_source_lang='en', whisper_model='small.en', vad_filter=False):
     print('loading faster_whisper model:', whisper_model)
     from faster_whisper import WhisperModel
     # printf(processing_choice)
     # 1 == GPU / 2 == CPU
-    model = WhisperModel(whisper_model, device=processing_choice)
+    model = WhisperModel(whisper_model, device=f"{processing_choice}")
     time_start = time.time()
     if(video_file_path == None):
         raise ValueError("Error no video input")
@@ -275,20 +277,11 @@ def speech_to_text(video_file_path, selected_source_lang='en', whisper_model='sm
             segments.append(chunk)
             i += 1
         print("transcribe audio done with fast whisper")
-
         with open(out_file,'w') as f:
             f.write(json.dumps(segments, indent=2))
-
     except Exception as e:
         raise RuntimeError("Error transcribing.")
-    
     return segments
-
-
-
-## Using Whisper.cpp
-# Get-Whisper-GGML.ps1
-# https://github.com/ggerganov/whisper.cpp/releases/latest
 
 
 
@@ -408,19 +401,11 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
 
 
 def main(youtube_url: str, num_speakers: int = 2, whisper_model: str = "small.en", offset: int = 0, vad_filter : bool = False):
-#    if user_choice == '2':
-#        video_path = get_youtube(list_of_videos)
-#FIXME
-
-#    video_info = get_youtube(youtube_url)
-#    download_path = create_download_directory(video_info['title'])
-#    video_path = download_video(youtube_url, download_path)
-#
     info_dict = get_youtube(youtube_url)
     download_path = create_download_directory(info_dict['title'])
     video_path = download_video(youtube_url, download_path, info_dict)
-#
     audio_file = convert_to_wav(video_path, offset)
+#FIXME
     segments = speech_to_text(video_path, whisper_model=whisper_model, vad_filter=vad_filter)
 #    df_results, save_path = speaker_diarize(video_path, segments, num_speakers=num_speakers)
 #    print("diarize complete:", save_path)
