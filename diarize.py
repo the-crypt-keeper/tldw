@@ -24,18 +24,11 @@ import yt_dlp
 #
 # Usage:
 #          Single URL: python diarize.py https://example.com/video.mp4
+#
 #          List of Files: python diarize.py --input_path="path_to_your_text_file.txt"
-###
-
-
-###
-# To Dos
-#   Implement more logging (add an actual log file)
-#   Add conditional args for whether its ran in batch mode(File supplied) or single use (single url)
-#   Add support for actual summarization
-#   Add benchmarking for summarization results for various LLM usages.
-#   Add option for Whisper model selection/download
-#   Add option for actual summarization :/
+#
+#          Transcribe a local file: python diarize.py /path/to/your/localfile.mp4
+#
 ###
 
 # Dirty hack - sue me.
@@ -168,9 +161,11 @@ def process_path(path):
 # FIXME
 def process_local_file(file_path):
     logging.info(f"Processing local file: {file_path}")
-    # Implement processing logic here
-    # FIXME
-    return {'title': os.path.basename(file_path)}
+    title = normalize_title(os.path.splitext(os.path.basename(file_path))[0])
+    info_dict = {'title': title}
+    download_path = create_download_directory(title)
+    audio_file = convert_to_wav(file_path)  # Assumes input files are videos needing audio extraction
+    return download_path, info_dict, audio_file
 
 
 
@@ -452,24 +447,33 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
 def main(input_path: str, num_speakers: int = 2, whisper_model: str = "small.en", offset: int = 0, vad_filter: bool = False):
     if os.path.isfile(input_path) and input_path.endswith('.txt'):
         paths = read_paths_from_file(input_path)
-    elif input_path.startswith('http'):
-        paths = [input_path]
     else:
-        logging.error("Invalid input: Please provide a valid URL or a text file path.")
-        return
+        paths = [input_path]
 
     results = []
     for path in paths:
-        info_dict = process_path(path)
+        if path.startswith('http'):
+            info_dict = get_youtube(path)
+            if info_dict:
+                download_path = create_download_directory(info_dict['title'])
+                video_path = download_video(path, download_path, info_dict)
+                audio_file = convert_to_wav(video_path, offset)
+        else:
+            if os.path.exists(path):
+                download_path, info_dict, audio_file = process_local_file(path)
+            else:
+                logging.error(f"File does not exist: {path}")
+                continue
+
         if info_dict:
-            download_path = create_download_directory(info_dict['title'])
-            video_path = download_video(path, download_path, info_dict)
-            audio_file = convert_to_wav(video_path, offset)
             segments = speech_to_text(audio_file, whisper_model=whisper_model, vad_filter=vad_filter)
-            # Uncomment the next line if diarization is needed
-            # df_results, save_path = speaker_diarize(audio_file, segments, num_speakers=num_speakers)
-            results.append({'video_path': video_path, 'audio_file': audio_file, 'transcription': segments})
-            logging.info("Transcription complete: " + audio_file)
+            results.append({
+                'video_path': path,
+                'audio_file': audio_file,
+                'transcription': segments
+            })
+            logging.info(f"Transcription complete: {audio_file}")
+
     return results
 
 
