@@ -51,54 +51,62 @@ print(r"""_____  _          ________  _    _
 
 
 # Perform Platform Check
-if platform.system() == "Linux":
-    print("Linux OS detected \n Running Linux appropriate commands")
-    userOS = "Linux"
-elif platform.system() == "Windows":
-    print("Windows OS detected \n Running Windows appropriate commands")
-    userOS = "Windows"
-else:
-    print("Other OS detected \n Maybe try running things manually?")
-    exit()
-
-
+userOS = ""
+def platform_check():
+    if platform.system() == "Linux":
+        print("Linux OS detected \n Running Linux appropriate commands")
+        userOS = "Linux"
+    elif platform.system() == "Windows":
+        print("Windows OS detected \n Running Windows appropriate commands")
+        userOS = "Windows"
+    else:
+        print("Other OS detected \n Maybe try running things manually?")
+        exit()
 #print(userOS)
 
 
-# Check for NVIDIA GPU and CUDA availability
-try:
-    nvidia_smi = subprocess.check_output("nvidia-smi", shell=True).decode()
-    if "NVIDIA-SMI" in nvidia_smi:
-        print("NVIDIA GPU with CUDA is available.\n You can enable GPU processing if you wish.\n")
-    else:
-        print("NVIDIA GPU with CUDA is not available.\n You either have an AMD GPU, or you're stuck with CPU only.\n")
-        processing_choice = "cpu"
-except subprocess.CalledProcessError:
-    print("NVIDIA GPU with CUDA is not available.\n You either have an AMD GPU, or you're stuck with CPU only.\n")
-    processing_choice = "cpu"
 
+processing_choice = ""  # Initialize processing_choice variable
+
+# Check for NVIDIA GPU and CUDA availability
+def cuda_check():
+    global processing_choice
+    try:
+        nvidia_smi = subprocess.check_output("nvidia-smi", shell=True).decode()
+        if "NVIDIA-SMI" in nvidia_smi:
+            print("NVIDIA GPU with CUDA is available.")
+            processing_choice = "gpu"  # Set processing_choice to gpu if NVIDIA GPU with CUDA is available
+        else:
+            print("NVIDIA GPU with CUDA is not available.\nYou either have an AMD GPU, or you're stuck with CPU only.")
+            processing_choice = "cpu"  # Set processing_choice to cpu if NVIDIA GPU with CUDA is not available
+    except subprocess.CalledProcessError:
+        print("NVIDIA GPU with CUDA is not available.\nYou either have an AMD GPU, or you're stuck with CPU only.")
+        processing_choice = "cpu"  # Set processing_choice to cpu if nvidia-smi command fails
 
 # Ask user if they would like to use either their GPU or their CPU for transcription
-processing_input = input("Would you like to use your GPU or CPU for transcription? (1)GPU/(2)CPU): ").strip().upper()
-if processing_choice.lower() != "cpu" and (processing_input.lower() == "gpu" or processing_input == "1"):
-    print("You've chosen to use the GPU.")
-    processing_choice = "gpu"
-elif processing_input == "CPU" or processing_input == "2":
-    print("You've chosen to use the CPU.")
-    processing_choice = "cpu"
-else:
+def decide_cpugpu():
+    global processing_choice
+    processing_input = input("Would you like to use your GPU or CPU for transcription? (1)GPU/(2)CPU): ")
+    if processing_choice == "gpu" and (processing_input.lower() == "gpu" or processing_input == "1"):
+        print("You've chosen to use the GPU.")
+        processing_choice = "gpu"
+    elif processing_input.lower() == "cpu" or processing_input == "2":
+        print("You've chosen to use the CPU.")
+        processing_choice = "cpu"
+    else:
         print("Invalid choice. Please select either GPU or CPU.")
 
 
 # check for existence of ffmpeg
-if shutil.which("ffmpeg"):
-    pass
-else:
-    print("ffmpeg is not installed.\n You can either install it manually, or through your package manager of choice.\n Windows users, builds are here: https://www.gyan.dev/ffmpeg/builds/")
-    print("Script will continue, but is likely to break")
-
-
+def check_ffmpeg():
+    if shutil.which("ffmpeg"):
+        pass
+    else:
+        print("ffmpeg is not installed.\n You can either install it manually, or through your package manager of choice.\n Windows users, builds are here: https://www.gyan.dev/ffmpeg/builds/")
+        print("Script will continue, but is likely to break")
 #print(processing_choice)
+
+
 
 # Ask the user for the URL of the video to be downloaded. Alternatively, ask the user for the location of a local txt file to be read in and parsed to a list to be processed individually
 def get_video_url():
@@ -143,7 +151,8 @@ def get_youtube(video_url):
 # Convert video .m4a into .wav using ffmpeg
 # ffmpeg -i "example.mp4" -ar 16000 -ac 1 -c:a pcm_s16le "output.wav"
 # https://www.gyan.dev/ffmpeg/builds/
-import os
+
+
 
 #os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
 def convert_to_wav(video_file_path, offset=0):
@@ -177,6 +186,7 @@ def convert_to_wav(video_file_path, offset=0):
     except Exception as e:
         raise RuntimeError("Error converting video file to WAV. An issue occurred with ffmpeg.")
     return out_path
+
 
 
 # Transcribe .wav into .segments.json
@@ -231,9 +241,11 @@ def speech_to_text(video_file_path, selected_source_lang='en', whisper_model='sm
     return segments
 
 
+
 ## Using Whisper.cpp
 # Get-Whisper-GGML.ps1
 # https://github.com/ggerganov/whisper.cpp/releases/latest
+
 
 
 # TODO: https://huggingface.co/pyannote/speaker-diarization-3.1
@@ -349,19 +361,26 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
     except Exception as e:
         raise RuntimeError("Error Running inference with local model", e)
 
-# Add function to check amount of arguments passed to script match what's expected
 
+
+# Add function to check amount of arguments passed to script match what's expected
 def main(youtube_url: str, num_speakers: int = 2, whisper_model: str = "small.en", offset: int = 0, vad_filter : bool = False):
 #    if user_choice == '2':
 #        video_path = get_youtube(list_of_videos)
-#FIXME
     video_path = get_youtube(youtube_url)
     audio_file = convert_to_wav(video_path, offset)
-    segments = speech_to_text(video_path, whisper_model=whisper_model, vad_filter=vad_filter)
+#    segments = speech_to_text(video_path, whisper_model=whisper_model, vad_filter=vad_filter)
 #    df_results, save_path = speaker_diarize(video_path, segments, num_speakers=num_speakers)
 #    print("diarize complete:", save_path)
     print("Transcription complete:", audio_file)
+#FIXME
 
+
+# Main Function - Execution starts here
 if __name__ == "__main__":
     import fire
+    platform_check()
+    cuda_check()
+    decide_cpugpu()
+    check_ffmpeg()
     fire.Fire(main)
