@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 import datetime
+import unicodedata
 import time
 import os 
 import subprocess
 import json
+import logging
 import torch
 import contextlib
 import platform # used for checking OS version
 import shutil # used for checking existence of ffmpeg
 import ffmpeg # Used for issuing commands to underlying ffmpeg executable, pip package ffmpeg is from 2018
+import yt_dlp
 # idk....
+
+# To Dos
+# Implement more logging and remove print statements
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
@@ -24,6 +30,15 @@ source_languages = {
     "fr": "French"
 }
 source_language_list = [key[0] for key in source_languages.items()]
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Global variable to store the path of the last downloaded video
+last_video_path = None
+
+
+
 
 print(r"""_____  _          ________  _    _                                 
 |_   _|| |        / /|  _  \| |  | | _                              
@@ -66,7 +81,6 @@ def platform_check():
 
 
 
-processing_choice = ""  # Initialize processing_choice variable
 
 # Check for NVIDIA GPU and CUDA availability
 def cuda_check():
@@ -83,6 +97,8 @@ def cuda_check():
         print("NVIDIA GPU with CUDA is not available.\nYou either have an AMD GPU, or you're stuck with CPU only.")
         processing_choice = "cpu"  # Set processing_choice to cpu if nvidia-smi command fails
 
+
+
 # Ask user if they would like to use either their GPU or their CPU for transcription
 def decide_cpugpu():
     global processing_choice
@@ -95,6 +111,7 @@ def decide_cpugpu():
         processing_choice = "cpu"
     else:
         print("Invalid choice. Please select either GPU or CPU.")
+
 
 
 # check for existence of ffmpeg
@@ -129,22 +146,46 @@ def get_video_url():
 
 
 
-# Download video .m4a and info.json
-def get_youtube(video_url):
-    import yt_dlp
+def create_download_directory(title):
+    base_dir = "Results"
+    # Remove characters that are illegal in Windows filenames and normalize
+    safe_title = normalize_title(title)
+    session_path = os.path.join(base_dir, safe_title)
+    if not os.path.exists(session_path):
+        os.makedirs(session_path, exist_ok=True)
+        print(f"Created directory: {session_path}")
+    else:
+        print(f"Directory already exists: {session_path}")
+    return session_path
 
-    ydl_opts = { 'format': 'bestaudio[ext=m4a]' }
-    
+def normalize_title(title):
+    # Normalize the string to 'NFKD' form and encode to 'ascii' ignoring non-ascii characters
+    title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('ascii')
+    # Remove or replace illegal characters
+    title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '').replace('*', '').replace('?', '').replace('<', '').replace('>', '').replace('|', '')
+    return title
+
+def get_youtube(video_url):
+    ydl_opts = {
+        'format': 'bestaudio[ext=m4a]',
+        'noplaylist': True,
+        'quiet': True,
+        'extract_flat': True
+    }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(video_url, download=False)
-        info['title'] = info['title'].replace('$','').replace('|','-')
-        abs_video_path = ydl.prepare_filename(info)
-        with open(abs_video_path.replace('m4a','info.json'), 'w') as outfile:
-            json.dump(info, outfile, indent=2)
-        ydl.process_info(info)
-        
-    print("Success download",video_url,"to", abs_video_path)
-    return abs_video_path
+        info_dict = ydl.extract_info(video_url, download=False)
+    return info_dict
+
+def download_video(video_url, download_path, info_dict):
+    title = normalize_title(info_dict['title'])
+    file_path = os.path.join(download_path, f"{title}.m4a")
+    ydl_opts = {
+        'format': 'bestaudio[ext=m4a]',
+        'outtmpl': file_path,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([video_url])
+    return file_path
 
 
 
@@ -186,6 +227,9 @@ def convert_to_wav(video_file_path, offset=0):
     except Exception as e:
         raise RuntimeError("Error converting video file to WAV. An issue occurred with ffmpeg.")
     return out_path
+
+
+
 
 
 
@@ -363,13 +407,21 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
 
 
 
-# Add function to check amount of arguments passed to script match what's expected
 def main(youtube_url: str, num_speakers: int = 2, whisper_model: str = "small.en", offset: int = 0, vad_filter : bool = False):
 #    if user_choice == '2':
 #        video_path = get_youtube(list_of_videos)
-    video_path = get_youtube(youtube_url)
+#FIXME
+
+#    video_info = get_youtube(youtube_url)
+#    download_path = create_download_directory(video_info['title'])
+#    video_path = download_video(youtube_url, download_path)
+#
+    info_dict = get_youtube(youtube_url)
+    download_path = create_download_directory(info_dict['title'])
+    video_path = download_video(youtube_url, download_path, info_dict)
+#
     audio_file = convert_to_wav(video_path, offset)
-#    segments = speech_to_text(video_path, whisper_model=whisper_model, vad_filter=vad_filter)
+    segments = speech_to_text(video_path, whisper_model=whisper_model, vad_filter=vad_filter)
 #    df_results, save_path = speaker_diarize(video_path, segments, num_speakers=num_speakers)
 #    print("diarize complete:", save_path)
     print("Transcription complete:", audio_file)
