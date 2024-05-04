@@ -77,7 +77,7 @@ def platform_check():
     else:
         print("Other OS detected \n Maybe try running things manually?")
         exit()
-#print(userOS)
+
 
 
 
@@ -121,7 +121,6 @@ def check_ffmpeg():
     else:
         print("ffmpeg is not installed.\n You can either install it manually, or through your package manager of choice.\n Windows users, builds are here: https://www.gyan.dev/ffmpeg/builds/")
         print("Script will continue, but is likely to break")
-#print(processing_choice)
 
 
 
