@@ -13,6 +13,7 @@ import ffmpeg # Used for issuing commands to underlying ffmpeg executable, pip p
 import torch
 import yt_dlp
 
+
 ####
 #
 #       TL/DW: Too Long Didn't Watch
@@ -21,7 +22,11 @@ import yt_dlp
 #  Modifications made by https://github.com/rmusser01
 #  All credit to the original authors, I've just glued shit together.
 #
+# Usage:
+#          Single URL: python diarize.py https://example.com/video.mp4
+#          List of Files: python diarize.py --input_path="path_to_your_text_file.txt"
 ###
+
 
 ###
 # To Dos
@@ -30,8 +35,10 @@ import yt_dlp
 #   Add support for actual summarization
 #   Add benchmarking for summarization results for various LLM usages.
 #   Add option for Whisper model selection/download
+#   Add option for actual summarization :/
 ###
 
+# Dirty hack - sue me.
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 whisper_models = ["small", "medium", "small.en","medium.en"]
@@ -162,6 +169,7 @@ def process_path(path):
 def process_local_file(file_path):
     logging.info(f"Processing local file: {file_path}")
     # Implement processing logic here
+    # FIXME
     return {'title': os.path.basename(file_path)}
 
 
@@ -439,20 +447,6 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
     except Exception as e:
         raise RuntimeError("Error Running inference with local model", e)
 
-
-"""
-def main(youtube_url: str, num_speakers: int = 2, whisper_model: str = "small.en", offset: int = 0, vad_filter : bool = False):
-    info_dict = get_youtube(youtube_url)
-    download_path = create_download_directory(info_dict['title'])
-    video_path = download_video(youtube_url, download_path, info_dict)
-    audio_file = convert_to_wav(video_path, offset)
-#FIXME
-    segments = speech_to_text(video_path, whisper_model=whisper_model, vad_filter=vad_filter)
-#    df_results, save_path = speaker_diarize(video_path, segments, num_speakers=num_speakers)
-#    print("diarize complete:", save_path)
-    print("Transcription complete:", audio_file)
-#FIXME
-"""
 
 
 def main(input_path: str, num_speakers: int = 2, whisper_model: str = "small.en", offset: int = 0, vad_filter: bool = False):
