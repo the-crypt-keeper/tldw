@@ -4,7 +4,7 @@ Take a URL, single video, list of URLs, or list of local videos + URLs and feed 
 
 Original: `YouTube contains an incredible amount of knowledge, much of which is locked inside multi-hour videos.  Let's extract and summarize it with AI!`
 
-### tl/dr:
+### tl/dr: Download Videos -> Transcribe -> Summarize. Scripted.
 - Use the script to transcribe a local file or remote url. Any url youtube-dl supports _should_ work. If you pass an OpenAPI endpoint as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well.
   * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach.
 
