@@ -37,6 +37,8 @@ options:
 >python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name openai 
 >python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic --api_key lolyearight
 >python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name openai --api_key lolyearight
+
+By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
 ```
 
 
