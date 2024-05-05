@@ -2,10 +2,12 @@
 
 Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and downloaded if not local) using faster-whisper. Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. Any site supported by yt-dl is supported, so you can use this with sites besides just youtube.
 
+I personally recommend Sonnet, for the price it's very nice.
+
 Original: `YouTube contains an incredible amount of knowledge, much of which is locked inside multi-hour videos.  Let's extract and summarize it with AI!`
 
 ### tl/dr: Download Videos -> Transcribe -> Summarize. Scripted.
-- Use the script to transcribe a local file or remote url. Any url youtube-dl supports _should_ work. If you pass an OpenAPI endpoint as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well.
+- Use the script to transcribe a local file or remote url. Any url youtube-dl supports _should_ work. If you pass an API name (openai/anthropic/cohere) as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well.
   * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach.
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
@@ -19,13 +21,22 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --api_url API_URL     API URL for summarization (optional)
+  --api_name API_NAME   API name for summarization (optional)
+  --api_key API_KEY     API key for summarization (optional)
   --num_speakers NUM_SPEAKERS
                         Number of speakers (default: 2)
   --whisper_model WHISPER_MODEL
                         Whisper model (default: small.en)
   --offset OFFSET       Offset in seconds (default: 0)
   --vad_filter          Enable VAD filter
+  --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Log level (default: INFO)
+
+>python diarize.py ./local/file_on_your/system --api_name anthropic
+>python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic
+>python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name openai 
+>python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic --api_key lolyearight
+>python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name openai --api_key lolyearight
 ```
 
 
