@@ -52,6 +52,35 @@ import yt_dlp
 #
 ###
 
+
+#######################
+# Config loading
+#
+
+# Read configuration from file
+config = configparser.ConfigParser()
+config.read('config.txt')
+
+# API Keys
+cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
+anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
+openai_api_key = config.get('API', 'openai_api_key', fallback=None)
+
+# Models
+anthropic_model = config.get('API', 'anthropic_model', fallback='claude-v1')
+cohere_model = config.get('API', 'cohere_model', fallback='base_model')
+openai_model = config.get('API', 'openai_model', fallback='gpt-3.5-turbo')
+
+# Retrieve output paths from the configuration file
+output_path = config.get('Paths', 'output_path', fallback='Results')
+
+# Retrieve processing choice from the configuration file
+processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
+
+#
+#
+#######################
+
 # Dirty hack - sue me.
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
@@ -67,31 +96,7 @@ source_languages = {
 }
 source_language_list = [key[0] for key in source_languages.items()]
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Read configuration from file
-config = configparser.ConfigParser()
-config.read('config.txt')
-
-# Retrieve API keys and output paths from the configuration file
-openai_api_key = config.get('API', 'openai_api_key', fallback=None)
-anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
-cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
-output_path = config.get('Paths', 'output_path', fallback='Results')
-
-
-# Retrieve Anthropic model from the configuration file
-anthropic_model = config.get('API', 'anthropic_model', fallback='claude-v1')
-
-# Retrieve OpenAI model from the configuration file
-openai_model = config.get('API', 'openai_model', fallback='ChatGPT-4')
-
-# Retrieve Cohere model from the configuration file
-cohere_model = config.get('API', 'cohere_model', fallback='base')
-
-# Retrieve processing choice from the configuration file
-processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
 
 print(r"""_____  _          ________  _    _                                 
@@ -322,7 +327,7 @@ def download_video(video_url, download_path, info_dict):
 
 #os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
 def convert_to_wav(video_file_path, offset=0):
-    print("Starting conversion process of .m4a to .WAV\n\t...You may need to hit enter after a minute or so...")
+    print("Starting conversion process of .m4a to .WAV\n\t...You may need to hit enter(once or twice) after a minute or so...")
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
 
     try:
@@ -538,93 +543,178 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
 #
 
 # Summarize with OpenAI ChatGPT
+def extract_text_from_segments(segments):
+    text = ' '.join([segment['text'] for segment in segments])
+    return text
+
 def summarize_with_openai(api_key, file_path, model):
-    # Load your JSON data
-    with open(file_path, 'r') as file:
-        data = json.load(file)
-    
-    # Extract text from your data structure, modify the key access as needed
-    text = data.get('transcription', '')  # Adjust depending on your JSON structure
+    try:
+        # Load your JSON data
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
+        
+        # Extract text from the segments
+        text = extract_text_from_segments(segments)
 
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json'
-    }
-    
-    # Prepare the data for the OpenAI API
-    prompt_text = f"As a professional summarizer, create a concise and comprehensive summary of: {text}"
-    data = {
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are a professional summarizer."
-            },
-            {
-                "role": "user",
-                "content": prompt_text
-            }
-        ],
-        "max_tokens": 1024,  # Adjust tokens as needed
-        "temperature": 0.7
-    }
-    
-    response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
-    
-    if response.status_code == 200:
-        summary = response.json()['choices'][0]['message']['content'].strip()
-        print("Summary processed successfully.")
-        return summary
-    else:
-        print("Failed to process summary:", response.text)
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Prepare the data for the OpenAI API
+        prompt_text = f"{text} \n\n\n\nPlease provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points"
+        data = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a professional summarizer."
+                },
+                {
+                    "role": "user",
+                    "content": prompt_text
+                }
+            ],
+            "max_tokens": 4096,  # Adjust tokens as needed
+            "temperature": 0.7
+        }
+        
+        response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+        
+        if response.status_code == 200:
+            summary = response.json()['choices'][0]['message']['content'].strip()
+            print("Summary processed successfully.")
+            return summary
+        else:
+            print("Failed to process summary:", response.text)
+            return None
+    except Exception as e:
+        print("Error occurred while processing summary with OpenAI:", str(e))
         return None
 
 
-
-# Summarize with Anthropic Claude
 def summarize_with_claude(api_key, file_path, model):
-    # Load your JSON data
-    with open(file_path, 'r') as file:
-        data = json.load(file)
-    
-    # Extract text from your data structure, modify the key access as needed
-    text = data.get('transcription', '')  # Adjust depending on your JSON structure
+    try:
+        # Load your JSON data
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
+        
+        # Extract text from the segments
+        text = extract_text_from_segments(segments)
 
-    headers = {
-        'x-api-key': api_key,
-        'Content-Type': 'application/json'
-    }
-    
-    # Prepare the data for the Claude API
-    prompt_text = f"As a professional summarizer, create a concise and comprehensive summary of: {text}"
-    data = {
-        "model": model,
-        "prompt": prompt_text,
-        "max_tokens_to_sample": 1024,  # Adjust tokens as needed
-        "stop_sequences": ["\n\nHuman:"],
-        "temperature": 0.7
-    }
-    
-    response = requests.post('https://api.anthropic.com/v1/complete', headers=headers, json=data)
-    
-    if response.status_code == 200:
-        summary = response.json()['completion'].strip()
-        print("Summary processed successfully.")
-        return summary
-    else:
-        print("Failed to process summary:", response.text)
+        headers = {
+            'x-api-key': api_key,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json'
+        }
+        
+        # Prepare the data for the Claude API
+        user_message = {
+            "role": "user",
+            "content": f"{text} \n\n\n\nPlease provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points"
+        }
+
+        data = {
+            "model": model,
+            "max_tokens": 4096,            # max _possible_ tokens to return
+            "messages": [user_message],
+            "stop_sequences": ["\n\nHuman:"],
+            "temperature": 0.7,
+            "top_k": 0,
+            "top_p": 1.0,
+            "metadata": {
+                "user_id": "example_user_id",
+            },
+            "stream": False,
+            "system": "You are a professional summarizer."
+        }
+        
+        response = requests.post('https://api.anthropic.com/v1/messages', headers=headers, json=data)
+        
+        # Check if the status code indicates success
+        if response.status_code == 200:
+            response_data = response.json()
+            try:
+                summary = response_data['content'][0]['text'].strip()
+                print("Summary processed successfully.")
+                return summary
+            except (IndexError, KeyError) as e:
+                print("Unexpected response format from Claude API:", response.text)
+                return None
+        elif response.status_code == 500:  # Handle internal server error specifically
+            print("Internal server error from API. Retrying may be necessary.")
+            return None
+        else:
+            print(f"Failed to process summary, status code {response.status_code}: {response.text}")
+            return None
+
+    except Exception as e:
+        print("Error occurred while processing summary with Claude:", str(e))
         return None
+"""
+def summarize_with_claude(api_key, file_path, model):
+    try:
+        # Load your JSON data
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
+        
+        # Extract text from the segments
+        text = extract_text_from_segments(segments)
 
+        headers = {
+            'x-api-key': api_key,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json'
+        }
+        
+        # Prepare the data for the Claude API
+        user_message = {
+            "role": "user",
+            "content": f"{text} \n\n\n\nPlease provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points"
+        }
+
+        data = {
+            "model": model,
+            "messages": [user_message],
+            "max_tokens": 4096,            # max _possible_ tokens to return
+            "stop_sequences": ["\n\nHuman:"],
+            "temperature": 0.7,
+            "top_k": 0,
+            "top_p": 1.0,
+            "metadata": {
+                "user_id": "example_user_id",
+            },
+            "stream": False,
+            "system": "You are a professional summarizer."
+        }
+        
+        response = requests.post('https://api.anthropic.com/v1/messages', headers=headers, json=data)
+        
+        if response.status_code == 200:
+            if 'completion' in response.json():
+                summary = response.json()['completion'].strip()
+                print("Summary processed successfully.")
+                return summary
+            else:
+                print("Unexpected response format from Claude API:", response.text)
+                return None
+        else:
+            print("Failed to process summary:", response.text)
+            return None
+    except Exception as e:
+        print("Error occurred while processing summary with Claude:", str(e))
+        return None
+"""
 
 
 # Summarize with Cohere
 def summarize_with_cohere(api_key, file_path, model):
     # Load your JSON data
     with open(file_path, 'r') as file:
-        data = json.load(file)
+        segments = json.load(file)
     
-    # Extract text from your data structure, modify the key access as needed
-    text = data.get('transcription', '')  # Adjust depending on your JSON structure
+    # Extract text from the segments
+    text = extract_text_from_segments(segments)
 
     headers = {
         'accept': 'application/json',
@@ -633,7 +723,8 @@ def summarize_with_cohere(api_key, file_path, model):
     }
     
     # Prepare the data for the Cohere API
-    prompt_text = f"As a professional summarizer, create a concise and comprehensive summary of: {text}"
+    #prompt_text = f"As a professional summarizer, create a concise and comprehensive summary of: {text}"
+    prompt_text = f"{text} \n\n\n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text, be it an article, post, conversation, or passage, while adhering to these guidelines: Craft a summary that is detailed, thorough, in-depth, and complex, while maintaining clarity and conciseness. Incorporate main ideas and essential information, eliminating extraneous language and focusing on critical aspects. Rely strictly on the provided text, without including external information. Format the summary in paragraph form for easy understanding. Conclude your notes with [End of Notes, Message #X] to indicate completion, where 'X' represents the total number of messages that I have sent. In other words, include a message counter where you start with #1 and add 1 to the message counter every time I send a message. By following this optimized prompt, you will generate an effective summary that encapsulates the essence of the given text in a clear, concise, and reader-friendly manner. Utilize markdown to cleanly format your output. Example: Bold key subject matter and potential areas that may need expanded information"
     data = {
         "chat_history": [
             {"role": "USER", "message": prompt_text}
@@ -707,13 +798,16 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 logging.info(f"Transcription complete: {audio_file}")
 
                 # Perform summarization based on the specified API
-                if api_name and api_key:
+                if api_name:
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
+                        api_key = openai_api_key
                         summary = summarize_with_openai(api_key, json_file_path, openai_model)
                     elif api_name.lower() == 'anthropic':
+                        api_key = anthropic_api_key
                         summary = summarize_with_claude(api_key, json_file_path, anthropic_model)
                     elif api_name.lower() == 'cohere':
+                        api_key = cohere_api_key
                         summary = summarize_with_cohere(api_key, json_file_path, cohere_model)
                     else:
                         logging.warning(f"Unsupported API: {api_name}")
@@ -737,16 +831,12 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transcribe and summarize videos.')
     parser.add_argument('input_path', type=str, help='Path or URL of the video', nargs='?')
-    parser.add_argument('--api_url', type=str, help='API URL for summarization (optional)')
     parser.add_argument('--api_name', type=str, help='API name for summarization (optional)')
     parser.add_argument('--api_key', type=str, help='API key for summarization (optional)')
     parser.add_argument('--num_speakers', type=int, default=2, help='Number of speakers (default: 2)')
     parser.add_argument('--whisper_model', type=str, default='small.en', help='Whisper model (default: small.en)')
     parser.add_argument('--offset', type=int, default=0, help='Offset in seconds (default: 0)')
     parser.add_argument('--vad_filter', action='store_true', help='Enable VAD filter')
-    parser.add_argument('--anthropic_model', type=str, default='claude-v1', help='Anthropic model (default: claude-v1)')
-    parser.add_argument('--openai_model', type=str, default='base', help='OpenAI model (default: base)')
-    parser.add_argument('--cohere_model', type=str, default='base', help='Cohere model (default: base)')
     parser.add_argument('--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
     args = parser.parse_args()
 
@@ -758,7 +848,6 @@ if __name__ == "__main__":
 
     logging.info('Starting the transcription and summarization process.')
     logging.info(f'Input path: {args.input_path}')
-    logging.info(f'API URL: {args.api_url}')
     logging.info(f'Number of speakers: {args.num_speakers}')
     logging.info(f'Whisper model: {args.whisper_model}')
     logging.info(f'Offset: {args.offset}')
