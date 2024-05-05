@@ -49,12 +49,18 @@ By default videos, transcriptions and summaries are stored in a folder with the 
   3. Run `python diarize.py <video_url>` or `python diarize.py <List_of_videos.txt>`
   4. If you want summarization, add your API keys (if needed[is needed for now]) to the `config.txt` file, and then re-run the script, passing in the name of the API [or URL endpoint - to be added] to the script.
     * `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic` - This will attempt to download the video, then upload the resulting json file to the anthropic API endpoint, referring to values set in the config file (API key and model) to request summarization.
-    - OpenAI: 
     - Anthropic:
       * Opus: `claude-3-opus-20240229`
       * Sonnet: `claude-3-sonnet-20240229`
       * Haiku: `claude-3-haiku-20240307`
     - Cohere: 
+      * `command-r`
+      * `command-r-plus`
+    - OpenAI:
+      * `gpt-4-turbo`
+      * `gpt-4-turbo-preview`
+      * `gpt-4`
+
 
 ### What's in the repo?
 - `diarize.py` - download, transcribe and diarize audio
