@@ -1,8 +1,45 @@
 # TL/DW: Too Long, Didnt Watch
 
-YouTube contains an incredible amount of knowledge, much of which is locked inside multi-hour videos.  Let's extract and summarize with AI!
+Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and downloaded if not local) using faster-whisper. Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. Any site supported by yt-dl is supported, so you can use this with sites besides just youtube.
+
+Original: `YouTube contains an incredible amount of knowledge, much of which is locked inside multi-hour videos.  Let's extract and summarize it with AI!`
+
+### tl/dr:
+- Use the script to transcribe a local file or remote url. Any url youtube-dl supports _should_ work. If you pass an OpenAPI endpoint as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well.
+  * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach.
+
+Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
+```
+usage: diarize.py [-h] [--api_url API_URL] [--num_speakers NUM_SPEAKERS] [--whisper_model WHISPER_MODEL]
+                  [--offset OFFSET] [--vad_filter]
+                  [input_path]
+
+positional arguments:
+  input_path            Path or URL of the video
+
+options:
+  -h, --help            show this help message and exit
+  --api_url API_URL     API URL for summarization (optional)
+  --num_speakers NUM_SPEAKERS
+                        Number of speakers (default: 2)
+  --whisper_model WHISPER_MODEL
+                        Whisper model (default: small.en)
+  --offset OFFSET       Offset in seconds (default: 0)
+  --vad_filter          Enable VAD filter
+```
+
 
 ### Pieces
+- **Workflow**
+  1. Setup python + packages
+  2. Setup ffmpeg
+  3. Run `python diarize.py <video_url>` or `python diarize.py <List_of_videos.txt>`
+  4. If you want summarization, add your API keys (if needed[is needed for now]) to the `config.txt` file, and then re-run the script, passing in the URL endpoint of the API you want to use.
+    - OpenAI: 
+    - Anthropic:
+    - Cohere: 
+
+### What's in the repo?
 - `diarize.py` - download, transcribe and diarize audio
   1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
   2. Next, it uses [ffmpeg](https://github.com/FFmpeg/FFmpeg) to convert the resulting `.m4a` file to `.wav`
@@ -40,6 +77,15 @@ YouTube contains an incredible amount of knowledge, much of which is locked insi
       * FIXME
     8. For feeding the transcriptions to the API of your choice, simply use the corresponding script for your API provider.
       * FIXME: add scripts for OpenAI api (generic) and others
+
+### Usage
+- Single file (remote URL) transcription
+  * Single URL: `python diarize.py https://example.com/video.mp4`
+- Single file (local) transcription)
+  * Transcribe a local file: `python diarize.py /path/to/your/localfile.mp4`
+- Multiple files (local & remote)
+  * List of Files(can be URLs and local files mixed): `python diarize.py ./path/to/your/text_file.txt"`
+
 
 ### Credits
 - [original](https://github.com/the-crypt-keeper/tldw)
