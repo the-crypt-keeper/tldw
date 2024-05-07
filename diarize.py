@@ -389,7 +389,7 @@ def download_video(video_url, download_path, info_dict):
 
 #os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
 def convert_to_wav(video_file_path, offset=0):
-    print("Starting conversion process of .m4a to .WAV\n\t...You may need to hit enter(once or twice) after a minute or so...")
+    print("Starting conversion process of .m4a to .WAV")
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
 
     try:
