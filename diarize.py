@@ -675,6 +675,7 @@ def summarize_with_openai(api_key, file_path, model):
         return None
 
 
+
 def summarize_with_claude(api_key, file_path, model):
     try:
         logging.debug("anthropic: Loading JSON data")
@@ -825,13 +826,12 @@ def summarize_with_llama(api_url, file_path, token):
         logging.debug("API Response Data: %s", response_data)
 
         if response.status_code == 200:
-            if 'content' in response_data:
-                summary = response_data['summary'].strip()
-                logging.debug("llama: Summarization successful")
-                return summary
-            else:
-                logging.error("Expected 'summary' key not found in API response.")
-                return "Expected 'summary' key not found in API response."
+            #if 'X' in response_data:
+            logging.debug(response_data)
+            summary = response_data['content'].strip()
+            logging.debug("llama: Summarization successful")
+            print("Summarization successful.")
+            return summary
         else:
             logging.error(f"llama: API request failed with status code {response.status_code}: {response.text}")
             return f"llama: API request failed: {response.text}"
@@ -952,6 +952,7 @@ if __name__ == "__main__":
     parser.add_argument('--offset', type=int, default=0, help='Offset in seconds (default: 0)')
     parser.add_argument('--vad_filter', action='store_true', help='Enable VAD filter')
     parser.add_argument('--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
+    #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
     if args.input_path is None:
