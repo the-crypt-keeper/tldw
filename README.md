@@ -7,7 +7,11 @@ I personally recommend Sonnet, for the price it's very nice.
 Original: `YouTube contains an incredible amount of knowledge, much of which is locked inside multi-hour videos.  Let's extract and summarize it with AI!`
 
 ### tl/dr: Download Videos -> Transcribe -> Summarize. Scripted.
-- Use the script to transcribe a local file or remote url. Any url youtube-dl supports _should_ work. If you pass an API name (openai/anthropic/cohere) as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well.
+* Download->transcribe video from URL: `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
+* Download->transcribe->summarize using (`anthropic`/`cohere`/`openai`/`llama` - llama.cpp) API: `python diarize.py ./local/file_on_your/system --api_name <API_name>`
+- Use the script to transcribe a local file or remote url. 
+  * Any url youtube-dl supports _should_ work.
+  * If you pass an API name (openai/anthropic/cohere) as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well.
   * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach.
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
@@ -116,6 +120,11 @@ By default videos, transcriptions and summaries are stored in a folder with the 
       4. `server.exe -m ..\path\to\model -c <context_size>`
   - **Kobold.cpp**
   - **Exvllama2**
+- **Setting up a Local LLM Model**
+  1. 3.8B/7GB base, 4GB Q8 microsoft/Phi-3-mini-128k-instruct - https://huggingface.co/microsoft/Phi-3-mini-128k-instruct
+    * GGUF Quants: https://huggingface.co/pjh64/Phi-3-mini-128K-Instruct.gguf
+  2. 8B/16GB base, 8.5GB Q8  - https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
+    * GGUF Quants: https://huggingface.co/lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF
 
 
 

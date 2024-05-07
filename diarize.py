@@ -84,6 +84,9 @@ output_path = config.get('Paths', 'output_path', fallback='Results')
 # Retrieve processing choice from the configuration file
 processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
+# Log file
+#logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
+
 #
 #
 #######################
@@ -816,12 +819,13 @@ def summarize_with_llama(api_url, file_path, token):
         }
 
         logging.debug("llama: Submitting request to API endpoint")
+        print("llama: Submitting request to API endpoint")
         response = requests.post(api_url, headers=headers, json=data)
         response_data = response.json()
         logging.debug("API Response Data: %s", response_data)
 
         if response.status_code == 200:
-            if 'summary' in response_data:
+            if 'content' in response_data:
                 summary = response_data['summary'].strip()
                 logging.debug("llama: Summarization successful")
                 return summary
@@ -932,7 +936,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
             logging.error(f"Error processing path: {path}")
             logging.error(str(e))
     end_time = time.monotonic()
-    print("Total program execution time: " + timedelta(seconds=end_time - start_time))
+    #print("Total program execution time: " + timedelta(seconds=end_time - start_time))
 
     return results
 

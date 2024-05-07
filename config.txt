@@ -10,6 +10,7 @@ llama_api_IP = http://127.0.0.1:8080/completion
 
 [Paths]
 output_path = Results
+logging_file = Logs
 
 [Processing]
 processing_choice = cuda
