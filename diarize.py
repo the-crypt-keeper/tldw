@@ -68,7 +68,6 @@ config.read('config.txt')
 cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
 anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
 openai_api_key = config.get('API', 'openai_api_key', fallback=None)
-llama_api_key = config.get('API', 'llama_api_key', fallback=None)
 
 # Models
 anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
@@ -76,7 +75,8 @@ cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
 openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
 
 # Local-Models
-llama_ip = config.get('API', 'llama_api_IP', fallback='127.0.0.1:8080/v1/chat/completions')
+llama_api_IP = config.get('API', 'llama_api_IP', fallback='127.0.0.1:8080/v1/chat/completions')
+llama_api_key = config.get('API', 'llama_api_key', fallback='')
 
 # Retrieve output paths from the configuration file
 output_path = config.get('Paths', 'output_path', fallback='Results')
@@ -678,7 +678,7 @@ def summarize_with_claude(api_key, file_path, model):
         with open(file_path, 'r') as file:
             segments = json.load(file)
         
-        logging.debug("anthropic: Extracting text from the segments")
+        logging.debug("anthropic: Extracting text from the segments file")
         text = extract_text_from_segments(segments)
 
         headers = {
@@ -748,7 +748,7 @@ def summarize_with_cohere(api_key, file_path, model):
         with open(file_path, 'r') as file:
             segments = json.load(file)
 
-        logging.debug(f"cohere: Extracting text from {segments}")
+        logging.debug(f"cohere: Extracting text from segments file")
         text = extract_text_from_segments(segments)  # Make sure this function is defined
 
         headers = {
@@ -792,64 +792,50 @@ def summarize_with_cohere(api_key, file_path, model):
         return f"cohere: Error occurred while processing summary with Cohere: {str(e)}"
 
 
-"""
 
-        if response.status_code == 200:
-            json_response = response.json()
-            if 'response' in json_response:
-                summary = json_response['response'].strip()
-                print("Summary processed successfully.")
-                return summary
-            else:
-                logging.debug("Unexpected JSON structure: %s", json_response)
-                return "Error: Unexpected JSON structure."
-        else:
-            logging.debug("cohere: Unsuccessful request :(")
-            print("Failed to process summary:", response.text)
-            return None
-"""
-
-
-def summarize_with_llama(api_url, file_path):
+def summarize_with_llama(api_url, file_path, token):
     try:
         logging.debug("llama: Loading JSON data")
         with open(file_path, 'r') as file:
             segments = json.load(file)
-        
-        logging.debug("llama: Extracting text from segments")
-        text = extract_text_from_segments(segments)
 
-        logging.debug("llama: Preparing data + prompt for submittal")
+        logging.debug(f"llama: Extracting text from segments file")
+        text = extract_text_from_segments(segments)  # Define this function to extract text properly
+
+        headers = {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+        }
+        if len(token)>5:
+            headers['Authorization'] = f'Bearer {token}'
+
+
+        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
         data = {
-            "prompt": f"{text} \n\n\n\nPlease provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points",
-            "max_tokens": 4096,
-            "stop": ["\n\nHuman:"],
-            "temperature": 0.7,
-            "top_k": 0,
-            "top_p": 1.0,
-            "repeat_penalty": 1.0,
-            "repeat_last_n": 64,
-            "seed": -1,
-            "threads": 4,
-            "n_predict": 4096
+            "prompt": prompt_text
         }
 
-        logging.debug("llama: POSTing data to API endpoint")
-        response = requests.post(api_url, json=data)
+        logging.debug("llama: Submitting request to API endpoint")
+        response = requests.post(api_url, headers=headers, json=data)
+        response_data = response.json()
+        logging.debug("API Response Data: %s", response_data)
 
         if response.status_code == 200:
-            logging.debug("llama: POST Successful")
-            summary = response.json()['content'].strip()
-            print("Summary processed successfully.")
-            return summary
+            if 'summary' in response_data:
+                summary = response_data['summary'].strip()
+                logging.debug("llama: Summarization successful")
+                return summary
+            else:
+                logging.error("Expected 'summary' key not found in API response.")
+                return "Expected 'summary' key not found in API response."
         else:
-            logging.debug("llama: Unsuccessful POST")
-            print("Failed to process summary:", response.text)
-            return None
+            logging.error(f"llama: API request failed with status code {response.status_code}: {response.text}")
+            return f"llama: API request failed: {response.text}"
+
     except Exception as e:
-        logging.debug("llama: Generalized error, see above")
-        print("Error occurred while processing summary with llama.cpp:", str(e))
-        return None
+        logging.error("llama: Error in processing: %s", str(e))
+        return f"llama: Error occurred while processing summary with llama: {str(e)}"
+
 
 
 def save_summary_to_file(summary, file_path):
@@ -871,8 +857,8 @@ def save_summary_to_file(summary, file_path):
 ####################################################################################################################################
 # Main()
 #
-
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False):
+    start_time = time.monotonic()
     if os.path.isfile(input_path) and input_path.endswith('.txt'):
         logging.debug("MAIN: User passed in a text file, processing text file...")
         paths = read_paths_from_file(input_path)
@@ -928,7 +914,9 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         api_key = cohere_api_key
                         summary = summarize_with_cohere(api_key, json_file_path, cohere_model)
                     elif api_name.lower() == 'llama':
-                        summary = summarize_with_llmaa(llama_ip, json_file_path)
+                        token = llama_api_key
+                        llama_ip = llama_api_IP
+                        summary = summarize_with_llama(llama_ip, json_file_path, token)
                     else:
                         logging.warning(f"Unsupported API: {api_name}")
                         summary = None
@@ -943,6 +931,8 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
         except Exception as e:
             logging.error(f"Error processing path: {path}")
             logging.error(str(e))
+    end_time = time.monotonic()
+    print("Total program execution time: " + timedelta(seconds=end_time - start_time))
 
     return results
 

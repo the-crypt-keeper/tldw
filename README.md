@@ -103,6 +103,21 @@ By default videos, transcriptions and summaries are stored in a folder with the 
       * FIXME
     8. For feeding the transcriptions to the API of your choice, simply use the corresponding script for your API provider.
       * FIXME: add scripts for OpenAI api (generic) and others
+- **Setting up Local LLM Runner**
+  - **Llama.cpp**
+    - **Linux & Mac**
+      1. `git clone https://github.com/ggerganov/llama.cpp`
+      2. `make` in the `llama.cpp` folder 
+      3. `./server -m ../path/to/model -c <context_size>`
+    - **Windows**
+      1. `git clone https://github.com/ggerganov/llama.cpp/tree/master/examples/server`
+      2. Download + Run: https://github.com/skeeto/w64devkit/releases
+      3. cd to `llama.cpp` folder make` in the `llama.cpp` folder
+      4. `server.exe -m ..\path\to\model -c <context_size>`
+  - **Kobold.cpp**
+  - **Exvllama2**
+
+
 
 ### Usage
 - Single file (remote URL) transcription
