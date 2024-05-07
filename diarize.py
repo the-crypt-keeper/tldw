@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse, configparser, datetime, json, logging, os, platform, requests, shutil, subprocess, sys, time, unicodedata
+import zipfile
 from datetime import datetime
 import contextlib
 import ffmpeg # Used for issuing commands to underlying ffmpeg executable, pip package ffmpeg is from 2018
@@ -137,6 +138,7 @@ print(r"""_____  _          ________  _    _
 # Perform Platform Check
 userOS = ""
 def platform_check():
+    global userOS
     if platform.system() == "Linux":
         print("Linux OS detected \n Running Linux appropriate commands")
         userOS = "Linux"
@@ -191,16 +193,16 @@ def check_ffmpeg():
     else:
         logging.debug("ffmpeg not installed on the local system/in local PATH")
         print("ffmpeg is not installed.\n\n You can either install it manually, or through your package manager of choice.\n Windows users, builds are here: https://www.gyan.dev/ffmpeg/builds/")
-        if userOS == "Windows":
-            download_ffmpeg()
-        elif userOS == "Linux":
-            print("You should install ffmpeg using your platform's appropriate package manager, 'apt install ffmpeg','dnf install ffmpeg' or 'pacman', etc.")
-        else:
-            logging.debug("running an unsupported OS")
-            print("You're running an unspported/Un-tested OS")
-            exit_script = input("Let's exit the script, unless you're feeling lucky? (y/n)")
-            if exit_script == "y" or "yes" or "1":
-                exit()
+    if userOS == "Windows":
+        download_ffmpeg()
+    elif userOS == "Linux":
+        print("You should install ffmpeg using your platform's appropriate package manager, 'apt install ffmpeg','dnf install ffmpeg' or 'pacman', etc.")
+    else:
+        logging.debug("running an unsupported OS")
+        print("You're running an unspported/Un-tested OS")
+        exit_script = input("Let's exit the script, unless you're feeling lucky? (y/n)")
+        if exit_script == "y" or "yes" or "1":
+            exit()
 
 
 
@@ -208,17 +210,19 @@ def check_ffmpeg():
 def download_ffmpeg():
     user_choice = input("Do you want to download ffmpeg? (yes/no): ")
     if user_choice.lower() == 'yes' or 'y' or '1':
-        # Download the zip file
+        print("Downloading ffmpeg")
         url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
         response = requests.get(url)
         
         if response.status_code == 200:
+            print("Saving ffmpeg zip file")
             logging.debug("Saving ffmpeg zip file")
             zip_path = "ffmpeg-release-essentials.zip"
             with open(zip_path, 'wb') as file:
                 file.write(response.content)
             
             logging.debug("Extracting the 'ffmpeg.exe' file from the zip")
+            print("Extracting ffmpeg.exe from zip file to '/Bin' folder")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 ffmpeg_path = "ffmpeg-7.0-essentials_build/bin/ffmpeg.exe"
                 
@@ -236,11 +240,12 @@ def download_ffmpeg():
                 dst_path = os.path.join(bin_folder, "ffmpeg.exe")
                 shutil.move(src_path, dst_path)
             
-            # Remove the downloaded zip file
+            logging.debug("Removing ffmpeg zip file")
+            print("Deleting zip file (we've already extracted ffmpeg.exe, no worries)")
             os.remove(zip_path)
 
             logging.debug("ffmpeg.exe has been downloaded and extracted to the './Bin' folder.")
-            print("ffmpeg.exe has been downloaded and extracted to the './Bin' folder.")
+            print("ffmpeg.exe has been successfully downloaded and extracted to the './Bin' folder.")
         else:
             logging.error("Failed to download the zip file.")
             print("Failed to download the zip file.")
@@ -923,7 +928,7 @@ if __name__ == "__main__":
     logging.info('Starting the transcription and summarization process.')
     logging.info(f'Input path: {args.input_path}')
     logging.info(f'API Name: {args.api_name}')
-    logging.debug(f'API Key: {api_key}') # ehhhhh
+    logging.debug(f'API Key: {args.api_key}') # ehhhhh
     logging.info(f'Number of speakers: {args.num_speakers}')
     logging.info(f'Whisper model: {args.whisper_model}')
     logging.info(f'Offset: {args.offset}')
