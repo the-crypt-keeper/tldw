@@ -187,22 +187,22 @@ def decide_cpugpu():
 
 # check for existence of ffmpeg
 def check_ffmpeg():
-    if shutil.which("ffmpeg"):
-        logging.debug("ffmpeg found installed on the local system, or at least in the local PATH")
+    if shutil.which("ffmpeg") or (os.path.exists("Bin") and os.path.isfile(".\\Bin\\ffmpeg.exe")):
+        logging.debug("ffmpeg found installed on the local system, in the local PATH, or in the './Bin' folder")
         pass
     else:
         logging.debug("ffmpeg not installed on the local system/in local PATH")
         print("ffmpeg is not installed.\n\n You can either install it manually, or through your package manager of choice.\n Windows users, builds are here: https://www.gyan.dev/ffmpeg/builds/")
-    if userOS == "Windows":
-        download_ffmpeg()
-    elif userOS == "Linux":
-        print("You should install ffmpeg using your platform's appropriate package manager, 'apt install ffmpeg','dnf install ffmpeg' or 'pacman', etc.")
-    else:
-        logging.debug("running an unsupported OS")
-        print("You're running an unspported/Un-tested OS")
-        exit_script = input("Let's exit the script, unless you're feeling lucky? (y/n)")
-        if exit_script == "y" or "yes" or "1":
-            exit()
+        if userOS == "Windows":
+            download_ffmpeg()
+        elif userOS == "Linux":
+            print("You should install ffmpeg using your platform's appropriate package manager, 'apt install ffmpeg','dnf install ffmpeg' or 'pacman', etc.")
+        else:
+            logging.debug("running an unsupported OS")
+            print("You're running an unspported/Un-tested OS")
+            exit_script = input("Let's exit the script, unless you're feeling lucky? (y/n)")
+            if exit_script == "y" or "yes" or "1":
+                exit()
 
 
 
@@ -394,9 +394,15 @@ def convert_to_wav(video_file_path, offset=0):
 
     try:
         if os.name == "nt":
-            logging.debug("Whisper being ran on windows")
+            logging.debug("ffmpeg being ran on windows")
+
+            if sys.platform.startswith('win'):
+                ffmpeg_cmd = './Bin/ffmpeg.exe'
+            else:
+                ffmpeg_cmd = 'ffmpeg'  # Assume 'ffmpeg' is in PATH for non-Windows systems
+
             command = [
-                r".\Bin\ffmpeg.exe",        # Assuming the working directory is correctly set where .\Bin exists
+                ffmpeg_cmd,        # Assuming the working directory is correctly set where .\Bin exists
                 "-ss", "00:00:00",          # Start at the beginning of the video
                 "-i", video_file_path,
                 "-ar", "16000",             # Audio sample rate
@@ -404,13 +410,20 @@ def convert_to_wav(video_file_path, offset=0):
                 "-c:a", "pcm_s16le",        # Audio codec
                 out_path
             ]
-            result = subprocess.run(command, text=True, capture_output=True)
-            if result.returncode == 0:
-                logging.info("FFmpeg executed successfully")
-                logging.debug("Output: %s", result.stdout)
-            else:
-                logging.error("Error in running FFmpeg")
-                logging.error("Error Output: %s", result.stderr)
+            try:
+                # Redirect stdin from null device to prevent ffmpeg from waiting for input
+                with open(os.devnull, 'rb') as null_file:
+                    result = subprocess.run(command, stdin=null_file, text=True, capture_output=True)
+                if result.returncode == 0:
+                    logging.info("FFmpeg executed successfully")
+                    logging.debug("FFmpeg output: %s", result.stdout)
+                else:
+                    logging.error("Error in running FFmpeg")
+                    logging.error("FFmpeg stderr: %s", result.stderr)
+                    raise RuntimeError(f"FFmpeg error: {result.stderr}")
+            except Exception as e:
+                logging.error("Error occurred - ffmpeg doesn't like windows")
+                raise RuntimeError("ffmpeg failed")
         elif os.name == "posix":
             os.system(f'ffmpeg -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
         else:
@@ -606,7 +619,7 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
 
 # Summarize with OpenAI ChatGPT
 def extract_text_from_segments(segments):
-    logging.debug(f"openai: extracting text from {segment}")
+    logging.debug(f"openai: extracting text from {segments}")
     text = ' '.join([segment['text'] for segment in segments])
     return text
 
@@ -654,8 +667,8 @@ def summarize_with_openai(api_key, file_path, model):
             print("Failed to process summary:", response.text)
             return None
     except Exception as e:
-        logging.debug("openai: Generalized error, see above")
-        print("Error occurred while processing summary with OpenAI:", str(e))
+        logging.debug("openai: Error in processing: %s", str(e))
+        print("Error occurred while processing summary with openai:", str(e))
         return None
 
 
@@ -721,52 +734,80 @@ def summarize_with_claude(api_key, file_path, model):
             return None
 
     except Exception as e:
-        logging.debug("anthropic: Generalized error, see above")
-        print("Error occurred while processing summary with Claude:", str(e))
+        logging.debug("anthropic: Error in processing: %s", str(e))
+        print("Error occurred while processing summary with anthropic:", str(e))
         return None
 
 
 
 # Summarize with Cohere
 def summarize_with_cohere(api_key, file_path, model):
-    logging.debug("cohere: Loading JSON data")
-    with open(file_path, 'r') as file:
-        segments = json.load(file)
-    
-    logging.debug("cohere: Extracting text from segments")
-    text = extract_text_from_segments(segments)
+    try:
+        logging.basicConfig(level=logging.DEBUG)
+        logging.debug("cohere: Loading JSON data")
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
 
-    headers = {
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'Authorization': f'Bearer {api_key}'
-    }
-    
-    logging.debug("cohere: Preparing data + prompt for submittal")
-    #prompt_text = f"As a professional summarizer, create a concise and comprehensive summary of: {text}"
-    prompt_text = f"{text} \n\n\n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text, be it an article, post, conversation, or passage, while adhering to these guidelines: Craft a summary that is detailed, thorough, in-depth, and complex, while maintaining clarity and conciseness. Incorporate main ideas and essential information, eliminating extraneous language and focusing on critical aspects. Rely strictly on the provided text, without including external information. Format the summary in paragraph form for easy understanding. Conclude your notes with [End of Notes, Message #X] to indicate completion, where 'X' represents the total number of messages that I have sent. In other words, include a message counter where you start with #1 and add 1 to the message counter every time I send a message. By following this optimized prompt, you will generate an effective summary that encapsulates the essence of the given text in a clear, concise, and reader-friendly manner. Utilize markdown to cleanly format your output. Example: Bold key subject matter and potential areas that may need expanded information"
-    data = {
-        "chat_history": [
-            {"role": "USER", "message": prompt_text}
-        ],
-        "message": "Please provide a summary.",
-        "model": model,
-        "connectors": [{"id": "web-search"}]
-    }
+        logging.debug(f"cohere: Extracting text from {segments}")
+        text = extract_text_from_segments(segments)  # Make sure this function is defined
 
-    logging.debug("cohere: Submitting request to API endpoint")
-    response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
-    
-    if response.status_code == 200:
-        logging.debug("cohere: Request was successful!")
-        summary = response.json()['response'].strip()
-        print("Summary processed successfully.")
-        return summary
-    else:
-        logging.debug("cohere: Unsuccessful request :(")
-        print("Failed to process summary:", response.text)
-        return None
+        headers = {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+            'Authorization': f'Bearer {api_key}'
+        }
 
+        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
+        data = {
+            "chat_history": [
+                {"role": "USER", "message": prompt_text}
+            ],
+            "message": "Please provide a summary.",
+            "model": model,
+            "connectors": [{"id": "web-search"}]
+        }
+
+        logging.debug("cohere: Submitting request to API endpoint")
+        print("cohere: Submitting request to API endpoint")
+        response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
+        response_data = response.json()
+        logging.debug("API Response Data: %s", response_data)
+
+        if response.status_code == 200:
+            if 'text' in response_data:
+                summary = response_data['text'].strip()
+                logging.debug("cohere: Summarization successful")
+                print("Summary processed successfully.")
+                return summary
+            else:
+                logging.error("Expected data not found in API response.")
+                return "Expected data not found in API response."
+        else:
+            logging.error(f"cohere: API request failed with status code {response.status_code}: {resposne.text}")
+            print(f"Failed to process summary, status code {response.status_code}: {response.text}")
+            return f"cohere: API request failed: {response.text}"
+
+    except Exception as e:
+        logging.error("cohere: Error in processing: %s", str(e))
+        return f"cohere: Error occurred while processing summary with Cohere: {str(e)}"
+
+
+"""
+
+        if response.status_code == 200:
+            json_response = response.json()
+            if 'response' in json_response:
+                summary = json_response['response'].strip()
+                print("Summary processed successfully.")
+                return summary
+            else:
+                logging.debug("Unexpected JSON structure: %s", json_response)
+                return "Error: Unexpected JSON structure."
+        else:
+            logging.debug("cohere: Unsuccessful request :(")
+            print("Failed to process summary:", response.text)
+            return None
+"""
 
 
 def summarize_with_llama(api_url, file_path):
