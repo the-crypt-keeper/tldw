@@ -12,9 +12,11 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
-usage: diarize.py [-h] [--api_url API_URL] [--num_speakers NUM_SPEAKERS] [--whisper_model WHISPER_MODEL]
-                  [--offset OFFSET] [--vad_filter]
+usage: diarize.py [-h] [--api_name API_NAME] [--api_key API_KEY] [--num_speakers NUM_SPEAKERS] [--whisper_model WHISPER_MODEL] [--offset OFFSET]
+                  [--vad_filter] [--log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
                   [input_path]
+
+Transcribe and summarize videos.
 
 positional arguments:
   input_path            Path or URL of the video
@@ -27,6 +29,7 @@ options:
                         Number of speakers (default: 2)
   --whisper_model WHISPER_MODEL
                         Whisper model (default: small.en)
+                        Available one: "`small`", "`medium`", "`small.en`","`medium.en`"
   --offset OFFSET       Offset in seconds (default: 0)
   --vad_filter          Enable VAD filter
   --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
