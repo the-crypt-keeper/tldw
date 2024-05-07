@@ -12,4 +12,4 @@ llama_api_IP = <IP:port of llama.cpp server>
 output_path = Results
 
 [Processing]
-processing_choice = cuda	
+processing_choice = cuda

@@ -208,7 +208,7 @@ def check_ffmpeg():
 
 # Download ffmpeg
 def download_ffmpeg():
-    user_choice = input("Do you want to download ffmpeg? (yes/no): ")
+    user_choice = input("Do you want to download ffmpeg? (y)Yes/(n)No: ")
     if user_choice.lower() == 'yes' or 'y' or '1':
         print("Downloading ffmpeg")
         url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"

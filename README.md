@@ -29,7 +29,7 @@ options:
                         Number of speakers (default: 2)
   --whisper_model WHISPER_MODEL
                         Whisper model (default: small.en)
-                        Available one: "`small`", "`medium`", "`small.en`","`medium.en`"
+                        Available models: "`small`", "`medium`", "`small.en`","`medium.en`"
   --offset OFFSET       Offset in seconds (default: 0)
   --vad_filter          Enable VAD filter
   --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
