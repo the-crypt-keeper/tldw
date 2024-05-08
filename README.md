@@ -7,13 +7,13 @@ I personally recommend Sonnet, for the price, it's very nice.
 Original: `YouTube contains an incredible amount of knowledge, much of which is locked inside multi-hour videos.  Let's extract and summarize it with AI!`
 
 ### tl/dr: Download Videos -> Transcribe -> Summarize. Scripted.
-* **Download Audio only from URL -> Transcribe audio:**
+- **Download Audio only from URL -> Transcribe audio:**
   * `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
-* **Download Audio+Video from URL -> Transcribe audio from Video:**
+- **Download Audio+Video from URL -> Transcribe audio from Video:**
   * `python diarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
-* **Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` i.e. llama.cpp/`ooba`/`kobold`/`tabby`) API:**
+- **Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` i.e. llama.cpp/`ooba`/`kobold`/`tabby`) API:**
   * `python diarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>`
-* **Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
+- **Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
   * `python diarize.py ./local/file_on_your/system --api_name <API_name>`
 
 ### Table of Contents
@@ -80,15 +80,18 @@ options:
   -log {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                         Log level (default: INFO)
 
->python diarize.py ./local/file_on_your/system --api_name anthropic
--
->python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic
--
->python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name openai 
--
->python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic --api_key lolyearight
--
->python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name openai --api_key lolyearight
+
+-Download Audio only from URL -> Transcribe audio:
+>python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
+
+-Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` i.e. llama.cpp/`ooba`/`kobold`/`tabby`) API:
+>python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>
+
+-Download Audio+Video from URL -> Transcribe audio from Video:
+>python diarize.py --video https://www.youtube.com/watch?v=4nd1CDZP21s
+
+-Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:
+>python diarize.py --video ./local/file_on_your/system --api_name <API_name>
 
 By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
 ```
