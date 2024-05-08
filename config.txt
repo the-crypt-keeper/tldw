@@ -1,12 +1,18 @@
 [API]
 anthropic_api_key = <anthropic_api_key
 anthropic_model = claude-3-sonnet-20240229
-openai_api_key = <openai_api_key>
-openai_model = gpt-4-turbo
 cohere_api_key = <your_cohere_api_key>
 cohere_model = command-r-plus
+groq_api_key = idk
+groq_model = FIXME
+openai_api_key = <openai_api_key>
+openai_model = gpt-4-turbo
+
+[Local-API]
 llama_api_key = <llama.cpp api key>
 llama_api_IP = http://127.0.0.1:8080/completion
+ooba_api_key = <llama.cpp api key>
+ooba_api_IP = http://127.0.0.1:5000/api/v1/generate
 
 [Paths]
 output_path = Results
