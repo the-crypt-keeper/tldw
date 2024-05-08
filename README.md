@@ -16,7 +16,15 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
 * **Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
   * `python diarize.py ./local/file_on_your/system --api_name <API_name>`
 
-### What?
+### Table of Contents
+- [What?](#what)
+- [Using](#using)
+- [Setup](#setup)
+- [Pieces/What's in the Repo](#what)
+- [Setting up a Local LLM Inference Engine](#localllm)
+- [Credits](#credits)
+
+### <a name="what"></a>What?
 - Use the script to transcribe a local file or remote url. 
   * Any url youtube-dl supports _should_ work.
   * If you pass an API name (anthropic/cohere/grok/openai/) as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well. 
@@ -24,6 +32,25 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
     * Or pass the `--api_url` argument with the `IP:Port` to avoid making changes to the `config.txt` file.
     * If the self-hosted server requires an API key, modify the appropriate api_key variable in the `config.txt` file.
   * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach. This works for big context LLMs, but not everyone has access to them, and some transcriptions may be even longer, so we need to have an approach that can handle those cases.
+- **APIs Supported**
+  1. Anthropic
+  2. Cohere
+  3. Groq
+  4. Llama.cpp
+  5. Kobold.cpp
+  5. TabbyAPI
+  6. OpenAI
+  7. Oobabooga
+
+
+### <a name="using"></a>Using
+- Single file (remote URL) transcription
+  * Single URL: `python diarize.py https://example.com/video.mp4`
+- Single file (local) transcription)
+  * Transcribe a local file: `python diarize.py /path/to/your/localfile.mp4`
+- Multiple files (local & remote)
+  * List of Files(can be URLs and local files mixed): `python diarize.py ./path/to/your/text_file.txt"`
+
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
@@ -54,51 +81,19 @@ options:
                         Log level (default: INFO)
 
 >python diarize.py ./local/file_on_your/system --api_name anthropic
+-
 >python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic
+-
 >python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name openai 
+-
 >python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic --api_key lolyearight
+-
 >python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name openai --api_key lolyearight
 
 By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
 ```
 
-
-### Pieces
-- **Workflow**
-  1. Setup python + packages
-  2. Setup ffmpeg
-  3. Run `python diarize.py <video_url>` or `python diarize.py <List_of_videos.txt>`
-  4. If you want summarization, add your API keys (if not using a local LLM) to the `config.txt` file, and then re-run the script, passing in the name of the API [or URL endpoint - to be added] to the script.
-    * `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic` - This will attempt to download the video, then upload the resulting json file to the anthropic API endpoint, referring to values set in the config file (API key and model) to request summarization.
-    - Anthropic:
-      * Opus: `claude-3-opus-20240229`
-      * Sonnet: `claude-3-sonnet-20240229`
-      * Haiku: `claude-3-haiku-20240307`
-    - Cohere: 
-      * `command-r`
-      * `command-r-plus`
-    - OpenAI:
-      * `gpt-4-turbo`
-      * `gpt-4-turbo-preview`
-      * `gpt-4`
-
-
-### What's in the repo?
-- `diarize.py` - download, transcribe and diarize audio
-  1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
-  2. Next, it uses [ffmpeg](https://github.com/FFmpeg/FFmpeg) to convert the resulting `.m4a` file to `.wav`
-  3. Then it uses [faster_whisper](https://github.com/SYSTRAN/faster-whisper) to transcribe the `.wav` file to `.txt`
-  4. After that, it uses [pyannote](https://github.com/pyannote/pyannote-audio) to perform 'diarorization'
-  5. Finally, it'll send the resulting txt to an LLM endpoint of your choice for summarization of the text.
-    * Goal is to support OpenAI/Claude/Cohere/Groq/local OpenAI endpoint (oobabooga/llama.cpp/exllama2) so you can either do a batch query to X endpoint, or just feed them one at a time. Your choice.
-- `chunker.py` - break text into parts and prepare each part for LLM summarization
-- `roller-*.py` - rolling summarization
-  - [can-ai-code](https://github.com/the-crypt-keeper/can-ai-code) - interview executors to run LLM inference
-- `compare.py` - prepare LLM outputs for webapp
-- `compare-app.py` - summary viewer webapp
-
-
-### Setup
+### <a name="setup"></a>Setup
 - **Linux**
     1. Download necessary packages (Python3, ffmpeg[sudo apt install ffmpeg / dnf install ffmpeg], ?)
     2. Create a virtual env: `python -m venv ./`
@@ -121,6 +116,41 @@ By default videos, transcriptions and summaries are stored in a folder with the 
       * FIXME
     8. For feeding the transcriptions to the API of your choice, simply use the corresponding script for your API provider.
       * FIXME: add scripts for OpenAI api (generic) and others
+
+
+### <a name="pieces"></a>Pieces & What's in the repo?
+- **Workflow**
+  1. Setup python + packages
+  2. Setup ffmpeg
+  3. Run `python diarize.py <video_url>` or `python diarize.py <List_of_videos.txt>`
+  4. If you want summarization, add your API keys (if not using a local LLM) to the `config.txt` file, and then re-run the script, passing in the name of the API [or URL endpoint - to be added] to the script.
+    * `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic` - This will attempt to download the video, then upload the resulting json file to the anthropic API endpoint, referring to values set in the config file (API key and model) to request summarization.
+    - Anthropic:
+      * Opus: `claude-3-opus-20240229`
+      * Sonnet: `claude-3-sonnet-20240229`
+      * Haiku: `claude-3-haiku-20240307`
+    - Cohere: 
+      * `command-r`
+      * `command-r-plus`
+    - OpenAI:
+      * `gpt-4-turbo`
+      * `gpt-4-turbo-preview`
+      * `gpt-4`
+- **What's in the repo?**
+  - `diarize.py` - download, transcribe and diarize audio
+    1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
+    2. Next, it uses [ffmpeg](https://github.com/FFmpeg/FFmpeg) to convert the resulting `.m4a` file to `.wav`
+    3. Then it uses [faster_whisper](https://github.com/SYSTRAN/faster-whisper) to transcribe the `.wav` file to `.txt`
+    4. After that, it uses [pyannote](https://github.com/pyannote/pyannote-audio) to perform 'diarorization'
+    5. Finally, it'll send the resulting txt to an LLM endpoint of your choice for summarization of the text.
+  - `chunker.py` - break text into parts and prepare each part for LLM summarization
+  - `roller-*.py` - rolling summarization
+    - [can-ai-code](https://github.com/the-crypt-keeper/can-ai-code) - interview executors to run LLM inference
+  - `compare.py` - prepare LLM outputs for webapp
+  - `compare-app.py` - summary viewer webapp
+
+
+### <a name="localllm"></a>Setting up a Local LLM Inference Engine
 - **Setting up Local LLM Runner**
   - **Llama.cpp**
     - **Linux & Mac**
@@ -142,29 +172,7 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 
 
 
-### Usage
-- Single file (remote URL) transcription
-  * Single URL: `python diarize.py https://example.com/video.mp4`
-- Single file (local) transcription)
-  * Transcribe a local file: `python diarize.py /path/to/your/localfile.mp4`
-- Multiple files (local & remote)
-  * List of Files(can be URLs and local files mixed): `python diarize.py ./path/to/your/text_file.txt"`
-
-
-
-### APIs supported:
-1. Anthropic
-2. Cohere
-3. Groq
-4. Llama.cpp
-5. Kobold.cpp
-5. TabbyAPI
-6. OpenAI
-7. Oobabooga
-
-
-
-### Credits
+### <a name="credits"></a>Credits
 - [original](https://github.com/the-crypt-keeper/tldw)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 - [ffmpeg](https://github.com/FFmpeg/FFmpeg)

@@ -77,6 +77,8 @@ groq_model = config.get('API', 'groq_model', fallback='FIXME')
 openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
 
 # Local-Models
+kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
 llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
 llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
 ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
@@ -961,6 +963,55 @@ def summarize_with_llama(api_url, file_path, token):
 
 
 
+# https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
+def summarize_with_kobold(api_url, file_path):
+    try:
+        logging.debug("kobold: Loading JSON data")
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
+
+        logging.debug(f"kobold: Extracting text from segments file")
+        text = extract_text_from_segments(segments)
+
+        headers = {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+        }
+        # FIXME
+        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the above text."
+        logging.debug(prompt_text)
+        # Values literally c/p from the api docs....
+        data = {
+            "max_context_length": 8096,
+            "max_length": 4096,
+            "prompt": prompt_text,
+        }
+
+        logging.debug("kobold: Submitting request to API endpoint")
+        print("kobold: Submitting request to API endpoint")
+        response = requests.post(api_url, headers=headers, json=data)
+        response_data = response.json()
+        logging.debug("kobold: API Response Data: %s", response_data)
+
+        if response.status_code == 200:
+            if 'results' in response_data and len(response_data['results']) > 0:
+                summary = response_data['results'][0]['text'].strip()
+                logging.debug("kobold: Summarization successful")
+                print("Summarization successful.")
+                return summary
+            else:
+                logging.error("Expected data not found in API response.")
+                return "Expected data not found in API response."
+        else:
+            logging.error(f"kobold: API request failed with status code {response.status_code}: {response.text}")
+            return f"kobold: API request failed: {response.text}"
+
+    except Exception as e:
+        logging.error("kobold: Error in processing: %s", str(e))
+        return f"kobold: Error occurred while processing summary with kobold: {str(e)}"
+
+
+
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
 def summarize_with_oobabooga(api_url, file_path):
     try:
@@ -1104,11 +1155,14 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         token = llama_api_key
                         llama_ip = llama_api_IP
                         summary = summarize_with_llama(llama_ip, json_file_path, token)
+                    elif api_name.lower() == 'kobold':
+                        token = kobold_api_key
+                        kobold_ip = kobold_api_IP
+                        summary = summarize_with_kobold(kobold_ip, json_file_path)
                     elif api_name.lower() == 'oobabooga':
                         token = ooba_api_key
                         ooba_ip = ooba_api_IP
-                        oobabooga_url = "http://localhost:5000/api/v1/generate"  # Replace with your oobabooga API URL
-                        summary = summarize_with_oobabooga(oobabooga_url, json_file_path)
+                        summary = summarize_with_oobabooga(oobabooga_ip, json_file_path)
                     else:
                         logging.warning(f"Unsupported API: {api_name}")
                         summary = None
