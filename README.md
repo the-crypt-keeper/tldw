@@ -162,7 +162,16 @@ By default videos, transcriptions and summaries are stored in a folder with the 
       2. Download + Run: https://github.com/skeeto/w64devkit/releases
       3. cd to `llama.cpp` folder make` in the `llama.cpp` folder
       4. `server.exe -m ..\path\to\model -c <context_size>`
-  - **Kobold.cpp**
+  - **Kobold.cpp** - c/p'd from: https://github.com/LostRuins/koboldcpp/wiki
+    - **Windows**
+      1. Download from here: https://github.com/LostRuins/koboldcpp/releases/latest
+      2. `Double click KoboldCPP.exe and select model OR run "KoboldCPP.exe --help" in CMD prompt to get command line arguments for more control.`
+      3. `Generally you don't have to change much besides the Presets and GPU Layers. Run with CuBLAS or CLBlast for GPU acceleration.`
+      4. `Select your GGUF or GGML model you downloaded earlier, and connect to the displayed URL once it finishes loading.`
+    - **Linux**
+      1. `On Linux, we provide a koboldcpp-linux-x64 PyInstaller prebuilt binary on the releases page for modern systems. Simply download and run the binary.`
+        * Alternatively, you can also install koboldcpp to the current directory by running the following terminal command: `curl -fLo koboldcpp https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-linux-x64 && chmod +x koboldcpp`
+      2. When you can't use the precompiled binary directly, we provide an automated build script which uses conda to obtain all dependencies, and generates (from source) a ready-to-use a pyinstaller binary for linux users. Simply execute the build script with `./koboldcpp.sh dist` and run the generated binary.
   - **Exvllama2**
 - **Setting up a Local LLM Model**
   1. microsoft/Phi-3-mini-128k-instruct - 3.8B Model/7GB base, 4GB Q8 - https://huggingface.co/microsoft/Phi-3-mini-128k-instruct
