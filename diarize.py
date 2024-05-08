@@ -65,18 +65,22 @@ config = configparser.ConfigParser()
 config.read('config.txt')
 
 # API Keys
-cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
 anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
+cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
+groq_api_key = config.get('API', 'groq_api_key', fallback=None)
 openai_api_key = config.get('API', 'openai_api_key', fallback=None)
 
 # Models
 anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
 cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
+groq_model = config.get('API', 'groq_model', fallback='FIXME')
 openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
 
 # Local-Models
-llama_api_IP = config.get('API', 'llama_api_IP', fallback='127.0.0.1:8080/v1/chat/completions')
-llama_api_key = config.get('API', 'llama_api_key', fallback='')
+llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
+llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
+ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
 
 # Retrieve output paths from the configuration file
 output_path = config.get('Paths', 'output_path', fallback='Results')
@@ -857,6 +861,57 @@ def summarize_with_cohere(api_key, file_path, model):
 
 
 
+# https://console.groq.com/docs/quickstart
+def summarize_with_groq(api_url, file_path, token):
+    try:
+        logging.debug("groq: Loading JSON data")
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
+
+        logging.debug(f"groq: Extracting text from segments file")
+        text = extract_text_from_segments(segments)  # Define this function to extract text properly
+
+        headers = {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+            'Authorization': f'Bearer {token}'
+        }
+
+        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
+        data = {
+            "model": "groq-gpt-j-6b",
+            "prompt": prompt_text,
+            "max_tokens": 1024,
+            "temperature": 0.7,
+            "top_p": 1.0,
+            "stop": None
+        }
+
+        logging.debug("groq: Submitting request to API endpoint")
+        print("groq: Submitting request to API endpoint")
+        response = requests.post(api_url, headers=headers, json=data)
+        response_data = response.json()
+        logging.debug("API Response Data: %s", response_data)
+
+        if response.status_code == 200:
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                summary = response_data['choices'][0]['text'].strip()
+                logging.debug("groq: Summarization successful")
+                print("Summarization successful.")
+                return summary
+            else:
+                logging.error("Expected data not found in API response.")
+                return "Expected data not found in API response."
+        else:
+            logging.error(f"groq: API request failed with status code {response.status_code}: {response.text}")
+            return f"groq: API request failed: {response.text}"
+
+    except Exception as e:
+        logging.error("groq: Error in processing: %s", str(e))
+        return f"groq: Error occurred while processing summary with groq: {str(e)}"
+
+
+
 def summarize_with_llama(api_url, file_path, token):
     try:
         logging.debug("llama: Loading JSON data")
@@ -908,6 +963,66 @@ def save_summary_to_file(summary, file_path):
     with open(summary_file_path, 'w') as file:
         file.write(summary)
     logging.info(f"Summary saved to file: {summary_file_path}")
+
+
+# https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
+def summarize_with_oobabooga(api_url, file_path):
+    try:
+        logging.debug("oobabooga: Loading JSON data")
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
+
+        logging.debug(f"oobabooga: Extracting text from segments file")
+        text = extract_text_from_segments(segments)
+
+        headers = {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+        }
+
+        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
+        data = {
+            "prompt": prompt_text,
+            "max_new_tokens": 500,
+            "do_sample": True,
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "typical_p": 1,
+            "repetition_penalty": 1.05,
+            "top_k": 40,
+            "min_length": 0,
+            "no_repeat_ngram_size": 0,
+            "num_beams": 1,
+            "penalty_alpha": 0,
+            "length_penalty": 1,
+            "early_stopping": False,
+            "seed": -1,
+            "add_bos_token": True,
+            "truncation_length": 2048,
+            "ban_eos_token": False,
+            "skip_special_tokens": True,
+            "stopping_strings": []
+        }
+
+        logging.debug("oobabooga: Submitting request to API endpoint")
+        print("oobabooga: Submitting request to API endpoint")
+        response = requests.post(api_url, headers=headers, json=data)
+        response_data = response.json()
+        logging.debug("API Response Data: %s", response_data)
+
+        if response.status_code == 200:
+            summary = response_data['results'][0]['text'].strip()
+            logging.debug("oobabooga: Summarization successful")
+            print("Summarization successful.")
+            return summary
+        else:
+            logging.error(f"oobabooga: API request failed with status code {response.status_code}: {response.text}")
+            return f"oobabooga: API request failed: {response.text}"
+
+    except Exception as e:
+        logging.error("oobabooga: Error in processing: %s", str(e))
+        return f"oobabooga: Error occurred while processing summary with oobabooga: {str(e)}"
+
 #
 #
 ####################################################################################################################################
@@ -977,10 +1092,18 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     elif api_name.lower() == 'cohere':
                         api_key = cohere_api_key
                         summary = summarize_with_cohere(api_key, json_file_path, cohere_model)
+                    elif api_name.lower() == 'groq':
+                        api_key = groq_api_key
+                        summary = summarize_with_llama(api_key, json_file_path, groq_model)
                     elif api_name.lower() == 'llama':
                         token = llama_api_key
                         llama_ip = llama_api_IP
                         summary = summarize_with_llama(llama_ip, json_file_path, token)
+                    elif api_name.lower() == 'oobabooga':
+                        token = ooba_api_key
+                        ooba_ip = ooba_api_IP
+                        oobabooga_url = "http://localhost:5000/api/v1/generate"  # Replace with your oobabooga API URL
+                        summary = summarize_with_oobabooga(oobabooga_url, json_file_path)
                     else:
                         logging.warning(f"Unsupported API: {api_name}")
                         summary = None
