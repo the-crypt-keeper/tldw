@@ -360,19 +360,79 @@ def get_youtube(video_url):
 
 
 
-def download_video(video_url, download_path, info_dict):
+def download_video(video_url, download_path, info_dict, download_video_flag):
     logging.debug("About to normalize downloaded video title")
     title = normalize_title(info_dict['title'])
-    file_path = os.path.join(download_path, f"{title}.m4a")
-    ydl_opts = {
-        'format': 'bestaudio[ext=m4a]',
-        'outtmpl': file_path,
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        logging.debug("About to download video with youtube-dl")
-        ydl.download([video_url])
-        logging.debug("Video successfully downloaded with youtube-dl")
-    return file_path
+    
+    if download_video_flag == False:
+        file_path = os.path.join(download_path, f"{title}.m4a")
+        ydl_opts = {
+            'format': 'bestaudio[ext=m4a]',
+            'outtmpl': file_path,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            logging.debug("yt_dlp: About to download audio with youtube-dl")
+            ydl.download([video_url])
+            logging.debug("yt_dlp: Audio successfully downloaded with youtube-dl")
+        return file_path
+    else:
+        video_file_path = os.path.join(download_path, f"{title}_video.mp4")
+        audio_file_path = os.path.join(download_path, f"{title}_audio.m4a")
+        ydl_opts_video = {
+            'format': 'bestvideo[ext=mp4]',
+            'outtmpl': video_file_path,
+        }
+        ydl_opts_audio = {
+            'format': 'bestaudio[ext=m4a]',
+            'outtmpl': audio_file_path,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
+            logging.debug("yt_dlp: About to download video with youtube-dl")
+            ydl.download([video_url])
+            logging.debug("yt_dlp: Video successfully downloaded with youtube-dl")
+        
+        with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl:
+            logging.debug("yt_dlp: About to download audio with youtube-dl")
+            ydl.download([video_url])
+            logging.debug("yt_dlp: Audio successfully downloaded with youtube-dl")
+
+        output_file_path = os.path.join(download_path, f"{title}.mp4")
+
+        if userOS == "Windows":
+            logging.debug("Running ffmpeg on Windows...")
+            ffmpeg_command = [
+                '.\\Bin\\ffmpeg.exe',
+                '-i', video_file_path,
+                '-i', audio_file_path,
+                '-c:v', 'copy',
+                '-c:a', 'copy',
+                output_file_path
+            ]
+            subprocess.run(ffmpeg_command, check=True)
+        elif userOS == "Linux":
+            logging.debug("Running ffmpeg on Linux...")
+            ffmpeg_command = [
+                'ffmpeg',
+                '-i', video_file_path,
+                '-i', audio_file_path,
+                '-c:v', 'copy',
+                '-c:a', 'copy',
+                output_file_path
+            ]
+            subprocess.run(ffmpeg_command, check=True)            
+        else:
+            logging.error("You shouldn't be here...")
+            exit()
+        os.remove(video_file_path)
+        os.remove(audio_file_path)
+        
+        return output_file_path
+
+
+
+
+
 #
 #
 ####################################################################################################################################
@@ -400,7 +460,7 @@ def convert_to_wav(video_file_path, offset=0):
             logging.debug("ffmpeg being ran on windows")
 
             if sys.platform.startswith('win'):
-                ffmpeg_cmd = './Bin/ffmpeg.exe'
+                ffmpeg_cmd = ".\\Bin\\ffmpeg.exe"
             else:
                 ffmpeg_cmd = 'ffmpeg'  # Assume 'ffmpeg' is in PATH for non-Windows systems
 
@@ -861,7 +921,7 @@ def save_summary_to_file(summary, file_path):
 ####################################################################################################################################
 # Main()
 #
-def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False):
+def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
     start_time = time.monotonic()
     if os.path.isfile(input_path) and input_path.endswith('.txt'):
         logging.debug("MAIN: User passed in a text file, processing text file...")
@@ -880,7 +940,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     download_path = create_download_directory(info_dict['title'])
                     logging.debug("MAIN: Path created successfully")
                     logging.debug("MAIN: Downloading video from yt_dlp...")
-                    video_path = download_video(path, download_path, info_dict)
+                    video_path = download_video(path, download_path, info_dict, download_video_flag)
                     logging.debug("MAIN: Video downloaded successfully")
                     logging.debug("MAIN: Converting video file to WAV...")
                     audio_file = convert_to_wav(video_path, offset)
@@ -945,13 +1005,14 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transcribe and summarize videos.')
     parser.add_argument('input_path', type=str, help='Path or URL of the video', nargs='?')
-    parser.add_argument('--api_name', type=str, help='API name for summarization (optional)')
-    parser.add_argument('--api_key', type=str, help='API key for summarization (optional)')
-    parser.add_argument('--num_speakers', type=int, default=2, help='Number of speakers (default: 2)')
-    parser.add_argument('--whisper_model', type=str, default='small.en', help='Whisper model (default: small.en)')
-    parser.add_argument('--offset', type=int, default=0, help='Offset in seconds (default: 0)')
-    parser.add_argument('--vad_filter', action='store_true', help='Enable VAD filter')
-    parser.add_argument('--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
+    parser.add_argument('-v','--video',  action='store_true', help='Download the video instead of just the audio')
+    parser.add_argument('-name', '--api_name', type=str, help='API name for summarization (optional)')
+    parser.add_argument('-key', '--api_key', type=str, help='API key for summarization (optional)')
+    parser.add_argument('-ns', '--num_speakers', type=int, default=2, help='Number of speakers (default: 2)')
+    parser.add_argument('-wm', '--whisper_model', type=str, default='small.en', help='Whisper model (default: small.en)')
+    parser.add_argument('-off', '--offset', type=int, default=0, help='Offset in seconds (default: 0)')
+    parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
+    parser.add_argument('-log', '--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
     #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
@@ -985,7 +1046,7 @@ if __name__ == "__main__":
     check_ffmpeg()
 
     try:
-        results = main(args.input_path, api_name=args.api_name, api_key=args.api_key, num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset, vad_filter=args.vad_filter)
+        results = main(args.input_path, api_name=args.api_name, api_key=args.api_key, num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset, vad_filter=args.vad_filter, download_video_flag=args.video)
         logging.info('Transcription process completed.')
     except Exception as e:
         logging.error('An error occurred during the transcription process.')

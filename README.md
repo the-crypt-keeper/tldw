@@ -1,18 +1,28 @@
 # TL/DW: Too Long, Didnt Watch
 
-Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and downloaded if not local) using faster-whisper. Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. Any site supported by yt-dl is supported, so you can use this with sites besides just youtube.
+Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. Any site supported by yt-dl is supported, so you can use this with sites besides just youtube.
 
-I personally recommend Sonnet, for the price it's very nice.
+I personally recommend Sonnet, for the price, it's very nice.
 
 Original: `YouTube contains an incredible amount of knowledge, much of which is locked inside multi-hour videos.  Let's extract and summarize it with AI!`
 
 ### tl/dr: Download Videos -> Transcribe -> Summarize. Scripted.
-* Download->transcribe video from URL: `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
-* Download->transcribe->summarize using (`anthropic`/`cohere`/`openai`/`llama` - llama.cpp) API: `python diarize.py ./local/file_on_your/system --api_name <API_name>`
+* Download Audio only from URL -> Transcribe audio: 
+  * `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
+* Download Audio+Video from URL -> Transcribe audio from Video: 
+  * `python diarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
+* Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` i.e. llama.cpp/`ooba`/`kobold`/`tabby`) API: 
+  * `python diarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>`
+* Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:
+  * `python diarize.py ./local/file_on_your/system --api_name <API_name>`
+
 - Use the script to transcribe a local file or remote url. 
   * Any url youtube-dl supports _should_ work.
-  * If you pass an API name (openai/anthropic/cohere) as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well.
-  * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach.
+  * If you pass an API name (anthropic/cohere/grok/openai/) as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well. 
+    * Alternatively, you can pass `llama`/`ooba`/`kobold`/`tabby` and have the script perform a request to your local API endpoint for summarization. You will need to modify the `llama_api_IP` value in the `config.txt` to reflect the `IP:Port` of your local server.
+    * Or pass the `--api_url` argument with the `IP:Port` to avoid making changes to the `config.txt` file.
+    * If the self-hosted server requires an API key, modify the appropriate api_key variable in the `config.txt` file.
+  * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach. This works for big context LLMs, but not everyone has access to them, and some transcriptions may be even longer, so we need to have an approach that can handle those cases.
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
@@ -27,16 +37,19 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --api_name API_NAME   API name for summarization (optional)
-  --api_key API_KEY     API key for summarization (optional)
-  --num_speakers NUM_SPEAKERS
+  -v, --video           Download the video instead of just the audio
+  -name API_NAME, --api_name API_NAME
+                        API name for summarization (optional)
+  -key API_KEY, --api_key API_KEY
+                        API key for summarization (optional) - Please use the config file....
+  -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
                         Number of speakers (default: 2)
-  --whisper_model WHISPER_MODEL
+  -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
                         Whisper model (default: small.en)
-                        Available models: "`small`", "`medium`", "`small.en`","`medium.en`"
-  --offset OFFSET       Offset in seconds (default: 0)
-  --vad_filter          Enable VAD filter
-  --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+  -off OFFSET, --offset OFFSET
+                        Offset in seconds (default: 0)
+  -vad, --vad_filter    Enable VAD filter
+  -log {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                         Log level (default: INFO)
 
 >python diarize.py ./local/file_on_your/system --api_name anthropic
@@ -54,7 +67,7 @@ By default videos, transcriptions and summaries are stored in a folder with the 
   1. Setup python + packages
   2. Setup ffmpeg
   3. Run `python diarize.py <video_url>` or `python diarize.py <List_of_videos.txt>`
-  4. If you want summarization, add your API keys (if needed[is needed for now]) to the `config.txt` file, and then re-run the script, passing in the name of the API [or URL endpoint - to be added] to the script.
+  4. If you want summarization, add your API keys (if not using a local LLM) to the `config.txt` file, and then re-run the script, passing in the name of the API [or URL endpoint - to be added] to the script.
     * `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic` - This will attempt to download the video, then upload the resulting json file to the anthropic API endpoint, referring to values set in the config file (API key and model) to request summarization.
     - Anthropic:
       * Opus: `claude-3-opus-20240229`
@@ -121,9 +134,9 @@ By default videos, transcriptions and summaries are stored in a folder with the 
   - **Kobold.cpp**
   - **Exvllama2**
 - **Setting up a Local LLM Model**
-  1. 3.8B/7GB base, 4GB Q8 microsoft/Phi-3-mini-128k-instruct - https://huggingface.co/microsoft/Phi-3-mini-128k-instruct
+  1. microsoft/Phi-3-mini-128k-instruct - 3.8B Model/7GB base, 4GB Q8 - https://huggingface.co/microsoft/Phi-3-mini-128k-instruct
     * GGUF Quants: https://huggingface.co/pjh64/Phi-3-mini-128K-Instruct.gguf
-  2. 8B/16GB base, 8.5GB Q8  - https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
+  2. Meta Llama3-8B - 8B Model/16GB base, 8.5GB Q8  - https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
     * GGUF Quants: https://huggingface.co/lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF
 
 
@@ -135,6 +148,19 @@ By default videos, transcriptions and summaries are stored in a folder with the 
   * Transcribe a local file: `python diarize.py /path/to/your/localfile.mp4`
 - Multiple files (local & remote)
   * List of Files(can be URLs and local files mixed): `python diarize.py ./path/to/your/text_file.txt"`
+
+
+
+### APIs supported:
+1. Anthropic
+2. Cohere
+3. Groq
+4. Llama.cpp
+5. Kobold.cpp
+5. TabbyAPI
+6. OpenAI
+7. Oobabooga
+
 
 
 ### Credits
