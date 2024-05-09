@@ -279,7 +279,6 @@ def download_ffmpeg():
 
 def read_paths_from_file(file_path):
     """ Reads a file containing URLs or local file paths and returns them as a list. """
-    paths = []
     with open(file_path, 'r') as file:
         for line in file:
             line = line.strip()
@@ -354,7 +353,7 @@ def normalize_title(title):
 def get_youtube(video_url):
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]',
-        'noplaylist': True,
+        'noplaylist': False,
         'quiet': True,
         'extract_flat': True
     }
@@ -363,6 +362,33 @@ def get_youtube(video_url):
         info_dict = ydl.extract_info(video_url, download=False)
         logging.debug("Youtube info successfully extracted")
     return info_dict
+
+
+
+def get_playlist_videos(playlist_url):
+    ydl_opts = {
+        'extract_flat': True,
+        'skip_download': True,
+        'quiet': True
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(playlist_url, download=False)
+
+        if 'entries' in info:
+            video_urls = [entry['url'] for entry in info['entries']]
+            playlist_title = info['title']
+            return video_urls, playlist_title
+        else:
+            print("No videos found in the playlist.")
+            return [], None
+
+
+
+def save_to_file(video_urls, filename):
+    with open(filename, 'w') as file:
+        file.write('\n'.join(video_urls))
+    print(f"Video URLs saved to {filename}")
 
 
 
@@ -1092,30 +1118,49 @@ def save_summary_to_file(summary, file_path):
 ####################################################################################################################################
 # Main()
 #
+
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
     start_time = time.monotonic()
+    paths = []
     if os.path.isfile(input_path) and input_path.endswith('.txt'):
         logging.debug("MAIN: User passed in a text file, processing text file...")
         paths = read_paths_from_file(input_path)
     else:
-        paths = [input_path]
+        info_dict = get_youtube(input_path)
+        if 'entries' in info_dict:  # Check if the input is a playlist
+            logging.debug("MAIN: YouTube playlist detected")
+            print("\n\nSorry, but playlists aren't currently supported. You can run the following command to generate a text file that you can then pass into this script though!" + """\n\n\tpython Get_Playlist_URLs.py <Youtube Playlist URL>\n\n\tThen,\n\n\tpython diarizer.py <playlist text file name>\n\n""")
+        else:
+            paths = [input_path]
 
     results = []
+
     for path in paths:
         try:
             if path.startswith('http'):
                 logging.debug("MAIN: URL Detected")
                 info_dict = get_youtube(path)
                 if info_dict:
-                    logging.debug("MAIN: Creating path for video file...")
-                    download_path = create_download_directory(info_dict['title'])
-                    logging.debug("MAIN: Path created successfully")
-                    logging.debug("MAIN: Downloading video from yt_dlp...")
-                    video_path = download_video(path, download_path, info_dict, download_video_flag)
-                    logging.debug("MAIN: Video downloaded successfully")
-                    logging.debug("MAIN: Converting video file to WAV...")
-                    audio_file = convert_to_wav(video_path, offset)
-                    logging.debug("MAIN: Audio file converted succesfully")
+                    if 'entries' in info_dict:  # Check if the input is a playlist
+                        logging.debug("MAIN: Creating path for video file...")
+                        download_path = create_download_directory(info_dict['title'])
+                        logging.debug("MAIN: Path created successfully")
+                        logging.debug("MAIN: Downloading video from yt_dlp...")
+                        video_path = download_video(path, download_path, info_dict, download_video_flag)
+                        logging.debug("MAIN: Video downloaded successfully")
+                        logging.debug("MAIN: Converting video file to WAV...")
+                        audio_file = convert_to_wav(video_path, offset)
+                        logging.debug("MAIN: Audio file converted succesfully")
+                    else:
+                        logging.debug("MAIN: Creating path for video file...")
+                        download_path = create_download_directory(info_dict['title'])
+                        logging.debug("MAIN: Path created successfully")
+                        logging.debug("MAIN: Downloading video from yt_dlp...")
+                        video_path = download_video(path, download_path, info_dict, download_video_flag)
+                        logging.debug("MAIN: Video downloaded successfully")
+                        logging.debug("MAIN: Converting video file to WAV...")
+                        audio_file = convert_to_wav(video_path, offset)
+                        logging.debug("MAIN: Audio file converted succesfully")
             else:
                 if os.path.exists(path):
                     logging.debug("MAIN: Local file path detected")
