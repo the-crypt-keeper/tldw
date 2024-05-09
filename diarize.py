@@ -81,7 +81,7 @@ kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.
 kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
 llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
 llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
-ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
 ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
 
 # Retrieve output paths from the configuration file
@@ -1041,60 +1041,47 @@ def summarize_with_kobold(api_url, file_path):
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
 def summarize_with_oobabooga(api_url, file_path):
     try:
-        logging.debug("oobabooga: Loading JSON data")
+        logging.debug("ooba: Loading JSON data")
         with open(file_path, 'r') as file:
             segments = json.load(file)
 
-        logging.debug(f"oobabooga: Extracting text from segments file")
+        logging.debug(f"ooba: Extracting text from segments file\n\n\n")
         text = extract_text_from_segments(segments)
+        logging.debug(f"ooba: Finished extracting text from segments file")
 
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
         }
 
-        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
-        data = {
-            "prompt": prompt_text,
-            "max_new_tokens": 500,
-            "do_sample": True,
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "typical_p": 1,
-            "repetition_penalty": 1.05,
-            "top_k": 40,
-            "min_length": 0,
-            "no_repeat_ngram_size": 0,
-            "num_beams": 1,
-            "penalty_alpha": 0,
-            "length_penalty": 1,
-            "early_stopping": False,
-            "seed": -1,
-            "add_bos_token": True,
-            "truncation_length": 2048,
-            "ban_eos_token": False,
-            "skip_special_tokens": True,
-            "stopping_strings": []
+        prompt_text = "I like to eat cake and bake cakes. I am a baker. I work in a french bakery baking cakes. It is a fun job. I have been baking cakes for ten years. I also bake lots of other baked goods, but cakes are my favorite."
+        # prompt_text += f"\n\n{text}"  # Uncomment this line if you want to include the text variable
+        prompt_text += "\n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
+
+        data =  {
+            "mode": "chat",
+            "character": "Example",
+            "messages": [{"role": "user", "content": prompt_text}]
         }
 
-        logging.debug("oobabooga: Submitting request to API endpoint")
-        print("oobabooga: Submitting request to API endpoint")
-        response = requests.post(api_url, headers=headers, json=data)
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+        logging.debug("ooba: Submitting request to API endpoint")
+        print("ooba: Submitting request to API endpoint")
+        response = requests.post(api_url, headers=headers, json=data, verify=False)
+        logging.debug("ooba: API Response Data: %s", response)
 
         if response.status_code == 200:
-            summary = response_data['results'][0]['text'].strip()
-            logging.debug("oobabooga: Summarization successful")
+            response_data = response.json()
+            summary = response.json()['choices'][0]['message']['content']
+            logging.debug("ooba: Summarization successful")
             print("Summarization successful.")
             return summary
         else:
             logging.error(f"oobabooga: API request failed with status code {response.status_code}: {response.text}")
-            return f"oobabooga: API request failed: {response.text}"
+            return f"ooba: API request failed with status code {response.status_code}: {response.text}"
 
     except Exception as e:
-        logging.error("oobabooga: Error in processing: %s", str(e))
-        return f"oobabooga: Error occurred while processing summary with oobabooga: {str(e)}"
+        logging.error("ooba: Error in processing: %s", str(e))
+        return f"ooba: Error occurred while processing summary with oobabooga: {str(e)}"
 
 
 
@@ -1121,17 +1108,18 @@ def save_summary_to_file(summary, file_path):
 
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
     start_time = time.monotonic()
-    paths = []
     if os.path.isfile(input_path) and input_path.endswith('.txt'):
         logging.debug("MAIN: User passed in a text file, processing text file...")
         paths = read_paths_from_file(input_path)
+    elif os.path.exists(input_path):
+        logging.debug("MAIN: Local file path detected")
+        paths = [input_path]
+    elif (info_dict := get_youtube(input_path)) and 'entries' in info_dict:
+        logging.debug("MAIN: YouTube playlist detected")
+        print("\n\nSorry, but playlists aren't currently supported. You can run the following command to generate a text file that you can then pass into this script though!" + """\n\n\tpython Get_Playlist_URLs.py <Youtube Playlist URL>\n\n\tThen,\n\n\tpython diarizer.py <playlist text file name>\n\n""")
+        return
     else:
-        info_dict = get_youtube(input_path)
-        if 'entries' in info_dict:  # Check if the input is a playlist
-            logging.debug("MAIN: YouTube playlist detected")
-            print("\n\nSorry, but playlists aren't currently supported. You can run the following command to generate a text file that you can then pass into this script though!" + """\n\n\tpython Get_Playlist_URLs.py <Youtube Playlist URL>\n\n\tThen,\n\n\tpython diarizer.py <playlist text file name>\n\n""")
-        else:
-            paths = [input_path]
+        paths = [input_path]
 
     results = []
 
@@ -1141,26 +1129,15 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 logging.debug("MAIN: URL Detected")
                 info_dict = get_youtube(path)
                 if info_dict:
-                    if 'entries' in info_dict:  # Check if the input is a playlist
-                        logging.debug("MAIN: Creating path for video file...")
-                        download_path = create_download_directory(info_dict['title'])
-                        logging.debug("MAIN: Path created successfully")
-                        logging.debug("MAIN: Downloading video from yt_dlp...")
-                        video_path = download_video(path, download_path, info_dict, download_video_flag)
-                        logging.debug("MAIN: Video downloaded successfully")
-                        logging.debug("MAIN: Converting video file to WAV...")
-                        audio_file = convert_to_wav(video_path, offset)
-                        logging.debug("MAIN: Audio file converted succesfully")
-                    else:
-                        logging.debug("MAIN: Creating path for video file...")
-                        download_path = create_download_directory(info_dict['title'])
-                        logging.debug("MAIN: Path created successfully")
-                        logging.debug("MAIN: Downloading video from yt_dlp...")
-                        video_path = download_video(path, download_path, info_dict, download_video_flag)
-                        logging.debug("MAIN: Video downloaded successfully")
-                        logging.debug("MAIN: Converting video file to WAV...")
-                        audio_file = convert_to_wav(video_path, offset)
-                        logging.debug("MAIN: Audio file converted succesfully")
+                    logging.debug("MAIN: Creating path for video file...")
+                    download_path = create_download_directory(info_dict['title'])
+                    logging.debug("MAIN: Path created successfully")
+                    logging.debug("MAIN: Downloading video from yt_dlp...")
+                    video_path = download_video(path, download_path, info_dict, download_video_flag)
+                    logging.debug("MAIN: Video downloaded successfully")
+                    logging.debug("MAIN: Converting video file to WAV...")
+                    audio_file = convert_to_wav(video_path, offset)
+                    logging.debug("MAIN: Audio file converted succesfully")
             else:
                 if os.path.exists(path):
                     logging.debug("MAIN: Local file path detected")
@@ -1186,28 +1163,49 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
                         api_key = openai_api_key
-                        summary = summarize_with_openai(api_key, json_file_path, openai_model)
+                        try:
+                            summary = summarize_with_openai(api_key, json_file_path, openai_model)
+                        except requests.exceptions.ConnectionError:
+                            r.status_code = "Connection: "
                     elif api_name.lower() == 'anthropic':
                         api_key = anthropic_api_key
-                        summary = summarize_with_claude(api_key, json_file_path, anthropic_model)
+                        try:
+                            summary = summarize_with_claude(api_key, json_file_path, anthropic_model)
+                        except requests.exceptions.ConnectionError:
+                            r.status_code = "Connection: "
                     elif api_name.lower() == 'cohere':
                         api_key = cohere_api_key
-                        summary = summarize_with_cohere(api_key, json_file_path, cohere_model)
+                        try:
+                            summary = summarize_with_cohere(api_key, json_file_path, cohere_model)
+                        except requests.exceptions.ConnectionError:
+                            r.status_code = "Connection: "
                     elif api_name.lower() == 'groq':
                         api_key = groq_api_key
-                        summary = summarize_with_groq(api_key, json_file_path, groq_model)
+                        try:
+                            summary = summarize_with_groq(api_key, json_file_path, groq_model)
+                        except requests.exceptions.ConnectionError:
+                            r.status_code = "Connection: "
                     elif api_name.lower() == 'llama':
                         token = llama_api_key
                         llama_ip = llama_api_IP
-                        summary = summarize_with_llama(llama_ip, json_file_path, token)
+                        try:
+                            summary = summarize_with_llama(llama_ip, json_file_path, token)
+                        except requests.exceptions.ConnectionError:
+                            r.status_code = "Connection: "
                     elif api_name.lower() == 'kobold':
                         token = kobold_api_key
                         kobold_ip = kobold_api_IP
-                        summary = summarize_with_kobold(kobold_ip, json_file_path)
-                    elif api_name.lower() == 'oobabooga':
+                        try:
+                            summary = summarize_with_kobold(kobold_ip, json_file_path)
+                        except requests.exceptions.ConnectionError:
+                            r.status_code = "Connection: "
+                    elif api_name.lower() == 'ooba':
                         token = ooba_api_key
                         ooba_ip = ooba_api_IP
-                        summary = summarize_with_oobabooga(oobabooga_ip, json_file_path)
+                        try:
+                            summary = summarize_with_oobabooga(ooba_ip, json_file_path)
+                        except requests.exceptions.ConnectionError:
+                            r.status_code = "Connection: "
                     else:
                         logging.warning(f"Unsupported API: {api_name}")
                         summary = None
