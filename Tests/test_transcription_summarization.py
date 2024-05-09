@@ -6,26 +6,22 @@ from unittest.mock import patch, MagicMock
 
 # Run this: python -m unittest test_transcription_summarization.py
 """
-1. Test error handling:
-    You mentioned testing error handling in the comments, but there are no specific tests for it in the script. Consider adding tests that intentionally raise exceptions or simulate error conditions to ensure that the script handles them gracefully. Use assertRaises to check if the expected exceptions are raised.
-2. Test convert_to_wav:
+1. Test File/Path parsing
+2. Test if file is identified as existing/not existing successfully
+3. Implement tests for each API endpoint
+4. Test wav conversion
     In the test_convert_to_wav test, you can enhance it by creating a temporary video file using a library like cv2 or moviepy and then testing the conversion with the actual file. This will make the test more comprehensive.
-3. Test summarization functions:
-    You have a test for summarize_with_openai, but there are no tests for other summarization functions like summarize_with_claude, summarize_with_cohere, etc. Consider adding tests for each summarization function to ensure they work as expected.
-4. Parameterized tests:
-    You mentioned using parameterized tests in the comments, but the current script doesn't include any. Consider using the @parameterized decorator from the parameterized library to create parameterized tests. This allows you to test the script with different input paths, API names, models, and configurations without duplicating test code.
-5. Integration tests:
+5. Error handling
+    You mentioned testing error handling in the comments, but there are no specific tests for it in the script. Consider adding tests that intentionally raise exceptions or simulate error conditions to ensure that the script handles them gracefully. Use assertRaises to check if the expected exceptions are raised.
+6. Integration tests:
     The test_main function is a good example of an integration test. Consider adding more integration tests that cover different scenarios and combinations of input paths, API names, and configurations to ensure the script works end-to-end.
-6. Test coverage:
+7. Test summarization functions:
+    You have a test for summarize_with_openai, but there are no tests for other summarization functions like summarize_with_claude, summarize_with_cohere, etc. Consider adding tests for each summarization function to ensure they work as expected.
+8. Test coverage:
     Use a test coverage tool like coverage to measure the test coverage of your script. This helps identify areas that may require additional testing. You can run the tests with coverage and generate a coverage report to see which lines of code are covered by the tests.
-7. Naming conventions:
-    Follow consistent naming conventions for test methods and variables. For example, use test_ prefix for test method names and mock_ prefix for mocked objects.
-8. Docstrings and comments:
-    Add docstrings to each test method to describe what the test is verifying. This improves the readability and maintainability of the test script. You can also add comments to explain complex test setups or assertions.
-9. Integration tests:
-    Write integration tests that cover the entire flow of the script, from processing the input path to generating the summary.
-    Use a combination of real and mocked dependencies to test the integration between different components.
-10. Parameterized tests:
+9. Naming conventions:
+10. Docstrings and comments:
+11. Parameterized tests:
     Use parameterized tests to test the script with different input paths, API names, models, and other configurations.
     This allows you to cover a wide range of scenarios without duplicating test code.
 """
