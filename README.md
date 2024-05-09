@@ -32,15 +32,16 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
     * Or pass the `--api_url` argument with the `IP:Port` to avoid making changes to the `config.txt` file.
     * If the self-hosted server requires an API key, modify the appropriate api_key variable in the `config.txt` file.
   * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach. This works for big context LLMs, but not everyone has access to them, and some transcriptions may be even longer, so we need to have an approach that can handle those cases.
-- **APIs Supported**
+- **APIs Currently Supported**
   1. Anthropic
   2. Cohere
   3. Groq
   4. Llama.cpp
   5. Kobold.cpp
-  5. TabbyAPI
-  6. OpenAI
-  7. Oobabooga
+  6. Oobabooga
+- **Planned to Support**
+  1. TabbyAPI
+
 
 
 ### <a name="using"></a>Using
@@ -129,12 +130,16 @@ By default videos, transcriptions and summaries are stored in a folder with the 
   4. If you want summarization, add your API keys (if not using a local LLM) to the `config.txt` file, and then re-run the script, passing in the name of the API [or URL endpoint - to be added] to the script.
     * `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic` - This will attempt to download the video, then upload the resulting json file to the anthropic API endpoint, referring to values set in the config file (API key and model) to request summarization.
     - Anthropic:
-      * Opus: `claude-3-opus-20240229`
-      * Sonnet: `claude-3-sonnet-20240229`
-      * Haiku: `claude-3-haiku-20240307`
+      * `claude-3-opus-20240229`
+      * `claude-3-sonnet-20240229`
+      * `claude-3-haiku-20240307`
     - Cohere: 
       * `command-r`
       * `command-r-plus`
+    - Groq
+      * `llama3-8b-8192`
+      * `llama3-70b-8192`
+      * `mixtral-8x7b-32768`
     - OpenAI:
       * `gpt-4-turbo`
       * `gpt-4-turbo-preview`
