@@ -8,13 +8,13 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
 
 ### tl/dr: Download Videos -> Transcribe -> Summarize. Scripted.
 - **Download Audio only from URL -> Transcribe audio:**
-  * `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
+  * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
 - **Download Audio+Video from URL -> Transcribe audio from Video:**
-  * `python diarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
+  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
 - **Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` i.e. llama.cpp/`ooba`/`kobold`/`tabby`) API:**
-  * `python diarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>`
+  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>`
 - **Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
-  * `python diarize.py ./local/file_on_your/system --api_name <API_name>`
+  * `python summarize.py ./local/file_on_your/system --api_name <API_name>`
 
 ### Table of Contents
 - [What?](#what)
@@ -46,16 +46,16 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
 
 ### <a name="using"></a>Using
 - Single file (remote URL) transcription
-  * Single URL: `python diarize.py https://example.com/video.mp4`
+  * Single URL: `python summarize.py https://example.com/video.mp4`
 - Single file (local) transcription)
-  * Transcribe a local file: `python diarize.py /path/to/your/localfile.mp4`
+  * Transcribe a local file: `python summarize.py /path/to/your/localfile.mp4`
 - Multiple files (local & remote)
-  * List of Files(can be URLs and local files mixed): `python diarize.py ./path/to/your/text_file.txt"`
+  * List of Files(can be URLs and local files mixed): `python summarize.py ./path/to/your/text_file.txt"`
 
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
-usage: diarize.py [-h] [--api_name API_NAME] [--api_key API_KEY] [--num_speakers NUM_SPEAKERS] [--whisper_model WHISPER_MODEL] [--offset OFFSET]
+usage: summarize.py [-h] [--api_name API_NAME] [--api_key API_KEY] [--num_speakers NUM_SPEAKERS] [--whisper_model WHISPER_MODEL] [--offset OFFSET]
                   [--vad_filter] [--log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
                   [input_path]
 
@@ -83,16 +83,16 @@ options:
 
 
 -Download Audio only from URL -> Transcribe audio:
->python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
+>python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
 
 -Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` i.e. llama.cpp/`ooba`/`kobold`/`tabby`) API:
->python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>
+>python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>
 
 -Download Audio+Video from URL -> Transcribe audio from Video:
->python diarize.py --video https://www.youtube.com/watch?v=4nd1CDZP21s
+>python summarize.py --video https://www.youtube.com/watch?v=4nd1CDZP21s
 
 -Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:
->python diarize.py --video ./local/file_on_your/system --api_name <API_name>
+>python summarize.py --video ./local/file_on_your/system --api_name <API_name>
 
 By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
 ```
@@ -110,7 +110,7 @@ By default videos, transcriptions and summaries are stored in a folder with the 
     4. See `Linux && Windows`
 - **Linux && Windows**
     1. `pip install -r requirements.txt` - may take a bit of time...
-    2. Run `python ./diarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
+    2. Run `python ./summarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
     3. You'll then be asked if you'd like to run the transcription through GPU(1) or CPU(2).
     4. Next, the video will be downloaded to the local directory by ytdl.
     5. Then the video will be transcribed by faster_whisper. (You can see this in the console output)
@@ -126,9 +126,9 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 - **Workflow**
   1. Setup python + packages
   2. Setup ffmpeg
-  3. Run `python diarize.py <video_url>` or `python diarize.py <List_of_videos.txt>`
+  3. Run `python summarize.py <video_url>` or `python summarize.py <List_of_videos.txt>`
   4. If you want summarization, add your API keys (if not using a local LLM) to the `config.txt` file, and then re-run the script, passing in the name of the API [or URL endpoint - to be added] to the script.
-    * `python diarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic` - This will attempt to download the video, then upload the resulting json file to the anthropic API endpoint, referring to values set in the config file (API key and model) to request summarization.
+    * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic` - This will attempt to download the video, then upload the resulting json file to the anthropic API endpoint, referring to values set in the config file (API key and model) to request summarization.
     - Anthropic:
       * `claude-3-opus-20240229`
       * `claude-3-sonnet-20240229`
@@ -145,7 +145,7 @@ By default videos, transcriptions and summaries are stored in a folder with the 
       * `gpt-4-turbo-preview`
       * `gpt-4`
 - **What's in the repo?**
-  - `diarize.py` - download, transcribe and diarize audio
+  - `summarize.py` - download, transcribe and summarize audio
     1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
     2. Next, it uses [ffmpeg](https://github.com/FFmpeg/FFmpeg) to convert the resulting `.m4a` file to `.wav`
     3. Then it uses [faster_whisper](https://github.com/SYSTRAN/faster-whisper) to transcribe the `.wav` file to `.txt`
