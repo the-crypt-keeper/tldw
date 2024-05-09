@@ -280,6 +280,7 @@ def download_ffmpeg():
 
 def read_paths_from_file(file_path):
     """ Reads a file containing URLs or local file paths and returns them as a list. """
+    paths = []  # Initialize paths as an empty list
     with open(file_path, 'r') as file:
         for line in file:
             line = line.strip()
@@ -719,6 +720,8 @@ def extract_text_from_segments(segments):
     text = ' '.join([segment['text'] for segment in segments])
     return text
 
+
+
 def summarize_with_openai(api_key, file_path, model):
     try:
         logging.debug("openai: Loading json data for summarization")
@@ -1156,7 +1159,65 @@ def launch_ui():
         description="Submit a video URL for transcription and summarization.",
         allow_flagging="never"
     )
-    iface.launch()
+
+
+# FIXME - c/p from openai - only to be used when configured with Gradio for HF Space
+def summarize_with_huggingface(api_key, file_path):
+    try:
+        logging.debug("openai: Loading json data for summarization")
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
+        
+        logging.debug("openai: Extracting text from the segments")
+        text = extract_text_from_segments(segments)
+
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        logging.debug("openai: Preparing data + prompt for submittal")
+        prompt_text = f"{text} \n\n\n\nPlease provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points"
+        data = {
+            "model": "CohereForAI/c4ai-command-r-plus",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a professional summarizer."
+                },
+                {
+                    "role": "user",
+                    "content": prompt_text
+                }
+            ],
+            "max_tokens": 4096,  # Adjust tokens as needed
+            "temperature": 0.7
+        }
+        logging.debug("openai: Posting request")
+        response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+        
+        if response.status_code == 200:
+            summary = response.json()['choices'][0]['message']['content'].strip()
+            logging.debug("openai: Summarization successful")
+            print("Summarization successful.")
+            return summary
+        else:
+            logging.debug("openai: Summarization failed")
+            print("Failed to process summary:", response.text)
+            return None
+    except Exception as e:
+        logging.debug("openai: Error in processing: %s", str(e))
+        print("Error occurred while processing summary with openai:", str(e))
+        return None
+
+
+
+    def same_auth(username, password):
+        return username == password
+
+
+
+    iface.launch(auth=same_auth,share=True)
 
 #
 #
@@ -1174,6 +1235,7 @@ def launch_ui():
 
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
     start_time = time.monotonic()
+    paths = []  # Initialize paths as an empty list
     if os.path.isfile(input_path) and input_path.endswith('.txt'):
         logging.debug("MAIN: User passed in a text file, processing text file...")
         paths = read_paths_from_file(input_path)
@@ -1182,11 +1244,10 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
         paths = [input_path]
     elif (info_dict := get_youtube(input_path)) and 'entries' in info_dict:
         logging.debug("MAIN: YouTube playlist detected")
-        print("\n\nSorry, but playlists aren't currently supported. You can run the following command to generate a text file that you can then pass into this script though!" + """\n\n\tpython Get_Playlist_URLs.py <Youtube Playlist URL>\n\n\tThen,\n\n\tpython diarizer.py <playlist text file name>\n\n""")
+        print("\n\nSorry, but playlists aren't currently supported. You can run the following command to generate a text file that you can then pass into this script though! (It may not work... playlist support seems spotty)" + """\n\n\tpython Get_Playlist_URLs.py <Youtube Playlist URL>\n\n\tThen,\n\n\tpython diarizer.py <playlist text file name>\n\n""")
         return
     else:
         paths = [input_path]
-
     results = []
 
     for path in paths:

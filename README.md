@@ -1,20 +1,20 @@
-# TL/DW: Too Long, Didnt Watch
+# [**TL/DW: Too Long, Didnt Watch - Download, Transcribe & Summarize Videos. All automated. (public instance link)**](https://hf.co/app)
+
+![License](https://img.shields.io/badge/license-apache2.0-green)
+
+### What is TL/DW?
 
 Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. Any site supported by yt-dl is supported, so you can use this with sites besides just youtube.
 
 I personally recommend Sonnet, for the price, it's very nice.
 
-Original: `YouTube contains an incredible amount of knowledge, much of which is locked inside multi-hour videos.  Let's extract and summarize it with AI!`
+### Application Demo
+CLI
+![tldw-summarization-cli-demo](cli-demo-video)
+GUI
+![tldw-summarization-gui-demo](gui-demo-video)
 
-### tl/dr: Download Videos -> Transcribe -> Summarize. Scripted.
-- **Download Audio only from URL -> Transcribe audio:**
-  * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
-- **Download Audio+Video from URL -> Transcribe audio from Video:**
-  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
-- **Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
-  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>`
-- **Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
-  * `python summarize.py ./local/file_on_your/system --api_name <API_name>`
+----------
 
 ### Table of Contents
 - [What?](#what)
@@ -24,14 +24,39 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
 - [Setting up a Local LLM Inference Engine](#localllm)
 - [Credits](#credits)
 
+
+
+### Quickstart after Installation
+- **Download Audio only from URL -> Transcribe audio:**
+  * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
+- **Download Audio+Video from URL -> Transcribe audio from Video:**
+  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
+- **Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
+  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>`
+- **Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
+  * `python summarize.py ./local/file_on_your/system --api_name <API_name>`
+
+
+
 ### <a name="what"></a>What?
-- Use the script to (download->)transcribe(->summarize) a local file or remote url. 
-  * Any youtube video. (Playlists you have to use the `Get_Playlist_URLs.py` with `Get_Playlist_URLs.py <Playlist URL>` and it'll create a text file with all the URLs for each video, so you can pass the text file as input and they'll all be downloaded. Pull requests are welcome.)
+- **Use the script to (download->)transcribe(->summarize) a local file or remote url.**
+- **What can you transcribe and summarize?**
+  * **Any youtube video.**
+    * (Playlists you have to use the `Get_Playlist_URLs.py` with `Get_Playlist_URLs.py <Playlist URL>` and it'll create a text file with all the URLs for each video, so you can pass the text file as input and they'll all be downloaded. Pull requests are welcome.)
     * Any url youtube-dl supports _should_ work.
-  * If you pass an API name (anthropic/cohere/grok/openai/) as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well. 
-    * Alternatively, you can pass `llama`/`ooba`/`kobold`/`tabby` and have the script perform a request to your local API endpoint for summarization. You will need to modify the `llama_api_IP` value in the `config.txt` to reflect the `IP:Port` of your local server.
-    * Or pass the `--api_url` argument with the `IP:Port` to avoid making changes to the `config.txt` file.
-    * If the self-hosted server requires an API key, modify the appropriate api_key variable in the `config.txt` file.
+  * **Local Videos**
+    * Pass in the filepath to any local video file, and it will be transcribed.
+    * You can also pass in a text file containing a list of videos for batch processing.
+- **How does it Summarize?**
+  - **Remote Summarization**
+    * Pass an API name (anthropic/cohere/grok/openai/) as an argument, ex: `-api anthropic`
+    * Add your API key to the `config.txt` file
+    * The script when ran, will detect that you passed an API name, and will perform summarization of the resulting transcription.
+  - **Local Summarization**
+    * Alternatively, you can pass `llama`/`ooba`/`kobold`/`tabby` as the API name and have the script perform a request to your local API endpoint for summarization. 
+      * You will need to modify the `<endpoint_name>_api_IP` value in the `config.txt` to reflect the `IP:Port` of your local server.
+      * Or pass the `--api_url` argument with the `IP:Port` to avoid making changes to the `config.txt` file.
+      * If the self-hosted server requires an API key, modify the appropriate api_key variable in the `config.txt` file.
   * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach. This works for big context LLMs, but not everyone has access to them, and some transcriptions may be even longer, so we need to have an approach that can handle those cases.
 - **APIs Currently Supported**
   1. Anthropic
@@ -42,6 +67,32 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
   6. Oobabooga
 - **Planned to Support**
   1. TabbyAPI
+
+----------
+
+### <a name="setup"></a>Setup
+- **Linux**
+    1. Download necessary packages (Python3, ffmpeg[sudo apt install ffmpeg / dnf install ffmpeg], ?)
+    2. Create a virtual env: `python -m venv ./`
+    3. Launch/activate your virtual env: `. .\scripts\activate.sh`
+    4. See `Linux && Windows`
+- **Windows**
+    1. Download necessary packages (Python3, [ffmpeg](https://www.gyan.dev/ffmpeg/builds/), ?)
+    2. Create a virtual env: `python -m venv .\`
+    3. Launch/activate your virtual env: `. .\scripts\activate.ps1`
+    4. See `Linux && Windows`
+- **Linux && Windows**
+    1. `pip install -r requirements.txt` - may take a bit of time...
+    2. Run `python ./summarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
+    3. You'll then be asked if you'd like to run the transcription through GPU(1) or CPU(2).
+    4. Next, the video will be downloaded to the local directory by ytdl.
+    5. Then the video will be transcribed by faster_whisper. (You can see this in the console output)
+      * The resulting transcription output will be stored as both a json file with timestamps, as well as a txt file with no timestamps.
+    6. Finally, you can have the transcription summarized through feeding it into an LLM of your choice.
+    7. For running it locally, here's the commands to do so:
+      * FIXME
+    8. For feeding the transcriptions to the API of your choice, simply use the corresponding script for your API provider.
+      * FIXME: add scripts for OpenAI api (generic) and others
 
 
 
@@ -98,29 +149,40 @@ options:
 By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
 ```
 
-### <a name="setup"></a>Setup
-- **Linux**
-    1. Download necessary packages (Python3, ffmpeg[sudo apt install ffmpeg / dnf install ffmpeg], ?)
-    2. Create a virtual env: `python -m venv ./`
-    3. Launch/activate your virtual env: `. .\scripts\activate.sh`
-    4. See `Linux && Windows`
-- **Windows**
-    1. Download necessary packages (Python3, [ffmpeg](https://www.gyan.dev/ffmpeg/builds/), ?)
-    2. Create a virtual env: `python -m venv .\`
-    3. Launch/activate your virtual env: `. .\scripts\activate.ps1`
-    4. See `Linux && Windows`
-- **Linux && Windows**
-    1. `pip install -r requirements.txt` - may take a bit of time...
-    2. Run `python ./summarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
-    3. You'll then be asked if you'd like to run the transcription through GPU(1) or CPU(2).
-    4. Next, the video will be downloaded to the local directory by ytdl.
-    5. Then the video will be transcribed by faster_whisper. (You can see this in the console output)
-      * The resulting transcription output will be stored as both a json file with timestamps, as well as a txt file with no timestamps.
-    6. Finally, you can have the transcription summarized through feeding it into an LLM of your choice.
-    7. For running it locally, here's the commands to do so:
-      * FIXME
-    8. For feeding the transcriptions to the API of your choice, simply use the corresponding script for your API provider.
-      * FIXME: add scripts for OpenAI api (generic) and others
+
+------------
+
+### <a name="localllm"></a>Setting up a Local LLM Inference Engine
+- **Setting up Local LLM Runner**
+  - **Llama.cpp**
+    - **Linux & Mac**
+      1. `git clone https://github.com/ggerganov/llama.cpp`
+      2. `make` in the `llama.cpp` folder 
+      3. `./server -m ../path/to/model -c <context_size>`
+    - **Windows**
+      1. `git clone https://github.com/ggerganov/llama.cpp/tree/master/examples/server`
+      2. Download + Run: https://github.com/skeeto/w64devkit/releases
+      3. cd to `llama.cpp` folder make` in the `llama.cpp` folder
+      4. `server.exe -m ..\path\to\model -c <context_size>`
+  - **Kobold.cpp** - c/p'd from: https://github.com/LostRuins/koboldcpp/wiki
+    - **Windows**
+      1. Download from here: https://github.com/LostRuins/koboldcpp/releases/latest
+      2. `Double click KoboldCPP.exe and select model OR run "KoboldCPP.exe --help" in CMD prompt to get command line arguments for more control.`
+      3. `Generally you don't have to change much besides the Presets and GPU Layers. Run with CuBLAS or CLBlast for GPU acceleration.`
+      4. `Select your GGUF or GGML model you downloaded earlier, and connect to the displayed URL once it finishes loading.`
+    - **Linux**
+      1. `On Linux, we provide a koboldcpp-linux-x64 PyInstaller prebuilt binary on the releases page for modern systems. Simply download and run the binary.`
+        * Alternatively, you can also install koboldcpp to the current directory by running the following terminal command: `curl -fLo koboldcpp https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-linux-x64 && chmod +x koboldcpp`
+      2. When you can't use the precompiled binary directly, we provide an automated build script which uses conda to obtain all dependencies, and generates (from source) a ready-to-use a pyinstaller binary for linux users. Simply execute the build script with `./koboldcpp.sh dist` and run the generated binary.
+  - **Exvllama2**
+- **Setting up a Local LLM Model**
+  1. microsoft/Phi-3-mini-128k-instruct - 3.8B Model/7GB base, 4GB Q8 - https://huggingface.co/microsoft/Phi-3-mini-128k-instruct
+    * GGUF Quants: https://huggingface.co/pjh64/Phi-3-mini-128K-Instruct.gguf
+  2. Meta Llama3-8B - 8B Model/16GB base, 8.5GB Q8  - https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
+    * GGUF Quants: https://huggingface.co/lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF
+
+
+----------
 
 
 ### <a name="pieces"></a>Pieces & What's in the repo?
@@ -159,36 +221,7 @@ By default videos, transcriptions and summaries are stored in a folder with the 
   - `compare-app.py` - summary viewer webapp
 
 
-### <a name="localllm"></a>Setting up a Local LLM Inference Engine
-- **Setting up Local LLM Runner**
-  - **Llama.cpp**
-    - **Linux & Mac**
-      1. `git clone https://github.com/ggerganov/llama.cpp`
-      2. `make` in the `llama.cpp` folder 
-      3. `./server -m ../path/to/model -c <context_size>`
-    - **Windows**
-      1. `git clone https://github.com/ggerganov/llama.cpp/tree/master/examples/server`
-      2. Download + Run: https://github.com/skeeto/w64devkit/releases
-      3. cd to `llama.cpp` folder make` in the `llama.cpp` folder
-      4. `server.exe -m ..\path\to\model -c <context_size>`
-  - **Kobold.cpp** - c/p'd from: https://github.com/LostRuins/koboldcpp/wiki
-    - **Windows**
-      1. Download from here: https://github.com/LostRuins/koboldcpp/releases/latest
-      2. `Double click KoboldCPP.exe and select model OR run "KoboldCPP.exe --help" in CMD prompt to get command line arguments for more control.`
-      3. `Generally you don't have to change much besides the Presets and GPU Layers. Run with CuBLAS or CLBlast for GPU acceleration.`
-      4. `Select your GGUF or GGML model you downloaded earlier, and connect to the displayed URL once it finishes loading.`
-    - **Linux**
-      1. `On Linux, we provide a koboldcpp-linux-x64 PyInstaller prebuilt binary on the releases page for modern systems. Simply download and run the binary.`
-        * Alternatively, you can also install koboldcpp to the current directory by running the following terminal command: `curl -fLo koboldcpp https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-linux-x64 && chmod +x koboldcpp`
-      2. When you can't use the precompiled binary directly, we provide an automated build script which uses conda to obtain all dependencies, and generates (from source) a ready-to-use a pyinstaller binary for linux users. Simply execute the build script with `./koboldcpp.sh dist` and run the generated binary.
-  - **Exvllama2**
-- **Setting up a Local LLM Model**
-  1. microsoft/Phi-3-mini-128k-instruct - 3.8B Model/7GB base, 4GB Q8 - https://huggingface.co/microsoft/Phi-3-mini-128k-instruct
-    * GGUF Quants: https://huggingface.co/pjh64/Phi-3-mini-128K-Instruct.gguf
-  2. Meta Llama3-8B - 8B Model/16GB base, 8.5GB Q8  - https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
-    * GGUF Quants: https://huggingface.co/lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF
-
-
+------------
 
 ### <a name="credits"></a>Credits
 - [original](https://github.com/the-crypt-keeper/tldw)
