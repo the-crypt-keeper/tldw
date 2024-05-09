@@ -14,7 +14,7 @@ kobold_api_IP = http://127.0.0.1:5001/api/v1/generate
 llama_api_key = <llama.cpp api key>
 llama_api_IP = http://127.0.0.1:8080/completion
 ooba_api_key = <ooba api key>
-ooba_api_IP = http://127.0.0.1:5000/api/v1/generate
+ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
 
 [Paths]
 output_path = Results
