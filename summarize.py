@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
+import gradio as gr
 import argparse, configparser, datetime, json, logging, os, platform, requests, shutil, subprocess, sys, time, unicodedata
 import zipfile
 from datetime import datetime
 import contextlib
-import ffmpeg # Used for issuing commands to underlying ffmpeg executable, pip package ffmpeg is from 2018
+import ffmpeg
 import torch
 import yt_dlp
 
@@ -1101,6 +1102,71 @@ def save_summary_to_file(summary, file_path):
 
 
 
+####################################################################################################################################
+# Gradio UI
+#
+
+def process_url(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
+    try:
+        results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset, vad_filter=vad_filter, download_video_flag=download_video_flag)
+        
+        if results:
+            transcription_result = results[0]
+            json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+            with open(json_file_path, 'r') as file:
+                json_data = json.load(file)
+            
+            summary = transcription_result.get('summary', '')
+            
+            return json_data, summary, json_file_path, json_file_path.replace('.segments.json', '_summary.txt')
+        else:
+            return None, "No results found.", None, None
+    except Exception as e:
+        error_message = f"An error occurred: {str(e)}"
+        return None, error_message, None, None
+
+
+
+def launch_ui():
+    def process_transcription(json_data):
+        if json_data:
+            return "\n".join([item["text"] for item in json_data])
+        else:
+            return ""
+
+    iface = gr.Interface(
+        fn=process_url,
+        inputs=[
+            gr.components.Textbox(label="URL"),
+            gr.components.Dropdown(choices=["openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], label="API Name"),
+            gr.components.Textbox(label="API Key"),
+            gr.components.Number(value=2, label="Number of Speakers"),
+            gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
+            gr.components.Number(value=0, label="Offset"),
+            gr.components.Checkbox(value=False, label="VAD Filter"),
+            gr.components.Checkbox(value=False, label="Download Video")
+        ],
+        outputs=[
+            gr.components.Textbox(label="Transcription", value=lambda: "", max_lines=10),
+            gr.components.Textbox(label="Summary"),
+            gr.components.File(label="Download Transcription JSON"),
+            gr.components.File(label="Download Summary")
+        ],
+        title="Video Transcription and Summarization",
+        description="Submit a video URL for transcription and summarization.",
+        allow_flagging="never"
+    )
+    iface.launch()
+
+#
+#
+####################################################################################################################################
+
+
+
+
+
+
 
 ####################################################################################################################################
 # Main()
@@ -1238,12 +1304,16 @@ if __name__ == "__main__":
     parser.add_argument('-off', '--offset', type=int, default=0, help='Offset in seconds (default: 0)')
     parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
     parser.add_argument('-log', '--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
+    parser.add_argument('-ui', '--user_interface', action='store_true', help='Launch the Gradio user interface')
     #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
-    if args.input_path is None:
-        parser.print_help()
-        sys.exit(1)
+    if args.user_interface:
+        launch_ui()
+    else:
+        if args.input_path is None:
+            parser.print_help()
+            sys.exit(1)
 
     logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 

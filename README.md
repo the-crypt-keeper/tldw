@@ -11,7 +11,7 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
   * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
 - **Download Audio+Video from URL -> Transcribe audio from Video:**
   * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
-- **Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` i.e. llama.cpp/`ooba`/`kobold`/`tabby`) API:**
+- **Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
   * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>`
 - **Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
   * `python summarize.py ./local/file_on_your/system --api_name <API_name>`
@@ -25,8 +25,9 @@ Original: `YouTube contains an incredible amount of knowledge, much of which is 
 - [Credits](#credits)
 
 ### <a name="what"></a>What?
-- Use the script to transcribe a local file or remote url. 
-  * Any url youtube-dl supports _should_ work.
+- Use the script to (download->)transcribe(->summarize) a local file or remote url. 
+  * Any youtube video. (Playlists you have to use the `Get_Playlist_URLs.py` with `Get_Playlist_URLs.py <Playlist URL>` and it'll create a text file with all the URLs for each video, so you can pass the text file as input and they'll all be downloaded. Pull requests are welcome.)
+    * Any url youtube-dl supports _should_ work.
   * If you pass an API name (anthropic/cohere/grok/openai/) as a second argument, and add your API key to the config file, you can have your resulting transcriptions summarized as well. 
     * Alternatively, you can pass `llama`/`ooba`/`kobold`/`tabby` and have the script perform a request to your local API endpoint for summarization. You will need to modify the `llama_api_IP` value in the `config.txt` to reflect the `IP:Port` of your local server.
     * Or pass the `--api_url` argument with the `IP:Port` to avoid making changes to the `config.txt` file.
