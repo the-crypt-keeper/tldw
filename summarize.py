@@ -359,14 +359,16 @@ def process_url(input_path, num_speakers=2, whisper_model="small.en", offset=0, 
             
             summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
             if os.path.exists(summary_file_path):
-                return json_data, summary_file_path, json_file_path, summary_file_path
+                video_file_path = transcription_result['video_path'] if download_video_flag else None                
+                return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
             else:
-                return json_data, "Summary not available.", json_file_path, None
+                video_file_path = transcription_result['video_path'] if download_video_flag else None
+                return json_data, "Summary not available.", json_file_path, None, video_file_path
         else:
-            return None, "No results found.", None, None
+            return None, "No results found.", None, None, None
     except Exception as e:
         error_message = f"An error occurred: {str(e)}"
-        return None, error_message, None, None
+        return None, error_message, None, None, None
 
 
 
@@ -474,7 +476,7 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
 
         output_file_path = os.path.join(download_path, f"{title}.mp4")
 
-        if userOS == "Windows":
+        if sys.platform.startswith('win'):
             logging.debug("Running ffmpeg on Windows...")
             ffmpeg_command = [
                 '.\\Bin\\ffmpeg.exe',
@@ -1233,7 +1235,8 @@ def launch_ui(demo_mode=False):
             gr.components.Textbox(label="Transcription", value=lambda: "", max_lines=10),
             gr.components.Textbox(label="Summary or Status Message"),
             gr.components.File(label="Download Transcription as JSON"),
-            gr.components.File(label="Download Summary as text", visible=lambda summary_file_path: summary_file_path is not None)
+            gr.components.File(label="Download Summary as text", visible=lambda summary_file_path: summary_file_path is not None),
+            gr.components.File(label="Download Video", visible=lambda video_file_path: video_file_path is not None)
         ],
         title="Video Transcription and Summarization",
         description="Submit a video URL for transcription and summarization.",
