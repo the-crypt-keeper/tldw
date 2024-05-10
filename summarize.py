@@ -1203,8 +1203,8 @@ def launch_ui():
         allow_flagging="never"
     )
 
-    #iface.launch(auth=same_auth,share=False)
-    iface.launch()
+    #iface.launch(auth=same_auth,share=True)
+    iface.launch(share=False)
 
 #
 #
