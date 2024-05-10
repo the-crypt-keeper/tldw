@@ -161,7 +161,7 @@ By default videos, transcriptions and summaries are stored in a folder with the 
       2. `make` in the `llama.cpp` folder 
       3. `./server -m ../path/to/model -c <context_size>`
     - **Windows**
-      1. `git clone https://github.com/ggerganov/llama.cpp/tree/master/examples/server`
+      1. `git clone https://github.com/ggerganov/llama.cpp`
       2. Download + Run: https://github.com/skeeto/w64devkit/releases
       3. cd to `llama.cpp` folder make` in the `llama.cpp` folder
       4. `server.exe -m ..\path\to\model -c <context_size>`
@@ -175,6 +175,13 @@ By default videos, transcriptions and summaries are stored in a folder with the 
       1. `On Linux, we provide a koboldcpp-linux-x64 PyInstaller prebuilt binary on the releases page for modern systems. Simply download and run the binary.`
         * Alternatively, you can also install koboldcpp to the current directory by running the following terminal command: `curl -fLo koboldcpp https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-linux-x64 && chmod +x koboldcpp`
       2. When you can't use the precompiled binary directly, we provide an automated build script which uses conda to obtain all dependencies, and generates (from source) a ready-to-use a pyinstaller binary for linux users. Simply execute the build script with `./koboldcpp.sh dist` and run the generated binary.
+  - **oobabooga - text-generation-webui** - https://github.com/oobabooga/text-generation-webui
+    1. Clone or download the repository.
+      * Clone: `git clone https://github.com/oobabooga/text-generation-webui`
+      * Download: https://github.com/oobabooga/text-generation-webui/releases/latest -> Download the `Soruce code (zip)` file -> Extract -> Continue below.
+    2. Run the `start_linux.sh`, `start_windows.bat`, `start_macos.sh`, or `start_wsl.bat` script depending on your OS.
+    3. Select your GPU vendor when asked.
+    4. Once the installation ends, browse to http://localhost:7860/?__theme=dark.
   - **Exvllama2**
 - **Setting up a Local LLM Model**
   1. microsoft/Phi-3-mini-128k-instruct - 3.8B Model/7GB base, 4GB Q8 - https://huggingface.co/microsoft/Phi-3-mini-128k-instruct
