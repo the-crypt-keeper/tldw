@@ -521,6 +521,7 @@ def convert_to_wav(video_file_path, offset=0):
             except Exception as e:
                 logging.error("Error occurred - ffmpeg doesn't like windows")
                 raise RuntimeError("ffmpeg failed")
+                exit()
         elif os.name == "posix":
             os.system(f'ffmpeg -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
         else:
