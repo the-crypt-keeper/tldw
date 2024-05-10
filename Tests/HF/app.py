@@ -24,13 +24,13 @@ import yt_dlp
 
 # To Do
 # Offline diarization - https://github.com/pyannote/pyannote-audio/blob/develop/tutorials/community/offline_usage_speaker_diarization.ipynb
+# Dark mode changes under gradio
 #
 # Changes made to app.py version:
 # 1. Removal of video files after conversion -> check main function
 # 2. Usage of/Hardcoding HF_TOKEN as token for API calls
 # 3. Usage of HuggingFace for Inference
 # 4. Other stuff I can't remember. Will eventually do a diff and document them.
-# 5. Dark mode changes under gradio
 # 
 
 
@@ -76,17 +76,27 @@ config.read('config.txt')
 
 # API Keys
 anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
+logging.debug(f"Loaded Anthropic API Key: {anthropic_api_key}")
+
 cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
+logging.debug(f"Loaded cohere API Key: {cohere_api_key}")
+
 groq_api_key = config.get('API', 'groq_api_key', fallback=None)
+logging.debug(f"Loaded groq API Key: {groq_api_key}")
+
 openai_api_key = config.get('API', 'openai_api_key', fallback=None)
+logging.debug(f"Loaded openAI Face API Key: {openai_api_key}")
+
 huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
+logging.debug(f"Loaded HuggingFace Face API Key: {huggingface_api_key}")
+
 
 # Models
 anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
 cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
 groq_model = config.get('API', 'groq_model', fallback='FIXME')
 openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
-huggingface_model = config.get('API', 'huggingface_model', fallback='microsoft/Phi-3-mini-128k-instruct')
+huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
 
 # Local-Models
 kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
@@ -340,10 +350,11 @@ def process_local_file(file_path):
 # Video Download/Handling
 #
 
-def process_url(input_path, num_speakers=2, whisper_model="small.en", offset=0, api_name=None, api_key=None, vad_filter=False, download_video_flag=False, demo_mode=False):
+def process_url(input_path, num_speakers=2, whisper_model="small.en", offset=0, api_name=None, api_key=None, vad_filter=False, download_video_flag=False, demo_mode=True):
     if demo_mode:
         api_name = "huggingface"
-        api_key = os.environ.get("HF_TOKEN")
+        api_key = os.environ.get(HF_TOKEN)
+        print("HUGGINGFACE API KEY CHECK #3: " + api_key)
         vad_filter = False
         download_video_flag = False
     
@@ -353,16 +364,20 @@ def process_url(input_path, num_speakers=2, whisper_model="small.en", offset=0, 
         if results:
             transcription_result = results[0]
             json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+
             with open(json_file_path, 'r') as file:
                 json_data = json.load(file)
-            
             summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
+
             if os.path.exists(summary_file_path):
                 return json_data, summary_file_path, json_file_path, summary_file_path
+
             else:
                 return json_data, "Summary not available.", json_file_path, None
+
         else:
             return None, "No results found.", None, None
+
     except Exception as e:
         error_message = f"An error occurred: {str(e)}"
         return None, error_message, None, None
@@ -755,10 +770,10 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
 #
 #
 
-# Summarize with OpenAI ChatGPT
 def extract_text_from_segments(segments):
-    logging.debug(f"openai: extracting text from {segments}")
+    logging.debug(f"Main: extracting text from {segments}")
     text = ' '.join([segment['text'] for segment in segments])
+    logging.debug(f"Main: Successfully extracted text from {segments}")
     return text
 
 
@@ -1153,6 +1168,38 @@ def save_summary_to_file(summary, file_path):
 # Only to be used when configured with Gradio for HF Space
 def summarize_with_huggingface(api_key, file_path):
     logging.debug(f"huggingface: Summarization process starting...")
+
+    model = "microsoft/Phi-3-mini-128k-instruct"
+    API_URL = f"https://api-inference.huggingface.co/models/{model}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    with open(file_path, 'r') as file:
+        segments = json.load(file)
+    text = ''.join([segment['text'] for segment in segments])
+
+    # FIXME adjust max_length and min_length as needed
+    data = {
+        "inputs": text,
+        "parameters": {"max_length": 4096, "min_length": 100}
+    }
+
+    max_retries = 5
+
+    for attempt in range(max_retries):
+        response = requests.post(API_URL, headers=headers, json=data)
+        if response.status_code == 200:
+            summary = response.json()[0]['summary_text']
+            return summary, None
+        elif response.status_code == 503:
+            response_data = response.json()
+            wait_time = response_data.get('estimated_time', 10)
+            return None, f"Model is loading, retrying in {int(wait_time)} seconds..."
+        # Sleep before retrying....
+        time.sleep(wait_time)
+
+    if api_key == "":
+        api_key = os.environ.get(HF_TOKEN)
+        logging.debug("HUGGINGFACE API KEY CHECK: " + api_key)
     try:
         logging.debug("huggingface: Loading json data for summarization")
         with open(file_path, 'r') as file:
@@ -1161,16 +1208,11 @@ def summarize_with_huggingface(api_key, file_path):
         logging.debug("huggingface: Extracting text from the segments")
         text = ' '.join([segment['text'] for segment in segments])
 
-        api_key = os.environ.get('HF_TOKEN')
-        headers = {
-            "Authorization": f"Bearer {api_key}"
-        }
-        model = "microsoft/Phi-3-mini-128k-instruct"
-        API_URL = f"https://api-inference.huggingface.co/models/{model}"
-        data = {
-            "inputs": text,
-            "parameters": {"max_length": 512, "min_length": 100}  # You can adjust max_length and min_length as needed
-        }
+        api_key = os.environ.get(HF_TOKEN)
+        logging.debug("HUGGINGFACE API KEY CHECK #2: " + api_key)
+
+
+
         
         logging.debug("huggingface: Submitting request...")
         response = requests.post(API_URL, headers=headers, json=data)
@@ -1195,56 +1237,65 @@ def summarize_with_huggingface(api_key, file_path):
 
 
 
+def format_transcription(transcription_result):
+    if transcription_result:
+        json_data = transcription_result['transcription']
+        return json.dumps(json_data, indent=2)
+    else:
+        return ""
+
+
+
+def process_text(api_key,text_file):
+    summary,message = summarize_with_huggingface(api_key,text_file)
+    if summary:
+        # Show summary on success
+        return "Summary:",summary 
+    else:
+        # Inform user about load/wait time
+        return "Notice:",message
+
+
 def launch_ui(demo_mode=False):
     def process_transcription(json_data):
         if json_data:
-            return "\n".join([item["text"] for item in json_data])
+            return json.dumps(json_data, indent=2)
+            #return "\n".join([item["text"] for item in json_data])
         else:
             return ""
-    with gr.Blocks(theme='bethecloud/storj_theme') as demo:
-        with gr.Column(scale=3):
-            with gr.Box():
-                dropdown.render()
-                toggle_dark = gr.Button(value="Toggle Dark").style(full_width=True)
-    dropdown.change(None, dropdown, None, _js=js)
-    toggle_dark.click(
-        None,
-        _js="""
-        () => {
-            document.body.classList.toggle('dark');
-            document.querySelector('gradio-app').style.backgroundColor = 'var(--color-background-primary)'
-        }
-        """,
-    )
-    
+
     inputs = [
-        gr.components.Textbox(label="URL"),
-        gr.components.Number(value=2, label="Number of Speakers"),
-        gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
-        gr.components.Number(value=0, label="Offset")
+        gr.components.Textbox(label="URL of video to be Transcribed/Summarized"),
+        gr.components.Number(value=2, label="Number of Speakers (for Diarization)"),
+        gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model (Can ignore this)"),
+        gr.components.Number(value=0, label="Offset time to start transcribing from\n\n (helpful if you only want part of a video/lecture)")
     ]
 
     if not demo_mode:
         inputs.extend([
-            gr.components.Dropdown(choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value="anthropic", label="API Name"),
-            gr.components.Textbox(label="API Key"),
-            gr.components.Checkbox(value=False, label="VAD Filter"),
-            gr.components.Checkbox(value=False, label="Download Video")
+            gr.components.Dropdown(choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value="huggingface", label="API Name - What LLM service will summarize your transcription"),
+            gr.components.Textbox(label="API Key - Have to provide one, unless you're fine waiting on HuggingFace..."),
+#            gr.components.Checkbox(value=False, label="Download Video"),
+#            gr.components.Checkbox(value=False, label="VAD Filter")
         ])
 
     iface = gr.Interface(
+#        fn=lambda url, num_speakers, whisper_model, offset, api_name, api_key: process_url(url, num_speakers, whisper_model, offset, api_name=api_name, api_key=api_key, demo_mode=demo_mode),
         fn=lambda *args: process_url(*args, demo_mode=demo_mode),
         inputs=inputs,
         outputs=[
             gr.components.Textbox(label="Transcription", value=lambda: "", max_lines=10),
-            gr.components.Textbox(label="Summary"),
+            gr.components.Textbox(label="Summary or Status Message"),
             gr.components.File(label="Download Transcription as JSON"),
             gr.components.File(label="Download Summary as text", visible=lambda summary_file_path: summary_file_path is not None)
         ],
         title="Video Transcription and Summarization",
         description="Submit a video URL for transcription and summarization.",
         allow_flagging="never",
-        theme='bethecloud/storj_theme'
+        #https://huggingface.co/spaces/bethecloud/storj_theme
+        theme="bethecloud/storj_theme"
+        # FIXME - Figure out how to enable dark mode...
+        # other themes: https://huggingface.co/spaces/gradio/theme-gallery
     )
 
     iface.launch(share=True)
@@ -1262,7 +1313,7 @@ def launch_ui(demo_mode=False):
 ####################################################################################################################################
 # Main()
 #
-def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
+def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False, demo_mode=False):
     if input_path is None and args.user_interface:
         return []
     start_time = time.monotonic()
@@ -1325,61 +1376,72 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
-                        api_key = openai_api_key
                         try:
                             logging.debug(f"MAIN: trying to summarize with openAI")                            
+                            api_key = openai_api_key
+                            logging.debug(f"OpenAI: OpenAI API Key: {api_key}")
                             summary = summarize_with_openai(api_key, json_file_path, openai_model)
                         except requests.exceptions.ConnectionError:
                             r.status_code = "Connection: "
                     elif api_name.lower() == 'anthropic':
-                        api_key = anthropic_api_key
                         try:
-                            logging.debug(f"MAIN: Trying to summarize with anthropic")
+                            logging.debug("MAIN: Trying to summarize with anthropic")
+                            api_key = anthropic_api_key
+                            logging.debug(f"Anthropic: Anthropic API Key: {api_key}")
                             summary = summarize_with_claude(api_key, json_file_path, anthropic_model)
                         except requests.exceptions.ConnectionError:
                             r.status_code = "Connection: "
                     elif api_name.lower() == 'cohere':
-                        api_key = cohere_api_key
                         try:
-                            logging.debug(f"MAIN: Trying to summarize with cohere")
+                            logging.debug("Main: Trying to summarize with cohere")
+                            api_key = cohere_api_key
+                            logging.debug(f"Cohere: Cohere API Key: {api_key}")
                             summary = summarize_with_cohere(api_key, json_file_path, cohere_model)
                         except requests.exceptions.ConnectionError:
                             r.status_code = "Connection: "
                     elif api_name.lower() == 'groq':
-                        api_key = groq_api_key
                         try:
-                            logging.debug(f"MAIN: Trying to summarize with Groq")
+                            logging.debug("Main: Trying to summarize with Groq")
+                            api_key = groq_api_key
+                            logging.debug(f"Groq: Groq API Key: {api_key}")
                             summary = summarize_with_groq(api_key, json_file_path, groq_model)
                         except requests.exceptions.ConnectionError:
                             r.status_code = "Connection: "
                     elif api_name.lower() == 'llama':
-                        token = llama_api_key
-                        llama_ip = llama_api_IP
                         try:
-                            logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
+                            logging.debug("Main: Trying to summarize with Llama.cpp")
+                            token = llama_api_key
+                            logging.debug(f"Llama.cpp: Llama.cpp API Key: {api_key}")
+                            llama_ip = llama_api_IP
+                            logging.debug(f"Llama.cpp: Llama.cpp API IP:Port : {llama_ip}")
                             summary = summarize_with_llama(llama_ip, json_file_path, token)
                         except requests.exceptions.ConnectionError:
                             r.status_code = "Connection: "
                     elif api_name.lower() == 'kobold':
-                        token = kobold_api_key
-                        kobold_ip = kobold_api_IP
                         try:
-                            logging.debug(f"MAIN: Trying to summarize with kobold.cpp")
+                            logging.debug("Main: Trying to summarize with kobold.cpp")
+                            token = kobold_api_key
+                            logging.debug(f"kobold.cpp: Kobold.cpp API Key: {api_key}")
+                            kobold_ip = kobold_api_IP
+                            logging.debug(f"kobold.cpp: Kobold.cpp API IP:Port : {kobold_api_IP}")
                             summary = summarize_with_kobold(kobold_ip, json_file_path)
                         except requests.exceptions.ConnectionError:
                             r.status_code = "Connection: "
                     elif api_name.lower() == 'ooba':
-                        token = ooba_api_key
-                        ooba_ip = ooba_api_IP
                         try:
-                            logging.debug(f"MAIN: Trying to summarize with oobabooga")
+                            logging.debug("Main: Trying to summarize with oobabooga")
+                            token = ooba_api_key
+                            logging.debug(f"oobabooga: ooba API Key: {api_key}")
+                            ooba_ip = ooba_api_IP
+                            logging.debug(f"oobabooga: ooba API IP:Port : {ooba_ip}")
                             summary = summarize_with_oobabooga(ooba_ip, json_file_path)
                         except requests.exceptions.ConnectionError:
                             r.status_code = "Connection: "
                     if api_name.lower() == 'huggingface':
-                        api_key = huggingface_api_key
                         try:
-                            logging.debug(f"MAIN: Trying to summarize with huggingface")
+                            logging.debug("MAIN: Trying to summarize with huggingface")
+                            api_key = huggingface_api_key
+                            logging.debug(f"huggingface: huggingface API Key: {api_key}")
                             summarize_with_huggingface(api_key, json_file_path)
                         except requests.exceptions.ConnectionError:
                             r.status_code = "Connection: "
@@ -1411,7 +1473,6 @@ if __name__ == "__main__":
     parser.add_argument('input_path', type=str, help='Path or URL of the video', nargs='?')
     parser.add_argument('-v','--video',  action='store_true', help='Download the video instead of just the audio')
     parser.add_argument('-api', '--api_name', type=str, help='API name for summarization (optional)')
-    parser.add_argument('-key', '--api_key', type=str, help='API key for summarization (optional)')
     parser.add_argument('-ns', '--num_speakers', type=int, default=2, help='Number of speakers (default: 2)')
     parser.add_argument('-wm', '--whisper_model', type=str, default='small.en', help='Whisper model (default: small.en)')
     parser.add_argument('-off', '--offset', type=int, default=0, help='Offset in seconds (default: 0)')

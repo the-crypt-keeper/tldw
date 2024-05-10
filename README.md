@@ -36,10 +36,12 @@ GUI
 - **Download Audio+Video from URL -> Transcribe audio from Video:**
   * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
 - **Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
-  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>`
+  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>` - Make sure to put your API key into `config.txt` under the appropriate API variable
 - **Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
   * `python summarize.py ./local/file_on_your/system --api_name <API_name>`
-
+- **Run it as a WebApp**
+  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
+    * Can be helpful for setting up a shared instance, but not wanting people to perform inference on your server.
 
 
 ### <a name="what"></a>What?
@@ -112,9 +114,9 @@ GUI
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
-usage: summarize.py [-h] [--api_name API_NAME] [--api_key API_KEY] [--num_speakers NUM_SPEAKERS] [--whisper_model WHISPER_MODEL] [--offset OFFSET]
-                  [--vad_filter] [--log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
-                  [input_path]
+usage: summarize.py [-h] [-v] [-api API_NAME] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET] [-vad]
+                    [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-ui] [-demo]
+                    [input_path]
 
 Transcribe and summarize videos.
 
@@ -126,8 +128,6 @@ options:
   -v, --video           Download the video instead of just the audio
   -api API_NAME, --api_name API_NAME
                         API name for summarization (optional)
-  -key API_KEY, --api_key API_KEY
-                        API key for summarization (optional)
   -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
                         Number of speakers (default: 2)
   -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
