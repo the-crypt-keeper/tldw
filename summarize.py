@@ -1173,42 +1173,47 @@ def summarize_with_huggingface(api_key, file_path):
 
 
 
-def launch_ui():
+def launch_ui(demo_mode=False):
     def process_transcription(json_data):
         if json_data:
             return "\n".join([item["text"] for item in json_data])
         else:
             return ""
 
-    iface = gr.Interface(
-        fn=process_url,
-        inputs=[
-            gr.components.Textbox(label="URL"),
-            gr.components.Dropdown(choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], label="API Name"),
+    inputs = [
+        gr.components.Textbox(label="URL"),
+        gr.components.Number(value=2, label="Number of Speakers"),
+        gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
+        gr.components.Number(value=0, label="Offset")
+    ]
+
+    if not demo_mode:
+        inputs.extend([
+            gr.components.Dropdown(choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value="anthropic", label="API Name"),
             gr.components.Textbox(label="API Key"),
-            gr.components.Number(value=2, label="Number of Speakers"),
-            gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
-            gr.components.Number(value=0, label="Offset"),
             gr.components.Checkbox(value=False, label="VAD Filter"),
             gr.components.Checkbox(value=False, label="Download Video")
-        ],
+        ])
+
+    iface = gr.Interface(
+        fn=process_url,
+        inputs=inputs,
         outputs=[
             gr.components.Textbox(label="Transcription", value=lambda: "", max_lines=10),
             gr.components.Textbox(label="Summary"),
-            gr.components.File(label="Download Transcription JSON"),
-            gr.components.File(label="Download Summary")
+            gr.components.File(label="Download Transcription as JSON"),
+            gr.components.File(label="Download Summary as text")
         ],
         title="Video Transcription and Summarization",
         description="Submit a video URL for transcription and summarization.",
         allow_flagging="never"
     )
 
-    #iface.launch(auth=same_auth,share=True)
-    iface.launch(share=False)
+    iface.launch(share=True)
 
 #
 #
-####################################################################################################################################
+#####################################################################################################################################
 
 
 
@@ -1355,11 +1360,12 @@ if __name__ == "__main__":
     parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
     parser.add_argument('-log', '--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
     parser.add_argument('-ui', '--user_interface', action='store_true', help='Launch the Gradio user interface')
+    parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
     #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
     if args.user_interface:
-        launch_ui()
+        launch_ui(demo_mode=args.demo_mode)
     else:
         if not args.input_path:
             parser.print_help()
