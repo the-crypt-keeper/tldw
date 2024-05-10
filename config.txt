@@ -7,6 +7,9 @@ groq_api_key = idk
 groq_model = FIXME
 openai_api_key = <openai_api_key>
 openai_model = gpt-4-turbo
+huggingface_api_token = <huggingface_api_token>
+huggingface_model = CohereForAI/c4ai-command-r-plus
+
 
 [Local-API]
 kobold_api_key = <kobold api key>
@@ -16,9 +19,11 @@ llama_api_IP = http://127.0.0.1:8080/completion
 ooba_api_key = <ooba api key>
 ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
 
+
 [Paths]
 output_path = Results
 logging_file = Logs
+
 
 [Processing]
 processing_choice = cuda

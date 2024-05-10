@@ -70,12 +70,14 @@ anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
 cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
 groq_api_key = config.get('API', 'groq_api_key', fallback=None)
 openai_api_key = config.get('API', 'openai_api_key', fallback=None)
+huggingface_api_token = config.get('API', 'huhuggingface_api_token', fallback=None)
 
 # Models
 anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
 cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
 groq_model = config.get('API', 'groq_model', fallback='FIXME')
 openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
+huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
 
 # Local-Models
 kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
@@ -328,6 +330,27 @@ def process_local_file(file_path):
 ####################################################################################################################################
 # Video Download/Handling
 #
+
+def process_url(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
+    try:
+        results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset, vad_filter=vad_filter, download_video_flag=download_video_flag)
+        
+        if results:
+            transcription_result = results[0]
+            json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+            with open(json_file_path, 'r') as file:
+                json_data = json.load(file)
+            
+            summary = transcription_result.get('summary', '')
+            
+            return json_data, summary, json_file_path, json_file_path.replace('.segments.json', '_summary.txt')
+        else:
+            return None, "No results found.", None, None
+    except Exception as e:
+        error_message = f"An error occurred: {str(e)}"
+        return None, error_message, None, None
+
+
 
 def create_download_directory(title):
     base_dir = "Results"
@@ -1110,24 +1133,43 @@ def save_summary_to_file(summary, file_path):
 # Gradio UI
 #
 
-def process_url(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
+# Only to be used when configured with Gradio for HF Space
+def summarize_with_huggingface(api_key, file_path):
     try:
-        results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset, vad_filter=vad_filter, download_video_flag=download_video_flag)
+        logging.debug("huggingface: Loading json data for summarization")
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
         
-        if results:
-            transcription_result = results[0]
-            json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-            with open(json_file_path, 'r') as file:
-                json_data = json.load(file)
-            
-            summary = transcription_result.get('summary', '')
-            
-            return json_data, summary, json_file_path, json_file_path.replace('.segments.json', '_summary.txt')
+        logging.debug("huggingface: Extracting text from the segments")
+        text = extract_text_from_segments(segments)
+
+        API_TOKEN = huggingface_api_token
+        headers = {"Authorization": f"Bearer {API_TOKEN}"}
+
+        logging.debug("huggingface: Creating query...")
+        data = query("Can you please let us know more details about your ")
+
+        API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}"
+        response = requests.post(API_URL, headers=headers, json=data)
+        
+        if response.status_code == 200:
+            summary = response.json()['choices'][0]['message']['content'].strip()
+            logging.debug("huggingface: Summarization successful")
+            print("Summarization successful.")
+            return summary
         else:
-            return None, "No results found.", None, None
+            logging.debug("huggingface: Summarization failed")
+            print("Failed to process summary:", response.text)
+            return None
     except Exception as e:
-        error_message = f"An error occurred: {str(e)}"
-        return None, error_message, None, None
+        logging.debug("huggingface: Error in processing: %s", str(e))
+        print("Error occurred while processing summary with huggingface:", str(e))
+        return None
+
+
+
+    def same_auth(username, password):
+        return username == password
 
 
 
@@ -1142,7 +1184,7 @@ def launch_ui():
         fn=process_url,
         inputs=[
             gr.components.Textbox(label="URL"),
-            gr.components.Dropdown(choices=["openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], label="API Name"),
+            gr.components.Dropdown(choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], label="API Name"),
             gr.components.Textbox(label="API Key"),
             gr.components.Number(value=2, label="Number of Speakers"),
             gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
@@ -1161,64 +1203,8 @@ def launch_ui():
         allow_flagging="never"
     )
 
-
-# FIXME - c/p from openai - only to be used when configured with Gradio for HF Space
-def summarize_with_huggingface(api_key, file_path):
-    try:
-        logging.debug("openai: Loading json data for summarization")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
-        
-        logging.debug("openai: Extracting text from the segments")
-        text = extract_text_from_segments(segments)
-
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-        
-        logging.debug("openai: Preparing data + prompt for submittal")
-        prompt_text = f"{text} \n\n\n\nPlease provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points"
-        data = {
-            "model": "CohereForAI/c4ai-command-r-plus",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are a professional summarizer."
-                },
-                {
-                    "role": "user",
-                    "content": prompt_text
-                }
-            ],
-            "max_tokens": 4096,  # Adjust tokens as needed
-            "temperature": 0.7
-        }
-        logging.debug("openai: Posting request")
-        response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
-        
-        if response.status_code == 200:
-            summary = response.json()['choices'][0]['message']['content'].strip()
-            logging.debug("openai: Summarization successful")
-            print("Summarization successful.")
-            return summary
-        else:
-            logging.debug("openai: Summarization failed")
-            print("Failed to process summary:", response.text)
-            return None
-    except Exception as e:
-        logging.debug("openai: Error in processing: %s", str(e))
-        print("Error occurred while processing summary with openai:", str(e))
-        return None
-
-
-
-    def same_auth(username, password):
-        return username == password
-
-
-
-    iface.launch(auth=same_auth,share=True)
+    #iface.launch(auth=same_auth,share=False)
+    iface.launch()
 
 #
 #
@@ -1235,6 +1221,8 @@ def summarize_with_huggingface(api_key, file_path):
 #
 
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
+    if input_path is None and args.user_interface:
+        return []
     start_time = time.monotonic()
     paths = []  # Initialize paths as an empty list
     if os.path.isfile(input_path) and input_path.endswith('.txt'):
@@ -1373,40 +1361,40 @@ if __name__ == "__main__":
     if args.user_interface:
         launch_ui()
     else:
-        if args.input_path is None:
+        if not args.input_path:
             parser.print_help()
             sys.exit(1)
 
-    logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 
-    logging.info('Starting the transcription and summarization process.')
-    logging.info(f'Input path: {args.input_path}')
-    logging.info(f'API Name: {args.api_name}')
-    logging.debug(f'API Key: {args.api_key}') # ehhhhh
-    logging.info(f'Number of speakers: {args.num_speakers}')
-    logging.info(f'Whisper model: {args.whisper_model}')
-    logging.info(f'Offset: {args.offset}')
-    logging.info(f'VAD filter: {args.vad_filter}')
-    logging.info(f'Log Level: {args.log_level}') #lol
+        logging.info('Starting the transcription and summarization process.')
+        logging.info(f'Input path: {args.input_path}')
+        logging.info(f'API Name: {args.api_name}')
+        logging.debug(f'API Key: {args.api_key}') # ehhhhh
+        logging.info(f'Number of speakers: {args.num_speakers}')
+        logging.info(f'Whisper model: {args.whisper_model}')
+        logging.info(f'Offset: {args.offset}')
+        logging.info(f'VAD filter: {args.vad_filter}')
+        logging.info(f'Log Level: {args.log_level}') #lol
 
-    if args.api_name and args.api_key:
-        logging.info(f'API: {args.api_name}')
-        logging.info('Summarization will be performed.')
-    else:
-        logging.info('No API specified. Summarization will not be performed.')
+        if args.api_name and args.api_key:
+            logging.info(f'API: {args.api_name}')
+            logging.info('Summarization will be performed.')
+        else:
+            logging.info('No API specified. Summarization will not be performed.')
 
-    logging.debug("Platform check being performed...")
-    platform_check()
-    logging.debug("CUDA check being performed...")
-    cuda_check()
-    logging.debug("ffmpeg check being performed...")
-    check_ffmpeg()
+        logging.debug("Platform check being performed...")
+        platform_check()
+        logging.debug("CUDA check being performed...")
+        cuda_check()
+        logging.debug("ffmpeg check being performed...")
+        check_ffmpeg()
 
-    try:
-        results = main(args.input_path, api_name=args.api_name, api_key=args.api_key, num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset, vad_filter=args.vad_filter, download_video_flag=args.video)
-        logging.info('Transcription process completed.')
-    except Exception as e:
-        logging.error('An error occurred during the transcription process.')
-        logging.error(str(e))
-        sys.exit(1)
+        try:
+            results = main(args.input_path, api_name=args.api_name, api_key=args.api_key, num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset, vad_filter=args.vad_filter, download_video_flag=args.video)
+            logging.info('Transcription process completed.')
+        except Exception as e:
+            logging.error('An error occurred during the transcription process.')
+            logging.error(str(e))
+            sys.exit(1)
 
