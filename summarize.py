@@ -36,23 +36,22 @@ import yt_dlp
 #
 #
 # Usage:
-#          Transcribe a single URL: 
-#                python diarize.py https://example.com/video.mp4
 #
-#          Transcribe a single URL and have the resulting transcription summarized: 
-#                python diarize.py https://example.com/video.mp4
+#   Download Audio only from URL -> Transcribe audio:
+#       python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
 #
-#          Transcribe a list of files:
-#               python diarize.py ./path/to/your/text_file.txt
+#   Download Audio+Video from URL -> Transcribe audio from Video:**
+#       python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
 #
-#          Transcribe a local file:
-#               python diarize.py /path/to/your/localfile.mp4
-#
-#          Transcribe a local file and have it summarized:
-#               python diarize.py ./input.mp4 --api_name openai --api_key <your_openai_api_key>
-#
-#          Transcribe a list of files and have them all summarized:
-#               python diarize.py path_to_your_text_file.txt --api_name <openai> --api_key <your_openai_api_key>
+#   Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
+#       python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>` - Make sure to put your API key into `config.txt` under the appropriate API variable
+# 
+#   Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
+#       python summarize.py ./local/file_on_your/system --api_name <API_name>`
+# 
+#   Run it as a WebApp**
+#       python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
+#           Can be helpful for setting up a shared instance, but not wanting people to perform inference on your server.
 #
 ###
 
@@ -341,7 +340,7 @@ def process_local_file(file_path):
 # Video Download/Handling
 #
 
-def process_url(input_path, num_speakers=2, whisper_model="small.en", offset=0, api_name=None, api_key=None, vad_filter=False, download_video_flag=False, demo_mode=False):
+def process_url(input_path, num_speakers=2, whisper_model="small.en", custom_prompt=None, offset=0, api_name=None, api_key=None, vad_filter=False, download_video_flag=False, demo_mode=False):
     if demo_mode:
 #        api_name = "<demo_mode_api>"
 #        api_key = "<demo_mode_key>"
@@ -782,7 +781,7 @@ def summarize_with_openai(api_key, file_path, model):
         }
         
         logging.debug("openai: Preparing data + prompt for submittal")
-        prompt_text = f"{text} \n\n\n\nPlease provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points"
+        openai_prompt = f"{text} \n\n\n\n{custom_prompt}"
         data = {
             "model": model,
             "messages": [
@@ -792,7 +791,7 @@ def summarize_with_openai(api_key, file_path, model):
                 },
                 {
                     "role": "user",
-                    "content": prompt_text
+                    "content": openai_prompt
                 }
             ],
             "max_tokens": 4096,  # Adjust tokens as needed
@@ -831,11 +830,12 @@ def summarize_with_claude(api_key, file_path, model):
             'anthropic-version': '2023-06-01',
             'Content-Type': 'application/json'
         }
-        
-        logging.debug("anthropic: Prepping data + prompt for submittal")
+
+        anthropic_prompt = custom_prompt
+        logging.debug("anthropic: Prompt is {anthropic_prompt}")
         user_message = {
             "role": "user",
-            "content": f"{text} \n\n\n\nPlease provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points"
+            "content": f"{text} \n\n\n\n{anthropic_prompt}"
         }
 
         data = {
@@ -902,10 +902,12 @@ def summarize_with_cohere(api_key, file_path, model):
             'Authorization': f'Bearer {api_key}'
         }
 
-        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
+        cohere_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        logging.debug("cohere: Prompt being sent is {cohere_prompt}")
+
         data = {
             "chat_history": [
-                {"role": "USER", "message": prompt_text}
+                {"role": "USER", "message": cohere_prompt}
             ],
             "message": "Please provide a summary.",
             "model": model,
@@ -953,12 +955,14 @@ def summarize_with_groq(api_key, file_path, model):
             'Content-Type': 'application/json'
         }
 
-        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
+        groq_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        logging.debug("groq: Prompt being sent is {groq_prompt}")
+
         data = {
             "messages": [
                 {
                     "role": "user",
-                    "content": prompt_text
+                    "content": groq_prompt
                 }
             ],
             "model": model
@@ -1010,9 +1014,11 @@ def summarize_with_llama(api_url, file_path, token):
             headers['Authorization'] = f'Bearer {token}'
 
 
-        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
+        llama_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        logging.debug("llama: Prompt being sent is {llama_prompt}")
+
         data = {
-            "prompt": prompt_text
+            "prompt": llama_prompt
         }
 
         logging.debug("llama: Submitting request to API endpoint")
@@ -1052,14 +1058,16 @@ def summarize_with_kobold(api_url, file_path):
             'accept': 'application/json',
             'content-type': 'application/json',
         }
+
+        kobold_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        logging.debug("kobold: Prompt being sent is {kobold_prompt}")
+
         # FIXME
-        prompt_text = f"{text} \n\nAs a professional summarizer, create a concise and comprehensive summary of the above text."
-        logging.debug(prompt_text)
         # Values literally c/p from the api docs....
         data = {
             "max_context_length": 8096,
             "max_length": 4096,
-            "prompt": prompt_text,
+            "prompt": kobold_prompt,
         }
 
         logging.debug("kobold: Submitting request to API endpoint")
@@ -1103,14 +1111,15 @@ def summarize_with_oobabooga(api_url, file_path):
             'content-type': 'application/json',
         }
 
-        prompt_text = "I like to eat cake and bake cakes. I am a baker. I work in a french bakery baking cakes. It is a fun job. I have been baking cakes for ten years. I also bake lots of other baked goods, but cakes are my favorite."
+        # prompt_text = "I like to eat cake and bake cakes. I am a baker. I work in a french bakery baking cakes. It is a fun job. I have been baking cakes for ten years. I also bake lots of other baked goods, but cakes are my favorite."
         # prompt_text += f"\n\n{text}"  # Uncomment this line if you want to include the text variable
-        prompt_text += "\n\nAs a professional summarizer, create a concise and comprehensive summary of the provided text."
+        ooba_prompt = "{text}\n\n\n\n{custom_prompt}"
+        logging.debug("ooba: Prompt being sent is {ooba_prompt}")
 
         data =  {
             "mode": "chat",
             "character": "Example",
-            "messages": [{"role": "user", "content": prompt_text}]
+            "messages": [{"role": "user", "content": ooba_prompt}]
         }
 
         logging.debug("ooba: Submitting request to API endpoint")
@@ -1166,7 +1175,6 @@ def summarize_with_huggingface(api_key, file_path):
         logging.debug(f"huggingface: Segments: {segments}")
         text = ' '.join([segment['text'] for segment in segments])
 
-
 # API KEY ASSIGNMENT HERE
         api_key = huggingface_api_key
         print(f"huggingface: lets make sure the HF api key exists...\n\t {huggingface_api_key}" )
@@ -1176,6 +1184,10 @@ def summarize_with_huggingface(api_key, file_path):
 
         model = "microsoft/Phi-3-mini-128k-instruct"
         API_URL = f"https://api-inference.huggingface.co/models/{model}"
+
+
+        huggingface_prompt = "{text}\n\n\n\n{custom_prompt}"
+        logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
         data = {
             "inputs": text,
             "parameters": {"max_length": 512, "min_length": 100}  # You can adjust max_length and min_length as needed
@@ -1184,6 +1196,7 @@ def summarize_with_huggingface(api_key, file_path):
         print(f"huggingface: lets make sure the HF api key is the same..\n\t {huggingface_api_key}")
 
         logging.debug("huggingface: Submitting request...")
+
         response = requests.post(API_URL, headers=headers, json=data)
         
         if response.status_code == 200:
@@ -1217,6 +1230,7 @@ def launch_ui(demo_mode=False):
         gr.components.Textbox(label="URL"),
         gr.components.Number(value=2, label="Number of Speakers"),
         gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
+        gr.components.Textbox(label="Custom Prompt", value="Please provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points", lines=3),
         gr.components.Number(value=0, label="Offset")
     ]
 
@@ -1245,7 +1259,8 @@ def launch_ui(demo_mode=False):
         theme="bethecloud/storj_theme"
     )
 
-    iface.launch(share=True)
+    #iface.launch(share=True)
+    iface.launch(share=False)
 
 #
 #
@@ -1260,7 +1275,7 @@ def launch_ui(demo_mode=False):
 ####################################################################################################################################
 # Main()
 #
-def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
+def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False, custom_prompt=None):
     if input_path is None and args.user_interface:
         return []
     start_time = time.monotonic()
