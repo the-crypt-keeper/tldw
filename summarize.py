@@ -88,7 +88,7 @@ ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:
 ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
 
 # Retrieve output paths from the configuration file
-output_path = config.get('Paths', 'output_path', fallback='Results')
+output_path = config.get('Paths', 'output_path', fallback='results')
 
 # Retrieve processing choice from the configuration file
 processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
@@ -286,7 +286,7 @@ def read_paths_from_file(file_path):
     with open(file_path, 'r') as file:
         for line in file:
             line = line.strip()
-            if line and not os.path.exists(os.path.join('Results', normalize_title(line.split('/')[-1].split('.')[0]) + '.json')):
+            if line and not os.path.exists(os.path.join('results', normalize_title(line.split('/')[-1].split('.')[0]) + '.json')):
                 logging.debug("line successfully imported from file and added to list to be transcribed")
                 paths.append(line)
     return paths
@@ -331,7 +331,7 @@ def process_local_file(file_path):
 # Video Download/Handling
 #
 
-def process_url(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
+a = """def process_url(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
     try:
         results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset, vad_filter=vad_filter, download_video_flag=download_video_flag)
         
@@ -344,6 +344,28 @@ def process_url(input_path, api_name=None, api_key=None, num_speakers=2, whisper
             summary = transcription_result.get('summary', '')
             
             return json_data, summary, json_file_path, json_file_path.replace('.segments.json', '_summary.txt')
+        else:
+            return None, "No results found.", None, None
+    except Exception as e:
+        error_message = f"An error occurred: {str(e)}"
+        return None, error_message, None, None
+"""
+
+def process_url(input_path, num_speakers=2, whisper_model="small.en", offset=0):
+    try:
+        results = main(input_path, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset)
+        
+        if results:
+            transcription_result = results[0]
+            json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+            with open(json_file_path, 'r') as file:
+                json_data = json.load(file)
+            
+            summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
+            if os.path.exists(summary_file_path):
+                return json_data, summary_file_path, json_file_path, summary_file_path
+            else:
+                return json_data, "Summary not available.", json_file_path, None
         else:
             return None, "No results found.", None, None
     except Exception as e:
@@ -1202,7 +1224,7 @@ def launch_ui(demo_mode=False):
             gr.components.Textbox(label="Transcription", value=lambda: "", max_lines=10),
             gr.components.Textbox(label="Summary"),
             gr.components.File(label="Download Transcription as JSON"),
-            gr.components.File(label="Download Summary as text")
+            gr.components.File(label="Download Summary as text", visible=lambda summary_file_path: summary_file_path is not None)
         ],
         title="Video Transcription and Summarization",
         description="Submit a video URL for transcription and summarization.",
@@ -1224,7 +1246,6 @@ def launch_ui(demo_mode=False):
 ####################################################################################################################################
 # Main()
 #
-
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False):
     if input_path is None and args.user_interface:
         return []
@@ -1279,7 +1300,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 logging.info(f"Transcription complete: {audio_file}")
 
                 # Perform summarization based on the specified API
-                if api_name:
+                if api_name and api_key:
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
@@ -1337,7 +1358,8 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         save_summary_to_file(summary, json_file_path)
                     else:
                         logging.warning(f"Failed to generate summary using {api_name} API")
-
+                else:
+                    logging.info("No API specified. Summarization will not be performed")
         except Exception as e:
             logging.error(f"Error processing path: {path}")
             logging.error(str(e))
