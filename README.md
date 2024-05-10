@@ -6,13 +6,15 @@
 
 Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. Any site supported by yt-dl is supported, so you can use this with sites besides just youtube.
 
-I personally recommend Sonnet, for the price, it's very nice.
+I personally recommend Sonnet. It's great quality and relatively inexpensive. 
+To be clear, Microsoft Phi-3 Mini 128k is great if you don't have a lot of VRAM and want to self-host. (I think it's better than anything up to 70B for summarization...)
 
 ### Application Demo
 CLI
 ![tldw-summarization-cli-demo](cli-demo-video)
+
 GUI
-![tldw-summarization-gui-demo](gui-demo-video)
+![tldw-summarization-gui-demo](./Tests/Capture.PNG)
 
 ----------
 
