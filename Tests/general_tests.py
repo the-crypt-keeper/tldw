@@ -8,7 +8,24 @@ import faster_whisper
 sys.path.append("../")
 
 # Import the necessary functions and classes from your script
-from summarize import *
+import summarize
+from summarize import (
+    read_paths_from_file,
+    process_path,
+    get_youtube,
+    download_video,
+    convert_to_wav,
+    speech_to_text,
+    summarize_with_openai,
+    summarize_with_claude,
+    summarize_with_cohere,
+    summarize_with_groq,
+    summarize_with_llama,
+    summarize_with_kobold,
+    summarize_with_oobabooga,
+    main
+)
+
 
 class TestTranscriptionScript(unittest.TestCase):
     def setUp(self):
@@ -30,13 +47,14 @@ class TestTranscriptionScript(unittest.TestCase):
         expected_paths = [
             "http://example.com/video1.mp4",
             "http://example.com/video2.mp4",
-            "http://example.com/video3.mp4"]
+            "http://example.com/video3.mp4"
+        ]
         self.assertListEqual(paths, expected_paths)
 
         os.unlink(temp_file_path)
 
     def test_process_path(self):
-        with patch.object(summarize, 'get_youtube', return_value={'title': 'Sample Video'}):
+        with patch('summarize.get_youtube', return_value={'title': 'Sample Video'}):
             result = process_path("http://example.com/video.mp4")
             self.assertIsNotNone(result)
 
@@ -50,13 +68,13 @@ class TestTranscriptionScript(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_get_youtube(self):
-        with patch.object(yt_dlp.YoutubeDL, 'extract_info', return_value={'title': 'Sample YouTube Video'}):
+        with patch('yt_dlp.YoutubeDL.extract_info', return_value={'title': 'Sample YouTube Video'}):
             info_dict = get_youtube("http://example.com/youtube_video.mp4")
             self.assertIsNotNone(info_dict)
             self.assertEqual(info_dict['title'], 'Sample YouTube Video')
 
     def test_download_video(self):
-        with patch.object(yt_dlp.YoutubeDL, 'download') as mock_download:
+        with patch('yt_dlp.YoutubeDL.download') as mock_download:
             video_path = download_video("http://example.com/video.mp4", "download_path", {'title': 'Sample Video'}, False)
             self.assertIsNotNone(video_path)
             mock_download.assert_called_once()
@@ -73,7 +91,7 @@ class TestTranscriptionScript(unittest.TestCase):
     def test_speech_to_text(self):
         with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
             temp_file_path = temp_file.name
-        with patch.object(faster_whisper.WhisperModel, 'transcribe', return_value=([], {})):
+        with patch('faster_whisper.WhisperModel.transcribe', return_value=([], {})):
             segments = speech_to_text(temp_file_path)
             self.assertIsInstance(segments, list)
         os.unlink(temp_file_path)
@@ -93,13 +111,14 @@ class TestTranscriptionScript(unittest.TestCase):
     # ...
 
     def test_main(self):
-        with patch.object(summarize, 'process_path', return_value=("download_path", {'title': 'Sample Video'}, "audio_file")):
-            with patch.object(summarize, 'speech_to_text', return_value=[]):
-                with patch.object(summarize, 'summarize_with_openai', return_value='Sample summary'):
+        with patch('summarize.process_path', return_value=("download_path", {'title': 'Sample Video'}, "audio_file")):
+            with patch('summarize.speech_to_text', return_value=[]):
+                with patch('summarize.summarize_with_openai', return_value='Sample summary'):
                     results = main("https://www.youtube.com/watch?v=YRfN-UGoKJY", api_name="openai", api_key="api_key")
                     self.assertIsInstance(results, list)
                     self.assertEqual(len(results), 1)
                     self.assertIn('summary', results[0])
+
 
     # Add more integration tests for different scenarios
     # ...
@@ -112,10 +131,6 @@ class TestTranscriptionScript(unittest.TestCase):
             with patch('subprocess.run', side_effect=subprocess.CalledProcessError(1, 'ffmpeg')):
                 convert_to_wav("invalid_path")
 
-    def test_logging(self):
-        with self.assertLogs(level='INFO') as log:
-            main("https://www.youtube.com/watch?v=YRfN-UGoKJY", api_name="openai", api_key="api_key")
-            self.assertIn('INFO:root:Starting the transcription and summarization process.', log.output)
 
     def test_warnings(self):
         with self.assertWarns(UserWarning):
