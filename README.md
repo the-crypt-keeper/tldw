@@ -122,10 +122,10 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   -v, --video           Download the video instead of just the audio
-  -name API_NAME, --api_name API_NAME
+  -api API_NAME, --api_name API_NAME
                         API name for summarization (optional)
   -key API_KEY, --api_key API_KEY
-                        API key for summarization (optional) - Please use the config file....
+                        API key for summarization (optional)
   -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
                         Number of speakers (default: 2)
   -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
@@ -135,6 +135,9 @@ options:
   -vad, --vad_filter    Enable VAD filter
   -log {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                         Log level (default: INFO)
+  -ui, --user_interface
+                        Launch the Gradio user interface
+  -demo, --demo_mode    Enable demo mode
 
 
 -Download Audio only from URL -> Transcribe audio:
