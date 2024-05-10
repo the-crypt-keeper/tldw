@@ -67,10 +67,20 @@ config.read('config.txt')
 
 # API Keys
 anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
+logging.debug(f"Loaded Anthropic API Key: {anthropic_api_key}")
+
 cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
+logging.debug(f"Loaded cohere API Key: {cohere_api_key}")
+
 groq_api_key = config.get('API', 'groq_api_key', fallback=None)
+logging.debug(f"Loaded groq API Key: {groq_api_key}")
+
 openai_api_key = config.get('API', 'openai_api_key', fallback=None)
+logging.debug(f"Loaded openAI Face API Key: {openai_api_key}")
+
 huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
+logging.debug(f"Loaded HuggingFace Face API Key: {huggingface_api_key}")
+
 
 # Models
 anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
@@ -564,6 +574,7 @@ def convert_to_wav(video_file_path, offset=0):
     except Exception as e:
         logging.error("Unexpected error occurred: %s", str(e))
         raise RuntimeError("Error converting video file to WAV")
+        exit()
     return out_path
 
 
@@ -746,10 +757,10 @@ def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embed
 #
 #
 
-# Summarize with OpenAI ChatGPT
 def extract_text_from_segments(segments):
-    logging.debug(f"openai: extracting text from {segments}")
+    logging.debug(f"Main: extracting text from {segments}")
     text = ' '.join([segment['text'] for segment in segments])
+    logging.debug(f"Main: Successfully extracted text from {segments}")
     return text
 
 
@@ -1150,19 +1161,26 @@ def summarize_with_huggingface(api_key, file_path):
             segments = json.load(file)
         
         logging.debug("huggingface: Extracting text from the segments")
+        logging.debug(f"huggingface: Segments: {segments}")
         text = ' '.join([segment['text'] for segment in segments])
 
-        api_key = os.environ.get('HF_TOKEN')
+
+# API KEY ASSIGNMENT HERE
+        api_key = huggingface_api_key
+        print(f"huggingface: lets make sure the HF api key exists...\n\t {huggingface_api_key}" )
         headers = {
-            "Authorization": f"Bearer {api_key}"
+            "Authorization": f"Bearer {huggingface_api_key}"
         }
+
         model = "microsoft/Phi-3-mini-128k-instruct"
         API_URL = f"https://api-inference.huggingface.co/models/{model}"
         data = {
             "inputs": text,
             "parameters": {"max_length": 512, "min_length": 100}  # You can adjust max_length and min_length as needed
         }
-        
+
+        print(f"huggingface: lets make sure the HF api key is the same..\n\t {huggingface_api_key}")
+
         logging.debug("huggingface: Submitting request...")
         response = requests.post(API_URL, headers=headers, json=data)
         
@@ -1213,14 +1231,15 @@ def launch_ui(demo_mode=False):
         inputs=inputs,
         outputs=[
             gr.components.Textbox(label="Transcription", value=lambda: "", max_lines=10),
-            gr.components.Textbox(label="Summary"),
+            gr.components.Textbox(label="Summary or Status Message"),
             gr.components.File(label="Download Transcription as JSON"),
             gr.components.File(label="Download Summary as text", visible=lambda summary_file_path: summary_file_path is not None)
         ],
         title="Video Transcription and Summarization",
         description="Submit a video URL for transcription and summarization.",
         allow_flagging="never",
-        theme='bethecloud/storj_theme'
+        #https://huggingface.co/spaces/bethecloud/storj_theme
+        theme="bethecloud/storj_theme"
     )
 
     iface.launch(share=True)
@@ -1382,7 +1401,6 @@ if __name__ == "__main__":
     parser.add_argument('input_path', type=str, help='Path or URL of the video', nargs='?')
     parser.add_argument('-v','--video',  action='store_true', help='Download the video instead of just the audio')
     parser.add_argument('-api', '--api_name', type=str, help='API name for summarization (optional)')
-    parser.add_argument('-key', '--api_key', type=str, help='API key for summarization (optional)')
     parser.add_argument('-ns', '--num_speakers', type=int, default=2, help='Number of speakers (default: 2)')
     parser.add_argument('-wm', '--whisper_model', type=str, default='small.en', help='Whisper model (default: small.en)')
     parser.add_argument('-off', '--offset', type=int, default=0, help='Offset in seconds (default: 0)')
@@ -1415,8 +1433,10 @@ if __name__ == "__main__":
         if args.api_name and args.api_key:
             logging.info(f'API: {args.api_name}')
             logging.info('Summarization will be performed.')
+            summary = None  # Initialize to ensure it's always defined
         else:
             logging.info('No API specified. Summarization will not be performed.')
+            summary = None  # Initialize to ensure it's always defined
 
         logging.debug("Platform check being performed...")
         platform_check()
