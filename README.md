@@ -65,6 +65,7 @@ GUI
   4. Llama.cpp
   5. Kobold.cpp
   6. Oobabooga
+  7. HuggingFace
 - **Planned to Support**
   1. TabbyAPI
 
@@ -203,6 +204,11 @@ By default videos, transcriptions and summaries are stored in a folder with the 
       * `llama3-8b-8192`
       * `llama3-70b-8192`
       * `mixtral-8x7b-32768`
+    - HuggingFace:
+      * `CohereForAI/c4ai-command-r-plus`
+      * `meta-llama/Meta-Llama-3-70B-Instruct`
+      * `meta-llama/Meta-Llama-3-8B-Instruct`
+      * Supposedly you can use any model on there, but this is for reference for the free demo instance, in case you'd like to host your own.
     - OpenAI:
       * `gpt-4-turbo`
       * `gpt-4-turbo-preview`
