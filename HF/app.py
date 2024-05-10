@@ -360,7 +360,7 @@ def process_url(input_path, num_speakers=2, whisper_model="small.en", offset=0, 
     
     try:
         results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset, vad_filter=vad_filter, download_video_flag=download_video_flag)
-        
+
         if results:
             transcription_result = results[0]
             json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
@@ -1281,7 +1281,10 @@ def launch_ui(demo_mode=False):
 
     iface = gr.Interface(
 #        fn=lambda url, num_speakers, whisper_model, offset, api_name, api_key: process_url(url, num_speakers, whisper_model, offset, api_name=api_name, api_key=api_key, demo_mode=demo_mode),
-        fn=lambda *args: process_url(*args, demo_mode=demo_mode),
+
+        fn=lambda url, num_speakers, whisper_model, offset, api_name, api_key: process_url(url, num_speakers, whisper_model, offset, api_name, api_key, demo_mode=demo_mode),
+
+#        fn=lambda *args: process_url(*args, demo_mode=demo_mode),
         inputs=inputs,
         outputs=[
             gr.components.Textbox(label="Transcription", value=lambda: "", max_lines=10),
