@@ -30,7 +30,8 @@ import yt_dlp
 # 2. Usage of/Hardcoding HF_TOKEN as token for API calls
 # 3. Usage of HuggingFace for Inference
 # 4. Other stuff I can't remember. Will eventually do a diff and document them.
-#
+# 5. Dark mode changes under gradio
+# 
 
 
 
@@ -1200,7 +1201,22 @@ def launch_ui(demo_mode=False):
             return "\n".join([item["text"] for item in json_data])
         else:
             return ""
-
+    with gr.Blocks(theme='bethecloud/storj_theme') as demo:
+        with gr.Column(scale=3):
+            with gr.Box():
+                dropdown.render()
+                toggle_dark = gr.Button(value="Toggle Dark").style(full_width=True)
+    dropdown.change(None, dropdown, None, _js=js)
+    toggle_dark.click(
+        None,
+        _js="""
+        () => {
+            document.body.classList.toggle('dark');
+            document.querySelector('gradio-app').style.backgroundColor = 'var(--color-background-primary)'
+        }
+        """,
+    )
+    
     inputs = [
         gr.components.Textbox(label="URL"),
         gr.components.Number(value=2, label="Number of Speakers"),
@@ -1228,7 +1244,7 @@ def launch_ui(demo_mode=False):
         title="Video Transcription and Summarization",
         description="Submit a video URL for transcription and summarization.",
         allow_flagging="never",
-        theme='freddyaboulton/dracula_revamped'
+        theme='bethecloud/storj_theme'
     )
 
     iface.launch(share=True)

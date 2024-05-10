@@ -1220,7 +1220,7 @@ def launch_ui(demo_mode=False):
         title="Video Transcription and Summarization",
         description="Submit a video URL for transcription and summarization.",
         allow_flagging="never",
-        theme='freddyaboulton/dracula_revamped'
+        theme='bethecloud/storj_theme'
     )
 
     iface.launch(share=True)
