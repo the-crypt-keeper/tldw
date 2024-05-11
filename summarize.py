@@ -8,7 +8,6 @@ import ffmpeg
 import torch
 import yt_dlp
 
-
 #######
 # Function Sections
 #
@@ -340,35 +339,35 @@ def process_local_file(file_path):
 # Video Download/Handling
 #
 
-def process_url(input_path, num_speakers=2, whisper_model="small.en", custom_prompt=None, offset=0, api_name=None, api_key=None, vad_filter=False, download_video_flag=False, demo_mode=False):
-    custom_prompt = ""
-    if demo_mode:
-#        api_name = "<demo_mode_api>"
-#        api_key = "<demo_mode_key>"
-        vad_filter = False
-        download_video_flag = False
-    
-    try:
-        results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset, vad_filter=vad_filter, download_video_flag=download_video_flag)
-        
-        if results:
-            transcription_result = results[0]
-            json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-            with open(json_file_path, 'r') as file:
-                json_data = json.load(file)
-            
-            summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
-            if os.path.exists(summary_file_path):
-                video_file_path = transcription_result['video_path'] if download_video_flag else None                
-                return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
-            else:
-                video_file_path = transcription_result['video_path'] if download_video_flag else None
-                return json_data, "Summary not available.", json_file_path, None, video_file_path
-        else:
-            return None, "No results found.", None, None, None
-    except Exception as e:
-        error_message = f"An error occurred: {str(e)}"
-        return None, error_message, None, None, None
+    # def process_url(input_path, num_speakers=2, whisper_model="small.en", custom_prompt=None, offset=0, api_name=None, api_key=None, vad_filter=False, download_video_flag=False, demo_mode=False):
+    #     custom_prompt = ""
+    #     if demo_mode:
+    # #        api_name = "<demo_mode_api>"
+    # #        api_key = "<demo_mode_key>"
+    #         vad_filter = False
+    #         download_video_flag = False
+    #
+    #     try:
+    #         results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset, vad_filter=vad_filter, download_video_flag=download_video_flag)
+    #
+    #         if results:
+    #             transcription_result = results[0]
+    #             json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+    #             with open(json_file_path, 'r') as file:
+    #                 json_data = json.load(file)
+    #
+    #             summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
+    #             if os.path.exists(summary_file_path):
+    #                 video_file_path = transcription_result['video_path'] if download_video_flag else None
+    #                 return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
+    #             else:
+    #                 video_file_path = transcription_result['video_path'] if download_video_flag else None
+    #                 return json_data, "Summary not available.", json_file_path, None, video_file_path
+    #         else:
+    #             return None, "No results found.", None, None, None
+    #     except Exception as e:
+    #         error_message = f"An error occurred: {str(e)}"
+    #         return None, error_message, None, None, None
 
 
 
@@ -1170,7 +1169,7 @@ def save_summary_to_file(summary, file_path):
 #
 
 # Only to be used when configured with Gradio for HF Space
-def summarize_with_huggingface(api_key, file_path):
+def summarize_with_huggingface(api_key, file_path, custom_prompt):
     logging.debug(f"huggingface: Summarization process starting...")
     try:
         logging.debug("huggingface: Loading json data for summarization")
@@ -1181,18 +1180,16 @@ def summarize_with_huggingface(api_key, file_path):
         logging.debug(f"huggingface: Segments: {segments}")
         text = ' '.join([segment['text'] for segment in segments])
 
-# API KEY ASSIGNMENT HERE
-        api_key = huggingface_api_key
-        print(f"huggingface: lets make sure the HF api key exists...\n\t {huggingface_api_key}" )
+        print(f"huggingface: lets make sure the HF api key exists...\n\t {api_key}" )
         headers = {
-            "Authorization": f"Bearer {huggingface_api_key}"
+            "Authorization": f"Bearer {api_key}"
         }
 
         model = "microsoft/Phi-3-mini-128k-instruct"
         API_URL = f"https://api-inference.huggingface.co/models/{model}"
 
 
-        huggingface_prompt = "{text}\n\n\n\n{custom_prompt}"
+        huggingface_prompt = f"{text}\n\n\n\n{custom_prompt}"
         logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
         data = {
             "inputs": text,
@@ -1226,46 +1223,57 @@ def summarize_with_huggingface(api_key, file_path):
 
 
 def launch_ui(demo_mode=False):
-    def process_transcription(json_data):
-        if json_data:
-            return "\n".join([item["text"] for item in json_data])
-        else:
-            return ""
+    def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video):
+        try:
+            # Assuming 'main' is the function that handles the processing logic.
+            # Adjust parameters as needed based on your actual 'main' function implementation.
+            results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
+            whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
+            download_video_flag=download_video, custom_prompt=custom_prompt)
+
+            if results:
+                transcription_result = results[0]
+                json_data = transcription_result['transcription']
+                summary_file_path = transcription_result.get('summary', "Summary not available.")
+                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+                video_file_path = transcription_result.get('video_path', None)
+                return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
+            else:
+                return "No results found.", "No summary available.", None, None, None
+        except Exception as e:
+            return str(e), "Error processing the request.", None, None, None
 
     inputs = [
-        gr.components.Textbox(label="URL"),
+        gr.components.Textbox(label="URL", placeholder="Enter the video URL here"),
         gr.components.Number(value=2, label="Number of Speakers"),
         gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
-        gr.components.Textbox(label="Custom Prompt", value="Please provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points", lines=3),
-        gr.components.Number(value=0, label="Offset")
+        gr.components.Textbox(label="Custom Prompt", placeholder="Enter a custom prompt here", lines=3),
+        gr.components.Number(value=0, label="Offset"),
+        gr.components.Dropdown(choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], label="API Name"),
+        gr.components.Textbox(label="API Key", placeholder="Enter your API key here"),
+        gr.components.Checkbox(label="VAD Filter", value=False),
+        gr.components.Checkbox(label="Download Video", value=False)
     ]
 
-    if not demo_mode:
-        inputs.extend([
-            gr.components.Dropdown(choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value="anthropic", label="API Name"),
-            gr.components.Textbox(label="API Key"),
-            gr.components.Checkbox(value=False, label="VAD Filter"),
-            gr.components.Checkbox(value=False, label="Download Video")
-        ])
+
+    outputs = [
+        gr.components.Textbox(label="Transcription"),
+        gr.components.Textbox(label="Summary or Status Message"),
+        gr.components.File(label="Download Transcription as JSON", visible=lambda x: x is not None),
+        gr.components.File(label="Download Summary as Text", visible=lambda x: x is not None),
+        gr.components.File(label="Download Video", visible=lambda x: x is not None)
+    ]
+
 
     iface = gr.Interface(
-        fn=lambda *args: process_url(*args, demo_mode=demo_mode),
+        fn=process_url,
         inputs=inputs,
-        outputs=[
-            gr.components.Textbox(label="Transcription", value=lambda: "", max_lines=10),
-            gr.components.Textbox(label="Summary or Status Message"),
-            gr.components.File(label="Download Transcription as JSON"),
-            gr.components.File(label="Download Summary as text", visible=lambda summary_file_path: summary_file_path is not None),
-            gr.components.File(label="Download Video", visible=lambda video_file_path: video_file_path is not None)
-        ],
+        outputs=outputs,
         title="Video Transcription and Summarization",
-        description="Submit a video URL for transcription and summarization.",
-        allow_flagging="never",
-        #https://huggingface.co/spaces/bethecloud/storj_theme
-        theme="bethecloud/storj_theme"
+        description="Submit a video URL for transcription and summarization. Ensure you input all necessary information including API keys.",
+        theme="bethecloud/storj_theme" # Adjust theme as necessary
     )
 
-    #iface.launch(share=True)
     iface.launch(share=False)
 
 #
@@ -1394,7 +1402,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         api_key = huggingface_api_key
                         try:
                             logging.debug(f"MAIN: Trying to summarize with huggingface")
-                            summarize_with_huggingface(api_key, json_file_path)
+                            summarize_with_huggingface(api_key, json_file_path, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
 
@@ -1437,7 +1445,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.user_interface:
-        launch_ui(demo_mode=args.demo_mode)
+        launch_ui(demo_mode=False)
     else:
         if not args.input_path:
             parser.print_help()
