@@ -1396,6 +1396,7 @@ if __name__ == "__main__":
     parser.add_argument('input_path', type=str, help='Path or URL of the video', nargs='?')
     parser.add_argument('-v', '--video', action='store_true', help='Download the video instead of just the audio')
     parser.add_argument('-api', '--api_name', type=str, help='API name for summarization (optional)')
+    parser.add_argument('-key', '--api_key', type=str, help='API key for summarization (optional)')
     parser.add_argument('-ns', '--num_speakers', type=int, default=2, help='Number of speakers (default: 2)')
     parser.add_argument('-wm', '--whisper_model', type=str, default='small.en',
                         help='Whisper model (default: small.en)')
