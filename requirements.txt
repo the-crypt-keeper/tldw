@@ -26,8 +26,10 @@ fire==0.6.0
 flatbuffers==24.3.25
 fonttools==4.51.0
 fsspec==2024.3.1
-gradio==4.29.0
-gradio_client==0.16.1
+gradio
+#gradio==4.29.0
+gradio_client
+#gradio_client==0.16.1
 h11==0.14.0
 httpcore==1.0.5
 httptools==0.6.1
@@ -89,8 +91,6 @@ timm==0.9.16
 tokenizers==0.15.2
 tomlkit==0.12.0
 toolz==0.12.1
-torch==2.2.2+cu121
-torchaudio==2.2.2+cu121
 torchvision==0.17.2
 tqdm==4.66.2
 transformers==4.39.3
@@ -101,5 +101,12 @@ ujson==5.9.0
 urllib3==2.2.1
 uvicorn==0.29.0
 watchfiles==0.21.0
-websockets==11.0.3
-yt-dlp==2024.4.9
+websockets
+#websockets==11.0.3
+yt-dlp
+#yt-dlp==2024.4.9
+--extra-index-url https://download.pytorch.org/whl/cu113
+torch
+torchaudio
+#torch==2.2.2+cu121
+#torchaudio==2.2.2+cu121

@@ -341,6 +341,7 @@ def process_local_file(file_path):
 #
 
 def process_url(input_path, num_speakers=2, whisper_model="small.en", custom_prompt=None, offset=0, api_name=None, api_key=None, vad_filter=False, download_video_flag=False, demo_mode=False):
+    custom_prompt = ""
     if demo_mode:
 #        api_name = "<demo_mode_api>"
 #        api_key = "<demo_mode_key>"
@@ -766,7 +767,7 @@ def extract_text_from_segments(segments):
 
 
 
-def summarize_with_openai(api_key, file_path, model):
+def summarize_with_openai(api_key, file_path, model, custom_prompt):
     try:
         logging.debug("openai: Loading json data for summarization")
         with open(file_path, 'r') as file:
@@ -779,7 +780,12 @@ def summarize_with_openai(api_key, file_path, model):
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json'
         }
-        
+#        headers = {
+#           'Authorization': f'Bearer {api_key}',
+#           'Content-Type': 'application/json'
+#        }
+
+        logging.debug(f"openai: API Key is: {api_key}")
         logging.debug("openai: Preparing data + prompt for submittal")
         openai_prompt = f"{text} \n\n\n\n{custom_prompt}"
         data = {
@@ -816,7 +822,7 @@ def summarize_with_openai(api_key, file_path, model):
 
 
 
-def summarize_with_claude(api_key, file_path, model):
+def summarize_with_claude(api_key, file_path, model, custom_prompt):
     try:
         logging.debug("anthropic: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -886,7 +892,7 @@ def summarize_with_claude(api_key, file_path, model):
 
 
 # Summarize with Cohere
-def summarize_with_cohere(api_key, file_path, model):
+def summarize_with_cohere(api_key, file_path, model, custom_prompt):
     try:
         logging.basicConfig(level=logging.DEBUG)
         logging.debug("cohere: Loading JSON data")
@@ -930,7 +936,7 @@ def summarize_with_cohere(api_key, file_path, model):
                 logging.error("Expected data not found in API response.")
                 return "Expected data not found in API response."
         else:
-            logging.error(f"cohere: API request failed with status code {response.status_code}: {resposne.text}")
+            logging.error(f"cohere: API request failed with status code {response.status_code}: {response.text}")
             print(f"Failed to process summary, status code {response.status_code}: {response.text}")
             return f"cohere: API request failed: {response.text}"
 
@@ -941,7 +947,7 @@ def summarize_with_cohere(api_key, file_path, model):
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, file_path, model):
+def summarize_with_groq(api_key, file_path, model, custom_prompt):
     try:
         logging.debug("groq: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -997,7 +1003,7 @@ def summarize_with_groq(api_key, file_path, model):
 #
 # Local Summarization
 
-def summarize_with_llama(api_url, file_path, token):
+def summarize_with_llama(api_url, file_path, token, custom_prompt):
     try:
         logging.debug("llama: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -1045,7 +1051,7 @@ def summarize_with_llama(api_url, file_path, token):
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(api_url, file_path):
+def summarize_with_kobold(api_url, file_path,custom_prompt):
     try:
         logging.debug("kobold: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -1096,7 +1102,7 @@ def summarize_with_kobold(api_url, file_path):
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(api_url, file_path):
+def summarize_with_oobabooga(api_url, file_path, custom_prompt):
     try:
         logging.debug("ooba: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -1336,61 +1342,61 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         api_key = openai_api_key
                         try:
                             logging.debug(f"MAIN: trying to summarize with openAI")                            
-                            summary = summarize_with_openai(api_key, json_file_path, openai_model)
+                            summary = summarize_with_openai(api_key, json_file_path, openai_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
-                            r.status_code = "Connection: "
+                            requests.status_code = "Connection: "
                     elif api_name.lower() == "anthropic":
                         api_key = anthropic_api_key
                         try:
                             logging.debug(f"MAIN: Trying to summarize with anthropic")
-                            summary = summarize_with_claude(api_key, json_file_path, anthropic_model)
+                            summary = summarize_with_claude(api_key, json_file_path, anthropic_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
-                            r.status_code = "Connection: "
+                            requests.status_code = "Connection: "
                     elif api_name.lower() == "cohere":
                         api_key = cohere_api_key
                         try:
                             logging.debug(f"MAIN: Trying to summarize with cohere")
                             summary = summarize_with_cohere(api_key, json_file_path, cohere_model)
                         except requests.exceptions.ConnectionError:
-                            r.status_code = "Connection: "
+                            requests.status_code = "Connection: "
                     elif api_name.lower() == "groq":
                         api_key = groq_api_key
                         try:
                             logging.debug(f"MAIN: Trying to summarize with Groq")
                             summary = summarize_with_groq(api_key, json_file_path, groq_model)
                         except requests.exceptions.ConnectionError:
-                            r.status_code = "Connection: "
+                            requests.status_code = "Connection: "
                     elif api_name.lower() == "llama":
                         token = llama_api_key
                         llama_ip = llama_api_IP
                         try:
                             logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
-                            summary = summarize_with_llama(llama_ip, json_file_path, token)
+                            summary = summarize_with_llama(llama_ip, json_file_path, token, custom_prompt)
                         except requests.exceptions.ConnectionError:
-                            r.status_code = "Connection: "
+                            requests.status_code = "Connection: "
                     elif api_name.lower() == "kobold":
                         token = kobold_api_key
                         kobold_ip = kobold_api_IP
                         try:
                             logging.debug(f"MAIN: Trying to summarize with kobold.cpp")
-                            summary = summarize_with_kobold(kobold_ip, json_file_path)
+                            summary = summarize_with_kobold(kobold_ip, json_file_path, custom_prompt)
                         except requests.exceptions.ConnectionError:
-                            r.status_code = "Connection: "
+                            requests.status_code = "Connection: "
                     elif api_name.lower() == "ooba":
                         token = ooba_api_key
                         ooba_ip = ooba_api_IP
                         try:
                             logging.debug(f"MAIN: Trying to summarize with oobabooga")
-                            summary = summarize_with_oobabooga(ooba_ip, json_file_path)
+                            summary = summarize_with_oobabooga(ooba_ip, json_file_path, custom_prompt)
                         except requests.exceptions.ConnectionError:
-                            r.status_code = "Connection: "
-                    if api_name.lower() == "huggingface":
+                            requests.status_code = "Connection: "
+                    elif api_name.lower() == "huggingface":
                         api_key = huggingface_api_key
                         try:
                             logging.debug(f"MAIN: Trying to summarize with huggingface")
                             summarize_with_huggingface(api_key, json_file_path)
                         except requests.exceptions.ConnectionError:
-                            r.status_code = "Connection: "
+                            requests.status_code = "Connection: "
 
                     else:
                         logging.warning(f"Unsupported API: {api_name}")
