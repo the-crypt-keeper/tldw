@@ -1426,6 +1426,7 @@ if __name__ == "__main__":
     parser.add_argument('-log', '--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
     parser.add_argument('-ui', '--user_interface', action='store_true', help='Launch the Gradio user interface')
     parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
+    parser.add_argument('-prompt', '--custom_prompt', type=str, help='Pass in a custom prompt to be used in place of the existing one.(Probably should just modify the script itself...)')
     #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
