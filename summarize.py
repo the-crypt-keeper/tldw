@@ -516,7 +516,8 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
 def convert_to_wav(video_file_path, offset=0):
     print("Starting conversion process of .m4a to .WAV")
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
-
+    logging.debug("ffmpeg: about to check OS")
+    
     try:
         if os.name == "nt":
             logging.debug("ffmpeg being ran on windows")
@@ -1307,7 +1308,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 logging.info(f"Transcription complete: {audio_file}")
 
                 # Perform summarization based on the specified API
-                if api_name and api_key:
+                if api_name:
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
