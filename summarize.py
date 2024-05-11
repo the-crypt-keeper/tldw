@@ -62,6 +62,15 @@ import yt_dlp
 #
 ###
 
+#######################
+#       Random issues I've encountered and how I solved them:
+#   1. Something about cuda nn library missing, even though cuda is installed...
+#       https://github.com/tensorflow/tensorflow/issues/54784 - Basically, installing zlib made it go away. idk.
+#
+#
+#
+#
+#
 
 #######################
 # Config loading
