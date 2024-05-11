@@ -1223,7 +1223,7 @@ def launch_ui(demo_mode=False):
         gr.components.Textbox(label="URL", placeholder="Enter the video URL here"),
         gr.components.Number(value=2, label="Number of Speakers"),
         gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
-        gr.components.Textbox(label="Custom Prompt", placeholder="Enter a custom prompt here", lines=3),
+        gr.components.Textbox(label="Custom Prompt", placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:", lines=3),
         gr.components.Number(value=0, label="Offset"),
         gr.components.Dropdown(
             choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
@@ -1420,6 +1420,14 @@ if __name__ == "__main__":
                         help='Pass in a custom prompt to be used in place of the existing one.(Probably should just modify the script itself...)')
     #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
+
+    if args.custom_prompt == "":
+        logging.debug(f"Custom prompt defined, will use \n\nf{args.custom_prompt} \n\nas prompt")
+        print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
+    else:
+        logging.debug("No custom prompt defined, will use default")
+        args.custom_prompt = "\n\nQ: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:"
+        print("No custom prompt defined, will use default")
 
     if args.user_interface:
         launch_ui(demo_mode=False)
