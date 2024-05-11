@@ -1,4 +1,6 @@
-# [**TL/DW: Too Long, Didnt Watch - Download, Transcribe & Summarize Videos. All automated. (Public Demo)**](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
+# **TL/DW: Too Long, Didnt Watch**
+## Download, Transcribe & Summarize Videos. All automated
+## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
 
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
