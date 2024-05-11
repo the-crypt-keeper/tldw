@@ -1,5 +1,5 @@
 [API]
-anthropic_api_key = <anthropic_api_key
+anthropic_api_key = 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
 anthropic_model = claude-3-sonnet-20240229
 cohere_api_key = <your_cohere_api_key>
 cohere_model = command-r-plus
