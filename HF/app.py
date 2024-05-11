@@ -42,7 +42,6 @@ import yt_dlp
 # 
 
 
-
 ####
 #
 #       TL/DW: Too Long Didn't Watch
@@ -60,8 +59,10 @@ import yt_dlp
 #   Download Audio+Video from URL -> Transcribe audio from Video:**
 #       python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
 #
-#   Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
-#       python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>` - Make sure to put your API key into `config.txt` under the appropriate API variable
+# Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` (
+# llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:** python summarize.py
+# -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>` - Make sure to put your API key into
+# `config.txt` under the appropriate API variable
 # 
 #   Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
 #       python summarize.py ./local/file_on_your/system --api_name <API_name>`
@@ -97,7 +98,6 @@ logging.debug(f"Loaded openAI Face API Key: {openai_api_key}")
 huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
 logging.debug(f"Loaded HuggingFace Face API Key: {huggingface_api_key}")
 
-
 # Models
 anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
 cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
@@ -127,9 +127,9 @@ processing_choice = config.get('Processing', 'processing_choice', fallback='cpu'
 #######################
 
 # Dirty hack - sue me.
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-whisper_models = ["small", "medium", "small.en","medium.en"]
+whisper_models = ["small", "medium", "small.en", "medium.en"]
 source_languages = {
     "en": "English",
     "zh": "Chinese",
@@ -140,9 +140,6 @@ source_languages = {
     "fr": "French"
 }
 source_language_list = [key[0] for key in source_languages.items()]
-
-
-
 
 print(r"""_____  _          ________  _    _                                 
 |_   _|| |        / /|  _  \| |  | | _                              
@@ -175,6 +172,8 @@ print(r"""_____  _          ________  _    _
 
 # Perform Platform Check
 userOS = ""
+
+
 def platform_check():
     global userOS
     if platform.system() == "Linux":
@@ -186,7 +185,6 @@ def platform_check():
     else:
         print("Other OS detected \n Maybe try running things manually?")
         exit()
-
 
 
 # Check for NVIDIA GPU and CUDA availability
@@ -205,7 +203,6 @@ def cuda_check():
         processing_choice = "cpu"  # Set processing_choice to cpu if nvidia-smi command fails
 
 
-
 # Ask user if they would like to use either their GPU or their CPU for transcription
 def decide_cpugpu():
     global processing_choice
@@ -222,7 +219,6 @@ def decide_cpugpu():
         print("Invalid choice. Please select either GPU or CPU.")
 
 
-
 # check for existence of ffmpeg
 def check_ffmpeg():
     if shutil.which("ffmpeg") or (os.path.exists("Bin") and os.path.isfile(".\\Bin\\ffmpeg.exe")):
@@ -230,18 +226,19 @@ def check_ffmpeg():
         pass
     else:
         logging.debug("ffmpeg not installed on the local system/in local PATH")
-        print("ffmpeg is not installed.\n\n You can either install it manually, or through your package manager of choice.\n Windows users, builds are here: https://www.gyan.dev/ffmpeg/builds/")
+        print(
+            "ffmpeg is not installed.\n\n You can either install it manually, or through your package manager of choice.\n Windows users, builds are here: https://www.gyan.dev/ffmpeg/builds/")
         if userOS == "Windows":
             download_ffmpeg()
         elif userOS == "Linux":
-            print("You should install ffmpeg using your platform's appropriate package manager, 'apt install ffmpeg','dnf install ffmpeg' or 'pacman', etc.")
+            print(
+                "You should install ffmpeg using your platform's appropriate package manager, 'apt install ffmpeg','dnf install ffmpeg' or 'pacman', etc.")
         else:
             logging.debug("running an unsupported OS")
-            print("You're running an unspported/Un-tested OS")
+            print("You're running an unsupported/Un-tested OS")
             exit_script = input("Let's exit the script, unless you're feeling lucky? (y/n)")
             if exit_script == "y" or "yes" or "1":
                 exit()
-
 
 
 # Download ffmpeg
@@ -251,33 +248,33 @@ def download_ffmpeg():
         print("Downloading ffmpeg")
         url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
         response = requests.get(url)
-        
+
         if response.status_code == 200:
             print("Saving ffmpeg zip file")
             logging.debug("Saving ffmpeg zip file")
             zip_path = "ffmpeg-release-essentials.zip"
             with open(zip_path, 'wb') as file:
                 file.write(response.content)
-            
+
             logging.debug("Extracting the 'ffmpeg.exe' file from the zip")
             print("Extracting ffmpeg.exe from zip file to '/Bin' folder")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 ffmpeg_path = "ffmpeg-7.0-essentials_build/bin/ffmpeg.exe"
-                
+
                 logging.debug("checking if the './Bin' folder exists, creating if not")
                 bin_folder = "Bin"
                 if not os.path.exists(bin_folder):
                     logging.debug("Creating a folder for './Bin', it didn't previously exist")
                     os.makedirs(bin_folder)
-                
+
                 logging.debug("Extracting 'ffmpeg.exe' to the './Bin' folder")
                 zip_ref.extract(ffmpeg_path, path=bin_folder)
-                
+
                 logging.debug("Moving 'ffmpeg.exe' to the './Bin' folder")
                 src_path = os.path.join(bin_folder, ffmpeg_path)
                 dst_path = os.path.join(bin_folder, "ffmpeg.exe")
                 shutil.move(src_path, dst_path)
-            
+
             logging.debug("Removing ffmpeg zip file")
             print("Deleting zip file (we've already extracted ffmpeg.exe, no worries)")
             os.remove(zip_path)
@@ -291,14 +288,10 @@ def download_ffmpeg():
         logging.debug("User chose to not download ffmpeg")
         print("ffmpeg will not be downloaded.")
 
-# 
+
+#
 # 
 ####################################################################################################################################
-
-
-
-
-
 
 
 ####################################################################################################################################
@@ -312,11 +305,11 @@ def read_paths_from_file(file_path):
     with open(file_path, 'r') as file:
         for line in file:
             line = line.strip()
-            if line and not os.path.exists(os.path.join('results', normalize_title(line.split('/')[-1].split('.')[0]) + '.json')):
+            if line and not os.path.exists(
+                    os.path.join('results', normalize_title(line.split('/')[-1].split('.')[0]) + '.json')):
                 logging.debug("line successfully imported from file and added to list to be transcribed")
                 paths.append(line)
     return paths
-
 
 
 def process_path(path):
@@ -332,7 +325,6 @@ def process_path(path):
         return None
 
 
-
 # FIXME
 def process_local_file(file_path):
     logging.info(f"Processing local file: {file_path}")
@@ -342,31 +334,32 @@ def process_local_file(file_path):
     download_path = create_download_directory(title)
     logging.debug(f"Converting '{title}' to an audio file (wav).")
     audio_file = convert_to_wav(file_path)  # Assumes input files are videos needing audio extraction
-    logging.debug(f"'{title}' succesfully converted to an audio file (wav).")   
+    logging.debug(f"'{title}' successfully converted to an audio file (wav).")
     return download_path, info_dict, audio_file
-# 
+
+
+#
 #
 ####################################################################################################################################
-
-
-
-
 
 
 ####################################################################################################################################
 # Video Download/Handling
 #
 
-def process_url(input_path, num_speakers=2, whisper_model="small.en", custom_prompt=None, offset=0, api_name=None, api_key=None, vad_filter=False, download_video_flag=False, demo_mode=False):
+def process_url(input_path, num_speakers=2, whisper_model="small.en", custom_prompt=None, offset=0, api_name=None,
+                api_key=None, vad_filter=False, download_video_flag=False, demo_mode=False):
     if demo_mode:
         api_name = "huggingface"
         api_key = os.environ.get(HF_TOKEN)
         print("HUGGINGFACE API KEY CHECK #3: " + api_key)
         vad_filter = False
         download_video_flag = False
-    
+
     try:
-        results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset, vad_filter=vad_filter, download_video_flag=download_video_flag)
+        results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
+                       whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
+                       download_video_flag=download_video_flag)
 
         if results:
             transcription_result = results[0]
@@ -390,7 +383,6 @@ def process_url(input_path, num_speakers=2, whisper_model="small.en", custom_pro
         return None, error_message, None, None
 
 
-
 def create_download_directory(title):
     base_dir = "Results"
     # Remove characters that are illegal in Windows filenames and normalize
@@ -405,13 +397,13 @@ def create_download_directory(title):
     return session_path
 
 
-
 def normalize_title(title):
     # Normalize the string to 'NFKD' form and encode to 'ascii' ignoring non-ascii characters
     title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('ascii')
-    title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '').replace('*', '').replace('?', '').replace('<', '').replace('>', '').replace('|', '')
+    title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '').replace('*', '').replace('?',
+                                                                                                                   '').replace(
+        '<', '').replace('>', '').replace('|', '')
     return title
-
 
 
 def get_youtube(video_url):
@@ -426,7 +418,6 @@ def get_youtube(video_url):
         info_dict = ydl.extract_info(video_url, download=False)
         logging.debug("Youtube info successfully extracted")
     return info_dict
-
 
 
 def get_playlist_videos(playlist_url):
@@ -448,18 +439,16 @@ def get_playlist_videos(playlist_url):
             return [], None
 
 
-
 def save_to_file(video_urls, filename):
     with open(filename, 'w') as file:
         file.write('\n'.join(video_urls))
     print(f"Video URLs saved to {filename}")
 
 
-
 def download_video(video_url, download_path, info_dict, download_video_flag):
     logging.debug("About to normalize downloaded video title")
     title = normalize_title(info_dict['title'])
-    
+
     if download_video_flag == False:
         file_path = os.path.join(download_path, f"{title}.m4a")
         ydl_opts = {
@@ -482,12 +471,12 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
             'format': 'bestaudio[ext=m4a]',
             'outtmpl': audio_file_path,
         }
-        
+
         with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
             logging.debug("yt_dlp: About to download video with youtube-dl")
             ydl.download([video_url])
             logging.debug("yt_dlp: Video successfully downloaded with youtube-dl")
-        
+
         with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl:
             logging.debug("yt_dlp: About to download audio with youtube-dl")
             ydl.download([video_url])
@@ -516,26 +505,19 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
                 '-c:a', 'copy',
                 output_file_path
             ]
-            subprocess.run(ffmpeg_command, check=True)            
+            subprocess.run(ffmpeg_command, check=True)
         else:
             logging.error("You shouldn't be here...")
             exit()
         os.remove(video_file_path)
         os.remove(audio_file_path)
-        
+
         return output_file_path
-
-
-
 
 
 #
 #
 ####################################################################################################################################
-
-
-
-
 
 
 ####################################################################################################################################
@@ -561,12 +543,12 @@ def convert_to_wav(video_file_path, offset=0):
                 ffmpeg_cmd = 'ffmpeg'  # Assume 'ffmpeg' is in PATH for non-Windows systems
 
             command = [
-                ffmpeg_cmd,        # Assuming the working directory is correctly set where .\Bin exists
-                "-ss", "00:00:00",          # Start at the beginning of the video
+                ffmpeg_cmd,  # Assuming the working directory is correctly set where .\Bin exists
+                "-ss", "00:00:00",  # Start at the beginning of the video
                 "-i", video_file_path,
-                "-ar", "16000",             # Audio sample rate
-                "-ac", "1",                 # Number of audio channels
-                "-c:a", "pcm_s16le",        # Audio codec
+                "-ar", "16000",  # Audio sample rate
+                "-ac", "1",  # Number of audio channels
+                "-c:a", "pcm_s16le",  # Audio codec
                 out_path
             ]
             try:
@@ -598,7 +580,6 @@ def convert_to_wav(video_file_path, offset=0):
     return out_path
 
 
-
 # Transcribe .wav into .segments.json
 def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='small.en', vad_filter=False):
     logging.info('Loading faster_whisper model: %s', whisper_model)
@@ -617,7 +598,7 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
             with open(out_file) as f:
                 segments = json.load(f)
             return segments
-        
+
         logging.info('Starting transcription...')
         options = dict(language=selected_source_lang, beam_size=5, best_of=5, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
@@ -639,13 +620,11 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
         logging.error("Error transcribing audio: %s", str(e))
         raise RuntimeError("Error transcribing audio")
     return segments
+
+
 #
 #
 ####################################################################################################################################
-
-
-
-
 
 
 ####################################################################################################################################
@@ -768,10 +747,6 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
 ####################################################################################################################################
 
 
-
-
-
-
 ####################################################################################################################################
 #Summarizers
 #
@@ -782,7 +757,6 @@ def extract_text_from_segments(segments):
     text = ' '.join([segment['text'] for segment in segments])
     logging.debug(f"Main: Successfully extracted text from {segments}")
     return text
-
 
 
 def summarize_with_openai(api_key, file_path, model, custom_prompt):
@@ -1160,7 +1134,6 @@ def summarize_with_oobabooga(api_url, file_path, custom_prompt):
         return f"ooba: Error occurred while processing summary with oobabooga: {str(e)}"
 
 
-
 def save_summary_to_file(summary, file_path):
     summary_file_path = file_path.replace('.segments.json', '_summary.txt')
     logging.debug("Opening summary file for writing, *segments.json with *_summary.txt")
@@ -1168,13 +1141,10 @@ def save_summary_to_file(summary, file_path):
         file.write(summary)
     logging.info(f"Summary saved to file: {summary_file_path}")
 
+
 #
 #
 ####################################################################################################################################
-
-
-
-
 
 
 ####################################################################################################################################
@@ -1210,8 +1180,8 @@ def summarize_with_huggingface(api_key, file_path):
             response_data = response.json()
             wait_time = response_data.get('estimated_time', 10)
             return None, f"Model is loading, retrying in {int(wait_time)} seconds..."
-        # Sleep before retrying....
-        time.sleep(wait_time)
+            # Sleep before retrying....
+            time.sleep(wait_time)
 
     if api_key == "":
         api_key = os.environ.get(HF_TOKEN)
@@ -1220,19 +1190,16 @@ def summarize_with_huggingface(api_key, file_path):
         logging.debug("huggingface: Loading json data for summarization")
         with open(file_path, 'r') as file:
             segments = json.load(file)
-        
+
         logging.debug("huggingface: Extracting text from the segments")
         text = ' '.join([segment['text'] for segment in segments])
 
         api_key = os.environ.get(HF_TOKEN)
         logging.debug("HUGGINGFACE API KEY CHECK #2: " + api_key)
 
-
-
-        
         logging.debug("huggingface: Submitting request...")
         response = requests.post(API_URL, headers=headers, json=data)
-        
+
         if response.status_code == 200:
             summary = response.json()[0]['summary_text']
             logging.debug("huggingface: Summarization successful")
@@ -1246,11 +1213,8 @@ def summarize_with_huggingface(api_key, file_path):
         print(f"Error occurred while processing summary with huggingface: {str(e)}")
         return None
 
-
-
     def same_auth(username, password):
         return username == password
-
 
 
 def format_transcription(transcription_result):
@@ -1261,79 +1225,83 @@ def format_transcription(transcription_result):
         return ""
 
 
-
-def process_text(api_key,text_file):
-    summary,message = summarize_with_huggingface(api_key,text_file)
+def process_text(api_key, text_file):
+    summary, message = summarize_with_huggingface(api_key, text_file)
     if summary:
         # Show summary on success
-        return "Summary:",summary 
+        return "Summary:", summary
     else:
         # Inform user about load/wait time
-        return "Notice:",message
+        return "Notice:", message
 
 
 def launch_ui(demo_mode=False):
-    def process_transcription(json_data):
-        if json_data:
-            return json.dumps(json_data, indent=2)
-            #return "\n".join([item["text"] for item in json_data])
-        else:
-            return ""
+    def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
+                    download_video):
+        try:
+            # Assuming 'main' is the function that handles the processing logic.
+            # Adjust parameters as needed based on your actual 'main' function implementation.
+            results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
+                           whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
+                           download_video_flag=download_video, custom_prompt=custom_prompt)
+
+            if results:
+                transcription_result = results[0]
+                json_data = transcription_result['transcription']
+                summary_file_path = transcription_result.get('summary', "Summary not available.")
+                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+                video_file_path = transcription_result.get('video_path', None)
+                return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
+            else:
+                return "No results found.", "No summary available.", None, None, None
+        except Exception as e:
+            return str(e), "Error processing the request.", None, None, None
 
     inputs = [
-        gr.components.Textbox(label="URL of video to be Transcribed/Summarized"),
-        gr.components.Number(value=2, label="Number of Speakers (for Diarization)"),
-        gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model (Can ignore this)"),
-        gr.components.Textbox(label="Custom Prompt", value="Please provide a detailed, bulleted list of the points made throughout the transcribed video and any supporting arguments made for said points", lines=3),
-        gr.components.Number(value=0, label="Offset time to start transcribing from\n\n (helpful if you only want part of a video/lecture)")
+        gr.components.Textbox(label="URL", placeholder="Enter the video URL here"),
+        gr.components.Number(value=2, label="Number of Speakers"),
+        gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
+        gr.components.Textbox(label="Custom Prompt", placeholder="Enter a custom prompt here", lines=3),
+        gr.components.Number(value=0, label="Offset"),
+        gr.components.Dropdown(
+            choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
+            label="API Name"),
+        gr.components.Textbox(label="API Key", placeholder="Enter your API key here"),
+        gr.components.Checkbox(label="VAD Filter", value=False),
+        gr.components.Checkbox(label="Download Video", value=False)
     ]
 
-    if not demo_mode:
-        inputs.extend([
-            gr.components.Dropdown(choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value="huggingface", label="API Name - What LLM service will summarize your transcription"),
-            gr.components.Textbox(label="API Key - Have to provide one, unless you're fine waiting on HuggingFace..."),
-#            gr.components.Checkbox(value=False, label="Download Video"),
-#            gr.components.Checkbox(value=False, label="VAD Filter")
-        ])
+    outputs = [
+        gr.components.Textbox(label="Transcription"),
+        gr.components.Textbox(label="Summary or Status Message"),
+        gr.components.File(label="Download Transcription as JSON", visible=lambda x: x is not None),
+        gr.components.File(label="Download Summary as Text", visible=lambda x: x is not None),
+        gr.components.File(label="Download Video", visible=lambda x: x is not None)
+    ]
 
     iface = gr.Interface(
-#        fn=lambda url, num_speakers, whisper_model, offset, api_name, api_key: process_url(url, num_speakers, whisper_model, offset, api_name=api_name, api_key=api_key, demo_mode=demo_mode),
-#        fn=lambda url, num_speakers, whisper_model, offset, api_name, custom_prompt, api_key: process_url(url, num_speakers, whisper_model, offset, api_name, api_key, demo_mode=demo_mode),
-        fn=lambda *args: process_url(*args, demo_mode=demo_mode),
-
+        fn=process_url,
         inputs=inputs,
-        outputs=[
-            gr.components.Textbox(label="Transcription", value=lambda: "", max_lines=10),
-            gr.components.Textbox(label="Summary or Status Message"),
-            gr.components.File(label="Download Transcription as JSON"),
-            gr.components.File(label="Download Summary as text", visible=lambda summary_file_path: summary_file_path is not None)
-        ],
+        outputs=outputs,
         title="Video Transcription and Summarization",
-        description="Submit a video URL for transcription and summarization.",
-        allow_flagging="never",
-        #https://huggingface.co/spaces/bethecloud/storj_theme
-        theme="bethecloud/storj_theme"
-        # FIXME - Figure out how to enable dark mode...
-        # other themes: https://huggingface.co/spaces/gradio/theme-gallery
+        description="Submit a video URL for transcription and summarization. Ensure you input all necessary information including API keys.",
+        theme="bethecloud/storj_theme"  # Adjust theme as necessary
     )
 
-    iface.launch(share=True)
+    iface.launch(share=False)
+
 
 #
 #
 #####################################################################################################################################
 
 
-
-
-
-
-
 ####################################################################################################################################
 # Main()
 #
 
-def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False, download_video_flag=False, demo_mode=False):
+def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
+         download_video_flag=False, demo_mode=False, custom_prompt=None):
     if input_path is None and args.user_interface:
         return []
     start_time = time.monotonic()
@@ -1346,7 +1314,8 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
         paths = [input_path]
     elif (info_dict := get_youtube(input_path)) and 'entries' in info_dict:
         logging.debug("MAIN: YouTube playlist detected")
-        print("\n\nSorry, but playlists aren't currently supported. You can run the following command to generate a text file that you can then pass into this script though! (It may not work... playlist support seems spotty)" + """\n\n\tpython Get_Playlist_URLs.py <Youtube Playlist URL>\n\n\tThen,\n\n\tpython diarizer.py <playlist text file name>\n\n""")
+        print(
+            "\n\nSorry, but playlists aren't currently supported. You can run the following command to generate a text file that you can then pass into this script though! (It may not work... playlist support seems spotty)" + """\n\n\tpython Get_Playlist_URLs.py <Youtube Playlist URL>\n\n\tThen,\n\n\tpython diarizer.py <playlist text file name>\n\n""")
         return
     else:
         paths = [input_path]
@@ -1471,28 +1440,28 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
     return results
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transcribe and summarize videos.')
     parser.add_argument('input_path', type=str, help='Path or URL of the video', nargs='?')
-    parser.add_argument('-v','--video',  action='store_true', help='Download the video instead of just the audio')
+    parser.add_argument('-v', '--video', action='store_true', help='Download the video instead of just the audio')
     parser.add_argument('-api', '--api_name', type=str, help='API name for summarization (optional)')
     parser.add_argument('-ns', '--num_speakers', type=int, default=2, help='Number of speakers (default: 2)')
-    parser.add_argument('-wm', '--whisper_model', type=str, default='small.en', help='Whisper model (default: small.en)')
+    parser.add_argument('-wm', '--whisper_model', type=str, default='small.en',
+                        help='Whisper model (default: small.en)')
     parser.add_argument('-off', '--offset', type=int, default=0, help='Offset in seconds (default: 0)')
     parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
-    parser.add_argument('-log', '--log_level', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
+    parser.add_argument('-log', '--log_level', type=str, default='INFO',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
     parser.add_argument('-ui', '--user_interface', action='store_true', help='Launch the Gradio user interface')
     parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
     #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
-    
+
     print(f"Is CUDA available: {torch.cuda.is_available()}")
     # True
     print(f"CUDA device: {torch.cuda.get_device_name(torch.cuda.current_device())}")
     # Tesla T4
 
-    
     # Since this is running in HF....
     args.user_interface = True
     if args.user_interface:
@@ -1507,12 +1476,12 @@ if __name__ == "__main__":
         logging.info('Starting the transcription and summarization process.')
         logging.info(f'Input path: {args.input_path}')
         logging.info(f'API Name: {args.api_name}')
-        logging.debug(f'API Key: {args.api_key}') # ehhhhh
+        logging.debug(f'API Key: {args.api_key}')  # ehhhhh
         logging.info(f'Number of speakers: {args.num_speakers}')
         logging.info(f'Whisper model: {args.whisper_model}')
         logging.info(f'Offset: {args.offset}')
         logging.info(f'VAD filter: {args.vad_filter}')
-        logging.info(f'Log Level: {args.log_level}') #lol
+        logging.info(f'Log Level: {args.log_level}')  #lol
 
         if args.api_name and args.api_key:
             logging.info(f'API: {args.api_name}')
@@ -1529,13 +1498,13 @@ if __name__ == "__main__":
 
         # Hey, we're in HuggingFace
         launch_ui(demo_mode=args.demo_mode)
-        
+
         try:
-            results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model="small.en", offset=offset, vad_filter=vad_filter, download_video_flag=download_video_flag)
-            results = main(args.input_path, api_name=args.api_name, api_key=args.api_key, num_speakers=args.num_speakers, whisper_model="small.en", offset=args.offset, vad_filter=args.vad_filter, download_video_flag=args.video)
+            results = main(args.input_path, api_name=args.api_name, api_key=args.api_key,
+                           num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset,
+                           vad_filter=args.vad_filter, download_video_flag=args.video)
             logging.info('Transcription process completed.')
         except Exception as e:
             logging.error('An error occurred during the transcription process.')
             logging.error(str(e))
             sys.exit(1)
-
