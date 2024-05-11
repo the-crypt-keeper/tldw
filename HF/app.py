@@ -141,7 +141,8 @@ source_languages = {
 }
 source_language_list = [key[0] for key in source_languages.items()]
 
-print(r"""_____  _          ________  _    _                                 
+print(r"""
+ _____  _          ________  _    _                                 
 |_   _|| |        / /|  _  \| |  | | _                              
   | |  | |       / / | | | || |  | |(_)                             
   | |  | |      / /  | | | || |/\| |                                
