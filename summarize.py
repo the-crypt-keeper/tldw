@@ -1439,6 +1439,7 @@ if __name__ == "__main__":
         print("No custom prompt defined, will use default")
 
     if args.user_interface:
+        logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
         launch_ui(demo_mode=False)
     else:
         if not args.input_path:
