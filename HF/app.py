@@ -39,7 +39,7 @@ import yt_dlp
 # 2. Usage of/Hardcoding HF_TOKEN as token for API calls
 # 3. Usage of HuggingFace for Inference
 # 4. Other stuff I can't remember. Will eventually do a diff and document them.
-# 
+#
 
 
 ####
@@ -63,10 +63,10 @@ import yt_dlp
 # llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:** python summarize.py
 # -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>` - Make sure to put your API key into
 # `config.txt` under the appropriate API variable
-# 
+#
 #   Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
 #       python summarize.py ./local/file_on_your/system --api_name <API_name>`
-# 
+#
 #   Run it as a WebApp**
 #       python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
 #           Can be helpful for setting up a shared instance, but not wanting people to perform inference on your server.
@@ -120,7 +120,7 @@ output_path = config.get('Paths', 'output_path', fallback='results')
 processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
 # Log file
-#logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
+# logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
 
 #
 #
@@ -148,8 +148,8 @@ print(r"""
   | |  | |      / /  | | | || |/\| |                                
   | |  | |____ / /   | |/ / \  /\  / _                              
   \_/  \_____//_/    |___/   \/  \/ (_)                             
-                                                                    
-                                                                    
+
+
  _                   _                                              
 | |                 | |                                             
 | |_   ___    ___   | |  ___   _ __    __ _                         
@@ -168,8 +168,8 @@ print(r"""
 
 ####################################################################################################################################
 # System Checks
-# 
-# 
+#
+#
 
 # Perform Platform Check
 userOS = ""
@@ -291,13 +291,13 @@ def download_ffmpeg():
 
 
 #
-# 
+#
 ####################################################################################################################################
 
 
 ####################################################################################################################################
 # Processing Paths and local file handling
-# 
+#
 #
 
 def read_paths_from_file(file_path):
@@ -374,7 +374,7 @@ def process_url(input_path, num_speakers=2, whisper_model="small.en", custom_pro
                 return json_data, summary_file_path, json_file_path, summary_file_path
 
             else:
-                return json_data, "Summary not available.", json_file_path, None
+                return json_data, "Summary not available.", json_file_path, "Summary not available."
 
         else:
             return None, "No results found.", None, None
@@ -508,8 +508,8 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
             ]
             subprocess.run(ffmpeg_command, check=True)
         else:
-            logging.error("You shouldn't be here...")
-            exit()
+            logging.error("ffmpeg: Unsupported operating system for video download and merging.")
+            raise RuntimeError("ffmpeg: Unsupported operating system for video download and merging.")
         os.remove(video_file_path)
         os.remove(audio_file_path)
 
@@ -529,7 +529,7 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
 #       https://www.gyan.dev/ffmpeg/builds/
 #
 
-#os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
+# os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
 def convert_to_wav(video_file_path, offset=0):
     print("Starting conversion process of .m4a to .WAV")
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
@@ -539,7 +539,8 @@ def convert_to_wav(video_file_path, offset=0):
             logging.debug("ffmpeg being ran on windows")
 
             if sys.platform.startswith('win'):
-                ffmpeg_cmd = ".\\Bin\\ffmpeg.exe"
+                ffmpeg_cmd = "..\\Bin\\ffmpeg.exe"
+                logging.debug(f"ffmpeg_cmd: {ffmpeg_cmd}")
             else:
                 ffmpeg_cmd = 'ffmpeg'  # Assume 'ffmpeg' is in PATH for non-Windows systems
 
@@ -749,7 +750,7 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
 
 
 ####################################################################################################################################
-#Summarizers
+# Summarizers
 #
 #
 
@@ -1023,7 +1024,7 @@ def summarize_with_llama(api_url, file_path, token, custom_prompt):
         logging.debug("API Response Data: %s", response_data)
 
         if response.status_code == 200:
-            #if 'X' in response_data:
+            # if 'X' in response_data:
             logging.debug(response_data)
             summary = response_data['content'].strip()
             logging.debug("llama: Summarization successful")
@@ -1236,28 +1237,11 @@ def process_text(api_key, text_file):
         return "Notice:", message
 
 
+def format_file_path(file_path):
+    # Helper function to check file existence and return an appropriate path or message
+    return file_path if file_path and os.path.exists(file_path) else None
+
 def launch_ui(demo_mode=False):
-    def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
-                    download_video):
-        try:
-            # Assuming 'main' is the function that handles the processing logic.
-            # Adjust parameters as needed based on your actual 'main' function implementation.
-            results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
-                           whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
-                           download_video_flag=download_video, custom_prompt=custom_prompt)
-
-            if results:
-                transcription_result = results[0]
-                json_data = transcription_result['transcription']
-                summary_file_path = transcription_result.get('summary', "Summary not available.")
-                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-                video_file_path = transcription_result.get('video_path', None)
-                return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
-            else:
-                return "No results found.", "No summary available.", None, None, None
-        except Exception as e:
-            return str(e), "Error processing the request.", None, None, None
-
     inputs = [
         gr.components.Textbox(label="URL", placeholder="Enter the video URL here"),
         gr.components.Number(value=2, label="Number of Speakers"),
@@ -1275,8 +1259,90 @@ def launch_ui(demo_mode=False):
     outputs = [
         gr.components.Textbox(label="Transcription"),
         gr.components.Textbox(label="Summary or Status Message"),
-        gr.components.File(label="Download Transcription as JSON", visible=lambda x: x is not None),
-        gr.components.File(label="Download Summary as Text", visible=lambda x: x is not None),
+        gr.components.File(label="Download Transcription as JSON", visible=lambda x: x != "File not available"),
+        gr.components.File(label="Download Summary as Text", visible=lambda x: x != "File not available"),
+        gr.components.File(label="Download Video", visible=lambda x: x is not None)
+    ]
+
+    def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
+                    download_video):
+        video_file_path = None
+        try:
+            results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
+                           whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
+                           download_video_flag=download_video, custom_prompt=custom_prompt)
+            if results:
+                transcription_result = results[0]
+                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+                summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
+
+                json_file_path = format_file_path(json_file_path)
+                summary_file_path = format_file_path(summary_file_path)
+
+                return transcription_result['transcription'], "Summary available", json_file_path, summary_file_path, video_file_path
+            else:
+                return "No results found.", "No summary available.", None, None
+        except Exception as e:
+            return str(e), "Error processing the request.", None, None
+
+    iface = gr.Interface(
+        fn=process_url,
+        inputs=inputs,
+        outputs=outputs,
+        title="Video Transcription and Summarization",
+        description="Submit a video URL for transcription and summarization. Ensure you input all necessary information including API keys."
+    )
+
+    iface.launch(share=False)
+
+
+
+
+a = """def launch_ui(demo_mode=False):
+    def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
+                    download_video):
+        try:
+            results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
+                           whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
+                           download_video_flag=download_video, custom_prompt=custom_prompt)
+
+            if results:
+                transcription_result = results[0]
+                json_data = transcription_result['transcription']
+                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+                summary_file_path = transcription_result.get('summary', "Summary not available.")
+                video_file_path = transcription_result.get('video_path', None)
+
+                json_file_path = format_file_path(json_file_path)
+                summary_file_path = format_file_path(summary_file_path)
+
+                return json_data, "Summary available", json_file_path, summary_file_path, video_file_path
+            else:
+                return "No results found.", "No summary available.", None, None, None
+        except Exception as e:
+            return str(e), "Error processing the request.", None, None, None, None
+
+    inputs = [
+        gr.components.Textbox(label="URL", placeholder="Enter the video URL here"),
+        gr.components.Number(value=2, label="Number of Speakers"),
+        gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
+        gr.components.Textbox(label="Custom Prompt",
+                              placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:",
+                              lines=3),
+        gr.components.Number(value=0, label="Offset"),
+        gr.components.Dropdown(
+            choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
+            label="API Name"),
+        gr.components.Textbox(label="API Key", placeholder="Enter your API key here"),
+        gr.components.Checkbox(label="VAD Filter", value=False),
+        gr.components.Checkbox(label="Download Video", value=False)
+    ]
+
+    outputs = [
+        gr.components.Textbox(label="Transcription"),
+        gr.components.Textbox(label="Summary or Status Message"),
+        gr.components.File(label="Download Transcription as JSON", visible=lambda x: x != "File not available"),
+        gr.components.File(label="Download Summary as Text", visible=lambda x: x != "File not available"),
         gr.components.File(label="Download Video", visible=lambda x: x is not None)
     ]
 
@@ -1290,7 +1356,7 @@ def launch_ui(demo_mode=False):
     )
 
     iface.launch(share=False)
-
+"""
 
 #
 #
@@ -1332,7 +1398,12 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     download_path = create_download_directory(info_dict['title'])
                     logging.debug("MAIN: Path created successfully")
                     logging.debug("MAIN: Downloading video from yt_dlp...")
-                    video_path = download_video(path, download_path, info_dict, download_video_flag)
+                    try:
+                        video_path = download_video(path, download_path, info_dict, download_video_flag)
+                    except RuntimeError as e:
+                        logging.error(f"Error downloading video: {str(e)}")
+                        #FIXME - figure something out for handling this situation....
+                        continue
                     logging.debug("MAIN: Video downloaded successfully")
                     logging.debug("MAIN: Converting video file to WAV...")
                     audio_file = convert_to_wav(video_path, offset)
@@ -1436,7 +1507,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
             logging.error(f"Error processing path: {path}")
             logging.error(str(e))
     end_time = time.monotonic()
-    #print("Total program execution time: " + timedelta(seconds=end_time - start_time))
+    # print("Total program execution time: " + timedelta(seconds=end_time - start_time))
 
     return results
 
@@ -1455,7 +1526,9 @@ if __name__ == "__main__":
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
     parser.add_argument('-ui', '--user_interface', action='store_true', help='Launch the Gradio user interface')
     parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
-    #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
+    parser.add_argument('-prompt', '--custom_prompt', type=str,
+                        help='Pass in a custom prompt to be used in place of the existing one.(Probably should just modify the script itself...)')
+    # parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
     custom_prompt = args.custom_prompt
@@ -1467,9 +1540,9 @@ if __name__ == "__main__":
         args.custom_prompt = "\n\nQ: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:"
         print("No custom prompt defined, will use default")
 
-    print(f"Is CUDA available: {torch.cuda.is_available()}")
+    # print(f"Is CUDA available: {torch.cuda.is_available()}")
     # True
-    print(f"CUDA device: {torch.cuda.get_device_name(torch.cuda.current_device())}")
+    # print(f"CUDA device: {torch.cuda.get_device_name(torch.cuda.current_device())}")
     # Tesla T4
 
     # Since this is running in HF....
@@ -1491,7 +1564,7 @@ if __name__ == "__main__":
         logging.info(f'Whisper model: {args.whisper_model}')
         logging.info(f'Offset: {args.offset}')
         logging.info(f'VAD filter: {args.vad_filter}')
-        logging.info(f'Log Level: {args.log_level}')  #lol
+        logging.info(f'Log Level: {args.log_level}')  # lol
 
         if args.api_name and args.api_key:
             logging.info(f'API: {args.api_name}')
