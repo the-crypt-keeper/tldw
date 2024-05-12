@@ -216,12 +216,12 @@ print(summary_with_detail_1)
 
 
 # Print summary using additional instructions:
-summary_with_additional_instructions = summarize(artificial_intelligence_wikipedia_text, detail=0.1,
+summary_with_additional_instructions = summarize(artificial_intelligence, detail=0.1,
                                                  additional_instructions="Write in point form and focus on numerical data.")
 print(summary_with_additional_instructions)
 
 
 # Print summary using recursive summarization:
-recursive_summary = summarize(artificial_intelligence_wikipedia_text, detail=0.1, summarize_recursively=True)
+recursive_summary = summarize(artificial_intelligence, detail=0.1, summarize_recursively=True)
 print(recursive_summary)
 
