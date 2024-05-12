@@ -5,17 +5,15 @@ import json
 import logging
 import os
 import platform
-from venv import logger
-
-import requests
 import shutil
 import subprocess
 import sys
 import time
-import unicodedata
 import zipfile
 
 import gradio as gr
+import requests
+import unicodedata
 import yt_dlp
 
 log_level = "INFO"
@@ -1039,7 +1037,7 @@ def summarize_with_llama(api_url, file_path, token, custom_prompt):
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(api_url, file_path, custom_prompt):
+def summarize_with_kobold(api_url, file_path, kobold_api_token, custom_prompt):
     try:
         logging.debug("kobold: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -1089,7 +1087,7 @@ def summarize_with_kobold(api_url, file_path, custom_prompt):
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(api_url, file_path, custom_prompt):
+def summarize_with_oobabooga(api_url, file_path, ooba_api_token, custom_prompt):
     try:
         logging.debug("ooba: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -1223,8 +1221,7 @@ def launch_ui(demo_mode=False):
                     return transcription_result[
                         'transcription'], "Summary available.", json_file_path, summary_file_path, video_file_path
                 else:
-                    return transcription_result[
-                        'transcription'], "No summary available.", json_file_path, summary_file_path, video_file_path
+                    return transcription_result['transcription'], "No summary available.", json_file_path, None, video_file_path
                 # return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
             else:
                 return "No results found.", "No summary available.", None, None, None
@@ -1275,6 +1272,7 @@ def launch_ui(demo_mode=False):
 #
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
          download_video_flag=False, custom_prompt=None):
+    global summary
     if input_path is None and args.user_interface:
         return []
     start_time = time.monotonic()
@@ -1333,62 +1331,62 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
-                        api_key = openai_api_key
+                        openai_api_key = api_key if api_key else config.get('API', 'openai_api_key', fallback=None)
                         try:
                             logging.debug(f"MAIN: trying to summarize with openAI")
-                            summary = summarize_with_openai(api_key, json_file_path, openai_model, custom_prompt)
+                            summary = summarize_with_openai(openai_api_key, json_file_path, openai_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "anthropic":
-                        api_key = anthropic_api_key
+                        anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key', fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with anthropic")
-                            summary = summarize_with_claude(api_key, json_file_path, anthropic_model, custom_prompt)
+                            summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "cohere":
-                        api_key = cohere_api_key
+                        cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with cohere")
                             summary = summarize_with_cohere(api_key, json_file_path, cohere_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "groq":
-                        api_key = groq_api_key
+                        groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with Groq")
                             summary = summarize_with_groq(api_key, json_file_path, groq_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "llama":
-                        token = llama_api_key
+                        llama_token = api_key if api_key else config.get('API', 'llama_api_key', fallback=None)
                         llama_ip = llama_api_IP
                         try:
                             logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
-                            summary = summarize_with_llama(llama_ip, json_file_path, token, custom_prompt)
+                            summary = summarize_with_llama(llama_ip, json_file_path, llama_token, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "kobold":
-                        token = kobold_api_key
+                        kobold_token = api_key if api_key else config.get('API', 'kobold_api_key', fallback=None)
                         kobold_ip = kobold_api_IP
                         try:
                             logging.debug(f"MAIN: Trying to summarize with kobold.cpp")
-                            summary = summarize_with_kobold(kobold_ip, json_file_path, custom_prompt)
+                            summary = summarize_with_kobold(kobold_ip, json_file_path, kobold_token, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "ooba":
-                        token = ooba_api_key
+                        ooba_token = api_key if api_key else config.get('API', 'ooba_api_key', fallback=None)
                         ooba_ip = ooba_api_IP
                         try:
                             logging.debug(f"MAIN: Trying to summarize with oobabooga")
-                            summary = summarize_with_oobabooga(ooba_ip, json_file_path, custom_prompt)
+                            summary = summarize_with_oobabooga(ooba_ip, json_file_path, ooba_token, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "huggingface":
-                        api_key = huggingface_api_key
+                        huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with huggingface")
-                            summarize_with_huggingface(api_key, json_file_path, custom_prompt)
+                            summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
 
