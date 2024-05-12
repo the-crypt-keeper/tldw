@@ -1201,20 +1201,27 @@ def summarize_with_huggingface(api_key, file_path, custom_prompt):
 def launch_ui(demo_mode=False):
     def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
                     download_video):
+        video_file_path = None
         try:
-            # Assuming 'main' is the function that handles the processing logic.
-            # Adjust parameters as needed based on your actual 'main' function implementation.
             results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
                            whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
                            download_video_flag=download_video, custom_prompt=custom_prompt)
 
             if results:
                 transcription_result = results[0]
-                json_data = transcription_result['transcription']
-                summary_file_path = transcription_result.get('summary', "Summary not available.")
                 json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+                summary_file_path = transcription_result.get('summary', "Summary not available.")
+
+                #json_data = transcription_result['transcription']
+
                 video_file_path = transcription_result.get('video_path', None)
-                return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
+                if summary_file_path and os.path.exists(summary_file_path):
+                    return transcription_result[
+                        'transcription'], "Summary available.", json_file_path, summary_file_path, video_file_path
+                else:
+                    return transcription_result[
+                        'transcription'], "No summary available.", json_file_path, summary_file_path, video_file_path
+                # return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
             else:
                 return "No results found.", "No summary available.", None, None, None
         except Exception as e:

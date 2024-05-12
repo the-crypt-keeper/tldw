@@ -1279,11 +1279,16 @@ def launch_ui(demo_mode=False):
                 json_file_path = format_file_path(json_file_path)
                 summary_file_path = format_file_path(summary_file_path)
 
-                return transcription_result['transcription'], "Summary available", json_file_path, summary_file_path, video_file_path
+                if summary_file_path and os.path.exists(summary_file_path):
+                    return transcription_result[
+                        'transcription'], "Summary available", json_file_path, summary_file_path, video_file_path
+                else:
+                    return transcription_result[
+                        'transcription'], "Summary not available", json_file_path, None, video_file_path
             else:
-                return "No results found.", "No summary available.", None, None
+                return "No results found.", "Summary not available", None, None, None
         except Exception as e:
-            return str(e), "Error processing the request.", None, None
+            return str(e), "Error processing the request.", None, None, None
 
     iface = gr.Interface(
         fn=process_url,
