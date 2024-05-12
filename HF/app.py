@@ -17,10 +17,7 @@ import gradio as gr
 import torch
 import yt_dlp
 
-log_level = "DEBUG"
-logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
-
 #######
 # Function Sections
 #
@@ -226,7 +223,7 @@ def decide_cpugpu():
 
 # check for existence of ffmpeg
 def check_ffmpeg():
-    if shutil.which("ffmpeg") or (os.path.exists("..\\Bin") and os.path.isfile("..\\Bin\\ffmpeg.exe")):
+    if shutil.which("ffmpeg") or (os.path.exists("Bin") and os.path.isfile(".\\Bin\\ffmpeg.exe")):
         logging.debug("ffmpeg found installed on the local system, in the local PATH, or in the './Bin' folder")
         pass
     else:
@@ -492,7 +489,7 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
         if userOS == "Windows":
             logging.debug("Running ffmpeg on Windows...")
             ffmpeg_command = [
-                '..\\Bin\\ffmpeg.exe',
+                '.\\Bin\\ffmpeg.exe',
                 '-i', video_file_path,
                 '-i', audio_file_path,
                 '-c:v', 'copy',
@@ -890,6 +887,7 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt):
 # Summarize with Cohere
 def summarize_with_cohere(api_key, file_path, model, custom_prompt):
     try:
+        logging.basicConfig(level=logging.DEBUG)
         logging.debug("cohere: Loading JSON data")
         with open(file_path, 'r') as file:
             segments = json.load(file)
@@ -1245,48 +1243,14 @@ def format_file_path(file_path):
     return file_path if file_path and os.path.exists(file_path) else None
 
 def launch_ui(demo_mode=False):
-    def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
-                    download_video):
-        video_file_path = None
-        try:
-            results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
-                           whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
-                           download_video_flag=download_video, custom_prompt=custom_prompt)
-
-            if results:
-                transcription_result = results[0]
-                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-                summary_file_path = transcription_result.get('summary', None)
-
-                video_file_path = transcription_result.get('video_path', None)
-                if summary:
-                    transcription_result['summary'] = summary
-                    summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
-                    transcription_result['summary_file_path'] = summary_file_path
-                    logging.info(f"Summary generated using {api_name} API")
-                    save_summary_to_file(summary, json_file_path)
-                    return transcription_result['transcription'], "Summary available.", json_file_path, summary_file_path, video_file_path
-                else:
-                    return transcription_result[
-                        'transcription'], "Summary not available.", json_file_path, None, video_file_path
-            else:
-                logging.warning(f"Failed to generate summary using {api_name} API")
-                return "No results found.", "Summary not available.", None, None, None
-
-        except Exception as e:
-            return str(e), "Error processing the request.", None, None, None
-
     inputs = [
         gr.components.Textbox(label="URL", placeholder="Enter the video URL here"),
         gr.components.Number(value=2, label="Number of Speakers"),
         gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
-        gr.components.Textbox(label="Custom Prompt",
-                              placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:",
-                              lines=3),
+        gr.components.Textbox(label="Custom Prompt", placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:", lines=3),
         gr.components.Number(value=0, label="Offset"),
         gr.components.Dropdown(
             choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
-            value="huggingface",
             label="API Name"),
         gr.components.Textbox(label="API Key", placeholder="Enter your API key here"),
         gr.components.Checkbox(label="VAD Filter", value=False),
@@ -1296,18 +1260,43 @@ def launch_ui(demo_mode=False):
     outputs = [
         gr.components.Textbox(label="Transcription"),
         gr.components.Textbox(label="Summary or Status Message"),
-        gr.components.File(label="Download Transcription as JSON", visible=lambda x: x is not None),
-        gr.components.File(label="Download Summary as Text", visible=lambda x: x is not None),
+        gr.components.File(label="Download Transcription as JSON", visible=lambda x: x != "File not available"),
+        gr.components.File(label="Download Summary as Text", visible=lambda x: x != "File not available"),
         gr.components.File(label="Download Video", visible=lambda x: x is not None)
     ]
+
+    def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
+                    download_video):
+        video_file_path = None
+        try:
+            results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
+                           whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
+                           download_video_flag=download_video, custom_prompt=custom_prompt)
+            if results:
+                transcription_result = results[0]
+                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+                summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
+
+                json_file_path = format_file_path(json_file_path)
+                summary_file_path = format_file_path(summary_file_path)
+
+                if summary_file_path and os.path.exists(summary_file_path):
+                    return transcription_result[
+                        'transcription'], "Summary available", json_file_path, summary_file_path, video_file_path
+                else:
+                    return transcription_result[
+                        'transcription'], "Summary not available", json_file_path, None, video_file_path
+            else:
+                return "No results found.", "Summary not available", None, None, None
+        except Exception as e:
+            return str(e), "Error processing the request.", None, None, None
 
     iface = gr.Interface(
         fn=process_url,
         inputs=inputs,
         outputs=outputs,
         title="Video Transcription and Summarization",
-        description="Submit a video URL for transcription and summarization. Ensure you input all necessary information including API keys.",
-        theme="bethecloud/storj_theme"  # Adjust theme as necessary
+        description="Submit a video URL for transcription and summarization. Ensure you input all necessary information including API keys."
     )
 
     iface.launch(share=False)
@@ -1386,7 +1375,6 @@ a = """def launch_ui(demo_mode=False):
 
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
          download_video_flag=False, demo_mode=False, custom_prompt=None):
-    global summary
     if input_path is None and args.user_interface:
         return []
     start_time = time.monotonic()
@@ -1451,7 +1439,6 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
                         api_key = openai_api_key
-                        logging.debug(f"MAIN: API Key in main: {api_key}")
                         try:
                             logging.debug(f"MAIN: trying to summarize with openAI")
                             summary = summarize_with_openai(api_key, json_file_path, openai_model, custom_prompt)
@@ -1541,16 +1528,15 @@ if __name__ == "__main__":
                         help='Whisper model (default: small.en)')
     parser.add_argument('-off', '--offset', type=int, default=0, help='Offset in seconds (default: 0)')
     parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
-    # Give app.py verbose logging - DEBUG
-    parser.add_argument('-log', '--log_level', type=str, default='DEBUG',
-                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: DEBUG)')
+    parser.add_argument('-log', '--log_level', type=str, default='INFO',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
     parser.add_argument('-ui', '--user_interface', action='store_true', help='Launch the Gradio user interface')
     parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
     parser.add_argument('-prompt', '--custom_prompt', type=str,
                         help='Pass in a custom prompt to be used in place of the existing one.(Probably should just modify the script itself...)')
     # parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
-    logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+
     custom_prompt = args.custom_prompt
     if custom_prompt == "":
         logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
@@ -1568,18 +1554,18 @@ if __name__ == "__main__":
     # Since this is running in HF....
     args.user_interface = True
     if args.user_interface:
-        log_level = "DEBUG"
-        logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
         launch_ui(demo_mode=args.demo_mode)
     else:
         if not args.input_path:
             parser.print_help()
             sys.exit(1)
 
-        logging.debug('Logging configured')
+        logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+
         logging.info('Starting the transcription and summarization process.')
         logging.info(f'Input path: {args.input_path}')
         logging.info(f'API Name: {args.api_name}')
+        logging.debug(f'API Key: {args.api_key}')  # ehhhhh
         logging.info(f'Number of speakers: {args.num_speakers}')
         logging.info(f'Whisper model: {args.whisper_model}')
         logging.info(f'Offset: {args.offset}')

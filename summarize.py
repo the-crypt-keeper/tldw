@@ -1202,6 +1202,11 @@ def summarize_with_huggingface(api_key, file_path, custom_prompt):
         return username == password
 
 
+def format_file_path(file_path):
+    # Helper function to check file existence and return an appropriate path or message
+    return file_path if file_path and os.path.exists(file_path) else None
+
+
 def launch_ui(demo_mode=False):
     def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
                     download_video):
@@ -1210,27 +1215,22 @@ def launch_ui(demo_mode=False):
             results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
                            whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
                            download_video_flag=download_video, custom_prompt=custom_prompt)
-
             if results:
                 transcription_result = results[0]
                 json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-                summary_file_path = transcription_result.get('summary', None)
+                summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
 
-                video_file_path = transcription_result.get('video_path', None)
-                if summary:
-                    transcription_result['summary'] = summary
-                    summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
-                    transcription_result['summary_file_path'] = summary_file_path
-                    logging.info(f"Summary generated using {api_name} API")
-                    save_summary_to_file(summary, json_file_path)
-                    return transcription_result['transcription'], "Summary available.", json_file_path, summary_file_path, video_file_path
+                json_file_path = format_file_path(json_file_path)
+                summary_file_path = format_file_path(summary_file_path)
+
+                if summary_file_path and os.path.exists(summary_file_path):
+                    return transcription_result[
+                        'transcription'], "Summary available", json_file_path, summary_file_path, video_file_path
                 else:
                     return transcription_result[
-                        'transcription'], "Summary not available.", json_file_path, None, video_file_path
+                        'transcription'], "Summary not available", json_file_path, None, video_file_path
             else:
-                logging.warning(f"Failed to generate summary using {api_name} API")
-                return "No results found.", "Summary not available.", None, None, None
-
+                return "No results found.", "Summary not available", None, None, None
         except Exception as e:
             return str(e), "Error processing the request.", None, None, None
 
