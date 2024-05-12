@@ -17,6 +17,9 @@ import gradio as gr
 import torch
 import yt_dlp
 
+log_level = "DEBUG"
+logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+
 #######
 # Function Sections
 #
@@ -1556,15 +1559,14 @@ if __name__ == "__main__":
     # Since this is running in HF....
     args.user_interface = True
     if args.user_interface:
-        logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
-        logging.debug('Logging configured')
+        log_level = "DEBUG"
+        logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
         launch_ui(demo_mode=args.demo_mode)
     else:
         if not args.input_path:
             parser.print_help()
             sys.exit(1)
 
-        logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
         logging.debug('Logging configured')
         logging.info('Starting the transcription and summarization process.')
         logging.info(f'Input path: {args.input_path}')

@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import platform
+from venv import logger
+
 import requests
 import shutil
 import subprocess
@@ -15,6 +17,9 @@ import zipfile
 
 import gradio as gr
 import yt_dlp
+
+log_level = "INFO"
+logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 
 #######
 # Function Sections
@@ -881,7 +886,6 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt):
 # Summarize with Cohere
 def summarize_with_cohere(api_key, file_path, model, custom_prompt):
     try:
-        logging.basicConfig(level=logging.DEBUG)
         logging.debug("cohere: Loading JSON data")
         with open(file_path, 'r') as file:
             segments = json.load(file)
@@ -1429,6 +1433,8 @@ if __name__ == "__main__":
     #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
+    logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+
     custom_prompt = args.custom_prompt
     if custom_prompt == "":
         logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
@@ -1439,14 +1445,12 @@ if __name__ == "__main__":
         print("No custom prompt defined, will use default")
 
     if args.user_interface:
-        logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+
         launch_ui(demo_mode=False)
     else:
         if not args.input_path:
             parser.print_help()
             sys.exit(1)
-
-        logging.basicConfig(level=getattr(logging, args.log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 
         logging.info('Starting the transcription and summarization process.')
         logging.info(f'Input path: {args.input_path}')
