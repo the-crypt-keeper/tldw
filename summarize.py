@@ -18,6 +18,7 @@ import yt_dlp
 
 log_level = "INFO"
 logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 
 #######
 # Function Sections
@@ -55,10 +56,10 @@ logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(l
 #
 #   Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
 #       python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>` - Make sure to put your API key into `config.txt` under the appropriate API variable
-# 
+#
 #   Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
 #       python summarize.py ./local/file_on_your/system --api_name <API_name>`
-# 
+#
 #   Run it as a WebApp**
 #       python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
 #           Can be helpful for setting up a shared instance, but not wanting people to perform inference on your server.
@@ -121,7 +122,7 @@ output_path = config.get('Paths', 'output_path', fallback='results')
 processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
 # Log file
-#logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
+# logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
 
 #
 #
@@ -148,8 +149,8 @@ print(r"""_____  _          ________  _    _
   | |  | |      / /  | | | || |/\| |                                
   | |  | |____ / /   | |/ / \  /\  / _                              
   \_/  \_____//_/    |___/   \/  \/ (_)                             
-                                                                    
-                                                                    
+
+
  _                   _                                              
 | |                 | |                                             
 | |_   ___    ___   | |  ___   _ __    __ _                         
@@ -168,8 +169,8 @@ print(r"""_____  _          ________  _    _
 
 ####################################################################################################################################
 # System Checks
-# 
-# 
+#
+#
 
 # Perform Platform Check
 userOS = ""
@@ -291,13 +292,13 @@ def download_ffmpeg():
 
 
 #
-# 
+#
 ####################################################################################################################################
 
 
 ####################################################################################################################################
 # Processing Paths and local file handling
-# 
+#
 #
 
 def read_paths_from_file(file_path):
@@ -524,12 +525,12 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
 #       https://www.gyan.dev/ffmpeg/builds/
 #
 
-#os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
+# os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
 def convert_to_wav(video_file_path, offset=0):
     print("Starting conversion process of .m4a to .WAV")
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
     logging.debug("ffmpeg: about to check OS")
-    
+
     try:
         if os.name == "nt":
             logging.debug("ffmpeg being ran on windows")
@@ -748,7 +749,7 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
 
 
 ####################################################################################################################################
-#Summarizers
+# Summarizers
 #
 #
 
@@ -1021,7 +1022,7 @@ def summarize_with_llama(api_url, file_path, token, custom_prompt):
         logging.debug("API Response Data: %s", response_data)
 
         if response.status_code == 200:
-            #if 'X' in response_data:
+            # if 'X' in response_data:
             logging.debug(response_data)
             summary = response_data['content'].strip()
             logging.debug("llama: Summarization successful")
@@ -1134,6 +1135,7 @@ def summarize_with_oobabooga(api_url, file_path, ooba_api_token, custom_prompt):
 
 
 def save_summary_to_file(summary, file_path):
+    logging.debug("Now saving summary to file...")
     summary_file_path = file_path.replace('.segments.json', '_summary.txt')
     logging.debug("Opening summary file for writing, *segments.json with *_summary.txt")
     with open(summary_file_path, 'w') as file:
@@ -1212,19 +1214,23 @@ def launch_ui(demo_mode=False):
             if results:
                 transcription_result = results[0]
                 json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-                summary_file_path = transcription_result.get('summary', "Summary not available.")
-
-                #json_data = transcription_result['transcription']
+                summary_file_path = transcription_result.get('summary', None)
 
                 video_file_path = transcription_result.get('video_path', None)
-                if summary_file_path and os.path.exists(summary_file_path):
-                    return transcription_result[
-                        'transcription'], "Summary available.", json_file_path, summary_file_path, video_file_path
+                if summary:
+                    transcription_result['summary'] = summary
+                    summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
+                    transcription_result['summary_file_path'] = summary_file_path
+                    logging.info(f"Summary generated using {api_name} API")
+                    save_summary_to_file(summary, json_file_path)
+                    return transcription_result['transcription'], "Summary available.", json_file_path, summary_file_path, video_file_path
                 else:
-                    return transcription_result['transcription'], "No summary available.", json_file_path, None, video_file_path
-                # return json_data, summary_file_path, json_file_path, summary_file_path, video_file_path
+                    return transcription_result[
+                        'transcription'], "Summary not available.", json_file_path, None, video_file_path
             else:
-                return "No results found.", "No summary available.", None, None, None
+                logging.warning(f"Failed to generate summary using {api_name} API")
+                return "No results found.", "Summary not available.", None, None, None
+
         except Exception as e:
             return str(e), "Error processing the request.", None, None, None
 
@@ -1232,7 +1238,9 @@ def launch_ui(demo_mode=False):
         gr.components.Textbox(label="URL", placeholder="Enter the video URL here"),
         gr.components.Number(value=2, label="Number of Speakers"),
         gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
-        gr.components.Textbox(label="Custom Prompt", placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:", lines=3),
+        gr.components.Textbox(label="Custom Prompt",
+                              placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:",
+                              lines=3),
         gr.components.Number(value=0, label="Offset"),
         gr.components.Dropdown(
             choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
@@ -1338,10 +1346,12 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "anthropic":
-                        anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key', fallback=None)
+                        anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key',
+                                                                               fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with anthropic")
-                            summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model, custom_prompt)
+                            summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model,
+                                                            custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "cohere":
@@ -1383,7 +1393,8 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "huggingface":
-                        huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
+                        huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key',
+                                                                                 fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with huggingface")
                             summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
@@ -1406,7 +1417,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
             logging.error(f"Error processing path: {path}")
             logging.error(str(e))
     end_time = time.monotonic()
-    #print("Total program execution time: " + timedelta(seconds=end_time - start_time))
+    # print("Total program execution time: " + timedelta(seconds=end_time - start_time))
 
     return results
 
@@ -1428,7 +1439,7 @@ if __name__ == "__main__":
     parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
     parser.add_argument('-prompt', '--custom_prompt', type=str,
                         help='Pass in a custom prompt to be used in place of the existing one.(Probably should just modify the script itself...)')
-    #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
+    # parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
@@ -1458,7 +1469,7 @@ if __name__ == "__main__":
         logging.info(f'Whisper model: {args.whisper_model}')
         logging.info(f'Offset: {args.offset}')
         logging.info(f'VAD filter: {args.vad_filter}')
-        logging.info(f'Log Level: {args.log_level}')  #lol
+        logging.info(f'Log Level: {args.log_level}')  # lol
 
         if args.api_name and args.api_key:
             logging.info(f'API: {args.api_name}')
