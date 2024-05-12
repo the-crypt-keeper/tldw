@@ -500,8 +500,8 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
             ]
             subprocess.run(ffmpeg_command, check=True)
         else:
-            logging.error("You shouldn't be here...")
-            exit()
+            logging.error("ffmpeg: Unsupported operating system for video download and merging.")
+            raise RuntimeError("ffmpeg: Unsupported operating system for video download and merging.")
         os.remove(video_file_path)
         os.remove(audio_file_path)
 
@@ -533,6 +533,7 @@ def convert_to_wav(video_file_path, offset=0):
 
             if sys.platform.startswith('win'):
                 ffmpeg_cmd = ".\\Bin\\ffmpeg.exe"
+                logging.debug(f"ffmpeg_cmd: {ffmpeg_cmd}")
             else:
                 ffmpeg_cmd = 'ffmpeg'  # Assume 'ffmpeg' is in PATH for non-Windows systems
 
