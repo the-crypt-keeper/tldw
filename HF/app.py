@@ -1458,8 +1458,9 @@ if __name__ == "__main__":
     #parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
-    if args.custom_prompt == "":
-        logging.debug(f"Custom prompt defined, will use \n\nf{args.custom_prompt} \n\nas prompt")
+    custom_prompt = args.custom_prompt
+    if custom_prompt == "":
+        logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
     else:
         logging.debug("No custom prompt defined, will use default")
