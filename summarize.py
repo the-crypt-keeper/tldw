@@ -350,7 +350,7 @@ def process_local_file(file_path):
 #
 
 def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
-                download_video, download_audio):
+                download_video, download_audio, chunk_size):
     video_file_path = None
     try:
         results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
@@ -359,21 +359,26 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
         if results:
             transcription_result = results[0]
             json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
+            prettified_json_file_path = transcription_result['audio_file'].replace('.wav', '.segments_pretty.json')
             summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
 
             json_file_path = format_file_path(json_file_path)
+            prettified_json_file_path = format_file_path(prettified_json_file_path)
             summary_file_path = format_file_path(summary_file_path)
 
+            if download_video:
+                video_file_path = transcription_result['video_path'] if 'video_path' in transcription_result else None
+
+            formatted_transcription = format_transcription(transcription_result)
+
             if summary_file_path and os.path.exists(summary_file_path):
-                return transcription_result[
-                    'transcription'], "Summary available", json_file_path, summary_file_path, video_file_path
+                return formatted_transcription, "Summary available", prettified_json_file_path, summary_file_path, video_file_path, None
             else:
-                return transcription_result[
-                    'transcription'], "Summary not available", json_file_path, None, video_file_path
+                return formatted_transcription, "Summary not available", prettified_json_file_path, None, video_file_path, None
         else:
-            return "No results found.", "Summary not available", None, None, None
+            return "No results found.", "Summary not available", None, None, None, None
     except Exception as e:
-        return str(e), "Error processing the request.", None, None, None
+        return str(e), "Error processing the request.", None, None, None, None
 
 
 def create_download_directory(title):
@@ -581,22 +586,22 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
     logging.info('speech-to-text: Loading faster_whisper model: %s', whisper_model)
     from faster_whisper import WhisperModel
     model = WhisperModel(whisper_model, device=f"{processing_choice}")
-    logging.info(f"speech-to-text: Model chosen is {processing_choice}")
     time_start = time.time()
     if audio_file_path is None:
-        raise ValueError("No audio file provided")
+        raise ValueError("speech-to-text: No audio file provided")
     logging.info("speech-to-text: Audio file path: %s", audio_file_path)
 
     try:
         _, file_ending = os.path.splitext(audio_file_path)
         out_file = audio_file_path.replace(file_ending, ".segments.json")
+        prettified_out_file = audio_file_path.replace(file_ending, ".segments_pretty.json")
         if os.path.exists(out_file):
-            logging.info("Segments file already exists: %s", out_file)
+            logging.info("speech-to-text: Segments file already exists: %s", out_file)
             with open(out_file) as f:
                 segments = json.load(f)
             return segments
 
-        logging.info('Starting transcription...')
+        logging.info('speech-to-text: Starting transcription...')
         options = dict(language=selected_source_lang, beam_size=5, best_of=5, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
         segments_raw, info = model.transcribe(audio_file_path, **transcribe_options)
@@ -610,12 +615,19 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
             }
             logging.debug("Segment: %s", chunk)
             segments.append(chunk)
-        logging.info("Transcription completed with faster_whisper")
-        with open(out_file, 'w') as f:
+        logging.info("speech-to-text: Transcription completed with faster_whisper")
+
+        # Save prettified JSON
+        with open(prettified_out_file, 'w') as f:
             json.dump(segments, f, indent=2)
+
+        # Save non-prettified JSON
+        with open(out_file, 'w') as f:
+            json.dump(segments, f)
+
     except Exception as e:
-        logging.error("Error transcribing audio: %s", str(e))
-        raise RuntimeError("Error transcribing audio")
+        logging.error("speech-to-text: Error transcribing audio: %s", str(e))
+        raise RuntimeError("speech-to-text: Error transcribing audio")
     return segments
 
 
@@ -769,10 +781,6 @@ def summarize_with_openai(api_key, file_path, model, custom_prompt):
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json'
         }
-        #        headers = {
-        #           'Authorization': f'Bearer {api_key}',
-        #           'Content-Type': 'application/json'
-        #        }
 
         logging.debug(f"openai: API Key is: {api_key}")
         logging.debug("openai: Preparing data + prompt for submittal")
@@ -808,6 +816,7 @@ def summarize_with_openai(api_key, file_path, model, custom_prompt):
         logging.debug("openai: Error in processing: %s", str(e))
         print("Error occurred while processing summary with openai:", str(e))
         return None
+
 
 
 def summarize_with_claude(api_key, file_path, model, custom_prompt):
@@ -1198,64 +1207,111 @@ def summarize_with_huggingface(api_key, file_path, custom_prompt):
         return username == password
 
 
+def format_transcription(transcription_result):
+    if transcription_result:
+        json_data = transcription_result['transcription']
+        return json.dumps(json_data, indent=2)
+    else:
+        return ""
+
+
+
 def format_file_path(file_path):
     # Helper function to check file existence and return an appropriate path or message
     return file_path if file_path and os.path.exists(file_path) else None
 
 
 def launch_ui(demo_mode=False):
-    inputs = [
-        gr.components.Textbox(label="URL (Mandatory)",
-                              placeholder="Enter the video URL here"),
-        gr.components.Number(value=2,
-                             label="Number of Speakers(Optional - Currently has no effect)",
-                             visible=lambda x: x is not None),
-        gr.components.Dropdown(choices=whisper_models,
-                               value="small.en",
-                               label="Whisper Model(This is the ML model used for transcription.)",
-                               visible=lambda x: x is not None),
-        gr.components.Textbox(label="Custom Prompt (Customize your summary, or ask a different question)",
-                              placeholder="Q: As a professional summarizer, create a concise and comprehensive "
-                                          "summary of the provided text.\nA: Here is a detailed, bulleted list of the "
-                                          "key points made in the transcribed video and supporting arguments:",
-                              lines=3),
-        gr.components.Number(value=0,
-                             label="Offset (Seconds into the video to start transcribing at)",
-                             visible=lambda x: x is not None),
-        gr.components.Dropdown(
-            choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
-            label="API Name (Mandatory Unless you just want a Transcription)", visible=lambda x: x is not None),
-        gr.components.Textbox(label="API Key (Mandatory if API Name is specified)",
-                              placeholder="Enter your API key here", visible=lambda x: x is not None),
-        gr.components.Checkbox(label="VAD Filter(Can safely ignore)",
-                               value=False, visible=lambda x: x is not None),
-        gr.components.Checkbox(label="Download Video(Select to allow for file download of selected video)",
-                               value=False, visible=lambda x: x is not None),
-        gr.components.Checkbox(label="Download Audio(Select to allow for file download of selected Video's Audio)",
-                               value=False, visible=lambda x: x is not None)
-    ]
+    whisper_models = ["small.en", "medium.en", "large"]
 
-    outputs = [
-        gr.components.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
-        gr.components.Textbox(label="Summary or Status Message (Current status of Summary or Summary itself)"),
-        gr.components.File(label="Download Transcription as JSON (Download the Transcription as a file)",
-                           visible=lambda x: x is not None),
-        gr.components.File(label="Download Summary as Text (Download the Summary as a file)",
-                           visible=lambda x: x is not None),
-        gr.components.File(label="Download Video (Download the Video as a file)", visible=lambda x: x is not None),
-        gr.components.File(label="Download Audio (Download the Audio as a file)", visible=lambda x: x is not None)
-    ]
+    with gr.Blocks() as iface:
+        with gr.Tab("Audio Transcription + Summarization"):
+            with gr.Row():
+                # Light/Dark mode toggle switch
+                theme_toggle = gr.Radio(choices=["Light", "Dark"], value="Light",
+                                        label="Light/Dark Mode Toggle (Toggle to change UI color scheme)")
 
-    iface = gr.Interface(
-        fn=process_url,
-        inputs=inputs,
-        outputs=outputs,
-        title="Video Transcription and Summarization",
-        description="Submit a video URL for transcription and summarization. Ensure you input all necessary information including API keys.",
-        theme="bethecloud/storj_theme"  # Adjust theme as necessary
-    )
+                # UI Mode toggle switch
+                ui_mode_toggle = gr.Radio(choices=["Simple", "Advanced"], value="Simple",
+                                          label="UI Mode (Toggle to show all options)")
 
-    iface.launch(share=False)
+            # URL input is always visible
+            url_input = gr.Textbox(label="URL (Mandatory)", placeholder="Enter the video URL here")
+
+            # Inputs to be shown or hidden
+            num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)",
+                                           visible=True)
+            whisper_model_input = gr.Dropdown(choices=whisper_models, value="small.en",
+                                              label="Whisper Model(This is the ML model used for transcription.)",
+                                              visible=True)
+            custom_prompt_input = gr.Textbox(
+                label="Custom Prompt (Customize your summary, or ask a different question)",
+                placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:",
+                lines=3, visible=True)
+            offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
+                                     visible=True)
+            api_name_input = gr.Dropdown(
+                choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value=None,
+                label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
+            api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
+                                       placeholder="Enter your API key here", visible=True)
+            vad_filter_input = gr.Checkbox(label="VAD Filter(Can safely ignore)", value=False, visible=True)
+            download_video_input = gr.Checkbox(
+                label="Download Video(Select to allow for file download of selected video)", value=True, visible=True)
+            download_audio_input = gr.Checkbox(
+                label="Download Audio(Select to allow for file download of selected Video's Audio)", value=False,
+                visible=True)
+            detail_level_input = gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True,
+                                           label="Detail Level (Slide me)", visible=True)
+
+            inputs = [num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
+                      api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input]
+
+            # Function to toggle Light/Dark Mode
+            def toggle_light(mode):
+                dark = (mode == "Dark")
+                return {"__theme": "dark" if dark else "light"}
+
+            # Set the event listener for the Light/Dark mode toggle switch
+            theme_toggle.change(fn=toggle_light, inputs=theme_toggle, outputs=None)
+
+            # Function to toggle visibility of advanced inputs
+            def toggle_ui(mode):
+                visible = (mode == "Advanced")
+                return [visible] * len(inputs)
+
+            # Set the event listener for the UI Mode toggle switch
+            ui_mode_toggle.change(fn=toggle_ui, inputs=ui_mode_toggle, outputs=inputs)
+
+            # Combine URL input and inputs
+            all_inputs = [url_input] + inputs
+
+            outputs = [
+                gr.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
+                gr.Textbox(label="Summary or Status Message (Current status of Summary or Summary itself)"),
+                gr.File(label="Download Transcription as JSON (Download the Transcription as a file)"),
+                gr.File(label="Download Summary as Text (Download the Summary as a file)"),
+                gr.File(label="Download Video (Download the Video as a file)"),
+                gr.File(label="Download Audio (Download the Audio as a file)")
+            ]
+
+            gr.Interface(
+                fn=process_url,
+                inputs=all_inputs,
+                outputs=outputs,
+                title="Video Transcription and Summarization",
+                description="Submit a video URL for transcription and summarization. Ensure you input all necessary information including API keys."
+            )
+
+        with gr.Tab("Transcription & Summarization History"):
+            image_input = gr.Image(label="Upload Image")
+            image_output = gr.Image(label="Processed Image")
+
+        with gr.Accordion("Open for More!", open=False):
+            gr.Markdown("Look at me...")
+            gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True, label="Slide me")
+
+        iface.launch(share=False)
 
 
 #
@@ -1323,69 +1379,66 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 logging.info(f"Transcription complete: {audio_file}")
 
                 # Perform summarization based on the specified API
-                if api_name:
+                if api_name and api_key:
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
-                        openai_api_key = api_key if api_key else config.get('API', 'openai_api_key', fallback=None)
+                        api_key = openai_api_key
                         try:
                             logging.debug(f"MAIN: trying to summarize with openAI")
-                            summary = summarize_with_openai(openai_api_key, json_file_path, openai_model, custom_prompt)
+                            summary = summarize_with_openai(api_key, json_file_path, openai_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "anthropic":
-                        anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key',
-                                                                               fallback=None)
+                        api_key = anthropic_api_key
                         try:
                             logging.debug(f"MAIN: Trying to summarize with anthropic")
-                            summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model,
-                                                            custom_prompt)
+                            summary = summarize_with_claude(api_key, json_file_path, anthropic_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "cohere":
-                        cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
+                        api_key = cohere_api_key
                         try:
                             logging.debug(f"MAIN: Trying to summarize with cohere")
                             summary = summarize_with_cohere(api_key, json_file_path, cohere_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "groq":
-                        groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
+                        api_key = groq_api_key
                         try:
                             logging.debug(f"MAIN: Trying to summarize with Groq")
                             summary = summarize_with_groq(api_key, json_file_path, groq_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "llama":
-                        llama_token = api_key if api_key else config.get('API', 'llama_api_key', fallback=None)
+                        token = llama_api_key
                         llama_ip = llama_api_IP
                         try:
                             logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
-                            summary = summarize_with_llama(llama_ip, json_file_path, llama_token, custom_prompt)
+                            summary = summarize_with_llama(llama_ip, json_file_path, token, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "kobold":
-                        kobold_token = api_key if api_key else config.get('API', 'kobold_api_key', fallback=None)
+                        token = kobold_api_key
                         kobold_ip = kobold_api_IP
                         try:
                             logging.debug(f"MAIN: Trying to summarize with kobold.cpp")
-                            summary = summarize_with_kobold(kobold_ip, json_file_path, kobold_token, custom_prompt)
+                            summary = summarize_with_kobold(kobold_ip, json_file_path, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "ooba":
-                        ooba_token = api_key if api_key else config.get('API', 'ooba_api_key', fallback=None)
+                        token = ooba_api_key
                         ooba_ip = ooba_api_IP
                         try:
                             logging.debug(f"MAIN: Trying to summarize with oobabooga")
-                            summary = summarize_with_oobabooga(ooba_ip, json_file_path, ooba_token, custom_prompt)
+                            summary = summarize_with_oobabooga(ooba_ip, json_file_path, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "huggingface":
-                        huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key',
-                                                                                 fallback=None)
+                        api_key = huggingface_api_key
                         try:
                             logging.debug(f"MAIN: Trying to summarize with huggingface")
-                            summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
+                            summarize_with_huggingface(api_key, json_file_path, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
 
@@ -1404,10 +1457,10 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
         except Exception as e:
             logging.error(f"Error processing path: {path}")
             logging.error(str(e))
-    end_time = time.monotonic()
-    # print("Total program execution time: " + timedelta(seconds=end_time - start_time))
+        #end_time = time.monotonic()
+        # print("Total program execution time: " + timedelta(seconds=end_time - start_time))
 
-    return results
+        return results
 
 
 if __name__ == "__main__":
