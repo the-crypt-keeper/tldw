@@ -1253,15 +1253,15 @@ def launch_ui(demo_mode=False):
             offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
                                      visible=True)
             api_name_input = gr.Dropdown(
-                choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value=None,
+                choices=[None,"huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value=None,
                 label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
             api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
                                        placeholder="Enter your API key here", visible=True)
             vad_filter_input = gr.Checkbox(label="VAD Filter(Can safely ignore)", value=False, visible=True)
             download_video_input = gr.Checkbox(
-                label="Download Video(Select to allow for file download of selected video)", value=True, visible=True)
+                label="Download Video(Select to allow for file download of selected video)", value=False, visible=True)
             download_audio_input = gr.Checkbox(
-                label="Download Audio(Select to allow for file download of selected Video's Audio)", value=False,
+                label="Download Audio(Select to allow for file download of selected Video's Audio)", value=True,
                 visible=True)
             detail_level_input = gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True,
                                            label="Detail Level (Slide me)", visible=True)
