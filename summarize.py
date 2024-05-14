@@ -371,8 +371,10 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
 
             formatted_transcription = format_transcription(transcription_result)
 
+            summary_text = transcription_result.get('summary', 'Summary not available')
+
             if summary_file_path and os.path.exists(summary_file_path):
-                return formatted_transcription, "Summary available", prettified_json_file_path, summary_file_path, video_file_path, None
+                return formatted_transcription, summary_text, prettified_json_file_path, summary_file_path, video_file_path, None
             else:
                 return formatted_transcription, "Summary not available", prettified_json_file_path, None, video_file_path, None
         else:
@@ -1354,7 +1356,11 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     download_path = create_download_directory(info_dict['title'])
                     logging.debug("MAIN: Path created successfully")
                     logging.debug("MAIN: Downloading video from yt_dlp...")
-                    video_path = download_video(path, download_path, info_dict, download_video_flag)
+                    try:
+                        video_path = download_video(path, download_path, info_dict, download_video_flag)
+                    except RuntimeError as e:
+                        logging.error(f"Error downloading video: {str(e)}")
+                        continue
                     logging.debug("MAIN: Video downloaded successfully")
                     logging.debug("MAIN: Converting video file to WAV...")
                     audio_file = convert_to_wav(video_path, offset)
