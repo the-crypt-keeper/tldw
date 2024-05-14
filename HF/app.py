@@ -1308,7 +1308,7 @@ def launch_ui(demo_mode=False):
                 label="Download Video(Select to allow for file download of selected video)", value=False, visible=False)
             download_audio_input = gr.Checkbox(
                 label="Download Audio(Select to allow for file download of selected Video's Audio)", value=False,
-                visible=True)
+                visible=False)
             detail_level_input = gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=False,
                                            label="Detail Level (Slide me)", visible=True)
 
@@ -1487,6 +1487,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "huggingface":
+                        api_key = os.environ.get(HF_TOKEN)
                         huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with huggingface")
