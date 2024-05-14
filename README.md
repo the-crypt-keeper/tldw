@@ -242,6 +242,9 @@ By default videos, transcriptions and summaries are stored in a folder with the 
   - `compare.py` - prepare LLM outputs for webapp
   - `compare-app.py` - summary viewer webapp
 
+------------
+### Similar/Other projects:
+- https://github.com/Dicklesworthstone/bulk_transcribe_youtube_videos_from_playlist/tree/main
 
 ------------
 

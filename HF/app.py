@@ -349,40 +349,31 @@ def process_local_file(file_path):
 # Video Download/Handling
 #
 
-def process_url(input_path, num_speakers=2, whisper_model="small.en", custom_prompt=None, offset=0, api_name=None,
-                api_key=None, vad_filter=False, download_video_flag=False, demo_mode=False):
-    if demo_mode:
-        api_name = "huggingface"
-        api_key = os.environ.get(HF_TOKEN)
-        print("HUGGINGFACE API KEY CHECK #3: " + api_key)
-        vad_filter = False
-        download_video_flag = False
-
+def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
+                download_video, download_audio):
+    video_file_path = None
     try:
-        results = main(input_path, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
+        results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
                        whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
-                       download_video_flag=download_video_flag)
-
+                       download_video_flag=download_video, custom_prompt=custom_prompt)
         if results:
             transcription_result = results[0]
             json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-
-            with open(json_file_path, 'r') as file:
-                json_data = json.load(file)
             summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
 
-            if os.path.exists(summary_file_path):
-                return json_data, summary_file_path, json_file_path, summary_file_path
+            json_file_path = format_file_path(json_file_path)
+            summary_file_path = format_file_path(summary_file_path)
 
+            if summary_file_path and os.path.exists(summary_file_path):
+                return transcription_result[
+                    'transcription'], "Summary available", json_file_path, summary_file_path, video_file_path
             else:
-                return json_data, "Summary not available.", json_file_path, "Summary not available."
-
+                return transcription_result[
+                    'transcription'], "Summary not available", json_file_path, None, video_file_path
         else:
-            return None, "No results found.", None, None
-
+            return "No results found.", "Summary not available", None, None, None
     except Exception as e:
-        error_message = f"An error occurred: {str(e)}"
-        return None, error_message, None, None
+        return str(e), "Error processing the request.", None, None, None
 
 
 def create_download_directory(title):
@@ -1244,52 +1235,46 @@ def format_file_path(file_path):
 
 def launch_ui(demo_mode=False):
     inputs = [
-        gr.components.Textbox(label="URL", placeholder="Enter the video URL here"),
-        gr.components.Number(value=2, label="Number of Speakers"),
-        gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
-        gr.components.Textbox(label="Custom Prompt", placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:", lines=3),
-        gr.components.Number(value=0, label="Offset"),
+        gr.components.Textbox(label="URL (Mandatory)",
+                              placeholder="Enter the video URL here"),
+        gr.components.Number(value=2,
+                             label="Number of Speakers(Optional - Currently has no effect)",
+                             visible=lambda x: x is not None),
+        gr.components.Dropdown(choices=whisper_models,
+                               value="small.en",
+                               label="Whisper Model(This is the ML model used for transcription.)",
+                               visible=lambda x: x is not None),
+        gr.components.Textbox(label="Custom Prompt (Customize your summary, or ask a different question)",
+                              placeholder="Q: As a professional summarizer, create a concise and comprehensive "
+                                          "summary of the provided text.\nA: Here is a detailed, bulleted list of the "
+                                          "key points made in the transcribed video and supporting arguments:",
+                              lines=3),
+        gr.components.Number(value=0,
+                             label="Offset (Seconds into the video to start transcribing at)",
+                             visible=lambda x: x is not None),
         gr.components.Dropdown(
             choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
-            label="API Name"),
-        gr.components.Textbox(label="API Key", placeholder="Enter your API key here"),
-        gr.components.Checkbox(label="VAD Filter", value=False),
-        gr.components.Checkbox(label="Download Video", value=False)
+            label="API Name (Mandatory Unless you just want a Transcription)", visible=lambda x: x is not None),
+        gr.components.Textbox(label="API Key (Mandatory if API Name is specified)",
+                              placeholder="Enter your API key here", visible=lambda x: x is not None),
+        gr.components.Checkbox(label="VAD Filter(Can safely ignore)",
+                               value=False, visible=lambda x: x is not None),
+        gr.components.Checkbox(label="Download Video(Select to allow for file download of selected video)",
+                               value=False, visible=lambda x: x is not None),
+        gr.components.Checkbox(label="Download Audio(Select to allow for file download of selected Video's Audio)",
+                               value=False, visible=lambda x: x is not None)
     ]
 
     outputs = [
-        gr.components.Textbox(label="Transcription"),
-        gr.components.Textbox(label="Summary or Status Message"),
-        gr.components.File(label="Download Transcription as JSON", visible=lambda x: x != "File not available"),
-        gr.components.File(label="Download Summary as Text", visible=lambda x: x != "File not available"),
-        gr.components.File(label="Download Video", visible=lambda x: x is not None)
+        gr.components.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
+        gr.components.Textbox(label="Summary or Status Message (Current status of Summary or Summary itself)"),
+        gr.components.File(label="Download Transcription as JSON (Download the Transcription as a file)",
+                           visible=lambda x: x is not None),
+        gr.components.File(label="Download Summary as Text (Download the Summary as a file)",
+                           visible=lambda x: x is not None),
+        gr.components.File(label="Download Video (Download the Video as a file)", visible=lambda x: x is not None),
+        gr.components.File(label="Download Audio (Download the Audio as a file)", visible=lambda x: x is not None)
     ]
-
-    def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
-                    download_video):
-        video_file_path = None
-        try:
-            results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
-                           whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
-                           download_video_flag=download_video, custom_prompt=custom_prompt)
-            if results:
-                transcription_result = results[0]
-                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-                summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
-
-                json_file_path = format_file_path(json_file_path)
-                summary_file_path = format_file_path(summary_file_path)
-
-                if summary_file_path and os.path.exists(summary_file_path):
-                    return transcription_result[
-                        'transcription'], "Summary available", json_file_path, summary_file_path, video_file_path
-                else:
-                    return transcription_result[
-                        'transcription'], "Summary not available", json_file_path, None, video_file_path
-            else:
-                return "No results found.", "Summary not available", None, None, None
-        except Exception as e:
-            return str(e), "Error processing the request.", None, None, None
 
     iface = gr.Interface(
         fn=process_url,
@@ -1300,69 +1285,6 @@ def launch_ui(demo_mode=False):
     )
 
     iface.launch(share=False)
-
-
-
-
-a = """def launch_ui(demo_mode=False):
-    def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
-                    download_video):
-        try:
-            results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
-                           whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
-                           download_video_flag=download_video, custom_prompt=custom_prompt)
-
-            if results:
-                transcription_result = results[0]
-                json_data = transcription_result['transcription']
-                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-                summary_file_path = transcription_result.get('summary', "Summary not available.")
-                video_file_path = transcription_result.get('video_path', None)
-
-                json_file_path = format_file_path(json_file_path)
-                summary_file_path = format_file_path(summary_file_path)
-
-                return json_data, "Summary available", json_file_path, summary_file_path, video_file_path
-            else:
-                return "No results found.", "No summary available.", None, None, None
-        except Exception as e:
-            return str(e), "Error processing the request.", None, None, None, None
-
-    inputs = [
-        gr.components.Textbox(label="URL", placeholder="Enter the video URL here"),
-        gr.components.Number(value=2, label="Number of Speakers"),
-        gr.components.Dropdown(choices=whisper_models, value="small.en", label="Whisper Model"),
-        gr.components.Textbox(label="Custom Prompt",
-                              placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:",
-                              lines=3),
-        gr.components.Number(value=0, label="Offset"),
-        gr.components.Dropdown(
-            choices=["huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
-            label="API Name"),
-        gr.components.Textbox(label="API Key", placeholder="Enter your API key here"),
-        gr.components.Checkbox(label="VAD Filter", value=False),
-        gr.components.Checkbox(label="Download Video", value=False)
-    ]
-
-    outputs = [
-        gr.components.Textbox(label="Transcription"),
-        gr.components.Textbox(label="Summary or Status Message"),
-        gr.components.File(label="Download Transcription as JSON", visible=lambda x: x != "File not available"),
-        gr.components.File(label="Download Summary as Text", visible=lambda x: x != "File not available"),
-        gr.components.File(label="Download Video", visible=lambda x: x is not None)
-    ]
-
-    iface = gr.Interface(
-        fn=process_url,
-        inputs=inputs,
-        outputs=outputs,
-        title="Video Transcription and Summarization",
-        description="Submit a video URL for transcription and summarization. Ensure you input all necessary information including API keys.",
-        theme="bethecloud/storj_theme"  # Adjust theme as necessary
-    )
-
-    iface.launch(share=False)
-"""
 
 #
 #
