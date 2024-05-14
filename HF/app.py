@@ -17,7 +17,7 @@ import gradio as gr
 import torch
 import yt_dlp
 
-log_level = "INFO"
+log_level = "DEBUG"
 logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #######
@@ -1487,8 +1487,9 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "huggingface":
-                        api_key = os.environ.get(HF_TOKEN)
-                        huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
+                        huggingface_api_key = os.environ.get(HF_TOKEN)
+                        if huggingface_api_key is == None:
+                            huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with huggingface")
                             summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
