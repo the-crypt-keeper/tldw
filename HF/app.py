@@ -181,6 +181,7 @@ print(r"""
 # Perform Platform Check
 userOS = ""
 
+global summary
 
 def platform_check():
     global userOS
@@ -826,6 +827,7 @@ def summarize_with_openai(api_key, file_path, model, custom_prompt):
         response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
 
         if response.status_code == 200:
+            global summary
             summary = response.json()['choices'][0]['message']['content'].strip()
             logging.debug("openai: Summarization successful")
             print("Summarization successful.")
@@ -885,6 +887,7 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt):
             logging.debug("anthropic: Post submittal successful")
             response_data = response.json()
             try:
+                global summary
                 summary = response_data['content'][0]['text'].strip()
                 logging.debug("anthropic: Summarization successful")
                 print("Summary processed successfully.")
@@ -945,6 +948,7 @@ def summarize_with_cohere(api_key, file_path, model, custom_prompt):
 
         if response.status_code == 200:
             if 'text' in response_data:
+                global summary
                 summary = response_data['text'].strip()
                 logging.debug(f"cohere: Summarization successful:\n\n{summary}\n\n")
                 print("Summary processed successfully.")
@@ -999,6 +1003,7 @@ def summarize_with_groq(api_key, file_path, model, custom_prompt):
 
         if response.status_code == 200:
             if 'choices' in response_data and len(response_data['choices']) > 0:
+                global summary
                 summary = response_data['choices'][0]['message']['content'].strip()
                 logging.debug("groq: Summarization successful")
                 print("Summarization successful.")
@@ -1051,6 +1056,7 @@ def summarize_with_llama(api_url, file_path, token, custom_prompt):
         if response.status_code == 200:
             # if 'X' in response_data:
             logging.debug(response_data)
+            global summary
             summary = response_data['content'].strip()
             logging.debug("llama: Summarization successful")
             print("Summarization successful.")
@@ -1100,6 +1106,7 @@ def summarize_with_kobold(kobold_ip, json_file_path, kobold_token, custom_prompt
 
         if response.status_code == 200:
             if 'results' in response_data and len(response_data['results']) > 0:
+                global summary
                 summary = response_data['results'][0]['text'].strip()
                 logging.debug("kobold: Summarization successful")
                 print("Summarization successful.")
@@ -1152,6 +1159,7 @@ def summarize_with_oobabooga(ooba_ip, json_file_path, ooba_token, custom_prompt)
 
         if response.status_code == 200:
             response_data = response.json()
+            global summary
             summary = response.json()['choices'][0]['message']['content']
             logging.debug("ooba: Summarization successful")
             print("Summarization successful.")
@@ -1455,8 +1463,12 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key',
                                                                                  fallback=None)
                     try:
+                        global summary
                         logging.debug(f"MAIN: Trying to summarize with Cohere on HuggingFace Spaces")
                         summary = summarize_with_cohere(cohere_api_key, json_file_path, cohere_model, custom_prompt)
+                        transcription_result['summary'] = summary
+                        logging.info(f"Summary generated using {api_name} API")
+                        save_summary_to_file(summary, json_file_path)
                     except requests.exceptions.ConnectionError:
                         requests.status_code = "Connection: "
                 elif api_name and api_key:
@@ -1530,6 +1542,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         logging.warning(f"Unsupported API: {api_name}")
                         summary = None
 
+                    print(f"MAIN: #1 - Summary: {summary}")
                     if summary:
                         transcription_result['summary'] = summary
                         logging.info(f"Summary generated using {api_name} API")
