@@ -946,7 +946,7 @@ def summarize_with_cohere(api_key, file_path, model, custom_prompt):
         if response.status_code == 200:
             if 'text' in response_data:
                 summary = response_data['text'].strip()
-                logging.debug("cohere: Summarization successful")
+                logging.debug(f"cohere: Summarization successful:\n\n{summary}\n\n")
                 print("Summary processed successfully.")
                 return summary
             else:
@@ -1231,8 +1231,8 @@ def summarize_with_huggingface(huggingface_api_key, json_file_path, custom_promp
             # waiting_summary = f" {pretty_json} "  # Use prettified JSON
             # return waiting_summary
         else:
-            logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
-            return f"Failed to process summary, status code {response.status_code}: {response.text}"
+            logging.error(f"huggingface: Summarization failed with status code {response}")
+            return f"Failed to process summary, huggingface library error: {response}"
     except Exception as e:
         logging.error("huggingface: Error in processing: %s", str(e))
         print(f"Error occurred while processing summary with huggingface: {str(e)}")
@@ -1437,7 +1437,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 logging.info(f"Transcription complete: {audio_file}")
 
                 # Perform summarization based on the specified API
-                logging.debug(f"MAIN: HF: Summarization being performed by HuggingFace")
+                logging.debug(f"MAIN: Summarization being performed by {api_name} API")
                 json_file_path = audio_file.replace('.wav', '.segments.json')
                 if api_name == "huggingface":
                     huggingface_api_key = os.getenv('HF_TOKEN').replace('"', '')
@@ -1449,7 +1449,17 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
                     except requests.exceptions.ConnectionError:
                         requests.status_code = "Connection: "
-                if api_name and api_key:
+                elif api_name == "cohere":
+                    cohere_api_key = os.getenv('COHERE_TOKEN').replace('"', '')
+                    if cohere_api_key is None:
+                        cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key',
+                                                                                 fallback=None)
+                    try:
+                        logging.debug(f"MAIN: Trying to summarize with Cohere on HuggingFace Spaces")
+                        summary = summarize_with_cohere(cohere_api_key, json_file_path, cohere_model, custom_prompt)
+                    except requests.exceptions.ConnectionError:
+                        requests.status_code = "Connection: "
+                elif api_name and api_key:
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
