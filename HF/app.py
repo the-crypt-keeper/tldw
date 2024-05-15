@@ -1317,8 +1317,8 @@ def launch_ui(demo_mode=False):
             download_audio_input = gr.Checkbox(
                 label="Download Audio(Select to allow for file download of selected Video's Audio)", value=False,
                 visible=False)
-            detail_level_input = gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=False,
-                                           label="Detail Level (Slide me)", visible=True)
+            detail_level_input = gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True,
+                                           label="Detail Level (Slide me)", visible=False)
 
             inputs = [num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
                       api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input]
@@ -1345,10 +1345,12 @@ def launch_ui(demo_mode=False):
             outputs = [
                 gr.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
                 gr.Textbox(label="Summary or Status Message (Current status of Summary or Summary itself)"),
-                gr.File(label="Download Transcription as JSON (Download the Transcription as a file)"),
-                gr.File(label="Download Summary as Text (Download the Summary as a file)"),
-                gr.File(label="Download Video (Download the Video as a file)"),
-                gr.File(label="Download Audio (Download the Audio as a file)")
+                gr.File(label="Download Transcription as JSON (Download the Transcription as a file)",container=False,visible=True,render=False),
+                gr.File(label="Download Summary as Text (Download the Summary as a file)",container=False,visible=True,render=False),
+                # FIXME
+                # https://www.gradio.app/docs/gradio/file
+                gr.File(label="Download Video (Download the Video as a file)",container=False,visible=False,render=False),
+                gr.File(label="Download Audio (Download the Audio as a file)",container=False,visible=False,render=False)
             ]
 
             gr.Interface(
