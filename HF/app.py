@@ -1609,7 +1609,7 @@ if __name__ == "__main__":
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
     else:
         logging.debug("No custom prompt defined, will use default")
-        args.custom_prompt = ("\n\nHere is the transcript of a video: <transcript> {{TRANSCRIPT}} </transcript> Please "
+        args.custom_prompt = ("\n\nAbove is the transcript of a video. Please "
                               "read through the transcript carefully. Identify the main topics that are discussed "
                               "over the course of the transcript. Then, summarize the key points about each main "
                               "topic in a concise bullet point. The bullet points should cover the key information "
