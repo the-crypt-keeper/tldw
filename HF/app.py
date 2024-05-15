@@ -373,12 +373,15 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
                        download_video_flag=download_video, custom_prompt=custom_prompt)
         if results:
             transcription_result = results[0]
+
             json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
             prettified_json_file_path = transcription_result['audio_file'].replace('.wav', '.segments_pretty.json')
+
             summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
 
             json_file_path = format_file_path(json_file_path)
-            prettified_json_file_path = format_file_path(prettified_json_file_path)
+            prettified_json_file_path = format_file_path(prettified_json_file_path, fallback_path=json_file_path)
+
             summary_file_path = format_file_path(summary_file_path)
 
             if download_video:
@@ -1259,9 +1262,16 @@ def format_transcription(transcription_result):
         return ""
 
 
-def format_file_path(file_path):
-    # Helper function to check file existence and return an appropriate path or message
-    return file_path if file_path and os.path.exists(file_path) else None
+def format_file_path(file_path, fallback_path=None):
+    if file_path and os.path.exists(file_path):
+        logging.debug(f"File exists: {file_path}")
+        return file_path
+    elif fallback_path and os.path.exists(fallback_path):
+        logging.debug(f"File does not exist: {file_path}. Returning fallback path: {fallback_path}")
+        return fallback_path
+    else:
+        logging.debug(f"File does not exist: {file_path}. No fallback path available.")
+        return None
 
 
 def update_visibility(mode):
@@ -1447,7 +1457,13 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 # Perform summarization based on the specified API
                 logging.debug(f"MAIN: Summarization being performed by {api_name} API")
                 json_file_path = audio_file.replace('.wav', '.segments.json')
+                # UNDO
+                #prettified_json_file_path = transcription_result['audio_file'].replace('.wav', '.segments_pretty.json')
+                json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
                 prettified_json_file_path = transcription_result['audio_file'].replace('.wav', '.segments_pretty.json')
+
+                json_file_path = format_file_path(json_file_path)
+                prettified_json_file_path = format_file_path(prettified_json_file_path, fallback_path=json_file_path)
                 if api_name == "huggingface":
                     huggingface_api_key = os.getenv('HF_TOKEN').replace('"', '')
                     if huggingface_api_key is None:
