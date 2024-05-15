@@ -51,6 +51,7 @@ mutagen==1.47.0
 networkx==3.3
 numpy==1.26.4
 onnxruntime==1.17.3
+openai
 orjson==3.10.3
 packaging==24.0
 pandas==2.2.2
@@ -110,3 +111,5 @@ torch
 torchaudio
 #torch==2.2.2+cu121
 #torchaudio==2.2.2+cu121
+tiktoken~=0.6.0
+openai~=1.28.1
