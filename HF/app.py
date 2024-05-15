@@ -1292,11 +1292,11 @@ def launch_ui(demo_mode=False):
             with gr.Row():
                 # Light/Dark mode toggle switch
                 theme_toggle = gr.Radio(choices=["Light", "Dark"], value="Light",
-                                        label="Light/Dark Mode Toggle (Toggle to change UI color scheme)")
+                                        label="Light/Dark Mode Toggle (Toggle to change UI color scheme) (WIP)")
 
                 # UI Mode toggle switch
                 ui_mode_toggle = gr.Radio(choices=["Simple", "Advanced"], value="Simple",
-                                          label="UI Mode (Toggle to show all options)")
+                                          label="UI Mode (Toggle to show all options) (WIP)")
 
             # URL input is always visible
             url_input = gr.Textbox(label="URL (Mandatory)", placeholder="Enter the video URL here")
@@ -1308,7 +1308,7 @@ def launch_ui(demo_mode=False):
                                               label="Whisper Model(This is the ML model used for transcription.)",
                                               visible=False)
             custom_prompt_input = gr.Textbox(
-                label="Custom Prompt (Customize your summary, or ask a different question)",
+                label="Custom Prompt (Customize your summarization, or ask a question about the video and have it answered)",
                 placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the "
                             "provided text.\nA: Here is a detailed, bulleted list of the key points made in the "
                             "transcribed video and supporting arguments:",
@@ -1318,7 +1318,7 @@ def launch_ui(demo_mode=False):
             api_name_input = gr.Dropdown(
                 choices=[None, "huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
                 value=None,
-                label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
+                label="API Name (Mandatory Unless you just want a Transcription - Can use Cohere with no API Key)", visible=True)
             api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
                                        placeholder="Enter your API key here", visible=True)
             vad_filter_input = gr.Checkbox(label="VAD Filter(Can safely ignore)", value=False, visible=False)
@@ -1367,18 +1367,20 @@ def launch_ui(demo_mode=False):
                 fn=process_url,
                 inputs=all_inputs,
                 outputs=outputs,
-                title="TL/DW: Video Transcription and Summarization with Custom Prompt Support",
+                title="TL/DW: Video Transcription and Summarization with Custom Prompt Support (Demo Page)",
                 description="Submit a video URL for transcription and summarization. Ensure you input all necessary "
                             "information including API keys."
             )
 
         with gr.Tab("Transcription & Summarization History"):
-            image_input = gr.Image(label="Upload Image")
-            image_output = gr.Image(label="Processed Image")
+            gr.Markdown("Plan to put access to SQLite DB here")
+            gr.Markdown("Allow for searching/retrieval/re-prompting of previous transcriptions")
+            gr.Markdown("Also allow for re-transcribing videos if they're still online, while updating/adding to prior entry")
+            gr.Markdown("RAG here we come....:/")
+
 
         with gr.Accordion("Open for More!", open=False):
-            gr.Markdown("Look at me...")
-            gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True, label="Slide me")
+            gr.Markdown("Plan to put Prompt Samples/Templates down here")
 
         iface.launch(share=False)
 

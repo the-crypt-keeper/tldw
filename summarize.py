@@ -1450,7 +1450,7 @@ def launch_ui(demo_mode=False):
                                               label="Whisper Model(This is the ML model used for transcription.)",
                                               visible=True)
             custom_prompt_input = gr.Textbox(
-                label="Custom Prompt (Customize your summary, or ask a different question)",
+                label="Custom Prompt (Customize your summarization, or ask a question about the video and have it answered)",
                 placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the "
                             "provided text.\nA: Here is a detailed, bulleted list of the key points made in the "
                             "transcribed video and supporting arguments:",
@@ -1460,7 +1460,7 @@ def launch_ui(demo_mode=False):
             api_name_input = gr.Dropdown(
                 choices=[None,"huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
                 value=None,
-                label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
+                label="API Name (Mandatory Unless you just want a Transcription - Can use Cohere with no API Key)", visible=True)
             api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
                                        placeholder="Enter your API key here", visible=True)
             vad_filter_input = gr.Checkbox(label="VAD Filter(Can safely ignore)", value=False, visible=True)
@@ -1471,7 +1471,7 @@ def launch_ui(demo_mode=False):
                 visible=True)
             # FIXME - Hide unless advance menu shown
             detail_level_input = gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True,
-                                           label="Detail Level (Slide me)", visible=True)
+                                           label="Summary Detail Level (Slide me) (WIP)", visible=True)
 
             inputs = [num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
                       api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input]
@@ -1514,12 +1514,13 @@ def launch_ui(demo_mode=False):
             )
 
         with gr.Tab("Transcription & Summarization History"):
-            image_input = gr.Image(label="Upload Image")
-            image_output = gr.Image(label="Processed Image")
+            gr.Markdown("Plan to put access to SQLite DB here")
+            gr.Markdown("Allow for searching/retrieval/re-prompting of previous transcriptions")
+            gr.Markdown("Also allow for re-transcribing videos if they're still online, while updating/adding to prior entry")
+            gr.Markdown("RAG here we come....:/")
 
         with gr.Accordion("Open for More!", open=False):
-            gr.Markdown("Look at me...")
-            gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True, label="Slide me")
+            gr.Markdown("Plan to put Prompt Samples/Templates down here")
 
         iface.launch(share=False)
 
