@@ -390,8 +390,6 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
 
             if summary_file_path and os.path.exists(summary_file_path):
                 return formatted_transcription, summary_text, prettified_json_file_path, summary_file_path, video_file_path, None
-            #elif api_name.lower() == 'huggingface':
-            #    return formatted_transcription, waiting_summary, prettified_json_file_path, None, video_file_path, None
             else:
                 return formatted_transcription, summary_text, prettified_json_file_path, None, video_file_path, None
         else:
@@ -1447,6 +1445,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 # Perform summarization based on the specified API
                 logging.debug(f"MAIN: Summarization being performed by {api_name} API")
                 json_file_path = audio_file.replace('.wav', '.segments.json')
+                prettified_json_file_path = transcription_result['audio_file'].replace('.wav', '.segments_pretty.json')
                 if api_name == "huggingface":
                     huggingface_api_key = os.getenv('HF_TOKEN').replace('"', '')
                     if huggingface_api_key is None:
