@@ -361,18 +361,22 @@ def process_local_file(file_path):
 def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
                 download_video, download_audio, chunk_size):
     video_file_path = None
+    print("API Name received:", api_name)  # Debugging line
     try:
         results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers,
                        whisper_model=whisper_model, offset=offset, vad_filter=vad_filter,
                        download_video_flag=download_video, custom_prompt=custom_prompt)
         if results:
             transcription_result = results[0]
+
             json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
             prettified_json_file_path = transcription_result['audio_file'].replace('.wav', '.segments_pretty.json')
+
             summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
 
             json_file_path = format_file_path(json_file_path)
-            prettified_json_file_path = format_file_path(prettified_json_file_path)
+            prettified_json_file_path = format_file_path(prettified_json_file_path, fallback_path=json_file_path)
+
             summary_file_path = format_file_path(summary_file_path)
 
             if download_video:
@@ -383,11 +387,9 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
             summary_text = transcription_result.get('summary', 'Summary not available')
 
             if summary_file_path and os.path.exists(summary_file_path):
-                return (formatted_transcription, summary_text, prettified_json_file_path, summary_file_path,
-                        video_file_path, None)
+                return formatted_transcription, summary_text, prettified_json_file_path, summary_file_path, video_file_path, None
             else:
-                return (formatted_transcription, "Summary not available", prettified_json_file_path, None,
-                        video_file_path, None)
+                return formatted_transcription, summary_text, prettified_json_file_path, None, video_file_path, None
         else:
             return "No results found.", "Summary not available", None, None, None, None
     except Exception as e:
@@ -1412,9 +1414,16 @@ def format_transcription(transcription_result):
 
 
 
-def format_file_path(file_path):
-    # Helper function to check file existence and return an appropriate path or message
-    return file_path if file_path and os.path.exists(file_path) else None
+def format_file_path(file_path, fallback_path=None):
+    if file_path and os.path.exists(file_path):
+        logging.debug(f"File exists: {file_path}")
+        return file_path
+    elif fallback_path and os.path.exists(fallback_path):
+        logging.debug(f"File does not exist: {file_path}. Returning fallback path: {fallback_path}")
+        return fallback_path
+    else:
+        logging.debug(f"File does not exist: {file_path}. No fallback path available.")
+        return None
 
 
 def launch_ui(demo_mode=False):
