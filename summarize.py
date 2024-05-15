@@ -9,12 +9,19 @@ import shutil
 import subprocess
 import sys
 import time
+from typing import List, Tuple, Optional
 import zipfile
 
 import gradio as gr
 import requests
 import unicodedata
 import yt_dlp
+
+# OpenAI Tokenizer support
+from openai import OpenAI
+from tqdm import tqdm
+import tiktoken
+#######################
 
 log_level = "INFO"
 logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
@@ -167,7 +174,7 @@ print(r"""_____  _          ________  _    _
  \__,_||_| \__,_||_| |_|    \__|   \_/\_/   \__,_| \__| \___||_| |_|
 """)
 
-####################################################################################################################################
+#######################################################################################################################
 # System Checks
 #
 #
@@ -229,12 +236,14 @@ def check_ffmpeg():
     else:
         logging.debug("ffmpeg not installed on the local system/in local PATH")
         print(
-            "ffmpeg is not installed.\n\n You can either install it manually, or through your package manager of choice.\n Windows users, builds are here: https://www.gyan.dev/ffmpeg/builds/")
+            "ffmpeg is not installed.\n\n You can either install it manually, or through your package manager of "
+            "choice.\n Windows users, builds are here: https://www.gyan.dev/ffmpeg/builds/")
         if userOS == "Windows":
             download_ffmpeg()
         elif userOS == "Linux":
             print(
-                "You should install ffmpeg using your platform's appropriate package manager, 'apt install ffmpeg','dnf install ffmpeg' or 'pacman', etc.")
+                "You should install ffmpeg using your platform's appropriate package manager, 'apt install ffmpeg',"
+                "'dnf install ffmpeg' or 'pacman', etc.")
         else:
             logging.debug("running an unsupported OS")
             print("You're running an unspported/Un-tested OS")
@@ -293,10 +302,10 @@ def download_ffmpeg():
 
 #
 #
-####################################################################################################################################
+#######################################################################################################################
 
 
-####################################################################################################################################
+#######################################################################################################################
 # Processing Paths and local file handling
 #
 #
@@ -342,10 +351,10 @@ def process_local_file(file_path):
 
 #
 #
-####################################################################################################################################
+#######################################################################################################################
 
 
-####################################################################################################################################
+#######################################################################################################################
 # Video Download/Handling
 #
 
@@ -374,9 +383,11 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
             summary_text = transcription_result.get('summary', 'Summary not available')
 
             if summary_file_path and os.path.exists(summary_file_path):
-                return formatted_transcription, summary_text, prettified_json_file_path, summary_file_path, video_file_path, None
+                return (formatted_transcription, summary_text, prettified_json_file_path, summary_file_path,
+                        video_file_path, None)
             else:
-                return formatted_transcription, "Summary not available", prettified_json_file_path, None, video_file_path, None
+                return (formatted_transcription, "Summary not available", prettified_json_file_path, None,
+                        video_file_path, None)
         else:
             return "No results found.", "Summary not available", None, None, None, None
     except Exception as e:
@@ -517,10 +528,10 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
 
 #
 #
-####################################################################################################################################
+#######################################################################################################################
 
 
-####################################################################################################################################
+#######################################################################################################################
 # Audio Transcription
 #
 # Convert video .m4a into .wav using ffmpeg
@@ -528,18 +539,24 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
 #       https://www.gyan.dev/ffmpeg/builds/
 #
 
+
 # os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
-def convert_to_wav(video_file_path, offset=0):
+def convert_to_wav(video_file_path, offset=0, overwrite=False):
+    out_path = os.path.splitext(video_file_path)[0] + ".wav"
+
+    if os.path.exists(out_path) and not overwrite:
+        print(f"File '{out_path}' already exists. Skipping conversion.")
+        logging.info(f"Skipping conversion as file already exists: {out_path}")
+        return out_path
     print("Starting conversion process of .m4a to .WAV")
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
-    logging.debug("ffmpeg: about to check OS")
 
     try:
         if os.name == "nt":
             logging.debug("ffmpeg being ran on windows")
 
             if sys.platform.startswith('win'):
-                ffmpeg_cmd = ".\\Bin\\ffmpeg.exe"
+                ffmpeg_cmd = "..\\Bin\\ffmpeg.exe"
                 logging.debug(f"ffmpeg_cmd: {ffmpeg_cmd}")
             else:
                 ffmpeg_cmd = 'ffmpeg'  # Assume 'ffmpeg' is in PATH for non-Windows systems
@@ -567,7 +584,6 @@ def convert_to_wav(video_file_path, offset=0):
             except Exception as e:
                 logging.error("Error occurred - ffmpeg doesn't like windows")
                 raise RuntimeError("ffmpeg failed")
-                exit()
         elif os.name == "posix":
             os.system(f'ffmpeg -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
         else:
@@ -579,7 +595,6 @@ def convert_to_wav(video_file_path, offset=0):
     except Exception as e:
         logging.error("Unexpected error occurred: %s", str(e))
         raise RuntimeError("Error converting video file to WAV")
-        exit()
     return out_path
 
 
@@ -635,10 +650,10 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
 
 #
 #
-####################################################################################################################################
+#######################################################################################################################
 
 
-####################################################################################################################################
+#######################################################################################################################
 # Diarization
 #
 # TODO: https://huggingface.co/pyannote/speaker-diarization-3.1
@@ -755,10 +770,252 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
 #             raise RuntimeError("Error Running inference with local model", e)
 #
 #
-####################################################################################################################################
+#######################################################################################################################
 
 
-####################################################################################################################################
+#######################################################################################################################
+# Chunking-related Techniques & Functions
+#
+#
+
+
+# This function chunks a text into smaller pieces based on a maximum token count and a delimiter
+def chunk_on_delimiter(input_string: str,
+                       max_tokens: int,
+                       delimiter: str) -> List[str]:
+    chunks = input_string.split(delimiter)
+    combined_chunks, _, dropped_chunk_count = combine_chunks_with_no_minimum(
+        chunks, max_tokens, chunk_delimiter=delimiter, add_ellipsis_for_overflow=True
+    )
+    if dropped_chunk_count > 0:
+        print(f"Warning: {dropped_chunk_count} chunks were dropped due to exceeding the token limit.")
+    combined_chunks = [f"{chunk}{delimiter}" for chunk in combined_chunks]
+    return combined_chunks
+
+
+# This function combines chunks into larger pieces based on a maximum token count
+def combine_chunks_with_no_minimum(
+        chunks: List[str],
+        max_tokens: int,
+        chunk_delimiter="\n\n",
+        header: Optional[str] = None,
+        add_ellipsis_for_overflow=False,
+) -> Tuple[List[str], List[int]]:
+    dropped_chunk_count = 0
+    output = []  # list to hold the final combined chunks
+    output_indices = []  # list to hold the indices of the final combined chunks
+    candidate = (
+        [] if header is None else [header]
+    )  # list to hold the current combined chunk candidate
+    candidate_indices = []
+    for chunk_i, chunk in enumerate(chunks):
+        chunk_with_header = [chunk] if header is None else [header, chunk]
+        if len(tokenize(chunk_delimiter.join(chunk_with_header))) > max_tokens:
+            print(f"warning: chunk overflow")
+            if (
+                    add_ellipsis_for_overflow
+                    and len(tokenize(chunk_delimiter.join(candidate + ["..."]))) <= max_tokens
+            ):
+                candidate.append("...")
+                dropped_chunk_count += 1
+            continue  # this case would break downstream assumptions
+        # estimate token count with the current chunk added
+        extended_candidate_token_count = len(tokenize(chunk_delimiter.join(candidate + [chunk])))
+        # If the token count exceeds max_tokens, add the current candidate to output and start a new candidate
+        if extended_candidate_token_count > max_tokens:
+            output.append(chunk_delimiter.join(candidate))
+            output_indices.append(candidate_indices)
+            candidate = chunk_with_header  # re-initialize candidate
+            candidate_indices = [chunk_i]
+        # otherwise keep extending the candidate
+        else:
+            candidate.append(chunk)
+            candidate_indices.append(chunk_i)
+    # add the remaining candidate to output if it's not empty
+    if (header is not None and len(candidate) > 1) or (header is None and len(candidate) > 0):
+        output.append(chunk_delimiter.join(candidate))
+        output_indices.append(candidate_indices)
+    return output, output_indices, dropped_chunk_count
+
+def summarize(text: str,
+              detail: float = 0,
+              model: str = 'gpt-4-turbo',
+              additional_instructions: Optional[str] = None,
+              minimum_chunk_size: Optional[int] = 500,
+              chunk_delimiter: str = ".",
+              summarize_recursively=False,
+              verbose=False):
+    """
+    Summarizes a given text by splitting it into chunks, each of which is summarized individually.
+    The level of detail in the summary can be adjusted, and the process can optionally be made recursive.
+
+    Parameters: - text (str): The text to be summarized. - detail (float, optional): A value between 0 and 1
+    indicating the desired level of detail in the summary. 0 leads to a higher level summary, and 1 results in a more
+    detailed summary. Defaults to 0. - model (str, optional): The model to use for generating summaries. Defaults to
+    'gpt-3.5-turbo'. - additional_instructions (Optional[str], optional): Additional instructions to provide to the
+    model for customizing summaries. - minimum_chunk_size (Optional[int], optional): The minimum size for text
+    chunks. Defaults to 500. - chunk_delimiter (str, optional): The delimiter used to split the text into chunks.
+    Defaults to ".". - summarize_recursively (bool, optional): If True, summaries are generated recursively,
+    using previous summaries for context. - verbose (bool, optional): If True, prints detailed information about the
+    chunking process.
+
+    Returns:
+    - str: The final compiled summary of the text.
+
+    The function first determines the number of chunks by interpolating between a minimum and a maximum chunk count
+    based on the `detail` parameter. It then splits the text into chunks and summarizes each chunk. If
+    `summarize_recursively` is True, each summary is based on the previous summaries, adding more context to the
+    summarization process. The function returns a compiled summary of all chunks.
+    """
+
+    # check detail is set correctly
+    assert 0 <= detail <= 1
+
+    # interpolate the number of chunks based to get specified level of detail
+    max_chunks = len(chunk_on_delimiter(text, minimum_chunk_size, chunk_delimiter))
+    min_chunks = 1
+    num_chunks = int(min_chunks + detail * (max_chunks - min_chunks))
+
+    # adjust chunk_size based on interpolated number of chunks
+    document_length = len(tokenize(text))
+    chunk_size = max(minimum_chunk_size, document_length // num_chunks)
+    text_chunks = chunk_on_delimiter(text, chunk_size, chunk_delimiter)
+    if verbose:
+        print(f"Splitting the text into {len(text_chunks)} chunks to be summarized.")
+        print(f"Chunk lengths are {[len(tokenize(x)) for x in text_chunks]}")
+
+    # set system message
+    system_message_content = "Rewrite this text in summarized form."
+    if additional_instructions is not None:
+        system_message_content += f"\n\n{additional_instructions}"
+
+    accumulated_summaries = []
+    for chunk in tqdm(text_chunks):
+        if summarize_recursively and accumulated_summaries:
+            # Creating a structured prompt for recursive summarization
+            accumulated_summaries_string = '\n\n'.join(accumulated_summaries)
+            user_message_content = (f"Previous summaries:\n\n{accumulated_summaries_string}\n\nText to summarize "
+                                    f"next:\n\n{chunk}")
+        else:
+            # Directly passing the chunk for summarization without recursive context
+            user_message_content = chunk
+
+        # Constructing messages based on whether recursive summarization is applied
+        messages = [
+            {"role": "system", "content": system_message_content},
+            {"role": "user", "content": user_message_content}
+        ]
+
+        # Assuming this function gets the completion and works as expected
+        response = get_chat_completion(messages, model=model)
+        accumulated_summaries.append(response)
+
+    # Compile final summary from partial summaries
+    final_summary = '\n\n'.join(accumulated_summaries)
+
+    return final_summary
+
+
+# Straight up copy/paste from OpenAI Cookbook:
+def openai_rolling_summarize(text: str,
+              detail: float = 0,
+              model: str = 'gpt-4-turbo',
+              additional_instructions: Optional[str] = None,
+              minimum_chunk_size: Optional[int] = 500,
+              chunk_delimiter: str = ".",
+              summarize_recursively=False,
+              verbose=False):
+    """
+    Summarizes a given text by splitting it into chunks, each of which is summarized individually.
+    The level of detail in the summary can be adjusted, and the process can optionally be made recursive.
+
+    Parameters: - text (str): The text to be summarized. - detail (float, optional): A value between 0 and 1
+    indicating the desired level of detail in the summary. 0 leads to a higher level summary, and 1 results in a more
+    detailed summary. Defaults to 0. - model (str, optional): The model to use for generating summaries. Defaults to
+    'gpt-3.5-turbo'. - additional_instructions (Optional[str], optional): Additional instructions to provide to the
+    model for customizing summaries. - minimum_chunk_size (Optional[int], optional): The minimum size for text
+    chunks. Defaults to 500. - chunk_delimiter (str, optional): The delimiter used to split the text into chunks.
+    Defaults to ".". - summarize_recursively (bool, optional): If True, summaries are generated recursively,
+    using previous summaries for context. - verbose (bool, optional): If True, prints detailed information about the
+    chunking process.
+
+    Returns:
+    - str: The final compiled summary of the text.
+
+    The function first determines the number of chunks by interpolating between a minimum and a maximum chunk count
+    based on the `detail` parameter. It then splits the text into chunks and summarizes each chunk. If
+    `summarize_recursively` is True, each summary is based on the previous summaries, adding more context to the
+    summarization process. The function returns a compiled summary of all chunks.
+    """
+
+    # check detail is set correctly
+    assert 0 <= detail <= 1
+
+    # interpolate the number of chunks based to get specified level of detail
+    max_chunks = len(chunk_on_delimiter(text, minimum_chunk_size, chunk_delimiter))
+    min_chunks = 1
+    num_chunks = int(min_chunks + detail * (max_chunks - min_chunks))
+
+    # adjust chunk_size based on interpolated number of chunks
+    document_length = len(tokenize(text))
+    chunk_size = max(minimum_chunk_size, document_length // num_chunks)
+    text_chunks = chunk_on_delimiter(text, chunk_size, chunk_delimiter)
+    if verbose:
+        print(f"Splitting the text into {len(text_chunks)} chunks to be summarized.")
+        print(f"Chunk lengths are {[len(tokenize(x)) for x in text_chunks]}")
+
+    # set system message
+    system_message_content = "Rewrite this text in summarized form."
+    if additional_instructions is not None:
+        system_message_content += f"\n\n{additional_instructions}"
+
+    accumulated_summaries = []
+    for chunk in tqdm(text_chunks):
+        if summarize_recursively and accumulated_summaries:
+            # Creating a structured prompt for recursive summarization
+            accumulated_summaries_string = '\n\n'.join(accumulated_summaries)
+            user_message_content = (f"Previous summaries:\n\n{accumulated_summaries_string}\n\nText to summarize "
+                                    f"next:\n\n{chunk}")
+        else:
+            # Directly passing the chunk for summarization without recursive context
+            user_message_content = chunk
+
+        # Constructing messages based on whether recursive summarization is applied
+        messages = [
+            {"role": "system", "content": system_message_content},
+            {"role": "user", "content": user_message_content}
+        ]
+
+        # Assuming this function gets the completion and works as expected
+        response = get_chat_completion(messages, model=model)
+        accumulated_summaries.append(response)
+
+    # Compile final summary from partial summaries
+    final_summary = '\n\n'.join(accumulated_summaries)
+
+    return final_summary
+
+#
+#
+#######################################################################################################################
+
+
+#######################################################################################################################
+# Tokenization-related Techniques & Functions
+#
+#
+
+def tokenize(text: str) -> List[str]:
+    encoding = tiktoken.encoding_for_model('gpt-4-turbo')
+    return encoding.encode(text)
+
+#
+#
+#######################################################################################################################
+
+
+
+#######################################################################################################################
 # Summarizers
 #
 #
@@ -1110,8 +1367,9 @@ def summarize_with_oobabooga(api_url, file_path, ooba_api_token, custom_prompt):
             'content-type': 'application/json',
         }
 
-        # prompt_text = "I like to eat cake and bake cakes. I am a baker. I work in a French bakery baking cakes. It is a fun job. I have been baking cakes for ten years. I also bake lots of other baked goods, but cakes are my favorite."
-        # prompt_text += f"\n\n{text}"  # Uncomment this line if you want to include the text variable
+        # prompt_text = "I like to eat cake and bake cakes. I am a baker. I work in a French bakery baking cakes. It
+        # is a fun job. I have been baking cakes for ten years. I also bake lots of other baked goods, but cakes are
+        # my favorite." prompt_text += f"\n\n{text}"  # Uncomment this line if you want to include the text variable
         ooba_prompt = "{text}\n\n\n\n{custom_prompt}"
         logging.debug("ooba: Prompt being sent is {ooba_prompt}")
 
@@ -1152,10 +1410,10 @@ def save_summary_to_file(summary, file_path):
 
 #
 #
-####################################################################################################################################
+#######################################################################################################################
 
 
-####################################################################################################################################
+#######################################################################################################################
 # Gradio UI
 #
 
@@ -1205,8 +1463,11 @@ def summarize_with_huggingface(api_key, file_path, custom_prompt):
         print(f"Error occurred while processing summary with huggingface: {str(e)}")
         return None
 
-    def same_auth(username, password):
-        return username == password
+    # FIXME
+    # This is here for gradio authentication
+    # Its just not setup.
+    #def same_auth(username, password):
+    #    return username == password
 
 
 def format_transcription(transcription_result):
@@ -1248,12 +1509,15 @@ def launch_ui(demo_mode=False):
                                               visible=True)
             custom_prompt_input = gr.Textbox(
                 label="Custom Prompt (Customize your summary, or ask a different question)",
-                placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:",
+                placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the "
+                            "provided text.\nA: Here is a detailed, bulleted list of the key points made in the "
+                            "transcribed video and supporting arguments:",
                 lines=3, visible=True)
             offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
                                      visible=True)
             api_name_input = gr.Dropdown(
-                choices=[None,"huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value=None,
+                choices=[None,"huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
+                value=None,
                 label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
             api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
                                        placeholder="Enter your API key here", visible=True)
@@ -1302,7 +1566,8 @@ def launch_ui(demo_mode=False):
                 inputs=all_inputs,
                 outputs=outputs,
                 title="Video Transcription and Summarization",
-                description="Submit a video URL for transcription and summarization. Ensure you input all necessary information including API keys."
+                description="Submit a video URL for transcription and summarization. Ensure you input all necessary "
+                            "information including API keys."
             )
 
         with gr.Tab("Transcription & Summarization History"):
@@ -1318,14 +1583,14 @@ def launch_ui(demo_mode=False):
 
 #
 #
-#####################################################################################################################################
+#######################################################################################################################
 
 
-####################################################################################################################################
+#######################################################################################################################
 # Main()
 #
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
-         download_video_flag=False, custom_prompt=None):
+         download_video_flag=False, demo_mode=False, custom_prompt=None, overwrite=False):
     global summary
     if input_path is None and args.user_interface:
         return []
@@ -1340,7 +1605,10 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
     elif (info_dict := get_youtube(input_path)) and 'entries' in info_dict:
         logging.debug("MAIN: YouTube playlist detected")
         print(
-            "\n\nSorry, but playlists aren't currently supported. You can run the following command to generate a text file that you can then pass into this script though! (It may not work... playlist support seems spotty)" + """\n\n\tpython Get_Playlist_URLs.py <Youtube Playlist URL>\n\n\tThen,\n\n\tpython diarizer.py <playlist text file name>\n\n""")
+            "\n\nSorry, but playlists aren't currently supported. You can run the following command to generate a "
+            "text file that you can then pass into this script though! (It may not work... playlist support seems "
+            "spotty)" + """\n\n\tpython Get_Playlist_URLs.py <Youtube Playlist URL>\n\n\tThen,\n\n\tpython 
+            diarizer.py <playlist text file name>\n\n""")
         return
     else:
         paths = [input_path]
@@ -1354,12 +1622,12 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 if info_dict:
                     logging.debug("MAIN: Creating path for video file...")
                     download_path = create_download_directory(info_dict['title'])
-                    logging.debug("MAIN: Path created successfully")
-                    logging.debug("MAIN: Downloading video from yt_dlp...")
+                    logging.debug("MAIN: Path created successfully\n MAIN: Now Downloading video from yt_dlp...")
                     try:
                         video_path = download_video(path, download_path, info_dict, download_video_flag)
                     except RuntimeError as e:
                         logging.error(f"Error downloading video: {str(e)}")
+                        #FIXME - figure something out for handling this situation....
                         continue
                     logging.debug("MAIN: Video downloaded successfully")
                     logging.debug("MAIN: Converting video file to WAV...")
@@ -1389,17 +1657,20 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
-                        openai_api_key = api_key if api_key else config.get('API', 'openai_api_key', fallback=None)
+                        openai_api_key = api_key if api_key else config.get('API', 'openai_api_key',
+                                                                            fallback=None)
                         try:
                             logging.debug(f"MAIN: trying to summarize with openAI")
                             summary = summarize_with_openai(openai_api_key, json_file_path, openai_model, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "anthropic":
-                        anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key', fallback=None)
+                        anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key',
+                                                                               fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with anthropic")
-                            summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model, custom_prompt)
+                            summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model,
+                                                            custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "cohere":
@@ -1441,7 +1712,8 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "huggingface":
-                        huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
+                        huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key',
+                                                                                 fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with huggingface")
                             summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
@@ -1459,10 +1731,11 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     else:
                         logging.warning(f"Failed to generate summary using {api_name} API")
                 else:
-                    logging.info("No API specified. Summarization will not be performed")
+                    logging.info("MAIN: #2 - No API specified. Summarization will not be performed")
         except Exception as e:
             logging.error(f"Error processing path: {path}")
             logging.error(str(e))
+            continue
         #end_time = time.monotonic()
         # print("Total program execution time: " + timedelta(seconds=end_time - start_time))
 
@@ -1482,10 +1755,11 @@ if __name__ == "__main__":
     parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
     parser.add_argument('-log', '--log_level', type=str, default='INFO',
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
-    parser.add_argument('-ui', '--user_interface', action='store_true', help='Launch the Gradio user interface')
+    parser.add_argument('-ui', '--user_interface', action='store_true', help="Launch the Gradio user interface")
     parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
     parser.add_argument('-prompt', '--custom_prompt', type=str,
-                        help='Pass in a custom prompt to be used in place of the existing one.(Probably should just modify the script itself...)')
+                        help='Pass in a custom prompt to be used in place of the existing one.(Probably should just '
+                             'modify the script itself...)')
     # parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
@@ -1497,7 +1771,9 @@ if __name__ == "__main__":
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
     else:
         logging.debug("No custom prompt defined, will use default")
-        args.custom_prompt = "\n\nQ: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:"
+        args.custom_prompt = ("\n\nQ: As a professional summarizer, create a concise and comprehensive summary of the "
+                              "provided text.\nA: Here is a detailed, bulleted list of the key points made in the "
+                              "transcribed video and supporting arguments:")
         print("No custom prompt defined, will use default")
 
     if args.user_interface:
@@ -1536,7 +1812,7 @@ if __name__ == "__main__":
         try:
             results = main(args.input_path, api_name=args.api_name, api_key=args.api_key,
                            num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset,
-                           vad_filter=args.vad_filter, download_video_flag=args.video)
+                           vad_filter=args.vad_filter, download_video_flag=args.video, overwrite=args.overwrite)
             logging.info('Transcription process completed.')
         except Exception as e:
             logging.error('An error occurred during the transcription process.')
