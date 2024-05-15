@@ -936,6 +936,7 @@ def summarize_with_detail(detail, final_summary):
 
 
 def get_chat_completion(messages, model='gpt-4-turbo'):
+    client = OpenAI(api_key="<OPENAI_API_KEY_REPLACE_ME>")
     response = client.chat.completions.create(
         model=model,
         messages=messages,
@@ -1460,14 +1461,14 @@ def launch_ui(demo_mode=False):
             api_name_input = gr.Dropdown(
                 choices=[None,"huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
                 value=None,
-                label="API Name (Mandatory Unless you just want a Transcription - Can use Cohere with no API Key)", visible=True)
+                label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
             api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
-                                       placeholder="Enter your API key here", visible=True)
-            vad_filter_input = gr.Checkbox(label="VAD Filter(Can safely ignore)", value=False, visible=True)
+                                       placeholder="Enter your API key here; Ignore if using Local API or Built-in API", visible=True)
+            vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False, visible=True)
             download_video_input = gr.Checkbox(
                 label="Download Video(Select to allow for file download of selected video)", value=False, visible=True)
             download_audio_input = gr.Checkbox(
-                label="Download Audio(Select to allow for file download of selected Video's Audio)", value=True,
+                label="Download Audio(Select to allow for file download of selected Video's Audio)", value=False,
                 visible=True)
             # FIXME - Hide unless advance menu shown
             detail_level_input = gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True,
