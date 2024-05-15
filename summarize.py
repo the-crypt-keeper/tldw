@@ -1460,6 +1460,7 @@ def launch_ui(demo_mode=False):
             download_audio_input = gr.Checkbox(
                 label="Download Audio(Select to allow for file download of selected Video's Audio)", value=True,
                 visible=True)
+            # FIXME - Hide unless advance menu shown
             detail_level_input = gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True,
                                            label="Detail Level (Slide me)", visible=True)
 
