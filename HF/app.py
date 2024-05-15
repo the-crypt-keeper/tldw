@@ -14,6 +14,7 @@ import unicodedata
 import zipfile
 
 import gradio as gr
+from huggingface_hub import InferenceClient
 import torch
 import yt_dlp
 
@@ -388,14 +389,14 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
 
             if summary_file_path and os.path.exists(summary_file_path):
                 return formatted_transcription, summary_text, prettified_json_file_path, summary_file_path, video_file_path, None
+            #elif api_name.lower() == 'huggingface':
+            #    return formatted_transcription, waiting_summary, prettified_json_file_path, None, video_file_path, None
             else:
-                return formatted_transcription, "Summary not available", prettified_json_file_path, None, video_file_path, None
+                return formatted_transcription, summary_text, prettified_json_file_path, None, video_file_path, None
         else:
             return "No results found.", "Summary not available", None, None, None, None
     except Exception as e:
         return str(e), "Error processing the request.", None, None, None, None
-
-
 
 
 def create_download_directory(title):
@@ -437,7 +438,6 @@ def get_youtube(video_url):
         else:
             logging.error("Invalid info_dict format")
             return None
-
 
 
 def get_playlist_videos(playlist_url):
@@ -1185,35 +1185,22 @@ def save_summary_to_file(summary, file_path):
 # Only to be used when configured with Gradio for HF Space
 def summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt):
     logging.debug(f"huggingface: Summarization process starting...")
+    client = InferenceClient()
 
-    model = "microsoft/Phi-3-mini-128k-instruct"
+    #model = "microsoft/Phi-3-mini-128k-instruct"
+    model = "CohereForAI/c4ai-command-r-plus"
     API_URL = f"https://api-inference.huggingface.co/models/{model}"
     headers = {"Authorization": f"Bearer {huggingface_api_key}"}
+
+    client = InferenceClient(model=f"{model}", token=f"{huggingface_api_key}")
+
+    response = client.post(json={"inputs": "The goal of life is [MASK]."}, model="bert-base-uncased")
 
     with open(json_file_path, 'r') as file:
         segments = json.load(file)
     text = ''.join([segment['text'] for segment in segments])
 
-    # FIXME adjust max_length and min_length as needed
-    data = {
-        "inputs": text + "\n\n\n\n" + custom_prompt,
-        "parameters": {"max_length": 4096, "min_length": 100}
-    }
-
-    max_retries = 5
-
-    for attempt in range(max_retries):
-        response = requests.post(API_URL, headers=headers, json=data)
-        if response.status_code == 200:
-            summary = response.json()[0]['summary_text']
-            return summary, None
-        elif response.status_code == 503:
-            response_data = response.json()
-            wait_time = response_data.get('estimated_time', 10)
-            return None, f"Model is loading, retrying in {int(wait_time)} seconds..."
-            # FIXME : This is a hack, should be done better
-            # Sleep before retrying....
-            # time.sleep(wait_time)
+    hf_prompt = text + "\n\n\n\n" + custom_prompt
 
     if huggingface_api_key == "":
         api_key = os.getenv(HF_TOKEN)
@@ -1230,14 +1217,19 @@ def summarize_with_huggingface(huggingface_api_key, json_file_path, custom_promp
         logging.debug("HUGGINGFACE API KEY CHECK #2: " + huggingface_api_key)
 
         logging.debug("huggingface: Submitting request...")
-        logging.debug("huggingface: Printing request headers: %s", headers)
-        response = requests.post(API_URL, headers=headers, json=data)
-
-        if response.status_code == 200:
-            summary = response.json()[0]['summary_text']
-            logging.debug("huggingface: Summarization successful")
-            print("Summarization successful.")
-            return summary
+        response = client.text_generation(prompt=hf_prompt, max_new_tokens=4096)
+        if response is not None:
+            return response
+        #if response == FIXME:
+            #logging.debug("huggingface: Summarization successful")
+            #print("Summarization successful.")
+            #return response
+        #elif Bad Stuff:
+            # logging.debug(f"huggingface: Model is currently loading...{response.status_code}: {response.text}")
+            # global waiting_summary
+            # pretty_json = json.dumps(json.loads(response.text), indent=4)  # Prettify JSON
+            # waiting_summary = f" {pretty_json} "  # Use prettified JSON
+            # return waiting_summary
         else:
             logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
             return f"Failed to process summary, status code {response.status_code}: {response.text}"
@@ -1274,6 +1266,7 @@ def update_visibility(mode):
         # Hide all inputs below URL
         return [gr.update(visible=False)] * 9
 
+
 # https://www.gradio.app/guides/controlling-layout
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
@@ -1307,7 +1300,8 @@ def launch_ui(demo_mode=False):
             offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
                                      visible=False)
             api_name_input = gr.Dropdown(
-                choices=[None,"huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"], value=None,
+                choices=[None, "huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
+                value=None,
                 label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
             api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
                                        placeholder="Enter your API key here", visible=True)
@@ -1369,6 +1363,7 @@ def launch_ui(demo_mode=False):
             gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True, label="Slide me")
 
         iface.launch(share=False)
+
 
 #
 #
@@ -1447,7 +1442,8 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                 if api_name == "huggingface":
                     huggingface_api_key = os.getenv('HF_TOKEN').replace('"', '')
                     if huggingface_api_key is None:
-                        huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
+                        huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key',
+                                                                                 fallback=None)
                     try:
                         logging.debug(f"MAIN: Trying to summarize with huggingface")
                         summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
@@ -1466,17 +1462,20 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     elif api_name.lower() == "huggingface":
                         huggingface_api_key = os.getenv(HF_TOKEN)
                         if huggingface_api_key is None:
-                            huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
+                            huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key',
+                                                                                     fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with huggingface")
                             summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "anthropic":
-                        anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key', fallback=None)
+                        anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key',
+                                                                               fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with anthropic")
-                            summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model, custom_prompt)
+                            summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model,
+                                                            custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "cohere":
