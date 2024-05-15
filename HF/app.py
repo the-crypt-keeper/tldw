@@ -1309,9 +1309,12 @@ def launch_ui(demo_mode=False):
                                               visible=False)
             custom_prompt_input = gr.Textbox(
                 label="Custom Prompt (Customize your summarization, or ask a question about the video and have it answered)",
-                placeholder="Q: As a professional summarizer, create a concise and comprehensive summary of the "
-                            "provided text.\nA: Here is a detailed, bulleted list of the key points made in the "
-                            "transcribed video and supporting arguments:",
+                placeholder="Here is the transcript of a video: <transcript> {{TRANSCRIPT}} </transcript> Please read "
+                            "through the transcript carefully. Identify the main topics that are discussed over the "
+                            "course of the transcript. Then, summarize the key points about each main topic in a "
+                            "concise bullet point. The bullet points should cover the key information conveyed about "
+                            "each topic in the video, but should be much shorter than the full transcript. Please "
+                            "output your bullet point summary inside <bulletpoints> tags.",
                 lines=3, visible=True)
             offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
                                      visible=False)
@@ -1606,7 +1609,12 @@ if __name__ == "__main__":
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
     else:
         logging.debug("No custom prompt defined, will use default")
-        args.custom_prompt = "\n\nQ: As a professional summarizer, create a concise and comprehensive summary of the provided text.\nA: Here is a detailed, bulleted list of the key points made in the transcribed video and supporting arguments:"
+        args.custom_prompt = ("\n\nHere is the transcript of a video: <transcript> {{TRANSCRIPT}} </transcript> Please "
+                              "read through the transcript carefully. Identify the main topics that are discussed "
+                              "over the course of the transcript. Then, summarize the key points about each main "
+                              "topic in a concise bullet point. The bullet points should cover the key information "
+                              "conveyed about each topic in the video, but should be much shorter than the full "
+                              "transcript. Please output your bullet point summary inside <bulletpoints> tags.")
         print("No custom prompt defined, will use default")
 
     # print(f"Is CUDA available: {torch.cuda.is_available()}")
