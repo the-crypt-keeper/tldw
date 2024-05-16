@@ -318,12 +318,7 @@ def read_paths_from_file(file_path):
     """ Reads a file containing URLs or local file paths and returns them as a list. """
     paths = []  # Initialize paths as an empty list
     with open(file_path, 'r') as file:
-        for line in file:
-            line = line.strip()
-            if line and not os.path.exists(
-                    os.path.join('results', normalize_title(line.split('/')[-1].split('.')[0]) + '.json')):
-                logging.debug("line successfully imported from file and added to list to be transcribed")
-                paths.append(line)
+        paths = [line.strip() for line in file]
     return paths
 
 
@@ -331,10 +326,12 @@ def process_path(path):
     """ Decides whether the path is a URL or a local file and processes accordingly. """
     if path.startswith('http'):
         logging.debug("file is a URL")
-        return get_youtube(path)  # For YouTube URLs, modify to download and extract info
+        # For YouTube URLs, modify to download and extract info
+        return get_youtube(path)
     elif os.path.exists(path):
         logging.debug("File is a path")
-        return process_local_file(path)  # For local files, define a function to handle them
+        # For local files, define a function to handle them
+        return process_local_file(path)
     else:
         logging.error(f"Path does not exist: {path}")
         return None
@@ -1668,7 +1665,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     #         except requests.exceptions.ConnectionError:
                     #             requests.status_code = "Connection: "
                 # Perform summarization based on the specified API
-                elif api_name and api_key:
+                elif api_name:
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
@@ -1758,7 +1755,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
         #end_time = time.monotonic()
         # print("Total program execution time: " + timedelta(seconds=end_time - start_time))
 
-        return results
+    return results
 
 
 if __name__ == "__main__":
@@ -1793,6 +1790,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 
     custom_prompt = args.custom_prompt
+
     if custom_prompt == "":
         logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
@@ -1808,7 +1806,6 @@ if __name__ == "__main__":
         print("No custom prompt defined, will use default")
 
     if args.user_interface:
-
         launch_ui(demo_mode=False)
     else:
         if not args.input_path:
@@ -1834,6 +1831,8 @@ if __name__ == "__main__":
 
         # Get all API keys from the config
         api_keys = {key: value for key, value in config.items('API') if key.endswith('_api_key')}
+
+        api_name = args.api_name
 
         # Rolling Summarization will only be performed if an API is specified and the API key is available
         # and the rolling summarization flag is set
