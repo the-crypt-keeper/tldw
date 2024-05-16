@@ -4,7 +4,8 @@ from urllib.parse import urlparse, parse_qs
 
 def get_playlist_videos(playlist_url):
     ydl_opts = {
-        'extract_flat': True,        'skip_download': True,
+        'extract_flat': True,
+        'skip_download': True,
         'quiet': False
     }
 
@@ -23,12 +24,10 @@ def get_playlist_videos(playlist_url):
         print(f"An error occurred: {e}")
         return [], None
 
-
 def save_to_file(video_urls, filename):
     with open(filename, 'w') as file:
         file.write('\n'.join(video_urls))
     print(f"Video URLs saved to {filename}")
-
 
 def parse_playlist_url(url):
     parsed_url = urlparse(url)
@@ -42,17 +41,29 @@ def parse_playlist_url(url):
     else:
         return url
 
+def process_input(input):
+    if input.lower().endswith('.txt'):
+        with open(input, 'r') as file:
+            urls = file.readlines()
+            urls = [url.strip() for url in urls]
+        return urls
+    else:
+        return [input]
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Please provide the playlist URL as a command-line argument.")
-        print("""Example:\n\t python Get_Playlist_URLs.py "https://www.youtube.com/playlist?list=PLH15HpR5qRsWalnnt-9eYELxbEcYBPB6I" """)
+        print("Please provide the playlist URL or a path to a text file containing playlist URLs.")
+        print("Example usage:\n\t python Get_Playlist_URLs.py 'https://www.youtube.com/playlist?list=PLH15HpR5qRsWalnnt-9eYELxbEcYBPB6I'")
+        print("Or:\n\t python Get_Playlist_URLs.py 'playlists.txt'")
         sys.exit(1)
 
-    playlist_url = sys.argv[1]
-    parsed_playlist_url = parse_playlist_url(playlist_url)
-    video_urls, playlist_title = get_playlist_videos(parsed_playlist_url)
+    input_source = sys.argv[1]
+    inputs = process_input(input_source)
 
-    if video_urls:
-        filename = f"{playlist_title}.txt"
-        save_to_file(video_urls, filename)
+    for playlist_input in inputs:
+        parsed_playlist_url = parse_playlist_url(playlist_input)
+        video_urls, playlist_title = get_playlist_videos(parsed_playlist_url)
+
+        if video_urls:
+            filename = f"{playlist_title}.txt"
+            save_to_file(video_urls, filename)
