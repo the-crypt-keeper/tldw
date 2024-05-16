@@ -8,10 +8,12 @@
 
 - Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
 - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
+- Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported only through OpenAI currently, though the [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) will let you do it with exllama or vLLM.
 - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. ( https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md )
 
-I personally recommend Sonnet. It's great quality and relatively inexpensive. 
-* To be clear, Microsoft Phi-3 Mini 128k is great if you don't have a lot of VRAM and want to self-host. (I think it's better than anything up to 70B for summarization...)
+For commercial API usage, I personally recommend Sonnet. It's great quality and relatively inexpensive. 
+
+As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't have a lot of VRAM and want to self-host. (I think it's better than anything up to 70B for summarization - I do not have actual evidence for this)
 
 ### Application Demo
 CLI
@@ -33,21 +35,31 @@ GUI
 
 
 ### Quickstart after Installation
-- **Download Audio only from URL -> Transcribe audio:**
+- **Transcribe audio from a Youtube URL:**
   * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
-- **Download Audio+Video from URL -> Transcribe audio from Video:**
+
+- **Transcribe audio from a Youtube URL & Summarize it using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
+  * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>`
+    - Make sure to put your API key into `config.txt` under the appropriate API variable
+
+- **Transcribe a list of Youtube URLs & Summarize them using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
+  * `python summarize.py ./ListofVideos.txt -api <your choice of API>`
+    - Make sure to put your API key into `config.txt` under the appropriate API variable
+
+- **Transcribe & Summarize a List of Videos on your local filesytem with a text file:**
+  * `python summarize.py -v ./local/file_on_your/system`
+
+- **Download a Video with Audio from a URL:**
   * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
-- **Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` (llama.cpp)/`ooba` (oobabooga/text-gen-webui)/`kobold` (kobold.cpp)/`tabby` (Tabbyapi)) API:**
-  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>` - Make sure to put your API key into `config.txt` under the appropriate API variable
-- **Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:**
-  * `python summarize.py ./local/file_on_your/system --api_name <API_name>`
+
 - **Run it as a WebApp**
   * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
-    * Can be helpful for setting up a shared instance, but not wanting people to perform inference on your server.
-
+    * It will expose every CLI option (not currently/is planned)
+    * Has an option to download the generated transcript, and summary as text files.
+    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
 
 ### <a name="what"></a>What?
-- **Use the script to (download->)transcribe(->summarize) a local file or remote url.**
+- **Use the script to (download->)transcribe(->summarize) a local file or remote (supported) url.**
 - **What can you transcribe and summarize?**
   * **Any youtube video.** Or video hosted at any of these sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
     * (Playlists you have to use the `Get_Playlist_URLs.py` with `Get_Playlist_URLs.py <Playlist URL>` and it'll create a text file with all the URLs for each video, so you can pass the text file as input and they'll all be downloaded. Pull requests are welcome.)
@@ -67,15 +79,16 @@ GUI
       * If the self-hosted server requires an API key, modify the appropriate api_key variable in the `config.txt` file.
   * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach. This works for big context LLMs, but not everyone has access to them, and some transcriptions may be even longer, so we need to have an approach that can handle those cases.
 - **APIs Currently Supported**
-  1. Anthropic
-  2. Cohere
-  3. Groq
-  4. Llama.cpp
-  5. Kobold.cpp
-  6. Oobabooga
-  7. HuggingFace
+  1. Anthropic - https://www.anthropic.com/api
+  2. Cohere - https://docs.cohere.com/reference/about
+  3. Groq - https://docs.api.groq.com/index.html
+  4. Llama.cpp - https://github.com/ggerganov/llama.cpp & https://github.com/ggerganov/llama.cpp/blob/master/examples/server/README.md
+  5. Kobold.cpp - https://github.com/LostRuins/koboldcpp
+  6. Oobabooga - https://github.com/oobabooga/text-generation-webui
+  7. HuggingFace - https://huggingface.co/docs/api-inference/en/index
 - **Planned to Support**
-  1. TabbyAPI
+  1. TabbyAPI - https://github.com/theroyallab/tabbyAPI
+  2. vLLM - https://github.com/vllm-project/vllm
 
 ----------
 
@@ -98,10 +111,10 @@ GUI
     5. Then the video will be transcribed by faster_whisper. (You can see this in the console output)
       * The resulting transcription output will be stored as both a json file with timestamps, as well as a txt file with no timestamps.
     6. Finally, you can have the transcription summarized through feeding it into an LLM of your choice.
-    7. For running it locally, here's the commands to do so:
-      * FIXME
-    8. For feeding the transcriptions to the API of your choice, simply use the corresponding script for your API provider.
-      * FIXME: add scripts for OpenAI api (generic) and others
+    7. For running it locally, pass the '--local' argument into the script. This will download and launch a local inference server as part of the script. 
+      * This will take up at least 6 GB of space. (WIP - not in place yet)
+
+
 
 
 
@@ -116,8 +129,9 @@ GUI
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
-usage: summarize.py [-h] [-v] [-api API_NAME] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET] [-vad]
-                    [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-ui] [-demo]
+usage: summarize.py [-h] [-v] [-api API_NAME] [-key API_KEY] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET] [-vad]
+                    [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-ui] [-demo] [-prompt CUSTOM_PROMPT] [-overwrite] [-roll]
+                    [-detail DETAIL_LEVEL]
                     [input_path]
 
 Transcribe and summarize videos.
@@ -130,6 +144,8 @@ options:
   -v, --video           Download the video instead of just the audio
   -api API_NAME, --api_name API_NAME
                         API name for summarization (optional)
+  -key API_KEY, --api_key API_KEY
+                        API key for summarization (optional)
   -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
                         Number of speakers (default: 2)
   -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
@@ -142,19 +158,34 @@ options:
   -ui, --user_interface
                         Launch the Gradio user interface
   -demo, --demo_mode    Enable demo mode
-
+  -prompt CUSTOM_PROMPT, --custom_prompt CUSTOM_PROMPT
+                        Pass in a custom prompt to be used in place of the existing one. (Probably should just modify the script itself...)
+  -overwrite, --overwrite
+                        Overwrite existing files
+  -roll, --rolling_summarization
+                        Enable rolling summarization
+  -detail DETAIL_LEVEL, --detail_level DETAIL_LEVEL
+                        Mandatory if rolling summarization is enabled, defines the chunk size. Default is 0.01(lots of chunks) -> 1.00 (few
+                        chunks) Currently only OpenAI works.
 
 -Download Audio only from URL -> Transcribe audio:
->python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
+  >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
 
--Download Audio only from URL -> Transcribe audio -> Summarize using (`anthropic`/`cohere`/`openai`/`llama` i.e. llama.cpp/`ooba`/`kobold`/`tabby`) API:
->python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>
+-Transcribe audio from a Youtube URL & Summarize it using (anthropic/cohere/openai/llama (llama.cpp)/ooba (oobabooga/text-gen-webui)/kobold (kobold.cpp)/tabby (Tabbyapi)) API:
+  >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>
+    - Make sure to put your API key into `config.txt` under the appropriate API variable
 
--Download Audio+Video from URL -> Transcribe audio from Video:
->python summarize.py --video https://www.youtube.com/watch?v=4nd1CDZP21s
+-Download Video with audio from URL -> Transcribe audio from Video:
+  >python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s
 
 -Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:
->python summarize.py --video ./local/file_on_your/system --api_name <API_name>
+  >python summarize.py --video ./local/file_on_your/system --api_name <API_name>
+
+-Transcribe & Summarize a List of Videos on your local filesytem with a text file:
+  >python summarize.py -v ./local/file_on_your/system
+
+-Run it as a WebApp:
+  >python summarize.py -gui
 
 By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
 ```
@@ -249,7 +280,7 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 ------------
 
 ### <a name="credits"></a>Credits
-- [original](https://github.com/the-crypt-keeper/tldw)
+- [The original version of this project by @the-crypt-keeper](https://github.com/the-crypt-keeper/tldw)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 - [ffmpeg](https://github.com/FFmpeg/FFmpeg)
 - [faster_whisper](https://github.com/SYSTRAN/faster-whisper)
