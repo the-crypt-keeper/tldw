@@ -245,7 +245,7 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 ------------
 ### Similar/Other projects:
 - https://github.com/Dicklesworthstone/bulk_transcribe_youtube_videos_from_playlist/tree/main
-
+- https://github.com/akashe/YoutubeSummarizer
 ------------
 
 ### <a name="credits"></a>Credits
