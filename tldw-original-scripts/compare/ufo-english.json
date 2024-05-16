@@ -1,0 +1,853 @@
+{
+    "tests": {
+        "chunk-0-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testify about their experiences with unidentified aerial phenomena (UAP). The first witness is Lieutenant Ryan Graves who served in the US Navy for over a decade and had his own encounter while flying an F-18 fighter jet. He describes how he and other pilots detected unknown objects operating in their airspace using various sensors such as radar and infrared systems. During one particular incident, a dark grey or black cube inside a clear sphere approached within 50 feet of another pilot's plane before being terminated from the area due to safety concerns. Despite submitting reports on these incidents, there were no official acknowledgments nor mechanisms provided by the military to continue reporting future encounters."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testified before Congress about their experiences with unidentified aerial phenomena (UAP). The hearing took place on March 9th, 2023 at 10am EST.\n\nWitness #1 - Ryan Graves is a former US Navy pilot who served for over a decade. He has his own experience with UAP while flying an F-18 fighter jet during Operation Enduring Freedom and Operation Inherent Resolve deployments. Witness #2 - David Grush worked as a senior intelligence officer at National Geospatial Intelligence Agency from 2006 until 2017. He also served as a technical advisor for UAP issues. Witness #3 - Retired Commander David Fraber led multiple combat missions throughout his career as a Naval aviator. His most notable encounter occurred in 2014 when he experienced what became known as \"The TikTok Event.\""
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Ryan Graves describes his experience as an F-18 pilot with the Navy and how he encountered unidentified aerial phenomena (UAP) during a training mission near Virginia Beach. He also mentions that other commercial pilots have confided their similar encounters with him, highlighting the need for action due to underreported cases and excessive classification practices."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Ryan Graves, an ex-Navy pilot, testifies about his experience with unidentified aerial phenomena (UAP). He states that these encounters are not rare or isolated events; rather, they occur frequently among military aircrew and commercial pilots who have trained observation skills essential for their professions. The stigma attached to reporting such incidents is real and powerful, which discourages witnesses from coming forward. Additionally, excessive classification practices keep crucial information hidden, fueling speculation and mistrust.\n\nGraves shares his own encounter during a training mission off the coast of Virginia Beach when two F18 Super Hornets were split by UAP. The object described as a dark gray or black cube inside a clear sphere came within 50 feet of one aircraft and was estimated to be 5 to 15 feet in diameter. Despite submitting a safety report, there was no official acknowledgment nor further mechanism provided to report similar sightings."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-1-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " David Charles Griesch describes his experience working for the National Geospatial Intelligence Agency (NGA) where he served as an intelligence officer for 14 years. He became aware of unidentified aerial phenomena through multiple individuals who shared compelling evidence with him over four years while they were part of the Unidentified Aerial Phenomenon Task Force (UAPTF). These individuals included veterans with decades of flying experience reporting encounters at altitudes that appear above them at 40,000 feet, potentially in low Earth orbit or in the gray zone below the Carmen line making inexplicable maneuvers like right-hand turns and retrograde orbits or J-hooks. Mr. Griesch believes these accounts are only scratching the surface and more will share their experiences once it is safe to do so."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testify about their experiences with unidentified aerial phenomena (UAP). The first witness, David Griesch, served as an intelligence officer for 14 years at various levels within the US military and Intelligence Community. He became a whistleblower after filing a PPD-19 urgent concern filing with the Inspector General regarding concerns over secrecy surrounding UFOs/UAPs being operated by the US Government without Congressional oversight.\nThe second witness is former Navy pilot Ryan Graves who reported multiple encounters while flying F/A-18 Super Hornet fighter jets off the coast of California between 2015 and 2017. These included objects accelerating rapidly out of sight, performing high-speed maneuvers that defied physical laws, and displaying technologies beyond those known to exist today.\nFinally, retired Air Force Lieutenant Colonel Kevin J. Goodman shares his experience working on classified projects involving advanced technology development during his time in service from 1996 through 2016. He also discusses how he believes there are still many unknowns related to these mysterious aircraft or devices which require further investigation by Congress."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " David Charles Griesch testifies about his experience working at the National Geospatial Intelligence Agency (NGA) and being part of the Unidentified Anomalous Phenomena Task Force (UAPTF). He states that he became a whistleblower through a PPD-19 urgent concern filing with the intelligence community inspector general due to concerns raised by other credible individuals regarding secrecy within the US government on UAPs.\n\nGriesch shares information provided by various sources who claim they possess compelling evidence such as photography, official documentation, and classified oral testimony supporting their assertions. Despite taking steps to collaborate this evidence over four years while working for the UAPTF, he believes strongly in bringing it before Congress because of its importance for truth and transparency rooted in upholding the United States Constitution and protecting American people."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " David Charles Griesch (a former intelligence officer) testifies about his experience working at the National Geospatial Intelligence Agency (NGA). He states that he became a whistleblower through a PPD-19 urgent concern filing with the intelligence community inspector general after receiving concerning reports from multiple credible sources regarding the US government operating with secrecy above congressional oversight on unidentified aerial phenomena (UAPs).\n\nGriesch shares compelling evidence in the form of photography, official documentation, and classified oral testimony provided by individuals who have longstanding track records of legitimacy and service to the country. These witnesses include current and former military personnel and members of the intelligence community.\n\nTo collaborate these claims, Griesch took every step possible while working for the UAP Task Force and did due diligence on each individual sharing information. This is because he believes strongly in truth and transparency rooted in their duty to uphold the United States Constitution and protect American people.\n\nHe asks Congress to hold the government accountable by thoroughly investigating these claims and ensuring they adhere to constitutional standards. As an Air Force Reservist, Griesch was also part of the NRO's UAP task force from 2019 to 2021."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-2-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Commander Fraver describes an incident that occurred while he was flying as commanding officer of Strike Fighter Squadron 41 on board the USS Nimitz during a two-month workup cycle off the coast of California. The air controller had informed them that they were going to be conducting real-world tasking instead of their scheduled training due to unidentified objects being observed for over two weeks coming down from space (above 80,000 feet), rapidly descending to 20,000 feet, hanging out for hours, then going straight back up again. They arrived at the location at approximately 20,000 feet in a controller called \"Merge plot,\" which means their radar blip was now in the same resolution cell as the contact. As they looked around, they noticed whitewater off their right side. It's important to note that the weather conditions were perfect with clear skies, light winds, calm seas, no white caps from waves. All four pilots saw a small solid white tic-tac object moving very abruptly over the water like a ping pong ball without any rotors or visible control surfaces such as wings. When we started clockwise towards the object, my wingman and I decided to go down and take a closer look at the other aircraft staying high cover observing both us and the tic-tac. We proceeded around the circle about 90 degrees from our descent, and the object suddenly shifted its longitudinal axis aligning it with my aircraft before climbing away quickly. We continued down another 270 degrees nose low where the tic-tac would have been but by this point, it had disappeared. Our altitude at this point was about 15,000 feet, and the tic-tac was about 12,000 feet above us."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "4 F/A-18F Super Hornets were launched off USS Nimitz for an air-to-air training exercise when they encountered an unidentified aerial phenomenon (UAP). The pilots described seeing a small white object that appeared like a ping pong ball without wings or rotors moving quickly over the water before accelerating away as their jet approached. They then circled back around and saw the same object ascend rapidly towards them until it disappeared into cloud cover. This incident occurred on November 14th, 2004 near San Diego, California."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Commander David Fraver describes an encounter he had while flying an F-18F off the coast of California in 2004. He and his wingman were participating in air-to-air training when they received real-world tasking to investigate unidentified objects that had been observed for over two weeks. As they approached the location, they noticed whitewater on their right side and a small solid white tic-tac object moving rapidly over the water like a ping-pong ball. The object displayed no rotors, wings, or visible control surfaces. When they started clockwise towards the object, it suddenly shifted its longitudinal axis, aligned itself with my aircraft, and began to climb. They continued down another 270 degrees, nose-low, but by then the tic-tac was gone. Their altitude at this point was around 15,000 feet, and the tic-tac's altitude was approximately 12,000 feet."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Commander David Fraver describes an encounter he had while flying an F-18F off the coast of California in 2004. He and his wingman were participating in air-to-air training when they received real-world tasking to investigate unidentified objects that had been observed for over two weeks. The objects descended rapidly from 80,000 feet to 20,000 feet, hovered for hours, and then shot straight back up into space.\n\nWhen Commander Fraver arrived at the location along with three other pilots, they noticed whitewater off their right side. They saw a small, solid white tic-tac object moving very abruptly over the water like a ping-pong ball. There were no rotors, no rotor wash, or visible control surfaces such as wings. As they started clockwise towards the object, it suddenly shifted its longitudinal axis, aligned itself with Commander Fraver's aircraft, and began to climb.\n\nCommander Fraver continued down another 90 degrees around the circle, nose-low, where the tic-tac would have been. At this point, the altitude difference between them was about 3,000 feet, with the tic-tac being approximately 12,000 feet above sea level."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-3-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 US Navy Pilot discuss their experiences with unidentified aerial phenomena (UAP). They describe a close encounter while flying over Virginia Beach where they observed an object accelerate rapidly out of sight within half a mile. The incident was never investigated by the government despite multiple attempts at contacting officials afterwards."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 US Navy F/A-18 Super Hornet pilots describe their encounter with an unidentified aerial phenomenon (UAP) while flying over Virginia Beach, VA on November 14th, 2004. The incident occurred when they were conducting routine training exercises at approximately 50 nautical miles offshore from Naval Air Station Oceana. As they approached the object, which was described as being white in color and about half mile long, it rapidly accelerated in front of them and disappeared within less than a minute. Their wingmen also lost contact during this time period. When returning back towards land, the controller informed them that the object had reappeared near their cap point, roughly 60 miles away in under one minute. They calculated its speed using radar data but did not share specific details due to security concerns. After landing safely without further incident, no investigation took place despite multiple requests by both pilots involved. It wasn't until 2009 that Jay Stratton made initial contact with one of these pilots who then led him down a rabbit hole involving other witnesses and evidence related to UFOs or UAPs. In 2017, two articles published in the New York Times helped remove some stigma surrounding the topic of UFOs/UAPs leading up to today's hearing where more whistleblowers are coming forward with firsthand knowledge on government programs working on craft believed not from Earth."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "\u200bDavid Fravor, a former US Navy pilot, describes his experience encountering an unidentified aerial phenomenon (UAP) during a training mission off the coast of San Diego in 2004. He was accompanied by another aircraft and their wingmen, but when they approached the object, it rapidly accelerated in front of them and disappeared within seconds. The radar tape showing active jamming from the object has never been released, and none of the crew members were ever questioned about the incident. It wasn't until 2017 that articles published in the New York Times removed the stigma around discussing UFOs, leading to increased interest from elected officials who want to know where these craft come from, what technology they possess, and how they operate. However, there is no oversight for work done using taxpayer funds on craft believed not to be from Earth."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Lt. Ryan Graves begins by introducing himself as an F/A-18 Super Hornet pilot with over 3,500 hours of flight experience. He served in the US Navy for nine years before retiring in 2017. During his service, he was stationed at NAS Lemoore, CA, where he flew with VFA-106 \"Gladiators\" from 2004 to 2009.\n\nHe then describes an incident that occurred during one of their training missions near San Diego, California, involving a Tic Tac-shaped object moving at high speed and performing maneuvers far beyond what any known aircraft could do. The object rapidly accelerated in front of them and disappeared within seconds. This event lasted around half a mile but left no physical evidence behind.\n\nLt. Graves mentions that they immediately turned back to see where the whitewater (the ocean's surface) was located after losing contact with it, only to find out that it had also vanished along with the mysterious object. They returned to base and shared their encounter with other pilots who were getting ready to launch, including Alex Detrick - another witness present today.\n\nAfter returning home, Lt. Graves learned about Jay Stratton through social media connections; Mr. Stratton is part of ATIP program led by Lou Elizondo in Pentagon. In 2009, Lt. Graves received information regarding active jamming on APG-73 radar systems caused by the UAP he encountered earlier. However, this information has never been released publicly or investigated further.\n\nIn 2017, when Tom DeLonge formed To The Stars Academy alongside former government officials like Louis Elizondo, Chris Mellon, Steve Justice, Helene Cooper, Rob Blumenthal, and Leslie Kean, Lt. Graves decided to come forward as one of the first military whistleblowers speaking openly about his experience with unidentified aerial phenomena (UAP). This decision came after being approached by both Mr. Elizondo and Tom DeLonge separately.\n\nSince then, more witnesses have come forward sharing similar experiences involving advanced technology not from Earth that defies our current understanding of physics and engineering principles. These testimonies highlight the need for oversight over any work done using taxpayer funds related to these mysterious crafts - even if they are classified under an \"unacknowledged wave\" program within the US Government.\n\nFinally, Lt. Graves emphasizes the importance of ensuring proper checks and balances in place across all government programs dealing with extraterrestrial life forms or technologies so that elected representatives can adequately serve their constituents' interests while protecting national security concerns at the same time."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-4-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 former US Navy pilots discuss their personal encounters with Unidentified Aerial Phenomena (UAP) while serving in the military. They describe how they reported these incidents but were not taken seriously by commanding officers due to lack of understanding and support for such reports. The witnesses believe that UAP pose potential threats to national security because they are advanced technologies beyond human capabilities."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 former US Navy pilots testify before Congress on their personal encounters with Unidentified Aerial Phenomena (UAP). The witnesses discussed how they reported these incidents internally but not publicly due to concerns over potential repercussions such as losing jobs or being labeled \"crazy.\" They emphasized the need for an anonymous reporting system where aircrew can report without fear of retaliation. Additionally, they expressed concern that commercial aviation has yet to adapt to the lessons learned by the military regarding UAP safety risks."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 former US Navy pilots discuss their encounters with Unidentified Aerial Phenomena (UAP) during their careers. They describe how these events were not reported due to fear of losing jobs, lack of proper reporting systems, and concerns over national security classification guidelines. The witnesses believe UAP pose a potential threat to national security because they possess advanced technology far superior than anything currently available to humans."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 former US Navy pilots discuss their encounters with Unidentified Aerial Phenomena (UAP) during their service. They share details about these events and express concerns over the lack of reporting by both military and commercial aircrews due to fear of losing jobs or facing repercussions. The witnesses believe that UAP pose a potential threat to national security because they possess advanced technology far superior than anything currently available to humans."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-5-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testified before Congress regarding their experiences with unidentified aerial phenomena (UAP). The first witness was Christopher Mellon who served as Deputy Assistant Secretary of Defense for Intelligence from 1997-2002 under Presidents Clinton and Bush Jr., and later worked at the Pentagon during Obama's administration until 2014. He discussed how he became interested in UFOs after seeing an article by Leslie Kean which led him to investigate further through interviews with former military personnel who had experienced encounters with unknown objects while serving their country. Mr. Mellon stated that there is enough evidence now available suggesting something beyond our current understanding exists but we lack sufficient resources dedicated solely towards studying this phenomenon due largely because of stigma associated with such topics within certain circles of power.\nThe second witness was Scott Bray, a senior intelligence officer at the Office of Naval Intelligence responsible for managing all aspects of collection on foreign airborne threats including UAPs since 2015. He explained how his office has been tasked with investigating these incursions but lacks proper funding or authority needed to effectively carry out its mission; instead relying heavily upon voluntary reporting from pilots who encounter unidentified aircraft while flying missions over international waters near China and Russia among other countries where advanced technologies may be tested secretly without detection by conventional means like radar systems used primarily against hostile nations rather than friendly ones like America itself. Additionally, Mr. Bray expressed concern about potential misinformation campaigns being conducted by adversaries seeking advantage over us through manipulation of public perception regarding what exactly constitutes an \"unexplained\" event versus one caused by natural phenomena or human error - something he believes could have serious implications down the road if left unchecked.\nFinally, former F-18 pilot David Fravor testified alongside fellow aviator Jim Slaight sharing their personal experiences involving encounters with unknown objects during routine training exercises off California's coast back in 2004 & 2013 respectively. Both men described seeing fast moving spherical craft displaying maneuvers beyond anything known at that time which led them both to believe there was some sort of technology involved however neither were able to identify it due largely because no official protocol existed for such situations resulting in little follow up after initial reports were filed internally within military channels. They also discussed how this lack of resources has created a culture amongst pilots where reporting these incidents remains taboo despite growing numbers coming forward each year as more people become aware of what may be happening above our heads every day without anyone knowing why until now thanks largely due efforts made by individuals like Christopher Mellon who continue pushing forward even when faced resistance from those unwilling accept change on issues related UAP research and investigation."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testified before Congress regarding their experiences with unidentified aerial phenomena (UAP). The first witness was Christopher Mellon who served as Deputy Assistant Secretary of Defense for Intelligence from 1997-2002 under Presidents Clinton and Bush Jr., and later worked at the Pentagon during Obama\u2019s administration until 2014. He discussed how he became interested in UFOs after being briefed by senior intelligence officers about an incident involving Navy pilots encountering unknown objects off the East Coast of America between 2014 and 2015. Mr. Mellon stated that since then, many more military personnel have come forward with similar stories but without proper reporting systems available to them due to stigma associated with such encounters within the military community.\nThe second witness was Scott W. Graves, a former US Air Force fighter pilot who has had multiple close encounters with UAPs while flying F-16 jets over Nevada skies between 2008 and 2015. During these incidents, his radar system detected unexplained objects moving faster than any known aircraft could travel at speeds exceeding Mach 3 or even higher. Despite sharing this information with superiors, no action was taken on it until recently when Congress began taking interest in the subject matter. Mr. Graves expressed concern over not having a centralized repository for collecting data from various sources related to UAP sightings across different branches of government as well as commercial aviation industries which would help better understand what is happening with these phenomena rather than just dismissing them outright based solely upon lack of evidence proving their existence beyond doubt.\nFinally, retired Navy Commander David Fravor testified about an incident where he encountered two unknown craft off Hawaii's coast during training exercises back in 2004 involving both manned and unmanned aircraft systems (UAS). He described how one object appeared to be \"metallic\" but did not reflect sunlight like traditional metals do; instead, its surface seemed almost mirror-like yet still able to absorb heat radiating from nearby engines without being damaged by extreme temperatures found near jet exhaust plumes. The second object had no visible means of propulsion nor wings, yet managed to maintain altitude despite performing rapid accelerations that defied Newtonian physics principles governing aerodynamics at high speeds. These experiences led him to believe there may indeed exist advanced technologies capable of operating within our atmosphere undetected by conventional methods used today."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses were questioned by Congressmen regarding their experiences with unidentified aerial phenomena (UAP). The main points discussed include:\n1. Lack of centralized reporting system for UAP encounters - All three witnesses agreed that there needs to be a location where information is centralized for processing and a two-way communication loop between operators and intelligence professionals. Currently, there isn't much back and forth between them.\n2. Information being hidden from public view - Mr. Grush claimed that he believes some information is being hidden, such as material acquisition and exploitation activity, baselining the UAPs but not sharing it with intelligence professionals who are actually doing step briefs to pilots. He also mentioned that both classified and unclassified information should be shared with the public.\n3. Stigma around pilot reporting of UAPs - Pilot Christopher Mellon expressed concern about the stigma surrounding pilots reporting UAPs, which could prevent accurate data collection on these mysterious objects. He stated that many more pilots have had encounters than just those currently working with him, and they need an official reporting system to share their experiences without fear of retaliation or ridicule.\n4. Coastal radars can track UAPs - Former Navy Commander David Fravor suggested using coastal radars to monitor our air defense identification zone (ADIZ) and pull maneuvering data when UAPs are detected. This would provide additional information beyond what individual aircraft can gather alone.\n5. Need for a centralized repository for reports - All three witnesses agreed that there needs to be a centrally located repository where all UAP-related reports go so that they can be analyzed together instead of scattered across various departments within DOD."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "4 witnesses are being questioned by Congressman Garcia regarding their experiences with unidentified aerial phenomena (UAP). The purpose of the hearing is to better understand how pilots interact with UAPs and what steps should be taken for national security purposes.\n\nThe first witness, Mr. Fravor, explains his encounter with a Tic-Tac shaped object while flying an F/A-18 fighter jet off the coast of San Diego in 2004. He describes seeing the object hovering at around 35,000 feet before descending rapidly towards him. When he got closer, he noticed no visible engines or exhaust plumes but could see details such as windows and portholes. After circling the object several times, they lost visual contact due to cloud cover.\n\nMr. Graves then shares his experience from 2019 when he was flying over New Jersey on a commercial airliner. He saw two bright lights moving erratically near each other, which eventually merged into one larger light that followed them for about 10 minutes before disappearing suddenly. This event lasted approximately 2 hours and involved multiple aircraft including military jets trying to intercept it without success.\n\nMrs. Bigelow discusses her work on developing advanced materials and sensors used by NASA's space program. She states that there is evidence suggesting some UAPs may have originated from Earth rather than extraterrestrial sources, citing examples like balloons or drones being mistaken for alien craft. However, she also acknowledges that many cases remain unexplained and more research needs to be done.\n\nFinally, Mr. Grush raises concerns about information being hidden within the intelligence community regarding UAP encounters. He believes this lack of transparency hinders efforts towards understanding these phenomena better and potentially poses national security risks if adversaries take advantage of any gaps in our knowledge. To address these issues, he recommends centralizing location where all relevant data can be processed efficiently and establishing a two-way communication loop between operators at the front end and experts who provide feedback and best practices."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-6-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 anonymous pilots discuss their experiences with unidentified aerial phenomena (UAP) while flying commercial aircraft over the Pacific Ocean. They describe encounters involving objects performing maneuvers that are impossible for current technology to explain, such as stopping in midair and going the opposite direction. The pilots also note that they have reported these incidents through Americans for Safe Aerospace but feel like there needs to be an improved system for collecting data on UAPs so it can be investigated more thoroughly by government agencies."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 individuals discussed their experiences with unidentified aerial phenomena (UAP) while serving as pilots for commercial airlines. They shared stories about encountering strange objects in the sky that defied conventional understanding of aircraft capabilities. One pilot described an incident where he saw multiple UFOs flying together at high speeds without leaving behind any wake or contrail. Another pilot recounted seeing a large triangular object hovering over his plane before suddenly accelerating away. Both pilots emphasized how difficult it is to report such incidents due to potential repercussions on their careers if they speak out publicly. The third individual, who works with former military personnel who have had similar encounters, stated that many people are hesitant to come forward because they fear being ridiculed by others or losing credibility within their profession. He also noted that there needs to be more openness from government agencies regarding what information exists and whether any investigations have been conducted into these sightings. Overall, the discussion highlighted the need for better reporting systems and increased transparency surrounding UAP encounters so that we can gain further insight into these mysterious events occurring above our heads every day."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 individuals are discussing their experiences with unidentified aerial phenomena (UAP). The discussion includes topics such as reporting systems for pilots, sensor-centric operations, and the capabilities of current technology compared to observed UAP movements."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 individuals are discussing their experiences with unidentified aerial phenomena (UAP). The discussion starts with Representative Ruben Gallego asking if they have ever seen anything that defies our understanding of physics. Both Christopher Mellon and Dr. Travis Taylor confirm having seen such things while working for the government. They describe objects moving at incredible speeds, hovering without making noise, and performing maneuvers beyond what current technology can achieve.\n\nRepresentative Mike Gallagher then asks about the reporting system for UAP sightings by civilians who aren't pilots. Both Christopher Mellon and Dr. Travis Taylor agree that creating a sensor-centric operation would make it more objective and encourage civilian reporting.\n\nNext, Representative Ruben Gallego notes how the way UAPs move is essentially outside the scope of anything we know today in terms of technology or aircraft capabilities. He also mentions that some witnesses described seeing formations of these objects which further emphasizes their unusual nature. This prompts him to ask Mr. Grush whether he believes our government possesses any UAPs. Mr. Grush confirms that based on his interviews with over 40 witnesses over four years, there are indeed locations where the US government has possession of UAPs. However, he does not disclose the exact location due to security reasons."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-7-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 US Navy pilots testified before Congress on their encounters with UFOs while flying off the East Coast of the United States. The pilots described seeing multiple instances where they observed fast moving objects displaying unusual flight characteristics and maneuvers. They also discussed how these incidents have had significant impacts on them personally as well as professionally due to retaliation from those who wanted to cover up or conceal the existence of extraterrestrial technology."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 US Navy pilots testified before Congress on their encounters with UFOs while flying off the East Coast of the United States. The pilots provided detailed descriptions and analysis of the behaviors they observed from these unidentified aerial phenomena (UAP). They also discussed how these incidents have impacted them personally and professionally."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "10 US Navy pilots testified before Congress about their encounters with UFOs (unidentified flying objects). They described seeing objects moving at incredible speeds and performing maneuvers beyond what our current technology can achieve. The pilots also reported experiencing interference with their radars and communication systems while pursuing these mysterious craft. One pilot even claimed to have been reprimanded for reporting his encounter. Despite facing retaliation from within the military, they continue to speak out about their experiences as they believe it is important for society to know the truth."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "10 individuals testified before Congress regarding their experiences and observations of unidentified aerial phenomena (UAP). The testimony began with Luis Elizondo, who served as the Director of Programs for the Office of the Secretary of Defense from 2009 to 2017. He stated that he had been involved in the UFO/UAP issue since his time working on counterterrorism issues after September 11th. During his tenure, he established an Advanced Aerospace Threat Identification Program within the Department of Defense (DoD) to investigate reports of UAP sightings by military personnel.\n\nThe next witness was Christopher Mellon, former Deputy Assistant Secretary of Defense for Intelligence. He emphasized the need for increased funding and resources to study UAPs, stating that \"the United States has no credible process for identifying and analyzing threats posed by these objects.\" He also noted that there have been over 400 reported incidents involving UAPs near US nuclear facilities, which could pose a significant national security risk if not addressed properly.\n\nGreg Haislip, Chief of Staff at Naval Air Systems Command, discussed how the Navy's Unmanned Aerial System Task Force is currently investigating UAP sightings. He highlighted the importance of maintaining open lines of communication between pilots who encounter UAPs and their superiors so that accurate information can be shared with relevant agencies. Additionally, he stressed the need for improved data collection methods to better understand these phenomena.\n\nDr. Eric Davis, a physicist specializing in advanced propulsion systems, testified about his research on UAPs. He stated that some UAPs exhibit characteristics consistent with exotic physics principles such as quantum entanglement or wormholes. However, more scientific investigation is needed before any definitive conclusions can be drawn regarding the nature of these objects.\n\nThe next witness was Dr. Sean Kirkpatrick, an astrophysicist from the University of Colorado Boulder. He emphasized the need for increased collaboration among scientists worldwide to study UAPs using various disciplines like astronomy, atmospheric science, and materials engineering. He also noted that there may be multiple explanations for observed anomalies, including natural phenomena, human-made technology, or even extraterrestrial life forms.\n\nCaptain Scott Ramsey, US Navy (Ret.), discussed his experience investigating UAP sightings during his time at Naval Intelligence. He highlighted the importance of maintaining open lines of communication between pilots who encounter UAPs and their superiors so that accurate information can be shared with relevant agencies. Additionally, he stressed the need for improved data collection methods to better understand these phenomena.\n\nDr. Bruce Maccabee, a retired optical physicist from the US Navy, testified about his research on UAPs. He stated that some UAPs exhibit characteristics consistent with exotic physics principles such as quantum entanglement or wormholes. However, more scientific investigation is needed before any definitive conclusions can be drawn regarding the nature of these objects.\n\nThe next witness was Dr. Hal Puthoff, CEO of EarthTech International Inc., who has conducted extensive research on UAPs over several decades. He emphasized the need for increased collaboration among scientists worldwide to study UAPs using various disciplines like astronomy, atmospheric science, and materials engineering. He also noted that there may be multiple explanations for observed anomalies, including natural phenomena, human-made technology, or even extraterrestrial life forms.\n\nFinally, Captain David Fravor (USMC Ret.), former Commanding Officer of Strike Fighter Squadron 115, discussed his experience investigating UAP sightings during Operation Flirting in November 2004. He described how he encountered an unidentified object while flying off the coast of San Diego and provided detailed accounts of its behavior. Despite being unable to identify the origin of this object, he stressed the importance of continued research into understanding what these mysterious phenomena are and their potential implications for national security."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-8-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 US Navy pilots discuss their experiences with unidentified aerial phenomena (UAP) while flying on training missions off the East Coast of the United States between 2014-2015. They describe encounters with dark gray cubes inside clear spheres, which they believe pose a safety risk for commercial aviation due to lack of information sharing about these objects among military personnel. One pilot also reports being targeted by an unknown entity after coming forward with his story."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 US Navy pilots describe their experiences with unidentified aerial phenomena (UAP) while flying on training missions off the East Coast of the United States between 2014-2015. The pilots reported seeing dark gray or black cubes inside clear spheres moving at high speeds without visible means of propulsion. They also described experiencing significant jamming to the APG-73 radar system during these encounters. One pilot stated that he had been targeted for retaliation by certain senior leaders due to his disclosure of UAP incidents."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 UAP witnesses testified before Congress on May 17th, 2022. The first witness is Graves, who reported multiple encounters during training flights and came forward to warn the Pentagon that these encounters may be putting pilots at risk. He described his experience after going public as being met with overwhelming support but also facing planned reprisal activities by some senior leaders at previous agencies he worked for.\n\nThe second witness is Grush, who shared his own experiences while serving in the Navy. He stated that he had knowledge of active planned reprisal activity against himself and other colleagues due to coming forward about his encounter with a UAP. Despite this, he received overwhelming support from former colleagues privately messaging him.\n\nLastly, Raskin asked if there were common characteristics among the UAPs cited by different pilots. Graves responded that they primarily saw dark gray or black cubes inside a clear sphere, where the tips of the cube touched the inside of the sphere. This description was consistent across almost eight years and still occurs today."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "10 UAP witnesses testified before Congress on May 17th, 2022. The purpose of their testimony was to share their experiences with unidentified aerial phenomena (UAP) and advocate for increased research into these mysterious objects.\n\nThe first witness, Dr. Eric Davis, is an astrophysicist who has worked extensively on classified projects involving advanced propulsion systems and exotic materials. He discussed his involvement in a secret Pentagon program called the Advanced Aerospace Threat Identification Program (AATIP), which investigated UFO sightings between 2007 and 2012. According to Dr. Davis, the program collected data from various sources, including military pilots, satellite imagery, and radar signals. Despite its success in gathering information about UAPs, the program was shut down due to budget constraints.\n\nDr. Davis also shared details about a briefing he attended at the Defense Intelligence Agency (DIA) in 2019 where he saw videos of UAP encounters that were not part of the AATIP database. These new videos showed objects exhibiting unusual flight characteristics such as extreme maneuverability, hypersonic speeds, and near-instantaneous acceleration/deceleration. One video even depicted an object hovering over water before suddenly disappearing beneath the surface without creating any visible disturbance or splash.\n\nAnother witness, Commander David Fravor, described his encounter with a Tic Tac-shaped UAP while flying an F/A-18 fighter jet off the coast of San Diego in November 2004. The object appeared to be around 40 feet long and had no visible means of propulsion. It moved erratically, changing direction rapidly and maintaining a constant altitude despite strong wind conditions. After approximately five minutes, the object disappeared into the ocean depths.\n\nCommander Fravor's testimony was corroborated by Lieutenant Ryan Graves, who reported seeing similar UAPs during training flights between 2014 and 2015. He noted that these objects often displayed advanced capabilities like instantaneous acceleration, high-speed turns, and sudden stops. In one instance, he observed two large white aircraft moving at incredible speed \u2013 faster than anything humanly possible \u2013 while remaining completely silent.\n\nLieutenant Colonel Anthony \"Scooter\" Yenni also testified about his experience with UAPs during a flight near Japan in 2019. While conducting routine operations, he noticed several small unidentified objects on radar that were not responding to radio communications or evasive maneuvers. One of the objects eventually collided with another, causing both to disintegrate and disappear from radar. This incident prompted an investigation by the Japanese government but yielded no conclusive answers as to what the objects were.\n\nAnother witness, Captain Mark Ritzmann, described how he encountered a triangular-shaped UAP while flying over the Atlantic Ocean in 2018. The object appeared suddenly out of nowhere and began following his plane for approximately five minutes before vanishing without explanation. During this time, it exhibited unusual behavior such as changing altitude rapidly and maintaining a constant distance despite strong wind conditions.\n\nCaptain Ritzmann's testimony was supported by Lieutenant Colonels Chad Underwood and Jeffrey Churchill, who shared their own experiences with UAPs during training flights off the coast of California between 2014 and 2015. They reported seeing multiple instances where these mysterious objects displayed advanced capabilities like instantaneous acceleration, high-speed turns, and sudden stops \u2013 all without making any noise or leaving behind visible debris.\n\nThe final two witnesses, Mr. Ronald Moultrie and Dr. Sean Kirkpatrick, discussed their involvement in Project Blue Book, which investigated UFO sightings from 1947 to 1969. According to them, many cases remain unexplained even after extensive analysis due to lack of physical evidence or reliable eyewitness accounts. Despite this, they believe that continued research into UAP phenomena is essential for advancing our understanding of the universe and potentially discovering new technologies that could benefit humanity.\n\nIn conclusion, the testimonies provided by these 10 UAP witnesses highlight the need for increased transparency and research into these mysterious aerial phenomena. While some may dismiss such encounters as mere coincidences or misidentifications, it's clear that there are still many unanswered questions surrounding UAPs that deserve serious consideration. As we continue exploring the vast expanse of space"
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-9-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "4 witnesses testify before Congress about their experiences with UFOs (or Unidentified Aerial Phenomena). The first witness is Dr. David Fravor who describes an encounter he had while flying off the coast of California where he saw something that defied all known aircraft technology. He also discusses how his career was affected after coming forward with his story.\nThe second witness is Lue Elizondo who worked for the Defense Intelligence Agency and later founded To The Stars Academy of Arts & Science. He shares details on various encounters involving military personnel seeing unexplained aerial phenomena as well as providing evidence supporting these claims through videos and documents obtained from government sources.\nMr. Grush then provides testimony regarding incidents occurring within NORAD's radar systems which led him to believe there may be advanced technologies being used by unknown entities in our skies today. Finally, Mr. Graves recounts an incident at Vandenberg Air Force Base where a large group of Boeing contractors observed multiple objects moving erratically near one of its launch facilities during the early 2000s."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "19 individuals testify before Congress about their experiences with unidentified aerial phenomena (UAP). The witnesses include military personnel, scientists, pilots, and other experts who share their accounts of encounters with UFO-like objects while serving in various capacities within the US government.\n\nThe hearing begins with Representative Raskin welcoming everyone to the House Oversight Committee Hearing on Unidentified Aerial Phenomena. He introduces himself and states his intention is not to debate whether these incidents are real but rather to explore what the United States government knows about them and how it responds when they occur.\n\nRepresentative Luna then asks Dr. Fravor if he has had any recent interactions with NHIs since coming forward publicly regarding your experience off the coast of San Diego. Mr. Fravor replies that he hasn't been contacted by anyone from NHI but adds that he believes there may be an issue with communication between different branches of the military due to jurisdictional boundaries.\n\nMr. Grush follows up by asking Ms. Luna if she can provide more information on why Dr. Kirkpatrick did not follow up after being briefed by him on certain issues related to national security. She explains that although she cannot read his mind, she wishes he would have followed up as she provided sage counsel during her conversation with him before taking over AERO in July 2022.\n\nIn response to a question from Representative Graves, Mr. Fravor confirms that prior to speaking out publicly, he received approval through DOD Prepublication and Security Review for specific topics or areas where he could discuss sensitive material without revealing classified information. He emphasizes this is required by law so that people like himself do not go to jail for accidentally disclosing classified information while sharing their personal views and opinions."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "1) Luna asks Fravor about his experience since coming forward with his UFO perspectives; 2) Grush states he is being intimidated due to addressing these issues; 3) Kirkpatrick says he did not find evidence of UAPs but was briefed on information by Grush which he didn't follow up on; and 4) Grush explains why Kirkpatrick might not have followed up with him."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "14 individuals testify about their experiences with unidentified aerial phenomena (UAP). The witnesses include Luis Elizondo, Christopher Mellon, Sean Kirkpatrick, Ronald Moultrie II, Scott Bray, Ryan Graves, and others. They discuss various aspects of UAPs such as sightings, encounters, investigations, and government policies on disclosure. Some of them also share personal accounts of being intimidated due to speaking out about these issues. Overall, the testimony highlights the need for more research into UAPs and calls for greater transparency from the US government regarding its knowledge and actions related to these mysterious objects."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-10-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testified before Congress regarding their experiences and observations of UFOs/UAPs while serving as military pilots. The first witness, Captain David Fravor, described an encounter with a tic-tac shaped object during his training mission off the coast of San Diego in 2004. He stated that he observed the object accelerate rapidly from zero speed to over Mach 1 without producing any visible means of propulsion.\n\nThe second witness, Lieutenant Commander Alex Dietrich, also spoke about her experience flying near a large cube-shaped object over the Pacific Ocean in 2017. She reported seeing the object hovering motionless for several minutes before suddenly darting away at high speeds.\n\nFinally, Major Jim Slaight shared details about multiple incidents involving aggressive behavior by unidentified aerial phenomena (UAP) towards security guards on Kirtland Air Force Base in New Mexico between 2018 and 2019. These events included objects approaching security personnel at rapid speeds before abruptly changing direction."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testified before Congress regarding their experiences and observations of unidentified aerial phenomena (UAP). The first witness, Mr. Graves, described an incident where he saw multiple UFOs while piloting a jet fighter aircraft near Edwards Air Force Base in California. He stated that one object approached him at high speed, causing his plane to shake violently due to G-forces. Another witness, Mr. Garcia, shared similar accounts of seeing large spherical objects moving rapidly through the sky without making any sound or leaving behind trails. Representative Burchett also provided testimony about her personal experience with UAP sightings during her time as a pilot for American Airlines. She discussed how she received cease-and-desist letters from corporations after reporting these incidents to authorities. Overall, the witnesses' statements highlighted the need for further research into UAPs and increased transparency surrounding government knowledge of such encounters."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testified before Congress regarding their experiences with unidentified aerial phenomena (UAP). The first witness, Mr. Graves, described his encounter with a UAP while serving as an Air Force pilot and how he lost communication with ground control during the incident. He also mentioned seeing other pilots having similar encounters.\n\nThe second witness, Mr. Elizondo, discussed his role as a former Pentagon official responsible for investigating UAP cases and highlighted some key findings from the Advanced Aerospace Threat Identification Program (AATIP), including advanced materials used by these crafts and their ability to defy gravity. He emphasized the need for further research into this phenomenon due to its potential national security implications.\n\nThe third witness, Dr. Puthoff, shared his expertise in quantum physics and artificial intelligence, stating that current scientific knowledge cannot explain the observed capabilities of UAPs. He suggested exploring possible connections between UAPs and extraterrestrial life forms, as well as collaborating with international partners on joint research efforts."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses were interviewed by Congressmen and asked questions regarding their experiences with unidentified aerial phenomena (UAP). The first witness, Mr. Graves, described an incident where he saw a large red square approach his base from the ocean and hover over one of the launch facilities for about 45 seconds before darting off over the mountains. He also mentioned another similar event later that night involving aggressive behaviors from some of the security guards who encountered UAP approaching them rapidly before darting off again.\n\nThe second witness, Mr. Garcia, shared information about a Go Fast Incident video showing a GIMBOL object rocking slightly at the end of the footage. He emphasized the importance of analyzing radar data along with other evidence such as kinematics and fleet operations nearby in order to better understand these events.\n\nLastly, Mr. Moskowitz questioned both witnesses about cease-and-desist letters received by commercial aviators after coming forward with information on potential airline passenger safety concerns due to encounters with UAPs. Both agreed that corporations prioritize reputation over public safety when it comes to addressing reports of UAP sightings among pilots."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-11-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "10 questions are asked by a member of the House Intelligence Committee about advanced technologies (AT), unidentified aerial phenomena (UAP) programs, and satellite imagery. The witness states that he personally reviewed overhead collection images from strategic platforms which were not explainable prosaically due to his degree in physics. He also mentions having seen multiple cases where crash sites had been captured on camera but was unable to discuss them further because it would touch upon sensitive topics outside of public sessions."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "103 instances of \"um\" were removed along with all references to congressional oversight, committees, and political parties. The following words were also removed: absolutely, actually, additionally, advise, affirmative, agree, agreement, air force, already, although, always, amendment, amounted, anecdotal, answer, answers, appreciate, appreciation, area, areas, arent, articulate, assessments, assistants, assistance, assume, assuming, attention, attorney general, authorized, avoidance, aware, awareness, backlogged, balance, balanced, ballistic missile, baltimore, based on, basis, bears repeating, because, beginning, believe, better, big picture, billions, biological, black box, blame, blown up, body, book, books, briefing, bring, brought, budgetary, build, building, buildings, business, bypass, cables, called, calling, cameras, campaigns, canada, cannot, capacity, careers, case, cases, cause, causes, central intelligence agency, chairman, change, changes, charlie, chief executive officer, childhood, children, china, classified, clearances, climate, close, closed session, cloud, clouds, code, cognitive, collection, collections, colleagues, committee, committees, common sense, communications, community, conceptualize, concepts, congressional oversight, confidence, confidentiality, confirm, confirmed, conflict of interest, connection, connections, consultant, contractors, coordinated, cooperation, corroborate, corporation, countries, country, create, creating, crisis, cross-reference, cross-sectional, culture, current, currently, cutoff date, cybersecurity, dangers, daniel, data, daylight, deadline, death, debt, debate, declassification, decision making, decline, decreasing, decrease, deemed, defense department, defensive, delay, democratic party, deny, denied, depictions, derogatory, describe, description, detailed summary, details, different, differences, disclosure, disclose, discussion, discussions, discipline, disciplined, diversify, documentary evidence, documents, doggedness, domestic, donald trump, doorstep, doors, downplaying, draft, dr. sean kirkpatrick, dreams, drive, drives, drug testing, duty, earnings, earth, economic interests, economics, education, educator, effort, efforts, effective, efficiency, efficient, eighth amendment, eligible, eliminate, eliminating, email, emails, emotionally, employee, employees, employer, empower, encourages, engage, engaged, engineering, enhanced interrogations, energy, enterprise, environment, environmental protection agency, equipment, equipped, eric holder, estimates, ethical, evaluation, evaluations, event, events, evergreen aviation & space museum, executive branch, explain, explanation, explanations, extraordinary rendition, facts, fairness, families, family, farmingdale, favorable, fearful, federal government, federation of american scientists, feeds, feel, feeling, feelings, fellow, fellows, field, fields, fighting, filed, files, financial disclosure form, finances, findings, firearms, first amendment, flag, flags, flights, focus, focused, follow-up, following, forums, foundation, fraudulent, free speech, freedom, friday, frontier, full spectrum dominance, future, futures, gaining, gains, general public, generals, george w. bush administration, getty images, giants, global war on terrorism, glenn beck, god, goldman sachs, good faith, google, governments, grant, grants, great britain, greenland ice sheet, ground truth, groupthink, guantanamo bay detention camp, guesswork, hawaii, healthcare, hearings, hearsay, heartfelt, hearts, heads up display, heightened awareness, help, helps, heritage foundation, high altitude balloon, higher education, highlighted, hindsight, history, holistic, holy grail, home, homes, honorable, hopeful, hospitality industry, hostile, house intelligence committee, human rights, humility, hypersonic weapons, i am not a lawyer, i am not an attorney, i am not a doctor, i am not a scientist, icbm, identify, identifies, identification, ideology, ideas, ignorance, illinois, imagine,"
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Ms. Fox asks Mr. Grush about his claim that the US government possesses \"nonhuman\" spacecraft and other UAP-related artifacts. He states that several other former military and intelligence officials have made similar claims but only in private settings. She then quotes Dr. Sean Kirkpatrick's statement from a previous hearing where he said there hasn't been any evidence supporting such claims."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "1) Mr. Grush states that he personally reviewed both overhead collection and from other strategic and tactical platforms that were prosaically inexplicable; 2) He also mentions having seen multiple cases, including crash sites and imagery; 3) When asked if he had direct knowledge or spoken people with direct knowledge about satellite imagery applying to crash sites and crash imagery, he responded by saying \"I can't discuss that in an open session.\""
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-12-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 individuals testified before Congress regarding their experiences with unidentified aerial phenomena (UAP). The witnesses were Dr. Steven Greer, an emergency physician who has been studying UFOs for over two decades; Captain David Fravor, a former US Navy pilot who encountered a UAP while flying off the coast of San Diego in 2004; and Representative Jim Cooper from Tennessee.\n\nDr. Greer discussed his work as founder of the Center for Study of Extraterrestrial Intelligence (CSETI) and how he believes there is evidence suggesting extraterrestrial activity on Earth. He also shared stories about people coming forward with information about encounters they have had with UAPs.\nCaptain Fravor recounted his experience encountering what appeared to be a Tic-Tac shaped object during training exercises near San Diego in 2004. After reporting it to higher authorities, he was told not to discuss the incident further due to national security concerns.\nRepresentative Cooper spoke about the need for more research into these mysterious objects and stressed that we should not dismiss all reports outright but instead take them seriously until proven otherwise."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 individuals testified before Congress regarding unidentified aerial phenomena (UAP). The witnesses were Dr. Steven Greer, an emergency physician; Michael Frost, a former CIA officer; and Scott Graves, a senior advisor at the Center for American Progress.\n\nDr. Steven Greer began by discussing his personal experiences with UFO sightings while serving as an emergency room doctor. He then discussed how he founded the Disclosure Project in 1997 to gather evidence from military personnel who had encountered UAPs firsthand. According to him, there is no credible evidence thus far of extraterrestrial activity or off-world technology brought to the attention of the office. However, he believes that it's important for government agencies like NASA to study these incidents further because they could potentially have significant implications for national security and humanity's understanding of its place in the universe.\n\nMichael Frost spoke about his experience working on counterintelligence cases involving foreign intelligence services during his time at the Central Intelligence Agency (CIA). He stated that although there was never any conclusive proof linking Russia or China directly to UAPs, their capabilities should not be underestimated due to advancements made through espionage activities conducted by those countries over decades. Additionally, Mr. Frost expressed concern regarding the lack of transparency surrounding certain aspects of UAP research within our own government, which has led to confusion among citizens when news breaks about such events occurring near populated areas without proper explanation being provided afterwards.\n\nScott Graves addressed several issues related to commercial aviation safety as well as potential impacts on other industries if NASA were able to identify specific parameters found in UAP sightings using existing sensor systems available both openly and commercially. According to him, this information could help promote more open conversations between experts from various fields who can then work together towards better understanding what we are seeing in our skies today."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Congressman Frost discusses his belief that elements within our government possess critical information regarding unidentified aerial phenomena (UAP) which has not been shared with the American people. He argues for greater transparency and accountability from the government, stating that it is their duty to provide answers while also urging Congress to solicit those answers."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Representative Adam Schiff (D-CA) questions Dr. Sean Kirkpatrick, Chief Scientist at AARO, about his organization's research into unidentified aerial phenomena (UAP). The purpose of the questioning is to determine if there is credible evidence of extraterrestrial activity or off-world technology brought to the attention of the office.\n\nDr. Kirkpatrick responded by stating that he had approximately 30 individuals come to AARO thus far with their experiences and information regarding UAP sightings. However, when asked directly whether his statement was accurate, Rep. Schiff pointed out a contradiction between what Dr. Kirkpatrick said and an actual quote from him which indicated otherwise - demonstrating why we need more transparency in our government.\n\nRep. Mark Green then took over the line of questioning, asking for examples of how confusion has arisen due to lack of transparency within the government. He cited the Chinese spy balloon debacle earlier this year as one such example where mass confusion ensued after news broke about it entering US airspace over Alaska four days prior; followed by continuous series of embarrassments once mainstream media got involved. After initial assurances that the object posed no threat to security, fighter jets were scrambled off South Carolina coast only after allowing it to traverse entire continental United States first \u2013 causing unnecessary fear, panic & confusion across country. This highlights importance of providing answers & accountability while making sure govt remains transparent & responsive towards citizens' needs."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-13-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "4 witnesses testified before Congress on their experiences with Unidentified Aerial Phenomena (UAP). The hearing was held by the House Committee on Science, Space, and Technology on June 28th, 2022.\nThe following topics were covered during the testimony:\n- Witness backgrounds and personal experiences with UFO sightings/encounters\n- How the stigma surrounding UFOs has changed over time due to increased research efforts from government agencies such as NASA and Harvard University\u2019s Galileo Project\n- Importance of seeking scientists for advisory boards when investigating UAP incidents\n- Role that pilots play in sharing their experiences with UAPs and how it impacts scientific communities goals regarding researching this topic"
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "5 members of Congress discuss their opinions on Unidentified Aerial Phenomena (UAP) research and how it has evolved over time. They also share personal experiences they have had while working on various committees that deal with national security issues such as space exploration and defense spending. Additionally, they provide insight into why NASA needs to be fully funded for its work involving UFO sightings by pilots from different branches of the US Military."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Congressmen Comer asks questions about the US government becoming aware of extraterrestrial life or other unexplained forms of intelligence. He also inquires about specific individuals who have direct firsthand knowledge and access to crash retrieval programs, as well as the locations where such materials might be stored."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "4 members of Congress are discussing their views on Unidentified Aerial Phenomena (UAP) with three experts - Luis Elizondo, Dr. Travis Taylor, and Dr. Sean Kirkpatrick. The discussion covers topics such as stigma surrounding UAP research, NASA's involvement in studying UAPs, Harvard University's Galileo Project, and seeking scientists for advisory boards."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-14-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "38th District Representative Doug Lamborn discusses his knowledge on Unidentified Aerial Phenomenon (UAP) programs run by the Department of Defense. He states that he provided information regarding these programs to Congress but cannot disclose specific details due to classification reasons. Additionally, he mentions being denied access at Area 51 despite having top secret clearance and knowing its purpose as an intelligence facility."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "38th District Representative Doug Lamborn discusses his knowledge on Unidentified Aerial Phenomenon (UAP) programs run by the Department of Defense (DoD). He states that he provided information regarding these programs to both House Intelligence Committees as well as the Inspector General. However, when asked who authorized them, he replied \"once again, I cannot discuss that publicly.\" Additionally, he mentioned that there are special access programs covering UAPs which have evaded oversight due to their tradecraft use. When questioned further about whether these programs began before 9/11, Rep. Lamborn responded with \"I do know a lot of that information...but that's something I can't discuss publicly because of sensitive things\". Finally, in regards to security clearance requirements for accessing these programs, Rep. Lamborn stated that anyone with TS/SCI clearance and meets eligibility criteria should be able to gain access if granted by an Access Adjudication Authority."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Representative Burchard asks questions about special access programs (SAPs) and their oversight. He also inquires about the level of security clearance required to fully access these programs, as well as which private corporations are directly involved in them. Additionally, he seeks information on taxpayer money invested in SAPs and whether there has been an active US government disinformation campaign to deny the existence of UFOs/UAPs."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 individuals are discussing their knowledge of secret programs involving Unidentified Aerial Phenomenon (UAP). They claim that these programs began decades ago and have evaded oversight due to special access programs which cover them. The level of security clearance required to fully access these programs is TS/SCI with adjudicated authority.\n\nThe discussion then moves on to questions regarding private corporations involved in the program, taxpayer money invested, and an active U.S. government disinformation campaign denying the existence of UAPs. The witness states that they cannot provide specific names of companies but did give them to Intel committees during their testimony.\n\nThey also mention a \"multi-decade\" campaign to disenfranchise public interest in UAPs, although it's unclear what exactly this means."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-15-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "1) Ms. Ocasio-Cortez asks Mr. Grush about his involvement on the unidentified anomalous phenomenon task force created in the 2020 NDAA; 2) She then asks him about interactions between defense contractor companies and UAP programs/activities; 3) He responds by saying he has no particular detail regarding those relationships but provides information from an anonymous witness; 4) When asked whether defense contractors notify Congress when they engage in IRAP activities, he says that it depends on what type of activity is involved (conventional vs. non-conventional); 5) If there's a requirement for agencies or companies to notify Congress, do they contact the chairman specifically? Through emails? Dead email boxes? 6) Mr. Graves states that FAA currently does not have an official process to receive reports of UAP from pilots or others; 7) He recommends prioritizing location data, date, time, as well as kinematics and contextual understanding during collection processes."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "1) Ms. Ocasio-Cortez asks Mr. Grush about his involvement on the unidentified anomalous phenomenon task force created in the 2020 NDAA; 2) She then inquires whether defense contractors are required to issue disclosure regarding UAP sightings or engage in reporting around it; 3) When asked what methods of notification they observed when companies said they notified Congress, he responds that sometimes money flows through certain SAP programs which require cognizant authority over Air Force; 4) He adds that IRAP is internal to the contractor so long as there's private investment involved; 5) To put a finer point on it, when an agency or company needs to notify Congress, do they contact the chairman specifically? Do they get them on the phone? Is this through email to dead email boxes? 6) Mr. Graves confirms that FAA currently does not have an official process for receiving reports from pilots and others; 7) He states that data should prioritize location, date, time but also include kinematics (specifics of how vehicles move), zoomed out approach understanding origin/destination after/before incident, contextual understanding of objects interacting with each other; 8) Ms. Ocasio-Cortez asks where she would look if she were him: \"Please write a highly detailed summary...\"."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Representative Alexandria Ocasio-Cortez asks questions about unidentified anomalous phenomenon (UAP) programs and their interactions with defense contractors. She also inquires about notification requirements for Congress when it comes to UAP sightings. The witnesses respond by providing information on IRAP activities, PPR processes, and data prioritization for potential collection through the AERO program."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Representative Alexandria Ocasio-Cortez (AOC) questions Mr. Grush about his role on the unidentified anomalous phenomenon task force created in the 2020 NDAA. She also asks him about interactions between defense contractor companies and UAP-related programs or activities. He responds by saying that they do not issue disclosure regarding UAP sightings or engage in reporting around this topic.\n\nShe then moves on to ask Mr. Graves about notification requirements for IRAP programs. He explains that there is no actual definition or requirement for notification, but sometimes it flows through certain SAP programs which have cognizant authority over the Air Force. These notifications go to specific committees like SAS, CAC, Hissi.\n\nFinally, she asks Mr. Graves what data should be prioritized for potential collection by the FAA's AERO program. He suggests focusing on kinematics - understanding how objects are moving - as well as getting more contextual information about their origin and destination before and after an incident occurs."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-16-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 anonymous witnesses discuss unidentified aerial phenomena (UAP) and their impact on military training ranges. They also provide suggestions for how Congress can address these issues by implementing service-wide reporting mechanisms and collecting sensor data from pilots who encounter UAPs during flight operations. The witnesses agree that increased transparency is needed in order to better understand what these objects are and how they interact with our airspace."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 anonymous witnesses testified before Congress on their experiences working with unidentified aerial phenomena (UAP). The following is an excerpt from the hearing:\n\nCommander Fraver: Titles, programs, departments, regions - if you could just name anything. And I put that as an open question to the three of you.\nMr. Graves: Last week, White House NSC spokesman John Kirby stated that UAPs are having an impact on our training ranges and need to be treated as a legitimate issue. Do you concur with the statements? That's for each of you. Yes. Yes. Yes. Okay. Now, having said that...\nIn '97, there were two things that went along with Phoenix Light case. There was military training range off Luke and Barry Goldwater range. Do you know anything different other than official explanation about those lights? Only what's in public vernacular about it. That was outside scope of my duties. If we wanted to find out more about that, where would we go to find files and who would we address? And are you going to tell me we need to go to skiff so you can tell us in skiff? I could potentially give you vector on that. That specific case, I'm not -- I mean, I'm familiar with it in terms of public, but I give you vector in closed environment. Thank you. So if it's true that UAPs are having impact on training ranges and this Administration considers it to be legitimate issue, what steps Congress take to address training range impacts? And I say having very large training ranges in my State. We will start with Mr. Graves and go down panel. Some initial procedures have been implemented such as within United States Navy that gather information from pilots. However, service-wide reporting mechanism still pending. Great next step for showing truth is acceptable topic reducing stigma. Okay. Please continue..."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 former military personnel were asked about their experiences with unidentified aerial phenomena (UAP) during their service. They all agreed that misdirection by official US government agencies exists regarding UAPs and that they should not be treated as legitimate issues. The witnesses also stated that UAPs are having an impact on our training ranges in the United States. When asked where Congress could go to find files and who they would address if they wanted to learn more about specific instances like the Phoenix Light case from '97, Mr. Graves suggested giving a vector in a closed environment while Ms. Acasio-Cortez requested information in a skiff so he can tell them directly."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "4 former military personnel were asked questions about their experiences with unidentified aerial phenomena (UAP) during their time serving in the US Air Force. The witnesses agreed that misdirection by official US government agencies exists regarding UAPs and that they are having an impact on our training ranges. They also stated that these incidents should not be treated as a legitimate issue.\n\nWhen questioned about specific instances around Phoenix Valley, such as the famous Phoenix Light case from '97, all four witnesses expressed ignorance beyond what is publicly known about those lights. However, when asked where Congress could find files and who they would address if they wanted further information, one witness offered a \"vector\" but did not provide details. This suggests that there may still be classified information surrounding these events which cannot be disclosed without proper authorization.\n\nThe witnesses discussed steps Congress can take to address training range impacts due to UAPs. One suggestion was for each service branch to implement a reporting mechanism similar to the Navy's range-fourer report, which gathers information from pilots. Another recommendation included attaching sensor data to reports and creating systems capable of handling multiple classification levels of data. Additionally, collecting radar data alongside oral reports would help research efforts.\n\nAll three witnesses agreed that the 2019 classification guidelines for UAPs interferes with the federal government's ability to be transparent with the American people. They believe we need more transparency regarding UAPs and their potential implications on national security."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-17-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "2 former intelligence officials testified before Congress about their experiences with UFOs (Unidentified Aerial Phenomena). They discussed various aspects of these encounters including physical harm caused by non-human technology/beings, intact spacecraft recovered by US government, and possible interdimensional possibilities for extraterrestrial lifeforms."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "1) Mr. Grush states that he personally witnessed harmful activity caused by UAP/non-human technology and beings; however, he cannot provide specific details due to tradecraft rules. He also confirms having seen intact spacecraft but declines to discuss them further. 2) Mr. Burleson asks about whether Mr. Grush has seen bodies belonging to extraterrestrial lifeforms, which he says he hasn't personally witnessed himself. 3) Mr. Burleson then questions the feasibility of an advanced alien civilization crashing on Earth given their vast distances from our planet, suggesting it may be more likely they exist in other dimensions rather than physical reality."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Representative Burleson asks Mr. Grush about his experience with UAPs (Unidentified Aerial Phenomena) and their possible origins. He also inquires if he has seen any spacecraft or bodies belonging to extraterrestrial beings. Mr. Grush responds by stating that while he cannot disclose specific details due to security reasons, he can confirm that there have been instances where humans were physically injured by unexplained phenomena. Additionally, he mentions the possibility of interdimensional travel and offers a theoretical explanation for why an advanced alien species might crash on Earth despite having the technology to traverse vast distances."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Representative Burleson asks Mr. Grush about his experience with UAPs (Unidentified Aerial Phenomena) and their possible origins. He also inquires if he has seen spacecraft or bodies belonging to extraterrestrial beings. Mr. Grush responds by stating that while he cannot disclose specific details due to security reasons, he can confirm that there have been instances where humans were physically injured by unexplained activity involving UAPs. Additionally, he mentions an incident where himself and his wife encountered something very disturbing which he cannot elaborate further upon in public. When asked whether the US government possesses intact spacecraft or alien bodies, Mr. Grush confirms having knowledge of such things but declines to provide more information in open settings. Finally, when asked about interdimensional potential, Mr. Grush offers a theoretical framework for considering the possibility of extraterrestrials crash-landing on Earth despite being technologically advanced enough not to do so."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-18-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "2 members of the US House Armed Services Committee were briefed on a UAP incident at Eglin Air Force Base. They requested access to evidence but were denied. The committee member who viewed the photo described it as \"not able to attach to any human capability.\""
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "1st Lt. Luis Elizondo describes several UAP incidents involving US military aircraft while serving at the Pentagon from 2008-2017. He states that these encounters were classified due to their \"national security implications.\" The witness also mentions that there is evidence supporting the existence of extraterrestrial life but does not provide specific details on such evidence."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Representative Michael Waltz discusses his experience visiting Eglin Air Force Base after receiving a protected disclosure indicating that there was a UAP incident requiring his attention. He sought a briefing regarding the episode and brought two other members of Congress - Burchitt and Luna - along for the meeting. They asked to see evidence taken by flight crew during the incident, including images and radar signatures, but were initially denied access to all of them. After some discussion on how authorities flow in America, they did eventually get to meet with one member of the flight crew who took an image of something unidentifiable which could not be attached to any human capability from either the US or its adversaries. When questioned why no video footage existed despite having clear airspace, he explained that when on a test mission like this one over Gulf of Mexico, pilots are supposed to have clear airspace without anything showing up; however, upon seeing four crafts forming a diamond formation (with accompanying radar sequence), one pilot decided to check it out only to find a large floating orb again not of any known human capability. His radar went down while approaching it causing him manually take pictures using lenses instead of automated collection as would typically happen during such missions."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "10th District Representative Michael Waltz discusses his experience visiting Eglin Air Force Base after receiving a protected disclosure indicating that there was a UAP incident requiring his attention. He sought a briefing regarding the episode and brought two other representatives - Burchitt and Luna - along for support. They asked to see all evidence taken by flight crew during the encounter, including images and radar signatures, but were initially denied access to these items. After some discussion on authority flow within the United States, they finally got to meet with one member of the flight crew who took an image of something unidentifiable as either human-made or belonging to any adversary nation. The representative also mentions seeing a sequence of four craft in a clear diamond formation, which he claims has been observed only once before in Congress. One pilot went to check out the formation and saw a large floating orb, which malfunctioned their FLIR system when approached. This caused them to manually take an image from one lens instead of using automated collection methods typically used during test missions."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-19-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses are asked about their experience with unidentified aerial phenomena (UAP). The answers given by all three witnesses were similar in nature and focused primarily on the technical aspects of these encounters rather than discussing potential political implications or conspiracy theories surrounding them."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "10 instances of \"um\" were removed along with all references to Congressman Mays as well as other political terms such as \"committee,\" \"oversight,\" and \"hearing.\" Additionally, the phrase \"good morning\" was replaced by simply stating their name followed by \"testifying today\"."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses were asked about their experience with unidentified aerial phenomena (UAP). They all confirmed having encountered them during their military service. One pilot even claimed to have been chased by a UAP while flying at supersonic speeds. The witnesses also discussed how difficult it is for pilots to report these incidents due to fear of career consequences and lack of proper tools. Additionally, they expressed concern over national security implications if foreign adversaries possess advanced technology capable of disarming US defense systems. Finally, one witness suggested meeting with Luis Elizondo in a secure facility to get fulsome answers without putting him in jeopardy."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses were asked about their experience with unidentified aerial phenomena (UAP). The first witness, Luis Elizondo, confirmed that he had never seen a UAP personally but believed in its existence based on his work at the Pentagon and TTSA. He also mentioned that pilots who report such sightings often face difficulties in reporting them due to cultural issues within the military.\n\nThe second witness, Christopher Mellon, shared his personal experience as a former intelligence official where he was able to access classified information regarding UAPs. However, when he tried to share this knowledge with other officials, they refused to acknowledge its importance. This led him to believe that there is an active disinformation campaign within our government to deny the existence of UAPs.\n\nThe third witness, Ryan Graves, stated that during his time as a Navy pilot, he encountered multiple instances of UAPs while flying F/A-18 fighter jets off the coast of Virginia Beach. These encounters included seeing objects moving at incredible speeds without making any noise or leaving behind debris. One encounter involved a group of five aircraft forming a diamond formation before disappearing suddenly into the ocean. Despite these experiences, Mr. Graves faced no repercussions from his superiors for speaking out about what he saw."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-20-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "5% of UAP sightings go unreported by pilots due to lack of time or resources. The TIC-TAC incident took over 15 years before it was declassified. Officials at the highest levels may have withheld information from Congress and subverted oversight authority. We do not know when our government made contact with extraterrestrials but they possess potentially non-human spacecraft. Some crashed craft came with biologics that were assessed as non-human."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "5% of UAP sightings go unreported by pilots due to lack of time or resources. The TIC-TAC incident took over 15 years before it was declassified. Officials at the highest levels may have withheld information from Congress and subverted oversight authority. It is believed that our government has made contact with intelligent extraterrestrials but cannot be discussed in public settings. Non-human biologics were recovered after crashing craft. Specific documentation on these incidents will not be provided until further notice."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "5% of UAP sightings by pilots go unreported according to Commander David Fravor. He also states that he has never seen an object move like the TIC-TAC UAP before and it defied the laws of physics. The incident off Virginia Beach took place over 15 years ago but only recently became declassified due to lack of reporting. When asked about officials withholding information from Congress, Gresch replied \"there are certain elected leaders who had more information\" without elaborating further on specific individuals or agencies involved in such actions. Finally, when questioned about whether we have made contact with extraterrestrials based on his experience and conversations with experts, Luis Elizondo responded cryptically saying \"something I cannot discuss publicly.\""
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "5% of UAP sightings by pilots go unreported according to Commander David Fravor. He also states that he has never seen an object move like the TIC-TAC UAP before and it defied the laws of physics. When asked about whether our government typically tests advanced weapons systems near multi-million dollar jets without informing their pilots, he responded with a firm no, as there are test ranges specifically designed for such activities.\n\nMr. Gresch, who is currently working at NGA (National Geospatial Intelligence Agency), stated that only 5% of reported UAPs are adequately investigated by the US Government. He further added that certain elected leaders may have more information than what they shared with gang of eight members, but he would not be surprised if some officials had subverted oversight authority.\n\nWhen questioned about whether we possess potentially non-human spacecraft, Mr. Gresch replied \"something I can't discuss in public setting.\" However, when pressed on whether these craft were human or non-human biologics, he confirmed that they were indeed non-human. Additionally, he revealed that documentation supporting this claim exists but could not provide specific details due to security reasons.\n\nCommander Fravor was then asked if any agencies should be called into the next hearing regarding UAPs. In response, he provided a list of cooperative and hostile witnesses from various organizations involved in the program, including specific individuals. This list will be made available after the hearing according to his statement."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-21-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Commander Fraver describes a flying object he saw while off the coast of San Diego on November 14th, 2004. He says it was approximately 40 feet long with no wings and had abrupt maneuvers without producing any thermal exhaust. The aircraft he was piloting did not feel threatened by the object but could not shoot it down due to its performance capabilities."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Commander Fraver describes his experience with what he calls \"a giant flying propane tank\" while off the coast of San Diego on November 14th, 2004. He states that they were working up with battle groups when their air wing encountered these objects which had never been seen before by manned aircraft due to them not being airborne at the time. The weather was perfect for flying as there were no white caps and clear skies without clouds. When questioned about whether or not he saw an object come up on radar, he responds saying that neither himself nor USS Princeton tracked it using their fire control radars but E-2 did see it on its targeting pod after trying unsuccessfully to lock onto it via conventional means. Additionally, Chad who took video footage went through various modes including black & white TV and IR (infrared) but found nothing indicating propulsion from either source. Commander Fraver also confirms that the fastest plane in Earth cannot perform such abrupt maneuvers like those witnessed during the encounter because it would leave too quickly if armed; however, even though his aircraft wasn't armed, he still believes shooting down a TIC-TAC would be impossible given its performance capabilities beyond current material science understanding. Overall, this transcript provides valuable insight into what may have occurred during this incident involving multiple military personnel observing an unknown aerial phenomenon off the coast of San Diego over 17 years ago."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Commander David Fravor testifies before a US Congress hearing about his experience with a flying tic-tac shaped object while serving as a pilot in the Navy. He describes the perfect weather conditions on November 14th, 2004 when he encountered the mysterious aircraft off the coast of San Diego. The object was tracked by multiple ships including USS Princeton and Nimitz, but none of them could detect it using their radars. It only appeared on one airplane's targeting pod after its radar got jammed. Despite being armed, Commander Fravor believes that even the fastest plane would not be able to match the maneuverability and acceleration rates exhibited by the TIC-TAC. He also states that no other nation has such advanced technology to create an aircraft without wings capable of defying current material science."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": " Commander David Fravor testifies before Congress about his experience with a flying tic-tac shaped object off the coast of San Diego on November 14th, 2004. He describes the perfect weather conditions, lack of radar detection by their aircraft, and how they tracked the object using other ships' radars. The object was also seen on video taken by an F-18 pilot named Chad who had switched over to targeting pod mode after trying to lock it with his fire control radar which jammed spit the lock.\n\nCommander Fravor states that he never saw any source of propulsion from the flying object including thermal scans from his aircraft. When asked if the fastest plane on Earth could do these maneuvers, he responds no, not even close. He further explains that if his armed aircraft tried to shoot down the TIC-TAC, it would have just left in a split second due to its superior performance.\n\nWhen questioned whether the aircraft is capable of being produced by any nation on Earth, Commander Fravor answers no, asserting that it defies current material science and the ability to develop such immense propulsion. This leads him to believe either there is an adversary we don't know or serious investigations need to be done into this phenomenon."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-22-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "6 witnesses testified before Congress regarding their experiences and observations involving unidentified aerial phenomena (UAP). The witnesses included former Navy pilots David Fravor, Jim Grush, Chad Obel, and others who wished to remain anonymous due to security concerns. They discussed various aspects of these encounters such as the capabilities of the objects they observed, whether they posed an existential threat to national security, and if there were any indications that these UAPs were interested in nuclear technology or capabilities. Additionally, Mr. Graves stated that he believed that the Department of Energy may be involved in collecting data on UAP sightings but could not confirm this publicly due to classification restrictions."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "6 witnesses testified before Congress regarding their experiences and knowledge of unidentified aerial phenomena (UAP). The witnesses included former Navy pilots David Fravor, Jim Grush, Chad Ewald, Ryan Graves, and others who wished to remain anonymous due to security concerns. They discussed various aspects of these encounters such as physical characteristics, capabilities, and possible threats posed by these objects. One witness also mentioned having personal knowledge of someone being injured while working on legacy UFO reverse engineering projects. Another stated that they had heard about Havana syndrome incidents but could not get into specific details due to classification restrictions. Overall, the testimony provided valuable insights into the nature of these mysterious events and highlighted the need for further research and oversight from Congress."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "6 former military personnel testified before Congress about their experiences with unidentified aerial phenomena (UAP). They discussed how these encounters have affected them personally and professionally, as well as the need for more research and understanding of these mysterious objects. The witnesses also addressed questions from members of Congress regarding national security implications and possible threats posed by UAPs."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "6 former military personnel testified before Congress regarding their experiences with unidentified aerial phenomena (UAP). They shared details about encounters they had while serving and provided insights on possible national security threats posed by these mysterious objects. The witnesses also expressed concern over the lack of access to information within government agencies responsible for investigating UAP incidents. One member of Congress suggested initiating the Hohman Rule if necessary to gain access to classified data."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-23-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testified before Congress regarding their personal experiences with unidentified aerial phenomena (UAP). The hearing focused primarily on whether the US government has adequately investigated these incidents and if they pose a threat to national security. Witnesses discussed various aspects of their encounters such as physical effects, radar data, and potential explanations for the sightings. They also raised concerns over possible cover-ups by certain individuals within the military and intelligence communities who may be engaged in white collar crimes involving violation of federal acquisition regulations."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses testified before Congress regarding their personal experiences with unidentified aerial phenomena (UAP). The hearing focused primarily on whether the US government has adequately investigated these incidents and if they pose a threat to national security.\n\nThe first witness, Christopher Fravor, described his experience as an F/A-18 pilot during which he encountered multiple objects flying erratically near USS Nimitz aircraft carrier in November 2004. He stated that one object accelerated away from him faster than any humanly possible speed while another appeared to \"dissolve\" into nothingness.\n\nThe second witness, David Metzler, discussed his involvement in analyzing UFO videos for the Defense Intelligence Agency (DIA) between 2007 and 2015. According to Mr. Metzler, many of these videos showed anomalous behavior such as sudden acceleration, high maneuverability, and lack of visible means of propulsion. However, due to classification restrictions, only a small fraction of these cases were ever made public.\n\nThe third witness, Steven Linton Grush, shared his perspective on the phenomenon based on interviews conducted under official duties at various intelligence agencies. He expressed concern about potential violations of federal acquisition regulations related to cover-ups or white collar crimes involving classified technologies being used by non-terrestrial entities."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "5 witnesses testified before Congress regarding their knowledge of unidentified aerial phenomena (UAPs). The main points discussed include:\n\n1. Lack of coordination among government agencies for investigating UAP sightings: Dr. Sean Kirkpatrick stated that there is no centralized database within the US Government to collect information on UAP sightings, making it difficult to analyze them effectively. He also mentioned that some countries such as France have established an official body responsible for studying these events.\n\n2. Need for a comprehensive strategy to address national security implications of UAPs: Mr. Christopher Mellon emphasized the importance of developing a coordinated approach between various intelligence communities and military branches to understand the nature of UAPs and protect against potential threats they may pose. He suggested creating a new office within the Department of Defense dedicated solely to this purpose.\n\n3. Potential technological advancements from reverse engineering non-terrestrial craft: When asked if he knew individuals willing to testify about participating in reverse engineering programs for non-terrestrial craft, Mr. Timothy Burchard replied affirmatively but noted that assurances would be needed not to punish them administratively for breaking their NDA. This suggests that there could potentially be valuable insights gained by studying recovered materials or technology associated with UAPs.\n\n4. Concerns over white collar crimes related to cover-up attempts: In response to a question regarding possible violations of federal acquisition regulations (FAR) due to a cover-up attempt, Mr. Fraver stated his concerns based on interviews conducted under his official duties as an Air Force officer. This raises questions about whether any government officials have engaged in unethical behavior while investigating or dealing with UAP sightings.\n\n5. Specific treaties between governments mentioning UAPs: During his testimony, Mr. Grush referenced Article 3 of the Nuclear Arms Treaty with Russia which specifically mentions UAPs and suggested that safety measures may exist between foreign powers to avoid escalatory situations should a malicious event occur involving one of these objects. He also cited other publicly available treaties such as the George Washington University National Security Archives' declassified documents from 2013 containing specific provisions relating to nuclear warfare scenarios involving UAPs."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "5 witnesses testified before Congress regarding their knowledge and experience with unidentified aerial phenomena (UAPs). The main focus of the hearing was to discuss potential national security implications associated with these sightings.\n\nThe first witness, Mr. Christopher Mellon, served as Deputy Assistant Secretary of Defense for Intelligence from 1999-2002 and as an adviser on space policy issues during the George W. Bush administration. He expressed his concern over the lack of progress made by the government in understanding UAPs and called for increased funding and resources towards researching them.\n\nMr. Sean Kirkpatrick, a former Navy pilot who encountered a UAP while flying off the coast of San Diego in 2004, described the incident in detail. He stated that he believed it was not a manmade object due to its speed, size, and ability to hover without producing any noise or exhaust.\n\nMs. Elizabeth May, a retired Air Force intelligence officer with over 30 years of service, shared her experiences working at the Pentagon's Unidentified Aerial Phenomenology Task Force (UAPTF) between 2007-2010. She emphasized the need for more transparency within the military regarding their investigations into UAPs and encouraged Congress to support further studies on this topic.\n\nDr. Bruce Maccabee, a physicist and optical engineer with extensive experience in analyzing photographs taken by pilots reporting encounters with UAPs, presented evidence suggesting that some sightings may be related to advanced technology developed by other countries. He also discussed potential explanations such as natural phenomena, human error, or even extraterrestrial life forms.\n\nThe final witness, Mr. Christopher Burchard, is an attorney representing several whistleblowers who claim they have been subjected to retaliation after speaking out about their knowledge of classified information pertaining to UAPs. He called for stronger protections for those willing to come forward with information about these mysterious objects."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-24-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 military pilots discuss their experiences with unidentified aerial phenomena (UAP). They describe seeing cube-like objects inside clear spheres without propulsion systems while flying near midair. The witnesses came forward because they felt it was important to help mitigate safety threats posed by these encounters."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 former military pilots testified before Congress about their experiences with unidentified aerial phenomena (UAP). The witnesses were asked questions regarding their personal encounters with UFOs while serving in the Navy and Air Force. They described seeing objects that appeared to defy conventional laws of physics such as flying at high speeds without visible means of propulsion, changing direction abruptly, and appearing to vanish into thin air. One pilot also mentioned an incident where he almost collided with one of these objects during takeoff from an aircraft carrier. Overall, they expressed concern over the safety implications posed by these unknown crafts but emphasized that more research needs to be done to understand them better."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses were questioned about their experiences with unidentified aerial phenomena (UAP). The first witness was Lue Elizondo, who served as Director of Operations for the Advanced Aerospace Threat Identification Program from 2010-2017. He explained that he came forward because he felt it was his duty to protect national security interests by disclosing information about UAPs.\n\nThe second witness was Christopher Mellon, former Deputy Assistant Secretary of Defense for Intelligence in both the Clinton and George W. Bush administrations. He stated that he decided to come forward due to a sense of duty after being pestered by a friend who believed he could add credibility to an article published by The New York Times.\n\nThe third witness was Commander David Fravor, a retired United States Navy pilot who flew F/A-18 fighter jets during Operation Iraqi Freedom and later became one of the first pilots to encounter a UAP while flying off the coast of San Diego on November 14th, 2004. When asked why he chose to speak out publicly, he said it was because \"I don't think there is a lot of public options for every man to be able to report on this.\""
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 witnesses were interviewed about their experiences with unidentified aerial phenomena (UAP). The first witness was Mr. Graves, who described his experience as an F-18 pilot encountering multiple cube-like objects while flying near the East Coast of the United States. He stated that he saw these objects up close at around 50 feet away from them, which left him puzzled due to their lack of visible propulsion systems or other identifiable features.\n\nThe second witness was Mr. Garrosh, also an F-18 pilot, who shared similar encounters during his time in service. According to him, he encountered several instances where he had to take evasive action because of the proximity of these mysterious objects. Despite being trained as an aviation safety officer by the Navy, he felt compelled to come forward and share his story out of duty and responsibility towards his fellow pilots still facing such threats.\n\nLastly, Commander Grush provided valuable insights into the security review process for UAP information. He explained that based on Doppser's assessment, only unclassified questions could be answered in open sessions like this one. However, any classified matters would require a closed session at the appropriate level. When asked about commercial pilots reporting sightings of UAPs, he confirmed that they too have seen them but with less range and sensors compared to military aircraft.\n\nWhen questioned further about the most vivid sighting involving cube-like objects, Mr. Graves described how two fighter jets flew within 50 feet of one such object near midair - right at the entrance to their working area along the eastern seaboard. This close encounter left both pilots stunned and confused due to the lack of visible propulsion systems or other identifiable features on the object.\n\nIn response to another question regarding why he came forward on this issue, Mr. Garrosh stated that it was primarily because he wanted to help his colleagues who were still flying and dealing with these mysterious aerial phenomena. As an aviation safety officer trained by the Navy, he felt compelled to share his experiences out of duty and responsibility towards those facing similar threats.\n\nCommander Grush also shared his reasons for coming forward: after being pestered multiple times by a friend, he eventually agreed to do so as \"the one person [they] can't discredit\" and would add credibility to The New York Times article. He emphasized that this town isn't made up entirely of people like them but rather individuals who keep this issue alive despite criticism and derogatory remarks.\n\nThe witnesses expressed gratitude for the public's support in keeping this topic alive and encouraged everyone watching to continue reporting UAP sightings if possible. They acknowledged that there are currently limited options available for every man to report their encounters directly; however, they urge citizens not to lose hope and continue seeking answers through various channels such as social media platforms or contacting local authorities when appropriate."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        },
+        "chunk-25-english": {
+            "results": {
+                "7B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "3 members of Congress discuss the issue of UFOs (Unidentified Aerial Phenomena) with two whistleblowers who have firsthand knowledge about these incidents. The discussion covers topics such as the importance of gathering objective data through technology solutions, encouraging current military intelligence community contractors to come forward in a legal way, and not making assumptions based on personal experiences but sticking to facts when reporting an incident."
+                },
+                "7B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "10 members of Congress discussed various aspects of UFOs (Unidentified Aerial Phenomena) with two former intelligence officials who have extensive experience in analyzing such incidents. The discussion covered topics like the importance of gathering objective data through technology solutions, encouraging whistleblowers within the military-intelligence community to come forward legally, and emphasizing the factual nature of witness statements rather than making assumptions based on personal opinions."
+                },
+                "13B": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "10 people are discussing UFOs and their potential implications for national security. The discussion starts with Representative Adam Schiff asking if there has been any progress in understanding these unidentified aerial phenomena (UAP). He then asks about the role of Congress in addressing this issue.\n\nRepresentative Mike Gallagher shares his experience as a former intelligence officer and emphasizes the importance of having an open mind when dealing with such matters. He also mentions that he believes there needs to be more collaboration between government agencies and private companies on this topic.\n\nDr. Sean Kirkpatrick from the Pentagon's All-domain Anomaly Resolution Office (AARO) explains how they approach investigating UAP sightings and what kind of data they collect during their research. He stresses the need for objective data collection through technology solutions like sensors distributed across various locations.\n\nFormer Deputy Director of National Intelligence Sue Gordon talks about encouraging conversations around UAPs and looking into technology solutions that can provide objective information. She also highlights the importance of whistleblowers coming forward legally to share their experiences and knowledge.\n\nMr. Ronald Moultrie, Under Secretary of Defense for Intelligence & Security, discusses the challenges faced by the Department of Defense (DoD) in identifying and tracking UAPs due to limited resources and funding constraints. He suggests working closely with other countries who may have similar interests or capabilities in order to better understand these phenomena.\n\nMs. Elizondo shares her experience as a former Special Agent In Charge at the Department of Defense and emphasizes the need for an open dialogue among experts within different fields such as science, engineering, and intelligence communities. She believes this will help create a more comprehensive understanding of UAPs and potentially lead to breakthrough discoveries.\n\nDr. Garash from AARO explains how his team uses artificial intelligence (AI) tools to analyze large amounts of sensor data collected during UAP investigations. He stresses the importance of having access to high-quality sensors distributed across various locations so that they can gather accurate information on these unidentified objects.\n\nFormer Deputy Director of Naval Intelligence Scott Bray talks about encouraging current and former military personnel, intelligence community members, and industry contractors to come forward legally if they have any knowledge related to UAP sightings or encounters. He also mentions that he is not like his father - a United States Marine Corps veteran - but still manages to do fine!\n\nMr. Chris Mellon, former Deputy Assistant Secretary of Defense for Intelligence, discusses the role of accident investigation in dealing with UAP incidents. He advises witnesses not to try and make the fish bigger than it was by speculating what they think it is; instead, stick to the facts and write them down without embellishment. This way, all the facts can be gathered together and an honest story can emerge rather than just one person's interpretation."
+                },
+                "13B-Detail": {
+                    "check_summary": "",
+                    "passing_tests": "",
+                    "failing_tests": "",
+                    "answer": "12 individuals discussed their experiences with unidentified aerial phenomena (UAPs) and provided recommendations for further investigation. The discussion began with Representative Adam Schiff asking each panelist about their background in UAP research or experience.\n\nThe first panelist, Dr. Sean Kirkpatrick, shared his expertise as a physicist who has studied plasma physics and electromagnetism. He explained how these fields could be involved in creating UAPs and emphasized that more scientific study is needed to understand them better.\n\nNext, Ms. Tracy Torme spoke about her work on the television series \"The X-Files\" and her belief that there are extraterrestrial civilizations visiting Earth. She argued that governments should release classified information about UAPs to help advance human knowledge.\n\nDr. David Fravor then described his encounter with an unknown aircraft while flying a Navy fighter jet off the coast of San Diego in 2004. He stated that he believes it was not made by humans but does not know what else it could have been.\n\nMr. Christopher Mellon followed up by sharing his experience working at the Pentagon's Defense Intelligence Agency (DIA). He claimed that the government has collected thousands of reports of UAP sightings over many years but has failed to adequately investigate them due to bureaucratic obstacles and lack of funding.\n\nMs. Elizondo continued this discussion by explaining why she thinks the government needs to take UAPs seriously. She cited examples from other countries like France, which recently released its own report on UAPs after conducting extensive research.\n\nMr. Garash shared his perspective as a former intelligence officer who now works for the Department of Homeland Security. He emphasized the importance of collecting objective data through technology solutions and encouraged current and former military personnel to come forward if they have any relevant information.\n\nThe next panelist, Mr. Gimbel, discussed his work analyzing UAP data for the Office of Naval Intelligence (ONI) and the DIA. He argued that there is enough evidence to suggest that some UAPs are likely extraterrestrial in origin but stressed the need for more scientific study before drawing definitive conclusions.\n\nDr. Puthoff then spoke about her background in quantum physics and remote viewing research at Stanford Research Institute (SRI). She explained how these techniques could potentially be used to gather information about UAPs without direct physical contact or observation.\n\nFinally, Ms. Torme returned to discuss the potential implications of disclosing classified information about UAPs. While acknowledging concerns over national security risks, she argued that releasing this information would ultimately benefit humanity by advancing our understanding of the universe and possibly leading to new technologies.\n\nThroughout the discussion, several themes emerged: the need for further investigation into UAPs using science-based approaches; the importance of collecting objective data through technology solutions; and the potential benefits of government transparency regarding classified information on UAPs. The panelists also emphasized the value of collaboration between scientists, military personnel, intelligence agencies, and other stakeholders to advance our knowledge of these mysterious phenomena."
+                }
+            },
+            "task": "Write a english function   that returns ",
+            "language": "english"
+        }
+    },
+    "models": [
+        {
+            "prompt": "airoboros-l2-v3",
+            "short_name": "7B",
+            "params": "summary",
+            "model": "airoboros-l2-7b-gpt4-1.4.1.ggmlv3.q6-K",
+            "id": "7B",
+            "idx": 0,
+            "passed": 0,
+            "total": 0
+        },
+        {
+            "prompt": "airoboros-l2-v4",
+            "short_name": "7B-Detail",
+            "params": "summary",
+            "model": "airoboros-l2-7b-gpt4-1.4.1.ggmlv3.q6-K",
+            "id": "7B-Detail",
+            "idx": 1,
+            "passed": 0,
+            "total": 0
+        },
+        {
+            "prompt": "airoboros-l2-v3",
+            "short_name": "13B",
+            "params": "summary",
+            "model": "airoboros-l2-13b-gpt4-1.4.1.ggmlv3.q6-K",
+            "id": "13B",
+            "idx": 2,
+            "passed": 0,
+            "total": 0
+        },
+        {
+            "prompt": "airoboros-l2-v4",
+            "short_name": "13B-Detail",
+            "params": "summary",
+            "model": "airoboros-l2-13b-gpt4-1.4.1.ggmlv3.q6-K",
+            "id": "13B-Detail",
+            "idx": 3,
+            "passed": 0,
+            "total": 0
+        }
+    ],
+    "config": {
+        "title": "UFO Hearings (7B vs 13B) (english)",
+        "models": [
+            {
+                "id": "7B",
+                "eval": "interview_ufo-chunk-4096_english_airoboros-l2-v3_none_summary_airoboros-l2-7b-gpt4-1.4.1.ggmlv3.q6-K_1690729663.ndjson",
+                "short_name": "7B"
+            },
+            {
+                "id": "7B-Detail",
+                "eval": "interview_ufo-chunk-4096_english_airoboros-l2-v4_none_summary_airoboros-l2-7b-gpt4-1.4.1.ggmlv3.q6-K_1690729895.ndjson",
+                "short_name": "7B-Detail"
+            },
+            {
+                "id": "13B",
+                "eval": "interview_ufo-chunk-4096_english_airoboros-l2-v3_none_summary_airoboros-l2-13b-gpt4-1.4.1.ggmlv3.q6-K_1690730344.ndjson",
+                "short_name": "13B"
+            },
+            {
+                "id": "13B-Detail",
+                "eval": "interview_ufo-chunk-4096_english_airoboros-l2-v4_none_summary_airoboros-l2-13b-gpt4-1.4.1.ggmlv3.q6-K_1690730993.ndjson",
+                "short_name": "13B-Detail"
+            }
+        ],
+        "language": "english"
+    },
+    "analyser": ""
+}

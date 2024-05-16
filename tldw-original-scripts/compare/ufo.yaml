@@ -1,0 +1,14 @@
+title: UFO Hearings (7B vs 13B)
+models:
+  - id: 7B
+    eval: interview_ufo-chunk-4096_english_airoboros-l2-v3_none_summary_airoboros-l2-7b-gpt4-1.4.1.ggmlv3.q6-K_1690729663.ndjson
+    short_name: 7B
+  - id: 7B-Detail
+    eval: interview_ufo-chunk-4096_english_airoboros-l2-v4_none_summary_airoboros-l2-7b-gpt4-1.4.1.ggmlv3.q6-K_1690729895.ndjson
+    short_name: 7B-Detail
+  - id: 13B
+    eval: interview_ufo-chunk-4096_english_airoboros-l2-v3_none_summary_airoboros-l2-13b-gpt4-1.4.1.ggmlv3.q6-K_1690730344.ndjson
+    short_name: 13B
+  - id: 13B-Detail
+    eval: interview_ufo-chunk-4096_english_airoboros-l2-v4_none_summary_airoboros-l2-13b-gpt4-1.4.1.ggmlv3.q6-K_1690730993.ndjson
+    short_name: 13B-Detail
