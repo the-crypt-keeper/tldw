@@ -6,17 +6,22 @@ import logging
 import os
 import platform
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
 from typing import List, Tuple, Optional
 import zipfile
+from datetime import datetime
+from typing import List, Tuple
+from typing import Optional
 
 import gradio as gr
 import requests
+from SQLite_DB import *
+import tiktoken
 import unicodedata
 import yt_dlp
-
 # OpenAI Tokenizer support
 from openai import OpenAI
 from tqdm import tqdm
@@ -32,6 +37,7 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #
 # Config Loading
 # System Checks
+# DB Setup
 # Processing Paths and local file handling
 # Video Download/Handling
 # Audio Transcription
@@ -309,7 +315,47 @@ def download_ffmpeg():
 #######################################################################################################################
 
 
-#######################################################################################################################
+########################################################################################################################
+# DB Setup
+#
+#
+global db
+db = Database()
+# setup DB
+create_tables()
+
+# DB Functions
+#     create_tables()
+#     add_keyword()
+#     delete_keyword()
+#     add_keyword()
+#     add_media_with_keywords()
+#     search_db()
+#     format_results()
+#     search_and_display()
+#     export_to_csv()
+#     is_valid_url()
+#     is_valid_date()
+
+# Currently supported items are documents, 'video' and articles, need to change 'video' to 'audio transcripts'
+# FIXME - need to integrate above functions into script so that DB is used for keyword storage and retrieval and search
+#        functionality for tags and media items is available in the UI
+# FIXME - also need to integrate the DB functions into the main processing functions so that the DB is updated with the results
+#        of the processing
+# FIXME - need to integrate the DB functions into the summarization functions so that the results are stored in the DB
+#        and can be retrieved later
+# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can search the DB for previous results
+# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can export the results of a search to a CSV file
+# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can add keywords to the DB
+# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can delete keywords from the DB
+# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can add media items to the DB
+
+#
+#
+########################################################################################################################
+
+
+########################################################################################################################
 # Processing Paths and local file handling
 #
 #
@@ -1455,6 +1501,10 @@ def format_file_path(file_path, fallback_path=None):
         return None
 
 
+
+
+
+
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
 
@@ -1520,7 +1570,7 @@ def launch_ui(demo_mode=False):
             # Function to toggle visibility of advanced inputs
             def toggle_ui(mode):
                 visible = (mode == "Advanced")
-                return [visible] * len(inputs)
+                return [gr.update(visible=visible)] * len(inputs)
 
             # Set the event listener for the UI Mode toggle switch
             ui_mode_toggle.change(fn=toggle_ui, inputs=ui_mode_toggle, outputs=inputs)
@@ -1546,17 +1596,70 @@ def launch_ui(demo_mode=False):
                             "information including API keys."
             )
 
-        with gr.Tab("Transcription & Summarization History"):
-            gr.Markdown("Plan to put access to SQLite DB here")
-            gr.Markdown("Allow for searching/retrieval/re-prompting of previous transcriptions")
-            gr.Markdown("Also allow for re-transcribing videos if they're still online, while updating/adding to prior entry")
+        with gr.Tab("Scrape & Summarize Articles/Websites"):
+            gr.Markdown("Plan to put for for ingesting articles/websites here")
+            gr.Markdown("Will scrape page and store into SQLite DB")
             gr.Markdown("RAG here we come....:/")
 
-        with gr.Accordion("Open for More!", open=False):
-            gr.Markdown("Plan to put Prompt Samples/Templates down here")
+        with gr.Tab("Ingest & Summarize Documents"):
+            gr.Markdown("Plan to put ingestion form for documents here")
+            gr.Markdown("Will ingest documents and store into SQLite DB")
+            gr.Markdown("RAG here we come....:/")
 
-        iface.launch(share=False)
+        with gr.Tab("Sample Prompts/Questions"):
+            gr.Markdown("Plan to put Sample prompts/questions here")
+            gr.Markdown("Fabric prompts/live UI?")
 
+    # Gradio interface setup with tabs
+    search_tab = gr.Interface(
+        fn=search_and_display,
+        inputs=[
+            gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
+            gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"]),
+            gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
+            gr.Number(label="Page", value=1, precision=0)
+        ],
+        outputs=gr.Dataframe(label="Search Results"),
+        title="Search Media Summaries",
+        description="Search for media (documents, videos, articles) and their summaries in the database. Use keywords for better filtering.",
+        live=True
+    )
+
+    export_tab = gr.Interface(
+        fn=export_to_csv,
+        inputs=[
+            gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
+            gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"]),
+            gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
+            gr.Number(label="Page", value=1, precision=0),
+            gr.Number(label="Results per File", value=1000, precision=0)
+        ],
+        outputs="text",
+        title="Export Search Results to CSV",
+        description="Export the search results to a CSV file."
+    )
+
+    keyword_tab = gr.Interface(
+        fn=add_keywords,
+        inputs=gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here..."),
+        outputs="text",
+        title="Add Keywords",
+        description="Add multiple keywords to the database."
+    )
+
+    delete_keyword_tab = gr.Interface(
+        fn=delete_keyword,
+        inputs=gr.Textbox(label="Delete Keyword", placeholder="Enter keyword to delete here..."),
+        outputs="text",
+        title="Delete Keyword",
+        description="Delete a keyword from the database."
+    )
+
+    # Combine interfaces into a tabbed interface
+    tabbed_interface = gr.TabbedInterface([iface, search_tab, export_tab, keyword_tab, delete_keyword_tab], ["Transcription + Summarization", "Search", "Export", "Add Keywords", "Delete Keywords"])
+
+    # Launch the interface
+    tabbed_interface.launch()
 
 #
 #
@@ -1569,7 +1672,9 @@ def launch_ui(demo_mode=False):
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
          download_video_flag=False, demo_mode=False, custom_prompt=None, overwrite=False,
          rolling_summarization=None, detail=0.01):
+
     global summary, audio_file
+
     if input_path is None and args.user_interface:
         return []
     start_time = time.monotonic()
@@ -1771,7 +1876,7 @@ if __name__ == "__main__":
     parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
     parser.add_argument('-log', '--log_level', type=str, default='INFO',
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
-    parser.add_argument('-ui', '--user_interface', action='store_true', help="Launch the Gradio user interface")
+    parser.add_argument('-gui', '--user_interface', action='store_true', help="Launch the Gradio user interface")
     parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
     parser.add_argument('-prompt', '--custom_prompt', type=str,
                         help='Pass in a custom prompt to be used in place of the existing one.\n (Probably should just '
@@ -1787,6 +1892,8 @@ if __name__ == "__main__":
     # parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
 
+    # Logging setup
+    logger = logging.getLogger(__name__)
     logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 
     custom_prompt = args.custom_prompt
