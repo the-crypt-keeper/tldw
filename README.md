@@ -6,23 +6,7 @@
 
 
 
-```mermaid
-%%{ init : { "theme" : "forest", "flowchart" : { "curve" : "stepBefore" }}}%%
-graph TD
-    A[Get YouTube URL] --> B[Attempt to download subtitle]
-    B -->|Fail| C[Attempt to download auto-generated subtitle]
-    B -->|Success| D[Process subtitles]
-    C -->|Fail| E[Abort process]
-    C -->|Success| D[Process subtitles]
-    D --> F[Clean subtitles by removing timestamps, duplicates, and escape characters]
-    F --> G[Check if prompt length > 1000 tokens]
-    G -->|Yes| H[Split prompt into n chunks]
-    H --> I[Submit each chunk to ChatGPT, append each output and process until all chuncks are done]
-    G -->|No| J[Submit entire prompt to ChatGPT and wait for completion]
-    I --> K[Combine and process ChatGPT responses]
-    J --> K[Process ChatGPT response]
-    K --> L[Print results]
-```
+
 
 
 ### What is TL/DW?
