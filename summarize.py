@@ -406,7 +406,7 @@ def process_local_file(file_path):
 #
 
 def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
-                download_video, download_audio, chunk_size):
+                download_video, download_audio, chunk_size, question):
     video_file_path = None
     print("API Name received:", api_name)  # Debugging line
     try:
@@ -1473,6 +1473,7 @@ def summarize_with_huggingface(api_key, file_path, custom_prompt):
         print(f"Error occurred while processing summary with huggingface: {str(e)}")
         return None
 
+
     # FIXME
     # This is here for gradio authentication
     # Its just not setup.
@@ -1508,8 +1509,49 @@ def format_file_path(file_path, fallback_path=None):
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
 
+    def ask_question(transcription, summary, question, api_name, api_key):
+        if question.strip() == "":
+            return "Please enter a question."
+
+        prompt = f"Transcription:\n{transcription}\n\nGiven the above transcription, please answer the following:\n\n{question}"
+
+        # FIXME - Refactor main API checks so they're their own function - api_check()
+        # Call api_check() function here
+
+        if api_name.lower() == "openai":
+            openai_api_key = api_key if api_key else config.get('API', 'openai_api_key', fallback=None)
+            headers = {
+                'Authorization': f'Bearer {openai_api_key}',
+                'Content-Type': 'application/json'
+            }
+            data = {
+                "model": openai_model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that answers questions based on the given transcription and summary."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "max_tokens": 150,
+                "temperature": 0.7
+            }
+            response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+
+            if response.status_code == 200:
+                answer = response.json()['choices'][0]['message']['content'].strip()
+                return answer
+            else:
+                return "Failed to process the question."
+        else:
+            return "BZZZZT. WRONG QUESTION. Try again."
+
     with gr.Blocks() as iface:
         with gr.Tab("Audio Transcription + Summarization"):
+
             with gr.Row():
                 # Light/Dark mode toggle switch
                 theme_toggle = gr.Radio(choices=["Light", "Dark"], value="Light",
@@ -1559,7 +1601,15 @@ def launch_ui(demo_mode=False):
             inputs = [num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
                       api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input]
 
-            # Function to toggle Light/Dark Mode
+            outputs = [
+                gr.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
+                gr.Textbox(label="Summary or Status Message (Current status of Summary or Summary itself)"),
+                gr.File(label="Download Transcription as JSON (Download the Transcription as a file)"),
+                gr.File(label="Download Summary as Text (Download the Summary as a file)"),
+                gr.File(label="Download Video (Download the Video as a file)"),
+                gr.File(label="Download Audio (Download the Audio as a file)")
+            ]
+
             def toggle_light(mode):
                 if mode == "Dark":
                     return """
@@ -1658,14 +1708,6 @@ def launch_ui(demo_mode=False):
             # Combine URL input and inputs
             all_inputs = [url_input] + inputs
 
-            outputs = [
-                gr.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
-                gr.Textbox(label="Summary or Status Message (Current status of Summary or Summary itself)"),
-                gr.File(label="Download Transcription as JSON (Download the Transcription as a file)"),
-                gr.File(label="Download Summary as Text (Download the Summary as a file)"),
-                gr.File(label="Download Video (Download the Video as a file)"),
-                gr.File(label="Download Audio (Download the Audio as a file)")
-            ]
 
             gr.Interface(
                 fn=process_url,
@@ -1674,6 +1716,15 @@ def launch_ui(demo_mode=False):
                 title="Video Transcription and Summarization",
                 description="Submit a video URL for transcription and summarization. Ensure you input all necessary "
                             "information including API keys."
+            )
+
+            # Add the question input and button below the main interface
+            question_textbox = gr.Textbox(label="Insert Questions about the Transcription Here", lines=3)
+            question_button = gr.Button("Submit Question")
+            question_button.click(
+                fn=ask_question,
+                inputs=[outputs[0], outputs[1], question_textbox, api_name_input, api_key_input],
+                outputs=gr.Textbox(label="Answer")
             )
 
         with gr.Tab("Scrape & Summarize Articles/Websites"):
