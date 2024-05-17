@@ -169,19 +169,21 @@ def delete_keyword(keyword: str) -> str:
 
 
 # Function to add multiple keywords
-def add_keyword(keyword: str) -> int:
-    keyword = keyword.strip().lower()
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        try:
-            cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
-            cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-            keyword_id = cursor.fetchone()[0]
-            cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
+def add_keyword(keyword):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM keywords WHERE keyword = ?", (keyword,))
+            result = cursor.fetchone()
+            if result:
+                return result[0]  # Return the existing keyword ID
+            cursor.execute("INSERT INTO keywords (keyword) VALUES (?)", (keyword,))
             conn.commit()
-            return keyword_id
-        except sqlite3.Error as e:
-            raise DatabaseError(f"Error adding keyword: {e}")
+            return cursor.lastrowid  # Return the new keyword ID
+    except sqlite3.Error as e:
+        logging.error(f"Error adding keyword: {e}")
+        raise DatabaseError(f"Error adding keyword: {e}")
+
 
 
 # Function to add media with keywords
@@ -200,18 +202,21 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
     if ingestion_date and not is_valid_date(ingestion_date):
         raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")
 
-    keyword_list = [kw.strip().lower() for kw in keywords.split(',')]
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
+
+            # Insert media item
             cursor.execute('''
             INSERT INTO Media (url, title, type, content, author, ingestion_date) 
             VALUES (?, ?, ?, ?, ?, ?)
             ''', (url, title, media_type, content, author, ingestion_date))
             media_id = cursor.lastrowid
 
-            # Insert keywords
+            # Insert keywords and associate with media item
+            keyword_list = keywords.split(',')
             for keyword in keyword_list:
+                keyword = keyword.strip().lower()
                 keyword_id = add_keyword(keyword)
                 cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
             cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))

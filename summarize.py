@@ -100,38 +100,8 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #######################
 # DB Setup
 
-# Create tables
-create_tables()
+# Handled by SQLite_DB.py
 
-
-# Custom exceptions
-class DatabaseError(Exception):
-    pass
-
-
-class InputError(Exception):
-    pass
-
-
-# Database connection function with connection pooling
-class Database:
-    def __init__(self, db_name=None):
-        self.db_name = db_name or os.getenv('DB_NAME', 'media_summary.db')
-        self.pool = []
-        self.pool_size = 10
-
-    @contextmanager
-    def get_connection(self):
-        conn = self.pool.pop() if self.pool else sqlite3.connect(self.db_name, check_same_thread=False)
-        try:
-            yield conn
-        except sqlite3.Error as e:
-            raise DatabaseError(f"Database error: {e}")
-        finally:
-            self.pool.append(conn)
-
-
-db = Database()
 #######################
 
 
@@ -447,7 +417,7 @@ def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
 
-def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video, download_audio, detail_level, question_box):
+def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video, download_audio, detail_level, question_box, keywords):
     # Validate input
     if not url:
         return "No URL provided.", "No URL provided.", None, None, None, None, None, None
@@ -461,6 +431,7 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
     video_file_path = None
 
     try:
+        # Instantiate the database, db as a instance of the Database class
         db = Database()
         media_url = url
 
@@ -469,7 +440,7 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
 
         results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model,
                        offset=offset, vad_filter=vad_filter, download_video_flag=download_video,
-                       custom_prompt=custom_prompt)
+                       custom_prompt=custom_prompt, keywords=keywords)
         if not results:
             return "No URL provided.", "No URL provided.", None, None, None, None, None, None
 
@@ -482,10 +453,6 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
         audio_file_sanitized = sanitize_filename(transcription_result['audio_file'])
         json_file_path = audio_file_sanitized.replace('.wav', '.segments_pretty.json')
         summary_file_path = audio_file_sanitized.replace('.wav', '_summary.txt')
-
-        # Non-sanitized
-        #json_file_path = transcription_result['audio_file'].replace('.wav', '.segments_pretty.json')
-        #summary_file_path = transcription_result['audio_file'].replace('.wav', '_summary.txt')
 
         logging.debug(f"Transcription result: {transcription_result}")
         logging.debug(f"Audio file path: {transcription_result['audio_file']}")
@@ -519,26 +486,24 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
         try:
             db = Database()
             media_url = url
-            media_title = transcription_result['title'] if 'title' in transcription_result else 'Untitled'
             media_type = "video"
             media_content = transcription_text
-            # FIXME - Need to add the ability to add custom keywords in the Gradio UI
-            # FIXME - And if no keywords are provided, use 'default' and 'no_keyword_set' as the keywords
-            media_keywords = ', '.join(custom_prompt.split()) if custom_prompt else "default"
-            media_author = "auto_generated"
-            media_url = url
+            keyword_list = keywords.split(',') if keywords else ["default"]
+            media_keywords = ', '.join(keyword_list)
+            logging.info(f"Adding media keywords to the database: {media_keywords}")
             media_title = transcription_result['title'] if 'title' in transcription_result else 'Untitled'
+            logging.info(f"Adding media to the database: {media_title}")
+            media_author = "auto_generated"
             media_ingestion_date = datetime.now().strftime('%Y-%m-%d')
             add_media_with_keywords(media_url, media_title, media_type, media_content, media_keywords, media_author,
                                     media_ingestion_date)
-
         except Exception as e:
             logging.error(f"Failed to add media to the database: {e}")
 
-            if summary_file_path and os.path.exists(summary_file_path):
-                return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None#audio_file_path
-            else:
-                return transcription_text, summary_text, json_file_path, None, video_file_path, None#audio_file_path
+        if summary_file_path and os.path.exists(summary_file_path):
+            return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None#audio_file_path
+        else:
+            return transcription_text, summary_text, json_file_path, None, video_file_path, None#audio_file_path
     except Exception as e:
         logging.error(f"Error processing URL: {e}")
         return str(e), 'Error processing the request.', None, None, None, None
@@ -1705,13 +1670,18 @@ def launch_ui(demo_mode=False):
             # FIXME - Hide unless advance menu shown
             detail_level_input = gr.Slider(minimum=0.01, maximum=1.0, value=0.01, step=0.01, interactive=True,
                                            label="Summary Detail Level (Slide me) (WIP)", visible=False)
-            question_box_input = gr.Textbox(label="Question", placeholder="Enter a question to ask about the transcription", visible=False)
+            keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated Example: "
+                                                                      "tag_one,tag_two,tag_three)", value="default,no_keyword_set",visible=True)
+            question_box_input = gr.Textbox(label="Question",
+                                            placeholder="Enter a question to ask about the transcription",
+                                            visible=False)
             #question_button = gr.Button("Submit Question")
             #question_answer = gr.Textbox(label="Answer")
 
 
             inputs = [num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
-                      api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input, question_box_input]
+                      api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input,
+                      question_box_input, keywords_input]
 
             outputs = [
                 gr.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
@@ -1812,13 +1782,13 @@ def launch_ui(demo_mode=False):
             # Function to toggle visibility of advanced inputs
             def toggle_ui(mode):
                 visible = (mode == "Advanced")
-                return [gr.update(visible=visible) if i not in [2, 4, 5] else gr.update(visible=True) for i in
+                return [gr.update(visible=visible) if i not in [2, 4, 5, 11] else gr.update(visible=True) for i in
                         range(len(inputs))]
 
             # Set the event listener for the UI Mode toggle switch
             ui_mode_toggle.change(fn=toggle_ui, inputs=ui_mode_toggle, outputs=inputs)
 
-            # Combine URL input and inputs
+            # Combine URL input and inputs lists
             all_inputs = [url_input] + inputs
 
             gr.Interface(
@@ -1908,7 +1878,7 @@ def launch_ui(demo_mode=False):
 #
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
          download_video_flag=False, demo_mode=False, custom_prompt=None, overwrite=False,
-         rolling_summarization=None, detail=0.01):
+         rolling_summarization=None, detail=0.01, keywords=None):
     global summary, audio_file
 
     if input_path is None and args.user_interface:
