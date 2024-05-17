@@ -1524,10 +1524,10 @@ def launch_ui(demo_mode=False):
 
             # Inputs to be shown or hidden
             num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)",
-                                           visible=True)
+                                           visible=False)
             whisper_model_input = gr.Dropdown(choices=whisper_models, value="small.en",
                                               label="Whisper Model(This is the ML model used for transcription.)",
-                                              visible=True)
+                                              visible=False)
             custom_prompt_input = gr.Textbox(
                 label="Custom Prompt (Customize your summarization, or ask a question about the video and have it "
                       "answered)",
@@ -1539,38 +1539,118 @@ def launch_ui(demo_mode=False):
                             "output your bullet point summary inside <bulletpoints> tags.",
                 lines=3, visible=True)
             offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
-                                     visible=True)
+                                     visible=False)
             api_name_input = gr.Dropdown(
                 choices=[None,"huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
                 value=None,
                 label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
             api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
                                        placeholder="Enter your API key here; Ignore if using Local API or Built-in API", visible=True)
-            vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False, visible=True)
+            vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False, visible=False)
             download_video_input = gr.Checkbox(
-                label="Download Video(Select to allow for file download of selected video)", value=False, visible=True)
+                label="Download Video(Select to allow for file download of selected video)", value=False, visible=False)
             download_audio_input = gr.Checkbox(
                 label="Download Audio(Select to allow for file download of selected Video's Audio)", value=False,
-                visible=True)
+                visible=False)
             # FIXME - Hide unless advance menu shown
-            detail_level_input = gr.Slider(minimum=0.0, maximum=1.0, value=0.1, step=0.1, interactive=True,
-                                           label="Summary Detail Level (Slide me) (WIP)", visible=True)
+            detail_level_input = gr.Slider(minimum=0.01, maximum=1.0, value=0.01, step=0.01, interactive=True,
+                                           label="Summary Detail Level (Slide me) (WIP)", visible=False)
 
             inputs = [num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
                       api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input]
 
             # Function to toggle Light/Dark Mode
             def toggle_light(mode):
-                dark = (mode == "Dark")
-                return {"__theme": "dark" if dark else "light"}
+                if mode == "Dark":
+                    return """
+                    <style>
+                        body {
+                            background-color: #1c1c1c;
+                            color: #ffffff;
+                        }
+                        .gradio-container {
+                            background-color: #1c1c1c;
+                            color: #ffffff;
+                        }
+                        .gradio-button {
+                            background-color: #4c4c4c;
+                            color: #ffffff;
+                        }
+                        .gradio-input {
+                            background-color: #4c4c4c;
+                            color: #ffffff;
+                        }
+                        .gradio-dropdown {
+                            background-color: #4c4c4c;
+                            color: #ffffff;
+                        }
+                        .gradio-slider {
+                            background-color: #4c4c4c;
+                        }
+                        .gradio-checkbox {
+                            background-color: #4c4c4c;
+                        }
+                        .gradio-radio {
+                            background-color: #4c4c4c;
+                        }
+                        .gradio-textbox {
+                            background-color: #4c4c4c;
+                            color: #ffffff;
+                        }
+                        .gradio-label {
+                            color: #ffffff;
+                        }
+                    </style>
+                    """
+                else:
+                    return """
+                    <style>
+                        body {
+                            background-color: #ffffff;
+                            color: #000000;
+                        }
+                        .gradio-container {
+                            background-color: #ffffff;
+                            color: #000000;
+                        }
+                        .gradio-button {
+                            background-color: #f0f0f0;
+                            color: #000000;
+                        }
+                        .gradio-input {
+                            background-color: #f0f0f0;
+                            color: #000000;
+                        }
+                        .gradio-dropdown {
+                            background-color: #f0f0f0;
+                            color: #000000;
+                        }
+                        .gradio-slider {
+                            background-color: #f0f0f0;
+                        }
+                        .gradio-checkbox {
+                            background-color: #f0f0f0;
+                        }
+                        .gradio-radio {
+                            background-color: #f0f0f0;
+                        }
+                        .gradio-textbox {
+                            background-color: #f0f0f0;
+                            color: #000000;
+                        }
+                        .gradio-label {
+                            color: #000000;
+                        }
+                    </style>
+                    """
 
             # Set the event listener for the Light/Dark mode toggle switch
-            theme_toggle.change(fn=toggle_light, inputs=theme_toggle, outputs=None)
+            theme_toggle.change(fn=toggle_light, inputs=theme_toggle, outputs=gr.HTML())
 
             # Function to toggle visibility of advanced inputs
             def toggle_ui(mode):
                 visible = (mode == "Advanced")
-                return [gr.update(visible=visible)] * len(inputs)
+                return [gr.update(visible=visible) if i not in [2, 4, 5] else gr.update(visible=True) for i in range(len(inputs))]
 
             # Set the event listener for the UI Mode toggle switch
             ui_mode_toggle.change(fn=toggle_ui, inputs=ui_mode_toggle, outputs=inputs)
