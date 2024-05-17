@@ -6,7 +6,23 @@
 
 
 
-
+```mermaid
+%%{ init : { "theme" : "forest", "flowchart" : { "curve" : "stepBefore" }}}%%
+graph TD
+    A[Get YouTube URL] --> B[Attempt to download subtitle]
+    B -->|Fail| C[Attempt to download auto-generated subtitle]
+    B -->|Success| D[Process subtitles]
+    C -->|Fail| E[Abort process]
+    C -->|Success| D[Process subtitles]
+    D --> F[Clean subtitles by removing timestamps, duplicates, and escape characters]
+    F --> G[Check if prompt length > 1000 tokens]
+    G -->|Yes| H[Split prompt into n chunks]
+    H --> I[Submit each chunk to ChatGPT, append each output and process until all chuncks are done]
+    G -->|No| J[Submit entire prompt to ChatGPT and wait for completion]
+    I --> K[Combine and process ChatGPT responses]
+    J --> K[Process ChatGPT response]
+    K --> L[Print results]
+```
 
 
 ### What is TL/DW?
@@ -40,11 +56,11 @@ GUI
 
 
 ### Quickstart
-  1. Install Python3 for your platform
+  1. Install Python3 for your platform - https://www.python.org/downloads/
   2. Create a virtual env: `python -m venv .\`
   3. Launch/activate your virtual env: `. .\scripts\activate.ps1`
   4. `pip install -r requirements.txt` - may take a bit of time...
-  5. You're Ready to Go! Check out the below sample commands: 
+  5. **You are Ready to Go!** Check out the below sample commands: 
 
 - **Transcribe audio from a Youtube URL:**
   * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
