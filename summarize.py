@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import platform
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -360,11 +361,6 @@ def download_ffmpeg():
 # DB Setup
 #
 #
-global db
-db = Database()
-# setup DB
-create_tables()
-
 
 # DB Functions
 #     create_tables()
@@ -447,42 +443,98 @@ def process_local_file(file_path):
 # Video Download/Handling
 #
 
-def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
-                download_video, download_audio, chunk_size, question):
-    video_file_path = None
+def sanitize_filename(filename):
+    return re.sub(r'[<>:"/\\|?*]', '_', filename)
+
+
+def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video, download_audio, detail_level, question_box):
+    # Validate input
+    if not url:
+        return "No URL provided.", "No URL provided.", None, None, None, None, None, None
+
+    if not is_valid_url(url):
+        return "Invalid URL format.", "Invalid URL format.", None, None, None, None, None, None
+
     print("API Name received:", api_name)  # Debugging line
+
+    logging.info(f"Processing URL: {url}")
+    video_file_path = None
+
     try:
+        db = Database()
+        media_url = url
+
         results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model,
                        offset=offset, vad_filter=vad_filter, download_video_flag=download_video,
                        custom_prompt=custom_prompt)
-        if results:
-            transcription_result = results[0]
+        if not results:
+            return "No URL provided.", "No URL provided.", None, None, None, None, None, None
 
-            json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-            prettified_json_file_path = transcription_result['audio_file'].replace('.wav', '.segments_pretty.json')
+        transcription_result = results[0]
+        transcription_text = json.dumps(transcription_result['transcription'], indent=2)
+        summary_text = transcription_result.get('summary', 'Summary not available')
 
-            summary_file_path = json_file_path.replace('.segments.json', '_summary.txt')
+        # Prepare file paths for transcription and summary
+        # Sanitize filenames
+        audio_file_sanitized = sanitize_filename(transcription_result['audio_file'])
+        json_file_path = audio_file_sanitized.replace('.wav', '.segments_pretty.json')
+        summary_file_path = audio_file_sanitized.replace('.wav', '_summary.txt')
 
-            json_file_path = format_file_path(json_file_path)
-            prettified_json_file_path = format_file_path(prettified_json_file_path, fallback_path=json_file_path)
+        # Non-sanitized
+        #json_file_path = transcription_result['audio_file'].replace('.wav', '.segments_pretty.json')
+        #summary_file_path = transcription_result['audio_file'].replace('.wav', '_summary.txt')
 
-            summary_file_path = format_file_path(summary_file_path)
+        logging.debug(f"Transcription result: {transcription_result}")
+        logging.debug(f"Audio file path: {transcription_result['audio_file']}")
 
-            if download_video:
-                video_file_path = transcription_result['video_path'] if 'video_path' in transcription_result else None
+        # Write the transcription to the JSON File
+        try:
+            with open(json_file_path, 'w') as json_file:
+                json.dump(transcription_result['transcription'], json_file, indent=2)
+        except IOError as e:
+            logging.error(f"Error writing transcription to JSON file: {e}")
+        # Write the summary to the summary file
+        with open(summary_file_path, 'w') as summary_file:
+            summary_file.write(summary_text)
 
-            formatted_transcription = format_transcription(transcription_result)
+        if download_video:
+            video_file_path = transcription_result['video_path'] if 'video_path' in transcription_result else None
 
-            summary_text = transcription_result.get('summary', 'Summary not available')
+        # Check if files exist before returning paths
+        if not os.path.exists(json_file_path):
+            raise FileNotFoundError(f"File not found: {json_file_path}")
+        if not os.path.exists(summary_file_path):
+            raise FileNotFoundError(f"File not found: {summary_file_path}")
+
+        formatted_transcription = format_transcription(transcription_result)
+
+        # FIXME - Dead code?
+        #summary_text = transcription_result.get('summary', 'Summary not available')
+
+        # Add media to the database
+        try:
+            db = Database()
+            media_url = url
+            media_title = transcription_result['title'] if 'title' in transcription_result else 'Untitled'
+            media_type = "video"
+            media_content = transcription_text
+            # Convert custom_prompt to comma-separated string
+            media_keywords = ', '.join(custom_prompt.split()) if custom_prompt else "default"
+            media_author = "auto_generated"
+            media_ingest_date = datetime.now().strftime('%Y-%m-%d')
+            add_media_with_keywords(media_url, media_title, media_type, media_content, media_keywords, media_author,
+                                    media_ingest_date)
+
+        except Exception as e:
+            logging.error(f"Failed to add media to the database: {e}")
 
             if summary_file_path and os.path.exists(summary_file_path):
-                return formatted_transcription, summary_text, prettified_json_file_path, summary_file_path, video_file_path, None
+                return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None#audio_file_path
             else:
-                return formatted_transcription, summary_text, prettified_json_file_path, None, video_file_path, None
-        else:
-            return "No results found.", "Summary not available", None, None, None, None
+                return transcription_text, summary_text, json_file_path, None, video_file_path, None#audio_file_path
     except Exception as e:
-        return str(e), "Error processing the request.", None, None, None, None
+        logging.error(f"Error processing URL: {e}")
+        return str(e), 'Error processing the request.', None, None, None, None
 
 
 def create_download_directory(title):
@@ -1544,13 +1596,18 @@ def format_file_path(file_path, fallback_path=None):
         logging.debug(f"File does not exist: {file_path}. No fallback path available.")
         return None
 
+def search_media(query, fields, keyword, page):
+    try:
+        results = search_and_display(query, fields, keyword, page)
+        return results
+    except Exception as e:
+        logger.error(f"Error searching media: {e}")
+        return str(e)
 
-def launch_ui(demo_mode=False):
-    whisper_models = ["small.en", "medium.en", "large"]
-
-    def ask_question(transcription, summary, question, api_name, api_key):
-        if question.strip() == "":
-            return "Please enter a question."
+# FIXME - Change to use 'check_api()' function - also, create 'check_api()' function
+def ask_question(transcription, question, api_name, api_key):
+    if not question.strip():
+        return "Please enter a question."
 
         prompt = f"Transcription:\n{transcription}\n\nGiven the above transcription, please answer the following:\n\n{question}"
 
@@ -1580,13 +1637,17 @@ def launch_ui(demo_mode=False):
             }
             response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
 
-            if response.status_code == 200:
-                answer = response.json()['choices'][0]['message']['content'].strip()
-                return answer
-            else:
-                return "Failed to process the question."
+        if response.status_code == 200:
+            answer = response.json()['choices'][0]['message']['content'].strip()
+            return answer
         else:
-            return "BZZZZT. WRONG QUESTION. Try again."
+            return "Failed to process the question."
+    else:
+        return "Question answering is currently only supported with the OpenAI API."
+
+
+def launch_ui(demo_mode=False):
+    whisper_models = ["small.en", "medium.en", "large"]
 
     with gr.Blocks() as iface:
         with gr.Tab("Audio Transcription + Summarization"):
@@ -1637,17 +1698,21 @@ def launch_ui(demo_mode=False):
             # FIXME - Hide unless advance menu shown
             detail_level_input = gr.Slider(minimum=0.01, maximum=1.0, value=0.01, step=0.01, interactive=True,
                                            label="Summary Detail Level (Slide me) (WIP)", visible=False)
+            question_box_input = gr.Textbox(label="Question", placeholder="Enter a question to ask about the transcription", visible=False)
+            #question_button = gr.Button("Submit Question")
+            #question_answer = gr.Textbox(label="Answer")
+
 
             inputs = [num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
-                      api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input]
+                      api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input, question_box_input]
 
             outputs = [
                 gr.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
                 gr.Textbox(label="Summary or Status Message (Current status of Summary or Summary itself)"),
                 gr.File(label="Download Transcription as JSON (Download the Transcription as a file)"),
                 gr.File(label="Download Summary as Text (Download the Summary as a file)"),
-                gr.File(label="Download Video (Download the Video as a file)"),
-                gr.File(label="Download Audio (Download the Audio as a file)")
+                gr.File(label="Download Video (Download the Video as a file)", visible=False),
+                gr.File(label="Download Audio (Download the Audio as a file)", visible=False),
             ]
 
             def toggle_light(mode):
@@ -1758,15 +1823,6 @@ def launch_ui(demo_mode=False):
                             "information including API keys."
             )
 
-            # Add the question input and button below the main interface
-            question_textbox = gr.Textbox(label="Insert Questions about the Transcription Here", lines=3)
-            question_button = gr.Button("Submit Question")
-            question_button.click(
-                fn=ask_question,
-                inputs=[outputs[0], outputs[1], question_textbox, api_name_input, api_key_input],
-                outputs=gr.Textbox(label="Answer")
-            )
-
         with gr.Tab("Scrape & Summarize Articles/Websites"):
             gr.Markdown("Plan to put for for ingesting articles/websites here")
             gr.Markdown("Will scrape page and store into SQLite DB")
@@ -1811,7 +1867,7 @@ def launch_ui(demo_mode=False):
     )
 
     keyword_tab = gr.Interface(
-        fn=add_keywords,
+        fn=add_keyword,
         inputs=gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here..."),
         outputs="text",
         title="Add Keywords",

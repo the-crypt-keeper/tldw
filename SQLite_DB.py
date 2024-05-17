@@ -3,6 +3,8 @@ import gradio as gr
 import pandas as pd
 import logging
 import os
+import re
+import time
 from typing import List, Tuple, Union
 from contextlib import contextmanager
 from urllib.parse import urlparse
@@ -31,66 +33,104 @@ class Database:
 
     @contextmanager
     def get_connection(self):
-        conn = self.pool.pop() if self.pool else sqlite3.connect(self.db_name, check_same_thread=False)
-        try:
-            yield conn
-        except sqlite3.Error as e:
-            raise DatabaseError(f"Database error: {e}")
-        finally:
-            self.pool.append(conn)
+        retry_count = 5
+        retry_delay = 1
+        conn = None
+        while retry_count > 0:
+            try:
+                conn = self.pool.pop() if self.pool else sqlite3.connect(self.db_name, check_same_thread=False)
+                yield conn
+                self.pool.append(conn)
+                return
+            except sqlite3.OperationalError as e:
+                if 'database is locked' in str(e):
+                    logger.warning(f"Database is locked, retrying in {retry_delay} seconds...")
+                    retry_count -= 1
+                    time.sleep(retry_delay)
+                else:
+                    raise DatabaseError(f"Database error: {e}")
+            except Exception as e:
+                raise DatabaseError(f"Unexpected error: {e}")
+            finally:
+                # Ensure the connection is returned to the pool even on failure
+                if conn:
+                    self.pool.append(conn)
+        raise DatabaseError("Database is locked and retries have been exhausted")
 
+    def execute_query(self, query: str, params: Tuple = ()) -> None:
+        with self.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                conn.commit()
+            except sqlite3.Error as e:
+                raise DatabaseError(f"Database error: {e}, Query: {query}")
 
 db = Database()
 
 
 # Function to create tables with the new media schema
-def create_tables():
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        try:
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Media (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                url TEXT,
-                title TEXT NOT NULL,
-                type TEXT NOT NULL,
-                content TEXT,
-                author TEXT,
-                ingestion_date TEXT
-            )
-            ''')
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Keywords (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                keyword TEXT NOT NULL UNIQUE
-            )
-            ''')
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS MediaKeywords (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                media_id INTEGER NOT NULL,
-                keyword_id INTEGER NOT NULL,
-                FOREIGN KEY (media_id) REFERENCES Media(id),
-                FOREIGN KEY (keyword_id) REFERENCES Keywords(id)
-            )
-            ''')
-            cursor.execute('''
-            CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(title, content);
-            ''')
-            cursor.execute('''
-            CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword);
-            ''')
-            # Ensure indexing for efficient query performance
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_media_title ON Media(title)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_media_type ON Media(type)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_media_author ON Media(author)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_media_ingestion_date ON Media(ingestion_date)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON Keywords(keyword)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_mediakeywords_media_id ON MediaKeywords(media_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_mediakeywords_keyword_id ON MediaKeywords(keyword_id)')
-            conn.commit()
-        except sqlite3.Error as e:
-            raise DatabaseError(f"Error creating tables: {e}")
+# Function to create tables with the new media schema
+def create_tables() -> None:
+    table_queries = [
+        '''
+        CREATE TABLE IF NOT EXISTS Media (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT,
+            title TEXT NOT NULL,
+            type TEXT NOT NULL,
+            content TEXT,
+            author TEXT,
+            ingestion_date TEXT
+        )
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS Keywords (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            keyword TEXT NOT NULL UNIQUE
+        )
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS MediaKeywords (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER NOT NULL,
+            keyword_id INTEGER NOT NULL,
+            FOREIGN KEY (media_id) REFERENCES Media(id),
+            FOREIGN KEY (keyword_id) REFERENCES Keywords(id)
+        )
+        ''',
+        '''
+        CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(title, content);
+        ''',
+        '''
+        CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_media_title ON Media(title);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_media_type ON Media(type);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_media_author ON Media(author);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_media_ingestion_date ON Media(ingestion_date);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON Keywords(keyword);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_mediakeywords_media_id ON MediaKeywords(media_id);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_mediakeywords_keyword_id ON MediaKeywords(keyword_id);
+        '''
+    ]
+    for query in table_queries:
+        db.execute_query(query)
+
+create_tables()
 
 
 # Function to add a keyword
@@ -102,7 +142,7 @@ def add_keyword(keyword: str) -> int:
             cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
             cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
             keyword_id = cursor.fetchone()[0]
-            cursor.execute('INSERT INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
+            cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
             conn.commit()
             return keyword_id
         except sqlite3.Error as e:
@@ -129,21 +169,22 @@ def delete_keyword(keyword: str) -> str:
 
 
 # Function to add multiple keywords
-def add_keywords(keywords: str) -> str:
-    if not keywords.strip():
-        return "No keywords provided."
-
-    keyword_list = [kw.strip().lower() for kw in keywords.split(',')]
-    added_keywords = []
-    for keyword in keyword_list:
+def add_keyword(keyword: str) -> int:
+    keyword = keyword.strip().lower()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
         try:
-            keyword_id = add_keyword(keyword)
-            added_keywords.append(keyword)
-        except DatabaseError as e:
-            logger.error(f"Error adding keyword '{keyword}': {e}")
-    return f"Keywords added: {', '.join(added_keywords)}"
+            cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+            cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+            keyword_id = cursor.fetchone()[0]
+            cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
+            conn.commit()
+            return keyword_id
+        except sqlite3.Error as e:
+            raise DatabaseError(f"Error adding keyword: {e}")
 
 
+# Function to add media with keywords
 # Function to add media with keywords
 def add_media_with_keywords(url: str, title: str, media_type: str, content: str, keywords: str, author: str = None, ingestion_date: str = None) -> str:
     # Validate input
@@ -160,22 +201,29 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
         raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")
 
     keyword_list = [kw.strip().lower() for kw in keywords.split(',')]
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        try:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
             cursor.execute('''
             INSERT INTO Media (url, title, type, content, author, ingestion_date) 
             VALUES (?, ?, ?, ?, ?, ?)
             ''', (url, title, media_type, content, author, ingestion_date))
             media_id = cursor.lastrowid
+
+            # Insert keywords
             for keyword in keyword_list:
                 keyword_id = add_keyword(keyword)
-                cursor.execute('INSERT INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
+                cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
             cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))
             conn.commit()
+
             return f"Media '{title}' added successfully with keywords: {', '.join(keyword_list)}"
-        except sqlite3.Error as e:
-            raise DatabaseError(f"Error adding media with keywords: {e}")
+    except sqlite3.Error as e:
+        logger.error(f"SQL Error: {e}")
+        raise DatabaseError(f"Error adding media with keywords: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected Error: {e}")
+        raise DatabaseError(f"Unexpected error: {e}")
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
@@ -245,11 +293,15 @@ def export_to_csv(search_query: str, search_fields: List[str], keyword: str, pag
 
 # Helper function to validate URL format
 def is_valid_url(url: str) -> bool:
-    try:
-        result = urlparse(url)
-        return all([result.scheme, result.netloc])
-    except ValueError:
-        return False
+    regex = re.compile(
+        r'^(?:http|ftp)s?://'  # http:// or https://
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+        r'localhost|'  # localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|'  # ...or ipv4
+        r'\[?[A-F0-9]*:[A-F0-9:]+\]?)'  # ...or ipv6
+        r'(?::\d+)?'  # optional port
+        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    return re.match(regex, url) is not None
 
 
 # Helper function to validate date format
