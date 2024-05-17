@@ -464,6 +464,9 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
         db = Database()
         media_url = url
 
+        info_dict = get_youtube(url)  # Extract video information using yt_dlp
+        media_title = info_dict['title'] if 'title' in info_dict else 'Untitled'
+
         results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model,
                        offset=offset, vad_filter=vad_filter, download_video_flag=download_video,
                        custom_prompt=custom_prompt)
@@ -493,6 +496,7 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
                 json.dump(transcription_result['transcription'], json_file, indent=2)
         except IOError as e:
             logging.error(f"Error writing transcription to JSON file: {e}")
+
         # Write the summary to the summary file
         with open(summary_file_path, 'w') as summary_file:
             summary_file.write(summary_text)
@@ -518,12 +522,15 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
             media_title = transcription_result['title'] if 'title' in transcription_result else 'Untitled'
             media_type = "video"
             media_content = transcription_text
-            # Convert custom_prompt to comma-separated string
+            # FIXME - Need to add the ability to add custom keywords in the Gradio UI
+            # FIXME - And if no keywords are provided, use 'default' and 'no_keyword_set' as the keywords
             media_keywords = ', '.join(custom_prompt.split()) if custom_prompt else "default"
             media_author = "auto_generated"
-            media_ingest_date = datetime.now().strftime('%Y-%m-%d')
+            media_url = url
+            media_title = transcription_result['title'] if 'title' in transcription_result else 'Untitled'
+            media_ingestion_date = datetime.now().strftime('%Y-%m-%d')
             add_media_with_keywords(media_url, media_title, media_type, media_content, media_keywords, media_author,
-                                    media_ingest_date)
+                                    media_ingestion_date)
 
         except Exception as e:
             logging.error(f"Failed to add media to the database: {e}")
