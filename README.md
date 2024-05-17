@@ -9,6 +9,7 @@
 
 
 
+
 ### What is TL/DW?
 
 - Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
@@ -19,12 +20,9 @@
 For commercial API usage, I personally recommend Sonnet. It's great quality and relatively inexpensive. 
 
 As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't have a lot of VRAM and want to self-host. (I think it's better than anything up to 70B for summarization - I do not have actual evidence for this)
-
-### Application Demo
-CLI
-![tldw-summarization-cli-demo](cli-demo-video)
-
-GUI
+**CLI**
+![tldw-summarizing-cli-demo](./Tests/cli-demo.PNG)
+**GUI**
 ![tldw-summarization-gui-demo](./Tests/Capture.PNG)
 
 ----------
