@@ -417,7 +417,7 @@ def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
 
-def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video, download_audio, detail_level, question_box, keywords):
+def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video, download_audio, rolling_summarization, detail_level, question_box, keywords):
     # Validate input
     if not url:
         return "No URL provided.", "No URL provided.", None, None, None, None, None, None
@@ -440,7 +440,7 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
 
         results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model,
                        offset=offset, vad_filter=vad_filter, download_video_flag=download_video,
-                       custom_prompt=custom_prompt, keywords=keywords)
+                       custom_prompt=custom_prompt, rolling_summarization=rolling_summarization, detail_level=detail_level, keywords=keywords)
         if not results:
             return "No URL provided.", "No URL provided.", None, None, None, None, None, None
 
@@ -1662,14 +1662,16 @@ def launch_ui(demo_mode=False):
                                        placeholder="Enter your API key here; Ignore if using Local API or Built-in API",
                                        visible=True)
             vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False, visible=False)
+            rolling_summarization_input = gr.Checkbox(
+                label="Enable Rolling Summarization", value=False, visible=False)
             download_video_input = gr.Checkbox(
                 label="Download Video(Select to allow for file download of selected video)", value=False, visible=False)
             download_audio_input = gr.Checkbox(
                 label="Download Audio(Select to allow for file download of selected Video's Audio)", value=False,
                 visible=False)
-            # FIXME - Hide unless advance menu shown
+            # Show rolling summarization option and detail level slider
             detail_level_input = gr.Slider(minimum=0.01, maximum=1.0, value=0.01, step=0.01, interactive=True,
-                                           label="Summary Detail Level (Slide me) (WIP)", visible=False)
+                                           label="Summary Detail Level (Slide me) (Only OpenAI currently supported)", visible=False)
             keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated Example: "
                                                                       "tag_one,tag_two,tag_three)", value="default,no_keyword_set",visible=True)
             question_box_input = gr.Textbox(label="Question",
@@ -1680,7 +1682,7 @@ def launch_ui(demo_mode=False):
 
 
             inputs = [num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
-                      api_key_input, vad_filter_input, download_video_input, download_audio_input, detail_level_input,
+                      api_key_input, vad_filter_input, download_video_input, download_audio_input, rolling_summarization_input, detail_level_input,
                       question_box_input, keywords_input]
 
             outputs = [
@@ -1878,7 +1880,7 @@ def launch_ui(demo_mode=False):
 #
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
          download_video_flag=False, demo_mode=False, custom_prompt=None, overwrite=False,
-         rolling_summarization=None, detail=0.01, keywords=None):
+         rolling_summarization=False, detail_level=0.01, keywords=None):
     global summary, audio_file
 
     if input_path is None and args.user_interface:
@@ -1944,6 +1946,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
 
                 # Perform rolling summarization based on API Name, detail level, and if an API key exists
                 # Will remove the API key once rolling is added for llama.cpp
+                # FIXME - Update to reflect variable name changes
                 if rolling_summarization:
                     logging.info("MAIN: Rolling Summarization")
 
@@ -1954,7 +1957,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                     json_file_path = audio_file.replace('.wav', '.segments.json')
 
                     # Perform rolling summarization
-                    summary = summarize_with_detail_openai(text, detail=args.detail_level, verbose=False)
+                    summary = summarize_with_detail_openai(text, detail=detail_level, verbose=False)
 
                     # Handle the summarized output
                     if summary:
