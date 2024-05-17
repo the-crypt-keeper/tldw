@@ -26,6 +26,7 @@ import yt_dlp
 from openai import OpenAI
 from tqdm import tqdm
 import tiktoken
+
 #######################
 
 log_level = "INFO"
@@ -35,9 +36,10 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #######
 # Function Sections
 #
+# Database Setup
 # Config Loading
 # System Checks
-# DB Setup
+# DataBase Functions
 # Processing Paths and local file handling
 # Video Download/Handling
 # Audio Transcription
@@ -91,7 +93,46 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #
 #
 #
-#
+#######################
+
+
+#######################
+# DB Setup
+
+# Create tables
+create_tables()
+
+
+# Custom exceptions
+class DatabaseError(Exception):
+    pass
+
+
+class InputError(Exception):
+    pass
+
+
+# Database connection function with connection pooling
+class Database:
+    def __init__(self, db_name=None):
+        self.db_name = db_name or os.getenv('DB_NAME', 'media_summary.db')
+        self.pool = []
+        self.pool_size = 10
+
+    @contextmanager
+    def get_connection(self):
+        conn = self.pool.pop() if self.pool else sqlite3.connect(self.db_name, check_same_thread=False)
+        try:
+            yield conn
+        except sqlite3.Error as e:
+            raise DatabaseError(f"Database error: {e}")
+        finally:
+            self.pool.append(conn)
+
+
+db = Database()
+#######################
+
 
 #######################
 # Config loading
@@ -323,6 +364,7 @@ global db
 db = Database()
 # setup DB
 create_tables()
+
 
 # DB Functions
 #     create_tables()
@@ -831,6 +873,8 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
 # This is dirty and shameful and terrible. It should be replaced with a proper implementation.
 # anyways lets get to it....
 client = OpenAI(api_key=openai_api_key)
+
+
 def get_chat_completion(messages, model='gpt-4-turbo'):
     response = client.chat.completions.create(
         model=model,
@@ -903,13 +947,13 @@ def combine_chunks_with_no_minimum(
 
 
 def rolling_summarize(text: str,
-              detail: float = 0,
-              model: str = 'gpt-4-turbo',
-              additional_instructions: Optional[str] = None,
-              minimum_chunk_size: Optional[int] = 500,
-              chunk_delimiter: str = ".",
-              summarize_recursively=False,
-              verbose=False):
+                      detail: float = 0,
+                      model: str = 'gpt-4-turbo',
+                      additional_instructions: Optional[str] = None,
+                      minimum_chunk_size: Optional[int] = 500,
+                      chunk_delimiter: str = ".",
+                      summarize_recursively=False,
+                      verbose=False):
     """
     Summarizes a given text by splitting it into chunks, each of which is summarized individually.
     The level of detail in the summary can be adjusted, and the process can optionally be made recursive.
@@ -982,6 +1026,7 @@ def rolling_summarize(text: str,
 
     return final_summary
 
+
 #
 #
 #######################################################################################################################
@@ -996,12 +1041,12 @@ def openai_tokenize(text: str) -> List[str]:
     encoding = tiktoken.encoding_for_model('gpt-4-turbo')
     return encoding.encode(text)
 
+
 # openai summarize chunks
 
 #
 #
 #######################################################################################################################
-
 
 
 #######################################################################################################################
@@ -1065,7 +1110,6 @@ def summarize_with_openai(api_key, file_path, model, custom_prompt):
         logging.debug("openai: Error in processing: %s", str(e))
         print("Error occurred while processing summary with openai:", str(e))
         return None
-
 
 
 def summarize_with_claude(api_key, file_path, model, custom_prompt):
@@ -1418,6 +1462,7 @@ def summarize_with_detail_recursive_openai(text, detail, verbose=False):
     summary_with_recursive_summarization = rolling_summarize(text, detail=detail, summarize_recursively=True)
     print(summary_with_recursive_summarization)
 
+
 #
 #
 #######################################################################################################################
@@ -1473,7 +1518,6 @@ def summarize_with_huggingface(api_key, file_path, custom_prompt):
         print(f"Error occurred while processing summary with huggingface: {str(e)}")
         return None
 
-
     # FIXME
     # This is here for gradio authentication
     # Its just not setup.
@@ -1489,7 +1533,6 @@ def format_transcription(transcription_result):
         return ""
 
 
-
 def format_file_path(file_path, fallback_path=None):
     if file_path and os.path.exists(file_path):
         logging.debug(f"File exists: {file_path}")
@@ -1500,10 +1543,6 @@ def format_file_path(file_path, fallback_path=None):
     else:
         logging.debug(f"File does not exist: {file_path}. No fallback path available.")
         return None
-
-
-
-
 
 
 def launch_ui(demo_mode=False):
@@ -1583,11 +1622,12 @@ def launch_ui(demo_mode=False):
             offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
                                      visible=False)
             api_name_input = gr.Dropdown(
-                choices=[None,"huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
+                choices=[None, "huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
                 value=None,
                 label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
             api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
-                                       placeholder="Enter your API key here; Ignore if using Local API or Built-in API", visible=True)
+                                       placeholder="Enter your API key here; Ignore if using Local API or Built-in API",
+                                       visible=True)
             vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False, visible=False)
             download_video_input = gr.Checkbox(
                 label="Download Video(Select to allow for file download of selected video)", value=False, visible=False)
@@ -1700,14 +1740,14 @@ def launch_ui(demo_mode=False):
             # Function to toggle visibility of advanced inputs
             def toggle_ui(mode):
                 visible = (mode == "Advanced")
-                return [gr.update(visible=visible) if i not in [2, 4, 5] else gr.update(visible=True) for i in range(len(inputs))]
+                return [gr.update(visible=visible) if i not in [2, 4, 5] else gr.update(visible=True) for i in
+                        range(len(inputs))]
 
             # Set the event listener for the UI Mode toggle switch
             ui_mode_toggle.change(fn=toggle_ui, inputs=ui_mode_toggle, outputs=inputs)
 
             # Combine URL input and inputs
             all_inputs = [url_input] + inputs
-
 
             gr.Interface(
                 fn=process_url,
@@ -1787,10 +1827,13 @@ def launch_ui(demo_mode=False):
     )
 
     # Combine interfaces into a tabbed interface
-    tabbed_interface = gr.TabbedInterface([iface, search_tab, export_tab, keyword_tab, delete_keyword_tab], ["Transcription + Summarization", "Search", "Export", "Add Keywords", "Delete Keywords"])
+    tabbed_interface = gr.TabbedInterface([iface, search_tab, export_tab, keyword_tab, delete_keyword_tab],
+                                          ["Transcription + Summarization", "Search", "Export", "Add Keywords",
+                                           "Delete Keywords"])
 
     # Launch the interface
     tabbed_interface.launch()
+
 
 #
 #
@@ -1803,7 +1846,6 @@ def launch_ui(demo_mode=False):
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
          download_video_flag=False, demo_mode=False, custom_prompt=None, overwrite=False,
          rolling_summarization=None, detail=0.01):
-
     global summary, audio_file
 
     if input_path is None and args.user_interface:
@@ -2018,7 +2060,7 @@ if __name__ == "__main__":
                                                                       'defines the chunk size.\n Default is 0.01(lots '
                                                                       'of chunks) -> 1.00 (few chunks)\n Currently '
                                                                       'only OpenAI works. ',
-                        default=0.01,)
+                        default=0.01, )
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
     # parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()

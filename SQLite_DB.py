@@ -56,7 +56,7 @@ def create_tables():
                 type TEXT NOT NULL,
                 content TEXT,
                 author TEXT,
-                publication_date TEXT
+                ingestion_date TEXT
             )
             ''')
             cursor.execute('''
@@ -84,7 +84,7 @@ def create_tables():
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_media_title ON Media(title)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_media_type ON Media(type)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_media_author ON Media(author)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_media_publication_date ON Media(publication_date)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_media_ingestion_date ON Media(ingestion_date)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON Keywords(keyword)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_mediakeywords_media_id ON MediaKeywords(media_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_mediakeywords_keyword_id ON MediaKeywords(keyword_id)')
@@ -145,7 +145,7 @@ def add_keywords(keywords: str) -> str:
 
 
 # Function to add media with keywords
-def add_media_with_keywords(url: str, title: str, media_type: str, content: str, keywords: str, author: str = None, publication_date: str = None) -> str:
+def add_media_with_keywords(url: str, title: str, media_type: str, content: str, keywords: str, author: str = None, ingestion_date: str = None) -> str:
     # Validate input
     if not url or not title or not media_type or not content or not keywords:
         raise InputError("Please provide all required fields.")
@@ -156,17 +156,17 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
     if media_type not in ['document', 'video', 'article']:
         raise InputError("Invalid media type. Allowed types: document, video, article.")
 
-    if publication_date and not is_valid_date(publication_date):
-        raise InputError("Invalid publication date format. Use YYYY-MM-DD.")
+    if ingestion_date and not is_valid_date(ingestion_date):
+        raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")
 
     keyword_list = [kw.strip().lower() for kw in keywords.split(',')]
     with db.get_connection() as conn:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-            INSERT INTO Media (url, title, type, content, author, publication_date) 
+            INSERT INTO Media (url, title, type, content, author, ingestion_date) 
             VALUES (?, ?, ?, ?, ?, ?)
-            ''', (url, title, media_type, content, author, publication_date))
+            ''', (url, title, media_type, content, author, ingestion_date))
             media_id = cursor.lastrowid
             for keyword in keyword_list:
                 keyword_id = add_keyword(keyword)
@@ -191,7 +191,7 @@ def search_db(search_query: str, search_fields: List[str], keyword: str, page: i
         search_columns = " OR ".join([f"media_fts.{field} MATCH ?" for field in search_fields])
 
         query = f'''
-        SELECT Media.url, Media.title, Media.type, Media.content, Media.author, Media.publication_date
+        SELECT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date
         FROM Media
         JOIN media_fts ON Media.id = media_fts.rowid
         JOIN MediaKeywords ON Media.id = MediaKeywords.media_id
@@ -215,7 +215,7 @@ def format_results(results: Union[List[Tuple], str]) -> Union[pd.DataFrame, str]
     if isinstance(results, str):
         return results  # Return error message directly
 
-    df = pd.DataFrame(results, columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Publication Date'])
+    df = pd.DataFrame(results, columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date'])
     return df
 
 
@@ -260,57 +260,3 @@ def is_valid_date(date_string: str) -> bool:
     except ValueError:
         return False
 
-
-# Create tables
-# create_tables()
-#
-# # Gradio interface setup with tabs
-# search_tab = gr.Interface(
-#     fn=search_and_display,
-#     inputs=[
-#         gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
-#         gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], default=["Title"]),
-#         gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
-#         gr.Number(label="Page", default=1, precision=0)
-#     ],
-#     outputs=gr.Dataframe(label="Search Results"),
-#     title="Search Media Summaries",
-#     description="Search for media (documents, videos, articles) and their summaries in the database. Use keywords for better filtering.",
-#     live=True
-# )
-#
-# export_tab = gr.Interface(
-#     fn=export_to_csv,
-#     inputs=[
-#         gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
-#         gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], default=["Title"]),
-#         gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
-#         gr.Number(label="Page", default=1, precision=0),
-#         gr.Number(label="Results per File", default=1000, precision=0)
-#     ],
-#     outputs="text",
-#     title="Export Search Results to CSV",
-#     description="Export the search results to a CSV file."
-# )
-#
-# keyword_tab = gr.Interface(
-#     fn=add_keywords,
-#     inputs=gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here..."),
-#     outputs="text",
-#     title="Add Keywords",
-#     description="Add multiple keywords to the database."
-# )
-#
-# delete_keyword_tab = gr.Interface(
-#     fn=delete_keyword,
-#     inputs=gr.Textbox(label="Delete Keyword", placeholder="Enter keyword to delete here..."),
-#     outputs="text",
-#     title="Delete Keyword",
-#     description="Delete a keyword from the database."
-# )
-#
-# # Combine interfaces into a tabbed interface
-# tabbed_interface = gr.TabbedInterface([search_tab, export_tab, keyword_tab, delete_keyword_tab], ["Search", "Export", "Add Keywords", "Delete Keywords"])
-#
-# # Launch the interface
-# tabbed_interface.launch()
