@@ -149,7 +149,7 @@ create_tables()
 
 
 # Function to add a keyword
-def add_keyword(keyword: str) -> int:
+def add_keyword(keyword: str) -> str:
     keyword = keyword.strip().lower()
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -159,8 +159,9 @@ def add_keyword(keyword: str) -> int:
             keyword_id = cursor.fetchone()[0]
             cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
             conn.commit()
-            return keyword_id
+            return f"Keyword '{keyword}' added successfully."
         except sqlite3.Error as e:
+            logging.error(f"Error adding keyword: {e}")
             raise DatabaseError(f"Error adding keyword: {e}")
 
 
@@ -181,23 +182,6 @@ def delete_keyword(keyword: str) -> str:
                 return f"Keyword '{keyword}' not found."
         except sqlite3.Error as e:
             raise DatabaseError(f"Error deleting keyword: {e}")
-
-
-# Function to add multiple keywords
-def add_keyword(keyword):
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM keywords WHERE keyword = ?", (keyword,))
-            result = cursor.fetchone()
-            if result:
-                return result[0]  # Return the existing keyword ID
-            cursor.execute("INSERT INTO keywords (keyword) VALUES (?)", (keyword,))
-            conn.commit()
-            return cursor.lastrowid  # Return the new keyword ID
-    except sqlite3.Error as e:
-        logging.error(f"Error adding keyword: {e}")
-        raise DatabaseError(f"Error adding keyword: {e}")
 
 
 
