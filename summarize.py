@@ -347,18 +347,7 @@ def download_ffmpeg():
 #     is_valid_date()
 
 # Currently supported items are documents, 'video' and articles, need to change 'video' to 'audio transcripts'
-# FIXME - need to integrate above functions into script so that DB is used for keyword storage and retrieval and search
-#        functionality for tags and media items is available in the UI
-# FIXME - also need to integrate the DB functions into the main processing functions so that the DB is updated with the results
-#        of the processing
-# FIXME - need to integrate the DB functions into the summarization functions so that the results are stored in the DB
-#        and can be retrieved later
-# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can search the DB for previous results
-# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can export the results of a search to a CSV file
-# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can add keywords to the DB
-# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can delete keywords from the DB
-# FIXME - Need to integrate the DB functions into the Gradio UI so that the user can add media items to the DB
-
+# FIXME - need to FIXME
 #
 #
 ########################################################################################################################
@@ -411,7 +400,7 @@ def process_local_file(file_path):
 
 
 #######################################################################################################################
-# Video Download/Handling
+# Online Article Extraction / Handling
 #
 
 def sanitize_filename(filename):
@@ -428,6 +417,44 @@ def get_page_title(url: str) -> str:
     except requests.RequestException as e:
         logging.error(f"Error fetching page title: {e}")
         return "Untitled"
+
+
+def get_article_text(url: str) -> str:
+    pass
+
+
+def get_artice_title(article_url_arg: str) -> str:
+            # Use beautifulsoup to get the page title - Really should be using ytdlp for this....
+            article_title = get_page_title(article_url_arg)
+
+
+
+#
+#
+#######################################################################################################################
+
+
+#######################################################################################################################
+# Video Download/Handling
+#
+
+def sanitize_filename(filename):
+    return re.sub(r'[<>:"/\\|?*]', '_', filename)
+
+
+def get_video_info(url: str) -> dict:
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'skip_download': True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info_dict = ydl.extract_info(url, download=False)
+            return info_dict
+        except Exception as e:
+            logging.error(f"Error extracting video info: {e}")
+            return None
 
 
 def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video, download_audio, rolling_summarization, detail_level, question_box, keywords):
@@ -492,9 +519,6 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
 
         formatted_transcription = format_transcription(transcription_result)
 
-        # FIXME - Dead code?
-        #summary_text = transcription_result.get('summary', 'Summary not available')
-
         # Add media to the database
         try:
             # Ensure these variables are correctly populated
@@ -508,8 +532,8 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
 
             db = Database()
             media_url = url
-            # FIXME - DIRTY HACK
-            # Use beautifulsoup to get the page title - Really should be using ytdlp for this....
+            # FIXME  - IDK?
+            video_info = get_video_info(media_url)
             media_title = get_page_title(media_url)
             media_type = "video"
             media_content = transcription_text
