@@ -234,22 +234,47 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
         with db.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Insert media item
-            logger.debug(
-                f"Inserting media item with URL: {url}, Title: {title}, Type: {media_type}, Content: {content}, Author: {author}, Ingestion Date: {ingestion_date}, Prompt: {prompt}, Summary: {summary}")
-            cursor.execute('''
-            INSERT INTO Media (url, title, type, content, author, ingestion_date, prompt, summary) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (url, title, media_type, content, author, ingestion_date, prompt, summary))
-            media_id = cursor.lastrowid
-
-            # Insert keywords and associate with media item
+            # Initialize keyword_list
             keyword_list = keywords.split(',')
-            for keyword in keyword_list:
-                keyword = keyword.strip().lower()
-                keyword_id = add_keyword(keyword)
-                cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
-            cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))
+
+            # Check if media already exists
+            cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
+            existing_media = cursor.fetchone()
+
+            if existing_media:
+                media_id = existing_media[0]
+                logger.info(f"Existing media found with ID: {media_id}")
+
+                # Insert new prompt and summary into MediaModifications
+                cursor.execute('''
+                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+                VALUES (?, ?, ?, ?)
+                ''', (media_id, prompt, summary, ingestion_date))
+                logger.info("New summary and prompt added to MediaModifications")
+            else:
+                logger.info("New media entry being created")
+
+                # Insert new media item
+                cursor.execute('''
+                INSERT INTO Media (url, title, type, content, author, ingestion_date) 
+                VALUES (?, ?, ?, ?, ?, ?)
+                ''', (url, title, media_type, content, author, ingestion_date))
+                media_id = cursor.lastrowid
+
+                # Insert keywords and associate with media item
+                keyword_list = keywords.split(',')
+                for keyword in keyword_list:
+                    keyword = keyword.strip().lower()
+                    keyword_id = add_keyword(keyword)
+                    cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
+                cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))
+
+                # Also insert the initial prompt and summary into MediaModifications
+                cursor.execute('''
+                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+                VALUES (?, ?, ?, ?)
+                ''', (media_id, prompt, summary, ingestion_date))
+
             conn.commit()
 
             # Insert initial version of the prompt and summary
