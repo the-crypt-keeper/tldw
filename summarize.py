@@ -346,8 +346,6 @@ def download_ffmpeg():
 #     is_valid_url()
 #     is_valid_date()
 
-# Currently supported items are documents, 'video' and articles, need to change 'video' to 'audio transcripts'
-# FIXME - need to FIXME
 #
 #
 ########################################################################################################################
@@ -402,10 +400,6 @@ def process_local_file(file_path):
 #######################################################################################################################
 # Online Article Extraction / Handling
 #
-
-def sanitize_filename(filename):
-    return re.sub(r'[<>:"/\\|?*]', '_', filename)
-
 
 def get_page_title(url: str) -> str:
     try:
