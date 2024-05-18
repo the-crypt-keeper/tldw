@@ -189,11 +189,12 @@ def delete_keyword(keyword: str) -> str:
 # Function to add media with keywords
 def add_media_with_keywords(url: str, title: str, media_type: str, content: str, keywords: str, prompt: str, summary: str, author: str = None, ingestion_date: str = None) -> str:
     # Validate input
-    if not url or not title or not media_type or not content or not keywords or not prompt or not summary:
+    if not title or not media_type or not content or not keywords or not prompt or not summary:
         raise InputError("Please provide all required fields.")
 
-    if not is_valid_url(url):
-        raise InputError("Invalid URL format.")
+    # Use 'localhost' as the URL if no valid URL is provided
+    if not url or not is_valid_url(url):
+        url = 'localhost'
 
     if media_type not in ['document', 'video', 'article']:
         raise InputError("Invalid media type. Allowed types: document, video, article.")
@@ -250,7 +251,7 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
                 for keyword in keyword_list:
                     keyword = keyword.strip().lower()
                     keyword_id = add_keyword(keyword)
-                    cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
+                    cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?, ?)', (media_id, keyword_id))
                 cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))
 
                 # Also insert the initial prompt and summary into MediaModifications
