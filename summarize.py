@@ -2022,7 +2022,7 @@ def launch_ui(demo_mode=False):
 
             scrape_button.click(scrape_and_summarize, inputs=[url_input, custom_prompt_input, api_name_input, api_key_input, keywords_input], outputs=result_output)
 
-            gr.Markdown("### Or paste unstructured text below")
+            gr.Markdown("### Or Paste Unstructured Text Below (Will use settings from above)")
             text_input = gr.Textbox(label="Unstructured Text", placeholder="Paste unstructured text here", lines=10)
             text_ingest_button = gr.Button("Ingest Unstructured Text")
             text_ingest_result = gr.Textbox(label="Result")
