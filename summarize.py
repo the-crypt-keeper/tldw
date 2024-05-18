@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import List, Tuple
 from typing import Optional
 
+from bs4 import BeautifulSoup
 import gradio as gr
 import requests
 from SQLite_DB import *
@@ -417,6 +418,18 @@ def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
 
+def get_page_title(url: str) -> str:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        title_tag = soup.find('title')
+        return title_tag.string.strip() if title_tag else "Untitled"
+    except requests.RequestException as e:
+        logging.error(f"Error fetching page title: {e}")
+        return "Untitled"
+
+
 def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video, download_audio, rolling_summarization, detail_level, question_box, keywords):
     # Validate input
     if not url:
@@ -495,7 +508,9 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
 
             db = Database()
             media_url = url
-            media_title = transcription_result['title'] if 'title' in transcription_result else 'Untitled'
+            # FIXME - DIRTY HACK
+            # Use beautifulsoup to get the page title - Really should be using ytdlp for this....
+            media_title = get_page_title(media_url)
             media_type = "video"
             media_content = transcription_text
             keyword_list = keywords.split(',') if keywords else ["default"]
@@ -1899,7 +1914,7 @@ def launch_ui(demo_mode=False):
                                            "Delete Keywords"])
 
     # Launch the interface
-    tabbed_interface.launch()
+    tabbed_interface.launch(share=True,)
 
 
 #
