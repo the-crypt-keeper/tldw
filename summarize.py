@@ -22,6 +22,7 @@ import gradio as gr
 import requests
 from SQLite_DB import *
 import tiktoken
+import trafilatura
 import unicodedata
 import yt_dlp
 # OpenAI Tokenizer support
@@ -92,7 +93,8 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #   1. Something about cuda nn library missing, even though cuda is installed...
 #       https://github.com/tensorflow/tensorflow/issues/54784 - Basically, installing zlib made it go away. idk.
 #
-#
+#   2. ERROR: Could not install packages due to an OSError: [WinError 2] The system cannot find the file specified: 'C:\\Python312\\Scripts\\dateparser-download.exe' -> 'C:\\Python312\\Scripts\\dateparser-download.exe.deleteme'
+#       Resolved through adding --user to the pip install command
 #
 #
 #######################
@@ -1139,6 +1141,138 @@ def openai_tokenize(text: str) -> List[str]:
 
 
 #######################################################################################################################
+# Website-related Techniques & Functions
+#
+#
+
+def scrape_article(url: str) -> dict:
+    downloaded = trafilatura.fetch_url(url)
+    if downloaded:
+        # Use trafilatura.extract with more specific options to get the main content
+        result = trafilatura.extract(downloaded, with_metadata=True, include_comments=False, include_links=False)
+        if isinstance(result, dict):  # Ensure result is a dictionary
+            return {
+                'title': result.get('title', 'Untitled'),
+                'author': result.get('author', 'Unknown'),
+                'content': result.get('text', ''),
+                'date': result.get('date', '')
+            }
+        elif isinstance(result, str):
+            # Handle case where result is a string
+            return {
+                'title': 'Untitled',
+                'author': 'Unknown',
+                'content': result,
+                'date': ''
+            }
+        else:
+            print(f"Unexpected result type: {type(result)}")
+            return None
+    return None
+
+
+def ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date):
+    try:
+        if not content.strip():  # Check if content is not empty or whitespace
+            raise ValueError("Content is empty.")
+
+        db = Database()
+        keyword_list = keywords.split(',') if keywords else ["default"]
+        keyword_str = ', '.join(keyword_list)
+
+        # Check if any required field is empty and log the specific missing field
+        if not url:
+            raise ValueError("URL is missing.")
+        if not title:
+            raise ValueError("Title is missing.")
+        if not content:
+            raise ValueError("Content is missing.")
+        if not keywords:
+            raise ValueError("Keywords are missing.")
+
+        add_media_with_keywords(
+            url=url,
+            title=title,
+            media_type='article',
+            content=content,
+            keywords=keyword_str,
+            prompt=custom_prompt,
+            summary=summary,
+            author=author,
+            ingestion_date=ingestion_date
+        )
+        return "Article ingested successfully."
+    except Exception as e:
+        logging.error(f"Failed to ingest article to the database: {e}")
+        return str(e)
+
+
+def scrape_and_summarize(url, custom_prompt, api_name, api_key, keywords):
+    # Step 1: Scrape the article
+    article_data = scrape_article(url)
+    print(f"Scraped Article Data: {article_data}")  # Debugging statement
+    if not article_data:
+        return "Failed to scrape the article."
+
+    title = article_data.get('title', 'Untitled')
+    author = article_data.get('author', 'Unknown')
+    content = article_data.get('content', '')
+    ingestion_date = datetime.now().strftime('%Y-%m-%d')
+
+    print(f"Title: {title}, Author: {author}, Content Length: {len(content)}")  # Debugging statement
+
+    # Step 2: Summarize the article
+    if api_name:
+        json_file_path = f"Results/{title.replace(' ', '_')}_segments.json"
+        with open(json_file_path, 'w') as json_file:
+            json.dump([{'text': content}], json_file, indent=2)
+
+        if api_name.lower() == 'openai':
+            summary = summarize_with_openai(api_key, json_file_path, openai_model, custom_prompt)
+        # Add other APIs as needed
+        else:
+            summary = "Unsupported API."
+    else:
+        summary = "No API provided for summarization."
+
+    print(f"Summary: {summary}")  # Debugging statement
+
+    # Step 3: Ingest the article into the database
+    ingestion_result = ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date)
+
+    return f"Title: {title}\nAuthor: {author}\nSummary: {summary}\nIngestion Result: {ingestion_result}"
+
+
+def ingest_unstructured_text(text, custom_prompt, api_name, api_key, keywords):
+    title = "Unstructured Text"
+    author = "Unknown"
+    ingestion_date = datetime.now().strftime('%Y-%m-%d')
+
+    # Summarize the unstructured text
+    if api_name:
+        json_file_path = f"Results/{title.replace(' ', '_')}_segments.json"
+        with open(json_file_path, 'w') as json_file:
+            json.dump([{'text': text}], json_file, indent=2)
+
+        if api_name.lower() == 'openai':
+            summary = summarize_with_openai(api_key, json_file_path, openai_model, custom_prompt)
+        # Add other APIs as needed
+        else:
+            summary = "Unsupported API."
+    else:
+        summary = "No API provided for summarization."
+
+    # Ingest the unstructured text into the database
+    ingestion_result = ingest_article_to_db('Unstructured Text', title, author, text, keywords, summary, ingestion_date)
+
+    return f"Title: {title}\nSummary: {summary}\nIngestion Result: {ingestion_result}"
+
+#
+#
+#######################################################################################################################
+
+
+#######################################################################################################################
 # Summarizers
 #
 #
@@ -1868,9 +2002,32 @@ def launch_ui(demo_mode=False):
             )
 
         with gr.Tab("Scrape & Summarize Articles/Websites"):
-            gr.Markdown("Plan to put for for ingesting articles/websites here")
-            gr.Markdown("Will scrape page and store into SQLite DB")
-            gr.Markdown("RAG here we come....:/")
+            url_input = gr.Textbox(label="Article URL", placeholder="Enter the article URL here")
+            custom_prompt_input = gr.Textbox(
+                label="Custom Prompt (Optional)",
+                placeholder="Provide a custom prompt for summarization",
+                lines=3
+            )
+            api_name_input = gr.Dropdown(
+                choices=[None, "huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
+                value=None,
+                label="API Name (Mandatory for Summarization)"
+            )
+            api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
+                                       placeholder="Enter your API key here; Ignore if using Local API or Built-in API")
+            keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",value="default,no_keyword_set",visible=True)
+
+            scrape_button = gr.Button("Scrape and Summarize")
+            result_output = gr.Textbox(label="Result")
+
+            scrape_button.click(scrape_and_summarize, inputs=[url_input, custom_prompt_input, api_name_input, api_key_input, keywords_input], outputs=result_output)
+
+            gr.Markdown("### Or paste unstructured text below")
+            text_input = gr.Textbox(label="Unstructured Text", placeholder="Paste unstructured text here", lines=10)
+            text_ingest_button = gr.Button("Ingest Unstructured Text")
+            text_ingest_result = gr.Textbox(label="Result")
+
+            text_ingest_button.click(ingest_unstructured_text, inputs=[text_input, custom_prompt_input, api_name_input, api_key_input, keywords_input], outputs=text_ingest_result)
 
         with gr.Tab("Ingest & Summarize Documents"):
             gr.Markdown("Plan to put ingestion form for documents here")
