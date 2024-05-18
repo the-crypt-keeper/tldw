@@ -484,19 +484,51 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
 
         # Add media to the database
         try:
+            # Ensure these variables are correctly populated
+            custom_prompt = args.custom_prompt if args.custom_prompt else ("\n\nabove is the transcript of a video "
+                              "Please read through the transcript carefully. Identify the main topics that are "
+                              "discussed over the course of the transcript. Then, summarize the key points about each "
+                              "main topic in a concise bullet point. The bullet points should cover the key "
+                              "information conveyed about each topic in the video, but should be much shorter than "
+                              "the full transcript. Please output your bullet point summary inside <bulletpoints> "
+                              "tags.")
+
             db = Database()
             media_url = url
+            media_title = transcription_result['title'] if 'title' in transcription_result else 'Untitled'
             media_type = "video"
             media_content = transcription_text
             keyword_list = keywords.split(',') if keywords else ["default"]
             media_keywords = ', '.join(keyword_list)
-            logging.info(f"Adding media keywords to the database: {media_keywords}")
-            media_title = transcription_result['title'] if 'title' in transcription_result else 'Untitled'
-            logging.info(f"Adding media to the database: {media_title}")
             media_author = "auto_generated"
             media_ingestion_date = datetime.now().strftime('%Y-%m-%d')
-            add_media_with_keywords(media_url, media_title, media_type, media_content, media_keywords, media_author,
-                                    media_ingestion_date)
+
+            # Log the values before calling the function
+            logging.info(f"Media URL: {media_url}")
+            logging.info(f"Media Title: {media_title}")
+            logging.info(f"Media Type: {media_type}")
+            logging.info(f"Media Content: {media_content}")
+            logging.info(f"Media Keywords: {media_keywords}")
+            logging.info(f"Media Author: {media_author}")
+            logging.info(f"Ingestion Date: {media_ingestion_date}")
+            logging.info(f"Custom Prompt: {custom_prompt}")
+            logging.info(f"Summary Text: {summary_text}")
+
+            # Check if any required field is empty
+            if not media_url or not media_title or not media_type or not media_content or not media_keywords or not custom_prompt or not summary_text:
+                raise InputError("Please provide all required fields.")
+
+            add_media_with_keywords(
+                url=media_url,
+                title=media_title,
+                media_type=media_type,
+                content=media_content,
+                keywords=media_keywords,
+                prompt=custom_prompt,
+                summary=summary_text,
+                author=media_author,
+                ingestion_date=media_ingestion_date
+            )
         except Exception as e:
             logging.error(f"Failed to add media to the database: {e}")
 
@@ -2107,10 +2139,7 @@ if __name__ == "__main__":
 
     custom_prompt = args.custom_prompt
 
-    if custom_prompt == "":
-        logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
-        print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
-    else:
+    if custom_prompt is None or custom_prompt == "":
         logging.debug("No custom prompt defined, will use default")
         args.custom_prompt = ("\n\nabove is the transcript of a video "
                               "Please read through the transcript carefully. Identify the main topics that are "
@@ -2119,7 +2148,11 @@ if __name__ == "__main__":
                               "information conveyed about each topic in the video, but should be much shorter than "
                               "the full transcript. Please output your bullet point summary inside <bulletpoints> "
                               "tags.")
+        custom_prompt = args.custom_prompt
         print("No custom prompt defined, will use default")
+    else:
+        logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
+        print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
 
     if args.user_interface:
         launch_ui(demo_mode=False)
