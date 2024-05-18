@@ -70,7 +70,6 @@ db = Database()
 
 
 # Function to create tables with the new media schema
-# Function to create tables with the new media schema
 def create_tables() -> None:
     table_queries = [
         '''
@@ -81,7 +80,9 @@ def create_tables() -> None:
             type TEXT NOT NULL,
             content TEXT,
             author TEXT,
-            ingestion_date TEXT
+            ingestion_date TEXT,
+            prompt TEXT,
+            summary TEXT
         )
         ''',
         '''
@@ -97,6 +98,17 @@ def create_tables() -> None:
             keyword_id INTEGER NOT NULL,
             FOREIGN KEY (media_id) REFERENCES Media(id),
             FOREIGN KEY (keyword_id) REFERENCES Keywords(id)
+        )
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS MediaVersion (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER NOT NULL,
+            version INTEGER NOT NULL,
+            prompt TEXT,
+            summary TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
         )
         ''',
         '''
@@ -125,6 +137,9 @@ def create_tables() -> None:
         ''',
         '''
         CREATE INDEX IF NOT EXISTS idx_mediakeywords_keyword_id ON MediaKeywords(keyword_id);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_media_version_media_id ON MediaVersion(media_id);
         '''
     ]
     for query in table_queries:
@@ -188,9 +203,9 @@ def add_keyword(keyword):
 
 # Function to add media with keywords
 # Function to add media with keywords
-def add_media_with_keywords(url: str, title: str, media_type: str, content: str, keywords: str, author: str = None, ingestion_date: str = None) -> str:
+def add_media_with_keywords(url: str, title: str, media_type: str, content: str, keywords: str, prompt: str, summary: str, author: str = None, ingestion_date: str = None) -> str:
     # Validate input
-    if not url or not title or not media_type or not content or not keywords:
+    if not url or not title or not media_type or not content or not keywords or not prompt or not summary:
         raise InputError("Please provide all required fields.")
 
     if not is_valid_url(url):
@@ -202,15 +217,30 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
     if ingestion_date and not is_valid_date(ingestion_date):
         raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")
 
+    if not ingestion_date:
+        ingestion_date = datetime.now().strftime('%Y-%m-%d')
+
+    logging.info(f"URL: {url}")
+    logging.info(f"Title: {title}")
+    logging.info(f"Media Type: {media_type}")
+    logging.info(f"Content: {content}")
+    logging.info(f"Keywords: {keywords}")
+    logging.info(f"Prompt: {prompt}")
+    logging.info(f"Summary: {summary}")
+    logging.info(f"Author: {author}")
+    logging.info(f"Ingestion Date: {ingestion_date}")
+
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
 
             # Insert media item
+            logger.debug(
+                f"Inserting media item with URL: {url}, Title: {title}, Type: {media_type}, Content: {content}, Author: {author}, Ingestion Date: {ingestion_date}, Prompt: {prompt}, Summary: {summary}")
             cursor.execute('''
-            INSERT INTO Media (url, title, type, content, author, ingestion_date) 
-            VALUES (?, ?, ?, ?, ?, ?)
-            ''', (url, title, media_type, content, author, ingestion_date))
+            INSERT INTO Media (url, title, type, content, author, ingestion_date, prompt, summary) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (url, title, media_type, content, author, ingestion_date, prompt, summary))
             media_id = cursor.lastrowid
 
             # Insert keywords and associate with media item
@@ -222,6 +252,9 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
             cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))
             conn.commit()
 
+            # Insert initial version of the prompt and summary
+            add_media_version(media_id, prompt, summary)
+
             return f"Media '{title}' added successfully with keywords: {', '.join(keyword_list)}"
     except sqlite3.Error as e:
         logger.error(f"SQL Error: {e}")
@@ -229,6 +262,26 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
     except Exception as e:
         logger.error(f"Unexpected Error: {e}")
         raise DatabaseError(f"Unexpected error: {e}")
+
+
+# Function to add a version of a prompt and summary
+def add_media_version(media_id: int, prompt: str, summary: str) -> None:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get the current version number for the media item
+            cursor.execute('SELECT COUNT(*) FROM MediaVersion WHERE media_id = ?', (media_id,))
+            version = cursor.fetchone()[0] + 1
+
+            # Insert the new version
+            cursor.execute('''
+            INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (media_id, version, prompt, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            conn.commit()
+    except sqlite3.Error as e:
+        raise DatabaseError(f"Error adding media version: {e}")
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
@@ -244,7 +297,7 @@ def search_db(search_query: str, search_fields: List[str], keyword: str, page: i
         search_columns = " OR ".join([f"media_fts.{field} MATCH ?" for field in search_fields])
 
         query = f'''
-        SELECT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date
+        SELECT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date, Media.prompt, Media.summary
         FROM Media
         JOIN media_fts ON Media.id = media_fts.rowid
         JOIN MediaKeywords ON Media.id = MediaKeywords.media_id
@@ -268,7 +321,7 @@ def format_results(results: Union[List[Tuple], str]) -> Union[pd.DataFrame, str]
     if isinstance(results, str):
         return results  # Return error message directly
 
-    df = pd.DataFrame(results, columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date'])
+    df = pd.DataFrame(results, columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date', 'Prompt', 'Summary'])
     return df
 
 
