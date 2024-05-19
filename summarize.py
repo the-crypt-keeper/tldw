@@ -2046,14 +2046,19 @@ def launch_ui(demo_mode=False):
         fn=search_and_display,
         inputs=[
             gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
-            gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"]),
+            gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content", "URL", "Type", "Author"],
+                             value=["Title"]),
             gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
-            gr.Number(label="Page", value=1, precision=0)
+            gr.Number(label="Page", value=1, precision=0),
+            gr.Button("Submit")
         ],
-        outputs=gr.Dataframe(label="Search Results"),
+        outputs=[
+            gr.Dataframe(label="Search Results"),
+            gr.Textbox(label="Message", visible=False)
+        ],
         title="Search Media Summaries",
         description="Search for media (documents, videos, articles) and their summaries in the database. Use keywords for better filtering.",
-        live=True
+        allow_flagging="never"
     )
 
     export_tab = gr.Interface(
@@ -2092,7 +2097,7 @@ def launch_ui(demo_mode=False):
                                            "Delete Keywords"])
 
     # Launch the interface
-    tabbed_interface.launch(share=True,)
+    tabbed_interface.launch(share=False,)
 
 
 #
