@@ -537,6 +537,7 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
             media_keywords = ', '.join(keyword_list)
             media_author = "auto_generated"
             media_ingestion_date = datetime.now().strftime('%Y-%m-%d')
+            transcription_model = whisper_model  # Add the transcription model used
 
             # Log the values before calling the function
             logging.info(f"Media URL: {media_url}")
@@ -548,6 +549,7 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
             logging.info(f"Ingestion Date: {media_ingestion_date}")
             logging.info(f"Custom Prompt: {custom_prompt}")
             logging.info(f"Summary Text: {summary_text}")
+            logging.info(f"Transcription Model: {transcription_model}")
 
             # Check if any required field is empty
             if not media_url or not media_title or not media_type or not media_content or not media_keywords or not custom_prompt or not summary_text:
@@ -561,6 +563,7 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
                 keywords=media_keywords,
                 prompt=custom_prompt,
                 summary=summary_text,
+                transcription_model=transcription_model,  # Pass the transcription model
                 author=media_author,
                 ingestion_date=media_ingestion_date
             )

@@ -82,7 +82,8 @@ def create_tables() -> None:
             author TEXT,
             ingestion_date TEXT,
             prompt TEXT,
-            summary TEXT
+            summary TEXT,
+            transcription_model TEXT
         )
         ''',
         '''
@@ -108,6 +109,16 @@ def create_tables() -> None:
             prompt TEXT,
             summary TEXT,
             created_at TEXT NOT NULL,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS MediaModifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER NOT NULL,
+            prompt TEXT,
+            summary TEXT,
+            modification_date TEXT,
             FOREIGN KEY (media_id) REFERENCES Media(id)
         )
         ''',
@@ -187,9 +198,9 @@ def delete_keyword(keyword: str) -> str:
 
 # Function to add media with keywords
 # Function to add media with keywords
-def add_media_with_keywords(url: str, title: str, media_type: str, content: str, keywords: str, prompt: str, summary: str, author: str = None, ingestion_date: str = None) -> str:
+def add_media_with_keywords(url: str, title: str, media_type: str, content: str, keywords: str, prompt: str, summary: str, transcription_model: str, author: str = None, ingestion_date: str = None) -> str:
     # Validate input
-    if not title or not media_type or not content or not keywords or not prompt or not summary:
+    if not title or not media_type or not content or not keywords or not prompt or not summary or not transcription_model:
         raise InputError("Please provide all required fields.")
 
     # Use 'localhost' as the URL if no valid URL is provided
@@ -214,6 +225,7 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
     logging.info(f"Summary: {summary}")
     logging.info(f"Author: {author}")
     logging.info(f"Ingestion Date: {ingestion_date}")
+    logging.info(f"Transcription Model: {transcription_model}")
 
     try:
         with db.get_connection() as conn:
@@ -241,9 +253,9 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
 
                 # Insert new media item
                 cursor.execute('''
-                INSERT INTO Media (url, title, type, content, author, ingestion_date) 
-                VALUES (?, ?, ?, ?, ?, ?)
-                ''', (url, title, media_type, content, author, ingestion_date))
+                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (url, title, media_type, content, author, ingestion_date, transcription_model))
                 media_id = cursor.lastrowid
 
                 # Insert keywords and associate with media item
@@ -251,7 +263,7 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
                 for keyword in keyword_list:
                     keyword = keyword.strip().lower()
                     keyword_id = add_keyword(keyword)
-                    cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?, ?)', (media_id, keyword_id))
+                    cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
                 cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))
 
                 # Also insert the initial prompt and summary into MediaModifications
@@ -280,15 +292,15 @@ def add_media_version(media_id: int, prompt: str, summary: str) -> None:
         with db.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Get the current version number for the media item
-            cursor.execute('SELECT COUNT(*) FROM MediaVersion WHERE media_id = ?', (media_id,))
-            version = cursor.fetchone()[0] + 1
+            # Get the current version number
+            cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
+            current_version = cursor.fetchone()[0] or 0
 
             # Insert the new version
             cursor.execute('''
             INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
             VALUES (?, ?, ?, ?, ?)
-            ''', (media_id, version, prompt, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            ''', (media_id, current_version + 1, prompt, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
             conn.commit()
     except sqlite3.Error as e:
         raise DatabaseError(f"Error adding media version: {e}")
