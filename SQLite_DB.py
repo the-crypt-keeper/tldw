@@ -272,7 +272,10 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
 
                 # Insert keywords and associate with media item
                 for keyword in keyword_list:
-                    keyword_id = add_keyword(keyword.strip())
+                    keyword = keyword.strip().lower()
+                    cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+                    cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                    keyword_id = cursor.fetchone()[0]
                     cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
                 cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))
 
