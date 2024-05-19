@@ -2423,6 +2423,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
     return results
 
 
+############################## MAIN ##############################
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Transcribe and summarize videos.',
@@ -2467,15 +2468,32 @@ Sample commands:
                         default=0.01, )
     parser.add_argument('-k', '--keywords', nargs='+', default=['cli_ingest_no_tag'],
                         help='Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)')
+    parser.add_argument('--log_file', type=str, help='Where to save logfile (non-default)')
 
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
-    # parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
+
     args = parser.parse_args()
 
-    # Logging setup
-    logger = logging.getLogger(__name__)
-    logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+########## Logging setup
+    logger = logging.getLogger()
+    logger.setLevel(getattr(logging, args.log_level))
 
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(getattr(logging, args.log_level))
+    console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_handler = logger.addHandler(console_handler)
+
+    if args.log_file:
+        # Create file handler
+        file_handler = logging.FileHandler(args.log_file)
+        file_handler.setLevel(getattr(logging, args.log_level))
+        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
+        logger.info(f"Log file created at: {args.log_file}")
+
+########## Custom Prompt setup
     custom_prompt = args.custom_prompt
 
     if custom_prompt is None or custom_prompt == "":
