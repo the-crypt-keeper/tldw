@@ -307,12 +307,12 @@ def add_media_version(media_id: int, prompt: str, summary: str) -> None:
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
-def search_db(search_query: str, search_fields: List[str], keyword: str, page: int = 1, results_per_page: int = 10) -> Union[List[Tuple], str]:
+def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10) -> Union[List[Tuple], str]:
     # Validate input
     if page < 1:
         raise InputError("Page number must be 1 or greater.")
 
-    keyword = keyword.strip().lower()
+    keywords = [keyword.strip().lower() for keyword in keywords.split(',') if keyword.strip()]
     with db.get_connection() as conn:
         cursor = conn.cursor()
         offset = (page - 1) * results_per_page
@@ -320,8 +320,11 @@ def search_db(search_query: str, search_fields: List[str], keyword: str, page: i
         search_conditions = []
         if search_fields:
             search_conditions.append(" OR ".join([f"media_fts.{field} MATCH ?" for field in search_fields]))
-        if keyword:
-            search_conditions.append("keyword_fts.keyword MATCH ?")
+        if keywords:
+            keyword_conditions = []
+            for keyword in keywords:
+                keyword_conditions.append("keyword_fts.keyword MATCH ?")
+            search_conditions.append(" AND ".join(keyword_conditions))
 
         where_clause = " AND ".join(search_conditions)
 
@@ -337,7 +340,7 @@ def search_db(search_query: str, search_fields: List[str], keyword: str, page: i
         '''
 
         try:
-            params = tuple([search_query] * len(search_fields) + [keyword] if keyword else [])
+            params = tuple([search_query] * len(search_fields) + keywords)
             cursor.execute(query, params + (results_per_page, offset))
             results = cursor.fetchall()
             if not results:
