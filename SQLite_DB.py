@@ -316,7 +316,14 @@ def search_db(search_query: str, search_fields: List[str], keyword: str, page: i
     with db.get_connection() as conn:
         cursor = conn.cursor()
         offset = (page - 1) * results_per_page
-        search_columns = " OR ".join([f"media_fts.{field} MATCH ?" for field in search_fields])
+
+        search_conditions = []
+        if search_fields:
+            search_conditions.append(" OR ".join([f"media_fts.{field} MATCH ?" for field in search_fields]))
+        if keyword:
+            search_conditions.append("keyword_fts.keyword MATCH ?")
+
+        where_clause = " AND ".join(search_conditions)
 
         query = f'''
         SELECT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date, Media.prompt, Media.summary
@@ -325,11 +332,13 @@ def search_db(search_query: str, search_fields: List[str], keyword: str, page: i
         JOIN MediaKeywords ON Media.id = MediaKeywords.media_id
         JOIN Keywords ON MediaKeywords.keyword_id = Keywords.id
         JOIN keyword_fts ON Keywords.id = keyword_fts.rowid
-        WHERE ({search_columns}) AND keyword_fts.keyword MATCH ?
+        WHERE {where_clause}
         LIMIT ? OFFSET ?
         '''
+
         try:
-            cursor.execute(query, tuple([search_query] * len(search_fields) + [keyword, results_per_page, offset]))
+            params = tuple([search_query] * len(search_fields) + [keyword] if keyword else [])
+            cursor.execute(query, params + (results_per_page, offset))
             results = cursor.fetchall()
             if not results:
                 return "No results found."
@@ -339,24 +348,33 @@ def search_db(search_query: str, search_fields: List[str], keyword: str, page: i
 
 
 # Function to format results for display
-def format_results(results: Union[List[Tuple], str]) -> Union[pd.DataFrame, str]:
+def format_results(results: Union[List[Tuple], str]) -> pd.DataFrame:
     if isinstance(results, str):
-        return results  # Return error message directly
+        return pd.DataFrame()  # Return an empty DataFrame if results is a string
 
-    df = pd.DataFrame(results, columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date', 'Prompt', 'Summary'])
+    df = pd.DataFrame(results,
+                      columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date', 'Prompt', 'Summary'])
     return df
 
 
 # Gradio function to handle user input and display results with pagination, with better feedback
-def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int):
+def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int, submit: bool):
+    if not submit:
+        return [], gr.update(visible=False)
+
     try:
         if not search_query.strip():
             raise InputError("Please enter a valid search query.")
 
         results = search_db(search_query, search_fields, keyword, page)
-        return format_results(results)
+        df = format_results(results)
+
+        if df.empty:
+            return df, gr.update(value="No results found.", visible=True)
+        else:
+            return df, gr.update(visible=False)
     except (DatabaseError, InputError) as e:
-        return str(e)
+        return pd.DataFrame(), gr.update(value=str(e), visible=True)
 
 
 # Function to export search results to CSV with pagination
