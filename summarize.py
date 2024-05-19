@@ -1201,6 +1201,7 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
             keywords=keyword_str,
             prompt=custom_prompt,
             summary=summary,
+            transcription_model=None,
             author=author,
             ingestion_date=ingestion_date
         )
