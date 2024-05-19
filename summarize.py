@@ -2046,17 +2046,17 @@ def launch_ui(demo_mode=False):
         fn=search_and_display,
         inputs=[
             gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
-            gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content", "URL", "Type", "Author"],
-                             value=["Title"]),
+            gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content", "URL", "Type", "Author"], value=["Title"]),
             gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
             gr.Number(label="Page", value=1, precision=0),
+            gr.Checkbox(visible=False)  # Dummy input to match the expected number of arguments
         ],
         outputs=[
             gr.Dataframe(label="Search Results"),
             gr.Textbox(label="Message", visible=False)
         ],
         title="Search Media Summaries",
-        description="Search across your ingested media (documents, videos, articles) and their summaries in the database. Use keywords for better filtering. Keywords are 'must-match' and are separated by commas.",
+        description="Search for media (documents, videos, articles) and their summaries in the database. Use keywords for better filtering.",
         allow_flagging="never"
     )
 
@@ -2074,26 +2074,32 @@ def launch_ui(demo_mode=False):
         description="Export the search results to a CSV file."
     )
 
-    keyword_tab = gr.Interface(
+    keyword_add_interface = gr.Interface(
         fn=add_keyword,
         inputs=gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here..."),
         outputs="text",
         title="Add Keywords",
-        description="Add multiple keywords to the database."
+        description="Add one, or multiple keywords to the database.",
+        allow_flagging="never"
     )
 
-    delete_keyword_tab = gr.Interface(
+    keyword_delete_interface = gr.Interface(
         fn=delete_keyword,
         inputs=gr.Textbox(label="Delete Keyword", placeholder="Enter keyword to delete here..."),
         outputs="text",
         title="Delete Keyword",
-        description="Delete a keyword from the database."
+        description="Delete a keyword from the database.",
+        allow_flagging="never"
+    )
+
+    keyword_tab = gr.TabbedInterface(
+        [keyword_add_interface, keyword_delete_interface],
+        ["Add Keywords", "Delete Keywords"]
     )
 
     # Combine interfaces into a tabbed interface
-    tabbed_interface = gr.TabbedInterface([iface, search_tab, export_tab, keyword_tab, delete_keyword_tab],
-                                          ["Transcription + Summarization", "Search", "Export", "Add Keywords",
-                                           "Delete Keywords"])
+    tabbed_interface = gr.TabbedInterface([iface, search_tab, export_tab, keyword_tab],
+                                          ["Transcription + Summarization", "Search", "Export", "Keywords"])
 
     # Launch the interface
     tabbed_interface.launch(share=False,)

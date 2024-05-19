@@ -361,7 +361,7 @@ def format_results(results: Union[List[Tuple], str]) -> pd.DataFrame:
 
 
 # Gradio function to handle user input and display results with pagination, with better feedback
-def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int, submit: bool):
+def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int, dummy: bool = False):
     if not submit:
         return [], gr.update(visible=False)
 
