@@ -2082,6 +2082,23 @@ def launch_ui(demo_mode=False):
         with gr.Tab("Sample Prompts/Questions"):
             gr.Markdown("Plan to put Sample prompts/questions here")
             gr.Markdown("Fabric prompts/live UI?")
+            # Searchable list
+            with gr.Row():
+                search_box = gr.Textbox(label="Search prompts", placeholder="Type to filter prompts")
+                search_result = gr.Textbox(label="Matching prompts", interactive=False)
+                search_box.change(search_prompts, inputs=search_box, outputs=search_result)
+
+            # Interactive list
+            with gr.Row():
+                prompt_selector = gr.Radio(choices=all_prompts, label="Select a prompt")
+                selected_output = gr.Textbox(label="Selected prompt")
+                prompt_selector.change(handle_prompt_selection, inputs=prompt_selector, outputs=selected_output)
+
+            # Categorized display
+            with gr.Accordion("Category 1"):
+                gr.Markdown("\n".join(prompts_category_1))
+            with gr.Accordion("Category 2"):
+                gr.Markdown("\n".join(prompts_category_2))
 
     # Gradio interface setup with tabs
     search_tab = gr.Interface(
@@ -2145,6 +2162,40 @@ def launch_ui(demo_mode=False):
 
     # Launch the interface
     tabbed_interface.launch(share=False,)
+
+
+#
+#
+#######################################################################################################################
+
+
+#######################################################################################################################
+# Prompt Sample Box
+#
+
+# Sample data
+prompts_category_1 = [
+    "What are the key points discussed in the video?",
+    "Summarize the main arguments made by the speaker.",
+    "Describe the conclusions of the study presented."
+]
+
+prompts_category_2 = [
+    "How does the proposed solution address the problem?",
+    "What are the implications of the findings?",
+    "Can you explain the theory behind the observed phenomenon?"
+]
+
+all_prompts = prompts_category_1 + prompts_category_2
+
+# Search function
+def search_prompts(query):
+    filtered_prompts = [prompt for prompt in all_prompts if query.lower() in prompt.lower()]
+    return "\n".join(filtered_prompts)
+
+# Handle prompt selection
+def handle_prompt_selection(prompt):
+    return f"You selected: {prompt}"
 
 
 #
