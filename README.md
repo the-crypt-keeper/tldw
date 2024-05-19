@@ -139,9 +139,9 @@ As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't h
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
-usage: summarize.py [-h] [-v] [-api API_NAME] [-key API_KEY] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET] [-vad]
-                    [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-ui] [-demo] [-prompt CUSTOM_PROMPT] [-overwrite] [-roll]
-                    [-detail DETAIL_LEVEL]
+usage: summarize.py [-h] [-v] [-api API_NAME] [-key API_KEY] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET]
+                    [-vad] [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-gui] [-demo] [-prompt CUSTOM_PROMPT]
+                    [-overwrite] [-roll] [-detail DETAIL_LEVEL] [-k [KEYWORDS ...]]
                     [input_path]
 
 Transcribe and summarize videos.
@@ -165,18 +165,21 @@ options:
   -vad, --vad_filter    Enable VAD filter
   -log {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                         Log level (default: INFO)
-  -ui, --user_interface
+  -gui, --user_interface
                         Launch the Gradio user interface
   -demo, --demo_mode    Enable demo mode
   -prompt CUSTOM_PROMPT, --custom_prompt CUSTOM_PROMPT
-                        Pass in a custom prompt to be used in place of the existing one. (Probably should just modify the script itself...)
+                        Pass in a custom prompt to be used in place of the existing one. (Probably should just modify
+                        the script itself...)
   -overwrite, --overwrite
                         Overwrite existing files
   -roll, --rolling_summarization
                         Enable rolling summarization
   -detail DETAIL_LEVEL, --detail_level DETAIL_LEVEL
-                        Mandatory if rolling summarization is enabled, defines the chunk size. Default is 0.01(lots of chunks) -> 1.00 (few
-                        chunks) Currently only OpenAI works.
+                        Mandatory if rolling summarization is enabled, defines the chunk size. Default is 0.01(lots of
+                        chunks) -> 1.00 (few chunks) Currently only OpenAI works.
+  -k [KEYWORDS ...], --keywords [KEYWORDS ...]
+                        Keywords for tagging the media (default: cli_ingest_no_tag)
 
 -Download Audio only from URL -> Transcribe audio:
   >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s

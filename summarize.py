@@ -2208,8 +2208,13 @@ def handle_prompt_selection(prompt):
 #
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
          download_video_flag=False, demo_mode=False, custom_prompt=None, overwrite=False,
-         rolling_summarization=False, detail_level=0.01, keywords=None):
-    global summary, audio_file
+         rolling_summarization=False, detail=0.01, keywords=None):
+
+    global detail_level, summary, audio_file
+
+    detail_level = detail
+
+    print(f"Keywords: {keywords}")
 
     if input_path is None and args.user_interface:
         return []
@@ -2390,6 +2395,24 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         logging.warning(f"Failed to generate summary using {api_name} API")
                 else:
                     logging.info("MAIN: #2 - No API specified. Summarization will not be performed")
+
+                # Add media to the database
+                add_media_with_keywords(
+                    url=path,
+                    title=info_dict.get('title', 'Untitled'),
+                    media_type='video',
+                    content=' '.join([segment['text'] for segment in segments]),
+                    keywords=','.join(keywords),
+                    prompt=custom_prompt or 'No prompt provided',
+                    summary=summary or 'No summary provided',
+                    transcription_model=whisper_model,
+                    author=info_dict.get('uploader', 'Unknown'),
+                    ingestion_date=datetime.now().strftime('%Y-%m-%d')
+                )
+
+        except Exception as e:
+            logging.error(f"Error processing {path}: {str(e)}")
+            continue
         except Exception as e:
             logging.error(f"Error processing path: {path}")
             logging.error(str(e))
@@ -2401,7 +2424,24 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Transcribe and summarize videos.')
+    parser = argparse.ArgumentParser(
+        description='Transcribe and summarize videos.',
+        epilog='''
+Sample commands:
+    1. Simple Sample command structure:
+        summarize.py <path_to_video> -api openai -k tag_one tag_two tag_three
+
+    2. Rolling Summary Sample command structure:
+        summarize.py <path_to_video> -api openai -prompt "custom_prompt_goes_here-is-appended-after-transcription" -roll -detail 0.01 -k tag_one tag_two tag_three
+
+    3. FULL Sample command structure:
+        summarize.py <path_to_video> -api openai -ns 2 -wm small.en -off 0 -vad -log INFO -prompt "custom_prompt" -overwrite -roll -detail 0.01 -k tag_one tag_two tag_three
+
+    4. Sample command structure for UI:
+        summarize.py -gui -log DEBUG
+        ''',
+        formatter_class = argparse.RawTextHelpFormatter
+    )
     parser.add_argument('input_path', type=str, help='Path or URL of the video', nargs='?')
     parser.add_argument('-v', '--video', action='store_true', help='Download the video instead of just the audio')
     parser.add_argument('-api', '--api_name', type=str, help='API name for summarization (optional)')
@@ -2425,6 +2465,9 @@ if __name__ == "__main__":
                                                                       'of chunks) -> 1.00 (few chunks)\n Currently '
                                                                       'only OpenAI works. ',
                         default=0.01, )
+    parser.add_argument('-k', '--keywords', nargs='+', default=['cli_ingest_no_tag'],
+                        help='Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)')
+
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
     # parser.add_argument('--log_file', action=str, help='Where to save logfile (non-default)')
     args = parser.parse_args()
@@ -2483,6 +2526,8 @@ if __name__ == "__main__":
         # and the rolling summarization flag is set
         #
         summary = None  # Initialize to ensure it's always defined
+        if args.detail_level == None:
+            args.detail_level = 0.01
         if args.api_name and args.rolling_summarization and any(
                 key.startswith(args.api_name) and value is not None for key, value in api_keys.items()):
             logging.info(f'MAIN: API used: {args.api_name}')
@@ -2507,7 +2552,7 @@ if __name__ == "__main__":
                            num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset,
                            vad_filter=args.vad_filter, download_video_flag=args.video, overwrite=args.overwrite,
                            rolling_summarization=args.rolling_summarization, custom_prompt=args.custom_prompt,
-                           demo_mode=args.demo_mode, detail=args.detail_level)
+                           demo_mode=args.demo_mode, detail=args.detail_level, keywords=args.keywords)
             logging.info('Transcription process completed.')
         except Exception as e:
             logging.error('An error occurred during the transcription process.')
