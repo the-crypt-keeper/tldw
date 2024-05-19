@@ -5,20 +5,38 @@
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
 
-### What is TL/DW?
+### What is this (TL/DW)?
+- **15 Second Summary**
+  - Take a URL, a single video, a list of URLs, or list of local videos + URLs, one per line in a text file, and feed it into the script and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
 
-- Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
-- Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
-- Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported only through OpenAI currently, though the [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) will let you do it with exllama or vLLM.
-- Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. ( https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md )
+- **30 Second Summary**
+  - Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
+  - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
+  - Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported only through OpenAI currently, though the [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) will let you do it with exllama or vLLM, using the scripts in there for the entire pipeline.
+  - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. (List of supported sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md )
 
-For commercial API usage, I personally recommend Sonnet. It's great quality and relatively inexpensive. 
+- **Longer Summary/Goal**
+  - To be able to act as an ingestion tool for personal database storage. The idea being that there is so much data one comes across, and we can store it all as text.
+  - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your finger tips in a moments notice.
+  - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
+  - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite (for now, would like to build a shim for ElasticSearch/Similar) DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it. (Plus act as a nice way of personally tagging data for possible future training of your personal AI agent :P)
+    * On the to-do list to see about creating some form of structure within the plain text to make review/reconstruction a little easier(markdown?) - Reconstruction being review of the data for raw consumption and not fed into an analysis pipeline.
+  - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
+  - Next major functionality will be (not in order):
+    1. Keyword cloud viewing/editing, so you can view all keywords within the DB
+    2. Chunking transcriptions based on timestamps
+    3. Dark mode that actually works.
+    4. Change the `Sample Prompts/Questions` into a SQLite DB, with a viewer, so its easier to update/manage the stored prompt samples (this is separate and will remain separate from the ingestion DB, idea being that while the goal is to make both shareable, and create some method of reducing the friction, I would like to clearly separate the two, as I believe the sharing of them would be in different contexts.)
+    5. LLM Inference Engine + Model download as part of the script -> I would like this to have an extremely low usability bar, and as part of what I see being needed to achieve that is the option/inclusion of an LLM Inference engine + selected model for those who dont' know what those are, but can still see the value of using a tool like this for themselves. (originally Llama.cpp, but now thinking Kobold.cpp :shrug: and MS Phi-3 128k @ Q8)
+
+For commercial API usage, I personally recommend Sonnet. It's great quality and relatively inexpensive.
 
 As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't have a lot of VRAM and want to self-host. (I think it's better than anything up to 70B for summarization - I do not have actual evidence for this)
-**CLI**
-![tldw-summarizing-cli-demo](./Tests/cli-demo.PNG)
-**GUI**
-![tldw-summarization-gui-demo](./Tests/Capture.PNG)
+
+**CLI Screenshot**
+- **See [Using](#using)**
+**GUI Screenshot**
+![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
 
 ----------
 
@@ -92,11 +110,94 @@ As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't h
     7. For running it locally, pass the '--local' argument into the script. This will download and launch a local inference server as part of the script. 
       * This will take up at least 6 GB of space. (WIP - not in place yet)
 
+### <a name="using"></a>Using
+- Single file (remote URL) transcription
+  * Single URL: `python summarize.py https://example.com/video.mp4`
+- Single file (local) transcription)
+  * Transcribe a local file: `python summarize.py /path/to/your/localfile.mp4`
+- Multiple files (local & remote)
+  * List of Files(can be URLs and local files mixed): `python summarize.py ./path/to/your/text_file.txt"`
+
+
+Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
+```
+positional arguments:
+  input_path            Path or URL of the video
+
+options:
+  -h, --help            show this help message and exit
+  -v, --video           Download the video instead of just the audio
+  -api API_NAME, --api_name API_NAME
+                        API name for summarization (optional)
+  -key API_KEY, --api_key API_KEY
+                        API key for summarization (optional)
+  -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
+                        Number of speakers (default: 2)
+  -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
+                        Whisper model (default: small.en)
+  -off OFFSET, --offset OFFSET
+                        Offset in seconds (default: 0)
+  -vad, --vad_filter    Enable VAD filter
+  -log {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Log level (default: INFO)
+  -gui, --user_interface
+                        Launch the Gradio user interface
+  -demo, --demo_mode    Enable demo mode
+  -prompt CUSTOM_PROMPT, --custom_prompt CUSTOM_PROMPT
+                        Pass in a custom prompt to be used in place of the existing one.
+                         (Probably should just modify the script itself...)
+  -overwrite, --overwrite
+                        Overwrite existing files
+  -roll, --rolling_summarization
+                        Enable rolling summarization
+  -detail DETAIL_LEVEL, --detail_level DETAIL_LEVEL
+                        Mandatory if rolling summarization is enabled, defines the chunk size.
+                         Default is 0.01(lots of chunks) -> 1.00 (few chunks)
+                         Currently only OpenAI works.
+  -k KEYWORDS [KEYWORDS ...], --keywords KEYWORDS [KEYWORDS ...]
+                        Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)
+  --log_file LOG_FILE   Where to save logfile (non-default)
+
+Sample commands:
+    1. Simple Sample command structure:
+        summarize.py <path_to_video> -api openai -k tag_one tag_two tag_three
+
+    2. Rolling Summary Sample command structure:
+        summarize.py <path_to_video> -api openai -prompt "custom_prompt_goes_here-is-appended-after-transcription" -roll -detail 0.01 -k tag_one tag_two tag_three
+
+    3. FULL Sample command structure:
+        summarize.py <path_to_video> -api openai -ns 2 -wm small.en -off 0 -vad -log INFO -prompt "custom_prompt" -overwrite -roll -detail 0.01 -k tag_one tag_two tag_three
+
+    4. Sample command structure for UI:
+        summarize.py -gui -log DEBUG
+```
+- Download Audio only from URL -> Transcribe audio:
+  >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
+
+- Transcribe audio from a Youtube URL & Summarize it using (anthropic/cohere/openai/llama (llama.cpp)/ooba (oobabooga/text-gen-webui)/kobold (kobold.cpp)/tabby (Tabbyapi)) API:
+  >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>
+    - Make sure to put your API key into `config.txt` under the appropriate API variable
+
+- Download Video with audio from URL -> Transcribe audio from Video:
+  >python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s
+
+- Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:
+  >python summarize.py --video ./local/file_on_your/system --api_name <API_name>
+
+- Transcribe & Summarize a List of Videos on your local filesytem with a text file:
+  >python summarize.py -v ./local/file_on_your/system
+
+- Run it as a WebApp:
+  >`python summarize.py -gui
+
+By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
+
+
 ---------------------------------------------
 ### <a name="what"></a>What?
 - **Use the script to (download->)transcribe(->summarize) a local file or remote (supported) url.**
 - **What can you transcribe and summarize?**
-  * **Any youtube video.** Or video hosted at any of these sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
+  * **Any youtube video.** Or any video hosted at any of these sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
     * (Playlists you have to use the `Get_Playlist_URLs.py` with `Get_Playlist_URLs.py <Playlist URL>` and it'll create a text file with all the URLs for each video, so you can pass the text file as input and they'll all be downloaded. Pull requests are welcome.)
     * Any url youtube-dl supports _should_ work.
   * **Local Videos**
@@ -126,82 +227,6 @@ As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't h
 - **Planned to Support**
   1. TabbyAPI - https://github.com/theroyallab/tabbyAPI
   2. vLLM - https://github.com/vllm-project/vllm
-
-
-### <a name="using"></a>Using
-- Single file (remote URL) transcription
-  * Single URL: `python summarize.py https://example.com/video.mp4`
-- Single file (local) transcription)
-  * Transcribe a local file: `python summarize.py /path/to/your/localfile.mp4`
-- Multiple files (local & remote)
-  * List of Files(can be URLs and local files mixed): `python summarize.py ./path/to/your/text_file.txt"`
-
-
-Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
-```
-usage: summarize.py [-h] [-v] [-api API_NAME] [-key API_KEY] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET]
-                    [-vad] [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-gui] [-demo] [-prompt CUSTOM_PROMPT]
-                    [-overwrite] [-roll] [-detail DETAIL_LEVEL] [-k [KEYWORDS ...]]
-                    [input_path]
-
-Transcribe and summarize videos.
-
-positional arguments:
-  input_path            Path or URL of the video
-
-options:
-  -h, --help            show this help message and exit
-  -v, --video           Download the video instead of just the audio
-  -api API_NAME, --api_name API_NAME
-                        API name for summarization (optional)
-  -key API_KEY, --api_key API_KEY
-                        API key for summarization (optional)
-  -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
-                        Number of speakers (default: 2)
-  -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
-                        Whisper model (default: small.en)
-  -off OFFSET, --offset OFFSET
-                        Offset in seconds (default: 0)
-  -vad, --vad_filter    Enable VAD filter
-  -log {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
-                        Log level (default: INFO)
-  -gui, --user_interface
-                        Launch the Gradio user interface
-  -demo, --demo_mode    Enable demo mode
-  -prompt CUSTOM_PROMPT, --custom_prompt CUSTOM_PROMPT
-                        Pass in a custom prompt to be used in place of the existing one. (Probably should just modify
-                        the script itself...)
-  -overwrite, --overwrite
-                        Overwrite existing files
-  -roll, --rolling_summarization
-                        Enable rolling summarization
-  -detail DETAIL_LEVEL, --detail_level DETAIL_LEVEL
-                        Mandatory if rolling summarization is enabled, defines the chunk size. Default is 0.01(lots of
-                        chunks) -> 1.00 (few chunks) Currently only OpenAI works.
-  -k [KEYWORDS ...], --keywords [KEYWORDS ...]
-                        Keywords for tagging the media (default: cli_ingest_no_tag)
-
--Download Audio only from URL -> Transcribe audio:
-  >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
-
--Transcribe audio from a Youtube URL & Summarize it using (anthropic/cohere/openai/llama (llama.cpp)/ooba (oobabooga/text-gen-webui)/kobold (kobold.cpp)/tabby (Tabbyapi)) API:
-  >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>
-    - Make sure to put your API key into `config.txt` under the appropriate API variable
-
--Download Video with audio from URL -> Transcribe audio from Video:
-  >python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s
-
--Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:
-  >python summarize.py --video ./local/file_on_your/system --api_name <API_name>
-
--Transcribe & Summarize a List of Videos on your local filesytem with a text file:
-  >python summarize.py -v ./local/file_on_your/system
-
--Run it as a WebApp:
-  >python summarize.py -gui
-
-By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
-```
 
 
 ------------
