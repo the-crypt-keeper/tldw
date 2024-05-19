@@ -35,6 +35,8 @@ As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't h
 
 **CLI Screenshot**
 - **See [Using](#using)**
+
+
 **GUI Screenshot**
 ![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
 
