@@ -2050,14 +2050,13 @@ def launch_ui(demo_mode=False):
                              value=["Title"]),
             gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
             gr.Number(label="Page", value=1, precision=0),
-            gr.Button("Submit")
         ],
         outputs=[
             gr.Dataframe(label="Search Results"),
             gr.Textbox(label="Message", visible=False)
         ],
         title="Search Media Summaries",
-        description="Search for media (documents, videos, articles) and their summaries in the database. Use keywords for better filtering.",
+        description="Search across your ingested media (documents, videos, articles) and their summaries in the database. Use keywords for better filtering. Keywords are 'must-match' and are separated by commas.",
         allow_flagging="never"
     )
 
@@ -2066,7 +2065,7 @@ def launch_ui(demo_mode=False):
         inputs=[
             gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
             gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"]),
-            gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
+            gr.Textbox(label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )", placeholder="Enter keywords here..."),
             gr.Number(label="Page", value=1, precision=0),
             gr.Number(label="Results per File", value=1000, precision=0)
         ],
