@@ -160,7 +160,7 @@ create_tables()
 
 
 # Function to add a keyword
-def add_keyword(keyword: str) -> str:
+def add_keyword(keyword: str) -> int:
     keyword = keyword.strip().lower()
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -169,8 +169,12 @@ def add_keyword(keyword: str) -> str:
             cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
             keyword_id = cursor.fetchone()[0]
             cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
+            logging.info(f"Keyword '{keyword}' added to keyword_fts with ID: {keyword_id}")
             conn.commit()
-            return f"Keyword '{keyword}' added successfully."
+            return keyword_id
+        except sqlite3.IntegrityError as e:
+            logging.error(f"Integrity error adding keyword: {e}")
+            raise DatabaseError(f"Integrity error adding keyword: {e}")
         except sqlite3.Error as e:
             logging.error(f"Error adding keyword: {e}")
             raise DatabaseError(f"Error adding keyword: {e}")
@@ -198,13 +202,21 @@ def delete_keyword(keyword: str) -> str:
 
 # Function to add media with keywords
 # Function to add media with keywords
-def add_media_with_keywords(url: str, title: str, media_type: str, content: str, keywords: str, prompt: str, summary: str, transcription_model: str, author: str = None, ingestion_date: str = None) -> str:
-    # Validate input
-    if not title or not media_type or not content or not keywords or not prompt or not summary or not transcription_model:
-        raise InputError("Please provide all required fields.")
+def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author, ingestion_date):
+    # Set default values for missing fields
+    url = url or 'Unknown'
+    title = title or 'Untitled'
+    media_type = media_type or 'Unknown'
+    content = content or 'No content available'
+    keywords = keywords or 'default'
+    prompt = prompt or 'No prompt available'
+    summary = summary or 'No summary available'
+    transcription_model = transcription_model or 'Unknown'
+    author = author or 'Unknown'
+    ingestion_date = ingestion_date or datetime.now().strftime('%Y-%m-%d')
 
     # Use 'localhost' as the URL if no valid URL is provided
-    if not url or not is_valid_url(url):
+    if not is_valid_url(url):
         url = 'localhost'
 
     if media_type not in ['document', 'video', 'article']:
@@ -259,10 +271,8 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
                 media_id = cursor.lastrowid
 
                 # Insert keywords and associate with media item
-                keyword_list = keywords.split(',')
                 for keyword in keyword_list:
-                    keyword = keyword.strip().lower()
-                    keyword_id = add_keyword(keyword)
+                    keyword_id = add_keyword(keyword.strip())
                     cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
                 cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))
 
@@ -278,6 +288,9 @@ def add_media_with_keywords(url: str, title: str, media_type: str, content: str,
             add_media_version(media_id, prompt, summary)
 
             return f"Media '{title}' added successfully with keywords: {', '.join(keyword_list)}"
+    except sqlite3.IntegrityError as e:
+        logger.error(f"Integrity Error: {e}")
+        raise DatabaseError(f"Integrity error adding media with keywords: {e}")
     except sqlite3.Error as e:
         logger.error(f"SQL Error: {e}")
         raise DatabaseError(f"Error adding media with keywords: {e}")
