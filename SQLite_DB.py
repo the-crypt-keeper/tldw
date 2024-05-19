@@ -201,7 +201,6 @@ def delete_keyword(keyword: str) -> str:
 
 
 # Function to add media with keywords
-# Function to add media with keywords
 def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author, ingestion_date):
     # Set default values for missing fields
     url = url or 'Unknown'
@@ -231,8 +230,8 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     logging.info(f"URL: {url}")
     logging.info(f"Title: {title}")
     logging.info(f"Media Type: {media_type}")
-    logging.info(f"Content: {content}")
     logging.info(f"Keywords: {keywords}")
+    logging.info(f"Content: {content}")
     logging.info(f"Prompt: {prompt}")
     logging.info(f"Summary: {summary}")
     logging.info(f"Author: {author}")

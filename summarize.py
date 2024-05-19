@@ -1149,29 +1149,43 @@ def openai_tokenize(text: str) -> List[str]:
 #
 #
 
-def scrape_article(url: str) -> dict:
-    downloaded = trafilatura.fetch_url(url)
-    if downloaded:
-        # Use trafilatura.extract with more specific options to get the main content
-        result = trafilatura.extract(downloaded, with_metadata=True, include_comments=False, include_links=False)
-        if isinstance(result, dict):  # Ensure result is a dictionary
+def get_title(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    title = soup.find('title').text.strip()
+    return title
+
+
+def scrape_article(url: str, max_retries: int = 3, retry_delay: int = 5) -> dict:
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            title_element = soup.find('title')
+            title = title_element.text.strip() if title_element else 'Untitled'
+
+            if title.lower() == 'just a moment...':
+                raise ValueError('Bot protection detected')
+
+            # Extract other metadata using BeautifulSoup or other methods
+            author = 'Unknown'
+            content = ''
+            date = ''
+
             return {
-                'title': result.get('title', 'Untitled'),
-                'author': result.get('author', 'Unknown'),
-                'content': result.get('text', ''),
-                'date': result.get('date', '')
+                'title': title,
+                'author': author,
+                'content': content,
+                'date': date
             }
-        elif isinstance(result, str):
-            # Handle case where result is a string
-            return {
-                'title': 'Untitled',
-                'author': 'Unknown',
-                'content': result,
-                'date': ''
-            }
-        else:
-            print(f"Unexpected result type: {type(result)}")
-            return None
+        except (requests.RequestException, ValueError) as e:
+            if attempt < max_retries - 1:
+                print(f"Attempt {attempt + 1} failed. Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                print(f"Failed to scrape the article after {max_retries} attempts. Error: {str(e)}")
+                return None
+
     return None
 
 
@@ -1188,7 +1202,7 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
 
         # Set default values for missing fields
         url = url or 'Unknown'
-        title = title or 'Untitled'
+        title = title or 'Unknown'
         author = author or 'Unknown'
         keywords = keywords or 'default'
         summary = summary or 'No summary available'
@@ -1228,7 +1242,7 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
             raise ValueError("Custom prompt is missing.")
 
         # Add media with keywords to the database
-        add_media_with_keywords(
+        result = add_media_with_keywords(
             url=url,
             title=title,
             media_type='article',
@@ -1240,20 +1254,21 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
             author=author or 'Unknown',
             ingestion_date=ingestion_date
         )
-        return "Article ingested successfully."
+        return result
     except Exception as e:
         logging.error(f"Failed to ingest article to the database: {e}")
         return str(e)
 
 
-def scrape_and_summarize(url, custom_prompt, api_name, api_key, keywords):
+def scrape_and_summarize(url, custom_title, custom_prompt, api_name, api_key, keywords):
     # Step 1: Scrape the article
     article_data = scrape_article(url)
     print(f"Scraped Article Data: {article_data}")  # Debugging statement
     if not article_data:
         return "Failed to scrape the article."
 
-    title = article_data.get('title', 'Untitled')
+    # Use the custom title if provided, otherwise use the scraped title
+    title = custom_title.strip() if custom_title else article_data.get('title', 'Untitled')
     author = article_data.get('author', 'Unknown')
     content = article_data.get('content', '')
     ingestion_date = datetime.now().strftime('%Y-%m-%d')
@@ -1288,8 +1303,9 @@ def scrape_and_summarize(url, custom_prompt, api_name, api_key, keywords):
 
 
 
-def ingest_unstructured_text(text, custom_prompt, api_name, api_key, keywords):
-    title = "Unstructured Text"
+
+def ingest_unstructured_text(text, custom_title, custom_prompt, api_name, api_key, keywords):
+    title = custom_title.strip() if custom_title else "Unstructured Text"
     author = "Unknown"
     ingestion_date = datetime.now().strftime('%Y-%m-%d')
 
@@ -1309,7 +1325,6 @@ def ingest_unstructured_text(text, custom_prompt, api_name, api_key, keywords):
 
     # Ingest the unstructured text into the database
     ingestion_result = ingest_article_to_db('Unstructured Text', title, author, text, keywords, summary, ingestion_date)
-
     return f"Title: {title}\nSummary: {summary}\nIngestion Result: {ingestion_result}"
 
 #
@@ -2048,6 +2063,8 @@ def launch_ui(demo_mode=False):
 
         with gr.Tab("Scrape & Summarize Articles/Websites"):
             url_input = gr.Textbox(label="Article URL", placeholder="Enter the article URL here")
+            custom_article_title_input = gr.Textbox(label="Custom Article Title (Optional)",
+                                                    placeholder="Enter a custom title for the article")
             custom_prompt_input = gr.Textbox(
                 label="Custom Prompt (Optional)",
                 placeholder="Provide a custom prompt for summarization",
