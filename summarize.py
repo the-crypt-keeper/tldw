@@ -6,6 +6,7 @@ import logging
 import os
 import platform
 import re
+from requests.exceptions import RequestException
 import shutil
 import sqlite3
 import subprocess
@@ -152,8 +153,8 @@ vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1
 vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
 
 # Chunk settings for timed chunking summarization
-DEFAULT_CHUNK_DURATION = config.getint('Settings', 'chunk_duration')
-WORDS_PER_SECOND = config.getint('Settings', 'words_per_second')
+DEFAULT_CHUNK_DURATION = config.getint('Settings', 'chunk_duration', fallback='30')
+WORDS_PER_SECOND = config.getint('Settings', 'words_per_second', fallback='3')
 
 # Retrieve output paths from the configuration file
 output_path = config.get('Paths', 'output_path', fallback='results')
@@ -599,6 +600,7 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
         return str(e), 'Error processing the request.', None, None, None, None
 
 
+
 def create_download_directory(title):
     base_dir = "Results"
     # Remove characters that are illegal in Windows filenames and normalize
@@ -835,6 +837,7 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
         if os.path.exists(out_file):
             logging.info("speech-to-text: Segments file already exists: %s", out_file)
             with open(out_file) as f:
+                global segments
                 segments = json.load(f)
             return segments
 
@@ -1023,6 +1026,7 @@ def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_
             summaries.append(summarizer(api_key, chunk))
 
     return "\n\n".join(summaries)
+################## ####################
 
 
 ######### Token-size Chunking ######### FIXME - OpenAI only currently
@@ -1181,7 +1185,55 @@ def rolling_summarize(text: str,
     final_summary = '\n\n'.join(accumulated_summaries)
 
     return final_summary
+#######################################
 
+
+######### Words-per-second Chunking #########
+# FIXME - WHole section needs to be re-written
+def chunk_transcript(transcript: str, chunk_duration: int, words_per_second) -> List[str]:
+    words = transcript.split()
+    words_per_chunk = chunk_duration * words_per_second
+    chunks = [' '.join(words[i:i + words_per_chunk]) for i in range(0, len(words), words_per_chunk)]
+    return chunks
+
+def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_duration: int, words_per_second: int) -> str:
+    if api_name not in summarizers:  # See 'summarizers' dict in the main script
+        return f"Unsupported API: {api_name}"
+
+    if not transcript:
+        logging.error("Empty or None transcript provided to summarize_chunks")
+        return "Error: Empty or None transcript provided"
+
+    text = extract_text_from_segments(transcript)
+    chunks = chunk_transcript(text, chunk_duration, words_per_second)
+
+    custom_prompt = args.custom_prompt
+
+    summaries = []
+    for chunk in chunks:
+        if api_name == 'openai':
+            # Ensure the correct model and prompt are passed
+            summaries.append(summarize_with_openai(api_key, chunk, custom_prompt))
+        elif api_name == 'anthropic':
+            summaries.append(summarize_with_cohere(api_key, chunk, anthropic_model, custom_prompt))
+        elif api_name == 'cohere':
+            summaries.append(summarize_with_claude(api_key, chunk, cohere_model, custom_prompt))
+        elif api_name == 'groq':
+            summaries.append(summarize_with_groq(api_key, chunk, groq_model, custom_prompt))
+        elif api_name == 'llama':
+            summaries.append(summarize_with_llama(llama_api_IP, chunk, api_key, custom_prompt))
+        elif api_name == 'kobold':
+            summaries.append(summarize_with_kobold(kobold_api_IP, chunk, api_key, custom_prompt))
+        elif api_name == 'ooba':
+            summaries.append(summarize_with_oobabooga(ooba_api_IP, chunk, api_key, custom_prompt))
+        elif api_name == 'tabbyapi':
+            summaries.append(summarize_with_vllm(api_key, tabby_api_IP, chunk, llm_model, custom_prompt))
+        else:
+            return f"Unsupported API: {api_name}"
+
+    return "\n\n".join(summaries)
+
+#######################################
 
 #
 #
@@ -1460,7 +1512,7 @@ def summarize_with_openai(api_key, file_path, custom_prompt):
         return "Error occurred while processing summary"
 
 
-def summarize_with_claude(api_key, file_path, model, custom_prompt):
+def summarize_with_claude(api_key, file_path, model, custom_prompt, max_retries=3, retry_delay=5):
     try:
         logging.debug("anthropic: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -1475,8 +1527,8 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt):
             'Content-Type': 'application/json'
         }
 
-        anthropic_prompt = custom_prompt
-        logging.debug("anthropic: Prompt is {anthropic_prompt}")
+        anthropic_prompt = custom_prompt  # Sanitize the custom prompt
+        logging.debug(f"anthropic: Prompt is {anthropic_prompt}")
         user_message = {
             "role": "user",
             "content": f"{text} \n\n\n\n{anthropic_prompt}"
@@ -1497,35 +1549,49 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt):
             "system": "You are a professional summarizer."
         }
 
-        logging.debug("anthropic: Posting request to API")
-        response = requests.post('https://api.anthropic.com/v1/messages', headers=headers, json=data)
-
-        # Check if the status code indicates success
-        if response.status_code == 200:
-            logging.debug("anthropic: Post submittal successful")
-            response_data = response.json()
+        for attempt in range(max_retries):
             try:
-                summary = response_data['content'][0]['text'].strip()
-                logging.debug("anthropic: Summarization successful")
-                print("Summary processed successfully.")
-                return summary
-            except (IndexError, KeyError) as e:
-                logging.debug("anthropic: Unexpected data in response")
-                print("Unexpected response format from Claude API:", response.text)
-                return None
-        elif response.status_code == 500:  # Handle internal server error specifically
-            logging.debug("anthropic: Internal server error")
-            print("Internal server error from API. Retrying may be necessary.")
-            return None
-        else:
-            logging.debug(f"anthropic: Failed to summarize, status code {response.status_code}: {response.text}")
-            print(f"Failed to process summary, status code {response.status_code}: {response.text}")
-            return None
+                logging.debug("anthropic: Posting request to API")
+                response = requests.post('https://api.anthropic.com/v1/messages', headers=headers, json=data)
 
+                # Check if the status code indicates success
+                if response.status_code == 200:
+                    logging.debug("anthropic: Post submittal successful")
+                    response_data = response.json()
+                    try:
+                        summary = response_data['content'][0]['text'].strip()
+                        logging.debug("anthropic: Summarization successful")
+                        print("Summary processed successfully.")
+                        return summary
+                    except (IndexError, KeyError) as e:
+                        logging.debug("anthropic: Unexpected data in response")
+                        print("Unexpected response format from Claude API:", response.text)
+                        return None
+                elif response.status_code == 500:  # Handle internal server error specifically
+                    logging.debug("anthropic: Internal server error")
+                    print("Internal server error from API. Retrying may be necessary.")
+                    time.sleep(retry_delay)
+                else:
+                    logging.debug(f"anthropic: Failed to summarize, status code {response.status_code}: {response.text}")
+                    print(f"Failed to process summary, status code {response.status_code}: {response.text}")
+                    return None
+
+            except RequestException as e:
+                logging.error(f"anthropic: Network error during attempt {attempt + 1}/{max_retries}: {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                else:
+                    return f"anthropic: Network error: {str(e)}"
+
+    except FileNotFoundError as e:
+        logging.error(f"anthropic: File not found: {file_path}")
+        return f"anthropic: File not found: {file_path}"
+    except json.JSONDecodeError as e:
+        logging.error(f"anthropic: Invalid JSON format in file: {file_path}")
+        return f"anthropic: Invalid JSON format in file: {file_path}"
     except Exception as e:
-        logging.debug("anthropic: Error in processing: %s", str(e))
-        print("Error occurred while processing summary with anthropic:", str(e))
-        return None
+        logging.error(f"anthropic: Error in processing: {str(e)}")
+        return f"anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
 
 
 # Summarize with Cohere
@@ -2007,6 +2073,7 @@ def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
 
     with gr.Blocks() as iface:
+        # Tab 1: Audio Transcription + Summarization
         with gr.Tab("Audio Transcription + Summarization"):
 
             with gr.Row():
@@ -2056,6 +2123,9 @@ def launch_ui(demo_mode=False):
             chunk_summarization_input = gr.Checkbox(label="Time-based Chunk Summarization", value=False, visible=False)
             chunk_duration_input = gr.Number(label="Chunk Duration (seconds)", value=DEFAULT_CHUNK_DURATION, visible=False)
             words_per_second_input = gr.Number(label="Words per Second", value=WORDS_PER_SECOND, visible=False)
+            #time_based_summarization_input = gr.Checkbox(label="Enable Time-based Summarization", value=False, visible=False)
+            #time_chunk_duration_input = gr.Number(label="Time Chunk Duration (seconds)", value=60, visible=False)
+            #llm_model_input = gr.Dropdown(label="LLM Model", choices=["gpt-4o", "gpt-4-turbo", "claude-3-sonnet-20240229", "command-r-plus", "CohereForAI/c4ai-command-r-plus", "llama3-70b-8192"], value="gpt-4o", visible=False)
 
             inputs = [
                 num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
@@ -2063,6 +2133,14 @@ def launch_ui(demo_mode=False):
                 rolling_summarization_input, detail_level_input, question_box_input, keywords_input,
                 chunk_summarization_input, chunk_duration_input, words_per_second_input
             ]
+            # inputs_1 = [
+            #     url_input_1,
+            #     num_speakers_input, whisper_model_input, custom_prompt_input_1, offset_input, api_name_input_1,
+            #     api_key_input_1, vad_filter_input, download_video_input, download_audio_input,
+            #     rolling_summarization_input, detail_level_input, question_box_input, keywords_input_1,
+            #     chunk_summarization_input, chunk_duration_input, words_per_second_input,
+            #     time_based_summarization_input, time_chunk_duration_input, llm_model_input
+            # ]
 
             outputs = [
                 gr.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
@@ -2163,8 +2241,10 @@ def launch_ui(demo_mode=False):
             # Function to toggle visibility of advanced inputs
             def toggle_ui(mode):
                 visible = (mode == "Advanced")
-                return [gr.update(visible=visible) if i not in [2, 4, 5, 11] else gr.update(visible=True) for i in
-                        range(len(inputs))]
+                return [
+                    gr.update(visible=True) if i in [0, 3, 5, 6, 13] else gr.update(visible=visible)
+                    for i in range(len(inputs))
+                ]
 
             # Set the event listener for the UI Mode toggle switch
             ui_mode_toggle.change(fn=toggle_ui, inputs=ui_mode_toggle, outputs=inputs)
@@ -2181,6 +2261,7 @@ def launch_ui(demo_mode=False):
                             "information including API keys."
             )
 
+        # Tab 2: Scrape & Summarize Articles/Websites
         with gr.Tab("Scrape & Summarize Articles/Websites"):
             url_input = gr.Textbox(label="Article URL", placeholder="Enter the article URL here")
             custom_article_title_input = gr.Textbox(label="Custom Article Title (Optional)",
@@ -2351,13 +2432,13 @@ def handle_prompt_selection(prompt):
 #
 def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
          download_video_flag=False, demo_mode=False, custom_prompt=None, overwrite=False,
-         rolling_summarization=False, detail=0.01, keywords=None, chunk_summarization=False, chunk_duration=None,
+         rolling_summarization=False, detail_level=0.01, keywords=None, chunk_summarization=False, chunk_duration=None,
          words_per_second=None):
     global detail_level_number, summary, audio_file
 
-    global detail_level, summary, audio_file
+    global detail, summary, audio_file
 
-    detail_level = detail
+    detail = detail_level
 
     print(f"Keywords: {keywords}")
 
@@ -2630,8 +2711,12 @@ Sample commands:
                                                                       'of chunks) -> 1.00 (few chunks)\n Currently '
                                                                       'only OpenAI works. ',
                         default=0.01, )
+    # FIXME - This or time based...
     parser.add_argument('--chunk_duration', type=int, default=DEFAULT_CHUNK_DURATION,
                         help='Duration of each chunk in seconds')
+    # FIXME - This or chunk_duration.... -> Maybe both???
+    parser.add_argument('-time', '--time_based', type=int,
+                        help='Enable time-based summarization and specify the chunk duration in seconds (minimum 60 seconds, increments of 30 seconds)')
     parser.add_argument('-model', '--llm_model', type=str, default='', help='Model to use for LLM summarization (only used for vLLM/TabbyAPI)')
     parser.add_argument('-k', '--keywords', nargs='+', default=['cli_ingest_no_tag'],
                         help='Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)')
