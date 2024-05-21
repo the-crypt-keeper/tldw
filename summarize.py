@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import argparse
+import asyncio
 import configparser
 import json
 import logging
 import os
 import platform
 import re
-from requests.exceptions import RequestException
 import shutil
 import sqlite3
 import subprocess
@@ -20,7 +20,9 @@ from typing import Optional
 
 from bs4 import BeautifulSoup
 import gradio as gr
+from playwright.async_api import async_playwright
 import requests
+from requests.exceptions import RequestException
 from SQLite_DB import *
 import tiktoken
 import trafilatura
@@ -136,7 +138,7 @@ logging.debug(f"Loaded HuggingFace Face API Key: {huggingface_api_key}")
 # Models
 anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
 cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
-groq_model = config.get('API', 'groq_model', fallback='FIXME')
+groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
 openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
 huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
 
@@ -433,7 +435,6 @@ def get_artice_title(article_url_arg: str) -> str:
     article_title = get_page_title(article_url_arg)
 
 
-
 #
 #
 #######################################################################################################################
@@ -462,9 +463,24 @@ def get_video_info(url: str) -> dict:
             return None
 
 
-def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video,
-                download_audio, rolling_summarization, detail_level, question_box, keywords, chunk_summarization,
-                chunk_duration_input, words_per_second_input):
+def process_url(url,
+                num_speakers,
+                whisper_model,
+                custom_prompt,
+                offset,
+                api_name,
+                api_key,
+                vad_filter,
+                download_video,
+                download_audio,
+                rolling_summarization,
+                detail_level,
+                question_box,
+                keywords,
+                chunk_summarization,
+                chunk_duration_input,
+                words_per_second_input,
+                ):
     # Validate input
     if not url:
         return "No URL provided.", "No URL provided.", None, None, None, None, None, None
@@ -485,11 +501,22 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
         info_dict = get_youtube(url)  # Extract video information using yt_dlp
         media_title = info_dict['title'] if 'title' in info_dict else 'Untitled'
 
-        results = main(url, api_name=api_name, api_key=api_key, num_speakers=num_speakers, whisper_model=whisper_model,
-                       offset=offset, vad_filter=vad_filter, download_video_flag=download_video,
-                       custom_prompt=custom_prompt, rolling_summarization=rolling_summarization,
-                       detail_level=detail_level, keywords=keywords, chunk_summarization=chunk_summarization,
-                       chunk_duration=chunk_duration_input, words_per_second=words_per_second_input)
+        results = main(url, api_name=api_name, api_key=api_key,
+                       num_speakers=num_speakers,
+                       whisper_model=whisper_model,
+                       offset=offset,
+                       vad_filter=vad_filter,
+                       download_video_flag=download_video,
+                       custom_prompt=custom_prompt,
+                       overwrite=args.overwrite,
+                       rolling_summarization=rolling_summarization,
+                       detail=detail_level,
+                       keywords=keywords,
+                       chunk_summarization=chunk_summarization,
+                       chunk_duration=chunk_duration_input,
+                       words_per_second=words_per_second_input,
+                       )
+
         if not results:
             return "No URL provided.", "No URL provided.", None, None, None, None, None, None
 
@@ -529,22 +556,41 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
         formatted_transcription = format_transcription(transcription_result)
 
         # Check for chunk summarization
-
         if chunk_summarization:
             chunk_duration = chunk_duration_input if chunk_duration_input else DEFAULT_CHUNK_DURATION
             words_per_second = words_per_second_input if words_per_second_input else WORDS_PER_SECOND
-            summary_text = summarize_chunks(api_name, api_key, transcription_result['transcription'], chunk_duration, words_per_second)
+            summary_text = summarize_chunks(api_name, api_key, transcription_result['transcription'], chunk_duration,
+                                            words_per_second)
+
+        # FIXME - This is a mess
+        # # Check for time-based chunking summarization
+        # if time_based_summarization:
+        #     logging.info("MAIN: Time-based Summarization")
+        #
+        #     # Set the json_file_path
+        #     json_file_path = audio_file.replace('.wav', '.segments.json')
+        #
+        #     # Perform time-based summarization
+        #     summary = time_chunk_summarize(api_name, api_key, json_file_path, time_chunk_duration, custom_prompt)
+        #
+        #     # Handle the summarized output
+        #     if summary:
+        #         transcription_result['summary'] = summary
+        #         logging.info("MAIN: Time-based Summarization successful.")
+        #         save_summary_to_file(summary, json_file_path)
+        #     else:
+        #         logging.warning("MAIN: Time-based Summarization failed.")
 
         # Add media to the database
         try:
             # Ensure these variables are correctly populated
             custom_prompt = args.custom_prompt if args.custom_prompt else ("\n\nabove is the transcript of a video "
-                              "Please read through the transcript carefully. Identify the main topics that are "
-                              "discussed over the course of the transcript. Then, summarize the key points about each "
-                              "main topic in a concise bullet point. The bullet points should cover the key "
-                              "information conveyed about each topic in the video, but should be much shorter than "
-                              "the full transcript. Please output your bullet point summary inside <bulletpoints> "
-                              "tags.")
+                                                                           "Please read through the transcript carefully. Identify the main topics that are "
+                                                                           "discussed over the course of the transcript. Then, summarize the key points about each "
+                                                                           "main topic in a concise bullet point. The bullet points should cover the key "
+                                                                           "information conveyed about each topic in the video, but should be much shorter than "
+                                                                           "the full transcript. Please output your bullet point summary inside <bulletpoints> "
+                                                                           "tags.")
 
             db = Database()
             create_tables()
@@ -592,13 +638,12 @@ def process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_nam
             logging.error(f"Failed to add media to the database: {e}")
 
         if summary_file_path and os.path.exists(summary_file_path):
-            return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None#audio_file_path
+            return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None  # audio_file_path
         else:
-            return transcription_text, summary_text, json_file_path, None, video_file_path, None#audio_file_path
+            return transcription_text, summary_text, json_file_path, None, video_file_path, None  # audio_file_path
     except Exception as e:
         logging.error(f"Error processing URL: {e}")
         return str(e), 'Error processing the request.', None, None, None, None
-
 
 
 def create_download_directory(title):
@@ -732,11 +777,13 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
 
         return output_file_path
 
+
 def read_paths_from_file(file_path: str) -> List[str]:
     """Read paths from a text file."""
     with open(file_path, 'r') as file:
         paths = file.readlines()
     return [path.strip() for path in paths]
+
 
 def save_summary_to_file(summary: str, file_path: str):
     """Save summary to a JSON file."""
@@ -744,9 +791,11 @@ def save_summary_to_file(summary: str, file_path: str):
     with open(file_path, 'w') as file:
         json.dump(summary_data, file, indent=4)
 
+
 def extract_text_from_segments(segments: List[Dict]) -> str:
     """Extract text from segments."""
     return " ".join([segment['text'] for segment in segments])
+
 
 #
 #
@@ -1009,7 +1058,8 @@ def chunk_transcript(transcript: str, chunk_duration: int, words_per_second) -> 
     return chunks
 
 
-def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_duration: int, words_per_second: int) -> str:
+def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_duration: int,
+                     words_per_second: int) -> str:
     if api_name not in summarizers:  # See 'summarizers' dict in the main script
         return f"Unsupported API: {api_name}"
 
@@ -1026,6 +1076,8 @@ def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_
             summaries.append(summarizer(api_key, chunk))
 
     return "\n\n".join(summaries)
+
+
 ################## ####################
 
 
@@ -1075,7 +1127,7 @@ def combine_chunks_with_no_minimum(
     candidate_indices = []
     for chunk_i, chunk in enumerate(chunks):
         chunk_with_header = [chunk] if header is None else [header, chunk]
-        #FIXME MAKE NOT OPENAI SPECIFIC
+        # FIXME MAKE NOT OPENAI SPECIFIC
         if len(openai_tokenize(chunk_delimiter.join(chunk_with_header))) > max_tokens:
             print(f"warning: chunk overflow")
             if (
@@ -1185,6 +1237,8 @@ def rolling_summarize(text: str,
     final_summary = '\n\n'.join(accumulated_summaries)
 
     return final_summary
+
+
 #######################################
 
 
@@ -1196,7 +1250,9 @@ def chunk_transcript(transcript: str, chunk_duration: int, words_per_second) -> 
     chunks = [' '.join(words[i:i + words_per_chunk]) for i in range(0, len(words), words_per_chunk)]
     return chunks
 
-def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_duration: int, words_per_second: int) -> str:
+
+def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_duration: int,
+                     words_per_second: int) -> str:
     if api_name not in summarizers:  # See 'summarizers' dict in the main script
         return f"Unsupported API: {api_name}"
 
@@ -1233,6 +1289,7 @@ def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_
 
     return "\n\n".join(summaries)
 
+
 #######################################
 
 #
@@ -1262,47 +1319,64 @@ def openai_tokenize(text: str) -> List[str]:
 #
 #
 
-def get_title(url):
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    title = soup.find('title').text.strip()
-    return title
+def scrape_article(url):
+    async def fetch_html(url: str) -> str:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
+            page = await context.new_page()
+            await page.goto(url)
+            await page.wait_for_load_state("networkidle")  # Wait for the network to be idle
+            content = await page.content()
+            await browser.close()
+            return content
 
-
-def scrape_article(url: str, max_retries: int = 3, retry_delay: int = 5) -> dict:
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(url)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            title_element = soup.find('title')
-            title = title_element.text.strip() if title_element else 'Untitled'
-
-            if title.lower() == 'just a moment...':
-                raise ValueError('Bot protection detected')
-
-            # Extract other metadata using BeautifulSoup or other methods
-            author = 'Unknown'
-            content = ''
-            date = ''
-
-            return {
-                'title': title,
-                'author': author,
-                'content': content,
-                'date': date
-            }
-        except (requests.RequestException, ValueError) as e:
-            if attempt < max_retries - 1:
-                print(f"Attempt {attempt + 1} failed. Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
+    def extract_article_data(html: str) -> dict:
+        downloaded = trafilatura.extract(html, include_comments=False, include_tables=False, include_images=False)
+        if downloaded:
+            metadata = trafilatura.extract_metadata(html)
+            if metadata:
+                return {
+                    'title': metadata.title if metadata.title else 'N/A',
+                    'author': metadata.author if metadata.author else 'N/A',
+                    'content': downloaded,
+                    'date': metadata.date if metadata.date else 'N/A',
+                }
             else:
-                print(f"Failed to scrape the article after {max_retries} attempts. Error: {str(e)}")
+                print("Metadata extraction failed.")
                 return None
+        else:
+            print("Content extraction failed.")
+            return None
 
-    return None
+    def convert_html_to_markdown(html: str) -> str:
+        soup = BeautifulSoup(html, 'html.parser')
+        # Convert each paragraph to markdown
+        for para in soup.find_all('p'):
+            para.append('\n')  # Add a newline at the end of each paragraph for markdown separation
+
+        # Use .get_text() with separator to keep paragraph separation
+        text = soup.get_text(separator='\n\n')
+
+        return text
+
+    async def fetch_and_extract_article(url: str):
+        html = await fetch_html(url)
+        print("HTML Content:", html[:500])  # Print first 500 characters of the HTML for inspection
+        article_data = extract_article_data(html)
+        if article_data:
+            article_data['content'] = convert_html_to_markdown(article_data['content'])
+            return article_data
+        else:
+            return None
+
+    # Using asyncio.run to handle event loop creation and execution
+    article_data = asyncio.run(fetch_and_extract_article(url))
+    return article_data
 
 
-def ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date):
+def ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date, custom_prompt):
     try:
         # Check if content is not empty or whitespace
         if not content.strip():
@@ -1373,7 +1447,7 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
         return str(e)
 
 
-def scrape_and_summarize(url, custom_prompt, api_name, api_key, keywords, custom_article_title):
+def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_article_title):
     # Step 1: Scrape the article
     article_data = scrape_article(url)
     print(f"Scraped Article Data: {article_data}")  # Debugging statement
@@ -1388,28 +1462,85 @@ def scrape_and_summarize(url, custom_prompt, api_name, api_key, keywords, custom
 
     print(f"Title: {title}, Author: {author}, Content Length: {len(content)}")  # Debugging statement
 
+    # Custom prompt for the article
+    article_custom_prompt = custom_prompt_arg or "Summarize this article."
+
     # Step 2: Summarize the article
+    summary = None
     if api_name:
+        logging.debug(f"Article_Summarizer: Summarization being performed by {api_name}")
         json_file_path = f"Results/{title.replace(' ', '_')}_segments.json"
         with open(json_file_path, 'w') as json_file:
             json.dump([{'text': content}], json_file, indent=2)
 
-        if api_name.lower() == 'openai':
-            summary = summarize_with_openai(api_key, json_file_path, custom_prompt)
-        # Add other APIs as needed
-        else:
-            summary = "Unsupported API."
-    else:
-        summary = "No API provided for summarization."
+        try:
+            if api_name.lower() == 'openai':
+                openai_api_key = api_key if api_key else config.get('API', 'openai_api_key', fallback=None)
+                logging.debug(f"Article_Summarizer: trying to summarize with openAI")
+                summary = summarize_with_openai(openai_api_key, json_file_path, article_custom_prompt)
+            elif api_name.lower() == "anthropic":
+                anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key', fallback=None)
+                logging.debug(f"Article_Summarizer: Trying to summarize with anthropic")
+                summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model,
+                                                custom_prompt=article_custom_prompt)
+            elif api_name.lower() == "cohere":
+                cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
+                logging.debug(f"Article_Summarizer: Trying to summarize with cohere")
+                summary = summarize_with_cohere(cohere_api_key, json_file_path, cohere_model,
+                                                custom_prompt=article_custom_prompt)
+            elif api_name.lower() == "groq":
+                groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
+                logging.debug(f"Article_Summarizer: Trying to summarize with Groq")
+                summary = summarize_with_groq(groq_api_key, json_file_path, groq_model,
+                                              custom_prompt=article_custom_prompt)
+            elif api_name.lower() == "llama":
+                llama_token = api_key if api_key else config.get('API', 'llama_api_key', fallback=None)
+                llama_ip = llama_api_IP
+                logging.debug(f"Article_Summarizer: Trying to summarize with Llama.cpp")
+                summary = summarize_with_llama(llama_ip, json_file_path, llama_token, article_custom_prompt)
+            elif api_name.lower() == "kobold":
+                kobold_token = api_key if api_key else config.get('API', 'kobold_api_key', fallback=None)
+                kobold_ip = kobold_api_IP
+                logging.debug(f"Article_Summarizer: Trying to summarize with kobold.cpp")
+                summary = summarize_with_kobold(kobold_ip, json_file_path, kobold_token, article_custom_prompt)
+            elif api_name.lower() == "ooba":
+                ooba_token = api_key if api_key else config.get('API', 'ooba_api_key', fallback=None)
+                ooba_ip = ooba_api_IP
+                logging.debug(f"Article_Summarizer: Trying to summarize with oobabooga")
+                summary = summarize_with_oobabooga(ooba_ip, json_file_path, ooba_token, article_custom_prompt)
+            elif api_name.lower() == "tabbyapi":
+                tabbyapi_key = api_key if api_key else config.get('API', 'tabby_api_key', fallback=None)
+                tabbyapi_ip = tabby_api_IP
+                logging.debug(f"Article_Summarizer: Trying to summarize with tabbyapi")
+                tabby_model = llm_model
+                summary = summarize_with_tabbyapi(tabbyapi_key, tabbyapi_ip, json_file_path, tabby_model,
+                                                  article_custom_prompt)
+            elif api_name.lower() == "vllm":
+                logging.debug(f"Article_Summarizer: Trying to summarize with VLLM")
+                summary = summarize_with_vllm(vllm_api_url, vllm_api_key, llm_model, json_file_path,
+                                              article_custom_prompt)
+            elif api_name.lower() == "huggingface":
+                huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
+                logging.debug(f"Article_Summarizer: Trying to summarize with huggingface")
+                summary = summarize_with_huggingface(huggingface_api_key, json_file_path, article_custom_prompt)
+        except requests.exceptions.ConnectionError as e:
+            logging.error(f"Connection error while trying to summarize with {api_name}: {str(e)}")
 
-    # Set a default custom prompt if it's not provided
-    if not custom_prompt:
-        custom_prompt = "Summarize this article."
+        if summary:
+            logging.info(f"Article_Summarizer: Summary generated using {api_name} API")
+            save_summary_to_file(summary, json_file_path)
+        else:
+            summary = "Summary not available"
+            logging.warning(f"Failed to generate summary using {api_name} API")
+
+    else:
+        summary = "Article Summarization: No API provided for summarization."
 
     print(f"Summary: {summary}")  # Debugging statement
 
     # Step 3: Ingest the article into the database
-    ingestion_result = ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date)
+    ingestion_result = ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date,
+                                            article_custom_prompt)
 
     return f"Title: {title}\nAuthor: {author}\nSummary: {summary}\nIngestion Result: {ingestion_result}"
 
@@ -1434,8 +1565,10 @@ def ingest_unstructured_text(text, custom_prompt, api_name, api_key, keywords, c
         summary = "No API provided for summarization."
 
     # Ingest the unstructured text into the database
-    ingestion_result = ingest_article_to_db('Unstructured Text', title, author, text, keywords, summary, ingestion_date)
+    ingestion_result = ingest_article_to_db('Unstructured Text', title, author, text, keywords, summary, ingestion_date,
+                                            custom_prompt)
     return f"Title: {title}\nSummary: {summary}\nIngestion Result: {ingestion_result}"
+
 
 #
 #
@@ -1572,7 +1705,8 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt, max_retries=
                     print("Internal server error from API. Retrying may be necessary.")
                     time.sleep(retry_delay)
                 else:
-                    logging.debug(f"anthropic: Failed to summarize, status code {response.status_code}: {response.text}")
+                    logging.debug(
+                        f"anthropic: Failed to summarize, status code {response.status_code}: {response.text}")
                     print(f"Failed to process summary, status code {response.status_code}: {response.text}")
                     return None
 
@@ -1920,7 +2054,6 @@ summarizers: Dict[str, Callable[[str, str], str]] = {
 #
 
 def summarize_with_detail_openai(text, detail, verbose=False):
-    # FIXME MAKE function not specific to the artifiical intelligence example
     summary_with_detail_variable = rolling_summarize(text, detail=detail, verbose=True)
     print(len(openai_tokenize(summary_with_detail_variable)))
     return summary_with_detail_variable
@@ -1989,7 +2122,7 @@ def summarize_with_huggingface(api_key, file_path, custom_prompt):
     # FIXME
     # This is here for gradio authentication
     # Its just not setup.
-    #def same_auth(username, password):
+    # def same_auth(username, password):
     #    return username == password
 
 
@@ -2027,7 +2160,9 @@ def ask_question(transcription, question, api_name, api_key):
     if not question.strip():
         return "Please enter a question."
 
-        prompt = f"Transcription:\n{transcription}\n\nGiven the above transcription, please answer the following:\n\n{question}"
+        prompt = f"""Transcription:\n{transcription}
+
+        Given the above transcription, please answer the following:\n\n{question}"""
 
         # FIXME - Refactor main API checks so they're their own function - api_check()
         # Call api_check() function here
@@ -2047,7 +2182,8 @@ def ask_question(transcription, question, api_name, api_key):
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant that answers questions based on the given transcription and summary."
+                        "content": "You are a helpful assistant that answers questions based on the given "
+                                   "transcription and summary."
                     },
                     {
                         "role": "user",
@@ -2068,7 +2204,9 @@ def ask_question(transcription, question, api_name, api_key):
         return "Question answering is currently only supported with the OpenAI API."
 
 
-# Gradio setup
+import gradio as gr
+
+
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
 
@@ -2113,19 +2251,34 @@ def launch_ui(demo_mode=False):
             api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
                                        placeholder="Enter your API key here; Ignore if using Local API or Built-in API",
                                        visible=True)
-            vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False, visible=False)
-            rolling_summarization_input = gr.Checkbox(label="Enable Rolling Summarization", value=False, visible=False)
-            download_video_input = gr.components.Checkbox(label="Download Video(Select to allow for file download of selected video)", value=False, visible=False)
-            download_audio_input = gr.components.Checkbox(label="Download Audio(Select to allow for file download of selected Video's Audio)", value=False, visible=False)
-            detail_level_input = gr.Slider(minimum=0.01, maximum=1.0, value=0.01, step=0.01, interactive=True, label="Summary Detail Level (Slide me) (Only OpenAI currently supported)", visible=False)
-            keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated Example: tag_one,tag_two,tag_three)", value="default,no_keyword_set", visible=True)
-            question_box_input = gr.Textbox(label="Question", placeholder="Enter a question to ask about the transcription", visible=False)
-            chunk_summarization_input = gr.Checkbox(label="Time-based Chunk Summarization", value=False, visible=False)
-            chunk_duration_input = gr.Number(label="Chunk Duration (seconds)", value=DEFAULT_CHUNK_DURATION, visible=False)
-            words_per_second_input = gr.Number(label="Words per Second", value=WORDS_PER_SECOND, visible=False)
-            #time_based_summarization_input = gr.Checkbox(label="Enable Time-based Summarization", value=False, visible=False)
-            #time_chunk_duration_input = gr.Number(label="Time Chunk Duration (seconds)", value=60, visible=False)
-            #llm_model_input = gr.Dropdown(label="LLM Model", choices=["gpt-4o", "gpt-4-turbo", "claude-3-sonnet-20240229", "command-r-plus", "CohereForAI/c4ai-command-r-plus", "llama3-70b-8192"], value="gpt-4o", visible=False)
+            vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False,
+                                           visible=False)
+            rolling_summarization_input = gr.Checkbox(label="Enable Rolling Summarization", value=False,
+                                                      visible=False)
+            download_video_input = gr.components.Checkbox(label="Download Video(Select to allow for file download of "
+                                                                "selected video)", value=False, visible=False)
+            download_audio_input = gr.components.Checkbox(label="Download Audio(Select to allow for file download of "
+                                                                "selected Video's Audio)", value=False, visible=False)
+            detail_level_input = gr.Slider(minimum=0.01, maximum=1.0, value=0.01, step=0.01, interactive=True,
+                                           label="Summary Detail Level (Slide me) (Only OpenAI currently supported)",
+                                           visible=False)
+            keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated Example: "
+                                                                      "tag_one,tag_two,tag_three)",
+                                        value="default,no_keyword_set",
+                                        visible=True)
+            question_box_input = gr.Textbox(label="Question",
+                                            placeholder="Enter a question to ask about the transcription",
+                                            visible=False)
+            chunk_summarization_input = gr.Checkbox(label="Time-based Chunk Summarization",
+                                                    value=False,
+                                                    visible=False)
+            chunk_duration_input = gr.Number(label="Chunk Duration (seconds)", value=DEFAULT_CHUNK_DURATION,
+                                             visible=False)
+            words_per_second_input = gr.Number(label="Words per Second", value=WORDS_PER_SECOND,
+                                               visible=False)
+            # time_based_summarization_input = gr.Checkbox(label="Enable Time-based Summarization", value=False, visible=False)
+            # time_chunk_duration_input = gr.Number(label="Time Chunk Duration (seconds)", value=60, visible=False)
+            # llm_model_input = gr.Dropdown(label="LLM Model", choices=["gpt-4o", "gpt-4-turbo", "claude-3-sonnet-20240229", "command-r-plus", "CohereForAI/c4ai-command-r-plus", "llama3-70b-8192"], value="gpt-4o", visible=False)
 
             inputs = [
                 num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
@@ -2285,7 +2438,8 @@ def launch_ui(demo_mode=False):
             result_output = gr.Textbox(label="Result")
 
             scrape_button.click(scrape_and_summarize, inputs=[url_input, custom_prompt_input, api_name_input,
-                                                              api_key_input, keywords_input, custom_article_title_input], outputs=result_output)
+                                                              api_key_input, keywords_input,
+                                                              custom_article_title_input], outputs=result_output)
 
             gr.Markdown("### Or Paste Unstructured Text Below (Will use settings from above)")
             text_input = gr.Textbox(label="Unstructured Text", placeholder="Paste unstructured text here", lines=10)
@@ -2385,7 +2539,7 @@ def launch_ui(demo_mode=False):
                                           ["Transcription + Summarization", "Search", "Export", "Keywords"])
 
     # Launch the interface
-    tabbed_interface.launch(share=False,)
+    tabbed_interface.launch(share=False, )
 
 
 #
@@ -2412,10 +2566,12 @@ prompts_category_2 = [
 
 all_prompts = prompts_category_1 + prompts_category_2
 
+
 # Search function
 def search_prompts(query):
     filtered_prompts = [prompt for prompt in all_prompts if query.lower() in prompt.lower()]
     return "\n".join(filtered_prompts)
+
 
 # Handle prompt selection
 def handle_prompt_selection(prompt):
@@ -2430,15 +2586,28 @@ def handle_prompt_selection(prompt):
 #######################################################################################################################
 # Main()
 #
-def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model="small.en", offset=0, vad_filter=False,
-         download_video_flag=False, demo_mode=False, custom_prompt=None, overwrite=False,
-         rolling_summarization=False, detail_level=0.01, keywords=None, chunk_summarization=False, chunk_duration=None,
-         words_per_second=None):
+
+def main(input_path, api_name=None, api_key=None,
+         num_speakers=2,
+         whisper_model="small.en",
+         offset=0,
+         vad_filter=False,
+         download_video_flag=False,
+         custom_prompt=None,
+         overwrite=False,
+         rolling_summarization=False,
+         detail=0.01,
+         keywords=None,
+         chunk_summarization=False,
+         chunk_duration=None,
+         words_per_second=None,
+         llm_model=None,
+         time_based=False):
     global detail_level_number, summary, audio_file
 
-    global detail, summary, audio_file
+    global detail_level, summary, audio_file
 
-    detail = detail_level
+    detail_level = detail
 
     print(f"Keywords: {keywords}")
 
@@ -2478,7 +2647,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         video_path = download_video(path, download_path, info_dict, download_video_flag)
                     except RuntimeError as e:
                         logging.error(f"Error downloading video: {str(e)}")
-                        #FIXME - figure something out for handling this situation....
+                        # FIXME - figure something out for handling this situation....
                         continue
                     logging.debug("MAIN: Video downloaded successfully")
                     logging.debug("MAIN: Converting video file to WAV...")
@@ -2527,7 +2696,29 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         save_summary_to_file(summary, json_file_path)
                     else:
                         logging.warning("MAIN: Rolling Summarization failed.")
-                # Perform chunk summarization
+
+                # FIXME - fucking mess of a function.
+                # # Time-based Summarization
+                # elif args.time_based:
+                #     logging.info("MAIN: Time-based Summarization")
+                #     global time_based_value
+                #     time_based_value = args.time_based
+                #     # Set the json_file_path
+                #     json_file_path = audio_file.replace('.wav', '.segments.json')
+                #
+                #     # Perform time-based summarization
+                #     summary = time_chunk_summarize(api_name, api_key, segments, args.time_based, custom_prompt,
+                #                                    llm_model)
+                #
+                #     # Handle the summarized output
+                #     if summary:
+                #         transcription_result['summary'] = summary
+                #         logging.info("MAIN: Time-based Summarization successful.")
+                #         save_summary_to_file(summary, json_file_path)
+                #     else:
+                #         logging.warning("MAIN: Time-based Summarization failed.")
+
+                # Perform chunk summarization - FIXME
                 elif chunk_summarization:
                     logging.info("MAIN: Chunk Summarization")
 
@@ -2609,12 +2800,14 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
                         try:
                             logging.debug(f"MAIN: Trying to summarize with tabbyapi")
                             tabby_model = llm_model
-                            summary = summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, json_file_path, tabby_model, custom_prompt)
+                            summary = summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, json_file_path, tabby_model,
+                                                              custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "vllm":
                         logging.debug(f"MAIN: Trying to summarize with VLLM")
-                        summary = summarize_with_vllm(vllm_api_url, vllm_api_key, llm_model, json_file_path, custom_prompt)
+                        summary = summarize_with_vllm(vllm_api_url, vllm_api_key, llm_model, json_file_path,
+                                                      custom_prompt)
                     elif api_name.lower() == "huggingface":
                         huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key',
                                                                                  fallback=None)
@@ -2662,7 +2855,7 @@ def main(input_path, api_name=None, api_key=None, num_speakers=2, whisper_model=
             logging.error(f"Error processing path: {path}")
             logging.error(str(e))
             continue
-        #end_time = time.monotonic()
+        # end_time = time.monotonic()
         # print("Total program execution time: " + timedelta(seconds=end_time - start_time))
 
     return results
@@ -2686,7 +2879,7 @@ Sample commands:
     4. Sample command structure for UI:
         summarize.py -gui -log DEBUG
         ''',
-        formatter_class = argparse.RawTextHelpFormatter
+        formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument('input_path', type=str, help='Path or URL of the video', nargs='?')
     parser.add_argument('-v', '--video', action='store_true', help='Download the video instead of just the audio')
@@ -2717,7 +2910,8 @@ Sample commands:
     # FIXME - This or chunk_duration.... -> Maybe both???
     parser.add_argument('-time', '--time_based', type=int,
                         help='Enable time-based summarization and specify the chunk duration in seconds (minimum 60 seconds, increments of 30 seconds)')
-    parser.add_argument('-model', '--llm_model', type=str, default='', help='Model to use for LLM summarization (only used for vLLM/TabbyAPI)')
+    parser.add_argument('-model', '--llm_model', type=str, default='',
+                        help='Model to use for LLM summarization (only used for vLLM/TabbyAPI)')
     parser.add_argument('-k', '--keywords', nargs='+', default=['cli_ingest_no_tag'],
                         help='Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)')
     parser.add_argument('--log_file', type=str, help='Where to save logfile (non-default)')
@@ -2817,14 +3011,27 @@ Sample commands:
         logging.debug("ffmpeg check being performed...")
         check_ffmpeg()
 
-        llm_model = args.llm_model or ''
+        llm_model = args.llm_model or None
 
         try:
-            results = main(args.input_path, api_name=args.api_name, api_key=args.api_key,
-                           num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset,
-                           vad_filter=args.vad_filter, download_video_flag=args.video, overwrite=args.overwrite,
-                           rolling_summarization=args.rolling_summarization, custom_prompt=args.custom_prompt,
-                           demo_mode=args.demo_mode, detail=args.detail_level, keywords=args.keywords, llm_model=args.llm_model)
+            results = main(args.input_path, api_name=args.api_name,
+                           api_key=args.api_key,
+                           num_speakers=args.num_speakers,
+                           whisper_model=args.whisper_model,
+                           offset=args.offset,
+                           vad_filter=args.vad_filter,
+                           download_video_flag=args.video,
+                           custom_prompt=args.custom_prompt,
+                           overwrite=args.overwrite,
+                           rolling_summarization=args.rolling_summarization,
+                           detail=args.detail_level,
+                           keywords=args.keywords,
+                           chunk_summarization=False,
+                           chunk_duration=None,
+                           words_per_second=None,
+                           llm_model=args.llm_model,
+                           time_based=args.time_based)
+
             logging.info('Transcription process completed.')
         except Exception as e:
             logging.error('An error occurred during the transcription process.')
