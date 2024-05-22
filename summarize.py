@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
+import atexit
 import configparser
 import json
 import logging
@@ -8,6 +9,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -17,6 +19,7 @@ import zipfile
 from datetime import datetime
 from typing import List, Tuple
 from typing import Optional
+import webbrowser
 
 from bs4 import BeautifulSoup
 import gradio as gr
@@ -209,7 +212,7 @@ print(r"""_____  _          ________  _    _
 | (_| || || (_| || | | |   | |_   \ V  V / | (_| || |_ | (__ | | | |
  \__,_||_| \__,_||_| |_|    \__|   \_/\_/   \__,_| \__| \___||_| |_|
 """)
-
+time.sleep(1)
 #######################################################################################################################
 # System Checks
 #
@@ -345,6 +348,8 @@ def download_ffmpeg():
 # DB Setup
 #
 #
+
+# FIXME
 
 # DB Functions
 #     create_tables()
@@ -1623,8 +1628,8 @@ def summarize_with_openai(api_key, file_path, custom_prompt):
                     "content": openai_prompt
                 }
             ],
-            "max_tokens": 4096,  # Adjust tokens as needed
-            "temperature": 0.7
+            "max_tokens": 8192,  # Adjust tokens as needed
+            "temperature": 0.1
         }
         logging.debug("openai: Posting request")
         response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
@@ -1634,19 +1639,19 @@ def summarize_with_openai(api_key, file_path, custom_prompt):
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
                 logging.debug("openai: Summarization successful")
-                print("Summarization successful.")
+                print("openai: Summarization successful.")
                 return summary
             else:
                 logging.warning("openai: Summary not found in the response data")
-                return "Summary not available"
+                return "openai: Summary not available"
         else:
             logging.debug("openai: Summarization failed")
-            print("Failed to process summary:", response.text)
-            return "Failed to process summary"
+            print("openai: Failed to process summary:", response.text)
+            return "openai: Failed to process summary"
     except Exception as e:
         logging.debug("openai: Error in processing: %s", str(e))
-        print("Error occurred while processing summary with openai:", str(e))
-        return "Error occurred while processing summary"
+        print("openai: Error occurred while processing summary with openai:", str(e))
+        return "openai: Error occurred while processing summary"
 
 
 def summarize_with_claude(api_key, file_path, model, custom_prompt, max_retries=3, retry_delay=5):
@@ -1676,7 +1681,7 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt, max_retries=
             "max_tokens": 4096,  # max _possible_ tokens to return
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
-            "temperature": 0.7,
+            "temperature": 0.1,
             "top_k": 0,
             "top_p": 1.0,
             "metadata": {
@@ -1841,6 +1846,56 @@ def summarize_with_groq(api_key, file_path, model, custom_prompt):
 #################################
 #
 # Local Summarization
+
+def summarize_with_local_llm(file_path, custom_prompt):
+    try:
+        logging.debug("Local LLM: Loading json data for summarization")
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
+
+        logging.debug("Local LLM: Extracting text from the segments")
+        text = extract_text_from_segments(segments)
+
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        logging.debug("Local LLM: Preparing data + prompt for submittal")
+        local_llm_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        data = {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a professional summarizer."
+                },
+                {
+                    "role": "user",
+                    "content": local_llm_prompt
+                }
+            ],
+            "max_tokens": 28000,  # Adjust tokens as needed
+        }
+        logging.debug("Local LLM: Posting request")
+        response = requests.post('https://127.0.0.1/v1/chat/completions', headers=headers, json=data)
+
+        if response.status_code == 200:
+            response_data = response.json()
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                summary = response_data['choices'][0]['message']['content'].strip()
+                logging.debug("Local LLM: Summarization successful")
+                print("Local LLM: Summarization successful.")
+                return summary
+            else:
+                logging.warning("Local LLM: Summary not found in the response data")
+                return "Local LLM: Summary not available"
+        else:
+            logging.debug("Local LLM: Summarization failed")
+            print("Local LLM: Failed to process summary:", response.text)
+            return "Local LLM: Failed to process summary"
+    except Exception as e:
+        logging.debug("Local LLM: Error in processing: %s", str(e))
+        print("Error occurred while processing summary with Local LLM:", str(e))
+        return "Local LLM: Error occurred while processing summary"
 
 def summarize_with_llama(api_url, file_path, token, custom_prompt):
     try:
@@ -2194,8 +2249,8 @@ def ask_question(transcription, question, api_name, api_key):
                         "content": prompt
                     }
                 ],
-                "max_tokens": 150,
-                "temperature": 0.7
+                "max_tokens": 150000,
+                "temperature": 0.1
             }
             response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
 
@@ -2588,6 +2643,245 @@ def handle_prompt_selection(prompt):
 
 
 #######################################################################################################################
+# Local LLM Setup / Running
+#
+
+# Download latest llamafile from Github
+    # Example usage
+    #repo = "Mozilla-Ocho/llamafile"
+    #asset_name_prefix = "llamafile-"
+    #output_filename = "llamafile"
+    #download_latest_llamafile(repo, asset_name_prefix, output_filename)
+def download_latest_llamafile(repo, asset_name_prefix, output_filename):
+    # Check if the file already exists
+    print("Checking for and downloading Llamafile it it doesn't already exist...")
+    if os.path.exists(output_filename):
+        print("Llamafile already exists. Skipping download.")
+        logging.debug(f"{output_filename} already exists. Skipping download.")
+        llamafile_exists = True
+
+    if llamafile_exists == True:
+        pass
+    else:
+        # Get the latest release information
+        latest_release_url = f"https://api.github.com/repos/{repo}/releases/latest"
+        response = requests.get(latest_release_url)
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch latest release info: {response.status_code}")
+
+        latest_release_data = response.json()
+        tag_name = latest_release_data['tag_name']
+
+        # Get the release details using the tag name
+        release_details_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag_name}"
+        response = requests.get(release_details_url)
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch release details for tag {tag_name}: {response.status_code}")
+
+        release_data = response.json()
+        assets = release_data.get('assets', [])
+
+        # Find the asset with the specified prefix
+        asset_url = None
+        for asset in assets:
+            if re.match(f"{asset_name_prefix}.*", asset['name']):
+                asset_url = asset['browser_download_url']
+                break
+
+        if not asset_url:
+            raise Exception(f"No asset found with prefix {asset_name_prefix}")
+
+        # Download the asset
+        response = requests.get(asset_url)
+        if response.status_code != 200:
+            raise Exception(f"Failed to download asset: {response.status_code}")
+
+        print("Llamafile downloaded successfully.")
+        logging.debug("Main: Llamafile downloaded successfully.")
+
+        # Save the file
+        with open(output_filename, 'wb') as file:
+            file.write(response.content)
+
+        logging.debug(f"Downloaded {output_filename} from {asset_url}")
+        print(f"Downloaded {output_filename} from {asset_url}")
+
+    # Check to see if the LLM already exists, and if not, download the LLM
+    print("Checking for and downloading LLM from Huggingface if needed...")
+    llamafile_llm_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
+    llamafile_llm_output_filename = "mistral-7b-instruct-v0.2.Q8_0.llamafile"
+    logging.debug("Main: Checking and downloading LLM from Huggingface if needed...")
+    if os.path.exists(llamafile_llm_output_filename):
+        print("Model is already downloaded. Skipping download.")
+        pass
+    else:
+        logging.debug("Main: Checking and downloading LLM from Huggingface if needed...")
+        print("Downloading LLM from Huggingface...")
+        time.sleep(1)
+        print("Gonna be a bit...")
+        time.sleep(1)
+        print("Like seriously, an 8GB file...")
+        time.sleep(2)
+        dl_check = input("Final chance to back out, hit 'N'/'n' to cancel, or 'Y'/'y' to continue: ")
+        if dl_check == "N" or dl_check == "n":
+            exit()
+        else:
+            print("Downloading LLM from Huggingface...")
+            # Establish hash values for LLM models
+            mistral_7b_instruct_v0_2_q8_gguf_sha256 = "f326f5f4f137f3ad30f8c9cc21d4d39e54476583e8306ee2931d5a022cb85b06"
+            samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
+            mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
+            llm_choice = input("Which LLM model would you like to download? 1. Mistral-7B-Instruct-v0.2-GGUF or 2. Samantha-Mistral-Instruct-7B-Bulleted-Notes) (plain or 'custom'): Press '1' or '2' to specify: ")
+            while llm_choice != "1" and llm_choice != "2":
+                print("Invalid choice. Please try again.")
+            if llm_choice == "1":
+                llm_download_model = "Mistral-7B-Instruct-v0.2-Q8.llamafile"
+                mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
+                llm_download_model_hash = mistral_7b_instruct_v0_2_q8_0_llamafile_sha256
+                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
+            elif llm_choice == "2":
+                llm_download_model = "Samantha-Mistral-Instruct-7B-Bulleted-Notes-Q8.gguf"
+                samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
+                llm_download_model_hash = samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256
+                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
+            else:
+                print("Invalid choice. Please try again.")
+    return output_filename
+
+
+def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5):
+    temp_path = dest_path + '.tmp'
+
+    for attempt in range(max_retries):
+        try:
+            # Check if a partial download exists and get its size
+            resume_header = {}
+            if os.path.exists(temp_path):
+                resume_header = {'Range': f'bytes={os.path.getsize(temp_path)}-'}
+
+            response = requests.get(url, stream=True, headers=resume_header)
+            response.raise_for_status()
+
+            # Get the total file size from headers
+            total_size = int(response.headers.get('content-length', 0))
+            initial_pos = os.path.getsize(temp_path) if os.path.exists(temp_path) else 0
+
+            mode = 'ab' if 'Range' in response.headers else 'wb'
+            with open(temp_path, mode) as temp_file, tqdm(
+                total=total_size, unit='B', unit_scale=True, desc=dest_path, initial=initial_pos, ascii=True
+            ) as pbar:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:  # filter out keep-alive new chunks
+                        temp_file.write(chunk)
+                        pbar.update(len(chunk))
+
+            # Verify the checksum if provided
+            if expected_checksum:
+                if not verify_checksum(temp_path, expected_checksum):
+                    os.remove(temp_path)
+                    raise ValueError("Downloaded file's checksum does not match the expected checksum")
+
+            # Move the file to the final destination
+            os.rename(temp_path, dest_path)
+            print("Download complete and verified!")
+            return dest_path
+
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                print(f"Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                print("Max retries reached. Download failed.")
+                raise
+
+# FIXME / IMPLEMENT FULLY
+# File download verification
+#mistral_7b_llamafile_instruct_v02_q8_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
+#global mistral_7b_instruct_v0_2_q8_0_llamafile_sha256
+#mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
+
+#mistral_7b_v02_instruct_model_q8_gguf_url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q8_0.gguf?download=true"
+#global mistral_7b_instruct_v0_2_q8_gguf_sha256
+#mistral_7b_instruct_v0_2_q8_gguf_sha256 = "f326f5f4f137f3ad30f8c9cc21d4d39e54476583e8306ee2931d5a022cb85b06"
+
+#samantha_instruct_model_q8_gguf_url = "https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF/resolve/main/samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf?download=true"
+#global samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256
+#samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
+
+
+
+def verify_checksum(file_path, expected_checksum):
+    sha256_hash = sha256()
+    with open(file_path, 'rb') as f:
+        for byte_block in iter(lambda: f.read(4096), b''):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest() == expected_checksum
+
+# Function to close out llamafile process on script exit.
+def cleanup_process():
+    if 'process' in globals():
+        process.terminate()
+        logging.debug("Main: Terminated the external process")
+
+def signal_handler(sig, frame):
+    logging.info('Signal handler called with signal: %s', sig)
+    cleanup_process()
+    sys.exit(0)
+
+def local_llm_function():
+    repo = "Mozilla-Ocho/llamafile"
+    asset_name_prefix = "llamafile-"
+    useros = os.name
+    if useros == "nt":
+        output_filename = "llamafile.exe"
+    else:
+        output_filename = "llamafile"
+    print(
+        "WARNING - Checking for existence of llamafile and HuggingFace model, downloading if needed...This could be a while")
+    print("WARNING - and I mean a while. We're talking an 8 Gigabyte model here...")
+    print("WARNING - Hope you're comfy. Or it's already downloaded.")
+    time.sleep(6)
+    logging.debug("Main: Checking and downloading Llamafile from Github if needed...")
+    llamafile_path = download_latest_llamafile(repo, asset_name_prefix, output_filename)
+    logging.debug("Main: Llamafile downloaded successfully.")
+
+    # Launch the llamafile in an external process with the specified argument
+    arguments = ["-m", "mistral-7b-instruct-v0.2.Q8_0.llamafile"]
+    try:
+        logging.info("Main: Launching the LLM (llamafile) in an external terminal window...")
+        if useros == "nt":
+            launch_in_new_terminal_windows(llamafile_path, arguments)
+        elif useros == "posix":
+            launch_in_new_terminal_linux(llamafile_path, arguments)
+        else:
+            launch_in_new_terminal_mac(llamafile_path, arguments)
+        logging.info(f"Main: Launched the {llamafile_path} with PID {process.pid}")
+        atexit.register(cleanup_process, process)
+    except Exception as e:
+        logging.error(f"Failed to launch the process: {e}")
+        print(f"Failed to launch the process: {e}")
+
+def launch_in_new_terminal_windows(executable, args):
+    command = f'start cmd /k "{executable} {" ".join(args)}"'
+    subprocess.run(command, shell=True)
+
+# FIXME
+def launch_in_new_terminal_linux(executable, args):
+    command = f'gnome-terminal -- {executable} {" ".join(args)}'
+    subprocess.run(command, shell=True)
+
+# FIXME
+def launch_in_new_terminal_mac(executable, args):
+    command = f'open -a Terminal.app {executable} {" ".join(args)}'
+    subprocess.run(command, shell=True)
+
+#
+#
+#######################################################################################################################
+
+
+#######################################################################################################################
 # Main()
 #
 
@@ -2812,6 +3106,10 @@ def main(input_path, api_name=None, api_key=None,
                         logging.debug(f"MAIN: Trying to summarize with VLLM")
                         summary = summarize_with_vllm(vllm_api_url, vllm_api_key, llm_model, json_file_path,
                                                       custom_prompt)
+                    elif api_name.lower() == "local_llm":
+                        logging.debug(f"MAIN: Trying to summarize with the local LLM, Mistral Instruct v0.2")
+                        local_llm_url = "http://127.0.0.1:8080"
+                        summary = summarize_with_local_llm(json_file_path, custom_prompt)
                     elif api_name.lower() == "huggingface":
                         huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key',
                                                                                  fallback=None)
@@ -2864,9 +3162,20 @@ def main(input_path, api_name=None, api_key=None,
 
     return results
 
+def signal_handler(signal, frame):
+    logging.info('Signal received, exiting...')
+    sys.exit(0)
 
 ############################## MAIN ##############################
+#
+#
+
 if __name__ == "__main__":
+    # Register signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    # Establish logging baseline
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     parser = argparse.ArgumentParser(
         description='Transcribe and summarize videos.',
         epilog='''
@@ -2919,7 +3228,7 @@ Sample commands:
     parser.add_argument('-k', '--keywords', nargs='+', default=['cli_ingest_no_tag'],
                         help='Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)')
     parser.add_argument('--log_file', type=str, help='Where to save logfile (non-default)')
-
+    parser.add_argument('--local_llm', action='store_true', help="Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)")
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
 
     args = parser.parse_args()
@@ -2932,7 +3241,8 @@ Sample commands:
     console_handler = logging.StreamHandler()
     console_handler.setLevel(getattr(logging, args.log_level))
     console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console_handler = logger.addHandler(console_handler)
+    console_handler.setFormatter(console_formatter)
+    logger.addHandler(console_handler)
 
     if args.log_file:
         # Create file handler
@@ -2961,7 +3271,14 @@ Sample commands:
         logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
 
+    # Check if the user wants to use the local LLM from the script
+    local_llm = args.local_llm
+    logging.info(f'Local LLM flag: {local_llm}')
+
     if args.user_interface:
+        if local_llm:
+            local_llm_function()
+            webbrowser.open_new_tab('http://127.0.0.1:7860')
         launch_ui(demo_mode=False)
     else:
         if not args.input_path:
@@ -2975,7 +3292,7 @@ Sample commands:
         logging.info(f'Whisper model: {args.whisper_model}')
         logging.info(f'Offset: {args.offset}')
         logging.info(f'VAD filter: {args.vad_filter}')
-        logging.info(f'Log Level: {args.log_level}')  # lol
+        logging.info(f'Log Level: {args.log_level}')
         logging.info(f'Demo Mode: {args.demo_mode}')
         logging.info(f'Custom Prompt: {args.custom_prompt}')
         logging.info(f'Overwrite: {args.overwrite}')
@@ -3017,6 +3334,7 @@ Sample commands:
 
         llm_model = args.llm_model or None
 
+
         try:
             results = main(args.input_path, api_name=args.api_name,
                            api_key=args.api_key,
@@ -3037,7 +3355,11 @@ Sample commands:
                            time_based=args.time_based)
 
             logging.info('Transcription process completed.')
+            atexit.register(cleanup_process)
         except Exception as e:
             logging.error('An error occurred during the transcription process.')
             logging.error(str(e))
             sys.exit(1)
+
+        finally:
+            cleanup_process()
