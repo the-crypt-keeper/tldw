@@ -592,12 +592,11 @@ def process_url(url,
         try:
             # Ensure these variables are correctly populated
             custom_prompt = args.custom_prompt if args.custom_prompt else ("\n\nabove is the transcript of a video "
-                                                                           "Please read through the transcript carefully. Identify the main topics that are "
-                                                                           "discussed over the course of the transcript. Then, summarize the key points about each "
-                                                                           "main topic in a concise bullet point. The bullet points should cover the key "
-                                                                           "information conveyed about each topic in the video, but should be much shorter than "
-                                                                           "the full transcript. Please output your bullet point summary inside <bulletpoints> "
-                                                                           "tags.")
+                "Please read through the transcript carefully. Identify the main topics that are discussed over the "
+                "course of the transcript. Then, summarize the key points about each main topic in a concise bullet "
+                "point. The bullet points should cover the key information conveyed about each topic in the video, "
+                "but should be much shorter than the full transcript. Please output your bullet point summary inside "
+                "<bulletpoints> tags.")
 
             db = Database()
             create_tables()
@@ -2135,7 +2134,7 @@ def summarize_with_detail_recursive_openai(text, detail, verbose=False):
 #
 
 # Only to be used when configured with Gradio for HF Space
-def summarize_with_huggingface(api_key, file_path, custom_prompt):
+def summarize_with_huggingface(api_key, file_path, custom_prompt_arg):
     logging.debug(f"huggingface: Summarization process starting...")
     try:
         logging.debug("huggingface: Loading json data for summarization")
@@ -2154,7 +2153,7 @@ def summarize_with_huggingface(api_key, file_path, custom_prompt):
         model = "microsoft/Phi-3-mini-128k-instruct"
         API_URL = f"https://api-inference.huggingface.co/models/{model}"
 
-        huggingface_prompt = f"{text}\n\n\n\n{custom_prompt}"
+        huggingface_prompt = f"{text}\n\n\n\n{custom_prompt_arg}"
         logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
         data = {
             "inputs": text,
@@ -2337,9 +2336,11 @@ def launch_ui(demo_mode=False):
                                              visible=False)
             words_per_second_input = gr.Number(label="Words per Second", value=WORDS_PER_SECOND,
                                                visible=False)
-            # time_based_summarization_input = gr.Checkbox(label="Enable Time-based Summarization", value=False, visible=False)
-            # time_chunk_duration_input = gr.Number(label="Time Chunk Duration (seconds)", value=60, visible=False)
-            # llm_model_input = gr.Dropdown(label="LLM Model", choices=["gpt-4o", "gpt-4-turbo", "claude-3-sonnet-20240229", "command-r-plus", "CohereForAI/c4ai-command-r-plus", "llama3-70b-8192"], value="gpt-4o", visible=False)
+            # time_based_summarization_input = gr.Checkbox(label="Enable Time-based Summarization", value=False,
+            # visible=False) time_chunk_duration_input = gr.Number(label="Time Chunk Duration (seconds)", value=60,
+            # visible=False) llm_model_input = gr.Dropdown(label="LLM Model", choices=["gpt-4o", "gpt-4-turbo",
+            # "claude-3-sonnet-20240229", "command-r-plus", "CohereForAI/c4ai-command-r-plus", "llama3-70b-8192"],
+            # value="gpt-4o", visible=False)
 
             inputs = [
                 num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
@@ -2661,6 +2662,8 @@ def download_latest_llamafile(repo, asset_name_prefix, output_filename):
         print("Llamafile already exists. Skipping download.")
         logging.debug(f"{output_filename} already exists. Skipping download.")
         llamafile_exists = True
+    else:
+        llamafile_exists = False
 
     if llamafile_exists == True:
         pass
@@ -2823,7 +2826,7 @@ def verify_checksum(file_path, expected_checksum):
 # Function to close out llamafile process on script exit.
 def cleanup_process():
     if 'process' in globals():
-        process.terminate()
+        process.kill()
         logging.debug("Main: Terminated the external process")
 
 def signal_handler(sig, frame):
@@ -3280,6 +3283,7 @@ Sample commands:
     if args.user_interface:
         if local_llm:
             local_llm_function()
+            time.sleep(2)
             webbrowser.open_new_tab('http://127.0.0.1:7860')
         launch_ui(demo_mode=False)
     else:
