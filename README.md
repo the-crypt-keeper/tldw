@@ -5,6 +5,7 @@
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
 
+
 ### What is this (TL/DW)?
 - **15 Second Summary**
   - Take a URL, a single video, a list of URLs, or list of local videos + URLs, one per line in a text file, and feed it into the script and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
@@ -29,9 +30,11 @@
     4. Change the `Sample Prompts/Questions` into a SQLite DB, with a viewer, so its easier to update/manage the stored prompt samples (this is separate and will remain separate from the ingestion DB, idea being that while the goal is to make both shareable, and create some method of reducing the friction, I would like to clearly separate the two, as I believe the sharing of them would be in different contexts.)
     5. LLM Inference Engine + Model download as part of the script -> I would like this to have an extremely low usability bar, and as part of what I see being needed to achieve that is the option/inclusion of an LLM Inference engine + selected model for those who dont' know what those are, but can still see the value of using a tool like this for themselves. (originally Llama.cpp, but now thinking Kobold.cpp :shrug: and MS Phi-3 128k @ Q8)
 
-For commercial API usage, I personally recommend Sonnet. It's great quality and relatively inexpensive.
+For commercial API usage, I personally recommend Claude Sonnet. It's great quality and relatively inexpensive.
 
-As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't have a lot of VRAM and want to self-host. (I think it's better than anything up to 70B for summarization - I do not have actual evidence for this)
+For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.2 model:
+  * https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
+
 
 **CLI Screenshot**
 - **See [Using](#using)**
@@ -119,7 +122,8 @@ As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't h
   * Transcribe a local file: `python summarize.py /path/to/your/localfile.mp4`
 - Multiple files (local & remote)
   * List of Files(can be URLs and local files mixed): `python summarize.py ./path/to/your/text_file.txt"`
-
+- Download and run an LLM using only your system RAM! (Need at least 8GB Ram, realistically 12GB)
+  * `python summarize.py -gui --local_llama`
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
@@ -330,6 +334,6 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 - [ffmpeg](https://github.com/FFmpeg/FFmpeg)
 - [faster_whisper](https://github.com/SYSTRAN/faster-whisper)
 - [pyannote](https://github.com/pyannote/pyannote-audio)
-
+- Thank you cognitivetech for the system prompt(not yet implemented...): https://github.com/cognitivetech/llm-long-text-summarization/tree/main?tab=readme-ov-file#one-shot-prompting
 
 ### 

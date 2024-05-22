@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import atexit
 import configparser
+import hashlib
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from multiprocessing import process
 from typing import List, Tuple, Optional, Dict, Callable
 import zipfile
 from datetime import datetime
@@ -2812,7 +2814,7 @@ def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5
 
 
 def verify_checksum(file_path, expected_checksum):
-    sha256_hash = sha256()
+    sha256_hash = hashlib.sha256()
     with open(file_path, 'rb') as f:
         for byte_block in iter(lambda: f.read(4096), b''):
             sha256_hash.update(byte_block)
