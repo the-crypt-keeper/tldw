@@ -1469,7 +1469,11 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
     summary = None
     if api_name:
         logging.debug(f"Article_Summarizer: Summarization being performed by {api_name}")
-        json_file_path = f"Results/{title.replace(' ', '_')}_segments.json"
+
+        # Sanitize filename for saving the JSON file
+        sanitized_title = sanitize_filename(title)
+        json_file_path = os.path.join("Results", f"{sanitized_title}_segments.json")
+
         with open(json_file_path, 'w') as json_file:
             json.dump([{'text': content}], json_file, indent=2)
 
@@ -2539,7 +2543,7 @@ def launch_ui(demo_mode=False):
                                           ["Transcription + Summarization", "Search", "Export", "Keywords"])
 
     # Launch the interface
-    tabbed_interface.launch(share=False, )
+    tabbed_interface.launch(share=True, )
 
 
 #
