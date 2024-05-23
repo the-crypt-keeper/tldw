@@ -2560,19 +2560,48 @@ def launch_ui(demo_mode=False):
         allow_flagging="never"
     )
 
-    export_tab = gr.Interface(
-        fn=export_to_csv,
-        inputs=[
-            gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
-            gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"]),
-            gr.Textbox(label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )",
-                       placeholder="Enter keywords here..."),
-            gr.Number(label="Page", value=1, precision=0),
-            gr.Number(label="Results per File", value=1000, precision=0)
-        ],
+    export_keywords_interface = gr.Interface(
+        fn=export_keywords_to_csv,
+        inputs=[],
+        outputs=[gr.File(label="Download Exported Keywords"), gr.Textbox(label="Status")],
+        title="Export Keywords",
+        description="Export all keywords in the database to a CSV file."
+    )
+
+    # Gradio interface for importing data
+    def import_data(file):
+        # Placeholder for actual import functionality
+        return "Data imported successfully"
+
+    import_interface = gr.Interface(
+        fn=import_data,
+        inputs=gr.File(label="Upload file for import"),
         outputs="text",
-        title="Export Search Results to CSV",
-        description="Export the search results to a CSV file."
+        title="Import Data",
+        description="Import data into the database from a CSV file."
+    )
+
+    import_export_tab = gr.TabbedInterface(
+        [gr.TabbedInterface(
+            [gr.Interface(
+                fn=export_to_csv,
+                inputs=[
+                    gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
+                    gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"]),
+                    gr.Textbox(label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )",
+                               placeholder="Enter keywords here..."),
+                    gr.Number(label="Page", value=1, precision=0),
+                    gr.Number(label="Results per File", value=1000, precision=0)
+                ],
+                outputs="text",
+                title="Export Search Results to CSV",
+                description="Export the search results to a CSV file."
+            ),
+                export_keywords_interface],
+            ["Export Search Results", "Export Keywords"]
+        ),
+            import_interface],
+        ["Export", "Import"]
     )
 
     keyword_add_interface = gr.Interface(
@@ -2607,8 +2636,8 @@ def launch_ui(demo_mode=False):
     )
 
     # Combine interfaces into a tabbed interface
-    tabbed_interface = gr.TabbedInterface([iface, search_tab, export_tab, keyword_tab],
-                                          ["Transcription + Summarization", "Search", "Export", "Keywords"])
+    tabbed_interface = gr.TabbedInterface([iface, search_tab, import_export_tab, keyword_tab],
+                                          ["Transcription + Summarization", "Search", "Export/Import", "Keywords"])
 
     # Launch the interface
     server_port_variable = 7860

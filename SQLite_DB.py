@@ -1,3 +1,4 @@
+import csv
 import sqlite3
 import gradio as gr
 import pandas as pd
@@ -325,6 +326,25 @@ def display_keywords():
         return "\n".join(keywords) if keywords else "No keywords found."
     except DatabaseError as e:
         return str(e)
+
+
+def export_keywords_to_csv():
+    try:
+        keywords = fetch_all_keywords()
+        if not keywords:
+            return None, "No keywords found in the database."
+
+        filename = "keywords.csv"
+        with open(filename, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(["Keyword"])
+            for keyword in keywords:
+                writer.writerow([keyword])
+
+        return filename, f"Keywords exported to {filename}"
+    except Exception as e:
+        logger.error(f"Error exporting keywords to CSV: {e}")
+        return None, f"Error exporting keywords: {e}"
 
 
 #
