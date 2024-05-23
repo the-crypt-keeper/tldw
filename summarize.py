@@ -1290,6 +1290,8 @@ def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_
             summaries.append(summarize_with_oobabooga(ooba_api_IP, chunk, api_key, custom_prompt))
         elif api_name == 'tabbyapi':
             summaries.append(summarize_with_vllm(api_key, tabby_api_IP, chunk, llm_model, custom_prompt))
+        elif api_name == 'local-llm':
+            summaries.append(summarize_with_local_llm(chunk, custom_prompt))
         else:
             return f"Unsupported API: {api_name}"
 
@@ -1492,17 +1494,17 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
                 anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key', fallback=None)
                 logging.debug(f"Article_Summarizer: Trying to summarize with anthropic")
                 summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model,
-                                                custom_prompt=article_custom_prompt)
+                                                custom_prompt_arg=article_custom_prompt)
             elif api_name.lower() == "cohere":
                 cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
                 logging.debug(f"Article_Summarizer: Trying to summarize with cohere")
                 summary = summarize_with_cohere(cohere_api_key, json_file_path, cohere_model,
-                                                custom_prompt=article_custom_prompt)
+                                                custom_prompt_arg=article_custom_prompt)
             elif api_name.lower() == "groq":
                 groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
                 logging.debug(f"Article_Summarizer: Trying to summarize with Groq")
                 summary = summarize_with_groq(groq_api_key, json_file_path, groq_model,
-                                              custom_prompt=article_custom_prompt)
+                                              custom_prompt_arg=article_custom_prompt)
             elif api_name.lower() == "llama":
                 llama_token = api_key if api_key else config.get('API', 'llama_api_key', fallback=None)
                 llama_ip = llama_api_IP
@@ -1590,7 +1592,7 @@ def ingest_unstructured_text(text, custom_prompt, api_name, api_key, keywords, c
 #
 #
 
-
+# Fixme , function is replicated....
 def extract_text_from_segments(segments):
     logging.debug(f"Main: extracting text from {segments}")
     text = ' '.join([segment['text'] for segment in segments])
@@ -1598,7 +1600,7 @@ def extract_text_from_segments(segments):
     return text
 
 
-def summarize_with_openai(api_key, file_path, custom_prompt):
+def summarize_with_openai(api_key, file_path, custom_prompt_arg):
     try:
         logging.debug("openai: Loading json data for summarization")
         with open(file_path, 'r') as file:
@@ -1616,7 +1618,7 @@ def summarize_with_openai(api_key, file_path, custom_prompt):
 
         logging.debug(f"openai: API Key is: {api_key}")
         logging.debug("openai: Preparing data + prompt for submittal")
-        openai_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         data = {
             "model": open_ai_model,
             "messages": [
@@ -1655,7 +1657,7 @@ def summarize_with_openai(api_key, file_path, custom_prompt):
         return "openai: Error occurred while processing summary"
 
 
-def summarize_with_claude(api_key, file_path, model, custom_prompt, max_retries=3, retry_delay=5):
+def summarize_with_claude(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5):
     try:
         logging.debug("anthropic: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -1670,7 +1672,7 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt, max_retries=
             'Content-Type': 'application/json'
         }
 
-        anthropic_prompt = custom_prompt  # Sanitize the custom prompt
+        anthropic_prompt = custom_prompt_arg  # Sanitize the custom prompt
         logging.debug(f"anthropic: Prompt is {anthropic_prompt}")
         user_message = {
             "role": "user",
@@ -1739,7 +1741,7 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt, max_retries=
 
 
 # Summarize with Cohere
-def summarize_with_cohere(api_key, file_path, model, custom_prompt):
+def summarize_with_cohere(api_key, file_path, model, custom_prompt_arg):
     try:
         logging.debug("cohere: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -1754,7 +1756,7 @@ def summarize_with_cohere(api_key, file_path, model, custom_prompt):
             'Authorization': f'Bearer {api_key}'
         }
 
-        cohere_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        cohere_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         logging.debug("cohere: Prompt being sent is {cohere_prompt}")
 
         data = {
@@ -1792,7 +1794,7 @@ def summarize_with_cohere(api_key, file_path, model, custom_prompt):
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, file_path, model, custom_prompt):
+def summarize_with_groq(api_key, file_path, model, custom_prompt_arg):
     try:
         logging.debug("groq: Loading JSON data")
         with open(file_path, 'r') as file:
@@ -1806,7 +1808,7 @@ def summarize_with_groq(api_key, file_path, model, custom_prompt):
             'Content-Type': 'application/json'
         }
 
-        groq_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        groq_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         logging.debug("groq: Prompt being sent is {groq_prompt}")
 
         data = {
@@ -1848,7 +1850,7 @@ def summarize_with_groq(api_key, file_path, model, custom_prompt):
 #
 # Local Summarization
 
-def summarize_with_local_llm(file_path, custom_prompt):
+def summarize_with_local_llm(file_path, custom_prompt_arg):
     try:
         logging.debug("Local LLM: Loading json data for summarization")
         with open(file_path, 'r') as file:
@@ -1862,7 +1864,7 @@ def summarize_with_local_llm(file_path, custom_prompt):
         }
 
         logging.debug("Local LLM: Preparing data + prompt for submittal")
-        local_llm_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        local_llm_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         data = {
             "messages": [
                 {
@@ -1877,7 +1879,7 @@ def summarize_with_local_llm(file_path, custom_prompt):
             "max_tokens": 28000,  # Adjust tokens as needed
         }
         logging.debug("Local LLM: Posting request")
-        response = requests.post('https://127.0.0.1/v1/chat/completions', headers=headers, json=data)
+        response = requests.post('http://127.0.0.1:8080/v1/chat/completions', headers=headers, json=data)
 
         if response.status_code == 200:
             response_data = response.json()
@@ -2305,11 +2307,11 @@ def launch_ui(demo_mode=False):
             offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
                                      visible=False)
             api_name_input = gr.Dropdown(
-                choices=[None, "huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "Llama.cpp", "Kobold", "Ooba", "HuggingFace"],
                 value=None,
                 label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
-            api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
-                                       placeholder="Enter your API key here; Ignore if using Local API or Built-in API",
+            api_key_input = gr.Textbox(label="API Key (Mandatory unless you're running a local model/server/no API selected)",
+                                       placeholder="Enter your API key here; Ignore if using Local API or Built-in API('Local-LLM')",
                                        visible=True)
             vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False,
                                            visible=False)
@@ -2601,7 +2603,13 @@ def launch_ui(demo_mode=False):
                                           ["Transcription + Summarization", "Search", "Export", "Keywords"])
 
     # Launch the interface
-    tabbed_interface.launch(share=True, )
+    server_port_variable = 7860
+    if server_mode:
+        tabbed_interface.launch(share=True, server_port=server_port_variable, server_name="http://0.0.0.0")
+    elif share_public:
+        tabbed_interface.launch(share=True,)
+    else:
+        tabbed_interface.launch(share=False,)
 
 
 #
@@ -2853,6 +2861,8 @@ def local_llm_function():
 
     # Launch the llamafile in an external process with the specified argument
     arguments = ["-m", "mistral-7b-instruct-v0.2.Q8_0.llamafile"]
+    global running_local_llm
+    running_local_llm = True
     try:
         logging.info("Main: Launching the LLM (llamafile) in an external terminal window...")
         if useros == "nt":
@@ -2861,7 +2871,8 @@ def local_llm_function():
             launch_in_new_terminal_linux(llamafile_path, arguments)
         else:
             launch_in_new_terminal_mac(llamafile_path, arguments)
-        logging.info(f"Main: Launched the {llamafile_path} with PID {process.pid}")
+        # FIXME - pid doesn't exist in this context
+        #logging.info(f"Main: Launched the {llamafile_path} with PID {process.pid}")
         atexit.register(cleanup_process, process)
     except Exception as e:
         logging.error(f"Failed to launch the process: {e}")
@@ -3111,7 +3122,7 @@ def main(input_path, api_name=None, api_key=None,
                         logging.debug(f"MAIN: Trying to summarize with VLLM")
                         summary = summarize_with_vllm(vllm_api_url, vllm_api_key, llm_model, json_file_path,
                                                       custom_prompt)
-                    elif api_name.lower() == "local_llm":
+                    elif api_name.lower() == "local-llm":
                         logging.debug(f"MAIN: Trying to summarize with the local LLM, Mistral Instruct v0.2")
                         local_llm_url = "http://127.0.0.1:8080"
                         summary = summarize_with_local_llm(json_file_path, custom_prompt)
@@ -3234,9 +3245,15 @@ Sample commands:
                         help='Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)')
     parser.add_argument('--log_file', type=str, help='Where to save logfile (non-default)')
     parser.add_argument('--local_llm', action='store_true', help="Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)")
+    parser.add_argument('--server_mode', action='store_true', help='Run in server mode (This exposes the GUI/Server to the network)')
+    parser.add_argument('--share_public', type=int, default=7860, help="This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)")
+    parser.add_argument('--port', type=int, default=7860, help='Port to run the server on')
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
 
     args = parser.parse_args()
+    share_public = args.share_public
+    server_mode = args.server_mode
+    server_port = args.port
 
     ########## Logging setup
     logger = logging.getLogger()
