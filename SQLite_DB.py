@@ -159,6 +159,10 @@ def create_tables() -> None:
 create_tables()
 
 
+#######################################################################################################################
+# Keyword-related Functions
+#
+
 # Function to add a keyword
 def add_keyword(keyword: str) -> int:
     keyword = keyword.strip().lower()
@@ -299,6 +303,35 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     except Exception as e:
         logger.error(f"Unexpected Error: {e}")
         raise DatabaseError(f"Unexpected error: {e}")
+
+
+def fetch_all_keywords() -> List[str]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT keyword FROM Keywords')
+            keywords = [row[0] for row in cursor.fetchall()]
+            return keywords
+    except sqlite3.Error as e:
+        raise DatabaseError(f"Error fetching keywords: {e}")
+
+def keywords_browser_interface():
+    keywords = fetch_all_keywords()
+    return gr.Markdown("\n".join(f"- {keyword}" for keyword in keywords))
+
+def display_keywords():
+    try:
+        keywords = fetch_all_keywords()
+        return "\n".join(keywords) if keywords else "No keywords found."
+    except DatabaseError as e:
+        return str(e)
+
+
+#
+#
+#######################################################################################################################
+
+
 
 
 # Function to add a version of a prompt and summary
