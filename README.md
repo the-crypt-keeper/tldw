@@ -1,5 +1,6 @@
 # **TL/DW: Too Long, Didnt Watch**
 ## Download, Transcribe & Summarize Videos. All automated (+ More)
+#### More: Website Article scraping+summarization, Full-Text-Search across everything ingested, Local LLM inference as part of the script for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
 
 ![License](https://img.shields.io/badge/license-apache2.0-green)
@@ -16,14 +17,14 @@
 
 ----------
 
-### What is this (TL/DW)?
+### <a name="what"></a> What is this (TL/DW)?
 - **Don't care, give me code**
   - Take a URL, a single video, a list of URLs, or list of local videos + URLs, one per line in a text file, and feed it into the script and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
   * `git clone https://github.com/rmusser01/tldw` -> `cd tldw` -> `python -m venv .\` -> `. .\scripts\activate.ps1` -> `pip install -r requirements.txt` -> 
     * CLI usage: `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api openai -k tag_one tag_two tag_three` 
     - GUI usage: `python summarize.py -gui`
     - GUI with local LLM: `python summarize.py -gui --local_llama`
-- **20 Second Summary**
+- **Short Summary**
   - Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
   - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
   - Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported only through OpenAI currently, though the [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) will let you do it with exllama or vLLM, using the scripts in there for the entire pipeline.
@@ -224,42 +225,6 @@ Sample commands:
 By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
 
 
----------------------------------------------
-### <a name="what"></a>What?
-- **Use the script to (download->)transcribe(->summarize) a local file or remote (supported) url.**
-- **What can you transcribe and summarize?**
-  * **Any youtube video.** Or any video hosted at any of these sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
-    * (Playlists you have to use the `Get_Playlist_URLs.py` with `Get_Playlist_URLs.py <Playlist URL>` and it'll create a text file with all the URLs for each video, so you can pass the text file as input and they'll all be downloaded. Pull requests are welcome.)
-    * Any url youtube-dl supports _should_ work.
-  * **Local Videos**
-    * Pass in the filepath to any local video file, and it will be transcribed.
-    * You can also pass in a text file containing a list of videos for batch processing.
-- **How does it Summarize?**
-  - **Remote Summarization**
-    * Pass an API name (anthropic/cohere/grok/openai/) as an argument, ex: `-api anthropic`
-    * Add your API key to the `config.txt` file
-    * The script when ran, will detect that you passed an API name, and will perform summarization of the resulting transcription.
-  - **Local Summarization**
-    * Alternatively, you can pass `llama`/`ooba`/`kobold`/`tabby` as the API name and have the script perform a request to your local API endpoint for summarization. 
-      * You will need to modify the `<endpoint_name>_api_IP` value in the `config.txt` to reflect the `IP:Port` of your local server.
-      * Or pass the `--api_url` argument with the `IP:Port` to avoid making changes to the `config.txt` file.
-      * If the self-hosted server requires an API key, modify the appropriate api_key variable in the `config.txt` file.
-  * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach. This works for big context LLMs, but not everyone has access to them, and some transcriptions may be even longer, so we need to have an approach that can handle those cases.
-
-
-- **APIs Currently Supported**
-  1. Anthropic - https://www.anthropic.com/api
-  2. Cohere - https://docs.cohere.com/reference/about
-  3. Groq - https://docs.api.groq.com/index.html
-  4. Llama.cpp - https://github.com/ggerganov/llama.cpp & https://github.com/ggerganov/llama.cpp/blob/master/examples/server/README.md
-  5. Kobold.cpp - https://github.com/LostRuins/koboldcpp
-  6. Oobabooga - https://github.com/oobabooga/text-generation-webui
-  7. HuggingFace - https://huggingface.co/docs/api-inference/en/index
-- **Planned to Support**
-  1. TabbyAPI - https://github.com/theroyallab/tabbyAPI
-  2. vLLM - https://github.com/vllm-project/vllm
-
-
 ------------
 
 ### <a name="localllm"></a>Setting up a Local LLM Inference Engine
@@ -302,34 +267,8 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 ----------
 
 
-### <a name="pieces"></a>Pieces & What's in the repo?
-- **Workflow**
-  1. Setup python + packages
-  2. Setup ffmpeg (taken care of for you in the script if you're on windows)
-  3. Run `python summarize.py <video_url>` or `python summarize.py <List_of_videos.txt>`
-  4. If you want summarization, add your API keys (if not using a local LLM) to the `config.txt` file, and then re-run the script, passing in the name of the API [or URL endpoint - to be added] to the script.
-    * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic` - This will attempt to download the video, then upload the resulting json file to the anthropic API endpoint, referring to values set in the config file (API key and model) to request summarization.
-    - Anthropic:
-      * `claude-3-opus-20240229`
-      * `claude-3-sonnet-20240229`
-      * `claude-3-haiku-20240307`
-    - Cohere: 
-      * `command-r`
-      * `command-r-plus`
-    - Groq
-      * `llama3-8b-8192`
-      * `llama3-70b-8192`
-      * `mixtral-8x7b-32768`
-    - HuggingFace:
-      * `CohereForAI/c4ai-command-r-plus`
-      * `meta-llama/Meta-Llama-3-70B-Instruct`
-      * `meta-llama/Meta-Llama-3-8B-Instruct`
-      * Supposedly you can use any model on there, but this is for reference for the free demo instance, in case you'd like to host your own.
-    - OpenAI:
-      * `gpt-4-turbo`
-      * `gpt-4-turbo-preview`
-      * `gpt-4`
-- **What's in the repo?**
+### <a name="pieces"></a>Pieces & What's in the original repo?
+- **What's in the original repo?**
   - `summarize.py` - download, transcribe and summarize audio
     1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
     2. Next, it uses [ffmpeg](https://github.com/FFmpeg/FFmpeg) to convert the resulting `.m4a` file to `.wav`
