@@ -17,9 +17,12 @@
 ----------
 
 ### What is this (TL/DW)?
-- **One-Sentence Summary**
+- **Don't care, give me code**
   - Take a URL, a single video, a list of URLs, or list of local videos + URLs, one per line in a text file, and feed it into the script and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
-
+  * `git clone https://github.com/rmusser01/tldw` -> `cd tldw` -> `python -m venv .\` -> `. .\scripts\activate.ps1` -> `pip install -r requirements.txt` -> 
+    * CLI usage: `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api openai -k tag_one tag_two tag_three` 
+    - GUI usage: `python summarize.py -gui`
+    - GUI with local LLM: `python summarize.py -gui --local_llama`
 - **20 Second Summary**
   - Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
   - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
