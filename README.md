@@ -4,13 +4,23 @@
 
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
+----------
 
+### Table of Contents
+- [What?](#what)
+- [Using](#using)
+- [Setup](#setup)
+- [Pieces/What's in the Repo](#what)
+- [Setting up a Local LLM Inference Engine](#localllm)
+- [Credits](#credits)
+
+----------
 
 ### What is this (TL/DW)?
-- **15 Second Summary**
+- **One-Sentence Summary**
   - Take a URL, a single video, a list of URLs, or list of local videos + URLs, one per line in a text file, and feed it into the script and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
 
-- **30 Second Summary**
+- **20 Second Summary**
   - Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
   - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
   - Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported only through OpenAI currently, though the [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) will let you do it with exllama or vLLM, using the scripts in there for the entire pipeline.
@@ -23,18 +33,15 @@
   - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite (for now, would like to build a shim for ElasticSearch/Similar) DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it. (Plus act as a nice way of personally tagging data for possible future training of your personal AI agent :P)
     * On the to-do list to see about creating some form of structure within the plain text to make review/reconstruction a little easier(markdown?) - Reconstruction being review of the data for raw consumption and not fed into an analysis pipeline.
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
-  - Next major functionality will be (not in order):
-    1. Keyword cloud viewing/editing, so you can view all keywords within the DB
-    2. Chunking transcriptions based on timestamps
-    3. Dark mode that actually works.
-    4. Change the `Sample Prompts/Questions` into a SQLite DB, with a viewer, so its easier to update/manage the stored prompt samples (this is separate and will remain separate from the ingestion DB, idea being that while the goal is to make both shareable, and create some method of reducing the friction, I would like to clearly separate the two, as I believe the sharing of them would be in different contexts.)
-    5. LLM Inference Engine + Model download as part of the script -> I would like this to have an extremely low usability bar, and as part of what I see being needed to achieve that is the option/inclusion of an LLM Inference engine + selected model for those who dont' know what those are, but can still see the value of using a tool like this for themselves. (originally Llama.cpp, but now thinking Kobold.cpp :shrug: and MS Phi-3 128k @ Q8)
 
 For commercial API usage, I personally recommend Claude Sonnet. It's great quality and relatively inexpensive.
 
 For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.2 model:
   * https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
 
+Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruct, which you can get in a GGUF format from here: https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF
+  * Or you can let the script download and run a local server for you, using llama.cpp/llamafile and one of the above models. 
+    * (It'll ask you if you want to download one, and if so, which one out of a choice of 3) 
 
 **CLI Screenshot**
 - **See [Using](#using)**
@@ -42,16 +49,6 @@ For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.
 
 **GUI Screenshot**
 ![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
-
-----------
-
-### Table of Contents
-- [What?](#what)
-- [Using](#using)
-- [Setup](#setup)
-- [Pieces/What's in the Repo](#what)
-- [Setting up a Local LLM Inference Engine](#localllm)
-- [Credits](#credits)
 
 
 
