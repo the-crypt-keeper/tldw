@@ -170,12 +170,24 @@ options:
   -roll, --rolling_summarization
                         Enable rolling summarization
   -detail DETAIL_LEVEL, --detail_level DETAIL_LEVEL
-                        Mandatory if rolling summarization is enabled, defines the chunk size.
+                        Mandatory if rolling summarization is enabled, defines the chunk  size.
                          Default is 0.01(lots of chunks) -> 1.00 (few chunks)
                          Currently only OpenAI works.
+  --chunk_duration CHUNK_DURATION
+                        Duration of each chunk in seconds
+  -time TIME_BASED, --time_based TIME_BASED
+                        Enable time-based summarization and specify the chunk duration in seconds (minimum 60 seconds, increments of 30 seconds)
+  -model LLM_MODEL, --llm_model LLM_MODEL
+                        Model to use for LLM summarization (only used for vLLM/TabbyAPI)
   -k KEYWORDS [KEYWORDS ...], --keywords KEYWORDS [KEYWORDS ...]
                         Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)
   --log_file LOG_FILE   Where to save logfile (non-default)
+  --local_llm           Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)
+  --server_mode         Run in server mode (This exposes the GUI/Server to the network)
+  --share_public SHARE_PUBLIC
+                        This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)
+  --port PORT           Port to run the server on
+
 
 Sample commands:
     1. Simple Sample command structure:
