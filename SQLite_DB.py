@@ -392,27 +392,27 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
         offset = (page - 1) * results_per_page
 
         search_conditions = []
+        params = []
+
         for field in search_fields:
             if field:
-                search_conditions.append(f"media_fts.{field} MATCH ?")
+                search_conditions.append(f"Media.{field} LIKE ?")
+                params.append(f'%{search_query}%')
 
-        keyword_conditions = [f"keyword_fts.keyword MATCH ?" for keyword in keywords]
-        if keyword_conditions:
-            search_conditions.append(f"({' AND '.join(keyword_conditions)})")
+        keyword_conditions = []
+        for keyword in keywords:
+            keyword_conditions.append(f"EXISTS (SELECT 1 FROM MediaKeywords JOIN Keywords ON MediaKeywords.keyword_id = Keywords.id WHERE MediaKeywords.media_id = Media.id AND Keywords.keyword LIKE ?)")
+            params.append(f'%{keyword}%')
 
-        where_clause = " AND ".join(search_conditions) if search_conditions else "1=1"
+        where_clause = " AND ".join(search_conditions + keyword_conditions) if search_conditions or keyword_conditions else "1=1"
 
         query = f'''
         SELECT DISTINCT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date, Media.prompt, Media.summary
         FROM Media
-        JOIN media_fts ON Media.id = media_fts.rowid
-        LEFT JOIN MediaKeywords ON Media.id = MediaKeywords.media_id
-        LEFT JOIN Keywords ON MediaKeywords.keyword_id = Keywords.id
-        LEFT JOIN keyword_fts ON Keywords.id = keyword_fts.rowid
         WHERE {where_clause}
         LIMIT ? OFFSET ?
         '''
-        params = tuple([f'{search_query}*'] * len(search_fields) + keywords + [results_per_page, offset])
+        params.extend([results_per_page, offset])
         logging.debug(f"Executing query: {query} with params: {params}")
         cursor.execute(query, params)
         results = cursor.fetchall()
@@ -430,27 +430,8 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
 # Gradio function to handle user input and display results with pagination, with better feedback
 def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int):
     results = search_db(search_query, search_fields, keyword, page)
-    df, message = format_results(results)
-    if df.empty:
-        print("DataFrame is empty")  # Debugging print
-    else:
-        print("DataFrame contents:", df)  # Debugging print
-
+    df = format_results(results)
     return df
-
-
-def format_results(results):
-    if not results:
-        return pd.DataFrame(), "No results found."
-
-    df = pd.DataFrame(results,
-                      columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date', 'Prompt', 'Summary'])
-    logging.debug(f"Formatted DataFrame: {df}")
-
-    # Print the DataFrame for verification
-    print("Formatted DataFrame:", df)
-
-    return df, ""
 
 
 def display_details(row):
@@ -471,6 +452,15 @@ def display_details(row):
 
     return gr.update(value=details, visible=True)
 
+
+def format_results(results):
+    if not results:
+        return pd.DataFrame(columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date', 'Prompt', 'Summary'])
+
+    df = pd.DataFrame(results, columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date', 'Prompt', 'Summary'])
+    logging.debug(f"Formatted DataFrame: {df}")
+
+    return df
 
 # Function to export search results to CSV with pagination
 def export_to_csv(search_query: str, search_fields: List[str], keyword: str, page: int = 1, results_per_file: int = 1000):
