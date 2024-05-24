@@ -426,16 +426,43 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
 
 
 # Gradio function to handle user input and display results with pagination, with better feedback
-def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int):
-    results = search_db(search_query, search_fields, keyword, page)
-    df = format_results(results)
-    return df
+def search_and_display(search_query, search_fields, keywords, page):
+    results = search_db(search_query, search_fields, keywords, page)
+
+    if isinstance(results, pd.DataFrame):
+        # Convert DataFrame to a list of tuples or lists
+        processed_results = results.values.tolist()  # This converts DataFrame rows to lists
+    elif isinstance(results, list):
+        # Ensure that each element in the list is itself a list or tuple (not a dictionary)
+        processed_results = [list(item.values()) if isinstance(item, dict) else item for item in results]
+    else:
+        raise TypeError("Unsupported data type for results")
+
+    return processed_results
 
 
-def display_details(row):
-    if not row:
-        return gr.update(value="No item selected.", visible=True)
+def display_details(index, results):
+    if index is None or results is None or int(index) >= len(results):
+        return "Please select a valid result to view details."
+    selected_row = results[int(index)]  # Ensure `index` is converted to an integer to access the list
+    details_html = f"""
+    <h3>{selected_row['Title']}</h3>
+    <p><strong>URL:</strong> {selected_row['URL']}</p>
+    <p><strong>Type:</strong> {selected_row['Type']}</p>
+    <p><strong>Author:</strong> {selected_row['Author']}</p>
+    <p><strong>Ingestion Date:</strong> {selected_row['Ingestion Date']}</p>
+    <p><strong>Prompt:</strong> {selected_row['Prompt']}</p>
+    <p><strong>Summary:</strong> {selected_row['Summary']}</p>
+    <p><strong>Content:</strong></p>
+    <pre>{selected_row['Content']}</pre>
+    """
+    return details_html
 
+
+def get_details(index, dataframe):
+    if index is None or dataframe is None or index >= len(dataframe):
+        return "Please select a result to view details."
+    row = dataframe.iloc[index]
     details = f"""
     <h3>{row['Title']}</h3>
     <p><strong>URL:</strong> {row['URL']}</p>
@@ -447,8 +474,7 @@ def display_details(row):
     <p><strong>Content:</strong></p>
     <pre>{row['Content']}</pre>
     """
-
-    return gr.update(value=details, visible=True)
+    return details
 
 
 def format_results(results):

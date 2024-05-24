@@ -2267,7 +2267,9 @@ def ask_question(transcription, question, api_name, api_key):
         return "Question answering is currently only supported with the OpenAI API."
 
 
-# launch gradio UI
+
+
+# def gradio UI
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
 
@@ -2539,18 +2541,45 @@ def launch_ui(demo_mode=False):
             with gr.Accordion("Category 2"):
                 gr.Markdown("\n".join(prompts_category_2))
 
-    # Gradio interface setup with tabs
-    search_tab = gr.Interface(
-        fn=search_and_display,
-        inputs=[
-            gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
-            gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content", "URL", "Type", "Author"],
-                             value=["Title"]),
-            gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)..."),
-            gr.Slider(label="Page", minimum=1, maximum=10, step=1, value=1)
-        ],
-        outputs=gr.Dataframe(label="Search Results")
-    )
+    with gr.Blocks() as search_interface:
+        with gr.Tab("Search & Detailed View"):
+            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_fields_input = gr.CheckboxGroup(label="Search Fields",
+                                                   choices=["Title", "Content", "URL", "Type", "Author"],
+                                                   value=["Title"])
+            keywords_input = gr.Textbox(label="Keywords to Match against", placeholder="Enter keywords here (comma-separated)...")
+            page_input = gr.Slider(label="Pages of results to display", minimum=1, maximum=10, step=1, value=1)
+
+            search_button = gr.Button("Search")
+            results_output = gr.Dataframe()
+            index_input = gr.Number(label="Select index of the result", value=None)
+            details_button = gr.Button("Show Details")
+            details_output = gr.HTML()
+
+            search_button.click(
+                fn=search_and_display,
+                inputs=[search_query_input, search_fields_input, keywords_input, page_input],
+                outputs=results_output
+            )
+
+            details_button.click(
+                fn=display_details,
+                inputs=[index_input, results_output],
+                outputs=details_output
+            )
+    # search_tab = gr.Interface(
+    #     fn=search_and_display,
+    #     inputs=[
+    #         gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
+    #         gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content", "URL", "Type", "Author"],
+    #                          value=["Title"]),
+    #         gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)..."),
+    #         gr.Slider(label="Page", minimum=1, maximum=10, step=1, value=1)
+    #     ],
+    #     outputs=gr.Dataframe(label="Search Results", height=300)  # Height in pixels
+    #     #outputs=gr.Dataframe(label="Search Results")
+    # )
+
 
 
     export_keywords_interface = gr.Interface(
@@ -2629,9 +2658,8 @@ def launch_ui(demo_mode=False):
     )
 
     # Combine interfaces into a tabbed interface
-    tabbed_interface = gr.TabbedInterface([iface, search_tab, import_export_tab, keyword_tab],
-                                          ["Transcription + Summarization", "Search", "Export/Import", "Keywords"])
-
+    tabbed_interface = gr.TabbedInterface([iface, search_interface, import_export_tab, keyword_tab],
+                                          ["Transcription + Summarization", "Search and Detail View", "Export/Import", "Keywords"])
     # Launch the interface
     server_port_variable = 7860
     if server_mode:
