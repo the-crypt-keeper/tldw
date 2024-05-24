@@ -8,12 +8,7 @@
 ----------
 
 ### Table of Contents
-- [What?](#what)
-- [Using](#using)
-- [Setup](#setup)
-- [Pieces/What's in the Repo](#what)
-- [Setting up a Local LLM Inference Engine](#localllm)
-- [Credits](#credits)
+- [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#what) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits)
 
 ----------
 
@@ -100,7 +95,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
       * So everything you might consume during your path of research, tracked and assimilated and tagged.
       * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
 ----------
-### <a name="setup"></a>Setup
+### <a name="setup"></a>Setting it up
 - **Requirements**
   - Python3
   - ffmpeg
@@ -158,7 +153,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
        - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
        - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
 ----------
-### <a name="using"></a>Using
+### <a name="using"></a>Using tldw
 - Single file (remote URL) transcription
   * Single URL: `python summarize.py https://example.com/video.mp4`
 - Single file (local) transcription)
