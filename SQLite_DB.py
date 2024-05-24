@@ -381,6 +381,7 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
         raise InputError("Page number must be 1 or greater.")
 
     keywords = [keyword.strip().lower() for keyword in keywords.split(',') if keyword.strip()]
+
     with db.get_connection() as conn:
         cursor = conn.cursor()
         offset = (page - 1) * results_per_page
@@ -397,12 +398,12 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
         where_clause = " AND ".join(search_conditions)
 
         query = f'''
-        SELECT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date, Media.prompt, Media.summary
+        SELECT DISTINCT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date, Media.prompt, Media.summary
         FROM Media
         JOIN media_fts ON Media.id = media_fts.rowid
-        JOIN MediaKeywords ON Media.id = MediaKeywords.media_id
-        JOIN Keywords ON MediaKeywords.keyword_id = Keywords.id
-        JOIN keyword_fts ON Keywords.id = keyword_fts.rowid
+        LEFT JOIN MediaKeywords ON Media.id = MediaKeywords.media_id
+        LEFT JOIN Keywords ON MediaKeywords.keyword_id = Keywords.id
+        LEFT JOIN keyword_fts ON Keywords.id = keyword_fts.rowid
         WHERE {where_clause}
         LIMIT ? OFFSET ?
         '''
@@ -429,7 +430,7 @@ def format_results(results: Union[List[Tuple], str]) -> pd.DataFrame:
 
 
 # Gradio function to handle user input and display results with pagination, with better feedback
-def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int, dummy: bool = False):
+def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int, submit: bool = False):
     if not submit:
         return [], gr.update(visible=False)
 
