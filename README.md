@@ -46,6 +46,7 @@ For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.
 Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruct, which you can get in a GGUF format from here: https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF
   * Or you can let the script download and run a local server for you, using llama.cpp/llamafile and one of the above models. 
     * (It'll ask you if you want to download one, and if so, which one out of a choice of 3) 
+----------
 
 **CLI Screenshot**
 - **See [Using](#using)**
@@ -54,7 +55,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
 **GUI Screenshot**
 ![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
 
-
+----------
 
 ### Quickstart
   1. Update your drivers.
