@@ -377,35 +377,37 @@ def add_media_version(media_id: int, prompt: str, summary: str) -> None:
 
 # Function to search the database with advanced options, including keyword search and full-text search
 def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
-    logging.debug("Starting search_db function.")
     if page < 1:
         raise ValueError("Page number must be 1 or greater.")
 
+    # Prepare keywords by splitting and trimming
     keywords = [keyword.strip().lower() for keyword in keywords.split(',') if keyword.strip()]
-    logging.debug(f"Processed keywords: {keywords}")
-
-    if not search_query.strip():
-        return []
 
     with db.get_connection() as conn:
         cursor = conn.cursor()
         offset = (page - 1) * results_per_page
 
+        # Prepare the search conditions for general fields
         search_conditions = []
         params = []
 
         for field in search_fields:
-            if field:
+            if search_query:  # Ensure there's a search query before adding this condition
                 search_conditions.append(f"Media.{field} LIKE ?")
                 params.append(f'%{search_query}%')
 
+        # Prepare the conditions for keywords filtering
         keyword_conditions = []
         for keyword in keywords:
-            keyword_conditions.append(f"EXISTS (SELECT 1 FROM MediaKeywords JOIN Keywords ON MediaKeywords.keyword_id = Keywords.id WHERE MediaKeywords.media_id = Media.id AND Keywords.keyword LIKE ?)")
+            keyword_conditions.append(
+                f"EXISTS (SELECT 1 FROM MediaKeywords mk JOIN Keywords k ON mk.keyword_id = k.id WHERE mk.media_id = Media.id AND k.keyword LIKE ?)")
             params.append(f'%{keyword}%')
 
-        where_clause = " AND ".join(search_conditions + keyword_conditions) if search_conditions or keyword_conditions else "1=1"
+        # Combine all conditions
+        where_clause = " AND ".join(
+            search_conditions + keyword_conditions) if search_conditions or keyword_conditions else "1=1"
 
+        # Complete the query
         query = f'''
         SELECT DISTINCT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date, Media.prompt, Media.summary
         FROM Media
@@ -413,16 +415,9 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
         LIMIT ? OFFSET ?
         '''
         params.extend([results_per_page, offset])
-        logging.debug(f"Executing query: {query} with params: {params}")
+
         cursor.execute(query, params)
         results = cursor.fetchall()
-
-        logging.debug(f"SQL Query executed: {query}")
-        logging.debug(f"With parameters: {params}")
-        logging.debug(f"Results fetched: {results}")
-
-        # Print the raw results for verification
-        print("Raw results:", results)
 
         return results
 
