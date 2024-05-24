@@ -14,7 +14,7 @@ from datetime import datetime
 # Set up logging
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 #logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-#logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 # Custom exceptions
@@ -220,7 +220,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     author = author or 'Unknown'
     ingestion_date = ingestion_date or datetime.now().strftime('%Y-%m-%d')
 
-    # Use 'localhost' as the URL if no valid URL is provided
+    # Ensure URL is valid
     if not is_valid_url(url):
         url = 'localhost'
 
@@ -232,6 +232,9 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
 
     if not ingestion_date:
         ingestion_date = datetime.now().strftime('%Y-%m-%d')
+
+    # Split keywords correctly by comma
+    keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
 
     logging.info(f"URL: {url}")
     logging.info(f"Title: {title}")
@@ -249,7 +252,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
             cursor = conn.cursor()
 
             # Initialize keyword_list
-            keyword_list = keywords.split(',')
+            keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
 
             # Check if media already exists
             cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
@@ -270,7 +273,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
 
                 # Insert new media item
                 cursor.execute('''
-                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model) 
+                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (url, title, media_type, content, author, ingestion_date, transcription_model))
                 media_id = cursor.lastrowid
