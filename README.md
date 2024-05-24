@@ -57,11 +57,15 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
 
 
 ### Quickstart
-  1. Install Python3 for your platform - https://www.python.org/downloads/
-  2. Create a virtual env: `python -m venv .\`
-  3. Launch/activate your virtual env: `. .\scripts\activate.ps1`
-    * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `py -m pip install nvidia-cudnn-cu12`
-  4. `pip install -r requirements.txt` - may take a bit of time...
+  1. Update your drivers.
+  2. Install Python3 for your platform - https://www.python.org/downloads/
+  3. Download the repo: `git clone https://github.com/rmusser01/tldw` or manually download it (Green code button, upper right corner -> Download ZIP) and extract it to a folder of your choice.
+  4. Open a terminal, navigate to the directory you cloned the repo to, or unzipped the downloaded zip file to, and run the following commands:
+     - Create a virtual env: `python -m venv .\`
+     - Launch/activate your virtual env: `. .\scripts\activate.ps1`
+       * If you don't already have cuda installed(Nvidia), `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
+       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+     - `pip install -r requirements.txt` - may take a bit of time...
   5. **You are Ready to Go!** Check out the below sample commands: 
 
 - **Transcribe audio from a Youtube URL:**
@@ -96,24 +100,39 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
       * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
 
 ### <a name="setup"></a>Setup
+- **Requirements**
+  - Python3
+  - ffmpeg
+  - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
+  - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
+  - System RAM (8GB minimum, realistically 12GB)
+  - Disk Space (Depends on how much you ingest, but a few GBs (4+) should be fine for the total size of the project + DB)
 - **Linux**
     1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg / dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
-    2. Create a virtual env: `python -m venv ./`
-    3. Launch/activate your virtual env: `. .\scripts\activate.sh`
-       * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
+    2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
+    3. `git clone https://github.com/rmusser01/tldw`
+    4. `cd tldw`
+    5. Create a virtual env: `python -m venv ./`
+    6. Launch/activate your virtual env: `. .\scripts\activate.sh`
+    7. Setup the necessary python packages:
+       * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
        * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
        * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
        * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
-  6. See `Linux && Windows`
+    8. Then see `Linux && Windows`
 - **Windows**
     1. Download necessary packages ([Python3](https://www.python.org/downloads/windows/), Update your GPU drivers/CUDA drivers if you'll be running an LLM locally, ffmpeg will be installed by the script)
-    2. Create a virtual env: `python -m venv .\`
-    3. Launch/activate your virtual env: `. .\scripts\activate.ps1`
+    2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
+    3. `git clone https://github.com/rmusser01/tldw`
+    4. `cd tldw`
+    5. Create a virtual env: `python -m venv ./`
+    6. Launch/activate your virtual env: `. .\scripts\activate.sh`
+    7. Setup the necessary python packages:
        * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/windows.html
        * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
        * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
        * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
-  6. See `Linux && Windows`
+    8. See `Linux && Windows`
 - **Linux && Windows**
     1. `pip install -r requirements.txt` - may take a bit of time...
     2. **Script Usage:**
