@@ -442,19 +442,34 @@ def search_and_display(search_query, search_fields, keywords, page):
 
 
 def display_details(index, results):
-    if index is None or results is None or int(index) >= len(results):
-        return "Please select a valid result to view details."
-    selected_row = results[int(index)]  # Ensure `index` is converted to an integer to access the list
+    if index is None or results is None:
+        return "Please select a result to view details."
+
+    try:
+        # Ensure the index is an integer and access the row properly
+        index = int(index)
+        if isinstance(results, pd.DataFrame):
+            if index >= len(results):
+                return "Index out of range. Please select a valid index."
+            selected_row = results.iloc[index]
+        else:
+            # If results is not a DataFrame, but a list (assuming list of dicts)
+            selected_row = results[index]
+    except ValueError:
+        return "Index must be an integer."
+    except IndexError:
+        return "Index out of range. Please select a valid index."
+
+    # Build HTML output safely
     details_html = f"""
-    <h3>{selected_row['Title']}</h3>
-    <p><strong>URL:</strong> {selected_row['URL']}</p>
-    <p><strong>Type:</strong> {selected_row['Type']}</p>
-    <p><strong>Author:</strong> {selected_row['Author']}</p>
-    <p><strong>Ingestion Date:</strong> {selected_row['Ingestion Date']}</p>
-    <p><strong>Prompt:</strong> {selected_row['Prompt']}</p>
-    <p><strong>Summary:</strong> {selected_row['Summary']}</p>
-    <p><strong>Content:</strong></p>
-    <pre>{selected_row['Content']}</pre>
+    <h3>{selected_row.get('Title', 'No Title')}</h3>
+    <p><strong>URL:</strong> {selected_row.get('URL', 'No URL')}</p>
+    <p><strong>Type:</strong> {selected_row.get('Type', 'No Type')}</p>
+    <p><strong>Author:</strong> {selected_row.get('Author', 'No Author')}</p>
+    <p><strong>Ingestion Date:</strong> {selected_row.get('Ingestion Date', 'No Date')}</p>
+    <p><strong>Prompt:</strong> {selected_row.get('Prompt', 'No Prompt')}</p>
+    <p><strong>Summary:</strong> {selected_row.get('Summary', 'No Summary')}</p>
+    <p><strong>Content:</strong> {selected_row.get('Content', 'No Content')}</p>
     """
     return details_html
 
