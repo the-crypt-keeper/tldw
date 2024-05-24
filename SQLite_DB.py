@@ -410,12 +410,19 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
 
         try:
             params = tuple([search_query] * len(search_fields) + keywords)
+            # Log the query and parameters for debugging
+            logger.info(f"Executing query: {query}")
+            logger.info(f"With parameters: {params + (results_per_page, offset)}")
             cursor.execute(query, params + (results_per_page, offset))
             results = cursor.fetchall()
+            logger.info(f"Query results: {results}")
             if not results:
+                logger.info("No results found.")
                 return "No results found."
+            logger.info(f"Results found: {results}")
             return results
         except sqlite3.Error as e:
+            logger.error(f"Error executing query: {e}")
             raise DatabaseError(f"Error executing query: {e}")
 
 
