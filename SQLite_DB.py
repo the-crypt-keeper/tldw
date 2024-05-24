@@ -12,8 +12,9 @@ from urllib.parse import urlparse
 from datetime import datetime
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+#logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+#logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+#logger = logging.getLogger(__name__)
 
 
 # Custom exceptions
@@ -45,7 +46,7 @@ class Database:
                 return
             except sqlite3.OperationalError as e:
                 if 'database is locked' in str(e):
-                    logger.warning(f"Database is locked, retrying in {retry_delay} seconds...")
+                    logging.warning(f"Database is locked, retrying in {retry_delay} seconds...")
                     retry_count -= 1
                     time.sleep(retry_delay)
                 else:
@@ -375,27 +376,31 @@ def add_media_version(media_id: int, prompt: str, summary: str) -> None:
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
-def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10) -> Union[List[Tuple], str]:
-    # Validate input
+def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
+    logging.debug("Starting search_db function.")
     if page < 1:
-        raise InputError("Page number must be 1 or greater.")
+        raise ValueError("Page number must be 1 or greater.")
 
     keywords = [keyword.strip().lower() for keyword in keywords.split(',') if keyword.strip()]
+    logging.debug(f"Processed keywords: {keywords}")
+
+    if not search_query.strip():
+        return []
 
     with db.get_connection() as conn:
         cursor = conn.cursor()
         offset = (page - 1) * results_per_page
 
         search_conditions = []
-        if search_fields:
-            search_conditions.append(" OR ".join([f"media_fts.{field} MATCH ?" for field in search_fields]))
-        if keywords:
-            keyword_conditions = []
-            for keyword in keywords:
-                keyword_conditions.append("keyword_fts.keyword MATCH ?")
-            search_conditions.append(" AND ".join(keyword_conditions))
+        for field in search_fields:
+            if field:
+                search_conditions.append(f"media_fts.{field} MATCH ?")
 
-        where_clause = " AND ".join(search_conditions)
+        keyword_conditions = [f"keyword_fts.keyword MATCH ?" for keyword in keywords]
+        if keyword_conditions:
+            search_conditions.append(f"({' AND '.join(keyword_conditions)})")
+
+        where_clause = " AND ".join(search_conditions) if search_conditions else "1=1"
 
         query = f'''
         SELECT DISTINCT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date, Media.prompt, Media.summary
@@ -407,53 +412,64 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
         WHERE {where_clause}
         LIMIT ? OFFSET ?
         '''
+        params = tuple([f'{search_query}*'] * len(search_fields) + keywords + [results_per_page, offset])
+        logging.debug(f"Executing query: {query} with params: {params}")
+        cursor.execute(query, params)
+        results = cursor.fetchall()
 
-        try:
-            params = tuple([search_query] * len(search_fields) + keywords)
-            # Log the query and parameters for debugging
-            logger.info(f"Executing query: {query}")
-            logger.info(f"With parameters: {params + (results_per_page, offset)}")
-            cursor.execute(query, params + (results_per_page, offset))
-            results = cursor.fetchall()
-            logger.info(f"Query results: {results}")
-            if not results:
-                logger.info("No results found.")
-                return "No results found."
-            logger.info(f"Results found: {results}")
-            return results
-        except sqlite3.Error as e:
-            logger.error(f"Error executing query: {e}")
-            raise DatabaseError(f"Error executing query: {e}")
+        logging.debug(f"SQL Query executed: {query}")
+        logging.debug(f"With parameters: {params}")
+        logging.debug(f"Results fetched: {results}")
 
+        # Print the raw results for verification
+        print("Raw results:", results)
 
-# Function to format results for display
-def format_results(results: Union[List[Tuple], str]) -> pd.DataFrame:
-    if isinstance(results, str):
-        return pd.DataFrame()  # Return an empty DataFrame if results is a string
-
-    df = pd.DataFrame(results,
-                      columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date', 'Prompt', 'Summary'])
-    return df
+        return results
 
 
 # Gradio function to handle user input and display results with pagination, with better feedback
-def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int, submit: bool = False):
-    if not submit:
-        return [], gr.update(visible=False)
+def search_and_display(search_query: str, search_fields: List[str], keyword: str, page: int):
+    results = search_db(search_query, search_fields, keyword, page)
+    df, message = format_results(results)
+    if df.empty:
+        print("DataFrame is empty")  # Debugging print
+    else:
+        print("DataFrame contents:", df)  # Debugging print
 
-    try:
-        if not search_query.strip():
-            raise InputError("Please enter a valid search query.")
+    return df
 
-        results = search_db(search_query, search_fields, keyword, page)
-        df = format_results(results)
 
-        if df.empty:
-            return df, gr.update(value="No results found.", visible=True)
-        else:
-            return df, gr.update(visible=False)
-    except (DatabaseError, InputError) as e:
-        return pd.DataFrame(), gr.update(value=str(e), visible=True)
+def format_results(results):
+    if not results:
+        return pd.DataFrame(), "No results found."
+
+    df = pd.DataFrame(results,
+                      columns=['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date', 'Prompt', 'Summary'])
+    logging.debug(f"Formatted DataFrame: {df}")
+
+    # Print the DataFrame for verification
+    print("Formatted DataFrame:", df)
+
+    return df, ""
+
+
+def display_details(row):
+    if not row:
+        return gr.update(value="No item selected.", visible=True)
+
+    details = f"""
+    <h3>{row['Title']}</h3>
+    <p><strong>URL:</strong> {row['URL']}</p>
+    <p><strong>Type:</strong> {row['Type']}</p>
+    <p><strong>Author:</strong> {row['Author']}</p>
+    <p><strong>Ingestion Date:</strong> {row['Ingestion Date']}</p>
+    <p><strong>Prompt:</strong> {row['Prompt']}</p>
+    <p><strong>Summary:</strong> {row['Summary']}</p>
+    <p><strong>Content:</strong></p>
+    <pre>{row['Content']}</pre>
+    """
+
+    return gr.update(value=details, visible=True)
 
 
 # Function to export search results to CSV with pagination

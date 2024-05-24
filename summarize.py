@@ -100,6 +100,7 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #       Random issues I've encountered and how I solved them:
 #   1. Something about cuda nn library missing, even though cuda is installed...
 #       https://github.com/tensorflow/tensorflow/issues/54784 - Basically, installing zlib made it go away. idk.
+#       Or https://github.com/SYSTRAN/faster-whisper/issues/85
 #
 #   2. ERROR: Could not install packages due to an OSError: [WinError 2] The system cannot find the file specified: 'C:\\Python312\\Scripts\\dateparser-download.exe' -> 'C:\\Python312\\Scripts\\dateparser-download.exe.deleteme'
 #       Resolved through adding --user to the pip install command
@@ -2266,9 +2267,7 @@ def ask_question(transcription, question, api_name, api_key):
         return "Question answering is currently only supported with the OpenAI API."
 
 
-import gradio as gr
-
-
+# launch gradio UI
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
 
@@ -2548,17 +2547,11 @@ def launch_ui(demo_mode=False):
             gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content", "URL", "Type", "Author"],
                              value=["Title"]),
             gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
-            gr.Number(label="Page", value=1, precision=0),
-            gr.Checkbox(visible=False)  # Dummy input to match the expected number of arguments
+            gr.Number(label="Page", value=1, precision=0)
         ],
-        outputs=[
-            gr.Dataframe(label="Search Results"),
-            gr.Textbox(label="Message", visible=False)
-        ],
-        title="Search Media Summaries",
-        description="Search for media (documents, videos, articles) and their summaries in the database. Use keywords for better filtering.",
-        allow_flagging="never"
+        outputs=gr.Dataframe(label="Search Results")
     )
+
 
     export_keywords_interface = gr.Interface(
         fn=export_keywords_to_csv,
@@ -2643,7 +2636,7 @@ def launch_ui(demo_mode=False):
     server_port_variable = 7860
     if server_mode:
         tabbed_interface.launch(share=True, server_port=server_port_variable, server_name="http://0.0.0.0")
-    elif share_public:
+    elif share_public == True:
         tabbed_interface.launch(share=True,)
     else:
         tabbed_interface.launch(share=False,)
@@ -3316,7 +3309,6 @@ Sample commands:
     console_handler.setLevel(getattr(logging, args.log_level))
     console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
 
     if args.log_file:
         # Create file handler
