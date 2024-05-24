@@ -60,6 +60,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
   1. Install Python3 for your platform - https://www.python.org/downloads/
   2. Create a virtual env: `python -m venv .\`
   3. Launch/activate your virtual env: `. .\scripts\activate.ps1`
+    * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `py -m pip install nvidia-cudnn-cu12`
   4. `pip install -r requirements.txt` - may take a bit of time...
   5. **You are Ready to Go!** Check out the below sample commands: 
 
@@ -99,12 +100,20 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
     1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg / dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
     2. Create a virtual env: `python -m venv ./`
     3. Launch/activate your virtual env: `. .\scripts\activate.sh`
-    4. See `Linux && Windows`
+       * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
+       * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
+       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+       * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
+  6. See `Linux && Windows`
 - **Windows**
     1. Download necessary packages ([Python3](https://www.python.org/downloads/windows/), Update your GPU drivers/CUDA drivers if you'll be running an LLM locally, ffmpeg will be installed by the script)
     2. Create a virtual env: `python -m venv .\`
     3. Launch/activate your virtual env: `. .\scripts\activate.ps1`
-    4. See `Linux && Windows`
+       * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/windows.html
+       * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
+       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+       * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
+  6. See `Linux && Windows`
 - **Linux && Windows**
     1. `pip install -r requirements.txt` - may take a bit of time...
     2. **Script Usage:**
