@@ -2546,8 +2546,8 @@ def launch_ui(demo_mode=False):
             gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
             gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content", "URL", "Type", "Author"],
                              value=["Title"]),
-            gr.Textbox(label="Keyword", placeholder="Enter keywords here..."),
-            gr.Number(label="Page", value=1, precision=0)
+            gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)..."),
+            gr.Slider(label="Page", minimum=1, maximum=10, step=1, value=1)
         ],
         outputs=gr.Dataframe(label="Search Results")
     )
