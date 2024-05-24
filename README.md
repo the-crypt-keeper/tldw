@@ -99,7 +99,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
       * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
       * So everything you might consume during your path of research, tracked and assimilated and tagged.
       * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
-
+----------
 ### <a name="setup"></a>Setup
 - **Requirements**
   - Python3
@@ -157,7 +157,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
        - Then, after downloading and selecting a model, it'll launch the model using llamafile, so you'll have a browser window/tab opened with a frontend to the model/llama.cpp server.
        - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
        - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
-
+----------
 ### <a name="using"></a>Using
 - Single file (remote URL) transcription
   * Single URL: `python summarize.py https://example.com/video.mp4`
