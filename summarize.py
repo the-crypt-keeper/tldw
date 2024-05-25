@@ -242,16 +242,32 @@ def platform_check():
 def cuda_check():
     global processing_choice
     try:
-        nvidia_smi = subprocess.check_output("nvidia-smi", shell=True).decode()
-        if "NVIDIA-SMI" in nvidia_smi:
-            print("NVIDIA GPU with CUDA is available.")
-            processing_choice = "cuda"  # Set processing_choice to gpu if NVIDIA GPU with CUDA is available
+        # Run nvidia-smi to capture its output
+        nvidia_smi_output = subprocess.check_output("nvidia-smi", shell=True).decode()
+
+        # Look for CUDA version in the output
+        if "CUDA Version" in nvidia_smi_output:
+            cuda_version = next(
+                (line.split(":")[-1].strip() for line in nvidia_smi_output.splitlines() if "CUDA Version" in line),
+                "Not found")
+            print(f"NVIDIA GPU with CUDA Version {cuda_version} is available.")
+            processing_choice = "cuda"
         else:
-            print("NVIDIA GPU with CUDA is not available.\nYou either have an AMD GPU, or you're stuck with CPU only.")
-            processing_choice = "cpu"  # Set processing_choice to cpu if NVIDIA GPU with CUDA is not available
-    except subprocess.CalledProcessError:
-        print("NVIDIA GPU with CUDA is not available.\nYou either have an AMD GPU, or you're stuck with CPU only.")
-        processing_choice = "cpu"  # Set processing_choice to cpu if nvidia-smi command fails
+            print("CUDA is not installed or configured correctly.")
+            processing_choice = "cpu"
+
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to run 'nvidia-smi': {str(e)}")
+        processing_choice = "cpu"
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        processing_choice = "cpu"
+
+    # Optionally, check for the CUDA_VISIBLE_DEVICES env variable as an additional check
+    if "CUDA_VISIBLE_DEVICES" in os.environ:
+        print("CUDA_VISIBLE_DEVICES is set:", os.environ["CUDA_VISIBLE_DEVICES"])
+    else:
+        print("CUDA_VISIBLE_DEVICES not set.")
 
 
 # Ask user if they would like to use either their GPU or their CPU for transcription
