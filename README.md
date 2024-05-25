@@ -60,6 +60,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
      - Create a virtual env: `python -m venv .\`
      - Launch/activate your virtual env: `. .\scripts\activate.ps1`
        * If you don't already have cuda installed(Nvidia), `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
+       * Or AMD (Windows): `pip install torch-directml`
        * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
      - `pip install -r requirements.txt` - may take a bit of time...
   5. **You are Ready to Go!** Check out the below sample commands: 
