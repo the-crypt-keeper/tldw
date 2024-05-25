@@ -2822,7 +2822,7 @@ def download_latest_llamafile(repo, asset_name_prefix, output_filename):
             mistral_7b_instruct_v0_2_q8_gguf_sha256 = "f326f5f4f137f3ad30f8c9cc21d4d39e54476583e8306ee2931d5a022cb85b06"
             samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
             mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
-            llm_choice = input("Which LLM model would you like to download? 1. Mistral-7B-Instruct-v0.2-GGUF or 2. Samantha-Mistral-Instruct-7B-Bulleted-Notes) (plain or 'custom'): Press '1' or '2' to specify: ")
+            llm_choice = input("Which LLM model would you like to download? 1. Mistral-7B-Instruct-v0.2-GGUF or 2. Samantha-Mistral-Instruct-7B-Bulleted-Notes) (plain or 'custom') or MS Flavor: Phi-3-mini-128k-instruct-Q8_0.gguf  \n\n\tPress '1' or '2' or '3' to specify: ")
             while llm_choice != "1" and llm_choice != "2" and llm_choice != "3":
                 print("Invalid choice. Please try again.")
             if llm_choice == "1":
@@ -2840,6 +2840,14 @@ def download_latest_llamafile(repo, asset_name_prefix, output_filename):
                 llamafile_llm_url = "https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b-bulleted-notes-GGUF/resolve/main/samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf?download=true"
                 download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
             elif llm_choice == "3":
+                llm_download_model = "Phi-3-mini-128k-instruct-Q8_0.gguf"
+                Phi_3_mini_128k_instruct_Q8_0_gguf_sha256 = "6817b66d1c3c59ab06822e9732f0e594eea44e64cae2110906eac9d17f75d193"
+                llm_download_model_hash = Phi_3_mini_128k_instruct_Q8_0_gguf_sha256
+                llamafile_llm_output_filename = "Phi-3-mini-128k-instruct-Q8_0.gguf"
+                llamafile_llm_url = "https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF/resolve/main/Phi-3-mini-128k-instruct-Q8_0.gguf?download=true"
+                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
+            elif llm_choice == "4":
+                #FIXME - Add Llama3 Model
                 llm_download_model = "Phi-3-mini-128k-instruct-Q8_0.gguf"
                 Phi_3_mini_128k_instruct_Q8_0_gguf_sha256 = "6817b66d1c3c59ab06822e9732f0e594eea44e64cae2110906eac9d17f75d193"
                 llm_download_model_hash = Phi_3_mini_128k_instruct_Q8_0_gguf_sha256
