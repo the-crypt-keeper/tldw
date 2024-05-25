@@ -6,6 +6,7 @@ anyio==4.3.0
 attrs==23.2.0
 av==11.0.0
 Brotli==1.1.0
+bs4
 certifi==2024.2.2
 charset-normalizer==3.3.2
 click==8.1.7
