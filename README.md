@@ -128,10 +128,13 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
     5. Create a virtual env: `python -m venv ./`
     6. Launch/activate your virtual env: PowerShell: `. .\scripts\activate.ps1` or for CMD: `.\scripts\activate.bat`
     7. Setup the necessary python packages:
-       * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/windows.html
-       * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
-       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
-       * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
+       - Cuda
+         * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/windows.html
+           * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
+       - CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+           * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
+       - AMD
+         * `pip install torch-directml`
     8. See `Linux && Windows`
 - **Linux && Windows**
     1. `pip install -r requirements.txt` - may take a bit of time...
@@ -145,7 +148,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
          - Then the video will be transcribed by faster_whisper. (You can see this in the console output)
            * The resulting transcription output will be stored as both a json file with timestamps, as well as a txt file with no timestamps.
        - Finally, you can have the transcription summarized through feeding it into an LLM of your choice.
-    3. **GUI Usage:
+    3. **GUI Usage:**
        - Put your API keys and settings in the `config.txt` file.
          - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
        - (make sure your in the python venv - Run `./scripts/activate.sh` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
