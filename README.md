@@ -19,12 +19,12 @@
     * CLI usage: `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api openai -k tag_one tag_two tag_three` 
     - GUI usage: `python summarize.py -gui`
     - GUI with local LLM: `python summarize.py -gui --local_llama`
+  - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
+    - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
 - **Short Summary**
   - Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
   - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
   - Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported only through OpenAI currently, though the [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) will let you do it with exllama or vLLM, using the scripts in there for the entire pipeline.
-  - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. (List of supported sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md )
-
 - **Longer Summary/Goal**
   - To be able to act as an ingestion tool for personal database storage. The idea being that there is so much data one comes across, and we can store it all as text.
   - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your finger tips in a moments notice.
