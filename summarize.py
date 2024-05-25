@@ -2823,6 +2823,9 @@ def download_latest_llamafile(repo, asset_name_prefix, output_filename):
             samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
             mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
             global llm_choice
+
+            # FIXME - llm_choice
+            llm_choice = 2
             llm_choice = input("Which LLM model would you like to download? 1. Mistral-7B-Instruct-v0.2-GGUF or 2. Samantha-Mistral-Instruct-7B-Bulleted-Notes) (plain or 'custom') or MS Flavor: Phi-3-mini-128k-instruct-Q8_0.gguf  \n\n\tPress '1' or '2' or '3' to specify: ")
             while llm_choice != "1" and llm_choice != "2" and llm_choice != "3":
                 print("Invalid choice. Please try again.")
@@ -2847,14 +2850,11 @@ def download_latest_llamafile(repo, asset_name_prefix, output_filename):
                 llamafile_llm_output_filename = "Phi-3-mini-128k-instruct-Q8_0.gguf"
                 llamafile_llm_url = "https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF/resolve/main/Phi-3-mini-128k-instruct-Q8_0.gguf?download=true"
                 download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
-            elif llm_choice == "4":
-                #FIXME - Add Llama3 Model
-                llm_download_model = "Phi-3-mini-128k-instruct-Q8_0.gguf"
-                Phi_3_mini_128k_instruct_Q8_0_gguf_sha256 = "6817b66d1c3c59ab06822e9732f0e594eea44e64cae2110906eac9d17f75d193"
-                llm_download_model_hash = Phi_3_mini_128k_instruct_Q8_0_gguf_sha256
-                llamafile_llm_output_filename = "Phi-3-mini-128k-instruct-Q8_0.gguf"
-                llamafile_llm_url = "https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF/resolve/main/Phi-3-mini-128k-instruct-Q8_0.gguf?download=true"
-                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
+            elif llm_choice == "4": # FIXME - and meta_Llama_3_8B_Instruct_Q8_0_llamafile_exists == False:
+                meta_Llama_3_8B_Instruct_Q8_0_llamafile_sha256 = "406868a97f02f57183716c7e4441d427f223fdbc7fa42964ef10c4d60dd8ed37"
+                llm_download_model_hash = meta_Llama_3_8B_Instruct_Q8_0_llamafile_sha256
+                llamafile_llm_output_filename = " Meta-Llama-3-8B-Instruct.Q8_0.llamafile"
+                llamafile_llm_url = "https://huggingface.co/Mozilla/Meta-Llama-3-8B-Instruct-llamafile/resolve/main/Meta-Llama-3-8B-Instruct.Q8_0.llamafile?download=true"
             else:
                 print("Invalid choice. Please try again.")
     return output_filename
@@ -2960,6 +2960,9 @@ def local_llm_function():
     llamafile_path = download_latest_llamafile(repo, asset_name_prefix, output_filename)
     logging.debug("Main: Llamafile downloaded successfully.")
 
+    # FIXME - llm_choice
+    global llm_choice
+    llm_choice = 1
     # Launch the llamafile in an external process with the specified argument
     if llm_choice == 1:
         arguments = ["--ctx-size", "8192 ", " -m", "mistral-7b-instruct-v0.2.Q8_0.llamafile"]
