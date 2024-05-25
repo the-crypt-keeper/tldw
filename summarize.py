@@ -2822,6 +2822,7 @@ def download_latest_llamafile(repo, asset_name_prefix, output_filename):
             mistral_7b_instruct_v0_2_q8_gguf_sha256 = "f326f5f4f137f3ad30f8c9cc21d4d39e54476583e8306ee2931d5a022cb85b06"
             samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
             mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
+            global llm_choice
             llm_choice = input("Which LLM model would you like to download? 1. Mistral-7B-Instruct-v0.2-GGUF or 2. Samantha-Mistral-Instruct-7B-Bulleted-Notes) (plain or 'custom') or MS Flavor: Phi-3-mini-128k-instruct-Q8_0.gguf  \n\n\tPress '1' or '2' or '3' to specify: ")
             while llm_choice != "1" and llm_choice != "2" and llm_choice != "3":
                 print("Invalid choice. Please try again.")
@@ -2928,16 +2929,19 @@ def verify_checksum(file_path, expected_checksum):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest() == expected_checksum
 
+
 # Function to close out llamafile process on script exit.
 def cleanup_process():
     if 'process' in globals():
         process.kill()
         logging.debug("Main: Terminated the external process")
 
+
 def signal_handler(sig, frame):
     logging.info('Signal handler called with signal: %s', sig)
     cleanup_process()
     sys.exit(0)
+
 
 def local_llm_function():
     repo = "Mozilla-Ocho/llamafile"
@@ -2957,9 +2961,18 @@ def local_llm_function():
     logging.debug("Main: Llamafile downloaded successfully.")
 
     # Launch the llamafile in an external process with the specified argument
-    arguments = ["--ctx-size", "8192 ", " -m", "mistral-7b-instruct-v0.2.Q8_0.llamafile"]
-    global running_local_llm
-    running_local_llm = True
+    if llm_choice == 1:
+        arguments = ["--ctx-size", "8192 ", " -m", "mistral-7b-instruct-v0.2.Q8_0.llamafile"]
+    elif llm_choice == 2:
+        arguments = ["--ctx-size", "8192 ", " -m", "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf"]
+    elif llm_choice == 3:
+        arguments = ["--ctx-size", "8192 ", " -m", "Phi-3-mini-128k-instruct-Q8_0.gguf"]
+    elif llm_choice == 4:
+        arguments = ["--ctx-size", "8192 ", " -m", "llama-3"] # FIXME
+
+
+
+
     try:
         logging.info("Main: Launching the LLM (llamafile) in an external terminal window...")
         if useros == "nt":
