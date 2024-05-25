@@ -137,6 +137,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
     1. `pip install -r requirements.txt` - may take a bit of time...
     2. **Script Usage:**
        - Put your API keys and settings in the `config.txt` file.
+       - (make sure your in the python venv - `./scripts/activate.sh` or `.\scripts\activate.ps1` or `.\scripts\activate.bat`)
        - Run `python ./summarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
        - You'll then be asked if you'd like to run the transcription through GPU(1) or CPU(2).
          - Next, the video will be downloaded to the local directory by ytdl.
@@ -145,17 +146,20 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
        - Finally, you can have the transcription summarized through feeding it into an LLM of your choice.
     3. **GUI Usage:
        - Put your API keys and settings in the `config.txt` file.
+       - (make sure your in the python venv - `./scripts/activate.sh` or `.\scripts\activate.ps1` or `.\scripts\activate.bat`)
        - Run `python ./summarize.py -gui` - This will launch a webapp that will allow you to interact with the script in a more user-friendly manner.
          * You can pass in the API keys for the LLMs you want to use in the `config.txt` file, or pass them in when you use the GUI.
          * You can also download the generated transcript and summary as text files from the UI.
          * You can also download the video/audio as files from the UI. (WIP - doesn't currently work)
          * You can also access the SQLite DB that backs the app, with search, tagging, and export functionality.
     4. **Local LLM with the Script Usage:**
+       - (make sure your in the python venv - `./scripts/activate.sh` or `.\scripts\activate.ps1` or `.\scripts\activate.bat`)
        - I recognize some people may like the functionality and idea of it all, but don't necessarily know/want to know about LLMs/getting them working, so you can also have the script download and run a local model, using system RAM and llamafile/llama.cpp.
-       - Simply pass `--local_llm` to the script, and it'll ask you if you want to download a model, and which one you'd like to download.
+       - Simply pass `--local_llm` to the script (`python summarize.py --local-llm`), and it'll ask you if you want to download a model, and which one you'd like to download.
        - Then, after downloading and selecting a model, it'll launch the model using llamafile, so you'll have a browser window/tab opened with a frontend to the model/llama.cpp server.
        - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
        - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
+
 ----------
 ### <a name="using"></a>Using tldw
 - Single file (remote URL) transcription
