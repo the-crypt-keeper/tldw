@@ -2957,7 +2957,7 @@ def local_llm_function():
     logging.debug("Main: Llamafile downloaded successfully.")
 
     # Launch the llamafile in an external process with the specified argument
-    arguments = ["-m", "mistral-7b-instruct-v0.2.Q8_0.llamafile"]
+    arguments = ["--ctx-size", "8192 ", " -m", "mistral-7b-instruct-v0.2.Q8_0.llamafile"]
     global running_local_llm
     running_local_llm = True
     try:
