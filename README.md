@@ -100,6 +100,9 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
   - Python3
   - ffmpeg
   - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
+    - AMD GPUs are not supported by PyTorch, so you'll need to use a CPU-only installation.
+    - Apparently there is a ROCm version of PyTorch, but I haven't tested it.
+    - https://github.com/llvm/torch-mlir
   - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
   - System RAM (8GB minimum, realistically 12GB)
   - Disk Space (Depends on how much you ingest, but a few GBs (4+) should be fine for the total size of the project + DB)
@@ -122,7 +125,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`
     5. Create a virtual env: `python -m venv ./`
-    6. Launch/activate your virtual env: PowerShell: `. .\scripts\activate.ps1` / CMD: `.\scripts\activate.bat`
+    6. Launch/activate your virtual env: PowerShell: `. .\scripts\activate.ps1` or for CMD: `.\scripts\activate.bat`
     7. Setup the necessary python packages:
        * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/windows.html
        * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
