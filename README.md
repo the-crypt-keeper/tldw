@@ -100,10 +100,9 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
   - Python3
   - ffmpeg
   - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
-    - AMD GPUs are not supported by PyTorch, so you'll need to use a CPU-only installation.
-    - Apparently there is a ROCm version of PyTorch, but I haven't tested it.
-      - https://github.com/llvm/torch-mlir
-      - https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows
+    - Apparently there is a ROCm version of PyTorch.
+      - https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
+      - Use the 'AMD_requests.txt' file to install the necessary packages for AMD GPU support. Simply rename it before use.
   - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
   - System RAM (8GB minimum, realistically 12GB)
   - Disk Space (Depends on how much you ingest, but a few GBs (4+) should be fine for the total size of the project + DB)
