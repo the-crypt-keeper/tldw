@@ -324,6 +324,9 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 - https://github.com/akashe/YoutubeSummarizer
 - https://github.com/fmeyer/tldw
 - https://github.com/pashpashpash/vault-ai <-- Closest I've found open source to what I'm looking to build, though I'm not looking to add RAG for a while, and I'm focused on just accumulation, I figure at some point in the future can tackle chunking of hte longer form items in a manner that makes sense/is effective, but until then, data storage is cheap and text is small. And SQLite is easy to share with people. Also, no commercial aspects, this project's goal is to be able to be ran completely offline/free from outside influence.
+- https://github.com/bugbakery/transcribee
+- https://github.com/fedirz/faster-whisper-server
+- https://github.com/transcriptionstream/transcriptionstream
 - Commercial offerings:
   * Bit.ai 
   * 
