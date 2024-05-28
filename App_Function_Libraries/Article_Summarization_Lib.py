@@ -1,4 +1,4 @@
-# Article-Summarization-Lib.py
+# Article_Summarization_Lib.py
 #########################################
 # Article Summarization Library
 # This library is used to handle summarization of articles.
@@ -180,6 +180,10 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
                 huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
                 logging.debug(f"Article_Summarizer: Trying to summarize with huggingface")
                 summary = summarize_with_huggingface(huggingface_api_key, json_file_path, article_custom_prompt)
+            elif api_name.lower() == "openrouter":
+                openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
+                logging.debug(f"Article_Summarizer: Trying to summarize with openrouter")
+                summary = summarize_with_openrouter(openrouter_api_key, json_file_path, article_custom_prompt)
         except requests.exceptions.ConnectionError as e:
             logging.error(f"Connection error while trying to summarize with {api_name}: {str(e)}")
 

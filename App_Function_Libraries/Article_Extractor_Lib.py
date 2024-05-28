@@ -1,4 +1,4 @@
-# Article-Extractor-Lib.py
+# Article_Extractor_Lib.py
 #########################################
 # Article Extraction Library
 # This library is used to handle scraping and extraction of articles from web pages.

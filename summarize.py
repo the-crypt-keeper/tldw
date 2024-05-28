@@ -25,13 +25,14 @@ import zipfile
 # Local Module Imports (Libraries specific to this project)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
 from App_Function_Libraries import *
+from App_Function_Libraries.Web_UI_Lib import launch_ui
 # from App_Function_Libraries import Article-Extractor-Lib
 # from App_Function_Libraries import Article-Summarization-Lib
 # from App_Function_Libraries import Audio-Transcription-Lib
 # from App_Function_Libraries import Chunk-Lib
 # from App_Function_Libraries import Diarization-Lib
 # from App_Function_Libraries import Local-File-Handling-Lib
-# from App_Function_Libraries import Local-LLM-Infereence-Engine-Lib
+# from App_Function_Libraries import Local-LLM-Inference-Engine-Lib
 # from App_Function_Libraries import Local-Summarization-Lib
 # from App_Function_Libraries import Summarization-General-Lib
 # from App_Function_Libraries import System-Checks-Lib
@@ -323,6 +324,7 @@ time.sleep(1)
 
 #######################################################################################################################
 # Video Download/Handling
+# Video-DL-Ingestion-Lib
 #
 # Function List
 # 1. get_video_info(url)
@@ -423,7 +425,7 @@ time.sleep(1)
 # Summarization with Detail
 #
 
-# FIXME - see 'Old-Chunking-Lib.py'
+# FIXME - see 'Old_Chunking_Lib.py'
 
 #
 #
@@ -648,6 +650,13 @@ def main(input_path, api_name=None, api_key=None,
                         try:
                             logging.debug(f"MAIN: Trying to summarize with Groq")
                             summary = summarize_with_groq(groq_api_key, json_file_path, groq_model, custom_prompt)
+                        except requests.exceptions.ConnectionError:
+                            requests.status_code = "Connection: "
+                    elif api_name.lower() == "openrouter":
+                        openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
+                        try:
+                            logging.debug(f"MAIN: Trying to summarize with OpenRouter")
+                            summary = summarize_with_openrouter(openrouter_api_key, json_file_path, custom_prompt)
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "llama":

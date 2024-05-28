@@ -1,4 +1,4 @@
-# Diarization-Lib.py
+# Diarization_Lib.py
 #########################################
 # Diarization Library
 # This library is used to perform diarization of audio files.

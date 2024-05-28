@@ -1,4 +1,4 @@
-# Local-Summarization-Lib.py
+# Local_Summarization_Lib.py
 #########################################
 # Local Summarization Library
 # This library is used to perform summarization with a 'local' inference engine.

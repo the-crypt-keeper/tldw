@@ -1,4 +1,4 @@
-# Web-UI-Lib.py
+# Web_UI_Lib.py
 #########################################
 # Web-based UI library
 # This library is used to handle creating a GUI using Gradio for a web-based interface.
@@ -388,7 +388,7 @@ def launch_ui(demo_mode=False):
                 lines=3
             )
             api_name_input = gr.Dropdown(
-                choices=[None, "huggingface", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
+                choices=[None, "huggingface", "openrouter", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
                 value=None,
                 label="API Name (Mandatory for Summarization)"
             )

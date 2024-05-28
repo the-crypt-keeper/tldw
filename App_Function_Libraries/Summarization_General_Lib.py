@@ -1,4 +1,4 @@
-# Summarization-General-Lib.py
+# Summarization_General_Lib.py
 #########################################
 # General Summarization Library
 # This library is used to perform summarization.
@@ -21,8 +21,8 @@
 # Import necessary libraries
 import os
 import logging
-
-
+from typing import List, Dict
+import json
 
 #######################################################################################################################
 # Function Definitions
@@ -287,6 +287,52 @@ def summarize_with_groq(api_key, file_path, model, custom_prompt_arg):
     except Exception as e:
         logging.error("groq: Error in processing: %s", str(e))
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
+
+
+def summarize_with_openrouter(api_key, file_path, custom_prompt_arg)
+    import requests
+    import json
+    OPENROUTER_API_KEY = api_key
+    global openrouter_model
+    if openrouter_model is None:
+        openrouter_model = "microsoft/wizardlm-2-8x22b"
+
+    response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
+
+    logging.debug("openrouter: Submitting request to API endpoint")
+    print("openrouter: Submitting request to API endpoint")
+    response = requests.post(
+        url="https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        },
+        data=json.dumps({
+            "model": f"{openrouter_model}",
+            "messages": [
+                {"role": "user", "content": f"{custom_prompt_arg}"}
+            ]
+        })
+    )
+
+    response_data = response.json()
+    logging.debug("API Response Data: %s", response_data)
+
+    if response.status_code == 200:
+        if 'choices' in response_data and len(response_data['choices']) > 0:
+            summary = response_data['choices'][0]['message']['content'].strip()
+            logging.debug("openrouter: Summarization successful")
+            print("openrouter: Summarization successful.")
+            return summary
+        else:
+            logging.error("openrouter: Expected data not found in API response.")
+            return "openrouter: Expected data not found in API response."
+    else:
+        logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
+        return f"openrouter: API request failed: {response.text}"
+
+    except Exception as e:
+        logging.error("openrouter: Error in processing: %s", str(e))
+        return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
 
 
 #
