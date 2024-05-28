@@ -1740,6 +1740,7 @@ Sample commands:
     parser.add_argument('--share_public', type=int, default=7860,
                         help="This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)")
     parser.add_argument('--port', type=int, default=7860, help='Port to run the server on')
+    #parser.add_argument('--offload', type=int, default=20, help='Numbers of layers to offload to GPU for Llamafile usage')
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
 
     args = parser.parse_args()
