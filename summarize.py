@@ -696,6 +696,19 @@ def launch_ui(demo_mode=False):
                                                   chunk_text_by_tokens_checkbox, max_tokens_input
                                               ])
 
+            def start_llamafile(prompt, temperature, top_k, top_p, min_p, stream, stop, typical_p, repeat_penalty,
+                                repeat_last_n,
+                                penalize_nl, presence_penalty, frequency_penalty, penalty_prompt, ignore_eos,
+                                system_prompt):
+                # Code to start llamafile with the provided configuration
+                # ...
+                return "Llamafile started"
+
+            def stop_llamafile():
+                # Code to stop llamafile
+                # ...
+                return "Llamafile stopped"
+
             def toggle_light(mode):
                 if mode == "Dark":
                     return """
@@ -868,6 +881,70 @@ def launch_ui(demo_mode=False):
                 gr.Markdown("\n".join(prompts_category_1))
             with gr.Accordion("Category 2"):
                 gr.Markdown("\n".join(prompts_category_2))
+
+        with gr.Tab("Llamafile Settings"):
+            gr.Markdown("Settings for Llamafile")
+            # Start/Stop buttons
+            start_button = gr.Button("Start Llamafile")
+            stop_button = gr.Button("Stop Llamafile")
+
+            # Configuration inputs
+            prompt_input = gr.Textbox(label="Prompt", value="")
+            temperature_input = gr.Number(label="Temperature", value=0.8)
+            top_k_input = gr.Number(label="Top K", value=40)
+            top_p_input = gr.Number(label="Top P", value=0.95)
+            min_p_input = gr.Number(label="Min P", value=0.05)
+            stream_input = gr.Checkbox(label="Stream", value=False)
+            stop_input = gr.Textbox(label="Stop", value="[]")
+            typical_p_input = gr.Number(label="Typical P", value=1.0)
+            repeat_penalty_input = gr.Number(label="Repeat Penalty", value=1.1)
+            repeat_last_n_input = gr.Number(label="Repeat Last N", value=64)
+            penalize_nl_input = gr.Checkbox(label="Penalize New Lines", value=False)
+            presence_penalty_input = gr.Number(label="Presence Penalty", value=0.0)
+            frequency_penalty_input = gr.Number(label="Frequency Penalty", value=0.0)
+            penalty_prompt_input = gr.Textbox(label="Penalty Prompt", value="")
+            ignore_eos_input = gr.Checkbox(label="Ignore EOS", value=False)
+            system_prompt_input = gr.Textbox(label="System Prompt", value="")
+
+            # Output display
+            output_display = gr.Textbox(label="Llamafile Output")
+
+            start_button.click(start_llamafile, inputs=[prompt_input, temperature_input, top_k_input, top_p_input, min_p_input,
+                                                stream_input, stop_input, typical_p_input, repeat_penalty_input,
+                                                repeat_last_n_input, penalize_nl_input, presence_penalty_input,
+                                                frequency_penalty_input, penalty_prompt_input, ignore_eos_input,
+                                                system_prompt_input], outputs=output_display)
+
+            stop_button.click(stop_llamafile, outputs=output_display)
+
+        with gr.Tab("Llamafile Usage"):
+            # Define the HTML content with the iframe
+            html_content = """
+            <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Llama.cpp Server Chat Interface - Loaded from  http://127.0.0.1:8080</title>
+                    <style>
+                        body, html {
+                        height: 100%;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    iframe {
+                        border: none;
+                        width: 85%;
+                        height: 85vh; /* Full viewport height */
+                    }
+                </style>
+            </head>
+            <body>
+                <iframe src="http://127.0.0.1:8080" title="Llama.cpp Server Chat Interface - Loaded from  http://127.0.0.1:8080"></iframe>
+            </body>
+            </html>
+            """
+            gr.HTML(html_content)
 
     with gr.Blocks() as search_interface:
         with gr.Tab("Search & Detailed View"):

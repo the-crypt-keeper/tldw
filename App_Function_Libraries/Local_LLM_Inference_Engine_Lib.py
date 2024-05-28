@@ -269,6 +269,7 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
+# FIXME - Add callout to gradio UI
 def local_llm_function():
     repo = "Mozilla-Ocho/llamafile"
     asset_name_prefix = "llamafile-"
@@ -299,8 +300,52 @@ def local_llm_function():
     elif llm_choice == 4:
         arguments = ["--ctx-size", "8192 ", " -m", "llama-3"] # FIXME
 
+    try:
+        logging.info("Main: Launching the LLM (llamafile) in an external terminal window...")
+        if useros == "nt":
+            launch_in_new_terminal_windows(llamafile_path, arguments)
+        elif useros == "posix":
+            launch_in_new_terminal_linux(llamafile_path, arguments)
+        else:
+            launch_in_new_terminal_mac(llamafile_path, arguments)
+        # FIXME - pid doesn't exist in this context
+        #logging.info(f"Main: Launched the {llamafile_path} with PID {process.pid}")
+        atexit.register(cleanup_process, process)
+    except Exception as e:
+        logging.error(f"Failed to launch the process: {e}")
+        print(f"Failed to launch the process: {e}")
 
 
+def local_llm_gui_function(prompt, temperature, top_k, top_p, min_p, stream, stop, typical_p, repeat_penalty, repeat_last_n,
+                       penalize_nl, presence_penalty, frequency_penalty, penalty_prompt, ignore_eos, system_prompt):
+    repo = "Mozilla-Ocho/llamafile"
+    asset_name_prefix = "llamafile-"
+    useros = os.name
+    if useros == "nt":
+        output_filename = "llamafile.exe"
+    else:
+        output_filename = "llamafile"
+    print(
+        "WARNING - Checking for existence of llamafile and HuggingFace model, downloading if needed...This could be a while")
+    print("WARNING - and I mean a while. We're talking an 8 Gigabyte model here...")
+    print("WARNING - Hope you're comfy. Or it's already downloaded.")
+    time.sleep(6)
+    logging.debug("Main: Checking and downloading Llamafile from Github if needed...")
+    llamafile_path = download_latest_llamafile(repo, asset_name_prefix, output_filename)
+    logging.debug("Main: Llamafile downloaded successfully.")
+
+    # FIXME - llm_choice
+    global llm_choice
+    llm_choice = 1
+    # Launch the llamafile in an external process with the specified argument
+    if llm_choice == 1:
+        arguments = ["--ctx-size", "8192 ", " -m", "mistral-7b-instruct-v0.2.Q8_0.llamafile"]
+    elif llm_choice == 2:
+        arguments = ["--ctx-size", "8192 ", " -m", "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf"]
+    elif llm_choice == 3:
+        arguments = ["--ctx-size", "8192 ", " -m", "Phi-3-mini-128k-instruct-Q8_0.gguf"]
+    elif llm_choice == 4:
+        arguments = ["--ctx-size", "8192 ", " -m", "llama-3"] # FIXME
 
     try:
         logging.info("Main: Launching the LLM (llamafile) in an external terminal window...")
@@ -317,14 +362,20 @@ def local_llm_function():
         logging.error(f"Failed to launch the process: {e}")
         print(f"Failed to launch the process: {e}")
 
+
+
+
+# Launch the executable in a new terminal window # FIXME - really should figure out a cleaner way of doing this...
 def launch_in_new_terminal_windows(executable, args):
     command = f'start cmd /k "{executable} {" ".join(args)}"'
     subprocess.run(command, shell=True)
+
 
 # FIXME
 def launch_in_new_terminal_linux(executable, args):
     command = f'gnome-terminal -- {executable} {" ".join(args)}'
     subprocess.run(command, shell=True)
+
 
 # FIXME
 def launch_in_new_terminal_mac(executable, args):
