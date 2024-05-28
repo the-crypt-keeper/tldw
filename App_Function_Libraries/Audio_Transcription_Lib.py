@@ -5,7 +5,7 @@
 # Currently, uses faster_whisper for transcription.
 #
 ####
-
+import configparser
 ####################
 # Function List
 #
@@ -22,7 +22,24 @@ import os
 import sys
 import subprocess
 import time
-
+# Import Local
+import summarize
+from Article_Summarization_Lib import *
+from Article_Extractor_Lib import *
+#from Audio_Transcription_Lib import *
+from Chunk_Lib import *
+from Diarization_Lib import *
+from Video_DL_Ingestion_Lib import *
+from Local_File_Processing_Lib import *
+from Local_LLM_Inference_Engine_Lib import *
+from Local_Summarization_Lib import *
+from Old_Chunking_Lib import *
+from SQLite_DB import *
+from Summarization_General_Lib import *
+from System_Checks_Lib import *
+from Tokenization_Methods_Lib import *
+from Video_DL_Ingestion_Lib import *
+from Web_UI_Lib import *
 
 #######################################################################################################################
 # Function Definitions
@@ -96,6 +113,10 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='small.en', vad_filter=False):
     logging.info('speech-to-text: Loading faster_whisper model: %s', whisper_model)
     from faster_whisper import WhisperModel
+    # Retrieve processing choice from the configuration file
+    config = configparser.ConfigParser()
+    config.read('config.txt')
+    processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
     model = WhisperModel(whisper_model, device=f"{processing_choice}")
     time_start = time.time()
     if audio_file_path is None:

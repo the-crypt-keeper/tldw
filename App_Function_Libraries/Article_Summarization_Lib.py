@@ -18,11 +18,12 @@
 # Import necessary libraries
 import os
 import logging
+import bs4
 import huggingface_hub
 import tokenizers
 import torchvision
 import transformers
-
+import summarize
 
 
 #######################################################################################################################

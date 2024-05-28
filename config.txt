@@ -9,8 +9,8 @@ openai_api_key = <openai_api_key>
 openai_model = gpt-4-turbo
 huggingface_api_token = <huggingface_api_token>
 huggingface_model = CohereForAI/c4ai-command-r-plus
-openrouter_api_token = <huggingface_api_token>
-openrouter_model = microsoft/wizardlm-2-8x22b
+openrouter_api_token = <openrouter_api_token>
+openrouter_model = mistralai/mistral-7b-instruct:free
 
 
 [Local-API]
