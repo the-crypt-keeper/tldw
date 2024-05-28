@@ -219,14 +219,6 @@ def save_to_file(video_urls, filename):
         file.write('\n'.join(video_urls))
     print(f"Video URLs saved to {filename}")
 
-
-def save_summary_to_file(summary: str, file_path: str):
-    """Save summary to a JSON file."""
-    summary_data = {'summary': summary, 'generated_at': datetime.now().isoformat()}
-    with open(file_path, 'w') as file:
-        json.dump(summary_data, file, indent=4)
-
-
 #
 #
 #######################################################################################################################

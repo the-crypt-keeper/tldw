@@ -202,6 +202,7 @@ def summarize_with_kobold(api_url, file_path, kobold_api_token, custom_prompt):
                 summary = response_data['results'][0]['text'].strip()
                 logging.debug("kobold: Summarization successful")
                 print("Summarization successful.")
+                save_summary_to_file(summary, file_path)  # Save the summary to a file
                 return summary
             else:
                 logging.error("Expected data not found in API response.")
@@ -234,7 +235,7 @@ def summarize_with_oobabooga(api_url, file_path, ooba_api_token, custom_prompt):
         # prompt_text = "I like to eat cake and bake cakes. I am a baker. I work in a French bakery baking cakes. It
         # is a fun job. I have been baking cakes for ten years. I also bake lots of other baked goods, but cakes are
         # my favorite." prompt_text += f"\n\n{text}"  # Uncomment this line if you want to include the text variable
-        ooba_prompt = f"{text}\n\n\n\n{custom_prompt}"
+        ooba_prompt = f"{text}" + f"\n\n\n\n{custom_prompt}"
         logging.debug("ooba: Prompt being sent is {ooba_prompt}")
 
         data = {
@@ -306,11 +307,21 @@ def summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, text, tabby_model, cust
 
 def save_summary_to_file(summary, file_path):
     logging.debug("Now saving summary to file...")
-    summary_file_path = os.path.splitext(file_path)[0] + '_summary.txt'
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    summary_file_path = os.path.join(os.path.dirname(file_path), base_name + '_summary.txt')
+    os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
     logging.debug("Opening summary file for writing, *segments.json with *_summary.txt")
     with open(summary_file_path, 'w') as file:
         file.write(summary)
     logging.info(f"Summary saved to file: {summary_file_path}")
+
+# From Video_DL_Ingestion_Lib.py
+# def save_summary_to_file(summary: str, file_path: str):
+#     """Save summary to a JSON file."""
+#     summary_data = {'summary': summary, 'generated_at': datetime.now().isoformat()}
+#     with open(file_path, 'w') as file:
+#         json.dump(summary_data, file, indent=4)
+
 
 #
 #
