@@ -76,7 +76,7 @@ cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
 groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
 openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
 huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
-openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
+openrouter_model = config.get('API', 'openrouter_model', fallback='mistralai/mistral-7b-instruct:free')
 
 
 #######################################################################################################################
@@ -344,7 +344,7 @@ def summarize_with_groq(api_key, file_path, model, custom_prompt_arg):
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
 
 
-def summarize_with_openrouter(api_key, file_path, custom_prompt_arg):
+def summarize_with_openrouter(api_key, json_file_path, custom_prompt_arg):
     import requests
     import json
     global openrouter_model
@@ -364,6 +364,8 @@ def summarize_with_openrouter(api_key, file_path, custom_prompt_arg):
     if openrouter_model is None:
         openrouter_model = "mistralai/mistral-7b-instruct:free"
 
+    openrouter_prompt = f"{json_file_path} \n\n\n\n{custom_prompt_arg}"
+
     try:
         logging.debug("openrouter: Submitting request to API endpoint")
         print("openrouter: Submitting request to API endpoint")
@@ -375,7 +377,7 @@ def summarize_with_openrouter(api_key, file_path, custom_prompt_arg):
             data=json.dumps({
                 "model": f"{openrouter_model}",
                 "messages": [
-                    {"role": "user", "content": f"{custom_prompt_arg}"}
+                    {"role": "user", "content": openrouter_prompt}
                 ]
             })
         )
