@@ -1,4 +1,4 @@
-# System-Checks-Lib.py
+# System_Checks_Lib.py
 #########################################
 # System Checks Library
 # This library is used to check the system for the necessary dependencies to run the script.

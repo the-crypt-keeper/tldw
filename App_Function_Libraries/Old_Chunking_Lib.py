@@ -1,4 +1,4 @@
-# Old-Chunking-Lib.py
+# Old_Chunking_Lib.py
 #########################################
 # Old Chunking Library
 # This library is used to handle chunking of text for summarization.

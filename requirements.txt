@@ -110,9 +110,10 @@ websockets
 yt-dlp
 #yt-dlp==2024.4.9
 #--extra-index-url https://download.pytorch.org/whl/cu113
+nltk
 torch
 torchaudio
 #torch==2.2.2+cu121
 #torchaudio==2.2.2+cu121
-tiktoken~=0.6.0
 openai~=1.28.1
+tiktoken~=0.6.0

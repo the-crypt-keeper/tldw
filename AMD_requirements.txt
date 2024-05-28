@@ -109,6 +109,7 @@ yt-dlp
 --extra-index-url https://download.pytorch.org/whl/cu113
 torch==2.2.1
 torchaudio
+nltk
 #torch==2.2.1+cu121
 #torchaudio==2.2.1+cu121
 torchvision==0.17.1

@@ -1,4 +1,4 @@
-# Audio-Transcription-Lib.py
+# Audio_Transcription_Lib.py
 #########################################
 # Transcription Library
 # This library is used to perform transcription of audio files.
