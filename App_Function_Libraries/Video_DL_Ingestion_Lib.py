@@ -25,7 +25,6 @@
 
 
 # Import necessary libraries to run solo for testing
-import datetime
 from datetime import datetime
 import json
 import logging
