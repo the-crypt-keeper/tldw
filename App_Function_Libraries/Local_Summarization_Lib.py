@@ -45,7 +45,7 @@ from Web_UI_Lib import *
 
 # Read configuration from file
 config = configparser.ConfigParser()
-config.read('config.txt')
+config.read('../config.txt')
 
 # Local-Models
 kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')

@@ -4,7 +4,7 @@
 # This library is used to perform summarization.
 #
 ####
-
+import configparser
 ####################
 # Function List
 #
@@ -25,7 +25,7 @@ import time
 import requests
 from typing import List, Dict
 import json
-
+import configparser
 from requests import RequestException
 
 # Import Local
@@ -49,7 +49,7 @@ from Video_DL_Ingestion_Lib import *
 
 # Read configuration from file
 config = configparser.ConfigParser()
-config.read('config.txt')
+config.read('../config.txt')
 
 # API Keys
 anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
@@ -67,8 +67,8 @@ logging.debug(f"Loaded openAI Face API Key: {openai_api_key}")
 huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
 logging.debug(f"Loaded HuggingFace Face API Key: {huggingface_api_key}")
 
-openrouter_api_key = config.get('Local-API', 'openrouter', fallback=None)
-logging.debug(f"Loaded OpenRouter API Key: {openrouter_api_key}")
+openrouter_api_token = config.get('API', 'openrouter_api_token', fallback=None)
+logging.debug(f"Loaded OpenRouter API Key: {openrouter_api_token}")
 
 # Models
 anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
@@ -347,10 +347,22 @@ def summarize_with_groq(api_key, file_path, model, custom_prompt_arg):
 def summarize_with_openrouter(api_key, file_path, custom_prompt_arg):
     import requests
     import json
-    OPENROUTER_API_KEY = api_key
     global openrouter_model
+
+    config = configparser.ConfigParser()
+    file_path = 'config.txt'
+
+    # Check if the file exists in the specified path
+    if os.path.exists(file_path):
+        config.read(file_path)
+    elif os.path.exists('config.txt'):  # Check in the current directory
+        config.read('../config.txt')
+    else:
+        print("config.txt not found in the specified path or current directory.")
+
+    openrouter_api_token = config.get('API', 'openrouter_api_token', fallback=None)
     if openrouter_model is None:
-        openrouter_model = "microsoft/wizardlm-2-8x22b"
+        openrouter_model = "mistralai/mistral-7b-instruct:free"
 
     try:
         logging.debug("openrouter: Submitting request to API endpoint")
@@ -358,7 +370,7 @@ def summarize_with_openrouter(api_key, file_path, custom_prompt_arg):
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Authorization": f"Bearer {openrouter_api_token}",
             },
             data=json.dumps({
                 "model": f"{openrouter_model}",
@@ -386,6 +398,57 @@ def summarize_with_openrouter(api_key, file_path, custom_prompt_arg):
     except Exception as e:
         logging.error("openrouter: Error in processing: %s", str(e))
         return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
+
+def summarize_with_huggingface(api_key, file_path, custom_prompt_arg):
+    logging.debug(f"huggingface: Summarization process starting...")
+    try:
+        logging.debug("huggingface: Loading json data for summarization")
+        with open(file_path, 'r') as file:
+            segments = json.load(file)
+
+        logging.debug("huggingface: Extracting text from the segments")
+        logging.debug(f"huggingface: Segments: {segments}")
+        text = ' '.join([segment['text'] for segment in segments])
+
+        print(f"huggingface: lets make sure the HF api key exists...\n\t {api_key}")
+        headers = {
+            "Authorization": f"Bearer {api_key}"
+        }
+
+        model = "microsoft/Phi-3-mini-128k-instruct"
+        API_URL = f"https://api-inference.huggingface.co/models/{model}"
+
+        huggingface_prompt = f"{text}\n\n\n\n{custom_prompt_arg}"
+        logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
+        data = {
+            "inputs": text,
+            "parameters": {"max_length": 512, "min_length": 100}  # You can adjust max_length and min_length as needed
+        }
+
+        print(f"huggingface: lets make sure the HF api key is the same..\n\t {huggingface_api_key}")
+
+        logging.debug("huggingface: Submitting request...")
+
+        response = requests.post(API_URL, headers=headers, json=data)
+
+        if response.status_code == 200:
+            summary = response.json()[0]['summary_text']
+            logging.debug("huggingface: Summarization successful")
+            print("Summarization successful.")
+            return summary
+        else:
+            logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
+            return f"Failed to process summary, status code {response.status_code}: {response.text}"
+    except Exception as e:
+        logging.error("huggingface: Error in processing: %s", str(e))
+        print(f"Error occurred while processing summary with huggingface: {str(e)}")
+        return None
+
+    # FIXME
+    # This is here for gradio authentication
+    # Its just not setup.
+    # def same_auth(username, password):
+    #    return username == password
 
 
 #
