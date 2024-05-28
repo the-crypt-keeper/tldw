@@ -76,7 +76,7 @@ global DEFAULT_CHUNK_DURATION
 DEFAULT_CHUNK_DURATION = 30
 global WORDS_PER_SECOND
 WORDS_PER_SECOND = 3
-
+custom_prompt = None
 
 #
 #
@@ -533,7 +533,20 @@ def ask_question(transcription, question, api_name, api_key):
         return "Question answering is currently only supported with the OpenAI API."
 
 
-
+summarizers: Dict[str, Callable[[str, str], str]] = {
+    'tabbyapi': summarize_with_tabbyapi,
+    'openai': summarize_with_openai,
+    'anthropic': summarize_with_claude,
+    'cohere': summarize_with_cohere,
+    'groq': summarize_with_groq,
+    'llama': summarize_with_llama,
+    'kobold': summarize_with_kobold,
+    'oobabooga': summarize_with_oobabooga,
+    'local-llm': summarize_with_local_llm,
+    'huggingface': summarize_with_huggingface,
+    'openrouter': summarize_with_openrouter
+    # Add more APIs here as needed
+}
 
 # def gradio UI
 def launch_ui(demo_mode=False):
@@ -1080,7 +1093,7 @@ def process_url(url,
             keyword_list = keywords.split(',') if keywords else ["default"]
             media_keywords = ', '.join(keyword_list)
             media_author = "auto_generated"
-            media_ingestion_date = datetime.datetime.now().strftime('%Y-%m-%d')
+            media_ingestion_date = datetime.now().strftime('%Y-%m-%d')
             transcription_model = whisper_model  # Add the transcription model used
 
             # Log the values before calling the function
@@ -1255,6 +1268,24 @@ def main(input_path, api_name=None, api_key=None,
             if info_dict:
                 logging.debug("MAIN: Creating transcription file from WAV")
                 segments = speech_to_text(audio_file, whisper_model=whisper_model, vad_filter=vad_filter)
+
+                if isinstance(segments, dict) and "error" in segments:
+                    logging.error(f"Error transcribing audio: {segments['error']}")
+                    transcription_result = {
+                        'video_path': path,
+                        'audio_file': audio_file,
+                        'transcription': segments,
+                        'error': segments['error']
+                    }
+                else:
+                    transcription_result = {
+                        'video_path': path,
+                        'audio_file': audio_file,
+                        'transcription': segments
+                    }
+
+                results.append(transcription_result)
+                logging.info(f"MAIN: Transcription complete: {audio_file}")
                 transcription_result = {
                     'video_path': path,
                     'audio_file': audio_file,
@@ -1263,11 +1294,14 @@ def main(input_path, api_name=None, api_key=None,
                 results.append(transcription_result)
                 logging.info(f"MAIN: Transcription complete: {audio_file}")
 
+                # Check if segments is a dictionary before proceeding with summarization
+                if isinstance(segments, dict):
+                    logging.warning("Skipping summarization due to transcription error")
+                    continue
+
+                # FIXME
                 # Perform rolling summarization based on API Name, detail level, and if an API key exists
                 # Will remove the API key once rolling is added for llama.cpp
-
-                # FIXME - Add input for model name for tabby and vllm
-
                 if rolling_summarization:
                     logging.info("MAIN: Rolling Summarization")
 
@@ -1331,11 +1365,28 @@ def main(input_path, api_name=None, api_key=None,
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
                     json_file_path = audio_file.replace('.wav', '.segments.json')
                     if api_name.lower() == 'openai':
-                        openai_api_key = api_key if api_key else config.get('API', 'openai_api_key',
-                                                                            fallback=None)
                         try:
                             logging.debug(f"MAIN: trying to summarize with openAI")
                             summary = summarize_with_openai(openai_api_key, json_file_path, custom_prompt)
+                            if summary != "openai: Error occurred while processing summary":
+                                transcription_result['summary'] = summary
+                                logging.info(f"Summary generated using {api_name} API")
+                                save_summary_to_file(summary, json_file_path)
+                                # Add media to the database
+                                add_media_with_keywords(
+                                    url=path,
+                                    title=info_dict.get('title', 'Untitled'),
+                                    media_type='video',
+                                    content=' '.join([segment['text'] for segment in segments]),
+                                    keywords=','.join(keywords),
+                                    prompt=custom_prompt or 'No prompt provided',
+                                    summary=summary or 'No summary provided',
+                                    transcription_model=whisper_model,
+                                    author=info_dict.get('uploader', 'Unknown'),
+                                    ingestion_date=datetime.now().strftime('%Y-%m-%d')
+                                )
+                            else:
+                                logging.warning(f"Failed to generate summary using {api_name} API")
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "anthropic":
@@ -1571,17 +1622,20 @@ Sample commands:
     ########## Custom Prompt setup
     custom_prompt = args.custom_prompt
 
-    if custom_prompt is None or custom_prompt == "":
+    if not args.custom_prompt:
         logging.debug("No custom prompt defined, will use default")
-        args.custom_prompt = ("\n\nabove is the transcript of a video "
-                              "Please read through the transcript carefully. Identify the main topics that are "
-                              "discussed over the course of the transcript. Then, summarize the key points about each "
-                              "main topic in a concise bullet point. The bullet points should cover the key "
-                              "information conveyed about each topic in the video, but should be much shorter than "
-                              "the full transcript. Please output your bullet point summary inside <bulletpoints> "
-                              "tags.")
-        custom_prompt = args.custom_prompt
+        args.custom_prompt = (
+            "\n\nabove is the transcript of a video. "
+            "Please read through the transcript carefully. Identify the main topics that are "
+            "discussed over the course of the transcript. Then, summarize the key points about each "
+            "main topic in a concise bullet point. The bullet points should cover the key "
+            "information conveyed about each topic in the video, but should be much shorter than "
+            "the full transcript. Please output your bullet point summary inside <bulletpoints> "
+            "tags."
+        )
         print("No custom prompt defined, will use default")
+        global custom_prompt
+        custom_prompt = args.custom_prompt
     else:
         logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")

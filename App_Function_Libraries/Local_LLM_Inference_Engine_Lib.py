@@ -6,9 +6,8 @@
 #
 #
 ####
-
-
-
+import atexit
+import hashlib
 ####################
 # Function List
 #
@@ -27,11 +26,14 @@
 # Import necessary libraries
 import json
 import logging
+from multiprocessing import Process as process
 import requests
 import sys
 import os
 # Import 3rd-pary Libraries
 import gradio as gr
+from tqdm import tqdm
+
 # Import Local
 import summarize
 from Article_Summarization_Lib import *

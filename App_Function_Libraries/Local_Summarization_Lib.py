@@ -27,6 +27,9 @@ from typing import Callable
 
 # Import Local
 import summarize
+from App_Function_Libraries.Old_Chunking_Lib import client
+from App_Function_Libraries.SQLite_DB import logger
+from App_Function_Libraries.Summarization_General_Lib import extract_text_from_segments, summarize_with_claude
 from Article_Summarization_Lib import *
 from Article_Extractor_Lib import *
 from Audio_Transcription_Lib import *
@@ -185,7 +188,7 @@ def summarize_with_kobold(api_url, file_path, kobold_api_token, custom_prompt):
         data = {
             "max_context_length": 8096,
             "max_length": 4096,
-            "prompt": kobold_prompt,
+            "prompt": f"{text}\n\n\n\n{custom_prompt}"
         }
 
         logging.debug("kobold: Submitting request to API endpoint")
@@ -231,7 +234,7 @@ def summarize_with_oobabooga(api_url, file_path, ooba_api_token, custom_prompt):
         # prompt_text = "I like to eat cake and bake cakes. I am a baker. I work in a French bakery baking cakes. It
         # is a fun job. I have been baking cakes for ten years. I also bake lots of other baked goods, but cakes are
         # my favorite." prompt_text += f"\n\n{text}"  # Uncomment this line if you want to include the text variable
-        ooba_prompt = "{text}\n\n\n\n{custom_prompt}"
+        ooba_prompt = f"{text}\n\n\n\n{custom_prompt}"
         logging.debug("ooba: Prompt being sent is {ooba_prompt}")
 
         data = {
@@ -303,24 +306,15 @@ def summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, text, tabby_model, cust
 
 def save_summary_to_file(summary, file_path):
     logging.debug("Now saving summary to file...")
-    summary_file_path = file_path.replace('.segments.json', '_summary.txt')
+    summary_file_path = os.path.splitext(file_path)[0] + '_summary.txt'
     logging.debug("Opening summary file for writing, *segments.json with *_summary.txt")
     with open(summary_file_path, 'w') as file:
         file.write(summary)
     logging.info(f"Summary saved to file: {summary_file_path}")
 
-
-summarizers: Dict[str, Callable[[str, str], str]] = {
-    'tabbyapi': summarize_with_tabbyapi,
-    'openai': summarize_with_openai,
-    'anthropic': summarize_with_claude,
-    'cohere': summarize_with_cohere,
-    'groq': summarize_with_groq,
-    'llama': summarize_with_llama,
-    'kobold': summarize_with_kobold,
-    'oobabooga': summarize_with_oobabooga
-    # Add more APIs here as needed
-}
+#
+#
+#######################################################################################################################
 
 
 
