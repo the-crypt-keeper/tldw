@@ -16,15 +16,34 @@
 
 
 # Import necessary libraries
+import datetime
+from datetime import datetime
+import json
 import os
 import logging
+# 3rd-Party Imports
 import bs4
 import huggingface_hub
 import tokenizers
 import torchvision
 import transformers
+# Local Imports
 import summarize
-
+import summarize
+from Article_Extractor_Lib import *
+from Chunk_Lib import *
+from Diarization_Lib import *
+from Video_DL_Ingestion_Lib import *
+from Local_File_Processing_Lib import *
+from Local_LLM_Inference_Engine_Lib import *
+from Local_Summarization_Lib import *
+from Old_Chunking_Lib import *
+from SQLite_DB import *
+from Summarization_General_Lib import *
+from System_Checks_Lib import *
+from Tokenization_Methods_Lib import *
+from Video_DL_Ingestion_Lib import *
+from Web_UI_Lib import *
 
 #######################################################################################################################
 # Function Definitions
@@ -47,7 +66,7 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
         author = author or 'Unknown'
         keywords = keywords or 'default'
         summary = summary or 'No summary available'
-        ingestion_date = ingestion_date or datetime.now().strftime('%Y-%m-%d')
+        ingestion_date = ingestion_date or datetime.datetime.now().strftime('%Y-%m-%d')
 
         # Log the values of all fields before calling add_media_with_keywords
         logging.debug(f"URL: {url}")

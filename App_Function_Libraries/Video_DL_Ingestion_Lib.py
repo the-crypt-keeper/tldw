@@ -26,6 +26,7 @@
 
 # Import necessary libraries to run solo for testing
 import datetime
+from datetime import datetime
 import json
 import logging
 import os
@@ -33,6 +34,7 @@ import re
 import subprocess
 import sys
 import unicodedata
+# 3rd-Party Imports
 import yt_dlp
 # Import Local
 import summarize
@@ -182,8 +184,19 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
                 output_file_path
             ]
             subprocess.run(ffmpeg_command, check=True)
-        elif userOS == "Linux":
+        elif sys.platform.startswith('linux'):
             logging.debug("Running ffmpeg on Linux...")
+            ffmpeg_command = [
+                'ffmpeg',
+                '-i', video_file_path,
+                '-i', audio_file_path,
+                '-c:v', 'copy',
+                '-c:a', 'copy',
+                output_file_path
+            ]
+            subprocess.run(ffmpeg_command, check=True)
+        elif sys.platform.startswith('darwin'):
+            logging.debug("Running ffmpeg on MacOS...")
             ffmpeg_command = [
                 'ffmpeg',
                 '-i', video_file_path,

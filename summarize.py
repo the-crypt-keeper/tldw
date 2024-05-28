@@ -453,56 +453,6 @@ def print_hello():
 #
 
 # Only to be used when configured with Gradio for HF Space
-def summarize_with_huggingface(api_key, file_path, custom_prompt_arg):
-    logging.debug(f"huggingface: Summarization process starting...")
-    try:
-        logging.debug("huggingface: Loading json data for summarization")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
-
-        logging.debug("huggingface: Extracting text from the segments")
-        logging.debug(f"huggingface: Segments: {segments}")
-        text = ' '.join([segment['text'] for segment in segments])
-
-        print(f"huggingface: lets make sure the HF api key exists...\n\t {api_key}")
-        headers = {
-            "Authorization": f"Bearer {api_key}"
-        }
-
-        model = "microsoft/Phi-3-mini-128k-instruct"
-        API_URL = f"https://api-inference.huggingface.co/models/{model}"
-
-        huggingface_prompt = f"{text}\n\n\n\n{custom_prompt_arg}"
-        logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
-        data = {
-            "inputs": text,
-            "parameters": {"max_length": 512, "min_length": 100}  # You can adjust max_length and min_length as needed
-        }
-
-        print(f"huggingface: lets make sure the HF api key is the same..\n\t {huggingface_api_key}")
-
-        logging.debug("huggingface: Submitting request...")
-
-        response = requests.post(API_URL, headers=headers, json=data)
-
-        if response.status_code == 200:
-            summary = response.json()[0]['summary_text']
-            logging.debug("huggingface: Summarization successful")
-            print("Summarization successful.")
-            return summary
-        else:
-            logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
-            return f"Failed to process summary, status code {response.status_code}: {response.text}"
-    except Exception as e:
-        logging.error("huggingface: Error in processing: %s", str(e))
-        print(f"Error occurred while processing summary with huggingface: {str(e)}")
-        return None
-
-    # FIXME
-    # This is here for gradio authentication
-    # Its just not setup.
-    # def same_auth(username, password):
-    #    return username == password
 
 
 def format_transcription(transcription_result):
@@ -1477,10 +1427,11 @@ def main(input_path, api_name=None, api_key=None,
                         transcription_result['summary'] = summary
                         logging.info(f"Summary generated using {api_name} API")
                         save_summary_to_file(summary, json_file_path)
-                    elif final_summary:
-                        logging.info(f"Rolling summary generated using {api_name} API")
-                        logging.info(f"Final Rolling summary is {final_summary}\n\n")
-                        save_summary_to_file(final_summary, json_file_path)
+                    # FIXME
+                    # elif final_summary:
+                    #     logging.info(f"Rolling summary generated using {api_name} API")
+                    #     logging.info(f"Final Rolling summary is {final_summary}\n\n")
+                    #     save_summary_to_file(final_summary, json_file_path)
                     else:
                         logging.warning(f"Failed to generate summary using {api_name} API")
                 else:

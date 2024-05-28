@@ -142,9 +142,9 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
         segments = []
         for segment_chunk in segments_raw:
             chunk = {
-                "start": segment_chunk.start,
-                "end": segment_chunk.end,
-                "text": segment_chunk.text
+                "Time_Start": segment_chunk.start,
+                "Time_End": segment_chunk.end,
+                "Text": segment_chunk.text
             }
             logging.debug("Segment: %s", chunk)
             segments.append(chunk)
