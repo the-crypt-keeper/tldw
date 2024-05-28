@@ -76,7 +76,9 @@ global DEFAULT_CHUNK_DURATION
 DEFAULT_CHUNK_DURATION = 30
 global WORDS_PER_SECOND
 WORDS_PER_SECOND = 3
+global custom_prompt
 custom_prompt = None
+
 
 #
 #
@@ -455,9 +457,9 @@ def print_hello():
 # Only to be used when configured with Gradio for HF Space
 
 
-def format_transcription(transcription_result):
-    if transcription_result:
-        json_data = transcription_result['transcription']
+def format_transcription(transcription_result_arg):
+    if transcription_result_arg:
+        json_data = transcription_result_arg['transcription']
         return json.dumps(json_data, indent=2)
     else:
         return ""
@@ -1018,8 +1020,9 @@ def process_url(url,
         # Prepare file paths for transcription and summary
         # Sanitize filenames
         audio_file_sanitized = sanitize_filename(transcription_result['audio_file'])
-        json_file_path = audio_file_sanitized.replace('.wav', '.segments_pretty.json')
-        summary_file_path = audio_file_sanitized.replace('.wav', '_summary.txt')
+        json_pretty_file_path = os.path.join('Results', audio_file_sanitized.replace('.wav', '.segments_pretty.json'))
+        json_file_path = os.path.join('Results', audio_file_sanitized.replace('.wav', '.segments.json'))
+        summary_file_path = os.path.join('Results', audio_file_sanitized.replace('.wav', '_summary.txt'))
 
         logging.debug(f"Transcription result: {transcription_result}")
         logging.debug(f"Audio file path: {transcription_result['audio_file']}")
@@ -1128,9 +1131,11 @@ def process_url(url,
             logging.error(f"Failed to add media to the database: {e}")
 
         if summary_file_path and os.path.exists(summary_file_path):
-            return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None  # audio_file_path
+            return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None
         else:
-            return transcription_text, summary_text, json_file_path, None, video_file_path, None  # audio_file_path
+            return transcription_text, summary_text, json_file_path, None, video_file_path, None
+
+
     except Exception as e:
         logging.error(f"Error processing URL: {e}")
         return str(e), 'Error processing the request.', None, None, None, None
@@ -1207,7 +1212,7 @@ def main(input_path, api_name=None, api_key=None,
          words_per_second=None,
          llm_model=None,
          time_based=False):
-    global detail_level_number, summary, audio_file
+    global detail_level_number, summary, audio_file, transcription_result
 
     global detail_level, summary, audio_file
 
@@ -1265,32 +1270,21 @@ def main(input_path, api_name=None, api_key=None,
                     logging.error(f"File does not exist: {path}")
                     continue
 
+
             if info_dict:
                 logging.debug("MAIN: Creating transcription file from WAV")
                 segments = speech_to_text(audio_file, whisper_model=whisper_model, vad_filter=vad_filter)
 
-                if isinstance(segments, dict) and "error" in segments:
-                    logging.error(f"Error transcribing audio: {segments['error']}")
-                    transcription_result = {
-                        'video_path': path,
-                        'audio_file': audio_file,
-                        'transcription': segments,
-                        'error': segments['error']
-                    }
-                else:
-                    transcription_result = {
-                        'video_path': path,
-                        'audio_file': audio_file,
-                        'transcription': segments
-                    }
-
-                results.append(transcription_result)
-                logging.info(f"MAIN: Transcription complete: {audio_file}")
                 transcription_result = {
                     'video_path': path,
                     'audio_file': audio_file,
                     'transcription': segments
                 }
+
+                if isinstance(segments, dict) and "error" in segments:
+                    logging.error(f"Error transcribing audio: {segments['error']}")
+                    transcription_result['error'] = segments['error']
+
                 results.append(transcription_result)
                 logging.info(f"MAIN: Transcription complete: {audio_file}")
 
@@ -1321,45 +1315,6 @@ def main(input_path, api_name=None, api_key=None,
                         save_summary_to_file(summary, json_file_path)
                     else:
                         logging.warning("MAIN: Rolling Summarization failed.")
-
-                # FIXME - fucking mess of a function.
-                # # Time-based Summarization
-                # elif args.time_based:
-                #     logging.info("MAIN: Time-based Summarization")
-                #     global time_based_value
-                #     time_based_value = args.time_based
-                #     # Set the json_file_path
-                #     json_file_path = audio_file.replace('.wav', '.segments.json')
-                #
-                #     # Perform time-based summarization
-                #     summary = time_chunk_summarize(api_name, api_key, segments, args.time_based, custom_prompt,
-                #                                    llm_model)
-                #
-                #     # Handle the summarized output
-                #     if summary:
-                #         transcription_result['summary'] = summary
-                #         logging.info("MAIN: Time-based Summarization successful.")
-                #         save_summary_to_file(summary, json_file_path)
-                #     else:
-                #         logging.warning("MAIN: Time-based Summarization failed.")
-
-                # Perform chunk summarization - FIXME
-                elif chunk_summarization:
-                    logging.info("MAIN: Chunk Summarization")
-
-                    # Set the json_file_path
-                    json_file_path = audio_file.replace('.wav', '.segments.json')
-
-                    # Perform chunk summarization
-                    summary = summarize_chunks(api_name, api_key, segments, chunk_duration, words_per_second)
-
-                    # Handle the summarized output
-                    if summary:
-                        transcription_result['summary'] = summary
-                        logging.info("MAIN: Chunk Summarization successful.")
-                        save_summary_to_file(summary, json_file_path)
-                    else:
-                        logging.warning("MAIN: Chunk Summarization failed.")
                 # Perform summarization based on the specified API
                 elif api_name:
                     logging.debug(f"MAIN: Summarization being performed by {api_name}")
@@ -1634,7 +1589,7 @@ Sample commands:
             "tags."
         )
         print("No custom prompt defined, will use default")
-        global custom_prompt
+
         custom_prompt = args.custom_prompt
     else:
         logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
