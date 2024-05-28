@@ -288,7 +288,7 @@ def summarize_chunks(api_name: str, api_key: str, transcript: List[dict], chunk_
         elif api_name == 'ooba':
             summaries.append(summarize_with_oobabooga(ooba_api_IP, chunk, api_key, custom_prompt))
         elif api_name == 'tabbyapi':
-            summaries.append(summarize_with_vllm(api_key, tabby_api_IP, chunk, llm_model, custom_prompt))
+            summaries.append(summarize_with_vllm(api_key, tabby_api_IP, chunk, summarize.llm_model, custom_prompt))
         elif api_name == 'local-llm':
             summaries.append(summarize_with_local_llm(chunk, custom_prompt))
         else:

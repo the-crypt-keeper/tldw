@@ -30,6 +30,7 @@ import transformers
 # Local Imports
 import summarize
 import summarize
+from App_Function_Libraries.SQLite_DB import Database
 from Article_Extractor_Lib import *
 from Chunk_Lib import *
 from Diarization_Lib import *
@@ -189,12 +190,12 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
                 tabbyapi_key = api_key if api_key else config.get('API', 'tabby_api_key', fallback=None)
                 tabbyapi_ip = tabby_api_IP
                 logging.debug(f"Article_Summarizer: Trying to summarize with tabbyapi")
-                tabby_model = llm_model
+                tabby_model = summarize.llm_model
                 summary = summarize_with_tabbyapi(tabbyapi_key, tabbyapi_ip, json_file_path, tabby_model,
                                                   article_custom_prompt)
             elif api_name.lower() == "vllm":
                 logging.debug(f"Article_Summarizer: Trying to summarize with VLLM")
-                summary = summarize_with_vllm(vllm_api_url, vllm_api_key, llm_model, json_file_path,
+                summary = summarize_with_vllm(vllm_api_url, vllm_api_key, summarize.llm_model, json_file_path,
                                               article_custom_prompt)
             elif api_name.lower() == "huggingface":
                 huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)

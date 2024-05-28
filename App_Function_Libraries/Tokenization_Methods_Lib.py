@@ -4,6 +4,7 @@
 # This library is used to handle tokenization of text for summarization.
 #
 ####
+import tiktoken
 
 # Import Local
 import summarize

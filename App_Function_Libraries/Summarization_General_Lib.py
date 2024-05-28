@@ -84,25 +84,39 @@ openrouter_model = config.get('API', 'openrouter_model', fallback='mistralai/mis
 #
 
 # FIXME
-def extract_text_from_segments(segments: List[Dict]) -> str:
-    """Extract text from segments."""
-    return " ".join([segment['text'] for segment in segments])
+# def extract_text_from_segments(segments: List[Dict]) -> str:
+#     """Extract text from segments."""
+#     return " ".join([segment['text'] for segment in segments])
 
 
-
-# Fixme , function is replicated....
 def extract_text_from_segments(segments):
-    logging.debug(f"Main: extracting text from {segments}")
-    text = ' '.join([segment['text'] for segment in segments])
-    logging.debug(f"Main: Successfully extracted text from {segments}")
-    return text
+    logging.debug(f"Segments received: {segments}")
+    logging.debug(f"Type of segments: {type(segments)}")
+
+    text = ""
+    for segment in segments:
+        logging.debug(f"Current segment: {segment}")
+        logging.debug(f"Type of segment: {type(segment)}")
+        text += segment['Text'] + " "
+    return text.strip()
 
 
-def summarize_with_openai(api_key, file_path, custom_prompt_arg):
+def summarize_with_openai(api_key, json_file_path, custom_prompt_arg):
     try:
         logging.debug("openai: Loading json data for summarization")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
+        with open(json_file_path, 'r') as file:
+            data = json.load(file)
+
+        logging.debug(f"openai: Loaded data: {data}")
+        logging.debug(f"openai: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("openai: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries, proceed with summarization
+        segments = data
 
         open_ai_model = openai_model or 'gpt-4-turbo'
 

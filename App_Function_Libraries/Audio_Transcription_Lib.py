@@ -104,8 +104,8 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
         logging.error("Error executing FFmpeg command: %s", str(e))
         raise RuntimeError("Error converting video file to WAV")
     except Exception as e:
-        logging.error("Unexpected error occurred: %s", str(e))
-        raise RuntimeError("Error converting video file to WAV")
+        logging.error("speech-to-text: Error transcribing audio: %s", str(e))
+        return {"error": str(e)}
     return out_path
 
 
