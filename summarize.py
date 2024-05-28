@@ -570,6 +570,24 @@ def launch_ui(demo_mode=False):
                 ui_mode_toggle = gr.Radio(choices=["Simple", "Advanced"], value="Simple",
                                           label="UI Mode (Toggle to show all options)")
 
+                # Add the new toggle switch
+                chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"], value="Non-Chunked",
+                                                  label="Summarization Mode")
+
+                # Add the additional input components
+                chunk_text_by_words_checkbox = gr.Checkbox(label="Chunk Text by Words", value=False, visible=False)
+                max_words_input = gr.Number(label="Max Words", value=0, precision=0, visible=False)
+
+                chunk_text_by_sentences_checkbox = gr.Checkbox(label="Chunk Text by Sentences", value=False, visible=False)
+                max_sentences_input = gr.Number(label="Max Sentences", value=0, precision=0, visible=False)
+
+                chunk_text_by_paragraphs_checkbox = gr.Checkbox(label="Chunk Text by Paragraphs", value=False,
+                                                            visible=False)
+                max_paragraphs_input = gr.Number(label="Max Paragraphs", value=0, precision=0, visible=False)
+
+                chunk_text_by_tokens_checkbox = gr.Checkbox(label="Chunk Text by Tokens", value=False, visible=False)
+                max_tokens_input = gr.Number(label="Max Tokens", value=0, precision=0, visible=False)
+
             # URL input is always visible
             url_input = gr.Textbox(label="URL (Mandatory)", placeholder="Enter the video URL here")
 
@@ -633,7 +651,11 @@ def launch_ui(demo_mode=False):
                 num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
                 api_key_input, vad_filter_input, download_video_input, download_audio_input,
                 rolling_summarization_input, detail_level_input, question_box_input, keywords_input,
-                chunk_summarization_input, chunk_duration_input, words_per_second_input
+                chunk_summarization_input, chunk_duration_input, words_per_second_input,
+                chunk_text_by_words_checkbox, max_words_input,
+                chunk_text_by_sentences_checkbox, max_sentences_input,
+                chunk_text_by_paragraphs_checkbox, max_paragraphs_input,
+                chunk_text_by_tokens_checkbox, max_tokens_input
             ]
             # inputs_1 = [
             #     url_input_1,
@@ -652,6 +674,27 @@ def launch_ui(demo_mode=False):
                 gr.File(label="Download Video (Download the Video as a file)", visible=False),
                 gr.File(label="Download Audio (Download the Audio as a file)", visible=False),
             ]
+
+            def toggle_chunk_summarization(mode):
+                visible = (mode == "Chunked-Summarization")
+                return [
+                    gr.update(visible=visible),  # chunk_text_by_words_checkbox
+                    gr.update(visible=visible),  # max_words_input
+                    gr.update(visible=visible),  # chunk_text_by_sentences_checkbox
+                    gr.update(visible=visible),  # max_sentences_input
+                    gr.update(visible=visible),  # chunk_text_by_paragraphs_checkbox
+                    gr.update(visible=visible),  # max_paragraphs_input
+                    gr.update(visible=visible),  # chunk_text_by_tokens_checkbox
+                    gr.update(visible=visible)  # max_tokens_input
+                ]
+
+            chunk_summarization_toggle.change(fn=toggle_chunk_summarization, inputs=chunk_summarization_toggle,
+                                              outputs=[
+                                                  chunk_text_by_words_checkbox, max_words_input,
+                                                  chunk_text_by_sentences_checkbox, max_sentences_input,
+                                                  chunk_text_by_paragraphs_checkbox, max_paragraphs_input,
+                                                  chunk_text_by_tokens_checkbox, max_tokens_input
+                                              ])
 
             def toggle_light(mode):
                 if mode == "Dark":
@@ -750,6 +793,7 @@ def launch_ui(demo_mode=False):
 
             # Set the event listener for the UI Mode toggle switch
             ui_mode_toggle.change(fn=toggle_ui, inputs=ui_mode_toggle, outputs=inputs)
+
 
             # Combine URL input and inputs lists
             all_inputs = [url_input] + inputs
@@ -973,7 +1017,27 @@ def process_url(url,
                 chunk_summarization,
                 chunk_duration_input,
                 words_per_second_input,
+                chunk_text_by_words,
+                max_words,
+                chunk_text_by_sentences,
+                max_sentences,
+                chunk_text_by_paragraphs,
+                max_paragraphs,
+                chunk_text_by_tokens,
+                max_tokens,
                 ):
+
+    # Handle the chunk summarization options
+    set_chunk_txt_by_words = chunk_text_by_words
+    set_max_txt_chunk_words = max_words
+    set_chunk_txt_by_sentences = chunk_text_by_sentences
+    set_max_txt_chunk_sentences = max_sentences
+    set_chunk_txt_by_paragraphs = chunk_text_by_paragraphs
+    set_max_txt_chunk_paragraphs = max_paragraphs
+    set_chunk_txt_by_tokens = chunk_text_by_tokens
+    set_max_txt_chunk_tokens = max_tokens
+
+
     # Validate input
     if not url:
         return "No URL provided.", "No URL provided.", None, None, None, None, None, None
@@ -1211,7 +1275,16 @@ def main(input_path, api_name=None, api_key=None,
          chunk_duration=None,
          words_per_second=None,
          llm_model=None,
-         time_based=False):
+         time_based=False,
+         set_chunk_txt_by_words=False,
+         set_max_txt_chunk_words=0,
+         set_chunk_txt_by_sentences=False,
+         set_max_txt_chunk_sentences=0,
+         set_chunk_txt_by_paragraphs=False,
+         set_max_txt_chunk_paragraphs=0,
+         set_chunk_txt_by_tokens=False,
+         set_max_txt_chunk_tokens=0,
+         ):
     global detail_level_number, summary, audio_file, transcription_result
 
     global detail_level, summary, audio_file
@@ -1677,7 +1750,16 @@ Sample commands:
                            chunk_duration=None,
                            words_per_second=None,
                            llm_model=args.llm_model,
-                           time_based=args.time_based)
+                           time_based=args.time_based,
+                           set_chunk_txt_by_words=set_chunk_txt_by_words_,
+                           set_max_txt_chunk_words=set_max_txt_chunk_words,
+                           set_chunk_txt_by_sentences=set_chunk_txt_by_sentences,
+                           set_max_txt_chunk_sentences=set_max_txt_chunk_sentences,
+                           set_chunk_txt_by_paragraphs=set_chunk_txt_by_paragraphs,
+                           set_max_txt_chunk_paragraphs=set_max_txt_chunk_paragraphs,
+                           set_chunk_txt_by_tokens=set_chunk_txt_by_tokens,
+                           set_max_txt_chunk_tokens=set_max_txt_chunk_tokens,
+                           )
 
             logging.info('Transcription process completed.')
             atexit.register(cleanup_process)
