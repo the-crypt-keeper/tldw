@@ -576,6 +576,7 @@ def launch_ui(demo_mode=False):
                 chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"],
                                                       value="Non-Chunked",
                                                       label="Summarization Mode")
+            with gr.Row():
 
                 # Add the additional input components
                 chunk_text_by_words_checkbox = gr.Checkbox(label="Chunk Text by Words", value=False, visible=False)
