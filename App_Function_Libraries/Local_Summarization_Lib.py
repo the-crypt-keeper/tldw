@@ -23,8 +23,45 @@
 # Import necessary libraries
 import os
 import logging
+from typing import Callable
 
+# Import Local
+import summarize
+from Article_Summarization_Lib import *
+from Article_Extractor_Lib import *
+from Audio_Transcription_Lib import *
+from Chunk_Lib import *
+from Diarization_Lib import *
+from Local_File_Processing_Lib import *
+from Local_LLM_Inference_Engine_Lib import *
+#from Local_Summarization_Lib import *
+from Old_Chunking_Lib import *
+from SQLite_DB import *
+from Summarization_General_Lib import *
+from System_Checks_Lib import *
+from Tokenization_Methods_Lib import *
+from Video_DL_Ingestion_Lib import *
+from Web_UI_Lib import *
 
+# Read configuration from file
+config = configparser.ConfigParser()
+config.read('config.txt')
+
+# Local-Models
+kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
+
+llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
+llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
+
+ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
+ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
+
+tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
+
+vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
+vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
 
 #######################################################################################################################
 # Function Definitions

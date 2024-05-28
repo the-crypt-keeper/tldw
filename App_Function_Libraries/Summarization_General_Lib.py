@@ -21,8 +21,63 @@
 # Import necessary libraries
 import os
 import logging
+import time
+import requests
 from typing import List, Dict
 import json
+
+from requests import RequestException
+
+# Import Local
+import summarize
+from Article_Summarization_Lib import *
+from Article_Extractor_Lib import *
+from Audio_Transcription_Lib import *
+from Chunk_Lib import *
+from Diarization_Lib import *
+from Local_File_Processing_Lib import *
+from Local_LLM_Inference_Engine_Lib import *
+from Local_Summarization_Lib import *
+from Old_Chunking_Lib import *
+from SQLite_DB import *
+#from Summarization_General_Lib import *
+from System_Checks_Lib import *
+from Tokenization_Methods_Lib import *
+from Video_DL_Ingestion_Lib import *
+#from Web_UI_Lib import *
+
+
+# Read configuration from file
+config = configparser.ConfigParser()
+config.read('config.txt')
+
+# API Keys
+anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
+logging.debug(f"Loaded Anthropic API Key: {anthropic_api_key}")
+
+cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
+logging.debug(f"Loaded cohere API Key: {cohere_api_key}")
+
+groq_api_key = config.get('API', 'groq_api_key', fallback=None)
+logging.debug(f"Loaded groq API Key: {groq_api_key}")
+
+openai_api_key = config.get('API', 'openai_api_key', fallback=None)
+logging.debug(f"Loaded openAI Face API Key: {openai_api_key}")
+
+huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
+logging.debug(f"Loaded HuggingFace Face API Key: {huggingface_api_key}")
+
+openrouter_api_key = config.get('Local-API', 'openrouter', fallback=None)
+logging.debug(f"Loaded OpenRouter API Key: {openrouter_api_key}")
+
+# Models
+anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
+cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
+groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
+openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
+huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
+openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
+
 
 #######################################################################################################################
 # Function Definitions
@@ -289,7 +344,7 @@ def summarize_with_groq(api_key, file_path, model, custom_prompt_arg):
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
 
 
-def summarize_with_openrouter(api_key, file_path, custom_prompt_arg)
+def summarize_with_openrouter(api_key, file_path, custom_prompt_arg):
     import requests
     import json
     OPENROUTER_API_KEY = api_key
@@ -297,39 +352,37 @@ def summarize_with_openrouter(api_key, file_path, custom_prompt_arg)
     if openrouter_model is None:
         openrouter_model = "microsoft/wizardlm-2-8x22b"
 
-    response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
+    try:
+        logging.debug("openrouter: Submitting request to API endpoint")
+        print("openrouter: Submitting request to API endpoint")
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            },
+            data=json.dumps({
+                "model": f"{openrouter_model}",
+                "messages": [
+                    {"role": "user", "content": f"{custom_prompt_arg}"}
+                ]
+            })
+        )
 
-    logging.debug("openrouter: Submitting request to API endpoint")
-    print("openrouter: Submitting request to API endpoint")
-    response = requests.post(
-        url="https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        },
-        data=json.dumps({
-            "model": f"{openrouter_model}",
-            "messages": [
-                {"role": "user", "content": f"{custom_prompt_arg}"}
-            ]
-        })
-    )
+        response_data = response.json()
+        logging.debug("API Response Data: %s", response_data)
 
-    response_data = response.json()
-    logging.debug("API Response Data: %s", response_data)
-
-    if response.status_code == 200:
-        if 'choices' in response_data and len(response_data['choices']) > 0:
-            summary = response_data['choices'][0]['message']['content'].strip()
-            logging.debug("openrouter: Summarization successful")
-            print("openrouter: Summarization successful.")
-            return summary
+        if response.status_code == 200:
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                summary = response_data['choices'][0]['message']['content'].strip()
+                logging.debug("openrouter: Summarization successful")
+                print("openrouter: Summarization successful.")
+                return summary
+            else:
+                logging.error("openrouter: Expected data not found in API response.")
+                return "openrouter: Expected data not found in API response."
         else:
-            logging.error("openrouter: Expected data not found in API response.")
-            return "openrouter: Expected data not found in API response."
-    else:
-        logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
-        return f"openrouter: API request failed: {response.text}"
-
+            logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
+            return f"openrouter: API request failed: {response.text}"
     except Exception as e:
         logging.error("openrouter: Error in processing: %s", str(e))
         return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
