@@ -20,6 +20,7 @@ import time
 import unicodedata
 from multiprocessing import process
 from typing import Callable, Dict, List, Optional, Tuple
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import webbrowser
 import zipfile
 
@@ -51,6 +52,7 @@ import requests
 from requests.exceptions import RequestException
 import trafilatura
 import yt_dlp
+
 
 # OpenAI Tokenizer support
 from openai import OpenAI
@@ -591,7 +593,8 @@ def launch_ui(demo_mode=False):
                 max_tokens_input = gr.Number(label="Max Tokens", value=0, precision=0, visible=False)
 
             # URL input is always visible
-            url_input = gr.Textbox(label="URL (Mandatory)", placeholder="Enter the video URL here")
+            url_input = gr.Textbox(label="URL (Mandatory) --> Playlist URLs will be stripped and only the linked video"
+                                         " will be downloaded)", placeholder="Enter the video URL here")
 
             # Inputs to be shown or hidden
             num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)",
@@ -601,7 +604,7 @@ def launch_ui(demo_mode=False):
                                               visible=False)
             custom_prompt_input = gr.Textbox(
                 label="Custom Prompt (Customize your summarization, or ask a question about the video and have it "
-                      "answered)",
+                      "answered)\n Does not work against the summary currently.",
                 placeholder="Above is the transcript of a video. Please read "
                             "through the transcript carefully. Identify the main topics that are discussed over the "
                             "course of the transcript. Then, summarize the key points about each main topic in a "
@@ -615,9 +618,9 @@ def launch_ui(demo_mode=False):
                 choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "OpenRouter", "Llama.cpp",
                          "Kobold", "Ooba", "HuggingFace"],
                 value=None,
-                label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
+                label="API Name (Mandatory) --> Unless you just want a Transcription", visible=True)
             api_key_input = gr.Textbox(
-                label="API Key (Mandatory unless you're running a local model/server/no API selected)",
+                label="API Key (Mandatory) --> Unless you're running a local model/server OR have no API selected",
                 placeholder="Enter your API key here; Ignore if using Local API or Built-in API('Local-LLM')",
                 visible=True)
             vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False,
@@ -891,8 +894,19 @@ def launch_ui(demo_mode=False):
             with gr.Accordion("Category 2"):
                 gr.Markdown("\n".join(prompts_category_2))
 
+        # Function to update the visibility of the UI elements for Llamafile Settings
+        def toggle_advanced_llamafile_mode(is_advanced):
+            if is_advanced:
+                return [gr.update(visible=True)] * 14
+            else:
+                return [gr.update(visible=False)] * 11 + [gr.update(visible=True)] * 3
+
         with gr.Tab("Llamafile Settings"):
             gr.Markdown("Settings for Llamafile")
+
+            # Toggle switch for Advanced/Simple mode
+            advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Click->Click again to only show 'simple' settings. Is a known bug...", value=False)
+
             # Start/Stop buttons
             start_button = gr.Button("Start Llamafile")
             stop_button = gr.Button("Stop Llamafile")
@@ -930,6 +944,14 @@ def launch_ui(demo_mode=False):
             # This function is not implemented yet...
             # FIXME - Implement this function
             stop_button.click(stop_llamafile, outputs=output_display)
+
+        # Toggle event for Advanced/Simple mode
+        advanced_mode_toggle.change(toggle_advanced_llamafile_mode,
+                                    inputs=[advanced_mode_toggle],
+                                    outputs=[top_k_input, top_p_input, min_p_input, stream_input, stop_input,
+                                             typical_p_input, repeat_penalty_input, repeat_last_n_input,
+                                             penalize_nl_input, presence_penalty_input, frequency_penalty_input,
+                                             penalty_prompt_input, ignore_eos_input])
 
         with gr.Tab("Llamafile Chat Interface"):
             gr.Markdown("Page to interact with Llamafile Server (iframe to Llamafile server port)")
@@ -1091,6 +1113,15 @@ def launch_ui(demo_mode=False):
         tabbed_interface.launch(share=False, )
 
 
+def clean_youtube_url(url):
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+    if 'list' in query_params:
+        query_params.pop('list')
+    cleaned_query = urlencode(query_params, doseq=True)
+    cleaned_url = urlunparse(parsed_url._replace(query=cleaned_query))
+    return cleaned_url
+
 def process_url(url,
                 num_speakers,
                 whisper_model,
@@ -1133,6 +1164,9 @@ def process_url(url,
 
     if not is_valid_url(url):
         return "Invalid URL format.", "Invalid URL format.", None, None, None, None, None, None
+
+    # Clean the URL to remove playlist parameters if any
+    url = clean_youtube_url(url)
 
     print("API Name received:", api_name)  # Debugging line
 
