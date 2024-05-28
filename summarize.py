@@ -19,7 +19,7 @@ import sys
 import time
 import unicodedata
 from multiprocessing import process
-from typing import  Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 import webbrowser
 import zipfile
 
@@ -60,7 +60,6 @@ import tiktoken
 # Other Tokenizers
 from transformers import GPT2Tokenizer
 
-
 #######################
 # Logging Setup
 #
@@ -68,7 +67,6 @@ from transformers import GPT2Tokenizer
 log_level = "DEBUG"
 logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
-
 
 #############
 # Global variables setup
@@ -78,7 +76,6 @@ global WORDS_PER_SECOND
 WORDS_PER_SECOND = 3
 global custom_prompt
 custom_prompt = None
-
 
 #
 #
@@ -250,6 +247,7 @@ source_languages = {
 }
 source_language_list = [key[0] for key in source_languages.items()]
 
+
 def print_hello():
     print(r"""_____  _          ________  _    _                                 
 |_   _|| |        / /|  _  \| |  | | _                              
@@ -276,6 +274,7 @@ def print_hello():
 """)
     time.sleep(1)
     return
+
 
 #
 #
@@ -550,6 +549,7 @@ summarizers: Dict[str, Callable[[str, str], str]] = {
     # Add more APIs here as needed
 }
 
+
 # def gradio UI
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
@@ -571,18 +571,20 @@ def launch_ui(demo_mode=False):
                                           label="UI Mode (Toggle to show all options)")
 
                 # Add the new toggle switch
-                chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"], value="Non-Chunked",
-                                                  label="Summarization Mode")
+                chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"],
+                                                      value="Non-Chunked",
+                                                      label="Summarization Mode")
 
                 # Add the additional input components
                 chunk_text_by_words_checkbox = gr.Checkbox(label="Chunk Text by Words", value=False, visible=False)
                 max_words_input = gr.Number(label="Max Words", value=0, precision=0, visible=False)
 
-                chunk_text_by_sentences_checkbox = gr.Checkbox(label="Chunk Text by Sentences", value=False, visible=False)
+                chunk_text_by_sentences_checkbox = gr.Checkbox(label="Chunk Text by Sentences", value=False,
+                                                               visible=False)
                 max_sentences_input = gr.Number(label="Max Sentences", value=0, precision=0, visible=False)
 
                 chunk_text_by_paragraphs_checkbox = gr.Checkbox(label="Chunk Text by Paragraphs", value=False,
-                                                            visible=False)
+                                                                visible=False)
                 max_paragraphs_input = gr.Number(label="Max Paragraphs", value=0, precision=0, visible=False)
 
                 chunk_text_by_tokens_checkbox = gr.Checkbox(label="Chunk Text by Tokens", value=False, visible=False)
@@ -610,12 +612,14 @@ def launch_ui(demo_mode=False):
             offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
                                      visible=False)
             api_name_input = gr.Dropdown(
-                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "HuggingFace"],
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "OpenRouter", "Llama.cpp",
+                         "Kobold", "Ooba", "HuggingFace"],
                 value=None,
                 label="API Name (Mandatory Unless you just want a Transcription)", visible=True)
-            api_key_input = gr.Textbox(label="API Key (Mandatory unless you're running a local model/server/no API selected)",
-                                       placeholder="Enter your API key here; Ignore if using Local API or Built-in API('Local-LLM')",
-                                       visible=True)
+            api_key_input = gr.Textbox(
+                label="API Key (Mandatory unless you're running a local model/server/no API selected)",
+                placeholder="Enter your API key here; Ignore if using Local API or Built-in API('Local-LLM')",
+                visible=True)
             vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False,
                                            visible=False)
             rolling_summarization_input = gr.Checkbox(label="Enable Rolling Summarization", value=False,
@@ -701,7 +705,12 @@ def launch_ui(demo_mode=False):
                                 penalize_nl, presence_penalty, frequency_penalty, penalty_prompt, ignore_eos,
                                 system_prompt):
                 # Code to start llamafile with the provided configuration
-                # ...
+                local_llm_gui_function(prompt, temperature, top_k, top_p, min_p, stream, stop, typical_p,
+                                       repeat_penalty,
+                                       repeat_last_n,
+                                       penalize_nl, presence_penalty, frequency_penalty, penalty_prompt, ignore_eos,
+                                       system_prompt)
+                # FIXME
                 return "Llamafile started"
 
             def stop_llamafile():
@@ -807,7 +816,6 @@ def launch_ui(demo_mode=False):
             # Set the event listener for the UI Mode toggle switch
             ui_mode_toggle.change(fn=toggle_ui, inputs=ui_mode_toggle, outputs=inputs)
 
-
             # Combine URL input and inputs lists
             all_inputs = [url_input] + inputs
 
@@ -831,7 +839,8 @@ def launch_ui(demo_mode=False):
                 lines=3
             )
             api_name_input = gr.Dropdown(
-                choices=[None, "huggingface", "openrouter", "openai", "anthropic", "cohere", "groq", "llama", "kobold", "ooba"],
+                choices=[None, "huggingface", "openrouter", "openai", "anthropic", "cohere", "groq", "llama", "kobold",
+                         "ooba"],
                 value=None,
                 label="API Name (Mandatory for Summarization)"
             )
@@ -861,7 +870,7 @@ def launch_ui(demo_mode=False):
             gr.Markdown("Will ingest documents and store into SQLite DB")
             gr.Markdown("RAG here we come....:/")
 
-        with gr.Tab("Sample Prompts/Questions"):
+        with gr.Tab("Prompt Examples & Questions Library"):
             gr.Markdown("Plan to put Sample prompts/questions here")
             gr.Markdown("Fabric prompts/live UI?")
             # Searchable list
@@ -909,15 +918,21 @@ def launch_ui(demo_mode=False):
             # Output display
             output_display = gr.Textbox(label="Llamafile Output")
 
-            start_button.click(start_llamafile, inputs=[prompt_input, temperature_input, top_k_input, top_p_input, min_p_input,
-                                                stream_input, stop_input, typical_p_input, repeat_penalty_input,
-                                                repeat_last_n_input, penalize_nl_input, presence_penalty_input,
-                                                frequency_penalty_input, penalty_prompt_input, ignore_eos_input,
-                                                system_prompt_input], outputs=output_display)
+            # Function calls local_llm_gui_function() with the provided arguments
+            # local_llm_gui_function() is found in 'Local_LLM_Inference_Engine_Lib.py' file
+            start_button.click(start_llamafile,
+                               inputs=[prompt_input, temperature_input, top_k_input, top_p_input, min_p_input,
+                                       stream_input, stop_input, typical_p_input, repeat_penalty_input,
+                                       repeat_last_n_input, penalize_nl_input, presence_penalty_input,
+                                       frequency_penalty_input, penalty_prompt_input, ignore_eos_input,
+                                       system_prompt_input], outputs=output_display)
 
+            # This function is not implemented yet...
+            # FIXME - Implement this function
             stop_button.click(stop_llamafile, outputs=output_display)
 
-        with gr.Tab("Llamafile Usage"):
+        with gr.Tab("Llamafile Chat Interface"):
+            gr.Markdown("Page to interact with Llamafile Server (iframe to Llamafile server port)")
             # Define the HTML content with the iframe
             html_content = """
             <!DOCTYPE html>
@@ -952,7 +967,8 @@ def launch_ui(demo_mode=False):
             search_fields_input = gr.CheckboxGroup(label="Search Fields",
                                                    choices=["Title", "Content", "URL", "Type", "Author"],
                                                    value=["Title"])
-            keywords_input = gr.Textbox(label="Keywords to Match against", placeholder="Enter keywords here (comma-separated)...")
+            keywords_input = gr.Textbox(label="Keywords to Match against",
+                                        placeholder="Enter keywords here (comma-separated)...")
             page_input = gr.Slider(label="Pages of results to display", minimum=1, maximum=10, step=1, value=1)
 
             search_button = gr.Button("Search")
@@ -984,8 +1000,6 @@ def launch_ui(demo_mode=False):
     #     outputs=gr.Dataframe(label="Search Results", height=300)  # Height in pixels
     #     #outputs=gr.Dataframe(label="Search Results")
     # )
-
-
 
     export_keywords_interface = gr.Interface(
         fn=export_keywords_to_csv,
@@ -1064,17 +1078,17 @@ def launch_ui(demo_mode=False):
 
     # Combine interfaces into a tabbed interface
     tabbed_interface = gr.TabbedInterface([iface, search_interface, import_export_tab, keyword_tab],
-                                          ["Transcription + Summarization", "Search and Detail View", "Export/Import", "Keywords"])
+                                          ["Transcription + Summarization", "Search and Detail View", "Export/Import",
+                                           "Keywords"])
     # Launch the interface
     server_port_variable = 7860
     global server_mode, share_public
     if server_mode is True and share_public is False:
         tabbed_interface.launch(share=True, server_port=server_port_variable, server_name="http://0.0.0.0")
     elif share_public == True:
-        tabbed_interface.launch(share=True,)
+        tabbed_interface.launch(share=True, )
     else:
-        tabbed_interface.launch(share=False,)
-
+        tabbed_interface.launch(share=False, )
 
 
 def process_url(url,
@@ -1103,7 +1117,6 @@ def process_url(url,
                 chunk_text_by_tokens,
                 max_tokens,
                 ):
-
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
     set_max_txt_chunk_words = max_words
@@ -1113,7 +1126,6 @@ def process_url(url,
     set_max_txt_chunk_paragraphs = max_paragraphs
     set_chunk_txt_by_tokens = chunk_text_by_tokens
     set_max_txt_chunk_tokens = max_tokens
-
 
     # Validate input
     if not url:
@@ -1220,11 +1232,11 @@ def process_url(url,
         try:
             # Ensure these variables are correctly populated
             custom_prompt = args.custom_prompt if args.custom_prompt else ("\n\nabove is the transcript of a video "
-                "Please read through the transcript carefully. Identify the main topics that are discussed over the "
-                "course of the transcript. Then, summarize the key points about each main topic in a concise bullet "
-                "point. The bullet points should cover the key information conveyed about each topic in the video, "
-                "but should be much shorter than the full transcript. Please output your bullet point summary inside "
-                "<bulletpoints> tags.")
+                                                                           "Please read through the transcript carefully. Identify the main topics that are discussed over the "
+                                                                           "course of the transcript. Then, summarize the key points about each main topic in a concise bullet "
+                                                                           "point. The bullet points should cover the key information conveyed about each topic in the video, "
+                                                                           "but should be much shorter than the full transcript. Please output your bullet point summary inside "
+                                                                           "<bulletpoints> tags.")
 
             db = Database()
             create_tables()
@@ -1309,6 +1321,7 @@ def search_prompts(query):
 # Handle prompt selection
 def handle_prompt_selection(prompt):
     return f"You selected: {prompt}"
+
 
 #
 #
@@ -1420,7 +1433,6 @@ def main(input_path, api_name=None, api_key=None,
                     logging.error(f"File does not exist: {path}")
                     continue
 
-
             if info_dict:
                 logging.debug("MAIN: Creating transcription file from WAV")
                 segments = speech_to_text(audio_file, whisper_model=whisper_model, vad_filter=vad_filter)
@@ -1518,7 +1530,8 @@ def main(input_path, api_name=None, api_key=None,
                         except requests.exceptions.ConnectionError:
                             requests.status_code = "Connection: "
                     elif api_name.lower() == "openrouter":
-                        openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
+                        openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key',
+                                                                                fallback=None)
                         try:
                             logging.debug(f"MAIN: Trying to summarize with OpenRouter")
                             summary = summarize_with_openrouter(openrouter_api_key, json_file_path, custom_prompt)
@@ -1616,9 +1629,11 @@ def main(input_path, api_name=None, api_key=None,
 
     return results
 
+
 def signal_handler(signal, frame):
     logging.info('Signal received, exiting...')
     sys.exit(0)
+
 
 ############################## MAIN ##############################
 #
@@ -1683,9 +1698,12 @@ Sample commands:
     parser.add_argument('-k', '--keywords', nargs='+', default=['cli_ingest_no_tag'],
                         help='Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)')
     parser.add_argument('--log_file', type=str, help='Where to save logfile (non-default)')
-    parser.add_argument('--local_llm', action='store_true', help="Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)")
-    parser.add_argument('--server_mode', action='store_true', help='Run in server mode (This exposes the GUI/Server to the network)')
-    parser.add_argument('--share_public', type=int, default=7860, help="This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)")
+    parser.add_argument('--local_llm', action='store_true',
+                        help="Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)")
+    parser.add_argument('--server_mode', action='store_true',
+                        help='Run in server mode (This exposes the GUI/Server to the network)')
+    parser.add_argument('--share_public', type=int, default=7860,
+                        help="This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)")
     parser.add_argument('--port', type=int, default=7860, help='Port to run the server on')
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
 
@@ -1808,7 +1826,6 @@ Sample commands:
         check_ffmpeg()
 
         llm_model = args.llm_model or None
-
 
         try:
             results = main(args.input_path, api_name=args.api_name,
