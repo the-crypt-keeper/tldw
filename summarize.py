@@ -1091,22 +1091,6 @@ def launch_ui(demo_mode=False):
         ["Browse Keywords", "Add Keywords", "Delete Keywords"]
     )
 
-    # I give up
-    def download_youtube_video_file(url):
-        """Download video using yt-dlp with specified options."""
-        global info_dict
-        ydl_opts = {
-            'format': 'bestvideo+bestaudio/best',
-            'outtmpl': 'downloads/%(title)s.%(ext)s',
-            'quiet': True,
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=True)
-            video_title = info_dict.get('title', 'video')
-            video_ext = info_dict.get('ext', 'mp4')
-            video_filename = f"results/{video_title}/{video_title}.{video_ext}"
-            return video_filename
-
     def ensure_dir_exists(path):
         if not os.path.exists(path):
             os.makedirs(path)
@@ -1482,11 +1466,15 @@ def main(input_path, api_name=None, api_key=None,
                 info_dict = get_youtube(path)
                 json_file_path = None
                 if info_dict:
+                    logging.debug(f"MAIN: info_dict content: {info_dict}")
                     logging.debug("MAIN: Creating path for video file...")
                     download_path = create_download_directory(info_dict['title'])
                     logging.debug("MAIN: Path created successfully\n MAIN: Now Downloading video from yt_dlp...")
                     try:
                         video_path = download_video(path, download_path, info_dict, download_video_flag)
+                        if video_path is None:
+                            logging.error("MAIN: video_path is None after download_video")
+                            continue
                     except RuntimeError as e:
                         logging.error(f"Error downloading video: {str(e)}")
                         # FIXME - figure something out for handling this situation....
