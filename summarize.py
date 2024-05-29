@@ -1410,6 +1410,7 @@ def main(input_path, api_name=None, api_key=None,
          set_chunk_txt_by_tokens=False,
          set_max_txt_chunk_tokens=0,
          ):
+
     global detail_level_number, summary, audio_file, transcription_result
 
     global detail_level, summary, audio_file
@@ -1665,8 +1666,9 @@ def main(input_path, api_name=None, api_key=None,
     return results
 
 
-def signal_handler(signal, frame):
-    logging.info('Signal received, exiting...')
+def signal_handler(sig, frame):
+    logging.info('Signal handler called with signal: %s', sig)
+    cleanup_process()
     sys.exit(0)
 
 
@@ -1744,6 +1746,17 @@ Sample commands:
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
 
     args = parser.parse_args()
+
+    # Set Chunking values/variables
+    set_chunk_txt_by_words = False
+    set_max_txt_chunk_words = 0
+    set_chunk_txt_by_sentences = False
+    set_max_txt_chunk_sentences = 0
+    set_chunk_txt_by_paragraphs = False
+    set_max_txt_chunk_paragraphs = 0
+    set_chunk_txt_by_tokens = False
+    set_max_txt_chunk_tokens = 0
+
     if args.share_public:
         share_public = args.share_public
     else:
@@ -1860,6 +1873,7 @@ Sample commands:
         cuda_check()
         logging.debug("ffmpeg check being performed...")
         check_ffmpeg()
+        #download_ffmpeg()
 
         llm_model = args.llm_model or None
 
@@ -1881,7 +1895,7 @@ Sample commands:
                            words_per_second=None,
                            llm_model=args.llm_model,
                            time_based=args.time_based,
-                           set_chunk_txt_by_words=set_chunk_txt_by_words_,
+                           set_chunk_txt_by_words=set_chunk_txt_by_words,
                            set_max_txt_chunk_words=set_max_txt_chunk_words,
                            set_chunk_txt_by_sentences=set_chunk_txt_by_sentences,
                            set_max_txt_chunk_sentences=set_max_txt_chunk_sentences,
