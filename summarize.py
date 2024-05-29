@@ -53,7 +53,6 @@ from requests.exceptions import RequestException
 import trafilatura
 import yt_dlp
 
-
 # OpenAI Tokenizer support
 from openai import OpenAI
 from tqdm import tqdm
@@ -526,6 +525,8 @@ def ask_question(transcription, question, api_name, api_key):
             return "Failed to process the question."
     else:
         return "Question answering is currently only supported with the OpenAI API."
+
+
 # For the above 'ask_question()' function, the following APIs are supported:
 # summarizers: Dict[str, Callable[[str, str], str]] = {
 #     'tabbyapi': summarize_with_tabbyapi,
@@ -559,7 +560,7 @@ def launch_ui(demo_mode=False):
 
                 # UI Mode toggle switch
                 ui_frontpage_mode_toggle = gr.Radio(choices=["Simple List", "Advanced List"], value="Simple List",
-                                          label="UI Mode Options Toggle(Toggle to show a few/all options)")
+                                                    label="UI Mode Options Toggle(Toggle to show a few/all options)")
 
                 # Add the new toggle switch
                 chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"],
@@ -629,7 +630,6 @@ def launch_ui(demo_mode=False):
 
             chunk_text_by_tokens_checkbox = gr.Checkbox(label="Chunk Text by Tokens", value=False, visible=False)
             max_tokens_input = gr.Number(label="Max Tokens", value=0, precision=0, visible=False)
-
 
             inputs = [
                 num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
@@ -895,7 +895,9 @@ def launch_ui(demo_mode=False):
             gr.Markdown("Settings for Llamafile")
 
             # Toggle switch for Advanced/Simple mode
-            advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Click->Click again to only show 'simple' settings. Is a known bug...", value=False)
+            advanced_mode_toggle = gr.Checkbox(
+                label="Advanced Mode - Click->Click again to only show 'simple' settings. Is a known bug...",
+                value=False)
 
             # Start/Stop buttons
             start_button = gr.Button("Start Llamafile")
@@ -1112,6 +1114,7 @@ def clean_youtube_url(url):
     cleaned_url = urlunparse(parsed_url._replace(query=cleaned_query))
     return cleaned_url
 
+
 def process_url(
         url,
         num_speakers,
@@ -1135,7 +1138,7 @@ def process_url(
         max_paragraphs,
         chunk_text_by_tokens,
         max_tokens
-    ):
+):
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
     set_max_txt_chunk_words = max_words
@@ -1213,6 +1216,12 @@ def process_url(
         if download_video:
             video_file_path = transcription_result['video_path'] if 'video_path' in transcription_result else None
 
+        if os.path.exists(video_file_path):
+            logging.debug(f"Confirmed existence of video file at {video_file_path}")
+        else:
+            logging.error(f"Video file not found at expected path: {video_file_path}")
+            video_file_path = None  # Set video_file_path to None if the file doesn't exist
+
         # Check if files exist before returning paths
         if not os.path.exists(json_file_path):
             raise FileNotFoundError(f"File not found: {json_file_path}")
@@ -1247,14 +1256,14 @@ def process_url(
             # Log the values before calling the function
             logging.info(f"Media URL: {media_url}")
             logging.info(f"Media Title: {media_title}")
-            logging.info(f"Media Type: {media_type}")
-            logging.info(f"Media Content: {media_content}")
-            logging.info(f"Media Keywords: {media_keywords}")
-            logging.info(f"Media Author: {media_author}")
-            logging.info(f"Ingestion Date: {media_ingestion_date}")
-            logging.info(f"Custom Prompt: {custom_prompt}")
-            logging.info(f"Summary Text: {summary_text}")
-            logging.info(f"Transcription Model: {transcription_model}")
+            logging.debug(f"Media Type: {media_type}")
+            logging.debug(f"Media Content: {media_content}")
+            logging.debug(f"Media Keywords: {media_keywords}")
+            logging.debug(f"Media Author: {media_author}")
+            logging.debug(f"Ingestion Date: {media_ingestion_date}")
+            logging.debug(f"Custom Prompt: {custom_prompt}")
+            logging.debug(f"Summary Text: {summary_text}")
+            logging.debug(f"Transcription Model: {transcription_model}")
 
             # Check if any required field is empty
             if not media_url or not media_title or not media_type or not media_content or not media_keywords or not custom_prompt or not summary_text:
@@ -1279,8 +1288,6 @@ def process_url(
             return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None
         else:
             return transcription_text, summary_text, json_file_path, None, video_file_path, None
-
-
     except Exception as e:
         logging.error(f"Error processing URL: {e}")
         return str(e), 'Error processing the request.', None, None, None, None
@@ -1364,7 +1371,6 @@ def main(input_path, api_name=None, api_key=None,
          set_chunk_txt_by_tokens=False,
          set_max_txt_chunk_tokens=0,
          ):
-
     global detail_level_number, summary, audio_file, transcription_result
 
     global detail_level, summary, audio_file
