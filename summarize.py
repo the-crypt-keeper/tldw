@@ -647,7 +647,7 @@ def launch_ui(demo_mode=False):
                 gr.Textbox(label="Summary or Status Message (Current status of Summary or Summary itself)"),
                 gr.File(label="Download Transcription as JSON (Download the Transcription as a file)"),
                 gr.File(label="Download Summary as Text (Download the Summary as a file)"),
-                gr.File(label="Download Video (Download the Video as a file)", visible=False),
+                gr.File(label="Download Video (Download the Video as a file)", visible=True),
                 gr.File(label="Download Audio (Download the Audio as a file)", visible=False),
             ]
 
@@ -1213,14 +1213,18 @@ def process_url(
         with open(summary_file_path, 'w') as summary_file:
             summary_file.write(summary_text)
 
-        if download_video:
-            video_file_path = transcription_result['video_path'] if 'video_path' in transcription_result else None
-
-        if os.path.exists(video_file_path):
-            logging.debug(f"Confirmed existence of video file at {video_file_path}")
-        else:
-            logging.error(f"Video file not found at expected path: {video_file_path}")
-            video_file_path = None  # Set video_file_path to None if the file doesn't exist
+        try:
+            if download_video:
+                video_file_path = transcription_result.get('video_path', None)
+                if video_file_path and os.path.exists(video_file_path):
+                    logging.debug(f"Confirmed existence of video file at {video_file_path}")
+                else:
+                    logging.error(f"Video file not found at expected path: {video_file_path}")
+                    video_file_path = None
+            else:
+                video_file_path = None
+        except Exception as e:
+            logging.error(f"Error processing video file: {e}")
 
         # Check if files exist before returning paths
         if not os.path.exists(json_file_path):
