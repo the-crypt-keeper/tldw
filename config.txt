@@ -33,5 +33,4 @@ logging_file = Logs
 processing_choice = cuda
 
 [Settings]
-chunk_duration = 30
-words_per_second = 3
+max_tokens = 100
