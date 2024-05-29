@@ -139,7 +139,7 @@ def check_ffmpeg():
 # Download ffmpeg
 def download_ffmpeg():
     user_choice = input("Do you want to download ffmpeg? (y)Yes/(n)No: ")
-    if user_choice.lower() == 'yes' or 'y' or '1':
+    if user_choice.lower() in ['yes', 'y', '1']:
         print("Downloading ffmpeg")
         url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
         response = requests.get(url)
@@ -154,7 +154,17 @@ def download_ffmpeg():
             logging.debug("Extracting the 'ffmpeg.exe' file from the zip")
             print("Extracting ffmpeg.exe from zip file to '/Bin' folder")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                ffmpeg_path = "ffmpeg-7.0-essentials_build/bin/ffmpeg.exe"
+                # Find the ffmpeg.exe file within the zip
+                ffmpeg_path = None
+                for file_info in zip_ref.infolist():
+                    if file_info.filename.endswith("ffmpeg.exe"):
+                        ffmpeg_path = file_info.filename
+                        break
+
+                if ffmpeg_path is None:
+                    logging.error("ffmpeg.exe not found in the zip file.")
+                    print("ffmpeg.exe not found in the zip file.")
+                    return
 
                 logging.debug("checking if the './Bin' folder exists, creating if not")
                 bin_folder = "Bin"

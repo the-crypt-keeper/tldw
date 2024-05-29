@@ -26,7 +26,7 @@ import hashlib
 # Import necessary libraries
 import json
 import logging
-from multiprocessing import Process as process
+from multiprocessing import Process as MpProcess
 import requests
 import sys
 import os
@@ -255,10 +255,11 @@ def verify_checksum(file_path, expected_checksum):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest() == expected_checksum
 
-
+process = None
 # Function to close out llamafile process on script exit.
 def cleanup_process():
-    if 'process' in globals():
+    global process
+    if process is not None:
         process.kill()
         logging.debug("Main: Terminated the external process")
 
@@ -271,6 +272,7 @@ def signal_handler(sig, frame):
 
 # FIXME - Add callout to gradio UI
 def local_llm_function():
+    global process
     repo = "Mozilla-Ocho/llamafile"
     asset_name_prefix = "llamafile-"
     useros = os.name
@@ -368,16 +370,16 @@ def local_llm_gui_function(prompt, temperature, top_k, top_p, min_p, stream, sto
 # Launch the executable in a new terminal window # FIXME - really should figure out a cleaner way of doing this...
 def launch_in_new_terminal_windows(executable, args):
     command = f'start cmd /k "{executable} {" ".join(args)}"'
-    subprocess.run(command, shell=True)
+    subprocess.Popen(command, shell=True)
 
 
 # FIXME
 def launch_in_new_terminal_linux(executable, args):
     command = f'gnome-terminal -- {executable} {" ".join(args)}'
-    subprocess.run(command, shell=True)
+    subprocess.Popen(command, shell=True)
 
 
 # FIXME
 def launch_in_new_terminal_mac(executable, args):
     command = f'open -a Terminal.app {executable} {" ".join(args)}'
-    subprocess.run(command, shell=True)
+    subprocess.Popen(command, shell=True)
