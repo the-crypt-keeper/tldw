@@ -526,8 +526,7 @@ def ask_question(transcription, question, api_name, api_key):
             return "Failed to process the question."
     else:
         return "Question answering is currently only supported with the OpenAI API."
-
-
+# For the above 'ask_question()' function, the following APIs are supported:
 # summarizers: Dict[str, Callable[[str, str], str]] = {
 #     'tabbyapi': summarize_with_tabbyapi,
 #     'openai': summarize_with_openai,
@@ -545,6 +544,8 @@ def ask_question(transcription, question, api_name, api_key):
 
 
 # def gradio UI
+
+
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
     with gr.Blocks() as iface:
@@ -564,22 +565,6 @@ def launch_ui(demo_mode=False):
                 chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"],
                                                       value="Non-Chunked",
                                                       label="Summarization Mode")
-            with gr.Row():
-
-                # Add the additional input components
-                chunk_text_by_words_checkbox = gr.Checkbox(label="Chunk Text by Words", value=False, visible=False)
-                max_words_input = gr.Number(label="Max Words", value=0, precision=0, visible=False)
-
-                chunk_text_by_sentences_checkbox = gr.Checkbox(label="Chunk Text by Sentences", value=False,
-                                                               visible=False)
-                max_sentences_input = gr.Number(label="Max Sentences", value=0, precision=0, visible=False)
-
-                chunk_text_by_paragraphs_checkbox = gr.Checkbox(label="Chunk Text by Paragraphs", value=False,
-                                                                visible=False)
-                max_paragraphs_input = gr.Number(label="Max Paragraphs", value=0, precision=0, visible=False)
-
-                chunk_text_by_tokens_checkbox = gr.Checkbox(label="Chunk Text by Tokens", value=False, visible=False)
-                max_tokens_input = gr.Number(label="Max Tokens", value=0, precision=0, visible=False)
 
             # URL input is always visible
             url_input = gr.Textbox(label="URL (Mandatory) --> Playlist URLs will be stripped and only the linked video"
@@ -630,6 +615,21 @@ def launch_ui(demo_mode=False):
             question_box_input = gr.Textbox(label="Question",
                                             placeholder="Enter a question to ask about the transcription",
                                             visible=False)
+            # Add the additional input components
+            chunk_text_by_words_checkbox = gr.Checkbox(label="Chunk Text by Words", value=False, visible=False)
+            max_words_input = gr.Number(label="Max Words", value=0, precision=0, visible=False)
+
+            chunk_text_by_sentences_checkbox = gr.Checkbox(label="Chunk Text by Sentences", value=False,
+                                                           visible=False)
+            max_sentences_input = gr.Number(label="Max Sentences", value=0, precision=0, visible=False)
+
+            chunk_text_by_paragraphs_checkbox = gr.Checkbox(label="Chunk Text by Paragraphs", value=False,
+                                                            visible=False)
+            max_paragraphs_input = gr.Number(label="Max Paragraphs", value=0, precision=0, visible=False)
+
+            chunk_text_by_tokens_checkbox = gr.Checkbox(label="Chunk Text by Tokens", value=False, visible=False)
+            max_tokens_input = gr.Number(label="Max Tokens", value=0, precision=0, visible=False)
+
 
             inputs = [
                 num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
