@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import os
+from pathlib import Path
 import platform
 import re
 import shutil
@@ -71,7 +72,7 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 
 #############
 # Global variables setup
-global custom_prompt
+
 custom_prompt = None
 
 #
@@ -1090,10 +1091,72 @@ def launch_ui(demo_mode=False):
         ["Browse Keywords", "Add Keywords", "Delete Keywords"]
     )
 
+    # I give up
+    def download_youtube_video_file(url):
+        """Download video using yt-dlp with specified options."""
+        global info_dict
+        ydl_opts = {
+            'format': 'bestvideo+bestaudio/best',
+            'outtmpl': 'downloads/%(title)s.%(ext)s',
+            'quiet': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            video_title = info_dict.get('title', 'video')
+            video_ext = info_dict.get('ext', 'mp4')
+            video_filename = f"results/{video_title}/{video_title}.{video_ext}"
+            return video_filename
+
+    def ensure_dir_exists(path):
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    def gradio_download_youtube_video(url):
+        """Download video using yt-dlp with specified options."""
+        # Determine ffmpeg path based on the operating system.
+        ffmpeg_path = './Bin/ffmpeg.exe' if os.name == 'nt' else 'ffmpeg'
+
+        # Extract information about the video
+        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+            info_dict = ydl.extract_info(url, download=False)
+            sanitized_title = sanitize_filename(info_dict['title'])
+            original_ext = info_dict['ext']
+
+        # Setup the final directory and filename
+        download_dir = Path(f"results/{sanitized_title}")
+        download_dir.mkdir(parents=True, exist_ok=True)
+        output_file_path = download_dir / f"{sanitized_title}.{original_ext}"
+
+        # Initialize yt-dlp with generic options and the output template
+        ydl_opts = {
+            'format': 'bestvideo+bestaudio/best',
+            'ffmpeg_location': ffmpeg_path,
+            'outtmpl': str(output_file_path),
+            'noplaylist': True, 'quiet': True
+        }
+
+        # Execute yt-dlp to download the video
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        # Final check to ensure file exists
+        if not output_file_path.exists():
+            raise FileNotFoundError(f"Expected file was not found: {output_file_path}")
+
+        return str(output_file_path)
+
+    download_videos_interface = gr.Interface(
+        fn=gradio_download_youtube_video,
+        inputs=gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here"),
+        outputs=gr.File(label="Download Video"),
+        title="YouTube Video Downloader",
+        description="Enter a YouTube URL to download the video."
+    )
+
     # Combine interfaces into a tabbed interface
-    tabbed_interface = gr.TabbedInterface([iface, search_interface, import_export_tab, keyword_tab],
+    tabbed_interface = gr.TabbedInterface([iface, search_interface, import_export_tab, keyword_tab, download_videos_interface],
                                           ["Transcription + Summarization", "Search and Detail View", "Export/Import",
-                                           "Keywords"])
+                                           "Keywords", "Download Video/Audio Files"])
     # Launch the interface
     server_port_variable = 7860
     global server_mode, share_public
@@ -1163,7 +1226,7 @@ def process_url(
 
     logging.info(f"Processing URL: {url}")
     video_file_path = None
-
+    global info_dict
     try:
         # Instantiate the database, db as a instance of the Database class
         db = Database()
@@ -1223,6 +1286,12 @@ def process_url(
                     video_file_path = None
             else:
                 video_file_path = None
+
+            if isinstance(transcription_result['transcription'], list):
+                text = ' '.join([segment['Text'] for segment in transcription_result['transcription']])
+            else:
+                text = ''
+
         except Exception as e:
             logging.error(f"Error processing video file: {e}")
 
@@ -1292,6 +1361,9 @@ def process_url(
             return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None
         else:
             return transcription_text, summary_text, json_file_path, None, video_file_path, None
+    except KeyError as e:
+        logging.error(f"Error processing {url}: {str(e)}")
+        return str(e), 'Error processing the request.', None, None, None, None
     except Exception as e:
         logging.error(f"Error processing URL: {e}")
         return str(e), 'Error processing the request.', None, None, None, None
@@ -1375,9 +1447,7 @@ def main(input_path, api_name=None, api_key=None,
          set_chunk_txt_by_tokens=False,
          set_max_txt_chunk_tokens=0,
          ):
-    global detail_level_number, summary, audio_file, transcription_result
-
-    global detail_level, summary, audio_file
+    global detail_level_number, summary, audio_file, transcription_result, info_dict
 
     detail_level = detail
 
