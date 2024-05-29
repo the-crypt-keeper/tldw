@@ -72,10 +72,6 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 
 #############
 # Global variables setup
-global DEFAULT_CHUNK_DURATION
-DEFAULT_CHUNK_DURATION = 30
-global WORDS_PER_SECOND
-WORDS_PER_SECOND = 3
 global custom_prompt
 custom_prompt = None
 
@@ -211,10 +207,6 @@ tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
 
 vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
 vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
-
-# Chunk settings for timed chunking summarization
-DEFAULT_CHUNK_DURATION = config.getint('Settings', 'chunk_duration', fallback='30')
-WORDS_PER_SECOND = config.getint('Settings', 'words_per_second', fallback='3')
 
 # Retrieve output paths from the configuration file
 output_path = config.get('Paths', 'output_path', fallback='results')
@@ -352,7 +344,7 @@ def print_hello():
 # 7. download_video(video_url, download_path, info_dict, download_video_flag)
 # 8. save_to_file(video_urls, filename)
 # 9. save_summary_to_file(summary, file_path)
-# 10. process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video, download_audio, rolling_summarization, detail_level, question_box, keywords, chunk_summarization, chunk_duration_input, words_per_second_input)
+# 10. process_url(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video, download_audio, rolling_summarization, detail_level, question_box, keywords, ) # FIXME - UPDATE
 #
 #
 #######################################################################################################################
@@ -536,29 +528,25 @@ def ask_question(transcription, question, api_name, api_key):
         return "Question answering is currently only supported with the OpenAI API."
 
 
-summarizers: Dict[str, Callable[[str, str], str]] = {
-    'tabbyapi': summarize_with_tabbyapi,
-    'openai': summarize_with_openai,
-    'anthropic': summarize_with_claude,
-    'cohere': summarize_with_cohere,
-    'groq': summarize_with_groq,
-    'llama': summarize_with_llama,
-    'kobold': summarize_with_kobold,
-    'oobabooga': summarize_with_oobabooga,
-    'local-llm': summarize_with_local_llm,
-    'huggingface': summarize_with_huggingface,
-    'openrouter': summarize_with_openrouter
-    # Add more APIs here as needed
-}
+# summarizers: Dict[str, Callable[[str, str], str]] = {
+#     'tabbyapi': summarize_with_tabbyapi,
+#     'openai': summarize_with_openai,
+#     'anthropic': summarize_with_claude,
+#     'cohere': summarize_with_cohere,
+#     'groq': summarize_with_groq,
+#     'llama': summarize_with_llama,
+#     'kobold': summarize_with_kobold,
+#     'oobabooga': summarize_with_oobabooga,
+#     'local-llm': summarize_with_local_llm,
+#     'huggingface': summarize_with_huggingface,
+#     'openrouter': summarize_with_openrouter
+#     # Add more APIs here as needed
+# }
 
 
 # def gradio UI
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
-    global DEFAULT_CHUNK_DURATION
-    DEFAULT_CHUNK_DURATION = 30
-    global WORDS_PER_SECOND
-    WORDS_PER_SECOND = 3
     with gr.Blocks() as iface:
         # Tab 1: Audio Transcription + Summarization
         with gr.Tab("Audio Transcription + Summarization"):
@@ -569,8 +557,8 @@ def launch_ui(demo_mode=False):
                                         label="Light/Dark Mode Toggle (Toggle to change UI color scheme)")
 
                 # UI Mode toggle switch
-                ui_mode_toggle = gr.Radio(choices=["Simple", "Advanced"], value="Simple",
-                                          label="UI Mode (Toggle to show all options)")
+                ui_frontpage_mode_toggle = gr.Radio(choices=["Simple List", "Advanced List"], value="Simple List",
+                                          label="UI Mode Options Toggle(Toggle to show a few/all options)")
 
                 # Add the new toggle switch
                 chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"],
@@ -642,37 +630,17 @@ def launch_ui(demo_mode=False):
             question_box_input = gr.Textbox(label="Question",
                                             placeholder="Enter a question to ask about the transcription",
                                             visible=False)
-            chunk_summarization_input = gr.Checkbox(label="Time-based Chunk Summarization",
-                                                    value=False,
-                                                    visible=False)
-            chunk_duration_input = gr.Number(label="Chunk Duration (seconds)", value=DEFAULT_CHUNK_DURATION,
-                                             visible=False)
-            words_per_second_input = gr.Number(label="Words per Second", value=WORDS_PER_SECOND,
-                                               visible=False)
-            # time_based_summarization_input = gr.Checkbox(label="Enable Time-based Summarization", value=False,
-            # visible=False) time_chunk_duration_input = gr.Number(label="Time Chunk Duration (seconds)", value=60,
-            # visible=False) llm_model_input = gr.Dropdown(label="LLM Model", choices=["gpt-4o", "gpt-4-turbo",
-            # "claude-3-sonnet-20240229", "command-r-plus", "CohereForAI/c4ai-command-r-plus", "llama3-70b-8192"],
-            # value="gpt-4o", visible=False)
 
             inputs = [
                 num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
                 api_key_input, vad_filter_input, download_video_input, download_audio_input,
                 rolling_summarization_input, detail_level_input, question_box_input, keywords_input,
-                chunk_summarization_input, chunk_duration_input, words_per_second_input,
-                chunk_text_by_words_checkbox, max_words_input,
-                chunk_text_by_sentences_checkbox, max_sentences_input,
-                chunk_text_by_paragraphs_checkbox, max_paragraphs_input,
+                chunk_text_by_words_checkbox, max_words_input, chunk_text_by_sentences_checkbox,
+                max_sentences_input, chunk_text_by_paragraphs_checkbox, max_paragraphs_input,
                 chunk_text_by_tokens_checkbox, max_tokens_input
             ]
-            # inputs_1 = [
-            #     url_input_1,
-            #     num_speakers_input, whisper_model_input, custom_prompt_input_1, offset_input, api_name_input_1,
-            #     api_key_input_1, vad_filter_input, download_video_input, download_audio_input,
-            #     rolling_summarization_input, detail_level_input, question_box_input, keywords_input_1,
-            #     chunk_summarization_input, chunk_duration_input, words_per_second_input,
-            #     time_based_summarization_input, time_chunk_duration_input, llm_model_input
-            # ]
+
+            all_inputs = [url_input] + inputs
 
             outputs = [
                 gr.Textbox(label="Transcription (Resulting Transcription from your input URL)"),
@@ -682,6 +650,36 @@ def launch_ui(demo_mode=False):
                 gr.File(label="Download Video (Download the Video as a file)", visible=False),
                 gr.File(label="Download Audio (Download the Audio as a file)", visible=False),
             ]
+
+            # Function to toggle visibility of advanced inputs
+            def toggle_frontpage_ui(mode):
+                visible_simple = mode == "Simple List"
+                visible_advanced = mode == "Advanced List"
+
+                return [
+                    gr.update(visible=True),  # URL input should always be visible
+                    gr.update(visible=visible_advanced),  # num_speakers_input
+                    gr.update(visible=visible_advanced),  # whisper_model_input
+                    gr.update(visible=True),  # custom_prompt_input
+                    gr.update(visible=visible_advanced),  # offset_input
+                    gr.update(visible=True),  # api_name_input
+                    gr.update(visible=True),  # api_key_input
+                    gr.update(visible=visible_advanced),  # vad_filter_input
+                    gr.update(visible=visible_advanced),  # download_video_input
+                    gr.update(visible=visible_advanced),  # download_audio_input
+                    gr.update(visible=visible_advanced),  # rolling_summarization_input
+                    gr.update(visible_advanced),  # detail_level_input
+                    gr.update(visible_advanced),  # question_box_input
+                    gr.update(visible=True),  # keywords_input
+                    gr.update(visible_advanced),  # chunk_text_by_words_checkbox
+                    gr.update(visible_advanced),  # max_words_input
+                    gr.update(visible_advanced),  # chunk_text_by_sentences_checkbox
+                    gr.update(visible_advanced),  # max_sentences_input
+                    gr.update(visible_advanced),  # chunk_text_by_paragraphs_checkbox
+                    gr.update(visible_advanced),  # max_paragraphs_input
+                    gr.update(visible_advanced),  # chunk_text_by_tokens_checkbox
+                    gr.update(visible_advanced),  # max_tokens_input
+                ]
 
             def toggle_chunk_summarization(mode):
                 visible = (mode == "Chunked-Summarization")
@@ -809,16 +807,7 @@ def launch_ui(demo_mode=False):
             # Set the event listener for the Light/Dark mode toggle switch
             theme_toggle.change(fn=toggle_light, inputs=theme_toggle, outputs=gr.HTML())
 
-            # Function to toggle visibility of advanced inputs
-            def toggle_ui(mode):
-                visible = (mode == "Advanced")
-                return [
-                    gr.update(visible=True) if i in [0, 3, 5, 6, 13] else gr.update(visible=visible)
-                    for i in range(len(inputs))
-                ]
-
-            # Set the event listener for the UI Mode toggle switch
-            ui_mode_toggle.change(fn=toggle_ui, inputs=ui_mode_toggle, outputs=inputs)
+            ui_frontpage_mode_toggle.change(fn=toggle_frontpage_ui, inputs=ui_frontpage_mode_toggle, outputs=inputs)
 
             # Combine URL input and inputs lists
             all_inputs = [url_input] + inputs
@@ -1123,32 +1112,30 @@ def clean_youtube_url(url):
     cleaned_url = urlunparse(parsed_url._replace(query=cleaned_query))
     return cleaned_url
 
-def process_url(url,
-                num_speakers,
-                whisper_model,
-                custom_prompt,
-                offset,
-                api_name,
-                api_key,
-                vad_filter,
-                download_video,
-                download_audio,
-                rolling_summarization,
-                detail_level,
-                question_box,
-                keywords,
-                chunk_summarization,
-                chunk_duration_input,
-                words_per_second_input,
-                chunk_text_by_words,
-                max_words,
-                chunk_text_by_sentences,
-                max_sentences,
-                chunk_text_by_paragraphs,
-                max_paragraphs,
-                chunk_text_by_tokens,
-                max_tokens,
-                ):
+def process_url(
+        url,
+        num_speakers,
+        whisper_model,
+        custom_prompt,
+        offset,
+        api_name,
+        api_key,
+        vad_filter,
+        download_video,
+        download_audio,
+        rolling_summarization,
+        detail_level,
+        question_box,
+        keywords,
+        chunk_text_by_words,
+        max_words,
+        chunk_text_by_sentences,
+        max_sentences,
+        chunk_text_by_paragraphs,
+        max_paragraphs,
+        chunk_text_by_tokens,
+        max_tokens
+    ):
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
     set_max_txt_chunk_words = max_words
@@ -1193,9 +1180,6 @@ def process_url(url,
                        rolling_summarization=rolling_summarization,
                        detail=detail_level,
                        keywords=keywords,
-                       chunk_summarization=chunk_summarization,
-                       chunk_duration=chunk_duration_input,
-                       words_per_second=words_per_second_input,
                        )
 
         if not results:
@@ -1237,33 +1221,6 @@ def process_url(url,
 
         formatted_transcription = format_transcription(transcription_result)
 
-        # Check for chunk summarization
-        if chunk_summarization:
-            chunk_duration = chunk_duration_input if chunk_duration_input else DEFAULT_CHUNK_DURATION
-            words_per_second = words_per_second_input if words_per_second_input else WORDS_PER_SECOND
-            summary_text = summarize_chunks(api_name, api_key, transcription_result['transcription'], chunk_duration,
-                                            words_per_second)
-
-        # FIXME - This is a mess
-        # # Check for time-based chunking summarization
-        # if time_based_summarization:
-        #     logging.info("MAIN: Time-based Summarization")
-        #
-        #     # Set the json_file_path
-        #     json_file_path = audio_file.replace('.wav', '.segments.json')
-        #
-        #     # Perform time-based summarization
-        #     summary = time_chunk_summarize(api_name, api_key, json_file_path, time_chunk_duration, custom_prompt)
-        #
-        #     # Handle the summarized output
-        #     if summary:
-        #         transcription_result['summary'] = summary
-        #         logging.info("MAIN: Time-based Summarization successful.")
-        #         save_summary_to_file(summary, json_file_path)
-        #     else:
-        #         logging.warning("MAIN: Time-based Summarization failed.")
-
-        # Add media to the database
         try:
             # Ensure these variables are correctly populated
             custom_prompt = args.custom_prompt if args.custom_prompt else ("\n\nabove is the transcript of a video "
@@ -1396,9 +1353,6 @@ def main(input_path, api_name=None, api_key=None,
          rolling_summarization=False,
          detail=0.01,
          keywords=None,
-         chunk_summarization=False,
-         chunk_duration=None,
-         words_per_second=None,
          llm_model=None,
          time_based=False,
          set_chunk_txt_by_words=False,
@@ -1724,12 +1678,6 @@ Sample commands:
                                                                       'of chunks) -> 1.00 (few chunks)\n Currently '
                                                                       'only OpenAI works. ',
                         default=0.01, )
-    # FIXME - This or time based...
-    parser.add_argument('--chunk_duration', type=int, default=DEFAULT_CHUNK_DURATION,
-                        help='Duration of each chunk in seconds')
-    # FIXME - This or chunk_duration.... -> Maybe both???
-    parser.add_argument('-time', '--time_based', type=int,
-                        help='Enable time-based summarization and specify the chunk duration in seconds (minimum 60 seconds, increments of 30 seconds)')
     parser.add_argument('-model', '--llm_model', type=str, default='',
                         help='Model to use for LLM summarization (only used for vLLM/TabbyAPI)')
     parser.add_argument('-k', '--keywords', nargs='+', default=['cli_ingest_no_tag'],
@@ -1890,9 +1838,6 @@ Sample commands:
                            rolling_summarization=args.rolling_summarization,
                            detail=args.detail_level,
                            keywords=args.keywords,
-                           chunk_summarization=False,
-                           chunk_duration=None,
-                           words_per_second=None,
                            llm_model=args.llm_model,
                            time_based=args.time_based,
                            set_chunk_txt_by_words=set_chunk_txt_by_words,
