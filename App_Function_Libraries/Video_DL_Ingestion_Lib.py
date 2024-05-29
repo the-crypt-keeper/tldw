@@ -139,8 +139,16 @@ def get_playlist_videos(playlist_url):
 def download_video(video_url, download_path, info_dict, download_video_flag):
     global video_file_path, ffmpeg_path
     global audio_file_path
+
+    # Normalize Video Title name
     logging.debug("About to normalize downloaded video title")
-    title = normalize_title(info_dict['title'])
+    normalized_video_title = normalize_title(info_dict['title'])
+    video_file_path = os.path.join(download_path, f"{normalized_video_title}.{info_dict['ext']}")
+
+    # Check for existence of video file
+    if os.path.exists(video_file_path):
+        logging.info(f"Video file already exists: {video_file_path}")
+        return video_file_path
 
     # Setup path handling for ffmpeg on different OSs
     if sys.platform.startswith('win'):
@@ -151,8 +159,7 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
         ffmpeg_path = 'ffmpeg'
 
     if download_video_flag:
-        video_file_path = os.path.join(download_path, f"{title}.mp4")
-        audio_file_path = os.path.join(download_path, f"{title}.m4a")
+        video_file_path = os.path.join(download_path, f"{normalized_video_title}.mp4")
 
         # Set options for video and audio
         ydl_opts_video = {
@@ -168,66 +175,7 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
         return video_file_path
 
     else:
-        audio_file_path = os.path.join(download_path, f"{title}.m4a")
-        ydl_opts_audio = {
-            'format': 'bestaudio[ext=m4a]',
-            'outtmpl': audio_file_path,
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl:
-            logging.debug("yt_dlp: About to download audio with youtube-dl")
-            ydl.download([video_url])
-            logging.debug("yt_dlp: Audio successfully downloaded with youtube-dl")
-
         return None
-
-        # with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl:
-        #     logging.debug("yt_dlp: About to download audio with youtube-dl")
-        #     ydl.download([video_url])
-        #     logging.debug("yt_dlp: Audio successfully downloaded with youtube-dl")
-        #
-        # output_file_path = os.path.join(download_path, f"{title}.mp4")
-        #
-        # if sys.platform.startswith('win'):
-        #     logging.debug("Running ffmpeg on Windows...")
-        #     ffmpeg_command = [
-        #         '.\\Bin\\ffmpeg.exe',
-        #         '-i', video_file_path,
-        #         '-i', audio_file_path,
-        #         '-c:v', 'copy',
-        #         '-c:a', 'copy',
-        #         output_file_path
-        #     ]
-        #     subprocess.run(ffmpeg_command, check=True)
-        # elif sys.platform.startswith('linux'):
-        #     logging.debug("Running ffmpeg on Linux...")
-        #     ffmpeg_command = [
-        #         'ffmpeg',
-        #         '-i', video_file_path,
-        #         '-i', audio_file_path,
-        #         '-c:v', 'copy',
-        #         '-c:a', 'copy',
-        #         output_file_path
-        #     ]
-        #     subprocess.run(ffmpeg_command, check=True)
-        # elif sys.platform.startswith('darwin'):
-        #     logging.debug("Running ffmpeg on MacOS...")
-        #     ffmpeg_command = [
-        #         'ffmpeg',
-        #         '-i', video_file_path,
-        #         '-i', audio_file_path,
-        #         '-c:v', 'copy',
-        #         '-c:a', 'copy',
-        #         output_file_path
-        #     ]
-        #     subprocess.run(ffmpeg_command, check=True)
-        # else:
-        #     logging.error("ffmpeg: Unsupported operating system for video download and merging.")
-        #     raise RuntimeError("ffmpeg: Unsupported operating system for video download and merging.")
-        # os.remove(video_file_path)
-        # os.remove(audio_file_path)
-        #
-        # return output_file_path
 
 
 def save_to_file(video_urls, filename):
