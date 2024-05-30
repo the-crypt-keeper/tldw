@@ -479,53 +479,54 @@ def search_media(query, fields, keyword, page):
         return str(e)
 
 
-# FIXME - Change to use 'check_api()' function - also, create 'check_api()' function
-def ask_question(transcription, question, api_name, api_key):
-    if not question.strip():
-        return "Please enter a question."
-
-        prompt = f"""Transcription:\n{transcription}
-
-        Given the above transcription, please answer the following:\n\n{question}"""
-
-        # FIXME - Refactor main API checks so they're their own function - api_check()
-        # Call api_check() function here
-
-        if api_name.lower() == "openai":
-            openai_api_key = api_key if api_key else config.get('API', 'openai_api_key', fallback=None)
-            headers = {
-                'Authorization': f'Bearer {openai_api_key}',
-                'Content-Type': 'application/json'
-            }
-            if openai_model:
-                pass
-            else:
-                openai_model = 'gpt-4-turbo'
-            data = {
-                "model": openai_model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant that answers questions based on the given "
-                                   "transcription and summary."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "max_tokens": 150000,
-                "temperature": 0.1
-            }
-            response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
-
-        if response.status_code == 200:
-            answer = response.json()['choices'][0]['message']['content'].strip()
-            return answer
-        else:
-            return "Failed to process the question."
-    else:
-        return "Question answering is currently only supported with the OpenAI API."
+# FIXME - code for the 're-prompt' functionality
+#- Change to use 'check_api()' function - also, create 'check_api()' function
+# def ask_question(transcription, question, api_name, api_key):
+#     if not question.strip():
+#         return "Please enter a question."
+#
+#         prompt = f"""Transcription:\n{transcription}
+#
+#         Given the above transcription, please answer the following:\n\n{question}"""
+#
+#         # FIXME - Refactor main API checks so they're their own function - api_check()
+#         # Call api_check() function here
+#
+#         if api_name.lower() == "openai":
+#             openai_api_key = api_key if api_key else config.get('API', 'openai_api_key', fallback=None)
+#             headers = {
+#                 'Authorization': f'Bearer {openai_api_key}',
+#                 'Content-Type': 'application/json'
+#             }
+#             if openai_model:
+#                 pass
+#             else:
+#                 openai_model = 'gpt-4-turbo'
+#             data = {
+#                 "model": openai_model,
+#                 "messages": [
+#                     {
+#                         "role": "system",
+#                         "content": "You are a helpful assistant that answers questions based on the given "
+#                                    "transcription and summary."
+#                     },
+#                     {
+#                         "role": "user",
+#                         "content": prompt
+#                     }
+#                 ],
+#                 "max_tokens": 150000,
+#                 "temperature": 0.1
+#             }
+#             response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+#
+#         if response.status_code == 200:
+#             answer = response.json()['choices'][0]['message']['content'].strip()
+#             return answer
+#         else:
+#             return "Failed to process the question."
+#     else:
+#         return "Question answering is currently only supported with the OpenAI API."
 
 
 # For the above 'ask_question()' function, the following APIs are supported:
@@ -570,7 +571,9 @@ def launch_ui(demo_mode=False):
 
             # URL input is always visible
             url_input = gr.Textbox(label="URL (Mandatory) --> Playlist URLs will be stripped and only the linked video"
-                                         " will be downloaded)", placeholder="Enter the video URL here")
+                          " will be downloaded)", placeholder="Enter the video URL here")
+#            url_input = gr.Textbox(label="URL (Mandatory) --> Playlist URLs will be stripped and only the linked video"
+#                                         " will be downloaded)", placeholder="Enter the video URL here")
 
             # Inputs to be shown or hidden
             num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)",
