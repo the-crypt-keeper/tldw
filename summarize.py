@@ -551,7 +551,9 @@ def search_media(query, fields, keyword, page):
 
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
-    with gr.Blocks() as iface:
+    # Set theme value with https://www.gradio.app/guides/theming-guide - 'theme='
+    my_theme = gr.Theme.from_hub("gradio/seafoam")
+    with gr.Blocks(theme=my_theme) as iface:
         # Tab 1: Audio Transcription + Summarization
         with gr.Tab("Audio Transcription + Summarization"):
 
@@ -816,13 +818,16 @@ def launch_ui(demo_mode=False):
             # Combine URL input and inputs lists
             all_inputs = [url_input] + inputs
 
+            # lets try embedding the theme here - FIXME?
             gr.Interface(
                 fn=process_url,
                 inputs=all_inputs,
                 outputs=outputs,
                 title="Video Transcription and Summarization",
                 description="Submit a video URL for transcription and summarization. Ensure you input all necessary "
-                            "information including API keys."
+                            "information including API keys.",
+                theme='freddyaboulton/dracula_revamped',
+                allow_flagging="never"
             )
 
         # Tab 2: Scrape & Summarize Articles/Websites
@@ -1137,7 +1142,8 @@ def launch_ui(demo_mode=False):
         inputs=gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here"),
         outputs=gr.File(label="Download Video"),
         title="YouTube Video Downloader (Simple youtube video downloader tool, if you want a real one, check this project: https://github.com/StefanLobbenmeier/youtube-dl-gui or https://github.com/yt-dlg/yt-dlg )",
-        description="Enter a YouTube URL to download the video."
+        description="Enter a YouTube URL to download the video.",
+        allow_flagging="never"
     )
 
     # Combine interfaces into a tabbed interface
