@@ -50,4 +50,54 @@
 server_mode = False
 share_public = False
 
-
+# Revisit later.
+#
+# def gradio_download_youtube_audio(url):
+#     """Download audio using yt-dlp with specified options."""
+#     # Determine ffmpeg path based on the operating system.
+#     ffmpeg_path = './Bin/ffmpeg.exe' if os.name == 'nt' else 'ffmpeg'
+#
+#     # Extract information about the video
+#     with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+#         info_dict = ydl.extract_info(url, download=False)
+#         sanitized_title = sanitize_filename(info_dict['title'])
+#
+#     # Setup the final directory and filename
+#     download_dir = Path(f"results/{sanitized_title}")
+#     download_dir.mkdir(parents=True, exist_ok=True)
+#     output_file_path = download_dir / f"{sanitized_title}.ogg"
+#
+#     # Initialize yt-dlp with generic options and the output template
+#     ydl_opts = {
+#         'format': 'bestaudio/best',
+#         'ffmpeg_location': ffmpeg_path,
+#         'outtmpl': str(output_file_path),
+#         'postprocessors': [{
+#             'key': 'FFmpegExtractAudio',
+#             'preferredcodec': 'vorbis',
+#             'preferredquality': '192',
+#         }],
+#         'noplaylist': True,
+#         'quiet': True
+#     }
+#
+#     # Execute yt-dlp to download the audio
+#     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+#         ydl.download([url])
+#
+#     # Final check to ensure file exists
+#     if not output_file_path.exists():
+#         raise FileNotFoundError(f"Expected file was not found: {output_file_path}")
+#
+#     return str(output_file_path)
+#
+# download_audio_interface = gr.Interface(
+#     fn=gradio_download_youtube_audio,
+#     inputs=gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here"),
+#     outputs=gr.File(label="Download Audio"),
+#     title="YouTube Audio Downloader",
+#     description="Enter a YouTube URL to download the audio as an .ogg file."
+# )
+#
+#
+#     tabbed_interface = gr.TabbedInterface([iface, search_interface, import_export_tab, keyword_tab, download_videos_interface, download_audio_interface],

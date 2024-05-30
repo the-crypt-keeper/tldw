@@ -1133,7 +1133,7 @@ def launch_ui(demo_mode=False):
         fn=gradio_download_youtube_video,
         inputs=gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here"),
         outputs=gr.File(label="Download Video"),
-        title="YouTube Video Downloader",
+        title="YouTube Video Downloader (Simple youtube video downloader tool, if you want a real one, check this project: https://github.com/StefanLobbenmeier/youtube-dl-gui or https://github.com/yt-dlg/yt-dlg )",
         description="Enter a YouTube URL to download the video."
     )
 
