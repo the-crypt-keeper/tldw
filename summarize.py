@@ -679,6 +679,29 @@ def insert_prompt_to_db(title, description, system_prompt, user_prompt):
     except sqlite3.Error as e:
         return f"Error adding prompt: {e}"
 
+def display_search_results(query):
+    if not query.strip():
+        return "Please enter a search query."
+
+    results = search_prompts(query)
+
+    # Debugging: Print the results to the console to see what is being returned
+    print(f"Processed search results for query '{query}': {results}")
+
+    if results:
+        result_md = "## Search Results:\n"
+        for result in results:
+            # Debugging: Print each result to see its format
+            print(f"Result item: {result}")
+
+            if len(result) == 2:
+                name, details = result
+                result_md += f"**Title:** {name}\n\n**Description:** {details}\n\n---\n"
+            else:
+                result_md += "Error: Unexpected result format.\n\n---\n"
+        return result_md
+    return "No results found."
+
 
 
 
@@ -1019,7 +1042,7 @@ def launch_ui(demo_mode=False):
                 return [gr.update(visible=False)] * 11 + [gr.update(visible=True)] * 3
 
     with gr.Blocks() as search_interface:
-        with gr.Tab("Search / Detailed Entry View / Prompt Management & Viewing"):
+        with gr.Tab("Search & Detailed Entry View"):
             search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
             search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
                                          label="Search By")
@@ -1036,7 +1059,7 @@ def launch_ui(demo_mode=False):
             items_output.change(fn=update_detailed_view, inputs=[items_output, item_mapping],
                                 outputs=[prompt_summary_output, content_output])
 
-        with gr.Tab("Prompts"):
+        with gr.Tab("View Prompts"):
             with gr.Column():
                 prompt_dropdown = gr.Dropdown(label="Select Prompt", choices=[])
                 prompt_details_output = gr.HTML()
@@ -1052,21 +1075,39 @@ def launch_ui(demo_mode=False):
                     fn=update_prompt_dropdown,
                     outputs=prompt_dropdown
                 )
-
+        # FIXME
+        with gr.Tab("Search Prompts"):
             with gr.Column():
-                gr.Markdown("### Add Prompt")
-                title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
-                description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
-                system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
-                user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
-                add_prompt_button = gr.Button("Add Prompt")
-                add_prompt_output = gr.HTML()
+                search_query_input = gr.Textbox(label="Search Query (It's broken)", placeholder="Enter your search query...")
+                search_results_output = gr.Markdown()
 
-                add_prompt_button.click(
-                    fn=add_prompt,
-                    inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
-                    outputs=add_prompt_output
+                search_button = gr.Button("Search Prompts")
+                search_button.click(
+                    fn=display_search_results,
+                    inputs=[search_query_input],
+                    outputs=[search_results_output]
                 )
+
+                search_query_input.change(
+                    fn=display_search_results,
+                    inputs=[search_query_input],
+                    outputs=[search_results_output]
+                )
+
+        with gr.Tab("Add Prompts"):
+            gr.Markdown("### Add Prompt")
+            title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
+            description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
+            system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
+            user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
+            add_prompt_button = gr.Button("Add Prompt")
+            add_prompt_output = gr.HTML()
+
+            add_prompt_button.click(
+                fn=add_prompt,
+                inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
+                outputs=add_prompt_output
+            )
 
     with gr.Blocks() as llamafile_interface:
         with gr.Tab("Llamafile Settings"):
