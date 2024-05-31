@@ -1042,7 +1042,7 @@ def launch_ui(demo_mode=False):
                 return [gr.update(visible=False)] * 11 + [gr.update(visible=True)] * 3
 
     with gr.Blocks() as search_interface:
-        with gr.Tab("Search & Detailed Entry View"):
+        with gr.Tab("Search Ingested Materials / Detailed Entry View / Prompts"):
             search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
             search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
                                          label="Search By")
