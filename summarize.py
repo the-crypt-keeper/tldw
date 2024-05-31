@@ -639,7 +639,7 @@ def update_dropdown(search_query, search_type):
     results = browse_items(search_query, search_type)
     item_options = [f"{item[1]} ({item[2]})" for item in results]
     item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}  # Map item display to media ID
-    return gr.update(choices=item_options), item_mapping
+    return gr.Dropdown.update(choices=item_options), item_mapping
 
 def get_media_id(selected_item, item_mapping):
     return item_mapping.get(selected_item)
@@ -653,7 +653,7 @@ def update_detailed_view(selected_item, item_mapping):
 
 def update_prompt_dropdown():
     prompt_names = list_prompts()
-    return gr.Dropdown.update(choices=prompt_names)
+    return gr.update(choices=prompt_names)
 
 def display_prompt_details(selected_prompt):
     if selected_prompt:
