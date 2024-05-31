@@ -665,6 +665,23 @@ def display_prompt_details(selected_prompt):
             return details_str + system_str + user_str
     return "No details available."
 
+def insert_prompt_to_db(title, description, system_prompt, user_prompt):
+    try:
+        conn = sqlite3.connect('prompts.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO Prompts (name, details, system, user) VALUES (?, ?, ?, ?)",
+            (title, description, system_prompt, user_prompt)
+        )
+        conn.commit()
+        conn.close()
+        return "Prompt added successfully!"
+    except sqlite3.Error as e:
+        return f"Error adding prompt: {e}"
+
+
+
+
 #
 # End of Gradio Search Function-related stuff
 ############################################################
@@ -1129,30 +1146,32 @@ def launch_ui(demo_mode=False):
                 prompt_dropdown = gr.Dropdown(label="Select Prompt", choices=[])
                 prompt_details_output = gr.HTML()
 
-            prompt_dropdown.change(
-                fn=display_prompt_details,
-                inputs=prompt_dropdown,
-                outputs=prompt_details_output
-            )
+                prompt_dropdown.change(
+                    fn=display_prompt_details,
+                    inputs=prompt_dropdown,
+                    outputs=prompt_details_output
+                )
 
-            prompt_list_button = gr.Button("List Prompts")
-            prompt_list_button.click(
-                fn=update_prompt_dropdown,
-                outputs=prompt_dropdown
-            )
+                prompt_list_button = gr.Button("List Prompts")
+                prompt_list_button.click(
+                    fn=update_prompt_dropdown,
+                    outputs=prompt_dropdown
+                )
 
-    # search_tab = gr.Interface(
-    #     fn=search_and_display,
-    #     inputs=[
-    #         gr.Textbox(label="Search Query", placeholder="Enter your search query here..."),
-    #         gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content", "URL", "Type", "Author"],
-    #                          value=["Title"]),
-    #         gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)..."),
-    #         gr.Slider(label="Page", minimum=1, maximum=10, step=1, value=1)
-    #     ],
-    #     outputs=gr.Dataframe(label="Search Results", height=300)  # Height in pixels
-    #     #outputs=gr.Dataframe(label="Search Results")
-    # )
+            with gr.Column():
+                gr.Markdown("### Add Prompt")
+                title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
+                description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
+                system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
+                user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
+                add_prompt_button = gr.Button("Add Prompt")
+                add_prompt_output = gr.HTML()
+
+                add_prompt_button.click(
+                    fn=add_prompt,
+                    inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
+                    outputs=add_prompt_output
+                )
 
     export_keywords_interface = gr.Interface(
         fn=export_keywords_to_csv,
