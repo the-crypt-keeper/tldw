@@ -579,6 +579,8 @@ def add_prompt(name, details, system, user=None):
         return "Prompt added successfully."
     except sqlite3.IntegrityError:
         return "Prompt with this name already exists."
+    except sqlite3.Error as e:
+        return f"Database error: {e}"
 
 def fetch_prompt_details(name):
     conn = sqlite3.connect('prompts.db')
@@ -602,6 +604,10 @@ def list_prompts():
     results = cursor.fetchall()
     conn.close()
     return [row[0] for row in results]
+
+def insert_prompt_to_db(title, description, system_prompt, user_prompt):
+    result = add_prompt(title, description, system_prompt, user_prompt)
+    return result
 
 #
 #
