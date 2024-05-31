@@ -546,6 +546,9 @@ def search_media(query, fields, keyword, page):
 # }
 
 #########################################################################
+
+
+# FIXME - Move to 'Web_UI_Lib.py'
 # Gradio Search Function-related stuff
 def display_details(media_id):
     if media_id:
@@ -647,6 +650,20 @@ def update_detailed_view(selected_item, item_mapping):
         prompt_summary_html, content_html = display_item_details(media_id)
         return gr.update(value=prompt_summary_html), gr.update(value=content_html)
     return gr.update(value="No details available"), gr.update(value="No details available")
+
+def update_prompt_dropdown():
+    prompt_names = list_prompts()
+    return gr.Dropdown.update(choices=prompt_names)
+
+def display_prompt_details(selected_prompt):
+    if selected_prompt:
+        details = fetch_prompt_details(selected_prompt)
+        if details:
+            details_str = f"<h4>Details:</h4><p>{details[0]}</p>"
+            system_str = f"<h4>System:</h4><p>{details[1]}</p>"
+            user_str = f"<h4>User:</h4><p>{details[2]}</p>" if details[2] else ""
+            return details_str + system_str + user_str
+    return "No details available."
 
 #
 # End of Gradio Search Function-related stuff
@@ -1106,6 +1123,23 @@ def launch_ui(demo_mode=False):
             content_output = gr.HTML(label="Content", visible=True)
             items_output.change(fn=update_detailed_view, inputs=[items_output, item_mapping],
                                 outputs=[prompt_summary_output, content_output])
+
+        with gr.Tab("Prompts"):
+            with gr.Column():
+                prompt_dropdown = gr.Dropdown(label="Select Prompt", choices=[])
+                prompt_details_output = gr.HTML()
+
+            prompt_dropdown.change(
+                fn=display_prompt_details,
+                inputs=prompt_dropdown,
+                outputs=prompt_details_output
+            )
+
+            prompt_list_button = gr.Button("List Prompts")
+            prompt_list_button.click(
+                fn=update_prompt_dropdown,
+                outputs=prompt_dropdown
+            )
 
     # search_tab = gr.Interface(
     #     fn=search_and_display,

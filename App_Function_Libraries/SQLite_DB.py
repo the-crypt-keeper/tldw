@@ -537,3 +537,74 @@ def is_valid_date(date_string: str) -> bool:
     except ValueError:
         return False
 
+#
+#
+#######################################################################################################################
+
+
+
+
+#######################################################################################################################
+# Functions to manage prompts DB
+#
+
+def create_prompts_db():
+    conn = sqlite3.connect('prompts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Prompts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            details TEXT,
+            system TEXT,
+            user TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+create_prompts_db()
+
+
+def add_prompt(name, details, system, user=None):
+    try:
+        conn = sqlite3.connect('prompts.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO Prompts (name, details, system, user)
+            VALUES (?, ?, ?, ?)
+        ''', (name, details, system, user))
+        conn.commit()
+        conn.close()
+        return "Prompt added successfully."
+    except sqlite3.IntegrityError:
+        return "Prompt with this name already exists."
+
+def fetch_prompt_details(name):
+    conn = sqlite3.connect('prompts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT details, system, user
+        FROM Prompts
+        WHERE name = ?
+    ''', (name,))
+    result = cursor.fetchone()
+    conn.close()
+    return result
+
+def list_prompts():
+    conn = sqlite3.connect('prompts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT name
+        FROM Prompts
+    ''')
+    results = cursor.fetchall()
+    conn.close()
+    return [row[0] for row in results]
+
+#
+#
+#######################################################################################################################
+
+

@@ -339,5 +339,6 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 - [faster_whisper](https://github.com/SYSTRAN/faster-whisper)
 - [pyannote](https://github.com/pyannote/pyannote-audio)
 - Thank you cognitivetech for the system prompt(not yet implemented...): https://github.com/cognitivetech/llm-long-text-summarization/tree/main?tab=readme-ov-file#one-shot-prompting
-
+- [Fabric](https://github.com/danielmiessler/fabric)
+- The people who have helped me get to this point, and especially for those not around to see it(DT & CC).
 ### 
