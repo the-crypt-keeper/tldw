@@ -545,7 +545,7 @@ def search_media(query, fields, keyword, page):
 #     # Add more APIs here as needed
 # }
 
-
+#########################################################################
 # Gradio Search Function-related stuff
 def display_details(media_id):
     if media_id:
@@ -588,6 +588,16 @@ def fetch_items_by_keyword(search_query: str):
     except sqlite3.Error as e:
         raise DatabaseError(f"Error fetching items by keyword: {e}")
 
+def fetch_items_by_content(search_query: str):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, url FROM Media WHERE content LIKE ?", (f'%{search_query}%',))
+            results = cursor.fetchall()
+            return results
+    except sqlite3.Error as e:
+        raise DatabaseError(f"Error fetching items by content: {e}")
+
 
 def fetch_item_details(media_id: int):
     try:
@@ -607,6 +617,8 @@ def fetch_item_details(media_id: int):
 def browse_items(search_query, search_type):
     if search_type == 'Keyword':
         results = fetch_items_by_keyword(search_query)
+    elif search_type == 'Content':
+        results = fetch_items_by_content(search_query)
     else:
         results = fetch_items_by_title_or_url(search_query, search_type)
     return results
@@ -625,6 +637,7 @@ def update_dropdown(search_query, search_type):
     item_options = [f"{item[1]} ({item[2]})" for item in results]
     item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}  # Map item display to media ID
     return gr.update(choices=item_options), item_mapping
+
 def get_media_id(selected_item, item_mapping):
     return item_mapping.get(selected_item)
 
@@ -635,7 +648,9 @@ def update_detailed_view(selected_item, item_mapping):
         return gr.update(value=prompt_summary_html), gr.update(value=content_html)
     return gr.update(value="No details available"), gr.update(value="No details available")
 
-
+#
+# End of Gradio Search Function-related stuff
+############################################################
 
 
 # def gradio UI
@@ -1077,7 +1092,8 @@ def launch_ui(demo_mode=False):
     with gr.Blocks() as search_interface:
         with gr.Tab("Search & Detailed View"):
             search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword"], value="Title", label="Search By")
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                         label="Search By")
 
             search_button = gr.Button("Search")
             items_output = gr.Dropdown(label="Select Item", choices=[])
