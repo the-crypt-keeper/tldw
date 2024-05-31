@@ -546,9 +546,99 @@ def search_media(query, fields, keyword, page):
 # }
 
 
+# Gradio Search Function-related stuff
+def display_details(media_id):
+    if media_id:
+        details = display_item_details(media_id)
+        details_html = ""
+        for detail in details:
+            details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
+            details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
+            details_html += f"<h4>Transcription:</h4><pre>{detail[2]}</pre><hr>"
+        return details_html
+    return "No details available."
+
+def fetch_items_by_title_or_url(search_query: str, search_type: str):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            if search_type == 'Title':
+                cursor.execute("SELECT id, title, url FROM Media WHERE title LIKE ?", (f'%{search_query}%',))
+            elif search_type == 'URL':
+                cursor.execute("SELECT id, title, url FROM Media WHERE url LIKE ?", (f'%{search_query}%',))
+            results = cursor.fetchall()
+            return results
+    except sqlite3.Error as e:
+        raise DatabaseError(f"Error fetching items by {search_type}: {e}")
+
+
+def fetch_items_by_keyword(search_query: str):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT m.id, m.title, m.url
+                FROM Media m
+                JOIN MediaKeywords mk ON m.id = mk.media_id
+                JOIN Keywords k ON mk.keyword_id = k.id
+                WHERE k.keyword LIKE ?
+            """, (f'%{search_query}%',))
+            results = cursor.fetchall()
+            return results
+    except sqlite3.Error as e:
+        raise DatabaseError(f"Error fetching items by keyword: {e}")
+
+
+def fetch_item_details(media_id: int):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT prompt, summary FROM MediaModifications WHERE media_id = ?", (media_id,))
+            prompt_summary_results = cursor.fetchall()
+
+            cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
+            content_result = cursor.fetchone()
+            content = content_result[0] if content_result else ""
+
+            return prompt_summary_results, content
+    except sqlite3.Error as e:
+        raise DatabaseError(f"Error fetching item details: {e}")
+
+def browse_items(search_query, search_type):
+    if search_type == 'Keyword':
+        results = fetch_items_by_keyword(search_query)
+    else:
+        results = fetch_items_by_title_or_url(search_query, search_type)
+    return results
+
+def display_item_details(media_id):
+    prompt_summary_results, content = fetch_item_details(media_id)
+    content_section = f"<h4>Transcription:</h4><pre>{content}</pre><hr>"
+    prompt_summary_section = ""
+    for prompt, summary in prompt_summary_results:
+        prompt_summary_section += f"<h4>Prompt:</h4><p>{prompt}</p>"
+        prompt_summary_section += f"<h4>Summary:</h4><p>{summary}</p><hr>"
+    return prompt_summary_section, content_section
+
+def update_dropdown(search_query, search_type):
+    results = browse_items(search_query, search_type)
+    item_options = [f"{item[1]} ({item[2]})" for item in results]
+    item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}  # Map item display to media ID
+    return gr.update(choices=item_options), item_mapping
+def get_media_id(selected_item, item_mapping):
+    return item_mapping.get(selected_item)
+
+def update_detailed_view(selected_item, item_mapping):
+    media_id = get_media_id(selected_item, item_mapping)
+    if media_id:
+        prompt_summary_html, content_html = display_item_details(media_id)
+        return gr.update(value=prompt_summary_html), gr.update(value=content_html)
+    return gr.update(value="No details available"), gr.update(value="No details available")
+
+
+
+
 # def gradio UI
-
-
 def launch_ui(demo_mode=False):
     whisper_models = ["small.en", "medium.en", "large"]
     # Set theme value with https://www.gradio.app/guides/theming-guide - 'theme='
@@ -987,30 +1077,20 @@ def launch_ui(demo_mode=False):
     with gr.Blocks() as search_interface:
         with gr.Tab("Search & Detailed View"):
             search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-            search_fields_input = gr.CheckboxGroup(label="Search Fields",
-                                                   choices=["Title", "Content", "URL", "Type", "Author"],
-                                                   value=["Title"])
-            keywords_input = gr.Textbox(label="Keywords to Match against",
-                                        placeholder="Enter keywords here (comma-separated)...")
-            page_input = gr.Slider(label="Pages of results to display", minimum=1, maximum=10, step=1, value=1)
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword"], value="Title", label="Search By")
 
             search_button = gr.Button("Search")
-            results_output = gr.Dataframe()
-            index_input = gr.Number(label="Select index of the result", value=None)
-            details_button = gr.Button("Show Details")
-            details_output = gr.HTML()
+            items_output = gr.Dropdown(label="Select Item", choices=[])
+            item_mapping = gr.State({})
 
-            search_button.click(
-                fn=search_and_display,
-                inputs=[search_query_input, search_fields_input, keywords_input, page_input],
-                outputs=results_output
-            )
+            search_button.click(fn=update_dropdown, inputs=[search_query_input, search_type_input],
+                                outputs=[items_output, item_mapping])
 
-            details_button.click(
-                fn=display_details,
-                inputs=[index_input, results_output],
-                outputs=details_output
-            )
+            prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
+            content_output = gr.HTML(label="Content", visible=True)
+            items_output.change(fn=update_detailed_view, inputs=[items_output, item_mapping],
+                                outputs=[prompt_summary_output, content_output])
+
     # search_tab = gr.Interface(
     #     fn=search_and_display,
     #     inputs=[
