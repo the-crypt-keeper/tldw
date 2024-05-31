@@ -349,7 +349,6 @@ from bs4 import BeautifulSoup
 import requests
 import trafilatura
 # Import Local
-import summarize
 def get_page_title(url: str) -> str:
     try:
         response = requests.get(url)
@@ -444,8 +443,6 @@ import tokenizers
 import torchvision
 import transformers
 # Local Imports
-import summarize
-import summarize
 
 
 
