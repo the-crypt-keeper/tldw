@@ -1011,27 +1011,6 @@ def launch_ui(demo_mode=False):
             gr.Markdown("Will ingest documents and store into SQLite DB")
             gr.Markdown("RAG here we come....:/")
 
-        with gr.Tab("Prompt Examples & Questions Library"):
-            gr.Markdown("Plan to put Sample prompts/questions here")
-            gr.Markdown("Fabric prompts/live UI?")
-            # Searchable list
-            with gr.Row():
-                search_box = gr.Textbox(label="Search prompts", placeholder="Type to filter prompts")
-                search_result = gr.Textbox(label="Matching prompts", interactive=False)
-                search_box.change(search_prompts, inputs=search_box, outputs=search_result)
-
-            # Interactive list
-            with gr.Row():
-                prompt_selector = gr.Radio(choices=all_prompts, label="Select a prompt")
-                selected_output = gr.Textbox(label="Selected prompt")
-                prompt_selector.change(handle_prompt_selection, inputs=prompt_selector, outputs=selected_output)
-
-            # Categorized display
-            with gr.Accordion("Category 1"):
-                gr.Markdown("\n".join(prompts_category_1))
-            with gr.Accordion("Category 2"):
-                gr.Markdown("\n".join(prompts_category_2))
-
         # Function to update the visibility of the UI elements for Llamafile Settings
         def toggle_advanced_llamafile_mode(is_advanced):
             if is_advanced:
@@ -1039,6 +1018,57 @@ def launch_ui(demo_mode=False):
             else:
                 return [gr.update(visible=False)] * 11 + [gr.update(visible=True)] * 3
 
+    with gr.Blocks() as search_interface:
+        with gr.Tab("Search / Detailed Entry View / Prompt Management & Viewing"):
+            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                         label="Search By")
+
+            search_button = gr.Button("Search")
+            items_output = gr.Dropdown(label="Select Item", choices=[])
+            item_mapping = gr.State({})
+
+            search_button.click(fn=update_dropdown, inputs=[search_query_input, search_type_input],
+                                outputs=[items_output, item_mapping])
+
+            prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
+            content_output = gr.HTML(label="Content", visible=True)
+            items_output.change(fn=update_detailed_view, inputs=[items_output, item_mapping],
+                                outputs=[prompt_summary_output, content_output])
+
+        with gr.Tab("Prompts"):
+            with gr.Column():
+                prompt_dropdown = gr.Dropdown(label="Select Prompt", choices=[])
+                prompt_details_output = gr.HTML()
+
+                prompt_dropdown.change(
+                    fn=display_prompt_details,
+                    inputs=prompt_dropdown,
+                    outputs=prompt_details_output
+                )
+
+                prompt_list_button = gr.Button("List Prompts")
+                prompt_list_button.click(
+                    fn=update_prompt_dropdown,
+                    outputs=prompt_dropdown
+                )
+
+            with gr.Column():
+                gr.Markdown("### Add Prompt")
+                title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
+                description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
+                system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
+                user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
+                add_prompt_button = gr.Button("Add Prompt")
+                add_prompt_output = gr.HTML()
+
+                add_prompt_button.click(
+                    fn=add_prompt,
+                    inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
+                    outputs=add_prompt_output
+                )
+
+    with gr.Blocks() as llamafile_interface:
         with gr.Tab("Llamafile Settings"):
             gr.Markdown("Settings for Llamafile")
 
@@ -1123,55 +1153,8 @@ def launch_ui(demo_mode=False):
             """
             gr.HTML(html_content)
 
-    with gr.Blocks() as search_interface:
-        with gr.Tab("Search & Detailed View"):
-            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
-                                         label="Search By")
 
-            search_button = gr.Button("Search")
-            items_output = gr.Dropdown(label="Select Item", choices=[])
-            item_mapping = gr.State({})
 
-            search_button.click(fn=update_dropdown, inputs=[search_query_input, search_type_input],
-                                outputs=[items_output, item_mapping])
-
-            prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
-            content_output = gr.HTML(label="Content", visible=True)
-            items_output.change(fn=update_detailed_view, inputs=[items_output, item_mapping],
-                                outputs=[prompt_summary_output, content_output])
-
-        with gr.Tab("Prompts"):
-            with gr.Column():
-                prompt_dropdown = gr.Dropdown(label="Select Prompt", choices=[])
-                prompt_details_output = gr.HTML()
-
-                prompt_dropdown.change(
-                    fn=display_prompt_details,
-                    inputs=prompt_dropdown,
-                    outputs=prompt_details_output
-                )
-
-                prompt_list_button = gr.Button("List Prompts")
-                prompt_list_button.click(
-                    fn=update_prompt_dropdown,
-                    outputs=prompt_dropdown
-                )
-
-            with gr.Column():
-                gr.Markdown("### Add Prompt")
-                title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
-                description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
-                system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
-                user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
-                add_prompt_button = gr.Button("Add Prompt")
-                add_prompt_output = gr.HTML()
-
-                add_prompt_button.click(
-                    fn=add_prompt,
-                    inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
-                    outputs=add_prompt_output
-                )
 
     export_keywords_interface = gr.Interface(
         fn=export_keywords_to_csv,
@@ -1296,9 +1279,9 @@ def launch_ui(demo_mode=False):
     )
 
     # Combine interfaces into a tabbed interface
-    tabbed_interface = gr.TabbedInterface([iface, search_interface, import_export_tab, keyword_tab, download_videos_interface],
-                                          ["Transcription + Summarization", "Search and Detail View", "Export/Import",
-                                           "Keywords", "Download Video/Audio Files"])
+    tabbed_interface = gr.TabbedInterface([iface, search_interface, llamafile_interface, keyword_tab, import_export_tab, download_videos_interface],
+                                          ["Transcription / Summarization / Ingestion", "Search / Detailed View",
+                                           "Llamafile Interface", "Keywords", "Export/Import",  "Download Video/Audio Files"])
     # Launch the interface
     server_port_variable = 7860
     global server_mode, share_public
