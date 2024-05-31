@@ -1061,7 +1061,7 @@ def launch_ui(demo_mode=False):
 
         with gr.Tab("View Prompts"):
             with gr.Column():
-                prompt_dropdown = gr.Dropdown(label="Select Prompt", choices=[])
+                prompt_dropdown = gr.Dropdown(label="Select Prompt (Thanks to the 'Fabric' project for this initial set: https://github.com/danielmiessler/fabric", choices=[])
                 prompt_details_output = gr.HTML()
 
                 prompt_dropdown.change(

@@ -609,6 +609,9 @@ def insert_prompt_to_db(title, description, system_prompt, user_prompt):
     result = add_prompt(title, description, system_prompt, user_prompt)
     return result
 
+
+
+
 #
 #
 #######################################################################################################################
