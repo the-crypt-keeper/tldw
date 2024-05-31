@@ -318,8 +318,11 @@ def local_llm_function():
         print(f"Failed to launch the process: {e}")
 
 
-def local_llm_gui_function(prompt, temperature, top_k, top_p, min_p, stream, stop, typical_p, repeat_penalty, repeat_last_n,
-                       penalize_nl, presence_penalty, frequency_penalty, penalty_prompt, ignore_eos, system_prompt):
+def local_llm_gui_function(prompt, verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
+                 model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
+                 ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value, port_checked,
+                 port_value, system_prompt):
+    # FIXME -> Update to reflect actual args for llamafile, not just standard defaults
     repo = "Mozilla-Ocho/llamafile"
     asset_name_prefix = "llamafile-"
     useros = os.name

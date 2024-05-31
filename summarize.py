@@ -870,16 +870,51 @@ def launch_ui(demo_mode=False):
                                                   chunk_text_by_tokens_checkbox, max_tokens_input
                                               ])
 
-            def start_llamafile(prompt, temperature, top_k, top_p, min_p, stream, stop, typical_p, repeat_penalty,
-                                repeat_last_n,
-                                penalize_nl, presence_penalty, frequency_penalty, penalty_prompt, ignore_eos,
-                                system_prompt):
+            def start_llamafile(*args):
+                # Unpack arguments
+                (prompt, verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
+                 model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
+                 ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value, port_checked,
+                 port_value, system_prompt) = args
+
+                # Construct command based on checked values
+                command = []
+                if verbose_checked:
+                    command.append('-v')
+                if threads_checked and threads_value is not None:
+                    command.extend(['-t', str(threads_value)])
+                if http_threads_checked and http_threads_value is not None:
+                    command.extend(['--threads', str(http_threads_value)])
+                if model_checked:
+                    command.extend(['-m', model_value])
+                if hf_repo_checked:
+                    command.extend(['-hfr', hf_repo_value])
+                if hf_file_checked:
+                    command.extend(['-hff', hf_file_value])
+                if ctx_size_checked and ctx_size_value is not None:
+                    command.extend(['-c', str(ctx_size_value)])
+                if ngl_checked and ngl_value is not None:
+                    command.extend(['-ngl', str(ngl_value)])
+                if host_checked:
+                    command.extend(['--host', host_value])
+                if port_checked and port_value is not None:
+                    command.extend(['--port', str(port_value)])
+
+                # Example command output to verify
+                return f"Command: {' '.join(command)}"
+
                 # Code to start llamafile with the provided configuration
-                local_llm_gui_function(prompt, temperature, top_k, top_p, min_p, stream, stop, typical_p,
-                                       repeat_penalty,
-                                       repeat_last_n,
-                                       penalize_nl, presence_penalty, frequency_penalty, penalty_prompt, ignore_eos,
-                                       system_prompt)
+                local_llm_gui_function(prompt, verbose_checked, threads_checked, threads_value,
+                                                http_threads_checked, http_threads_value, model_checked,
+                                                model_value, hf_repo_checked, hf_repo_value, hf_file_checked,
+                                                hf_file_value, ctx_size_checked, ctx_size_value, ngl_checked,
+                                                ngl_value, host_checked, host_value, port_checked, port_value,
+                                                system_prompt)
+
+                # Example command output to verify
+                return f"Command: {' '.join(command)}"
+
+
                 # FIXME
                 return "Llamafile started"
 
@@ -1035,11 +1070,19 @@ def launch_ui(demo_mode=False):
             gr.Markdown("RAG here we come....:/")
 
         # Function to update the visibility of the UI elements for Llamafile Settings
-        def toggle_advanced_llamafile_mode(is_advanced):
-            if is_advanced:
-                return [gr.update(visible=True)] * 14
+        # def toggle_advanced_llamafile_mode(is_advanced):
+        #     if is_advanced:
+        #         return [gr.update(visible=True)] * 14
+        #     else:
+        #         return [gr.update(visible=False)] * 11 + [gr.update(visible=True)] * 3
+        # FIXME
+        def toggle_advanced_mode(advanced_mode):
+            # Show all elements if advanced mode is on
+            if advanced_mode:
+                return {elem: gr.update(visible=True) for elem in all_elements}
             else:
-                return [gr.update(visible=False)] * 11 + [gr.update(visible=True)] * 3
+                # Show only specific elements if advanced mode is off
+                return {elem: gr.update(visible=elem in simple_mode_elements) for elem in all_elements}
 
     with gr.Blocks() as search_interface:
         with gr.Tab("Search Ingested Materials / Detailed Entry View / Prompts"):
@@ -1118,51 +1161,101 @@ def launch_ui(demo_mode=False):
                 label="Advanced Mode - Click->Click again to only show 'simple' settings. Is a known bug...",
                 value=False)
 
-            # Start/Stop buttons
+            # Simple mode elements
+            model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
+            model_value = gr.Textbox(label="Path to Local Model File", value="", visible=True)
+            ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
+            ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
+
+            # Advanced mode elements
+            verbose_checked = gr.Checkbox(label="Enable Verbose Output", value=False, visible=False)
+            threads_checked = gr.Checkbox(label="Set CPU Threads", value=False, visible=False)
+            threads_value = gr.Number(label="Number of CPU Threads", value=None, precision=0, visible=False)
+            http_threads_checked = gr.Checkbox(label="Set HTTP Server Threads", value=False, visible=False)
+            http_threads_value = gr.Number(label="Number of HTTP Server Threads", value=None, precision=0,
+                                           visible=False)
+            hf_repo_checked = gr.Checkbox(label="Use Huggingface Repo Model", value=False, visible=False)
+            hf_repo_value = gr.Textbox(label="Huggingface Repo Name", value="", visible=False)
+            hf_file_checked = gr.Checkbox(label="Set Huggingface Model File", value=False, visible=False)
+            hf_file_value = gr.Textbox(label="Huggingface Model File", value="", visible=False)
+            ctx_size_checked = gr.Checkbox(label="Set Prompt Context Size", value=False, visible=False)
+            ctx_size_value = gr.Number(label="Prompt Context Size", value=8124, precision=0, visible=False)
+            host_checked = gr.Checkbox(label="Set IP to Listen On", value=False, visible=False)
+            host_value = gr.Textbox(label="Host IP Address", value="", visible=False)
+            port_checked = gr.Checkbox(label="Set Server Port", value=False, visible=False)
+            port_value = gr.Number(label="Port Number", value=None, precision=0, visible=False)
+
+            # Start and Stop buttons
             start_button = gr.Button("Start Llamafile")
             stop_button = gr.Button("Stop Llamafile")
+            output_display = gr.Markdown()
 
-            # Configuration inputs
-            prompt_input = gr.Textbox(label="Prompt", value="")
-            temperature_input = gr.Number(label="Temperature", value=0.8)
-            top_k_input = gr.Number(label="Top K", value=40)
-            top_p_input = gr.Number(label="Top P", value=0.95)
-            min_p_input = gr.Number(label="Min P", value=0.05)
-            stream_input = gr.Checkbox(label="Stream", value=False)
-            stop_input = gr.Textbox(label="Stop", value="[]")
-            typical_p_input = gr.Number(label="Typical P", value=1.0)
-            repeat_penalty_input = gr.Number(label="Repeat Penalty", value=1.1)
-            repeat_last_n_input = gr.Number(label="Repeat Last N", value=64)
-            penalize_nl_input = gr.Checkbox(label="Penalize New Lines", value=False)
-            presence_penalty_input = gr.Number(label="Presence Penalty", value=0.0)
-            frequency_penalty_input = gr.Number(label="Frequency Penalty", value=0.0)
-            penalty_prompt_input = gr.Textbox(label="Penalty Prompt", value="")
-            ignore_eos_input = gr.Checkbox(label="Ignore EOS", value=False)
-            system_prompt_input = gr.Textbox(label="System Prompt", value="")
+            all_elements = [
+                verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
+                model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
+                ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value, port_checked,
+                port_value
+            ]
 
-            # Output display
-            output_display = gr.Textbox(label="Llamafile Output")
+            simple_mode_elements = [model_checked, model_value, ngl_checked, ngl_value]
 
-            # Function calls local_llm_gui_function() with the provided arguments
-            # local_llm_gui_function() is found in 'Local_LLM_Inference_Engine_Lib.py' file
-            start_button.click(start_llamafile,
-                               inputs=[prompt_input, temperature_input, top_k_input, top_p_input, min_p_input,
-                                       stream_input, stop_input, typical_p_input, repeat_penalty_input,
-                                       repeat_last_n_input, penalize_nl_input, presence_penalty_input,
-                                       frequency_penalty_input, penalty_prompt_input, ignore_eos_input,
-                                       system_prompt_input], outputs=output_display)
+            advanced_mode_toggle.change(
+                fn=toggle_advanced_mode,
+                inputs=[advanced_mode_toggle],
+                outputs=all_elements
+            )
 
-            # This function is not implemented yet...
-            # FIXME - Implement this function
-            stop_button.click(stop_llamafile, outputs=output_display)
-
-        # Toggle event for Advanced/Simple mode
-        advanced_mode_toggle.change(toggle_advanced_llamafile_mode,
-                                    inputs=[advanced_mode_toggle],
-                                    outputs=[top_k_input, top_p_input, min_p_input, stream_input, stop_input,
-                                             typical_p_input, repeat_penalty_input, repeat_last_n_input,
-                                             penalize_nl_input, presence_penalty_input, frequency_penalty_input,
-                                             penalty_prompt_input, ignore_eos_input])
+            # Function call with the new inputs
+            start_button.click(
+                fn=start_llamafile,
+                inputs=[verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
+                        model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
+                        ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value,
+                        port_checked, port_value],
+                outputs=output_display
+            )
+        # FIXME - Possibly dead code?
+        #
+        #     # Setting inputs with checkboxes
+        #     verbose_checked = gr.Checkbox(label="Enable Verbose Output", value=False)
+        #     threads_checked = gr.Checkbox(label="Enable Setting CPU Threads", value=False)
+        #     threads_value = gr.Number(label="Number of CPU Threads", value="", precision=0)
+        #     http_threads_checked = gr.Checkbox(label="Enable Setting HTTP Server Threads", value=False)
+        #     http_threads_value = gr.Number(label="Number of HTTP Server Threads", value="", precision=0)
+        #     model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False)
+        #     model_value = gr.Textbox(label="Path to Local Model File", value="")
+        #     hf_repo_checked = gr.Checkbox(label="Use Huggingface Repo Model", value=False)
+        #     hf_repo_value = gr.Textbox(label="Huggingface Repo Name", value="")
+        #     hf_file_checked = gr.Checkbox(label="Enable Setting Huggingface Model File", value=False)
+        #     hf_file_value = gr.Textbox(label="Huggingface Model File", value="")
+        #     ctx_size_checked = gr.Checkbox(label="Enable Setting Prompt Context Size", value=False)
+        #     ctx_size_value = gr.Number(label="Prompt Context Size", value=8124, precision=0)
+        #     ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False)
+        #     ngl_value = gr.Number(label="Number of GPU Layers", value="", precision=0)
+        #     host_checked = gr.Checkbox(label="Enable Setting IP to Listen On", value=False)
+        #     host_value = gr.Textbox(label="Host IP Address", value="")
+        #     port_checked = gr.Checkbox(label="Enable Setting Server Port", value=False)
+        #     port_value = gr.Number(label="Port Number", value="", precision=0)
+        #
+        #
+        #     # Function call with the new inputs
+        #     start_button.click(
+        #         fn=start_llamafile,
+        #         inputs=[verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
+        #                 model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
+        #                 ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value,
+        #                 port_checked, port_value],
+        #         outputs=output_display
+        #     )
+        #
+        #     # This function is not implemented yet...
+        #     # FIXME - Implement this function
+        #     stop_button.click(stop_llamafile, outputs=output_display)
+        #
+        # # Toggle event for Advanced/Simple mode
+        # advanced_mode_toggle.change(toggle_advanced_llamafile_mode,
+        #                             inputs=[advanced_mode_toggle],
+        #                             outputs=[])
 
         with gr.Tab("Llamafile Chat Interface"):
             gr.Markdown("Page to interact with Llamafile Server (iframe to Llamafile server port)")
