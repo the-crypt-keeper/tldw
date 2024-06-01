@@ -7,6 +7,9 @@ import os
 import sqlite3
 import argparse
 
+DATABASE_PATH = 'prompts.db'
+
+
 def ingest_prompts_from_folder(parent_folder):
     # Function to read the content of a file
     def read_file_content(file_path):
@@ -14,7 +17,7 @@ def ingest_prompts_from_folder(parent_folder):
             return file.read().strip()
 
     # Connect to the prompts database
-    conn = sqlite3.connect('..\\prompts.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
     # Iterate over each folder in the parent folder
