@@ -872,51 +872,46 @@ def launch_ui(demo_mode=False):
 
             def start_llamafile(*args):
                 # Unpack arguments
-                (prompt, verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
+                (am_noob, verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
                  model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
                  ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value, port_checked,
-                 port_value, system_prompt) = args
+                 port_value) = args
 
                 # Construct command based on checked values
                 command = []
-                if verbose_checked:
+                if am_noob:
+                    am_noob = True
+                if verbose_checked is not None and verbose_checked:
                     command.append('-v')
                 if threads_checked and threads_value is not None:
                     command.extend(['-t', str(threads_value)])
                 if http_threads_checked and http_threads_value is not None:
                     command.extend(['--threads', str(http_threads_value)])
-                if model_checked:
+                if model_checked is not None and model_value is not None:
                     command.extend(['-m', model_value])
-                if hf_repo_checked:
+                if hf_repo_checked and hf_repo_value is not None:
                     command.extend(['-hfr', hf_repo_value])
-                if hf_file_checked:
+                if hf_file_checked and hf_file_value is not None:
                     command.extend(['-hff', hf_file_value])
                 if ctx_size_checked and ctx_size_value is not None:
                     command.extend(['-c', str(ctx_size_value)])
                 if ngl_checked and ngl_value is not None:
                     command.extend(['-ngl', str(ngl_value)])
-                if host_checked:
+                if host_checked and host_value is not None:
                     command.extend(['--host', host_value])
                 if port_checked and port_value is not None:
                     command.extend(['--port', str(port_value)])
 
-                # Example command output to verify
-                return f"Command: {' '.join(command)}"
-
                 # Code to start llamafile with the provided configuration
-                local_llm_gui_function(prompt, verbose_checked, threads_checked, threads_value,
+                local_llm_gui_function(am_noob, verbose_checked, threads_checked, threads_value,
                                                 http_threads_checked, http_threads_value, model_checked,
                                                 model_value, hf_repo_checked, hf_repo_value, hf_file_checked,
                                                 hf_file_value, ctx_size_checked, ctx_size_value, ngl_checked,
-                                                ngl_value, host_checked, host_value, port_checked, port_value,
-                                                system_prompt)
+                                                ngl_value, host_checked, host_value, port_checked, port_value,)
 
                 # Example command output to verify
-                return f"Command: {' '.join(command)}"
+                return f"Command built and ran: {' '.join(command)} \n\nLlamafile started successfully."
 
-
-                # FIXME
-                return "Llamafile started"
 
             def stop_llamafile():
                 # Code to stop llamafile
@@ -1157,8 +1152,9 @@ def launch_ui(demo_mode=False):
             gr.Markdown("Settings for Llamafile")
 
             # Toggle switch for Advanced/Simple mode
+            am_noob = gr.Checkbox(label="Check this to enable sane defaults and then download(if not already downloaded) a model, click 'Start Llamafile' and then go to --> 'Llamafile Chat Interface')\n\n", value=False, visible=True)
             advanced_mode_toggle = gr.Checkbox(
-                label="Advanced Mode - Click->Click again to only show 'simple' settings. Is a known bug...",
+                label="Advanced Mode - Enable to show all settings\n\n",
                 value=False)
 
             # Simple mode elements
@@ -1208,7 +1204,7 @@ def launch_ui(demo_mode=False):
             # Function call with the new inputs
             start_button.click(
                 fn=start_llamafile,
-                inputs=[verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
+                inputs=[am_noob, verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
                         model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
                         ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value,
                         port_checked, port_value],
