@@ -1399,12 +1399,18 @@ def launch_ui(demo_mode=False):
 
         return str(output_file_path)
 
+    #FIXME - example to use for rest of gradio theming, just stuff in HTML/Markdown
+    # <-- set description variable with HTML -->
+    desc = "<h3>Youtube Video Downloader</h3><p>This Input takes a Youtube URL as input and creates " \
+           "a webm file for you to download. </br><em>If you want a full-featured one:</em> " \
+           "<strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>"
+
     download_videos_interface = gr.Interface(
         fn=gradio_download_youtube_video,
         inputs=gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here"),
         outputs=gr.File(label="Download Video"),
-        title="YouTube Video Downloader (Simple youtube video downloader tool, if you want a real one, check this project: https://github.com/StefanLobbenmeier/youtube-dl-gui or https://github.com/yt-dlg/yt-dlg )",
-        description="Enter a YouTube URL to download the video.",
+        title="YouTube Video Downloader",
+        description=desc,
         allow_flagging="never"
     )
 
