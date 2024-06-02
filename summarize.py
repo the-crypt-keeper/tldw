@@ -1714,10 +1714,11 @@ def main(input_path, api_name=None, api_key=None,
 
     print(f"Keywords: {keywords}")
 
-    if input_path is None and args.user_interface:
+    if input_path is None:
         return []
     start_time = time.monotonic()
     paths = []  # Initialize paths as an empty list
+
     if os.path.isfile(input_path) and input_path.endswith('.txt'):
         logging.debug("MAIN: User passed in a text file, processing text file...")
         paths = read_paths_from_file(input_path)
@@ -1734,32 +1735,148 @@ def main(input_path, api_name=None, api_key=None,
         return
     else:
         paths = [input_path]
+
     results = []
+
+    def normalize_title(title):
+        return "".join([c if c.isalnum() or c in (' ', '-', '_') else '_' for c in title])
+
+    def add_media(path, info_dict, segments, summary):
+        # Extract text content from segments
+        if isinstance(segments, list):
+            content = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
+        else:
+            logging.error("Segments is not a list, cannot extract content.")
+            content = "No content available"
+
+        # Add media to the database
+        logging.info("MAIN: Adding media to the database")
+        logging.info(f"URL: {path}")
+        logging.info(f"Title: {info_dict.get('title', 'Untitled')}")
+        logging.info(f"Media Type: video")
+        logging.info(f"Keywords: {','.join(keywords)}")
+        logging.info(f"Content: {content}")
+        logging.info(f"Prompt: {custom_prompt or 'No prompt provided'}")
+        logging.info(f"Summary: {summary or 'No summary provided'}")
+        logging.info(f"Author: {info_dict.get('uploader', 'Unknown')}")
+        logging.info(f"Ingestion Date: {datetime.now().strftime('%Y-%m-%d')}")
+        logging.info(f"Transcription Model: {whisper_model}")
+
+        try:
+            add_media_with_keywords(
+                url=path,
+                title=info_dict.get('title', 'Untitled'),
+                media_type='video',
+                content=content,
+                keywords=','.join(keywords),
+                prompt=custom_prompt or 'No prompt provided',
+                summary=summary or 'No summary provided',
+                transcription_model=whisper_model,
+                author=info_dict.get('uploader', 'Unknown'),
+                ingestion_date=datetime.now().strftime('%Y-%m-%d')
+            )
+            logging.info("MAIN: Media added to the database")
+        except Exception as e:
+            logging.error(f"Error adding media to database: {str(e)}")
+
+    def perform_summarization(api_name, json_file_path, custom_prompt):
+        summary = None
+        try:
+            if api_name.lower() == 'openai':
+                summary = summarize_with_openai(api_key, json_file_path, custom_prompt)
+            elif api_name.lower() == "cohere":
+                cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
+                if not cohere_api_key:
+                    logging.error("MAIN: Cohere API key not found.")
+                    return None
+                logging.debug(f"MAIN: Trying to summarize with cohere")
+                summary = summarize_with_cohere(cohere_api_key, json_file_path, cohere_model, custom_prompt)
+            elif api_name.lower() == "groq":
+                groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
+                if not groq_api_key:
+                    logging.error("MAIN: Groq API key not found.")
+                    return None
+                logging.debug(f"MAIN: Trying to summarize with groq")
+                summary = summarize_with_groq(groq_api_key, json_file_path, custom_prompt)
+            elif api_name.lower() == "openrouter":
+                openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
+                if not openrouter_api_key:
+                    logging.error("MAIN: OpenRouter API key not found.")
+                    return None
+                logging.debug(f"MAIN: Trying to summarize with OpenRouter")
+                summary = summarize_with_openrouter(openrouter_api_key, json_file_path, custom_prompt)
+            elif api_name.lower() == "detail_openai":
+                logging.debug(f"MAIN: Trying to summarize with Detailed OpenaAI")
+                summary = summarize_with_detail_openai(json_file_path, custom_prompt)
+            elif api_name.lower() == "llama":
+                logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
+                llama_token = api_key if api_key else config.get('Local-API', 'llama_token', fallback=None)
+                summary = summarize_with_llama(json_file_path, custom_prompt)
+            elif api_name.lower() == "kobold":
+                kobold_api_key = api_key if api_key else config.get('Local-API', 'kobold_api_key', fallback=None)
+                if not kobold_api_key:
+                    logging.error("MAIN: Kobold API key not found.")
+                    return None
+                logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
+                summary = summarize_with_kobold(kobold_api_key, json_file_path, custom_prompt)
+            elif api_name.lower() == "ooba":
+                ooba_token = api_key if api_key else config.get('Local-API', 'ooba_api_key', fallback=None)
+                ooba_ip = config.get('API', 'ooba_ip', fallback=None)
+                summary = summarize_with_oobabooga(ooba_ip, json_file_path, ooba_token, custom_prompt)
+            elif api_name.lower() == "tabbyapi":
+                tabbyapi_key = api_key if api_key else config.get('Local-API', 'tabbyapi_token', fallback=None)
+                tabby_model = config.get('Local-API', 'tabby_model', fallback=None)
+                summary = summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, json_file_path, tabby_model,
+                                                  custom_prompt)
+            elif api_name.lower() == "vllm":
+                logging.debug(f"MAIN: Trying to summarize with VLLM")
+                vllm_api_key = api_key if api_key else config.get('Local-API', 'vllm_api_key', fallback=None)
+                summary = summarize_with_vllm(vllm_api_url, vllm_api_key, llm_model, json_file_path,
+                                              custom_prompt)
+            elif api_name.lower() == "local-llm":
+                logging.debug(f"MAIN: Trying to summarize with Local LLM")
+                local_llm_url = "http://127.0.0.1:8080"
+                summary = summarize_with_local_llm(json_file_path, custom_prompt)
+            elif api_name.lower() == "huggingface":
+                logging.debug(f"MAIN: Trying to summarize with huggingface")
+                huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key',
+                                                                         fallback=None)
+                summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
+            # Add additional API handlers here...
+            else:
+                logging.warning(f"Unsupported API: {api_name}")
+        except requests.exceptions.ConnectionError:
+            logging.error("Connection error while summarizing")
+        except Exception as e:
+            logging.error(f"Error summarizing with {api_name}: {str(e)}")
+
+        if summary:
+            logging.info(f"Summary generated using {api_name} API")
+            save_summary_to_file(summary, json_file_path)
+        else:
+            logging.warning(f"Failed to generate summary using {api_name} API")
+        return summary
 
     for path in paths:
         try:
             if path.startswith('http'):
                 logging.debug("MAIN: URL Detected")
                 info_dict = get_youtube(path)
-                json_file_path = None
-                if info_dict:
-                    logging.debug(f"MAIN: info_dict content: {info_dict}")
-                    logging.debug("MAIN: Creating path for video file...")
-                    download_path = create_download_directory(info_dict['title'])
-                    logging.debug("MAIN: Path created successfully\n MAIN: Now Downloading video from yt_dlp...")
-                    try:
-                        video_path = download_video(path, download_path, info_dict, download_video_flag)
-                        if video_path is None:
-                            logging.error("MAIN: video_path is None after download_video")
-                            continue
-                    except RuntimeError as e:
-                        logging.error(f"Error downloading video: {str(e)}")
-                        # FIXME - figure something out for handling this situation....
-                        continue
-                    logging.debug("MAIN: Video downloaded successfully")
-                    logging.debug("MAIN: Converting video file to WAV...")
-                    audio_file = convert_to_wav(video_path, offset, overwrite)
-                    logging.debug("MAIN: Audio file converted successfully")
+                if not info_dict:
+                    logging.error("MAIN: Failed to get YouTube info")
+                    continue
+
+                title = normalize_title(info_dict['title'])
+                download_path = create_download_directory(title)
+                video_path = download_video(path, download_path, info_dict, download_video_flag)
+                if not video_path or not os.path.exists(video_path):
+                    logging.error("MAIN: Failed to download video")
+                    continue
+
+                audio_file = convert_to_wav(video_path, offset, overwrite)
+                if not audio_file or not os.path.exists(audio_file):
+                    logging.error("MAIN: Failed to convert video to WAV")
+                    continue
             else:
                 if os.path.exists(path):
                     logging.debug("MAIN: Local file path detected")
@@ -1768,202 +1885,65 @@ def main(input_path, api_name=None, api_key=None,
                     logging.error(f"File does not exist: {path}")
                     continue
 
-            # Validate the returned file is good, and if so, start the Transcription process
-            if info_dict and audio_file:
-                logging.debug("MAIN: info_dict and audio_file are valid, proceeding to transcription")
-                logging.debug("MAIN: Creating transcription file from WAV")
-                segments = speech_to_text(audio_file, whisper_model=whisper_model, vad_filter=vad_filter)
+            # Start the transcription process
+            segments = speech_to_text(audio_file, whisper_model=whisper_model, vad_filter=vad_filter)
+            if not segments:
+                logging.error("MAIN: Segments not returned from speech_to_text")
+                continue
 
-                if segments:
-                    logging.debug(f"MAIN: Transcription segments received: {segments}")
-                    transcription_result = {
-                        'video_path': path,
-                        'audio_file': audio_file,
-                        'transcription': segments
-                    }
+            logging.debug(f"MAIN: Transcription segments received: {segments}")
+            transcription_result = {
+                'video_path': path,
+                'audio_file': audio_file,
+                'transcription': segments
+            }
 
-                    if isinstance(segments, dict) and "error" in segments:
-                        logging.error(f"Error transcribing audio: {segments['error']}")
-                        transcription_result['error'] = segments['error']
+            results.append(transcription_result)
+            logging.info(f"MAIN: Transcription complete: {audio_file}")
 
-                    results.append(transcription_result)
-                    logging.info(f"MAIN: Transcription complete: {audio_file}")
+            if isinstance(segments, dict) and "error" in segments:
+                logging.error(f"Error transcribing audio: {segments['error']}")
+                transcription_result['error'] = segments['error']
+                continue
 
-                    # Check if segments is a dictionary before proceeding with summarization
-                    if isinstance(segments, dict):
-                        logging.warning("Skipping summarization due to transcription error")
-                        continue
+            # Set the json_file_path correctly
+            audio_file_sanitized = os.path.basename(audio_file).replace('.wav', '')
+            # Before writing the file
+            if segments:
+                json_file_path = os.path.join('Results', f"{audio_file_sanitized}.segments.json")
+                logging.debug(f"Saving segments to {json_file_path}")
+                with open(json_file_path, 'w') as file:
+                    json.dump({'segments': segments}, file)
+                logging.debug(f"Segments saved successfully to {json_file_path}")
+            else:
+                logging.error("No segments to save, skipping file write.")
 
-                    # Perform rolling summarization based on API Name, detail level, and if an API key exists
-                    if rolling_summarization:
-                        logging.info("MAIN: Rolling Summarization")
-
-                        # Extract the text from the segments
-                        text = extract_text_from_segments(segments)
-
-                        # Set the json_file_path
-                        json_file_path = audio_file.replace('.wav', '.segments.json')
-
-                        # Perform rolling summarization
-                        summary = summarize_with_detail_openai(text, detail=detail_level, verbose=False)
-
-                        # Handle the summarized output
-                        if summary:
-                            transcription_result['summary'] = summary
-                            logging.info("MAIN: Rolling Summarization successful.")
-                            save_summary_to_file(summary, json_file_path)
-                        else:
-                            logging.warning("MAIN: Rolling Summarization failed.")
-                    # Perform summarization based on the specified API
-                    elif api_name:
-                        logging.debug(f"MAIN: Summarization being performed by {api_name}")
-                        json_file_path = audio_file.replace('.wav', '.segments.json')
-                        if api_name.lower() == 'openai':
-                            try:
-                                logging.debug(f"MAIN: trying to summarize with openAI")
-                                summary = summarize_with_openai(openai_api_key, json_file_path, custom_prompt)
-                                if summary != "openai: Error occurred while processing summary":
-                                    transcription_result['summary'] = summary
-                                    logging.info(f"Summary generated using {api_name} API")
-                                    save_summary_to_file(summary, json_file_path)
-                                    # Add media to the database
-                                    add_media_with_keywords(
-                                        url=path,
-                                        title=info_dict.get('title', 'Untitled'),
-                                        media_type='video',
-                                        content=' '.join([segment['text'] for segment in segments]),
-                                        keywords=','.join(keywords),
-                                        prompt=custom_prompt or 'No prompt provided',
-                                        summary=summary or 'No summary provided',
-                                        transcription_model=whisper_model,
-                                        author=info_dict.get('uploader', 'Unknown'),
-                                        ingestion_date=datetime.now().strftime('%Y-%m-%d')
-                                    )
-                                else:
-                                    logging.warning(f"Failed to generate summary using {api_name} API")
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-                        elif api_name.lower() == "anthropic":
-                            anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key',
-                                                                                   fallback=None)
-                            try:
-                                logging.debug(f"MAIN: Trying to summarize with anthropic")
-                                summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model,
-                                                                custom_prompt)
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-                        elif api_name.lower() == "cohere":
-                            cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
-                            try:
-                                logging.debug(f"MAIN: Trying to summarize with cohere")
-                                summary = summarize_with_cohere(cohere_api_key, json_file_path, cohere_model, custom_prompt)
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-                        elif api_name.lower() == "groq":
-                            groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
-                            try:
-                                logging.debug(f"MAIN: Trying to summarize with Groq")
-                                summary = summarize_with_groq(groq_api_key, json_file_path, groq_model, custom_prompt)
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-                        elif api_name.lower() == "openrouter":
-                            openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key',
-                                                                                    fallback=None)
-                            try:
-                                logging.debug(f"MAIN: Trying to summarize with OpenRouter")
-                                summary = summarize_with_openrouter(openrouter_api_key, json_file_path, custom_prompt)
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-                        elif api_name.lower() == "llama":
-                            llama_token = api_key if api_key else config.get('API', 'llama_api_key', fallback=None)
-                            llama_ip = llama_api_IP
-                            try:
-                                logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
-                                summary = summarize_with_llama(llama_ip, json_file_path, llama_token, custom_prompt)
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-                        elif api_name.lower() == "kobold":
-                            kobold_token = api_key if api_key else config.get('API', 'kobold_api_key', fallback=None)
-                            kobold_ip = kobold_api_IP
-                            try:
-                                logging.debug(f"MAIN: Trying to summarize with kobold.cpp")
-                                summary = summarize_with_kobold(kobold_ip, json_file_path, kobold_token, custom_prompt)
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-                        elif api_name.lower() == "ooba":
-                            ooba_token = api_key if api_key else config.get('API', 'ooba_api_key', fallback=None)
-                            ooba_ip = ooba_api_IP
-                            try:
-                                logging.debug(f"MAIN: Trying to summarize with oobabooga")
-                                summary = summarize_with_oobabooga(ooba_ip, json_file_path, ooba_token, custom_prompt)
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-                        elif api_name.lower() == "tabbyapi":
-                            tabbyapi_key = api_key if api_key else config.get('API', 'tabby_api_key', fallback=None)
-                            tabbyapi_ip = tabby_api_IP
-                            try:
-                                logging.debug(f"MAIN: Trying to summarize with tabbyapi")
-                                tabby_model = llm_model
-                                summary = summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, json_file_path, tabby_model,
-                                                                  custom_prompt)
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-                        elif api_name.lower() == "vllm":
-                            logging.debug(f"MAIN: Trying to summarize with VLLM")
-                            summary = summarize_with_vllm(vllm_api_url, vllm_api_key, llm_model, json_file_path,
-                                                          custom_prompt)
-                        elif api_name.lower() == "local-llm":
-                            logging.debug(f"MAIN: Trying to summarize with the local LLM, Mistral Instruct v0.2")
-                            local_llm_url = "http://127.0.0.1:8080"
-                            summary = summarize_with_local_llm(json_file_path, custom_prompt)
-                        elif api_name.lower() == "huggingface":
-                            huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key',
-                                                                                     fallback=None)
-                            try:
-                                logging.debug(f"MAIN: Trying to summarize with huggingface")
-                                summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
-                            except requests.exceptions.ConnectionError:
-                                requests.status_code = "Connection: "
-
-                        else:
-                            logging.warning(f"Unsupported API: {api_name}")
-                            summary = None
-
-                        if summary:
-                            transcription_result['summary'] = summary
-                            logging.info(f"Summary generated using {api_name} API")
-                            save_summary_to_file(summary, json_file_path)
-                        else:
-                            logging.warning(f"Failed to generate summary using {api_name} API")
-                    else:
-                        logging.info("MAIN: #2 - No API specified. Summarization will not be performed")
-
-                    # Add media to the database
-                    add_media_with_keywords(
-                        url=path,
-                        title=info_dict.get('title', 'Untitled'),
-                        media_type='video',
-                        content=' '.join([segment['text'] for segment in segments]),
-                        keywords=','.join(keywords),
-                        prompt=custom_prompt or 'No prompt provided',
-                        summary=summary or 'No summary provided',
-                        transcription_model=whisper_model,
-                        author=info_dict.get('uploader', 'Unknown'),
-                        ingestion_date=datetime.now().strftime('%Y-%m-%d')
-                    )
+            # Perform summarization
+            summary = None
+            if rolling_summarization:
+                logging.info("MAIN: Rolling Summarization")
+                text = extract_text_from_segments(segments)
+                summary = summarize_with_detail_openai(text, detail=detail_level, verbose=False)
+                if summary:
+                    save_summary_to_file(summary, json_file_path)
                 else:
-                    logging.error("MAIN: Segments not returned from speech_to_text")
-                    continue
+                    logging.warning("MAIN: Rolling Summarization failed.")
+            elif api_name:
+                # Before summarization
+                if os.path.exists(json_file_path):
+                    logging.debug(f"File exists, proceeding with summarization for {json_file_path} using {api_name}")
+                    summary = perform_summarization(api_name, json_file_path, custom_prompt)
+                else:
+                    logging.error(f"Cannot perform summarization, file not found: {json_file_path}")
 
+
+            # Add media to the DB
+            add_media(path, info_dict, segments, summary)
+            time.sleep(2)
         except Exception as e:
             logging.error(f"Error processing {path}: {str(e)}")
-            logging.error(str(e))
             continue
-
     return results
-
-
-
 
 
 def signal_handler(sig, frame):
