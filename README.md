@@ -2,6 +2,7 @@
 ## Download, Transcribe & Summarize Videos. All automated (+ More)
 #### More: Website Article scraping+summarization, Full-Text-Search across everything ingested, Local LLM inference as part of the script for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
+#### Demo may be broken but should be working. If it's not, let me know. (HF dev spaces is touchy...)
 
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
