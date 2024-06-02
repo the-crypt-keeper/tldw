@@ -229,7 +229,7 @@ processing_choice = config.get('Processing', 'processing_choice', fallback='cpu'
 # Dirty hack - sue me. - FIXME - fix this...
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-whisper_models = ["small", "medium", "small.en", "medium.en"]
+whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3", "distil-large-v2", "distil-medium.en", "distil-small.en", "distil-large-v3"]
 source_languages = {
     "en": "English",
     "zh": "Chinese",
