@@ -1552,7 +1552,6 @@ def process_url(
                 text = ' '.join([segment['Text'] for segment in transcription_result['transcription']])
             else:
                 text = ''
-
         except Exception as e:
             logging.error(f"Error processing video file: {e}")
 
@@ -1782,6 +1781,19 @@ def main(input_path, api_name=None, api_key=None,
     def perform_summarization(api_name, json_file_path, custom_prompt):
         summary = None
         try:
+            logging.debug(f"Loading JSON data from {json_file_path}")
+            with open(json_file_path, 'r') as file:
+                data = json.load(file)
+            if isinstance(data, dict) and 'segments' in data:
+                segments = data['segments']
+            else:
+                logging.error("JSON structure is not as expected, 'segments' key missing.")
+                return
+
+            if not isinstance(segments, list):
+                logging.error(f"Segments is not a list: {type(segments)}")
+                return
+
             if api_name.lower() == 'openai':
                 summary = summarize_with_openai(api_key, json_file_path, custom_prompt)
             elif api_name.lower() == "cohere":
