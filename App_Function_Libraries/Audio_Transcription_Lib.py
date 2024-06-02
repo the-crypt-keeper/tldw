@@ -110,7 +110,7 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 
 
 # Transcribe .wav into .segments.json
-def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='small.en', vad_filter=False):
+def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False):
     logging.info('speech-to-text: Loading faster_whisper model: %s', whisper_model)
     from faster_whisper import WhisperModel
     # Retrieve processing choice from the configuration file
@@ -151,10 +151,12 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='sm
         logging.info("speech-to-text: Transcription completed with faster_whisper")
 
         # Save prettified JSON
+        logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
         with open(prettified_out_file, 'w') as f:
             json.dump(segments, f, indent=2)
 
         # Save non-prettified JSON
+        logging.info("speech-to-text: Saving JSON to %s", out_file)
         with open(out_file, 'w') as f:
             json.dump(segments, f)
 

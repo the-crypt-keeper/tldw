@@ -140,8 +140,6 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
     global video_file_path, ffmpeg_path
     global audio_file_path
 
-    # Dirty hack until I figure out whats going on.... FIXME
-    download_video_flag = True
     # Normalize Video Title name
     logging.debug("About to normalize downloaded video title")
     if 'title' not in info_dict or 'ext' not in info_dict:
@@ -166,8 +164,6 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
 
     if download_video_flag:
         video_file_path = os.path.join(download_path, f"{normalized_video_title}.mp4")
-
-        # Set options for video and audio
         ydl_opts_video = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]',
             'outtmpl': video_file_path,
@@ -187,9 +183,34 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
         except Exception as e:
             logging.error(f"yt_dlp: Error downloading video: {e}")
             return None
+    elif not download_video_flag:
+        video_file_path = os.path.join(download_path, f"{normalized_video_title}.mp4")
+        # Set options for video and audio
+        ydl_opts = {
+            'format': 'bestaudio[ext=m4a]',
+            'quiet': True,
+            'outtmpl': video_file_path
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                logging.debug("yt_dlp: About to download video with youtube-dl")
+                ydl.download([video_url])
+                logging.debug("yt_dlp: Video successfully downloaded with youtube-dl")
+                if os.path.exists(video_file_path):
+                    return video_file_path
+                else:
+                    logging.error("yt_dlp: Video file not found after download")
+                    return None
+        except Exception as e:
+            logging.error(f"yt_dlp: Error downloading video: {e}")
+            return None
+
     else:
-        logging.debug("Download video flag is set to False")
+        logging.debug("download_video: Download video flag is set to False and video file path is not found")
         return None
+
+
 
 
 def save_to_file(video_urls, filename):
