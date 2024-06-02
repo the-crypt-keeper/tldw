@@ -97,8 +97,21 @@ def extract_text_from_segments(segments):
     for segment in segments:
         logging.debug(f"Current segment: {segment}")
         logging.debug(f"Type of segment: {type(segment)}")
-        text += segment['Text'] + " "
+        if 'Text' in segment:
+            text += segment['Text'] + " "
+        else:
+            logging.warning(f"Skipping segment due to missing 'Text' key: {segment}")
     return text.strip()
+# def extract_text_from_segments(segments):
+#     logging.debug(f"Segments received: {segments}")
+#     logging.debug(f"Type of segments: {type(segments)}")
+#
+#     text = ""
+#     for segment in segments:
+#         logging.debug(f"Current segment: {segment}")
+#         logging.debug(f"Type of segment: {type(segment)}")
+#         text += segment['Text'] + " "
+#     return text.strip()
 
 
 def summarize_with_openai(api_key, json_file_path, custom_prompt_arg):
