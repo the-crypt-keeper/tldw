@@ -158,7 +158,7 @@ def summarize_with_openai(api_key, json_file_path, custom_prompt_arg):
                     "content": openai_prompt
                 }
             ],
-            "max_tokens": 8192,  # Adjust tokens as needed
+            "max_tokens": 4096,  # Adjust tokens as needed
             "temperature": 0.1
         }
         logging.debug("openai: Posting request")
