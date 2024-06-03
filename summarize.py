@@ -74,6 +74,7 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 # Global variables setup
 
 custom_prompt = None
+results_dir = "Results"
 
 #
 #
@@ -1488,6 +1489,7 @@ def process_url(
     logging.info(f"Processing URL: {url}")
     video_file_path = None
     global info_dict
+
     try:
         # Instantiate the database, db as a instance of the Database class
         db = Database()
@@ -1520,7 +1522,7 @@ def process_url(
         # Sanitize filenames
         audio_file_sanitized = sanitize_filename(transcription_result['audio_file'])
         json_pretty_file_path = os.path.join('Results', audio_file_sanitized.replace('.wav', '.segments_pretty.json'))
-        json_file_path = os.path.join('Results', audio_file_sanitized.replace('.wav', '.segments.json'))
+        json_file_path = os.path.join(results_dir, audio_file_sanitized.replace('.wav', '.segments.json'))
         summary_file_path = os.path.join('Results', audio_file_sanitized.replace('.wav', '_summary.txt'))
 
         logging.debug(f"Transcription result: {transcription_result}")
@@ -1922,7 +1924,7 @@ def main(input_path, api_name=None, api_key=None,
             audio_file_sanitized = os.path.basename(audio_file).replace('.wav', '')
             # Before writing the file
             if segments:
-                json_file_path = os.path.join('Results', f"{audio_file_sanitized}.segments.json")
+                json_file_path = os.path.join(results_dir, f"{audio_file_sanitized}.segments.json")
                 logging.debug(f"Saving segments to {json_file_path}")
                 with open(json_file_path, 'w') as file:
                     json.dump({'segments': segments}, file)
@@ -2110,11 +2112,11 @@ Sample commands:
             time.sleep(2)
             webbrowser.open_new_tab('http://127.0.0.1:7860')
         launch_ui(demo_mode=False)
+    elif not args.input_path:
+        parser.print_help()
+        sys.exit(1)
+    
     else:
-        if not args.input_path:
-            parser.print_help()
-            sys.exit(1)
-
         logging.info('Starting the transcription and summarization process.')
         logging.info(f'Input path: {args.input_path}')
         logging.info(f'API Name: {args.api_name}')
@@ -2191,6 +2193,7 @@ Sample commands:
                            set_chunk_txt_by_tokens=set_chunk_txt_by_tokens,
                            set_max_txt_chunk_tokens=set_max_txt_chunk_tokens,
                            )
+
 
             logging.info('Transcription process completed.')
             atexit.register(cleanup_process)
