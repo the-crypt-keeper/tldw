@@ -23,6 +23,7 @@ import os
 import logging
 # Import Local
 import summarize
+from App_Function_Libraries.Video_DL_Ingestion_Lib import *
 from App_Function_Libraries.Video_DL_Ingestion_Lib import get_youtube
 from Article_Summarization_Lib import *
 from Article_Extractor_Lib import *
@@ -48,8 +49,8 @@ def read_paths_from_file(file_path):
     """ Reads a file containing URLs or local file paths and returns them as a list. """
     paths = []  # Initialize paths as an empty list
     with open(file_path, 'r') as file:
-        paths = [line.strip() for line in file]
-    return paths
+        paths = file.readlines()
+    return [path.strip() for path in paths]
 
 
 def process_path(path):
@@ -68,23 +69,29 @@ def process_path(path):
 
 
 # FIXME
+
 def process_local_file(file_path):
     logging.info(f"Processing local file: {file_path}")
-    title = normalize_title(os.path.splitext(os.path.basename(file_path))[0])
-    info_dict = {'title': title}
-    logging.debug(f"Creating {title} directory...")
-    download_path = create_download_directory(title)
-    logging.debug(f"Converting '{title}' to an audio file (wav).")
-    audio_file = convert_to_wav(file_path)  # Assumes input files are videos needing audio extraction
-    logging.debug(f"'{title}' successfully converted to an audio file (wav).")
-    return download_path, info_dict, audio_file
+    file_extension = os.path.splitext(file_path)[1].lower()
+
+    if file_extension == '.txt':
+        # Handle text file containing URLs
+        with open(file_path, 'r') as file:
+            urls = file.read().splitlines()
+        return None, None, urls
+    else:
+        # Handle video file
+        title = normalize_title(os.path.splitext(os.path.basename(file_path))[0])
+        info_dict = {'title': title}
+        logging.debug(f"Creating {title} directory...")
+        download_path = create_download_directory(title)
+        logging.debug(f"Converting '{title}' to an audio file (wav).")
+        audio_file = convert_to_wav(file_path)
+        logging.debug(f"'{title}' successfully converted to an audio file (wav).")
+        return download_path, info_dict, audio_file
 
 
-def read_paths_from_file(file_path: str) -> List[str]:
-    """Read paths from a text file."""
-    with open(file_path, 'r') as file:
-        paths = file.readlines()
-    return [path.strip() for path in paths]
+
 
 
 #

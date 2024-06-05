@@ -32,6 +32,7 @@ from App_Function_Libraries.Web_UI_Lib import *
 from App_Function_Libraries.Article_Extractor_Lib import *
 from App_Function_Libraries.Article_Summarization_Lib import *
 from App_Function_Libraries.Audio_Transcription_Lib import *
+from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav
 from App_Function_Libraries.Chunk_Lib import *
 from App_Function_Libraries.Diarization_Lib import *
 from App_Function_Libraries.Local_File_Processing_Lib import *
@@ -41,6 +42,7 @@ from App_Function_Libraries.Summarization_General_Lib import *
 from App_Function_Libraries.System_Checks_Lib import *
 from App_Function_Libraries.Tokenization_Methods_Lib import *
 from App_Function_Libraries.Video_DL_Ingestion_Lib import *
+from App_Function_Libraries.Video_DL_Ingestion_Lib import normalize_title
 # from App_Function_Libraries.Web_UI_Lib import *
 
 
@@ -1788,8 +1790,7 @@ def main(input_path, api_name=None, api_key=None,
 
     detail_level = detail
 
-    print(f"Keywords: {keywords}")
-
+    print(f"Keyword: {keywords}")
     if not input_path:
         return []
 
@@ -1804,26 +1805,63 @@ def main(input_path, api_name=None, api_key=None,
                 download_path = create_download_directory(title)
                 video_path = download_video(path, download_path, info_dict, download_video_flag)
             else:
-                download_path, info_dict, video_path = process_local_file(path)
+                download_path, info_dict, urls_or_media_file = process_local_file(path)
+                if isinstance(urls_or_media_file, list):
+                    # Text file containing URLs
+                    for url in urls_or_media_file:
+                        info_dict, title = extract_video_info(url)
+                        download_path = create_download_directory(title)
+                        video_path = download_video(url, download_path, info_dict, download_video_flag)
 
-            audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
-            transcription_result = {'video_path': path, 'audio_file': audio_file, 'transcription': segments}
+                        audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+                        transcription_result = {'video_path': url, 'audio_file': audio_file, 'transcription': segments}
 
-            if rolling_summarization:
-                text = extract_text_from_segments(segments)
-                summary = summarize_with_detail_openai(text, detail=detail)
-            elif api_name:
-                summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
-            else:
-                summary = None
+                        if rolling_summarization:
+                            text = extract_text_from_segments(segments)
+                            summary = summarize_with_detail_openai(text, detail=detail)
+                        elif api_name:
+                            summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
+                        else:
+                            summary = None
 
-            if summary:
-                # Save the summary file in the download_path directory
-                summary_file_path = os.path.join(download_path, f"{transcription_result}_summary.txt")
-                with open(summary_file_path, 'w') as file:
-                    file.write(summary)
+                        if summary:
+                            # Save the summary file in the download_path directory
+                            summary_file_path = os.path.join(download_path, f"{transcription_result}_summary.txt")
+                            with open(summary_file_path, 'w') as file:
+                                file.write(summary)
 
-            add_media_to_database(path, info_dict, segments, summary, keywords, custom_prompt, whisper_model)
+                        add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt, whisper_model)
+                else:
+                    # Video or audio file
+                    media_path = urls_or_media_file
+
+                    if media_path.lower().endswith(('.mp4', '.avi', '.mov')):
+                        # Video file
+                        audio_file, segments = perform_transcription(media_path, offset, whisper_model, vad_filter)
+                    elif media_path.lower().endswith(('.wav', '.mp3', '.m4a')):
+                        # Audio file
+                        segments = speech_to_text(media_path, whisper_model=whisper_model, vad_filter=vad_filter)
+                    else:
+                        logging.error(f"Unsupported media file format: {media_path}")
+                        continue
+
+                    transcription_result = {'media_path': path, 'audio_file': media_path, 'transcription': segments}
+
+                    if rolling_summarization:
+                        text = extract_text_from_segments(segments)
+                        summary = summarize_with_detail_openai(text, detail=detail)
+                    elif api_name:
+                        summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
+                    else:
+                        summary = None
+
+                    if summary:
+                        # Save the summary file in the download_path directory
+                        summary_file_path = os.path.join(download_path, f"{transcription_result}_summary.txt")
+                        with open(summary_file_path, 'w') as file:
+                            file.write(summary)
+
+                    add_media_to_database(path, info_dict, segments, summary, keywords, custom_prompt, whisper_model)
 
         except Exception as e:
             logging.error(f"Error processing {path}: {str(e)}")
@@ -1850,6 +1888,8 @@ if __name__ == "__main__":
     # Logging setup
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     print_hello()
+
+    transcription_result = None
 
     parser = argparse.ArgumentParser(
         description='Transcribe and summarize videos.',
@@ -2034,8 +2074,7 @@ Sample commands:
         logging.debug("Platform check being performed...")
         platform_check()
         logging.debug("CUDA check being performed...")
-        # FIXME
-        #cuda_check()
+        cuda_check()
         processing_choice = "cpu"
         logging.debug("ffmpeg check being performed...")
         check_ffmpeg()
