@@ -1664,6 +1664,7 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 def perform_summarization(api_name, json_file_path, custom_prompt, api_key, config):
     summary = None
     try:
+        json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
         logging.debug(f"Loading JSON data from {json_file_path}")
         with open(json_file_path, 'r') as file:
             data = json.load(file)
@@ -1739,7 +1740,7 @@ def perform_summarization(api_name, json_file_path, custom_prompt, api_key, conf
         else:
             logging.warning(f"Unsupported API: {api_name}")
     except requests.exceptions.ConnectionError:
-        logging.error("Connection error while summarizing")
+            logging.error("Connection error while summarizing")
     except Exception as e:
         logging.error(f"Error summarizing with {api_name}: {str(e)}")
 
@@ -1751,8 +1752,6 @@ def perform_summarization(api_name, json_file_path, custom_prompt, api_key, conf
             file.write(summary)
     else:
         logging.warning(f"Failed to generate summary using {api_name} API")
-
-    return summary
 
 
 #

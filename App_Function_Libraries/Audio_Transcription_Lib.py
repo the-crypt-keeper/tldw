@@ -150,15 +150,18 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
             segments.append(chunk)
         logging.info("speech-to-text: Transcription completed with faster_whisper")
 
+        # Create a dictionary with the 'segments' key
+        output_data = {'segments': segments}
+
         # Save prettified JSON
         logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
         with open(prettified_out_file, 'w') as f:
-            json.dump(segments, f, indent=2)
+            json.dump(output_data, f, indent=2)
 
         # Save non-prettified JSON
         logging.info("speech-to-text: Saving JSON to %s", out_file)
         with open(out_file, 'w') as f:
-            json.dump(segments, f)
+            json.dump(output_data, f)
 
     except Exception as e:
         logging.error("speech-to-text: Error transcribing audio: %s", str(e))
