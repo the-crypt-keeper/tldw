@@ -354,6 +354,35 @@ def export_keywords_to_csv():
         return None, f"Error exporting keywords: {e}"
 
 
+# Function to fetch items based on search query and type
+def browse_items(search_query, search_type):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            if search_type == 'Title':
+                cursor.execute("SELECT id, title, url FROM Media WHERE title LIKE ?", (f'%{search_query}%',))
+            elif search_type == 'URL':
+                cursor.execute("SELECT id, title, url FROM Media WHERE url LIKE ?", (f'%{search_query}%',))
+            results = cursor.fetchall()
+            return results
+    except sqlite3.Error as e:
+        raise Exception(f"Error fetching items by {search_type}: {e}")
+
+
+# Function to fetch item details
+def fetch_item_details(media_id: int):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT prompt, summary FROM MediaModifications WHERE media_id = ?", (media_id,))
+            prompt_summary_results = cursor.fetchall()
+            cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
+            content_result = cursor.fetchone()
+            content = content_result[0] if content_result else ""
+            return prompt_summary_results, content
+    except sqlite3.Error as e:
+        raise Exception(f"Error fetching item details: {e}")
+
 #
 #
 #######################################################################################################################

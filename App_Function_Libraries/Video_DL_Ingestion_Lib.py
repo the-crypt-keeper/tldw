@@ -87,11 +87,11 @@ def create_download_directory(title):
     return session_path
 
 
-def sanitize_filename(title, max_length=255):
-    # Remove invalid path characters
-    title = re.sub(r'[\\/*?:"<>|]', "", title)
-    # Truncate long titles to avoid filesystem errors
-    return title[:max_length].rstrip()
+def sanitize_filename(filename):
+    # Remove invalid characters and replace spaces with underscores
+    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
+    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    return sanitized
 
 
 def normalize_title(title):
