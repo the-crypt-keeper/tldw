@@ -1790,7 +1790,8 @@ def main(input_path, api_name=None, api_key=None,
 
     detail_level = detail
 
-    print(f"Keyword: {keywords}")
+    print(f"Keywords: {keywords}")
+
     if not input_path:
         return []
 
@@ -1804,6 +1805,28 @@ def main(input_path, api_name=None, api_key=None,
                 info_dict, title = extract_video_info(path)
                 download_path = create_download_directory(title)
                 video_path = download_video(path, download_path, info_dict, download_video_flag)
+
+                if video_path:
+                    audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+                    transcription_result = {'video_path': path, 'audio_file': audio_file, 'transcription': segments}
+
+                    if rolling_summarization:
+                        text = extract_text_from_segments(segments)
+                        summary = summarize_with_detail_openai(text, detail=detail)
+                    elif api_name:
+                        summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
+                    else:
+                        summary = None
+
+                    if summary:
+                        # Save the summary file in the download_path directory
+                        summary_file_path = os.path.join(download_path, f"{transcription_result}_summary.txt")
+                        with open(summary_file_path, 'w') as file:
+                            file.write(summary)
+
+                    add_media_to_database(path, info_dict, segments, summary, keywords, custom_prompt, whisper_model)
+                else:
+                    logging.error(f"Failed to download video: {path}")
             else:
                 download_path, info_dict, urls_or_media_file = process_local_file(path)
                 if isinstance(urls_or_media_file, list):
@@ -1813,24 +1836,27 @@ def main(input_path, api_name=None, api_key=None,
                         download_path = create_download_directory(title)
                         video_path = download_video(url, download_path, info_dict, download_video_flag)
 
-                        audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
-                        transcription_result = {'video_path': url, 'audio_file': audio_file, 'transcription': segments}
+                        if video_path:
+                            audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+                            transcription_result = {'video_path': url, 'audio_file': audio_file, 'transcription': segments}
 
-                        if rolling_summarization:
-                            text = extract_text_from_segments(segments)
-                            summary = summarize_with_detail_openai(text, detail=detail)
-                        elif api_name:
-                            summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
+                            if rolling_summarization:
+                                text = extract_text_from_segments(segments)
+                                summary = summarize_with_detail_openai(text, detail=detail)
+                            elif api_name:
+                                summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
+                            else:
+                                summary = None
+
+                            if summary:
+                                # Save the summary file in the download_path directory
+                                summary_file_path = os.path.join(download_path, f"{transcription_result}_summary.txt")
+                                with open(summary_file_path, 'w') as file:
+                                    file.write(summary)
+
+                            add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt, whisper_model)
                         else:
-                            summary = None
-
-                        if summary:
-                            # Save the summary file in the download_path directory
-                            summary_file_path = os.path.join(download_path, f"{transcription_result}_summary.txt")
-                            with open(summary_file_path, 'w') as file:
-                                file.write(summary)
-
-                        add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt, whisper_model)
+                            logging.error(f"Failed to download video: {url}")
                 else:
                     # Video or audio file
                     media_path = urls_or_media_file
