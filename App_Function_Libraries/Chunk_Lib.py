@@ -22,7 +22,8 @@ from Local_LLM_Inference_Engine_Lib import *
 from Local_Summarization_Lib import *
 from Old_Chunking_Lib import *
 from SQLite_DB import *
-from Summarization_General_Lib import *
+from App_Function_Libraries.Local_Summarization_Lib import *
+from App_Function_Libraries.Summarization_General_Lib import *
 from System_Checks_Lib import *
 from Tokenization_Methods_Lib import *
 from Video_DL_Ingestion_Lib import *

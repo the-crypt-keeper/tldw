@@ -124,11 +124,35 @@ def extract_text_from_segments(segments):
     # return text.strip()
 
 
-def summarize_with_openai(api_key, json_file_path, custom_prompt_arg):
+def summarize_with_openai(api_key, input_data, custom_prompt_arg):
     try:
-        logging.debug("openai: Loading json data for summarization")
-        with open(json_file_path, 'r') as file:
-            data = json.load(file)
+        # Dead code - FIXME
+        # logging.debug("openai: Loading json data for summarization")
+        # with open(json_file_path, 'r') as file:
+        #     data = json.load(file)
+        #
+        # logging.debug(f"openai: Loaded data: {data}")
+        # logging.debug(f"openai: Type of data: {type(data)}")
+        #
+        # if isinstance(data, dict) and 'summary' in data:
+        #     # If the loaded data is a dictionary and already contains a summary, return it
+        #     logging.debug("openai: Summary already exists in the loaded data")
+        #     return data['summary']
+        #
+        # # If the loaded data is a list of segment dictionaries, proceed with summarization
+        # segments = data
+        #
+        #
+        # logging.debug("openai: Extracting text from the segments")
+        # text = extract_text_from_segments(segments)
+        #
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("openai: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("openai: Using provided string data for summarization")
+            data = input_data
 
         logging.debug(f"openai: Loaded data: {data}")
         logging.debug(f"openai: Type of data: {type(data)}")
@@ -138,13 +162,17 @@ def summarize_with_openai(api_key, json_file_path, custom_prompt_arg):
             logging.debug("openai: Summary already exists in the loaded data")
             return data['summary']
 
-        # If the loaded data is a list of segment dictionaries, proceed with summarization
-        segments = data
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Invalid input data format")
+
 
         open_ai_model = openai_model or 'gpt-4-turbo'
-
-        logging.debug("openai: Extracting text from the segments")
-        text = extract_text_from_segments(segments)
 
         headers = {
             'Authorization': f'Bearer {api_key}',
