@@ -101,3 +101,26 @@ share_public = False
 #
 #
 #     tabbed_interface = gr.TabbedInterface([iface, search_interface, import_export_tab, keyword_tab, download_videos_interface, download_audio_interface],
+
+
+# An idea - FIXME - Add a feedback mechanism to the summarization interface
+# def submit_feedback(summary_text, user_rating, user_comments):
+#     """
+#     Store or process user feedback on summaries.
+#     """
+#     print(f"Received rating: {user_rating}/5")
+#     print(f"User comments: {user_comments}")
+#     # Here you could log this to a database or use it to further train a model.
+#
+# # Adding to Gradio interface
+# feedback_interface = gr.Interface(
+#     fn=submit_feedback,
+#     inputs=[
+#         gr.Textbox(label="Summary Text", default="Generated summary will appear here...", readonly=True),
+#         gr.Slider(minimum=1, maximum=5, label="Rate the summary (1-5 stars)"),
+#         gr.Textbox(label="Comments", placeholder="Additional comments...")
+#     ],
+#     outputs=[]
+# )
+#
+# feedback_interface.launch()

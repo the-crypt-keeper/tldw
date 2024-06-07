@@ -94,6 +94,173 @@ def chunk_text_hybrid(text, max_tokens=1000):
 
     return chunks
 
+# Thanks openai
+def chunk_on_delimiter(input_string: str,
+                       max_tokens: int,
+                       delimiter: str) -> List[str]:
+    chunks = input_string.split(delimiter)
+    combined_chunks, _, dropped_chunk_count = combine_chunks_with_no_minimum(
+        chunks, max_tokens, chunk_delimiter=delimiter, add_ellipsis_for_overflow=True)
+    if dropped_chunk_count > 0:
+        print(f"Warning: {dropped_chunk_count} chunks were dropped due to exceeding the token limit.")
+    combined_chunks = [f"{chunk}{delimiter}" for chunk in combined_chunks]
+    return combined_chunks
+
+
+def rolling_summarize_function(text: str,
+                                detail: float = 0,
+                                api_name: str = None,
+                                api_key: str = None,
+                                model: str = None,
+                                custom_prompt: str = None,
+                                chunk_by_words: bool = False,
+                                max_words: int = 300,
+                                chunk_by_sentences: bool = False,
+                                max_sentences: int = 10,
+                                chunk_by_paragraphs: bool = False,
+                                max_paragraphs: int = 5,
+                                chunk_by_tokens: bool = False,
+                                max_tokens: int = 1000,
+                                summarize_recursively=False,
+                                verbose=False):
+    """
+    Summarizes a given text by splitting it into chunks, each of which is summarized individually.
+    Allows selecting the method for chunking (words, sentences, paragraphs, tokens).
+
+    Parameters:
+        - text (str): The text to be summarized.
+        - detail (float, optional): A value between 0 and 1 indicating the desired level of detail in the summary.
+        - api_name (str, optional): Name of the API to use for summarization.
+        - api_key (str, optional): API key for the specified API.
+        - model (str, optional): Model identifier for the summarization engine.
+        - custom_prompt (str, optional): Custom prompt for the summarization.
+        - chunk_by_words (bool, optional): If True, chunks the text by words.
+        - max_words (int, optional): Maximum number of words per chunk.
+        - chunk_by_sentences (bool, optional): If True, chunks the text by sentences.
+        - max_sentences (int, optional): Maximum number of sentences per chunk.
+        - chunk_by_paragraphs (bool, optional): If True, chunks the text by paragraphs.
+        - max_paragraphs (int, optional): Maximum number of paragraphs per chunk.
+        - chunk_by_tokens (bool, optional): If True, chunks the text by tokens.
+        - max_tokens (int, optional): Maximum number of tokens per chunk.
+        - summarize_recursively (bool, optional): If True, summaries are generated recursively.
+        - verbose (bool, optional): If verbose, prints additional output.
+
+    Returns:
+        - str: The final compiled summary of the text.
+    """
+
+    # Validate input
+    if not text.strip():
+        raise ValueError("Input text cannot be empty.")
+    if any([max_words <= 0, max_sentences <= 0, max_paragraphs <= 0, max_tokens <= 0]):
+        raise ValueError("All maximum chunk size parameters must be positive integers.")
+
+    # Select the chunking function based on the method specified
+    if chunk_by_words:
+        chunks = chunk_text_by_words(text, max_words)
+    elif chunk_by_sentences:
+        chunks = chunk_text_by_sentences(text, max_sentences)
+    elif chunk_by_paragraphs:
+        chunks = chunk_text_by_paragraphs(text, max_paragraphs)
+    elif chunk_by_tokens:
+        chunks = chunk_text_by_tokens(text, max_tokens)
+    else:
+        raise ValueError("No valid chunking method selected")
+
+    # Process each chunk for summarization
+    accumulated_summaries = []
+    for chunk in chunks:
+        if summarize_recursively and accumulated_summaries:
+            # Creating a structured prompt for recursive summarization
+            previous_summaries = '\n\n'.join(accumulated_summaries)
+            user_message_content = f"Previous summaries:\n\n{previous_summaries}\n\nText to summarize next:\n\n{chunk}"
+        else:
+            # Directly passing the chunk for summarization without recursive context
+            user_message_content = chunk
+
+        # Extracting the completion from the response
+        try:
+            if api_name.lower() == 'openai':
+                summary = summarize_with_openai(api_key, user_message_content, custom_prompt)
+            elif api_name.lower() == "cohere":
+                cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
+                if not cohere_api_key:
+                    logging.error("MAIN: Cohere API key not found.")
+                    return None
+                logging.debug(f"MAIN: Trying to summarize with cohere")
+                summary = summarize_with_cohere(cohere_api_key, user_message_content,
+                                                config.get('API', 'cohere_model', fallback='command-r-plus'),
+                                                custom_prompt)
+            elif api_name.lower() == "groq":
+                groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
+                if not groq_api_key:
+                    logging.error("MAIN: Groq API key not found.")
+                    return None
+                logging.debug(f"MAIN: Trying to summarize with groq")
+                summary = summarize_with_groq(groq_api_key, user_message_content, custom_prompt)
+            elif api_name.lower() == "openrouter":
+                openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
+                if not openrouter_api_key:
+                    logging.error("MAIN: OpenRouter API key not found.")
+                    return None
+                logging.debug(f"MAIN: Trying to summarize with OpenRouter")
+                summary = summarize_with_openrouter(openrouter_api_key, user_message_content, custom_prompt)
+            elif api_name.lower() == "llama":
+                logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
+                llama_token = api_key if api_key else config.get('Local-API', 'llama_token', fallback=None)
+                summary = summarize_with_llama(user_message_content, custom_prompt)
+            elif api_name.lower() == "kobold":
+                kobold_api_key = api_key if api_key else config.get('Local-API', 'kobold_api_key', fallback=None)
+                if not kobold_api_key:
+                    logging.error("MAIN: Kobold API key not found.")
+                    return None
+                logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
+                summary = summarize_with_kobold(kobold_api_key, user_message_content, custom_prompt)
+            elif api_name.lower() == "ooba":
+                ooba_token = api_key if api_key else config.get('Local-API', 'ooba_api_key', fallback=None)
+                ooba_ip = config.get('API', 'ooba_ip', fallback=None)
+                summary = summarize_with_oobabooga(ooba_ip, user_message_content, ooba_token, custom_prompt)
+            elif api_name.lower() == "tabbyapi":
+                tabbyapi_key = api_key if api_key else config.get('Local-API', 'tabbyapi_token', fallback=None)
+                tabby_model = config.get('Local-API', 'tabby_model', fallback=None)
+                summary = summarize_with_tabbyapi(tabby_api_key, config.get('Local-API', 'tabby_api_IP',
+                                                                            fallback='http://127.0.0.1:5000/api/v1/generate'),
+                                                  user_message_content, tabby_model, custom_prompt)
+            elif api_name.lower() == "vllm":
+                logging.debug(f"MAIN: Trying to summarize with VLLM")
+                vllm_api_key = api_key if api_key else config.get('Local-API', 'vllm_api_key', fallback=None)
+                summary = summarize_with_vllm(
+                    config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions'),
+                    vllm_api_key, config.get('API', 'vllm_model', fallback=''), user_message_content, custom_prompt)
+            elif api_name.lower() == "local-llm":
+                logging.debug(f"MAIN: Trying to summarize with Local LLM")
+                summary = summarize_with_local_llm(user_message_content, custom_prompt)
+            elif api_name.lower() == "huggingface":
+                logging.debug(f"MAIN: Trying to summarize with huggingface")
+                huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
+                summary = summarize_with_huggingface(huggingface_api_key, user_message_content, custom_prompt)
+            # Add additional API handlers here...
+            else:
+                logging.warning(f"Unsupported API: {api_name}")
+                summary = None
+        except requests.exceptions.ConnectionError:
+            logging.error("Connection error while summarizing")
+            summary = None
+        except Exception as e:
+            logging.error(f"Error summarizing with {api_name}: {str(e)}")
+            summary = None
+
+        if summary:
+            logging.info(f"Summary generated using {api_name} API")
+            accumulated_summaries.append(summary)
+        else:
+            logging.warning(f"Failed to generate summary using {api_name} API")
+
+    # Compile final summary from partial summaries
+    final_summary = '\n\n'.join(accumulated_summaries)
+    return final_summary
+
+
 
 # Sample text for testing
 sample_text = """

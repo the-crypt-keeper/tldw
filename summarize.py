@@ -833,7 +833,7 @@ def launch_ui(demo_mode=False):
                 gr.Textbox(label="Summary or Status Message (Current status of Summary or Summary itself)"),
                 gr.File(label="Download Transcription as JSON (Download the Transcription as a file)"),
                 gr.File(label="Download Summary as Text (Download the Summary as a file)"),
-                gr.File(label="Download Video (Download the Video as a file)", visible=True),
+                gr.File(label="Download Video (Download the Video as a file)", visible=False),
                 gr.File(label="Download Audio (Download the Audio as a file)", visible=False),
             ]
 
@@ -1443,15 +1443,18 @@ def launch_ui(demo_mode=False):
         [iface, search_interface, llamafile_interface, keyword_tab, import_export_tab, download_videos_interface],
         ["Transcription / Summarization / Ingestion", "Search / Detailed View",
          "Llamafile Interface", "Keywords", "Export/Import", "Download Video/Audio Files"])
+
     # Launch the interface
     server_port_variable = 7860
     global server_mode, share_public
-    if server_mode is True and share_public is False:
-        tabbed_interface.launch(share=True, server_port=server_port_variable, server_name="http://0.0.0.0")
-    elif share_public == True:
+
+    if share_public == True:
         tabbed_interface.launch(share=True, )
+    elif server_mode == True and share_public is False:
+        tabbed_interface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
     else:
-        tabbed_interface.launch(share=False, )
+        #tabbed_interface.launch(share=False, )
+        tabbed_interface.launch(share=True, )
 
 
 def clean_youtube_url(url):
@@ -1809,9 +1812,30 @@ def main(input_path, api_name=None, api_key=None,
                     audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
                     transcription_result = {'video_path': path, 'audio_file': audio_file, 'transcription': segments}
 
-                    if rolling_summarization:
+                    if rolling_summarization == True:
                         text = extract_text_from_segments(segments)
-                        summary = summarize_with_detail_openai(text, detail=detail)
+                        detail = detail_level
+                        additional_instructions = custom_prompt
+                        chunk_text_by_words = set_chunk_txt_by_words
+                        max_words = set_max_txt_chunk_words
+                        chunk_text_by_sentences = set_chunk_txt_by_sentences
+                        max_sentences = set_max_txt_chunk_sentences
+                        chunk_text_by_paragraphs = set_chunk_txt_by_paragraphs
+                        max_paragraphs = set_max_txt_chunk_paragraphs
+                        chunk_text_by_tokens = set_chunk_txt_by_tokens
+                        max_tokens = set_max_txt_chunk_tokens
+                        # FIXME - Need to add GUI/CLI options for non-recursive summarization
+                        summarize_recursively = rolling_summarization
+                        verbose = False
+                        model = None
+                        summary = rolling_summarize_function(text, detail, api_name, api_key, model, custom_prompt,
+                                                             chunk_text_by_words,
+                                                             max_words, chunk_text_by_sentences,
+                                                             max_sentences, chunk_text_by_paragraphs,
+                                                             max_paragraphs, chunk_text_by_tokens,
+                                                             max_tokens, summarize_recursively, verbose
+                                                             )
+
                     elif api_name:
                         summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
                     else:
@@ -1986,11 +2010,14 @@ Sample commands:
     set_chunk_txt_by_tokens = False
     set_max_txt_chunk_tokens = 0
 
+    global server_mode
+
     if args.share_public:
         share_public = args.share_public
     else:
         share_public = None
     if args.server_mode:
+
         server_mode = args.server_mode
     else:
         server_mode = None
@@ -2075,7 +2102,7 @@ Sample commands:
 
         # Get all API keys from the config
         api_keys = {key: value for key, value in config.items('API') if key.endswith('_api_key')}
-
+        global api_name
         api_name = args.api_name
 
         # Rolling Summarization will only be performed if an API is specified and the API key is available
