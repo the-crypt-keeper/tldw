@@ -192,6 +192,7 @@ def summarize_with_openai(api_key, json_file_path, custom_prompt_arg):
         return "openai: Error occurred while processing summary"
 
 
+# FIXME - Combine these two functions
 def summarize_with_claude(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5):
     try:
         logging.debug("anthropic: Loading JSON data")

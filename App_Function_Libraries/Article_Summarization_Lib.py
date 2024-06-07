@@ -31,17 +31,17 @@ import transformers
 import summarize
 import summarize
 from App_Function_Libraries.SQLite_DB import Database
-from Article_Extractor_Lib import *
+from App_Function_Libraries.Article_Extractor_Lib import *
 from Chunk_Lib import *
 from Diarization_Lib import *
 from Video_DL_Ingestion_Lib import *
 from Local_File_Processing_Lib import *
 from Local_LLM_Inference_Engine_Lib import *
-from Local_Summarization_Lib import *
+from App_Function_Libraries.Local_Summarization_Lib import *
 from Old_Chunking_Lib import *
 from SQLite_DB import *
-from Summarization_General_Lib import *
-from System_Checks_Lib import *
+from App_Function_Libraries.Summarization_General_Lib import *
+from App_Function_Libraries.System_Checks_Lib import *
 from Tokenization_Methods_Lib import *
 from Video_DL_Ingestion_Lib import *
 from Web_UI_Lib import *
@@ -224,7 +224,7 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
     ingestion_result = ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date,
                                             article_custom_prompt)
 
-    return f"Title: {title}\nAuthor: {author}\nSummary: {summary}\nIngestion Result: {ingestion_result}"
+    return f"Title: {title}\nAuthor: {author}\nIngestion Result: {ingestion_result}\n\nSummary: {summary}\n\nArticle Contents: {content}"
 
 
 def ingest_unstructured_text(text, custom_prompt, api_name, api_key, keywords, custom_article_title):
