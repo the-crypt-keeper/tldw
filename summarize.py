@@ -730,7 +730,8 @@ def display_search_results(query):
 
 # def gradio UI
 def launch_ui(demo_mode=False):
-    whisper_models = ["small.en", "medium.en", "large"]
+    whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
+                      "distil-large-v2", "distil-medium.en", "distil-small.en", "distil-large-v3"]
     # Set theme value with https://www.gradio.app/guides/theming-guide - 'theme='
     my_theme = gr.Theme.from_hub("gradio/seafoam")
     with gr.Blocks(theme=my_theme) as iface:
