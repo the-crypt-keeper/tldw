@@ -805,18 +805,18 @@ def launch_ui(demo_mode=False):
                                             visible=False)
             # Add the additional input components
             chunk_text_by_words_checkbox = gr.Checkbox(label="Chunk Text by Words", value=False, visible=False)
-            max_words_input = gr.Number(label="Max Words", value=0, precision=0, visible=False)
+            max_words_input = gr.Number(label="Max Words", value=300, precision=0, visible=False)
 
             chunk_text_by_sentences_checkbox = gr.Checkbox(label="Chunk Text by Sentences", value=False,
                                                            visible=False)
-            max_sentences_input = gr.Number(label="Max Sentences", value=0, precision=0, visible=False)
+            max_sentences_input = gr.Number(label="Max Sentences", value=10, precision=0, visible=False)
 
             chunk_text_by_paragraphs_checkbox = gr.Checkbox(label="Chunk Text by Paragraphs", value=False,
                                                             visible=False)
-            max_paragraphs_input = gr.Number(label="Max Paragraphs", value=0, precision=0, visible=False)
+            max_paragraphs_input = gr.Number(label="Max Paragraphs", value=5, precision=0, visible=False)
 
             chunk_text_by_tokens_checkbox = gr.Checkbox(label="Chunk Text by Tokens", value=False, visible=False)
-            max_tokens_input = gr.Number(label="Max Tokens", value=0, precision=0, visible=False)
+            max_tokens_input = gr.Number(label="Max Tokens", value=1000, precision=0, visible=False)
 
             inputs = [
                 num_speakers_input, whisper_model_input, custom_prompt_input, offset_input, api_name_input,
@@ -1454,8 +1454,8 @@ def launch_ui(demo_mode=False):
     elif server_mode == True and share_public is False:
         tabbed_interface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
     else:
-        #tabbed_interface.launch(share=False, )
-        tabbed_interface.launch(share=True, )
+        tabbed_interface.launch(share=False, )
+        #tabbed_interface.launch(share=True, )
 
 
 def clean_youtube_url(url):
@@ -1532,31 +1532,42 @@ def process_url(
         download_path = create_download_directory(title)
         video_path = download_video(url, download_path, info_dict, download_video_flag)
 
-        # Call the main function and store the results
-        transcription_result = main(url, num_speakers=num_speakers, whisper_model=whisper_model, offset=offset, vad_filter=vad_filter, download_video_flag=download_video, custom_prompt=custom_prompt, rolling_summarization=rolling_summarization, detail=detail_level, keywords=keywords)
+        segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+        transcription_result = {
+            'transcription': segments
+        }
 
-        if not transcription_result:
-            return "No URL provided.", "No URL provided.", None, None, None, None, None, None
+        transcription_text = json.dumps(segments, indent=2)
 
-        transcription_text = json.dumps(transcription_result['transcription'], indent=2)
-        summary_text = transcription_result.get('summary', 'Summary not available')
-
-        json_file_path, summary_file_path = save_transcription_and_summary(transcription_result, transcription_text, summary_text, download_path)
-
-        if api_name:
-            summary_text = perform_summarization(api_name, json_file_path, custom_prompt, api_key, config)
+        if rolling_summarization:
+            summary_text = rolling_summarize_function(
+                transcription_text,
+                detail=detail_level,
+                api_name=api_name,
+                api_key=api_key,
+                custom_prompt=custom_prompt,
+                chunk_by_words=chunk_text_by_words,
+                max_words=max_words,
+                chunk_by_sentences=chunk_text_by_sentences,
+                max_sentences=max_sentences,
+                chunk_by_paragraphs=chunk_text_by_paragraphs,
+                max_paragraphs=max_paragraphs,
+                chunk_by_tokens=chunk_text_by_tokens,
+                max_tokens=max_tokens
+            )
+        elif api_name:
+            summary_text = perform_summarization(api_name, transcription_text, custom_prompt, api_key, config)
         else:
             summary_text = 'Summary not available'
+
+        json_file_path, summary_file_path = save_transcription_and_summary(transcription_result, transcription_text, summary_text, download_path)
 
         if download_video:
             video_file_path = transcription_result.get('video_path', None)
         else:
             video_file_path = None
 
-        # Add media to database using the json_file_path
-        with open(json_file_path, 'r') as file:
-            transcription_data = json.load(file)
-        add_media_to_database(url, info_dict, transcription_data, summary_text, keywords, custom_prompt, whisper_model)
+        add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt, whisper_model)
 
         return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None
 
@@ -1631,7 +1642,7 @@ def extract_video_info(url):
 def perform_transcription(video_path, offset, whisper_model, vad_filter):
     audio_file = convert_to_wav(video_path, offset)
     segments = speech_to_text(audio_file, whisper_model=whisper_model, vad_filter=vad_filter)
-    return audio_file, segments
+    return segments
 
 
 def save_transcription_and_summary(transcription_result, transcription_text, summary_text, download_path):
