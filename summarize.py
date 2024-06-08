@@ -1420,7 +1420,7 @@ def process_url(
         info_dict, title = extract_video_info(url)
         download_path = create_download_directory(title)
         video_path = download_video(url, download_path, info_dict, download_video_flag)
-
+        global segments
         audio_file_path, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
 
         if audio_file_path is None or segments is None:
@@ -1434,6 +1434,7 @@ def process_url(
         logging.debug(f"Process_URL: Transcription text: {transcription_text}")
 
         if rolling_summarization:
+            text = extract_text_from_segments(segments)
             summary_text = rolling_summarize_function(
                 transcription_text,
                 detail=detail_level,
@@ -1465,8 +1466,8 @@ def process_url(
         return transcription_text, summary_text, json_file_path, summary_file_path, None, None
 
     except Exception as e:
-        logging.error(f"Error processing URL: {e}")
-        return str(e), 'Error processing the request.', None, None, None, None
+        logging.error(f": {e}")
+        return str(e), 'process_url: Error processing the request.', None, None, None, None
 
 
 # FIXME - Prompt sample box

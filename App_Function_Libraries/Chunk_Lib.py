@@ -24,6 +24,7 @@ from Old_Chunking_Lib import *
 from SQLite_DB import *
 from App_Function_Libraries.Local_Summarization_Lib import *
 from App_Function_Libraries.Summarization_General_Lib import *
+from App_Function_Libraries.Summarization_General_Lib import *
 from System_Checks_Lib import *
 from Tokenization_Methods_Lib import *
 from Video_DL_Ingestion_Lib import *
@@ -150,11 +151,18 @@ def rolling_summarize_function(text: str,
         - str: The final compiled summary of the text.
     """
 
+
+    def extract_text_from_segments(segments):
+        text = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
+        return text
     # Validate input
     if not text.strip():
         raise ValueError("Input text cannot be empty.")
     if any([max_words <= 0, max_sentences <= 0, max_paragraphs <= 0, max_tokens <= 0]):
         raise ValueError("All maximum chunk size parameters must be positive integers.")
+    global segments
+
+    text = extract_text_from_segments(segments)
 
     # Select the chunking function based on the method specified
     if chunk_by_words:
