@@ -151,18 +151,20 @@ def rolling_summarize_function(text: str,
         - str: The final compiled summary of the text.
     """
 
-
     def extract_text_from_segments(segments):
         text = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
         return text
     # Validate input
-    if not text.strip():
+    if not text:
         raise ValueError("Input text cannot be empty.")
     if any([max_words <= 0, max_sentences <= 0, max_paragraphs <= 0, max_tokens <= 0]):
         raise ValueError("All maximum chunk size parameters must be positive integers.")
     global segments
 
-    text = extract_text_from_segments(segments)
+    if isinstance(text, dict) and 'transcription' in text:
+        text = extract_text_from_segments(text['transcription'])
+    elif isinstance(text, list):
+        text = extract_text_from_segments(text)
 
     # Select the chunking function based on the method specified
     if chunk_by_words:
@@ -174,7 +176,7 @@ def rolling_summarize_function(text: str,
     elif chunk_by_tokens:
         chunks = chunk_text_by_tokens(text, max_tokens)
     else:
-        raise ValueError("No valid chunking method selected")
+        chunks = [text]
 
     # Process each chunk for summarization
     accumulated_summaries = []
