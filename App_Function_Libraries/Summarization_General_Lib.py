@@ -83,7 +83,9 @@ openrouter_model = config.get('API', 'openrouter_model', fallback='mistralai/mis
 # Function Definitions
 #
 
-
+# def extract_text_from_segments(segments):
+#     text = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
+#     return text
 def extract_text_from_segments(segments):
     logging.debug(f"Segments received: {segments}")
     logging.debug(f"Type of segments: {type(segments)}")
