@@ -453,9 +453,9 @@ def print_hello():
 # Only to be used when configured with Gradio for HF Space
 
 
-def format_transcription(transcription_result_arg):
-    if transcription_result_arg:
-        json_data = transcription_result_arg['transcription']
+def format_transcription(transcription_text_arg):
+    if transcription_text_arg:
+        json_data = transcription_text_arg['transcription']
         return json.dumps(json_data, indent=2)
     else:
         return ""
@@ -482,73 +482,7 @@ def search_media(query, fields, keyword, page):
         return str(e)
 
 
-# FIXME - code for the 're-prompt' functionality
-# - Change to use 'check_api()' function - also, create 'check_api()' function
-# def ask_question(transcription, question, api_name, api_key):
-#     if not question.strip():
-#         return "Please enter a question."
-#
-#         prompt = f"""Transcription:\n{transcription}
-#
-#         Given the above transcription, please answer the following:\n\n{question}"""
-#
-#         # FIXME - Refactor main API checks so they're their own function - api_check()
-#         # Call api_check() function here
-#
-#         if api_name.lower() == "openai":
-#             openai_api_key = api_key if api_key else config.get('API', 'openai_api_key', fallback=None)
-#             headers = {
-#                 'Authorization': f'Bearer {openai_api_key}',
-#                 'Content-Type': 'application/json'
-#             }
-#             if openai_model:
-#                 pass
-#             else:
-#                 openai_model = 'gpt-4-turbo'
-#             data = {
-#                 "model": openai_model,
-#                 "messages": [
-#                     {
-#                         "role": "system",
-#                         "content": "You are a helpful assistant that answers questions based on the given "
-#                                    "transcription and summary."
-#                     },
-#                     {
-#                         "role": "user",
-#                         "content": prompt
-#                     }
-#                 ],
-#                 "max_tokens": 150000,
-#                 "temperature": 0.1
-#             }
-#             response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
-#
-#         if response.status_code == 200:
-#             answer = response.json()['choices'][0]['message']['content'].strip()
-#             return answer
-#         else:
-#             return "Failed to process the question."
-#     else:
-#         return "Question answering is currently only supported with the OpenAI API."
-
-
-# For the above 'ask_question()' function, the following APIs are supported:
-# summarizers: Dict[str, Callable[[str, str], str]] = {
-#     'tabbyapi': summarize_with_tabbyapi,
-#     'openai': summarize_with_openai,
-#     'anthropic': summarize_with_claude,
-#     'cohere': summarize_with_cohere,
-#     'groq': summarize_with_groq,
-#     'llama': summarize_with_llama,
-#     'kobold': summarize_with_kobold,
-#     'oobabooga': summarize_with_oobabooga,
-#     'local-llm': summarize_with_local_llm,
-#     'huggingface': summarize_with_huggingface,
-#     'openrouter': summarize_with_openrouter
-#     # Add more APIs here as needed
-# }
-
-#########################################################################
+#######################################################
 
 
 # FIXME - Move to 'Web_UI_Lib.py'
@@ -1238,48 +1172,6 @@ def launch_ui(demo_mode=False):
                         port_checked, port_value],
                 outputs=output_display
             )
-        # FIXME - Possibly dead code?
-        #
-        #     # Setting inputs with checkboxes
-        #     verbose_checked = gr.Checkbox(label="Enable Verbose Output", value=False)
-        #     threads_checked = gr.Checkbox(label="Enable Setting CPU Threads", value=False)
-        #     threads_value = gr.Number(label="Number of CPU Threads", value="", precision=0)
-        #     http_threads_checked = gr.Checkbox(label="Enable Setting HTTP Server Threads", value=False)
-        #     http_threads_value = gr.Number(label="Number of HTTP Server Threads", value="", precision=0)
-        #     model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False)
-        #     model_value = gr.Textbox(label="Path to Local Model File", value="")
-        #     hf_repo_checked = gr.Checkbox(label="Use Huggingface Repo Model", value=False)
-        #     hf_repo_value = gr.Textbox(label="Huggingface Repo Name", value="")
-        #     hf_file_checked = gr.Checkbox(label="Enable Setting Huggingface Model File", value=False)
-        #     hf_file_value = gr.Textbox(label="Huggingface Model File", value="")
-        #     ctx_size_checked = gr.Checkbox(label="Enable Setting Prompt Context Size", value=False)
-        #     ctx_size_value = gr.Number(label="Prompt Context Size", value=8124, precision=0)
-        #     ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False)
-        #     ngl_value = gr.Number(label="Number of GPU Layers", value="", precision=0)
-        #     host_checked = gr.Checkbox(label="Enable Setting IP to Listen On", value=False)
-        #     host_value = gr.Textbox(label="Host IP Address", value="")
-        #     port_checked = gr.Checkbox(label="Enable Setting Server Port", value=False)
-        #     port_value = gr.Number(label="Port Number", value="", precision=0)
-        #
-        #
-        #     # Function call with the new inputs
-        #     start_button.click(
-        #         fn=start_llamafile,
-        #         inputs=[verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
-        #                 model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
-        #                 ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value,
-        #                 port_checked, port_value],
-        #         outputs=output_display
-        #     )
-        #
-        #     # This function is not implemented yet...
-        #     # FIXME - Implement this function
-        #     stop_button.click(stop_llamafile, outputs=output_display)
-        #
-        # # Toggle event for Advanced/Simple mode
-        # advanced_mode_toggle.change(toggle_advanced_llamafile_mode,
-        #                             inputs=[advanced_mode_toggle],
-        #                             outputs=[])
 
         with gr.Tab("Llamafile Chat Interface"):
             gr.Markdown("Page to interact with Llamafile Server (iframe to Llamafile server port)")
@@ -1473,9 +1365,6 @@ def extract_video_info(url):
     return info_dict, title
 
 
-
-
-
 def process_url(
         url,
         num_speakers,
@@ -1512,18 +1401,18 @@ def process_url(
 
     # Validate input
     if not url:
-        return "No URL provided.", "No URL provided.", None, None, None, None, None, None
+        return "Process_URL: No URL provided.", "No URL provided.", None, None, None, None, None, None
 
     if not is_valid_url(url):
-        return "Invalid URL format.", "Invalid URL format.", None, None, None, None, None, None
+        return "Process_URL: Invalid URL format.", "Invalid URL format.", None, None, None, None, None, None
 
     # Clean the URL to remove playlist parameters if any
     url = clean_youtube_url(url)
-    logging.info(f"Processing URL: {url}")
+    logging.info(f"Process_URL: Processing URL: {url}")
 
-    print("API Name received:", api_name)  # Debugging line
+    print("Process_URL: API Name received:", api_name)  # Debugging line
 
-    logging.info(f"Processing URL: {url}")
+    logging.info(f"Process_URL: Processing URL: {url}")
     video_file_path = None
     global info_dict
 
@@ -1532,12 +1421,17 @@ def process_url(
         download_path = create_download_directory(title)
         video_path = download_video(url, download_path, info_dict, download_video_flag)
 
-        segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
-        transcription_result = {
-            'transcription': segments
-        }
+        audio_file_path, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
 
-        transcription_text = json.dumps(segments, indent=2)
+        if audio_file_path is None or segments is None:
+            logging.error("Process_URL: Transcription failed or segments not available.")
+            return "Process_URL: Transcription failed.", "Transcription failed.", None, None, None, None
+
+        logging.debug(f"Process_URL: Transcription audio_file: {audio_file_path}")
+        logging.debug(f"Process_URL: Transcription segments: {segments}")
+
+        transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
+        logging.debug(f"Process_URL: Transcription text: {transcription_text}")
 
         if rolling_summarization:
             summary_text = rolling_summarize_function(
@@ -1555,21 +1449,20 @@ def process_url(
                 chunk_by_tokens=chunk_text_by_tokens,
                 max_tokens=max_tokens
             )
-        elif api_name:
-            summary_text = perform_summarization(api_name, transcription_text, custom_prompt, api_key, config)
+        if api_name:
+            summary_text = perform_summarization(api_name, segments_json_path, custom_prompt, api_key, config)
+            if summary_text is None:
+                logging.error("Summary text is None. Check summarization function.")
+                summary_file_path = None  # Set summary_file_path to None if summary is not generated
         else:
             summary_text = 'Summary not available'
+            summary_file_path = None  # Set summary_file_path to None if summary is not generated
 
-        json_file_path, summary_file_path = save_transcription_and_summary(transcription_result, transcription_text, summary_text, download_path)
-
-        if download_video:
-            video_file_path = transcription_result.get('video_path', None)
-        else:
-            video_file_path = None
+        json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path)
 
         add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt, whisper_model)
 
-        return transcription_text, summary_text, json_file_path, summary_file_path, video_file_path, None
+        return transcription_text, summary_text, json_file_path, summary_file_path, None, None
 
     except Exception as e:
         logging.error(f"Error processing URL: {e}")
@@ -1640,25 +1533,67 @@ def extract_video_info(url):
 
 
 def perform_transcription(video_path, offset, whisper_model, vad_filter):
-    audio_file = convert_to_wav(video_path, offset)
-    segments = speech_to_text(audio_file, whisper_model=whisper_model, vad_filter=vad_filter)
-    return segments
+    global segments_json_path
+    audio_file_path = convert_to_wav(video_path, offset)
+    segments_json_path = audio_file_path.replace('.wav', '.segments.json')
+
+    # Check if segments JSON already exists
+    if os.path.exists(segments_json_path):
+        logging.info(f"Segments file already exists: {segments_json_path}")
+        try:
+            with open(segments_json_path, 'r') as file:
+                segments = json.load(file)
+            if not segments:  # Check if the loaded JSON is empty
+                logging.warning(f"Segments JSON file is empty, re-generating: {segments_json_path}")
+                raise ValueError("Empty segments JSON file")
+            logging.debug(f"Loaded segments from {segments_json_path}")
+        except (json.JSONDecodeError, ValueError) as e:
+            logging.error(f"Failed to read or parse the segments JSON file: {e}")
+            # Remove the corrupted file
+            os.remove(segments_json_path)
+            # Re-generate the transcription
+            logging.info(f"Re-generating transcription for {audio_file_path}")
+            audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
+            if segments is None:
+                return None, None
+    else:
+        # Perform speech to text transcription
+        audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
+
+    return audio_file_path, segments
 
 
-def save_transcription_and_summary(transcription_result, transcription_text, summary_text, download_path):
+def re_generate_transcription(audio_file_path, whisper_model, vad_filter):
+    try:
+        segments = speech_to_text(audio_file_path, whisper_model=whisper_model, vad_filter=vad_filter)
+        # Save segments to JSON
+        segments_json_path = audio_file_path.replace('.wav', '.segments.json')
+        with open(segments_json_path, 'w') as file:
+            json.dump(segments, file, indent=2)
+        logging.debug(f"Transcription segments saved to {segments_json_path}")
+        return audio_file_path, segments
+    except Exception as e:
+        logging.error(f"Error in re-generating transcription: {str(e)}")
+        return None, None
+
+
+def save_transcription_and_summary(transcription_text, summary_text, download_path):
     video_title = sanitize_filename(info_dict.get('title', 'Untitled'))
 
     json_file_path = os.path.join(download_path, f"{video_title}.segments.json")
     summary_file_path = os.path.join(download_path, f"{video_title}_summary.txt")
 
     with open(json_file_path, 'w') as json_file:
-        json.dump(transcription_result['transcription'], json_file, indent=2)
+        json.dump(transcription_text['transcription'], json_file, indent=2)
 
-    with open(summary_file_path, 'w') as summary_file:
-        summary_file.write(summary_text)
+    if summary_text is not None:
+        with open(summary_file_path, 'w') as file:
+            file.write(summary_text)
+    else:
+        logging.warning("Summary text is None. Skipping summary file creation.")
+        summary_file_path = None
 
     return json_file_path, summary_file_path
-
 
 def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt, whisper_model):
     content = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
@@ -1679,95 +1614,96 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 def perform_summarization(api_name, json_file_path, custom_prompt, api_key, config):
     summary = None
     try:
-        json_file_path = transcription_result['audio_file'].replace('.wav', '.segments.json')
-        logging.debug(f"Loading JSON data from {json_file_path}")
+        if not json_file_path or not os.path.exists(json_file_path):
+            logging.error(f"JSON file does not exist: {json_file_path}")
+            return None
+
         with open(json_file_path, 'r') as file:
             data = json.load(file)
-        if isinstance(data, dict) and 'segments' in data:
-            segments = data['segments']
-        else:
-            logging.error("JSON structure is not as expected, 'segments' key missing.")
-            return
 
+        segments = data
         if not isinstance(segments, list):
             logging.error(f"Segments is not a list: {type(segments)}")
-            return
+            return None
+
+        text = extract_text_from_segments(segments)
 
         if api_name.lower() == 'openai':
-            summary = summarize_with_openai(api_key, json_file_path, custom_prompt)
+            summary = summarize_with_openai(api_key, text, custom_prompt)
         elif api_name.lower() == "cohere":
             cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
             if not cohere_api_key:
-                logging.error("MAIN: Cohere API key not found.")
+                logging.error("Cohere API key not found.")
                 return None
-            logging.debug(f"MAIN: Trying to summarize with cohere")
-            summary = summarize_with_cohere(cohere_api_key, json_file_path,
-                                            config.get('API', 'cohere_model', fallback='command-r-plus'), custom_prompt)
+            summary = summarize_with_cohere(cohere_api_key, text, config.get('API', 'cohere_model', fallback='command-r-plus'), custom_prompt)
         elif api_name.lower() == "groq":
             groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
             if not groq_api_key:
                 logging.error("MAIN: Groq API key not found.")
                 return None
             logging.debug(f"MAIN: Trying to summarize with groq")
-            summary = summarize_with_groq(groq_api_key, json_file_path, custom_prompt)
+            summary = summarize_with_groq(groq_api_key, text, custom_prompt)
         elif api_name.lower() == "openrouter":
             openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
             if not openrouter_api_key:
                 logging.error("MAIN: OpenRouter API key not found.")
                 return None
             logging.debug(f"MAIN: Trying to summarize with OpenRouter")
-            summary = summarize_with_openrouter(openrouter_api_key, json_file_path, custom_prompt)
+            summary = summarize_with_openrouter(openrouter_api_key, text, custom_prompt)
         elif api_name.lower() == "llama":
             logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
             llama_token = api_key if api_key else config.get('Local-API', 'llama_token', fallback=None)
-            summary = summarize_with_llama(json_file_path, custom_prompt)
+            summary = summarize_with_llama(text, custom_prompt)
         elif api_name.lower() == "kobold":
             kobold_api_key = api_key if api_key else config.get('Local-API', 'kobold_api_key', fallback=None)
             if not kobold_api_key:
                 logging.error("MAIN: Kobold API key not found.")
                 return None
             logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
-            summary = summarize_with_kobold(kobold_api_key, json_file_path, custom_prompt)
+            summary = summarize_with_kobold(kobold_api_key, text, custom_prompt)
         elif api_name.lower() == "ooba":
             ooba_token = api_key if api_key else config.get('Local-API', 'ooba_api_key', fallback=None)
             ooba_ip = config.get('API', 'ooba_ip', fallback=None)
-            summary = summarize_with_oobabooga(ooba_ip, json_file_path, ooba_token, custom_prompt)
+            summary = summarize_with_oobabooga(ooba_ip, text, ooba_token, custom_prompt)
         elif api_name.lower() == "tabbyapi":
             tabbyapi_key = api_key if api_key else config.get('Local-API', 'tabbyapi_token', fallback=None)
             tabby_model = config.get('Local-API', 'tabby_model', fallback=None)
             summary = summarize_with_tabbyapi(tabby_api_key, config.get('Local-API', 'tabby_api_IP',
                                                                         fallback='http://127.0.0.1:5000/api/v1/generate'),
-                                              json_file_path, tabby_model, custom_prompt)
+                                              text, tabby_model, custom_prompt)
         elif api_name.lower() == "vllm":
             logging.debug(f"MAIN: Trying to summarize with VLLM")
             vllm_api_key = api_key if api_key else config.get('Local-API', 'vllm_api_key', fallback=None)
             summary = summarize_with_vllm(
                 config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions'),
-                vllm_api_key, config.get('API', 'vllm_model', fallback=''), json_file_path, custom_prompt)
+                vllm_api_key, config.get('API', 'vllm_model', fallback=''), text, custom_prompt)
         elif api_name.lower() == "local-llm":
             logging.debug(f"MAIN: Trying to summarize with Local LLM")
-            summary = summarize_with_local_llm(json_file_path, custom_prompt)
+            summary = summarize_with_local_llm(text, custom_prompt)
         elif api_name.lower() == "huggingface":
             logging.debug(f"MAIN: Trying to summarize with huggingface")
             huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
-            summarize_with_huggingface(huggingface_api_key, json_file_path, custom_prompt)
+            summarize_with_huggingface(huggingface_api_key, text, custom_prompt)
         # Add additional API handlers here...
         else:
             logging.warning(f"Unsupported API: {api_name}")
+        if summary is None:
+            logging.debug("Summarization did not return valid text.")
+        if summary:
+            logging.info(f"Summary generated using {api_name} API")
+            # Save the summary file in the same directory as the JSON file
+            summary_file_path = json_file_path.replace('.json', '_summary.txt')
+            with open(summary_file_path, 'w') as file:
+                file.write(summary)
+        else:
+            logging.warning(f"Failed to generate summary using {api_name} API")
+        return summary
     except requests.exceptions.ConnectionError:
             logging.error("Connection error while summarizing")
     except Exception as e:
         logging.error(f"Error summarizing with {api_name}: {str(e)}")
 
-    if summary:
-        logging.info(f"Summary generated using {api_name} API")
-        # Save the summary file in the same directory as the JSON file
-        summary_file_path = json_file_path.replace('.json', '_summary.txt')
-        with open(summary_file_path, 'w') as file:
-            file.write(summary)
-    else:
-        logging.warning(f"Failed to generate summary using {api_name} API")
-
+    return summary
 
 #
 #
@@ -1800,7 +1736,7 @@ def main(input_path, api_name=None, api_key=None,
          set_chunk_txt_by_tokens=False,
          set_max_txt_chunk_tokens=0,
          ):
-    global detail_level_number, summary, audio_file, transcription_result, info_dict
+    global detail_level_number, summary, audio_file, transcription_text, info_dict
 
     detail_level = detail
 
@@ -1822,7 +1758,9 @@ def main(input_path, api_name=None, api_key=None,
 
                 if video_path:
                     audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
-                    transcription_result = {'video_path': path, 'audio_file': audio_file, 'transcription': segments}
+                    transcription_text = {'audio_file': audio_file, 'transcription': segments}
+                    # FIXME - V1
+                    #transcription_text = {'video_path': path, 'audio_file': audio_file, 'transcription': segments}
 
                     if rolling_summarization == True:
                         text = extract_text_from_segments(segments)
@@ -1836,7 +1774,7 @@ def main(input_path, api_name=None, api_key=None,
                         max_paragraphs = set_max_txt_chunk_paragraphs
                         chunk_text_by_tokens = set_chunk_txt_by_tokens
                         max_tokens = set_max_txt_chunk_tokens
-                        # FIXME - Need to add GUI/CLI options for non-recursive summarization
+                        # FIXME
                         summarize_recursively = rolling_summarization
                         verbose = False
                         model = None
@@ -1849,13 +1787,13 @@ def main(input_path, api_name=None, api_key=None,
                                                              )
 
                     elif api_name:
-                        summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
+                        summary = perform_summarization(api_name, transcription_text, custom_prompt, api_key, config)
                     else:
                         summary = None
 
                     if summary:
                         # Save the summary file in the download_path directory
-                        summary_file_path = os.path.join(download_path, f"{transcription_result}_summary.txt")
+                        summary_file_path = os.path.join(download_path, f"{transcription_text}_summary.txt")
                         with open(summary_file_path, 'w') as file:
                             file.write(summary)
 
@@ -1873,19 +1811,20 @@ def main(input_path, api_name=None, api_key=None,
 
                         if video_path:
                             audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
-                            transcription_result = {'video_path': url, 'audio_file': audio_file, 'transcription': segments}
-
+                            # FIXME - V1
+                            #transcription_text = {'video_path': url, 'audio_file': audio_file, 'transcription': segments}
+                            transcription_text = {'audio_file': audio_file, 'transcription': segments}
                             if rolling_summarization:
                                 text = extract_text_from_segments(segments)
                                 summary = summarize_with_detail_openai(text, detail=detail)
                             elif api_name:
-                                summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
+                                summary = perform_summarization(api_name, transcription_text, custom_prompt, api_key, config)
                             else:
                                 summary = None
 
                             if summary:
                                 # Save the summary file in the download_path directory
-                                summary_file_path = os.path.join(download_path, f"{transcription_result}_summary.txt")
+                                summary_file_path = os.path.join(download_path, f"{transcription_text}_summary.txt")
                                 with open(summary_file_path, 'w') as file:
                                     file.write(summary)
 
@@ -1906,19 +1845,19 @@ def main(input_path, api_name=None, api_key=None,
                         logging.error(f"Unsupported media file format: {media_path}")
                         continue
 
-                    transcription_result = {'media_path': path, 'audio_file': media_path, 'transcription': segments}
+                    transcription_text = {'media_path': path, 'audio_file': media_path, 'transcription': segments}
 
                     if rolling_summarization:
                         text = extract_text_from_segments(segments)
                         summary = summarize_with_detail_openai(text, detail=detail)
                     elif api_name:
-                        summary = perform_summarization(api_name, transcription_result, custom_prompt, api_key, config)
+                        summary = perform_summarization(api_name, transcription_text, custom_prompt, api_key, config)
                     else:
                         summary = None
 
                     if summary:
                         # Save the summary file in the download_path directory
-                        summary_file_path = os.path.join(download_path, f"{transcription_result}_summary.txt")
+                        summary_file_path = os.path.join(download_path, f"{transcription_text}_summary.txt")
                         with open(summary_file_path, 'w') as file:
                             file.write(summary)
 
@@ -1928,7 +1867,7 @@ def main(input_path, api_name=None, api_key=None,
             logging.error(f"Error processing {path}: {str(e)}")
             continue
 
-    return transcription_result
+    return transcription_text
 
 
 def signal_handler(sig, frame):
@@ -1950,7 +1889,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     print_hello()
 
-    transcription_result = None
+    transcription_text = None
 
     parser = argparse.ArgumentParser(
         description='Transcribe and summarize videos.',
@@ -2117,9 +2056,6 @@ Sample commands:
         global api_name
         api_name = args.api_name
 
-        # Rolling Summarization will only be performed if an API is specified and the API key is available
-        # and the rolling summarization flag is set
-        #
         summary = None  # Initialize to ensure it's always defined
         if args.detail_level == None:
             args.detail_level = 0.01
@@ -2162,30 +2098,6 @@ Sample commands:
                            set_max_txt_chunk_paragraphs=set_max_txt_chunk_paragraphs,
                            set_chunk_txt_by_tokens=set_chunk_txt_by_tokens,
                            set_max_txt_chunk_tokens=set_max_txt_chunk_tokens)
-            #
-            # results = main(args.input_path, api_name=args.api_name,
-            #                api_key=args.api_key,
-            #                num_speakers=args.num_speakers,
-            #                whisper_model=args.whisper_model,
-            #                offset=args.offset,
-            #                vad_filter=args.vad_filter,
-            #                download_video_flag=args.video,
-            #                custom_prompt=args.custom_prompt,
-            #                overwrite=args.overwrite,
-            #                rolling_summarization=args.rolling_summarization,
-            #                detail=args.detail_level,
-            #                keywords=args.keywords,
-            #                llm_model=args.llm_model,
-            #                time_based=args.time_based,
-            #                set_chunk_txt_by_words=set_chunk_txt_by_words,
-            #                set_max_txt_chunk_words=set_max_txt_chunk_words,
-            #                set_chunk_txt_by_sentences=set_chunk_txt_by_sentences,
-            #                set_max_txt_chunk_sentences=set_max_txt_chunk_sentences,
-            #                set_chunk_txt_by_paragraphs=set_chunk_txt_by_paragraphs,
-            #                set_max_txt_chunk_paragraphs=set_max_txt_chunk_paragraphs,
-            #                set_chunk_txt_by_tokens=set_chunk_txt_by_tokens,
-            #                set_max_txt_chunk_tokens=set_max_txt_chunk_tokens,
-            #                )
 
             logging.info('Transcription process completed.')
             atexit.register(cleanup_process)
