@@ -452,13 +452,23 @@ def print_hello():
 
 # Only to be used when configured with Gradio for HF Space
 
+# New
+def format_transcription(content):
+    # Add extra space after periods for better readability
+    content = content.replace('.', '. ').replace('.  ', '. ')
+    # Split the content into lines for multiline display; assuming simple logic here
+    lines = content.split('. ')
+    # Join lines with HTML line break for better presentation in HTML
+    formatted_content = "<br>".join(lines)
+    return formatted_content
 
-def format_transcription(transcription_text_arg):
-    if transcription_text_arg:
-        json_data = transcription_text_arg['transcription']
-        return json.dumps(json_data, indent=2)
-    else:
-        return ""
+# Old
+# def format_transcription(transcription_text_arg):
+#     if transcription_text_arg:
+#         json_data = transcription_text_arg['transcription']
+#         return json.dumps(json_data, indent=2)
+#     else:
+#         return ""
 
 
 def format_file_path(file_path, fallback_path=None):
@@ -593,13 +603,90 @@ def get_media_id(selected_item, item_mapping):
 
 
 # Function to update the detailed view based on selected item
-def update_detailed_view(selected_item, item_mapping):
-    media_id = item_mapping.get(selected_item)
-    if media_id:
-        prompt_summary_html, content_html = display_item_details(media_id)
-        return gr.update(value=prompt_summary_html), gr.update(value=content_html)
-    return gr.update(value="No details available"), gr.update(value="No details available")
 
+
+# # FIXME Old
+# def update_detailed_view(selected_item, item_mapping):
+#     media_id = item_mapping.get(selected_item)
+#     if media_id:
+#         prompt_summary_html, content_html = display_item_details(media_id)
+#         return gr.update(value=prompt_summary_html), gr.update(value=content_html)
+#     return gr.update(value="No details available"), gr.update(value="No details available")
+
+# Maybe new
+# def updated_detailed_view(item, item_mapping):
+#     if item:
+#         item_id = item_mapping.get(item)
+#         if item_id:
+#             # Fetch details using the fetch_item_details function which returns two values
+#             prompt_summary_results, content = fetch_item_details(item_id)
+#             if prompt_summary_results:
+#                 # Initialize HTML strings to accumulate details
+#                 details_html = "<h4>Details:</h4>"
+#                 # Assume prompt_summary_results contains tuples of (prompt, summary)
+#                 for prompt, summary in prompt_summary_results:
+#                     details_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
+#                     details_html += f"<p><strong>Summary:</strong> {summary}</p>"
+#                 # Format content with a header
+#                 content_html = f"<h4>Transcription:</h4><pre>{content}</pre>"
+#                 return details_html, content_html
+#             else:
+#                 # Handle cases where no details are found
+#                 return "No details available.", "No details available."
+#         else:
+#             # Handle cases where no valid item ID is mapped
+#             return "No item selected", "No item selected"
+#     else:
+#         # Handle cases where no item is selected
+#         return "No item selected", "No item selected"
+
+# 2nd old
+# def update_detailed_view(item, item_mapping):
+#     if item:
+#         item_id = item_mapping.get(item)
+#         if item_id:
+#             prompt_summary_results, content = fetch_item_details(item_id)
+#             if prompt_summary_results:
+#                 # Assuming each result in prompt_summary_results is a tuple (prompt, summary)
+#                 details_html = ""
+#                 for detail in prompt_summary_results:
+#                     details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
+#                     details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
+#                 content_html = f"<h4>Transcription:</h4><pre>{content}</pre><hr>"
+#                 return details_html, content_html
+#             else:
+#                 return "No details available.", "No details available."
+#         else:
+#             return "No item selected", "No item selected"
+#     else:
+#         return "No item selected", "No item selected"
+
+# Newest
+def update_detailed_view(item, item_mapping):
+    if item:
+        item_id = item_mapping.get(item)
+        if item_id:
+            prompt_summary_results, content = fetch_item_details(item_id)
+            if prompt_summary_results:
+                details_html = "<h4>Details:</h4>"
+                for prompt, summary in prompt_summary_results:
+                    details_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
+                    details_html += f"<p><strong>Summary:</strong> {summary}</p>"
+                # Format the transcription content for better readability
+                content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{format_transcription(content)}</div>"
+                return details_html, content_html
+            else:
+                return "No details available.", "No details available."
+        else:
+            return "No item selected", "No item selected"
+    else:
+        return "No item selected", "No item selected"
+
+
+def format_content(content):
+    # Format content using markdown
+    formatted_content = f"```\n{content}\n```"
+    return formatted_content
 
 
 def update_prompt_dropdown():
@@ -1047,7 +1134,8 @@ def launch_ui(demo_mode=False):
                                 )
 
             prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
-            content_output = gr.HTML(label="Content", visible=True)
+            # FIXME - temp change; see if markdown works nicer...
+            content_output = gr.Markdown(label="Content", visible=True)
             items_output.change(fn=update_detailed_view,
                                 inputs=[items_output, item_mapping],
                                 outputs=[prompt_summary_output, content_output]
