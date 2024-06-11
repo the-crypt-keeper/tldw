@@ -670,8 +670,8 @@ def update_detailed_view(item, item_mapping):
             if prompt_summary_results:
                 details_html = "<h4>Details:</h4>"
                 for prompt, summary in prompt_summary_results:
-                    details_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
-                    details_html += f"<p><strong>Summary:</strong> {summary}</p>"
+                    details_html += f"<h4>Prompt:</h4>{prompt}</p>"
+                    details_html += f"<h4>Summary:</h4>{summary}</p>"
                 # Format the transcription content for better readability
                 content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{format_transcription(content)}</div>"
                 return details_html, content_html
