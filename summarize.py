@@ -494,10 +494,8 @@ def search_media(query, fields, keyword, page):
 
 #######################################################
 
-
-# FIXME - Move to 'Web_UI_Lib.py'
-# Gradio Search Function-related stuff
 def display_details(media_id):
+    # Gradio Search Function-related stuff
     if media_id:
         details = display_item_details(media_id)
         details_html = ""
@@ -577,8 +575,8 @@ def browse_items(search_query, search_type):
     return results
 
 
-# Function to display item details
 def display_item_details(media_id):
+    # Function to display item details
     prompt_summary_results, content = fetch_item_details(media_id)
     content_section = f"<h4>Transcription:</h4><pre>{content}</pre><hr>"
     prompt_summary_section = ""
@@ -588,9 +586,8 @@ def display_item_details(media_id):
     return prompt_summary_section, content_section
 
 
-# Function to update the dropdown choices
-# Function to update the dropdown choices
 def update_dropdown(search_query, search_type):
+    # Function to update the dropdown choices
     results = browse_items(search_query, search_type)
     item_options = [f"{item[1]} ({item[2]})" for item in results]
     item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}  # Map item display to media ID
@@ -602,67 +599,8 @@ def get_media_id(selected_item, item_mapping):
     return item_mapping.get(selected_item)
 
 
-# Function to update the detailed view based on selected item
-
-
-# # FIXME Old
-# def update_detailed_view(selected_item, item_mapping):
-#     media_id = item_mapping.get(selected_item)
-#     if media_id:
-#         prompt_summary_html, content_html = display_item_details(media_id)
-#         return gr.update(value=prompt_summary_html), gr.update(value=content_html)
-#     return gr.update(value="No details available"), gr.update(value="No details available")
-
-# Maybe new
-# def updated_detailed_view(item, item_mapping):
-#     if item:
-#         item_id = item_mapping.get(item)
-#         if item_id:
-#             # Fetch details using the fetch_item_details function which returns two values
-#             prompt_summary_results, content = fetch_item_details(item_id)
-#             if prompt_summary_results:
-#                 # Initialize HTML strings to accumulate details
-#                 details_html = "<h4>Details:</h4>"
-#                 # Assume prompt_summary_results contains tuples of (prompt, summary)
-#                 for prompt, summary in prompt_summary_results:
-#                     details_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
-#                     details_html += f"<p><strong>Summary:</strong> {summary}</p>"
-#                 # Format content with a header
-#                 content_html = f"<h4>Transcription:</h4><pre>{content}</pre>"
-#                 return details_html, content_html
-#             else:
-#                 # Handle cases where no details are found
-#                 return "No details available.", "No details available."
-#         else:
-#             # Handle cases where no valid item ID is mapped
-#             return "No item selected", "No item selected"
-#     else:
-#         # Handle cases where no item is selected
-#         return "No item selected", "No item selected"
-
-# 2nd old
-# def update_detailed_view(item, item_mapping):
-#     if item:
-#         item_id = item_mapping.get(item)
-#         if item_id:
-#             prompt_summary_results, content = fetch_item_details(item_id)
-#             if prompt_summary_results:
-#                 # Assuming each result in prompt_summary_results is a tuple (prompt, summary)
-#                 details_html = ""
-#                 for detail in prompt_summary_results:
-#                     details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
-#                     details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
-#                 content_html = f"<h4>Transcription:</h4><pre>{content}</pre><hr>"
-#                 return details_html, content_html
-#             else:
-#                 return "No details available.", "No details available."
-#         else:
-#             return "No item selected", "No item selected"
-#     else:
-#         return "No item selected", "No item selected"
-
-# Newest
 def update_detailed_view(item, item_mapping):
+    # Function to update the detailed view based on selected item
     if item:
         item_id = item_mapping.get(item)
         if item_id:
