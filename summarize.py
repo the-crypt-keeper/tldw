@@ -713,9 +713,7 @@ def launch_ui(demo_mode=False):
 
             # URL input is always visible
             url_input = gr.Textbox(label="URL (Mandatory) --> Playlist URLs will be stripped and only the linked video"
-                                         " will be downloaded)", placeholder="Enter the video URL here")
-            #            url_input = gr.Textbox(label="URL (Mandatory) --> Playlist URLs will be stripped and only the linked video"
-            #                                         " will be downloaded)", placeholder="Enter the video URL here")
+                                         " will be downloaded)", placeholder="Enter the video URL here. Multiple at once supported, one per line")
 
             # Inputs to be shown or hidden
             num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)",
@@ -785,6 +783,9 @@ def launch_ui(demo_mode=False):
                 max_sentences_input, chunk_text_by_paragraphs_checkbox, max_paragraphs_input,
                 chunk_text_by_tokens_checkbox, max_tokens_input
             ]
+
+
+            # FIgure out how to check for url vs list of urls
 
             all_inputs = [url_input] + inputs
 
@@ -988,6 +989,7 @@ def launch_ui(demo_mode=False):
             all_inputs = [url_input] + inputs
 
             # lets try embedding the theme here - FIXME?
+            # Adding a check in process_url to identify if passed multiple URLs or just one
             gr.Interface(
                 fn=process_url,
                 inputs=all_inputs,
@@ -999,69 +1001,8 @@ def launch_ui(demo_mode=False):
                 allow_flagging="never"
             )
 
-            def process_video_urls(url_list):
-                urls = url_list.strip().split('\n')
-                progress = []  # This must always be a list
-                transcriptions = []  # This must always be a list
 
-                def update_progress(index, url, transcription):
-                    # Make sure to format transcription properly as a string for display or further processing
-                    transcription_str = json.dumps(transcription, indent=2)
-                    progress.append(f"Processed {index + 1}/{len(urls)}: {url}")  # Append to list
-                    transcriptions.append(transcription_str)  # Append to list
-                    return "\n".join(progress), "\n".join(transcriptions)  # Return strings for display
-
-                for index, url in enumerate(urls):
-                    try:
-                        transcription, summary, json_file_path, summary_file_path, _, _ = process_url(
-                            url=url,
-                            num_speakers=2,
-                            whisper_model="small.en",
-                            custom_prompt=None,
-                            offset=0,
-                            api_name=None,
-                            api_key=None,
-                            vad_filter=False,
-                            download_video_flag=False,
-                            download_audio=False,
-                            rolling_summarization=False,
-                            detail_level=0.01,
-                            question_box=None,
-                            keywords="default,no_keyword_set",
-                            chunk_text_by_words=False,
-                            max_words=0,
-                            chunk_text_by_sentences=False,
-                            max_sentences=0,
-                            chunk_text_by_paragraphs=False,
-                            max_paragraphs=0,
-                            chunk_text_by_tokens=False,
-                            max_tokens=0
-                        )
-                        # Update progress and transcription properly
-                        current_progress, current_transcriptions = update_progress(index, url, transcription)
-                    except Exception as e:
-                        current_progress, _ = update_progress(index, url, f"Error: {str(e)}")
-
-                return current_progress, current_transcriptions
-
-        # Tab 2: Scrape & Summarize Multiple videos into the DB
-        with gr.Tab("Batch Processing"):
-            url_list_input = gr.Textbox(
-                label="Video URLs (one per line)",
-                placeholder="Enter video URLs, one per line",
-                lines=10
-            )
-            process_button = gr.Button("Process URLs")
-            progress_output = gr.Textbox(label="Progress")
-            transcriptions_output = gr.Textbox(label="Transcriptions")
-
-            process_button.click(
-                fn=process_video_urls,
-                inputs=url_list_input,
-                outputs=[progress_output, transcriptions_output]
-            )
-
-        # Tab 3: Transcribe & Summarize Audio file
+        # Tab 2: Transcribe & Summarize Audio file
         with gr.Tab("Audio File Processing"):
             audio_url_input = gr.Textbox(
                 label="Audio File URL",
@@ -1078,7 +1019,7 @@ def launch_ui(demo_mode=False):
                 outputs=[audio_progress_output, audio_transcriptions_output]
             )
 
-        # Tab 4: Scrape & Summarize Articles/Websites
+        # Tab 3: Scrape & Summarize Articles/Websites
         with gr.Tab("Scrape & Summarize Articles/Websites"):
             url_input = gr.Textbox(label="Article URL", placeholder="Enter the article URL here")
             custom_article_title_input = gr.Textbox(label="Custom Article Title (Optional)",
@@ -1115,7 +1056,7 @@ def launch_ui(demo_mode=False):
                                      inputs=[text_input, custom_prompt_input, api_name_input, api_key_input,
                                              keywords_input, custom_article_title_input], outputs=text_ingest_result)
 
-        # Tab 5: Ingest & Summarize Documents
+        # Tab 4: Ingest & Summarize Documents
         with gr.Tab("Ingest & Summarize Documents"):
             gr.Markdown("Plan to put ingestion form for documents here")
             gr.Markdown("Will ingest documents and store into SQLite DB")
@@ -1592,6 +1533,17 @@ def process_url(
     if not url and not local_file_path:
         return "Process_URL: No URL provided.", "No URL provided.", None, None, None, None, None, None
 
+    # FIXME - Chatgpt again?
+    if isinstance(url, str):
+        urls = url.strip().split('\n')
+        if len(urls) > 1:
+            return process_video_urls(urls, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
+                                      download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
+                                      keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
+                                      chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens)
+        else:
+            url = urls[0]
+
     if url and not is_valid_url(url):
         return "Process_URL: Invalid URL format.", "Invalid URL format.", None, None, None, None, None, None
 
@@ -1722,6 +1674,55 @@ def process_url(
     except Exception as e:
         logging.error(f": {e}")
         return str(e), 'process_url: Error processing the request.', None, None, None, None
+
+# Handle multiple videos as input
+# Handle multiple videos as input
+def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
+                       download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
+                       keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
+                       chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens):
+    progress = []  # This must always be a list
+    transcriptions = []  # This must always be a list
+
+    def update_progress(index, url, transcription):
+        # Make sure to format transcription properly as a string for display or further processing
+        transcription_str = json.dumps(transcription, indent=2)
+        progress.append(f"Processed {index + 1}/{len(url_list)}: {url}")  # Append to list
+        transcriptions.append(transcription_str)  # Append to list
+        return "\n".join(progress), "\n".join(transcriptions)  # Return strings for display
+
+    for index, url in enumerate(url_list):
+        try:
+            transcription, summary, json_file_path, summary_file_path, _, _ = process_url(
+                url=url,
+                num_speakers=num_speakers,
+                whisper_model=whisper_model,
+                custom_prompt=custom_prompt,
+                offset=offset,
+                api_name=api_name,
+                api_key=api_key,
+                vad_filter=vad_filter,
+                download_video_flag=download_video_flag,
+                download_audio=download_audio,
+                rolling_summarization=rolling_summarization,
+                detail_level=detail_level,
+                question_box=question_box,
+                keywords=keywords,
+                chunk_text_by_words=chunk_text_by_words,
+                max_words=max_words,
+                chunk_text_by_sentences=max_sentences,
+                max_sentences=max_sentences,
+                chunk_text_by_paragraphs=chunk_text_by_paragraphs,
+                max_paragraphs=max_paragraphs,
+                chunk_text_by_tokens=chunk_text_by_tokens,
+                max_tokens=max_tokens
+            )
+            # Update progress and transcription properly
+            current_progress, current_transcriptions = update_progress(index, url, transcription)
+        except Exception as e:
+            current_progress, _ = update_progress(index, url, f"Error: {str(e)}")
+
+    return current_progress, current_transcriptions
 
 
 # FIXME - Prompt sample box
