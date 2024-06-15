@@ -694,8 +694,8 @@ def launch_ui(demo_mode=False):
     # Set theme value with https://www.gradio.app/guides/theming-guide - 'theme='
     my_theme = gr.Theme.from_hub("gradio/seafoam")
     with gr.Blocks(theme=my_theme) as iface:
-        # Tab 1: Audio Transcription + Summarization
-        with gr.Tab("Audio Transcription + Summarization"):
+        # Tab 1: Video Transcription + Summarization
+        with gr.Tab("Video Transcription + Summarization"):
 
             with gr.Row():
                 # Light/Dark mode toggle switch
@@ -726,10 +726,10 @@ def launch_ui(demo_mode=False):
             custom_prompt_input = gr.Textbox(
                 label="Custom Prompt (Customize your summarization, or ask a question about the video and have it "
                       "answered)\n Does not work against the summary currently.",
-                placeholder="Above is the transcript of a video. Please read "
+                placeholder="Above is the transcript of a podcast. Please read "
                             "through the transcript carefully. Identify the main topics that are discussed over the "
-                            "course of the transcript. Then, summarize the key points about each main topic in a "
-                            "concise bullet point. The bullet points should cover the key information conveyed about "
+                            "course of the transcript. Then, summarize the key points about each main topic in"
+                            " bullet points. The bullet points should cover the key information conveyed about "
                             "each topic in the video, but should be much shorter than the full transcript. Please "
                             "output your bullet point summary inside <bulletpoints> tags.",
                 lines=3, visible=True)
@@ -999,7 +999,86 @@ def launch_ui(demo_mode=False):
                 allow_flagging="never"
             )
 
-        # Tab 2: Scrape & Summarize Articles/Websites
+            def process_video_urls(url_list):
+                urls = url_list.strip().split('\n')
+                progress = []  # This must always be a list
+                transcriptions = []  # This must always be a list
+
+                def update_progress(index, url, transcription):
+                    # Make sure to format transcription properly as a string for display or further processing
+                    transcription_str = json.dumps(transcription, indent=2)
+                    progress.append(f"Processed {index + 1}/{len(urls)}: {url}")  # Append to list
+                    transcriptions.append(transcription_str)  # Append to list
+                    return "\n".join(progress), "\n".join(transcriptions)  # Return strings for display
+
+                for index, url in enumerate(urls):
+                    try:
+                        transcription, summary, json_file_path, summary_file_path, _, _ = process_url(
+                            url=url,
+                            num_speakers=2,
+                            whisper_model="small.en",
+                            custom_prompt=None,
+                            offset=0,
+                            api_name=None,
+                            api_key=None,
+                            vad_filter=False,
+                            download_video_flag=False,
+                            download_audio=False,
+                            rolling_summarization=False,
+                            detail_level=0.01,
+                            question_box=None,
+                            keywords="default,no_keyword_set",
+                            chunk_text_by_words=False,
+                            max_words=0,
+                            chunk_text_by_sentences=False,
+                            max_sentences=0,
+                            chunk_text_by_paragraphs=False,
+                            max_paragraphs=0,
+                            chunk_text_by_tokens=False,
+                            max_tokens=0
+                        )
+                        # Update progress and transcription properly
+                        current_progress, current_transcriptions = update_progress(index, url, transcription)
+                    except Exception as e:
+                        current_progress, _ = update_progress(index, url, f"Error: {str(e)}")
+
+                return current_progress, current_transcriptions
+
+        # Tab 2: Scrape & Summarize Multiple videos into the DB
+        with gr.Tab("Batch Processing"):
+            url_list_input = gr.Textbox(
+                label="Video URLs (one per line)",
+                placeholder="Enter video URLs, one per line",
+                lines=10
+            )
+            process_button = gr.Button("Process URLs")
+            progress_output = gr.Textbox(label="Progress")
+            transcriptions_output = gr.Textbox(label="Transcriptions")
+
+            process_button.click(
+                fn=process_video_urls,
+                inputs=url_list_input,
+                outputs=[progress_output, transcriptions_output]
+            )
+
+        # Tab 3: Transcribe & Summarize Audio file
+        with gr.Tab("Audio File Processing"):
+            audio_url_input = gr.Textbox(
+                label="Audio File URL",
+                placeholder="Enter the URL of the audio file"
+            )
+            audio_file_input = gr.File(label="Upload Audio File", file_types=["audio/*"])
+            process_audio_button = gr.Button("Process Audio File")
+            audio_progress_output = gr.Textbox(label="Progress")
+            audio_transcriptions_output = gr.Textbox(label="Transcriptions")
+
+            process_audio_button.click(
+                fn=process_audio_file,
+                inputs=[audio_url_input, audio_file_input],
+                outputs=[audio_progress_output, audio_transcriptions_output]
+            )
+
+        # Tab 4: Scrape & Summarize Articles/Websites
         with gr.Tab("Scrape & Summarize Articles/Websites"):
             url_input = gr.Textbox(label="Article URL", placeholder="Enter the article URL here")
             custom_article_title_input = gr.Textbox(label="Custom Article Title (Optional)",
@@ -1036,6 +1115,7 @@ def launch_ui(demo_mode=False):
                                      inputs=[text_input, custom_prompt_input, api_name_input, api_key_input,
                                              keywords_input, custom_article_title_input], outputs=text_ingest_result)
 
+        # Tab 5: Ingest & Summarize Documents
         with gr.Tab("Ingest & Summarize Documents"):
             gr.Markdown("Plan to put ingestion form for documents here")
             gr.Markdown("Will ingest documents and store into SQLite DB")
@@ -1056,6 +1136,7 @@ def launch_ui(demo_mode=False):
                 # Show only specific elements if advanced mode is off
                 return {elem: gr.update(visible=elem in simple_mode_elements) for elem in all_elements}
 
+    # Top-Level Gradio Tab #2 - 'Search / Detailed View'
     with gr.Blocks() as search_interface:
         with gr.Tab("Search Ingested Materials / Detailed Entry View / Prompts"):
             search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
@@ -1078,7 +1159,7 @@ def launch_ui(demo_mode=False):
                                 inputs=[items_output, item_mapping],
                                 outputs=[prompt_summary_output, content_output]
                                 )
-
+        # sub-tab #2 for Search / Detailed view
         with gr.Tab("View Prompts"):
             with gr.Column():
                 prompt_dropdown = gr.Dropdown(
@@ -1097,7 +1178,9 @@ def launch_ui(demo_mode=False):
                     fn=update_prompt_dropdown,
                     outputs=prompt_dropdown
                 )
+
         # FIXME
+        # Sub-tab #3 for Search / Detailed view
         with gr.Tab("Search Prompts"):
             with gr.Column():
                 search_query_input = gr.Textbox(label="Search Query (It's broken)",
@@ -1117,6 +1200,7 @@ def launch_ui(demo_mode=False):
                     outputs=[search_results_output]
                 )
 
+        # Sub-tab #4 for Search / Detailed view
         with gr.Tab("Add Prompts"):
             gr.Markdown("### Add Prompt")
             title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
@@ -1132,6 +1216,7 @@ def launch_ui(demo_mode=False):
                 outputs=add_prompt_output
             )
 
+    # Top-Level Gradio Tab #3
     with gr.Blocks() as llamafile_interface:
         with gr.Tab("Llamafile Settings"):
             gr.Markdown("Settings for Llamafile")
@@ -1199,6 +1284,7 @@ def launch_ui(demo_mode=False):
                 outputs=output_display
             )
 
+        # Secon sub-tab for Llamafile
         with gr.Tab("Llamafile Chat Interface"):
             gr.Markdown("Page to interact with Llamafile Server (iframe to Llamafile server port)")
             # Define the HTML content with the iframe
@@ -1229,6 +1315,7 @@ def launch_ui(demo_mode=False):
             """
             gr.HTML(html_content)
 
+    # Top-Level Gradio Tab #4 - Don't ask me how this is tabbed, but it is... #FIXME
     export_keywords_interface = gr.Interface(
         fn=export_keywords_to_csv,
         inputs=[],
@@ -1242,6 +1329,7 @@ def launch_ui(demo_mode=False):
         # Placeholder for actual import functionality
         return "Data imported successfully"
 
+    # Top-Level Gradio Tab #5 - Export/Import - Same deal as above, not sure why this is auto-tabbed
     import_interface = gr.Interface(
         fn=import_data,
         inputs=gr.File(label="Upload file for import"),
@@ -1250,6 +1338,7 @@ def launch_ui(demo_mode=False):
         description="Import data into the database from a CSV file."
     )
 
+    # Top-Level Gradio Tab #6 - Export/Import - Same deal as above, not sure why this is auto-tabbed
     import_export_tab = gr.TabbedInterface(
         [gr.TabbedInterface(
             [gr.Interface(
@@ -1273,6 +1362,7 @@ def launch_ui(demo_mode=False):
         ["Export", "Import"]
     )
 
+    # Second sub-tab for Keywords tab
     keyword_add_interface = gr.Interface(
         fn=add_keyword,
         inputs=gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here..."),
@@ -1282,6 +1372,7 @@ def launch_ui(demo_mode=False):
         allow_flagging="never"
     )
 
+    # Third sub-tab for Keywords tab
     keyword_delete_interface = gr.Interface(
         fn=delete_keyword,
         inputs=gr.Textbox(label="Delete Keyword", placeholder="Enter keyword to delete here..."),
@@ -1291,6 +1382,7 @@ def launch_ui(demo_mode=False):
         allow_flagging="never"
     )
 
+    # First sub-tab for Keywords tab
     browse_keywords_interface = gr.Interface(
         fn=keywords_browser_interface,
         inputs=[],
@@ -1299,6 +1391,8 @@ def launch_ui(demo_mode=False):
         description="View all keywords currently stored in the database."
     )
 
+    # Combine the keyword interfaces into a tabbed interface
+    # So this is how it works... #FIXME
     keyword_tab = gr.TabbedInterface(
         [browse_keywords_interface, keyword_add_interface, keyword_delete_interface],
         ["Browse Keywords", "Add Keywords", "Delete Keywords"]
@@ -1348,6 +1442,7 @@ def launch_ui(demo_mode=False):
            "a webm file for you to download. </br><em>If you want a full-featured one:</em> " \
            "<strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>"
 
+    # Sixth Top Tab - Download Video/Audio Files
     download_videos_interface = gr.Interface(
         fn=gradio_download_youtube_video,
         inputs=gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here"),
@@ -1361,7 +1456,7 @@ def launch_ui(demo_mode=False):
     tabbed_interface = gr.TabbedInterface(
         [iface, search_interface, llamafile_interface, keyword_tab, import_export_tab, download_videos_interface],
         ["Transcription / Summarization / Ingestion", "Search / Detailed View",
-         "Llamafile Interface", "Keywords", "Export/Import", "Download Video/Audio Files"])
+         "Local LLM with Llamafile", "Keywords", "Export/Import", "Download Video/Audio Files"])
 
     # Launch the interface
     server_port_variable = 7860
@@ -1391,6 +1486,72 @@ def extract_video_info(url):
     return info_dict, title
 
 
+def download_audio_file(url, save_path):
+    response = requests.get(url, stream=True)
+    file_size = int(response.headers.get('content-length', 0))
+    if file_size > 500 * 1024 * 1024:  # 500 MB limit
+        raise ValueError("File size exceeds the 500MB limit.")
+    with open(save_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+    return save_path
+
+def process_audio_file(audio_url, audio_file):
+    progress = []
+    transcriptions = []
+
+    def update_progress(stage, message):
+        progress.append(f"{stage}: {message}")
+        return "\n".join(progress), "\n".join(transcriptions)
+
+    try:
+        if audio_url:
+            # Process audio file from URL
+            save_path = Path("downloaded_audio_file.wav")
+            download_audio_file(audio_url, save_path)
+        elif audio_file:
+            # Process uploaded audio file
+            audio_file_size = os.path.getsize(audio_file.name)
+            if audio_file_size > 500 * 1024 * 1024:  # 500 MB limit
+                return update_progress("Error", "File size exceeds the 500MB limit.")
+            save_path = Path(audio_file.name)
+        else:
+            return update_progress("Error", "No audio file provided.")
+
+        # Perform transcription and summarization
+        transcription, summary, json_file_path, summary_file_path, _, _ = process_url(
+            url=None,
+            num_speakers=2,
+            whisper_model="small.en",
+            custom_prompt=None,
+            offset=0,
+            api_name=None,
+            api_key=None,
+            vad_filter=False,
+            download_video_flag=False,
+            download_audio=False,
+            rolling_summarization=False,
+            detail_level=0.01,
+            question_box=None,
+            keywords="default,no_keyword_set",
+            chunk_text_by_words=False,
+            max_words=0,
+            chunk_text_by_sentences=False,
+            max_sentences=0,
+            chunk_text_by_paragraphs=False,
+            max_paragraphs=0,
+            chunk_text_by_tokens=False,
+            max_tokens=0,
+            local_file_path=str(save_path)
+        )
+        transcriptions.append(transcription)
+        progress.append("Processing complete.")
+    except Exception as e:
+        progress.append(f"Error: {str(e)}")
+
+    return "\n".join(progress), "\n".join(transcriptions)
+
+
 def process_url(
         url,
         num_speakers,
@@ -1404,6 +1565,7 @@ def process_url(
         download_audio,
         rolling_summarization,
         detail_level,
+        # It's for the asking a question about a returned prompt - needs to be removed #FIXME
         question_box,
         keywords,
         chunk_text_by_words,
@@ -1413,7 +1575,8 @@ def process_url(
         chunk_text_by_paragraphs,
         max_paragraphs,
         chunk_text_by_tokens,
-        max_tokens
+        max_tokens,
+        local_file_path=None
 ):
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
@@ -1426,22 +1589,87 @@ def process_url(
     set_max_txt_chunk_tokens = max_tokens
 
     # Validate input
-    if not url:
+    if not url and not local_file_path:
         return "Process_URL: No URL provided.", "No URL provided.", None, None, None, None, None, None
 
-    if not is_valid_url(url):
+    if url and not is_valid_url(url):
         return "Process_URL: Invalid URL format.", "Invalid URL format.", None, None, None, None, None, None
 
-    # Clean the URL to remove playlist parameters if any
-    url = clean_youtube_url(url)
-    logging.info(f"Process_URL: Processing URL: {url}")
+    if url:
+        # Clean the URL to remove playlist parameters if any
+        url = clean_youtube_url(url)
+        logging.info(f"Process_URL: Processing URL: {url}")
 
-    print("Process_URL: API Name received:", api_name)  # Debugging line
+    if api_name:
+        print("Process_URL: API Name received:", api_name)  # Debugging line
 
-    logging.info(f"Process_URL: Processing URL: {url}")
     video_file_path = None
     global info_dict
 
+    # FIXME - need to handle local audio file processing
+    # If Local audio file is provided
+    if local_file_path:
+        try:
+            pass
+            # # insert code to process local audio file
+            # # Need to be able to add a title/author/etc for ingestion into the database
+            # # Also want to be able to optionally _just_ ingest it, and not ingest.
+            # # FIXME
+            # #download_path = create_download_directory(title)
+            # #audio_path = download_video(url, download_path, info_dict, download_video_flag)
+            #
+            # audio_file_path = local_file_path
+            # global segments
+            # audio_file_path, segments = perform_transcription(audio_file_path, offset, whisper_model, vad_filter)
+            #
+            # if audio_file_path is None or segments is None:
+            #     logging.error("Process_URL: Transcription failed or segments not available.")
+            #     return "Process_URL: Transcription failed.", "Transcription failed.", None, None, None, None
+            #
+            # logging.debug(f"Process_URL: Transcription audio_file: {audio_file_path}")
+            # logging.debug(f"Process_URL: Transcription segments: {segments}")
+            #
+            # transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
+            # logging.debug(f"Process_URL: Transcription text: {transcription_text}")
+            #
+            # if rolling_summarization:
+            #     text = extract_text_from_segments(segments)
+            #     summary_text = rolling_summarize_function(
+            #         transcription_text,
+            #         detail=detail_level,
+            #         api_name=api_name,
+            #         api_key=api_key,
+            #         custom_prompt=custom_prompt,
+            #         chunk_by_words=chunk_text_by_words,
+            #         max_words=max_words,
+            #         chunk_by_sentences=chunk_text_by_sentences,
+            #         max_sentences=max_sentences,
+            #         chunk_by_paragraphs=chunk_text_by_paragraphs,
+            #         max_paragraphs=max_paragraphs,
+            #         chunk_by_tokens=chunk_text_by_tokens,
+            #         max_tokens=max_tokens
+            #     )
+            # if api_name:
+            #     summary_text = perform_summarization(api_name, segments_json_path, custom_prompt, api_key, config)
+            #     if summary_text is None:
+            #         logging.error("Summary text is None. Check summarization function.")
+            #         summary_file_path = None  # Set summary_file_path to None if summary is not generated
+            # else:
+            #     summary_text = 'Summary not available'
+            #     summary_file_path = None  # Set summary_file_path to None if summary is not generated
+            #
+            # json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path)
+            #
+            # add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt, whisper_model)
+            #
+            # return transcription_text, summary_text, json_file_path, summary_file_path, None, None
+
+        except Exception as e:
+            logging.error(f": {e}")
+            return str(e), 'process_url: Error processing the request.', None, None, None, None
+
+
+    # If URL/Local video file is provided
     try:
         info_dict, title = extract_video_info(url)
         download_path = create_download_directory(title)
