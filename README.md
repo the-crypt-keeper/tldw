@@ -1,6 +1,6 @@
 # **TL/DW: Too Long, Didnt Watch**
-## Download, Transcribe & Summarize Videos. All automated (+ More)
-#### More: Website Article scraping+summarization, Full-Text-Search across everything ingested, Local LLM inference as part of the script for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
+## Download, Transcribe & Summarize: Video+Audio+Documents+Articles & Books(WIP). All automated 
+#### More: Full-Text-Search across everything ingested, Local LLM inference as part of the script for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
 #### Demo may be broken but should be working. If it's not, let me know. (HF dev spaces is touchy...)
 
@@ -15,11 +15,11 @@
 
 ### <a name="what"></a> What is this (TL/DW)?
 - **Don't care, give me code**
-  - Take a URL, a single video, a list of URLs, or list of local videos + URLs, one per line in a text file, and feed it into the script and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
+  - Take a URL, a single video, a list of URLs, or list of local videos + URLs, one per line in a text file, and feed it into the script(or GUI) and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
   * `git clone https://github.com/rmusser01/tldw` -> `cd tldw` -> `python -m venv .\` -> `. .\scripts\activate.ps1` -> `pip install -r requirements.txt` -> 
     * CLI usage: `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api openai -k tag_one tag_two tag_three` 
     - GUI usage: `python summarize.py -gui`
-    - GUI with local LLM: `python summarize.py -gui --local_llama`
+    - GUI with local LLM: `python summarize.py -gui --local_llama` (will ask you questions about which model to download)
   - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
     - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
 - **Short Summary**
@@ -38,8 +38,9 @@ For commercial API usage, I personally recommend Claude Sonnet. It's great quali
 
 For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.2 model:
   * https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
+  * Reason being is that its 'good enough', otherwise would recommend Command-R+, either self-hosted, or through a personal API key (it's free for 1k requests a month...)
 
-Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruct, which you can get in a GGUF format from here: https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF
+Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct, which you can get in a GGUF format from here: https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
   * Or you can let the script download and run a local server for you, using llama.cpp/llamafile and one of the above models. 
     * (It'll ask you if you want to download one, and if so, which one out of a choice of 3) 
 ----------
@@ -54,7 +55,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
 ----------
 
 ### Quickstart
-  1. Update your drivers.
+  1. Update your drivers. (I.e. CUDA for Nvidia GPUs, or AMD drivers (ROCM) for AMD GPUs )
      - Windows CUDA: https://developer.nvidia.com/cuda-downloads?target_os=Windows
   2. Install Python3 for your platform - https://www.python.org/downloads/
   3. Download the repo: `git clone https://github.com/rmusser01/tldw` or manually download it (Green code button, upper right corner -> Download ZIP) and extract it to a folder of your choice.
@@ -84,7 +85,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
 - **Download a Video with Audio from a URL:**
   * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`s
 
-- **Perform a 'rolling' summarization of a longer transcript**
+- **Perform a summarization of a longer transcript using 'Chunking'**
   * `python summarize.py -roll -detail 0.01 https://www.youtube.com/watch?v=4nd1CDZP21s`
     * Detail can go from `0.01` to `1.00`, increments at a measure of `.01`.
 
@@ -193,7 +194,7 @@ options:
   -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
                         Number of speakers (default: 2)
   -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
-                        Whisper model (default: small.en)
+                        Whisper model (default: small)| Options: tiny.en, tiny, base.en, base, small.en, small, medium.en, medium, large-v1, large-v2, large-v3, large, distil-large-v2, distil-medium.en, distil-small.en, distil-large-v3
   -off OFFSET, --offset OFFSET
                         Offset in seconds (default: 0)
   -vad, --vad_filter    Enable VAD filter
@@ -213,10 +214,6 @@ options:
                         Mandatory if rolling summarization is enabled, defines the chunk  size.
                          Default is 0.01(lots of chunks) -> 1.00 (few chunks)
                          Currently only OpenAI works.
-  --chunk_duration CHUNK_DURATION
-                        Duration of each chunk in seconds
-  -time TIME_BASED, --time_based TIME_BASED
-                        Enable time-based summarization and specify the chunk duration in seconds (minimum 60 seconds, increments of 30 seconds)
   -model LLM_MODEL, --llm_model LLM_MODEL
                         Model to use for LLM summarization (only used for vLLM/TabbyAPI)
   -k KEYWORDS [KEYWORDS ...], --keywords KEYWORDS [KEYWORDS ...]
@@ -226,7 +223,7 @@ options:
   --server_mode         Run in server mode (This exposes the GUI/Server to the network)
   --share_public SHARE_PUBLIC
                         This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)
-  --port PORT           Port to run the server on
+  --port PORT           Port to run the server on (default: 7860)
 
 
 Sample commands:
@@ -261,7 +258,7 @@ Sample commands:
 - Run it as a WebApp:
   >`python summarize.py -gui
 
-By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
+By default, videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
 
 
 ------------
@@ -307,6 +304,20 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 
 
 ### <a name="pieces"></a>Pieces & What's in the original repo?
+- **What's in the Repo currently?**
+  1. `summarize.py` - Main script for downloading, transcribing, and summarizing videos, audio files, books and documents.
+  2. `config.txt` - Config file used for settings for main app.
+  3. `requirements.txt` - Packages to install for Nvidia GPUs
+  4. `AMD_requirements.txt` - Packages to install for AMD GPUs
+  5. `llamafile` - Llama.cpp wrapper for local LLM inference, is multi-platform and multi-LLM compatible.
+  6. media_summary.db - SQLite DB that stores all the data ingested, transcribed, and summarized.
+  7. `prompts.db` - SQLite DB that stores all the prompts.
+  8. `App_Function_Libraries` Folder - Folder containing all of the applications function libraries
+  9. `Tests` Folder - Folder containing tests for the application (ha.)
+  10. `Helper_Scripts` - Folder containing helper scripts for the application
+  11. `HF` - Docker file and requirements.txt for Huggingface Spaces hosting
+  12. `models` - Folder containing the models for the speaker diarization LLMs
+  12. `tldw-original-scripts` - Original scripts from the original repo
 - **What's in the original repo?**
   - `summarize.py` - download, transcribe and summarize audio
     1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
@@ -342,5 +353,8 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 - [pyannote](https://github.com/pyannote/pyannote-audio)
 - Thank you cognitivetech for the system prompt(not yet implemented...): https://github.com/cognitivetech/llm-long-text-summarization/tree/main?tab=readme-ov-file#one-shot-prompting
 - [Fabric](https://github.com/danielmiessler/fabric)
+- [Llamafile](https://github.com/Mozilla-Ocho/llamafile) - For the local LLM inference engine
+- [Mikupad](https://github.com/lmg-anon/mikupad) - Because I'm not going to write a whole new frontend for non-chat writing.
 - The people who have helped me get to this point, and especially for those not around to see it(DT & CC).
+
 ### 
