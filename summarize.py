@@ -45,7 +45,6 @@ from App_Function_Libraries.Video_DL_Ingestion_Lib import *
 from App_Function_Libraries.Video_DL_Ingestion_Lib import normalize_title
 # from App_Function_Libraries.Web_UI_Lib import *
 
-
 # 3rd-Party Module Imports
 from bs4 import BeautifulSoup
 import gradio as gr
@@ -1225,7 +1224,7 @@ def launch_ui(demo_mode=False):
                 outputs=output_display
             )
 
-        # Secon sub-tab for Llamafile
+        # Second sub-tab for Llamafile
         with gr.Tab("Llamafile Chat Interface"):
             gr.Markdown("Page to interact with Llamafile Server (iframe to Llamafile server port)")
             # Define the HTML content with the iframe
@@ -1254,6 +1253,12 @@ def launch_ui(demo_mode=False):
             </body>
             </html>
             """
+            gr.HTML(html_content)
+
+        # Third sub-tab for Llamafile
+        # https://github.com/lmg-anon/mikupad/releases
+        with gr.Tab("Mikupad Chat Interface"):
+            gr.Markdown("Not implemented. Have to wait until I get rid of Gradio")
             gr.HTML(html_content)
 
     # Top-Level Gradio Tab #4 - Don't ask me how this is tabbed, but it is... #FIXME
@@ -1529,6 +1534,10 @@ def process_url(
     set_chunk_txt_by_tokens = chunk_text_by_tokens
     set_max_txt_chunk_tokens = max_tokens
 
+    progress = []
+    success_message = "All videos processed successfully. Transcriptions and summaries have been ingested into the database."
+
+
     # Validate input
     if not url and not local_file_path:
         return "Process_URL: No URL provided.", "No URL provided.", None, None, None, None, None, None
@@ -1542,7 +1551,7 @@ def process_url(
                                       keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
                                       chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens)
         else:
-            url = urls[0]
+            urls = [url]
 
     if url and not is_valid_url(url):
         return "Process_URL: Invalid URL format.", "Invalid URL format.", None, None, None, None, None, None
@@ -1682,14 +1691,13 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt, off
                        keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
                        chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens):
     progress = []  # This must always be a list
-    transcriptions = []  # This must always be a list
+    status = []  # This must always be a list
 
-    def update_progress(index, url, transcription):
-        # Make sure to format transcription properly as a string for display or further processing
-        transcription_str = json.dumps(transcription, indent=2)
-        progress.append(f"Processed {index + 1}/{len(url_list)}: {url}")  # Append to list
-        transcriptions.append(transcription_str)  # Append to list
-        return "\n".join(progress), "\n".join(transcriptions)  # Return strings for display
+    def update_progress(index, url, message):
+        progress.append(f"Processing {index + 1}/{len(url_list)}: {url}")  # Append to list
+        status.append(message)  # Append to list
+        return "\n".join(progress), "\n".join(status)  # Return strings for display
+
 
     for index, url in enumerate(url_list):
         try:
@@ -1718,11 +1726,12 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt, off
                 max_tokens=max_tokens
             )
             # Update progress and transcription properly
-            current_progress, current_transcriptions = update_progress(index, url, transcription)
+            current_progress, current_status = update_progress(index, url, "Video processed and ingested into the database.")
         except Exception as e:
-            current_progress, _ = update_progress(index, url, f"Error: {str(e)}")
+            current_progress, current_status = update_progress(index, url, f"Error: {str(e)}")
 
-    return current_progress, current_transcriptions
+    success_message = "All videos have been transcribed, summarized, and ingested into the database successfully."
+    return current_progress, success_message, None, None, None, None
 
 
 # FIXME - Prompt sample box

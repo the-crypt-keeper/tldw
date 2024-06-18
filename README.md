@@ -55,6 +55,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-128k-instruc
 
 ### Quickstart
   1. Update your drivers.
+     - Windows CUDA: https://developer.nvidia.com/cuda-downloads?target_os=Windows
   2. Install Python3 for your platform - https://www.python.org/downloads/
   3. Download the repo: `git clone https://github.com/rmusser01/tldw` or manually download it (Green code button, upper right corner -> Download ZIP) and extract it to a folder of your choice.
   4. Open a terminal, navigate to the directory you cloned the repo to, or unzipped the downloaded zip file to, and run the following commands:
