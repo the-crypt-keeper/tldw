@@ -116,7 +116,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`
     5. Create a virtual env: `python -m venv ./`
-    6. Launch/activate your virtual env: `. .\scripts\activate.sh`
+    6. Launch/activate your virtual environment: `source /venv/scripts/activate.sh`
     7. Setup the necessary python packages:
        * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
        * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
