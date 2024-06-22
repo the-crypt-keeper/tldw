@@ -34,7 +34,12 @@
     * On the to-do list to see about creating some form of structure within the plain text to make review/reconstruction a little easier(markdown?) - Reconstruction being review of the data for raw consumption and not fed into an analysis pipeline.
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
 
-For commercial API usage, I personally recommend Claude Sonnet. It's great quality and relatively inexpensive.
+For commercial API usage, I recommend none honestly. They all will gaslight you and charge you money for it.
+From @nrose 05/08/2024 on Threads:
+```
+No, it’s a design. First they train it, then they optimize it. Optimize it for what- better answers? No. For efficiency. Per watt. Because they need all the compute they can get to train the next model.So it’s a sawtooth. The model declines over time, then the optimization makes it somewhat better, then in a sort of reverse asymptote, they dedicate all their “good compute” to the next bigger model.Which they then trim down over time, so they can train the next big model… etc etc.
+None of these companies exist to provide AI services in 2024. They’re only doing it to finance the things they want to build in 2025 and 2026 and so on, and the goal is to obsolete computing in general and become a hidden monopoly like the oil and electric companies. 2024 service quality is not a metric they want to optimize, they’re forced to, only to maintain some directional income
+```
 
 For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.2 model:
   * https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
