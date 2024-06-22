@@ -105,8 +105,9 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
   - ffmpeg
   - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
     - Apparently there is a ROCm version of PyTorch.
-      - https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
+      - MS Pytorch: https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
       - Use the 'AMD_requests.txt' file to install the necessary packages for AMD GPU support. Simply rename it before use.
+      - AMD Pytorch: https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/wsl/install-pytorch.html
   - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
   - System RAM (8GB minimum, realistically 12GB)
   - Disk Space (Depends on how much you ingest, but a few GBs (4+) should be fine for the total size of the project + DB)
@@ -342,7 +343,7 @@ By default, videos, transcriptions and summaries are stored in a folder with the
 - https://github.com/transcriptionstream/transcriptionstream
 - Commercial offerings:
   * Bit.ai 
-  * 
+  * typeset.io/
 ------------
 
 ### <a name="credits"></a>Credits
