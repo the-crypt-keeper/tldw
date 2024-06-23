@@ -122,7 +122,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`
     5. Create a virtual env: `python -m venv ./`
-    6. Launch/activate your virtual environment: `source /venv/scripts/activate.sh`
+    6. Launch/activate your virtual environment: `source ./bin/activate`
     7. Setup the necessary python packages:
        * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
        * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
@@ -150,7 +150,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
     2. **Script Usage:**
        - Put your API keys and settings in the `config.txt` file.
          - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
-       - (make sure your in the python venv - Run `./scripts/activate.sh` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+       - (make sure your in the python venv - Run `./bin/activate.sh` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
        - Run `python ./summarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
        - You'll then be asked if you'd like to run the transcription through GPU(1) or CPU(2).
          - Next, the video will be downloaded to the local directory by ytdl.
