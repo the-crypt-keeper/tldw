@@ -1918,7 +1918,10 @@ def perform_summarization(api_name, json_file_path, custom_prompt, api_key, conf
         elif api_name.lower() == "llama.cpp":
             logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
             llama_token = api_key if api_key else config.get('Local-API', 'llama_token', fallback=None)
-            summary = summarize_with_llama(text, custom_prompt)
+            llama_key = None
+            api_url = "http://127.0.0.1:8080"
+            summary = summarize_with_llama(api_url, text, llama_token, custom_prompt)
+                        #summarize_with_llama(api_url, file_path, token, custom_prompt)
         elif api_name.lower() == "kobold":
             kobold_api_key = api_key if api_key else config.get('Local-API', 'kobold_api_key', fallback=None)
             if not kobold_api_key:
