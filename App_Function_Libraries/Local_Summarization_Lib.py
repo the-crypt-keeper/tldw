@@ -123,6 +123,7 @@ def summarize_with_local_llm(file_path, custom_prompt_arg):
 def summarize_with_llama(api_url, file_path, token, custom_prompt):
     try:
         api_url = llama_api_IP
+        token = llama_api_key
         logging.debug("llama: Loading JSON data")
         with open(file_path, 'r') as file:
             segments = json.load(file)
