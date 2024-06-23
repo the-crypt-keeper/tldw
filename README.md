@@ -160,14 +160,14 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
     3. **GUI Usage:**
        - Put your API keys and settings in the `config.txt` file.
          - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
-       - (make sure your in the python venv - Run `./scripts/activate.sh` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+       - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
        - Run `python ./summarize.py -gui` - This will launch a webapp that will allow you to interact with the script in a more user-friendly manner.
          * You can pass in the API keys for the LLMs you want to use in the `config.txt` file, or pass them in when you use the GUI.
          * You can also download the generated transcript and summary as text files from the UI.
          * You can also download the video/audio as files from the UI. (WIP - doesn't currently work)
          * You can also access the SQLite DB that backs the app, with search, tagging, and export functionality.
     4. **Local LLM with the Script Usage:**
-       - (make sure your in the python venv - Run `./scripts/activate.sh` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+       - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
        - I recognize some people may like the functionality and idea of it all, but don't necessarily know/want to know about LLMs/getting them working, so you can also have the script download and run a local model, using system RAM and llamafile/llama.cpp.
        - Simply pass `--local_llm` to the script (`python summarize.py --local-llm`), and it'll ask you if you want to download a model, and which one you'd like to download.
        - Then, after downloading and selecting a model, it'll launch the model using llamafile, so you'll have a browser window/tab opened with a frontend to the model/llama.cpp server.
