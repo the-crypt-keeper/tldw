@@ -1915,7 +1915,7 @@ def perform_summarization(api_name, json_file_path, custom_prompt, api_key, conf
                 return None
             logging.debug(f"MAIN: Trying to summarize with OpenRouter")
             summary = summarize_with_openrouter(openrouter_api_key, text, custom_prompt)
-        elif api_name.lower() == "llama":
+        elif api_name.lower() == "Llama.cpp":
             logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
             llama_token = api_key if api_key else config.get('Local-API', 'llama_token', fallback=None)
             summary = summarize_with_llama(text, custom_prompt)
