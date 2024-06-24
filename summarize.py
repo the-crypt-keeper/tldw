@@ -723,7 +723,7 @@ def launch_ui(demo_mode=False):
             custom_prompt_input = gr.Textbox(
                 label="Custom Prompt (Customize your summarization, or ask a question about the video and have it "
                       "answered)\n Does not work against the summary currently.",
-                placeholder="Above is the transcript of a podcast. Please read "
+                placeholder="Above is the transcript of a video. Please read "
                             "through the transcript carefully. Identify the main topics that are discussed over the "
                             "course of the transcript. Then, summarize the key points about each main topic in"
                             " bullet points. The bullet points should cover the key information conveyed about "
