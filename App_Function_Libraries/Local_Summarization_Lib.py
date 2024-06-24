@@ -206,7 +206,7 @@ def summarize_with_llama(api_url, input_data, token, custom_prompt):
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt):
+def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt_input):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Kobold.cpp: Loading json data for summarization")
@@ -238,7 +238,7 @@ def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt):
             'content-type': 'application/json',
         }
 
-        kobold_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        kobold_prompt = f"{text} \n\n\n\n{custom_prompt_input}"
         logging.debug("kobold: Prompt being sent is {kobold_prompt}")
 
         # FIXME
@@ -246,7 +246,7 @@ def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt):
         data = {
             "max_context_length": 8096,
             "max_length": 4096,
-            "prompt": f"{text}\n\n\n\n{custom_prompt}"
+            "prompt": f"{text}\n\n\n\n{custom_prompt_input}"
         }
 
         logging.debug("kobold: Submitting request to API endpoint")

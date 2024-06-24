@@ -74,7 +74,11 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #############
 # Global variables setup
 
-custom_prompt = None
+custom_prompt_input = ("Above is the transcript of a video. Please read through the transcript carefully. Identify the "
+"main topics that are discussed over the course of the transcript. Then, summarize the key points about each main "
+"topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, "
+"but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> "
+"tags.")
 
 #
 #
@@ -692,6 +696,7 @@ def launch_ui(demo_mode=False):
                       "distil-large-v2", "distil-medium.en", "distil-small.en", "distil-large-v3"]
     # Set theme value with https://www.gradio.app/guides/theming-guide - 'theme='
     my_theme = gr.Theme.from_hub("gradio/seafoam")
+    global custom_prompt_input
     with gr.Blocks(theme=my_theme) as iface:
         # Tab 1: Video Transcription + Summarization
         with gr.Tab("Video Transcription + Summarization"):
@@ -1469,7 +1474,7 @@ def process_audio_file(audio_url, audio_file):
             url=None,
             num_speakers=2,
             whisper_model="small.en",
-            custom_prompt=None,
+            custom_prompt_input=None,
             offset=0,
             api_name=None,
             api_key=None,
@@ -1502,7 +1507,7 @@ def process_url(
         url,
         num_speakers,
         whisper_model,
-        custom_prompt,
+        custom_prompt_input,
         offset,
         api_name,
         api_key,
@@ -1546,7 +1551,7 @@ def process_url(
     if isinstance(url, str):
         urls = url.strip().split('\n')
         if len(urls) > 1:
-            return process_video_urls(urls, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
+            return process_video_urls(urls, num_speakers, whisper_model, custom_prompt_input, offset, api_name, api_key, vad_filter,
                                       download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
                                       keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
                                       chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens)
@@ -1655,7 +1660,7 @@ def process_url(
                 detail=detail_level,
                 api_name=api_name,
                 api_key=api_key,
-                custom_prompt=custom_prompt,
+                custom_prompt_input=custom_prompt_input,
                 chunk_by_words=chunk_text_by_words,
                 max_words=max_words,
                 chunk_by_sentences=chunk_text_by_sentences,
@@ -1666,7 +1671,7 @@ def process_url(
                 max_tokens=max_tokens
             )
         if api_name:
-            summary_text = perform_summarization(api_name, segments_json_path, custom_prompt, api_key, config)
+            summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key, config)
             if summary_text is None:
                 logging.error("Summary text is None. Check summarization function.")
                 summary_file_path = None  # Set summary_file_path to None if summary is not generated
@@ -1676,7 +1681,7 @@ def process_url(
 
         json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path)
 
-        add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt, whisper_model)
+        add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
 
         return transcription_text, summary_text, json_file_path, summary_file_path, None, None
 
@@ -1686,7 +1691,7 @@ def process_url(
 
 # Handle multiple videos as input
 # Handle multiple videos as input
-def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter,
+def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_input, offset, api_name, api_key, vad_filter,
                        download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
                        keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
                        chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens):
@@ -1705,7 +1710,7 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt, off
                 url=url,
                 num_speakers=num_speakers,
                 whisper_model=whisper_model,
-                custom_prompt=custom_prompt,
+                custom_prompt_input=custom_prompt_input,
                 offset=offset,
                 api_name=api_name,
                 api_key=api_key,
@@ -1860,7 +1865,7 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
 
     return json_file_path, summary_file_path
 
-def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt, whisper_model):
+def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model):
     content = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
     add_media_with_keywords(
         url=url,
@@ -1868,7 +1873,7 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
         media_type='video',
         content=content,
         keywords=','.join(keywords),
-        prompt=custom_prompt or 'No prompt provided',
+        prompt=custom_prompt_input or 'No prompt provided',
         summary=summary or 'No summary provided',
         transcription_model=whisper_model,
         author=info_dict.get('uploader', 'Unknown'),
@@ -1876,7 +1881,13 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
     )
 
 
-def perform_summarization(api_name, json_file_path, custom_prompt, api_key, config):
+def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key, config):
+    custom_prompt_input = (
+        "Above is the transcript of a video. Please read through the transcript carefully. Identify the "
+        "main topics that are discussed over the course of the transcript. Then, summarize the key points about each main "
+        "topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, "
+        "but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> "
+        "tags.")
     summary = None
     try:
         if not json_file_path or not os.path.exists(json_file_path):
@@ -1894,70 +1905,80 @@ def perform_summarization(api_name, json_file_path, custom_prompt, api_key, conf
         text = extract_text_from_segments(segments)
 
         if api_name.lower() == 'openai':
-            summary = summarize_with_openai(api_key, text, custom_prompt)
+            summary = summarize_with_openai(api_key, text, custom_prompt_input)
+
         elif api_name.lower() == "cohere":
             cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
             if not cohere_api_key:
                 logging.error("Cohere API key not found.")
                 return None
-            summary = summarize_with_cohere(cohere_api_key, text, config.get('API', 'cohere_model', fallback='command-r-plus'), custom_prompt)
+            summary = summarize_with_cohere(cohere_api_key, text, config.get('API', 'cohere_model', fallback='command-r-plus'), custom_prompt_input)
+
         elif api_name.lower() == "groq":
             groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
             if not groq_api_key:
                 logging.error("MAIN: Groq API key not found.")
                 return None
             logging.debug(f"MAIN: Trying to summarize with groq")
-            summary = summarize_with_groq(groq_api_key, text, custom_prompt)
+            summary = summarize_with_groq(groq_api_key, text, custom_prompt_input)
+
         elif api_name.lower() == "openrouter":
             openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
             if not openrouter_api_key:
                 logging.error("MAIN: OpenRouter API key not found.")
                 return None
             logging.debug(f"MAIN: Trying to summarize with OpenRouter")
-            summary = summarize_with_openrouter(openrouter_api_key, text, custom_prompt)
+            summary = summarize_with_openrouter(openrouter_api_key, text, custom_prompt_input)
+
         elif api_name.lower() == "llama.cpp":
             logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
-            llama_token = api_key if api_key else config.get('Local-API', 'llama_token', fallback=None)
-            llama_key = None
-            api_url = "http://127.0.0.1:8080"
-            # FIXME - change api_url to llama
-            summary = summarize_with_llama(api_url, text, llama_token, custom_prompt)
-                        #summarize_with_llama(api_url, file_path, token, custom_prompt)
+            #def summarize_with_llama(api_url, file_path, token, custom_prompt)
+            summary = summarize_with_llama(llama_api_IP, text, llama_api_key, custom_prompt_input)
+
         elif api_name.lower() == "kobold":
             kobold_api_key = api_key if api_key else config.get('Local-API', 'kobold_api_key', fallback=None)
             if not kobold_api_key:
                 logging.error("MAIN: Kobold API key not found.")
                 return None
             logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
-            summary = summarize_with_kobold(kobold_api_key, text, custom_prompt)
+            #def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt_input):
+            summary = summarize_with_kobold(kobold_api_IP, text, kobold_api_key, custom_prompt_input)
+
         elif api_name.lower() == "ooba":
             ooba_token = api_key if api_key else config.get('Local-API', 'ooba_api_key', fallback=None)
             ooba_ip = config.get('API', 'ooba_ip', fallback=None)
-            summary = summarize_with_oobabooga(ooba_ip, text, ooba_token, custom_prompt)
+            summary = summarize_with_oobabooga(ooba_ip, text, ooba_token, custom_prompt_input)
+
         elif api_name.lower() == "tabbyapi":
             tabbyapi_key = api_key if api_key else config.get('Local-API', 'tabbyapi_token', fallback=None)
             tabby_model = config.get('Local-API', 'tabby_model', fallback=None)
             summary = summarize_with_tabbyapi(tabby_api_key, config.get('Local-API', 'tabby_api_IP',
                                                                         fallback='http://127.0.0.1:5000/api/v1/generate'),
-                                              text, tabby_model, custom_prompt)
+                                              text, tabby_model, custom_prompt_input)
+
         elif api_name.lower() == "vllm":
             logging.debug(f"MAIN: Trying to summarize with VLLM")
             vllm_api_key = api_key if api_key else config.get('Local-API', 'vllm_api_key', fallback=None)
             summary = summarize_with_vllm(
                 config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions'),
-                vllm_api_key, config.get('API', 'vllm_model', fallback=''), text, custom_prompt)
+                vllm_api_key, config.get('API', 'vllm_model', fallback=''), text, custom_prompt_input)
+
         elif api_name.lower() == "local-llm":
             logging.debug(f"MAIN: Trying to summarize with Local LLM")
-            summary = summarize_with_local_llm(text, custom_prompt)
+            summary = summarize_with_local_llm(text, custom_prompt_input)
+
         elif api_name.lower() == "huggingface":
             logging.debug(f"MAIN: Trying to summarize with huggingface")
             huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
-            summarize_with_huggingface(huggingface_api_key, text, custom_prompt)
+            summarize_with_huggingface(huggingface_api_key, text, custom_prompt_input)
         # Add additional API handlers here...
+
         else:
             logging.warning(f"Unsupported API: {api_name}")
+
         if summary is None:
             logging.debug("Summarization did not return valid text.")
+
         if summary:
             logging.info(f"Summary generated using {api_name} API")
             # Save the summary file in the same directory as the JSON file
@@ -1967,6 +1988,7 @@ def perform_summarization(api_name, json_file_path, custom_prompt, api_key, conf
         else:
             logging.warning(f"Failed to generate summary using {api_name} API")
         return summary
+
     except requests.exceptions.ConnectionError:
             logging.error("Connection error while summarizing")
     except Exception as e:
@@ -2034,7 +2056,7 @@ def main(input_path, api_name=None, api_key=None,
                     if rolling_summarization == True:
                         text = extract_text_from_segments(segments)
                         detail = detail_level
-                        additional_instructions = custom_prompt
+                        additional_instructions = custom_prompt_input
                         chunk_text_by_words = set_chunk_txt_by_words
                         max_words = set_max_txt_chunk_words
                         chunk_text_by_sentences = set_chunk_txt_by_sentences
@@ -2047,7 +2069,7 @@ def main(input_path, api_name=None, api_key=None,
                         summarize_recursively = rolling_summarization
                         verbose = False
                         model = None
-                        summary = rolling_summarize_function(text, detail, api_name, api_key, model, custom_prompt,
+                        summary = rolling_summarize_function(text, detail, api_name, api_key, model, custom_prompt_input,
                                                              chunk_text_by_words,
                                                              max_words, chunk_text_by_sentences,
                                                              max_sentences, chunk_text_by_paragraphs,
@@ -2056,7 +2078,7 @@ def main(input_path, api_name=None, api_key=None,
                                                              )
 
                     elif api_name:
-                        summary = perform_summarization(api_name, transcription_text, custom_prompt, api_key, config)
+                        summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key, config)
                     else:
                         summary = None
 
@@ -2066,7 +2088,7 @@ def main(input_path, api_name=None, api_key=None,
                         with open(summary_file_path, 'w') as file:
                             file.write(summary)
 
-                    add_media_to_database(path, info_dict, segments, summary, keywords, custom_prompt, whisper_model)
+                    add_media_to_database(path, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model)
                 else:
                     logging.error(f"Failed to download video: {path}")
             else:
@@ -2087,7 +2109,7 @@ def main(input_path, api_name=None, api_key=None,
                                 text = extract_text_from_segments(segments)
                                 summary = summarize_with_detail_openai(text, detail=detail)
                             elif api_name:
-                                summary = perform_summarization(api_name, transcription_text, custom_prompt, api_key, config)
+                                summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key, config)
                             else:
                                 summary = None
 
@@ -2097,7 +2119,7 @@ def main(input_path, api_name=None, api_key=None,
                                 with open(summary_file_path, 'w') as file:
                                     file.write(summary)
 
-                            add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt, whisper_model)
+                            add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model)
                         else:
                             logging.error(f"Failed to download video: {url}")
                 else:
@@ -2120,7 +2142,7 @@ def main(input_path, api_name=None, api_key=None,
                         text = extract_text_from_segments(segments)
                         summary = summarize_with_detail_openai(text, detail=detail)
                     elif api_name:
-                        summary = perform_summarization(api_name, transcription_text, custom_prompt, api_key, config)
+                        summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key, config)
                     else:
                         summary = None
 
@@ -2130,7 +2152,7 @@ def main(input_path, api_name=None, api_key=None,
                         with open(summary_file_path, 'w') as file:
                             file.write(summary)
 
-                    add_media_to_database(path, info_dict, segments, summary, keywords, custom_prompt, whisper_model)
+                    add_media_to_database(path, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model)
 
         except Exception as e:
             logging.error(f"Error processing {path}: {str(e)}")
@@ -2268,11 +2290,11 @@ Sample commands:
         logger.info(f"Log file created at: {args.log_file}")
 
     ########## Custom Prompt setup
-    custom_prompt = args.custom_prompt
+    custom_prompt_input = args.custom_prompt
 
     if not args.custom_prompt:
         logging.debug("No custom prompt defined, will use default")
-        args.custom_prompt = (
+        args.custom_prompt_input = (
             "\n\nabove is the transcript of a video. "
             "Please read through the transcript carefully. Identify the main topics that are "
             "discussed over the course of the transcript. Then, summarize the key points about each "
@@ -2283,7 +2305,7 @@ Sample commands:
         )
         print("No custom prompt defined, will use default")
 
-        custom_prompt = args.custom_prompt
+        custom_prompt_input = args.custom_prompt
     else:
         logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
@@ -2356,7 +2378,7 @@ Sample commands:
         try:
             results = main(args.input_path, api_name=args.api_name, api_key=args.api_key,
                            num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset,
-                           vad_filter=args.vad_filter, download_video_flag=args.video, custom_prompt=args.custom_prompt,
+                           vad_filter=args.vad_filter, download_video_flag=args.video, custom_prompt=args.custom_prompt_input,
                            overwrite=args.overwrite, rolling_summarization=args.rolling_summarization,
                            detail=args.detail_level, keywords=args.keywords, llm_model=args.llm_model,
                            time_based=args.time_based, set_chunk_txt_by_words=set_chunk_txt_by_words,
