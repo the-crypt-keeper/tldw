@@ -7,11 +7,11 @@
 
 ####################
 # Function List
-#
-# 1. summarize_with_local_llm(file_path, custom_prompt_arg)
-# 2. summarize_with_llama(api_url, file_path, token, custom_prompt)
-# 3. summarize_with_kobold(api_url, file_path, kobold_api_token, custom_prompt)
-# 4. summarize_with_oobabooga(api_url, file_path, ooba_api_token, custom_prompt)
+# FIXME - UPDATE Function Arguments
+# 1. summarize_with_local_llm(text, custom_prompt_arg)
+# 2. summarize_with_llama(api_url, text, token, custom_prompt)
+# 3. summarize_with_kobold(api_url, text, kobold_api_token, custom_prompt)
+# 4. summarize_with_oobabooga(api_url, text, ooba_api_token, custom_prompt)
 # 5. summarize_with_vllm(vllm_api_url, vllm_api_key_function_arg, llm_model, text, vllm_custom_prompt_function_arg)
 # 6. summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, text, tabby_model, custom_prompt)
 # 7. save_summary_to_file(summary, file_path)
@@ -70,14 +70,15 @@ vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
 # Function Definitions
 #
 
-def summarize_with_local_llm(file_path, custom_prompt_arg):
+def summarize_with_local_llm(text, custom_prompt_arg):
     try:
-        logging.debug("Local LLM: Loading json data for summarization")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
-
-        logging.debug("Local LLM: Extracting text from the segments")
-        text = extract_text_from_segments(segments)
+        # FIXME - DEAD CODE, handled in summarize.py, line 1894
+        # logging.debug("Local LLM: Loading json data for summarization")
+        # with open(file_path, 'r') as file:
+        #     segments = json.load(file)
+        #
+        # logging.debug("Local LLM: Extracting text from the segments")
+        # text = extract_text_from_segments(segments)
 
         headers = {
             'Content-Type': 'application/json'
@@ -120,16 +121,15 @@ def summarize_with_local_llm(file_path, custom_prompt_arg):
         print("Error occurred while processing summary with Local LLM:", str(e))
         return "Local LLM: Error occurred while processing summary"
 
-def summarize_with_llama(api_url, file_path, token, custom_prompt):
+def summarize_with_llama(api_url, text, token, custom_prompt):
     try:
         api_url = llama_api_IP
         token = llama_api_key
         logging.debug("llama: Loading JSON data")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
 
-        logging.debug(f"llama: Extracting text from segments file")
-        text = extract_text_from_segments(segments)  # Define this function to extract text properly
+        # FIXME - DEAD CODE, handled in summarize.py, line 1894
+        # logging.debug(f"llama: Extracting text from segments file")
+        # text = extract_text_from_segments(segments)  # Define this function to extract text properly
 
         headers = {
             'accept': 'application/json',
@@ -168,14 +168,15 @@ def summarize_with_llama(api_url, file_path, token, custom_prompt):
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(api_url, file_path, kobold_api_token, custom_prompt):
+def summarize_with_kobold(api_url, text, kobold_api_token, custom_prompt):
     try:
-        logging.debug("kobold: Loading JSON data")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
-
-        logging.debug(f"kobold: Extracting text from segments file")
-        text = extract_text_from_segments(segments)
+        # FIXME - DEAD CODE, handled in summarize.py, line 1894
+        # logging.debug("kobold: Loading JSON data")
+        # with open(file_path, 'r') as file:
+        #     segments = json.load(file)
+        #
+        # logging.debug(f"kobold: Extracting text from segments file")
+        # text = extract_text_from_segments(segments)
 
         headers = {
             'accept': 'application/json',
@@ -204,7 +205,8 @@ def summarize_with_kobold(api_url, file_path, kobold_api_token, custom_prompt):
                 summary = response_data['results'][0]['text'].strip()
                 logging.debug("kobold: Summarization successful")
                 print("Summarization successful.")
-                save_summary_to_file(summary, file_path)  # Save the summary to a file
+                # FIXME - DEAD CODE, handled in summarize.py, line ?
+                #save_summary_to_file(summary, file_path)  # Save the summary to a file
                 return summary
             else:
                 logging.error("Expected data not found in API response.")
@@ -219,15 +221,16 @@ def summarize_with_kobold(api_url, file_path, kobold_api_token, custom_prompt):
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(api_url, file_path, ooba_api_token, custom_prompt):
+def summarize_with_oobabooga(api_url, text, ooba_api_token, custom_prompt):
     try:
-        logging.debug("ooba: Loading JSON data")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
-
-        logging.debug(f"ooba: Extracting text from segments file\n\n\n")
-        text = extract_text_from_segments(segments)
-        logging.debug(f"ooba: Finished extracting text from segments file")
+        # FIXME - DEAD CODE, handled in summarize.py, line 1894
+        # logging.debug("ooba: Loading JSON data")
+        # with open(file_path, 'r') as file:
+        #     segments = json.load(file)
+        #
+        # logging.debug(f"ooba: Extracting text from segments file\n\n\n")
+        # text = extract_text_from_segments(segments)
+        # logging.debug(f"ooba: Finished extracting text from segments file")
 
         headers = {
             'accept': 'application/json',
