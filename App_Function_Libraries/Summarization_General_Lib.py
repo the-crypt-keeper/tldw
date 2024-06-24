@@ -128,26 +128,6 @@ def extract_text_from_segments(segments):
 
 def summarize_with_openai(api_key, input_data, custom_prompt_arg):
     try:
-        # Dead code - FIXME
-        # logging.debug("openai: Loading json data for summarization")
-        # with open(json_file_path, 'r') as file:
-        #     data = json.load(file)
-        #
-        # logging.debug(f"openai: Loaded data: {data}")
-        # logging.debug(f"openai: Type of data: {type(data)}")
-        #
-        # if isinstance(data, dict) and 'summary' in data:
-        #     # If the loaded data is a dictionary and already contains a summary, return it
-        #     logging.debug("openai: Summary already exists in the loaded data")
-        #     return data['summary']
-        #
-        # # If the loaded data is a list of segment dictionaries, proceed with summarization
-        # segments = data
-        #
-        #
-        # logging.debug("openai: Extracting text from the segments")
-        # text = extract_text_from_segments(segments)
-        #
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("openai: Loading json data for summarization")
             with open(input_data, 'r') as file:
@@ -173,8 +153,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
         else:
             raise ValueError("Invalid input data format")
 
-
-        open_ai_model = openai_model or 'gpt-4-turbo'
+        open_ai_model = openai_model or 'gpt-4o'
 
         headers = {
             'Authorization': f'Bearer {api_key}',
@@ -222,15 +201,33 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
         return "openai: Error occurred while processing summary"
 
 
-# FIXME - Combine these two functions
-def summarize_with_claude(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5):
-    try:
-        logging.debug("anthropic: Loading JSON data")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
 
-        logging.debug("anthropic: Extracting text from the segments file")
-        text = extract_text_from_segments(segments)
+def summarize_with_claude(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
+    try:
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("ClaudeAI: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("ClaudeAI: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"ClaudeAI: Loaded data: {data}")
+        logging.debug(f"ClaudeAI: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("ClaudeAI: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Invalid input data format")
 
         headers = {
             'x-api-key': api_key,
@@ -295,6 +292,7 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt_arg, max_retr
                 else:
                     return f"anthropic: Network error: {str(e)}"
 
+#FIXME
     except FileNotFoundError as e:
         logging.error(f"anthropic: File not found: {file_path}")
         return f"anthropic: File not found: {file_path}"
@@ -307,14 +305,32 @@ def summarize_with_claude(api_key, file_path, model, custom_prompt_arg, max_retr
 
 
 # Summarize with Cohere
-def summarize_with_cohere(api_key, file_path, model, custom_prompt_arg):
+def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
     try:
-        logging.debug("cohere: Loading JSON data")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Cohere: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Cohere: Using provided string data for summarization")
+            data = input_data
 
-        logging.debug(f"cohere: Extracting text from segments file")
-        text = extract_text_from_segments(segments)
+        logging.debug(f"Cohere: Loaded data: {data}")
+        logging.debug(f"Cohere: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Cohere: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Invalid input data format")
 
         headers = {
             'accept': 'application/json',
@@ -360,14 +376,32 @@ def summarize_with_cohere(api_key, file_path, model, custom_prompt_arg):
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, file_path, model, custom_prompt_arg):
+def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
     try:
-        logging.debug("groq: Loading JSON data")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Groq: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Groq: Using provided string data for summarization")
+            data = input_data
 
-        logging.debug(f"groq: Extracting text from segments file")
-        text = extract_text_from_segments(segments)
+        logging.debug(f"Groq: Loaded data: {data}")
+        logging.debug(f"Groq: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Groq: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Groq: Invalid input data format")
 
         headers = {
             'Authorization': f'Bearer {api_key}',
@@ -412,10 +446,35 @@ def summarize_with_groq(api_key, file_path, model, custom_prompt_arg):
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
 
 
-def summarize_with_openrouter(api_key, json_file_path, custom_prompt_arg):
+def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
     import requests
     import json
     global openrouter_model
+
+    if isinstance(input_data, str) and os.path.isfile(input_data):
+        logging.debug("openai: Loading json data for summarization")
+        with open(input_data, 'r') as file:
+            data = json.load(file)
+    else:
+        logging.debug("openai: Using provided string data for summarization")
+        data = input_data
+
+    logging.debug(f"openai: Loaded data: {data}")
+    logging.debug(f"openai: Type of data: {type(data)}")
+
+    if isinstance(data, dict) and 'summary' in data:
+        # If the loaded data is a dictionary and already contains a summary, return it
+        logging.debug("openai: Summary already exists in the loaded data")
+        return data['summary']
+
+    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+    if isinstance(data, list):
+        segments = data
+        text = extract_text_from_segments(segments)
+    elif isinstance(data, str):
+        text = data
+    else:
+        raise ValueError("Invalid input data format")
 
     config = configparser.ConfigParser()
     file_path = 'config.txt'
@@ -432,7 +491,7 @@ def summarize_with_openrouter(api_key, json_file_path, custom_prompt_arg):
     if openrouter_model is None:
         openrouter_model = "mistralai/mistral-7b-instruct:free"
 
-    openrouter_prompt = f"{json_file_path} \n\n\n\n{custom_prompt_arg}"
+    openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
 
     try:
         logging.debug("openrouter: Submitting request to API endpoint")
@@ -469,18 +528,35 @@ def summarize_with_openrouter(api_key, json_file_path, custom_prompt_arg):
         logging.error("openrouter: Error in processing: %s", str(e))
         return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
 
-def summarize_with_huggingface(api_key, file_path, custom_prompt_arg):
+def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
     logging.debug(f"huggingface: Summarization process starting...")
     try:
-        logging.debug("huggingface: Loading json data for summarization")
-        with open(file_path, 'r') as file:
-            segments = json.load(file)
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("HuggingFace: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("HuggingFace: Using provided string data for summarization")
+            data = input_data
 
-        logging.debug("huggingface: Extracting text from the segments")
-        logging.debug(f"huggingface: Segments: {segments}")
-        text = ' '.join([segment['text'] for segment in segments])
+        logging.debug(f"HuggingFace: Loaded data: {data}")
+        logging.debug(f"HuggingFace: Type of data: {type(data)}")
 
-        print(f"huggingface: lets make sure the HF api key exists...\n\t {api_key}")
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("HuggingFace: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("HuggingFace: Invalid input data format")
+
+        print(f"HuggingFace: lets make sure the HF api key exists...\n\t {api_key}")
         headers = {
             "Authorization": f"Bearer {api_key}"
         }
@@ -513,13 +589,6 @@ def summarize_with_huggingface(api_key, file_path, custom_prompt_arg):
         logging.error("huggingface: Error in processing: %s", str(e))
         print(f"Error occurred while processing summary with huggingface: {str(e)}")
         return None
-
-    # FIXME
-    # This is here for gradio authentication
-    # Its just not setup.
-    # def same_auth(username, password):
-    #    return username == password
-
 
 #
 #

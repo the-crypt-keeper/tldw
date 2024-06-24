@@ -70,15 +70,32 @@ vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
 # Function Definitions
 #
 
-def summarize_with_local_llm(text, custom_prompt_arg):
+def summarize_with_local_llm(input_data, custom_prompt_arg):
     try:
-        # FIXME - DEAD CODE, handled in summarize.py, line 1894
-        # logging.debug("Local LLM: Loading json data for summarization")
-        # with open(file_path, 'r') as file:
-        #     segments = json.load(file)
-        #
-        # logging.debug("Local LLM: Extracting text from the segments")
-        # text = extract_text_from_segments(segments)
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("openai: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("openai: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"openai: Loaded data: {data}")
+        logging.debug(f"openai: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("openai: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Invalid input data format")
 
         headers = {
             'Content-Type': 'application/json'
@@ -121,15 +138,36 @@ def summarize_with_local_llm(text, custom_prompt_arg):
         print("Error occurred while processing summary with Local LLM:", str(e))
         return "Local LLM: Error occurred while processing summary"
 
-def summarize_with_llama(api_url, text, token, custom_prompt):
+def summarize_with_llama(api_url, input_data, token, custom_prompt):
     try:
         api_url = llama_api_IP
         token = llama_api_key
         logging.debug("llama: Loading JSON data")
 
-        # FIXME - DEAD CODE, handled in summarize.py, line 1894
-        # logging.debug(f"llama: Extracting text from segments file")
-        # text = extract_text_from_segments(segments)  # Define this function to extract text properly
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Llama.cpp: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Llama.cpp: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"Llama.cpp: Loaded data: {data}")
+        logging.debug(f"Llama.cpp: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Llama.cpp: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Llama.cpp: Invalid input data format")
 
         headers = {
             'accept': 'application/json',
@@ -168,15 +206,32 @@ def summarize_with_llama(api_url, text, token, custom_prompt):
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(api_url, text, kobold_api_token, custom_prompt):
+def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt):
     try:
-        # FIXME - DEAD CODE, handled in summarize.py, line 1894
-        # logging.debug("kobold: Loading JSON data")
-        # with open(file_path, 'r') as file:
-        #     segments = json.load(file)
-        #
-        # logging.debug(f"kobold: Extracting text from segments file")
-        # text = extract_text_from_segments(segments)
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Kobold.cpp: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Kobold.cpp: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"Kobold.cpp: Loaded data: {data}")
+        logging.debug(f"Kobold.cpp: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Kobold.cpp: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Kobold.cpp: Invalid input data format")
 
         headers = {
             'accept': 'application/json',
@@ -221,16 +276,32 @@ def summarize_with_kobold(api_url, text, kobold_api_token, custom_prompt):
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(api_url, text, ooba_api_token, custom_prompt):
+def summarize_with_oobabooga(api_url, input_data, ooba_api_token, custom_prompt):
     try:
-        # FIXME - DEAD CODE, handled in summarize.py, line 1894
-        # logging.debug("ooba: Loading JSON data")
-        # with open(file_path, 'r') as file:
-        #     segments = json.load(file)
-        #
-        # logging.debug(f"ooba: Extracting text from segments file\n\n\n")
-        # text = extract_text_from_segments(segments)
-        # logging.debug(f"ooba: Finished extracting text from segments file")
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Oobabooga: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Oobabooga: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"Oobabooga: Loaded data: {data}")
+        logging.debug(f"Oobabooga: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Oobabooga: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Invalid input data format")
 
         headers = {
             'accept': 'application/json',
@@ -270,11 +341,36 @@ def summarize_with_oobabooga(api_url, text, ooba_api_token, custom_prompt):
 
 
 # FIXME - https://docs.vllm.ai/en/latest/getting_started/quickstart.html .... Great docs.
-def summarize_with_vllm(vllm_api_url, vllm_api_key_function_arg, llm_model, text, vllm_custom_prompt_function_arg):
+def summarize_with_vllm(vllm_api_url, vllm_api_key_function_arg, llm_model, input_data, vllm_custom_prompt_function_arg):
     vllm_client = OpenAI(
         base_url=vllm_api_url,
         api_key=vllm_api_key_function_arg
     )
+    if isinstance(input_data, str) and os.path.isfile(input_data):
+        logging.debug("Oobabooga: Loading json data for summarization")
+        with open(input_data, 'r') as file:
+            data = json.load(file)
+    else:
+        logging.debug("Oobabooga: Using provided string data for summarization")
+        data = input_data
+
+    logging.debug(f"Oobabooga: Loaded data: {data}")
+    logging.debug(f"Oobabooga: Type of data: {type(data)}")
+
+    if isinstance(data, dict) and 'summary' in data:
+        # If the loaded data is a dictionary and already contains a summary, return it
+        logging.debug("Oobabooga: Summary already exists in the loaded data")
+        return data['summary']
+
+    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+    if isinstance(data, list):
+        segments = data
+        text = extract_text_from_segments(segments)
+    elif isinstance(data, str):
+        text = data
+    else:
+        raise ValueError("Invalid input data format")
+
 
     custom_prompt = vllm_custom_prompt_function_arg
 
@@ -290,18 +386,44 @@ def summarize_with_vllm(vllm_api_url, vllm_api_key_function_arg, llm_model, text
 
 
 # FIXME - Install is more trouble than care to deal with right now.
-def summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, text, tabby_model, custom_prompt):
+def summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, input_data, tabby_model, custom_prompt):
     model = tabby_model
+
+    if isinstance(input_data, str) and os.path.isfile(input_data):
+        logging.debug("Oobabooga: Loading json data for summarization")
+        with open(input_data, 'r') as file:
+            data = json.load(file)
+    else:
+        logging.debug("Oobabooga: Using provided string data for summarization")
+        data = input_data
+
+    logging.debug(f"Oobabooga: Loaded data: {data}")
+    logging.debug(f"Oobabooga: Type of data: {type(data)}")
+
+    if isinstance(data, dict) and 'summary' in data:
+        # If the loaded data is a dictionary and already contains a summary, return it
+        logging.debug("Oobabooga: Summary already exists in the loaded data")
+        return data['summary']
+
+    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+    if isinstance(data, list):
+        segments = data
+        text = extract_text_from_segments(segments)
+    elif isinstance(data, str):
+        text = data
+    else:
+        raise ValueError("Invalid input data format")
+
     headers = {
         'Authorization': f'Bearer {tabby_api_key}',
         'Content-Type': 'application/json'
     }
-    data = {
+    data2 = {
         'text': text,
         'model': 'tabby'  # Specify the model if needed
     }
     try:
-        response = requests.post('https://api.tabbyapi.com/summarize', headers=headers, json=data)
+        response = requests.post('https://api.tabbyapi.com/summarize', headers=headers, json=data2)
         response.raise_for_status()
         summary = response.json().get('summary', '')
         return summary
@@ -319,14 +441,6 @@ def save_summary_to_file(summary, file_path):
     with open(summary_file_path, 'w') as file:
         file.write(summary)
     logging.info(f"Summary saved to file: {summary_file_path}")
-
-# From Video_DL_Ingestion_Lib.py
-# def save_summary_to_file(summary: str, file_path: str):
-#     """Save summary to a JSON file."""
-#     summary_data = {'summary': summary, 'generated_at': datetime.now().isoformat()}
-#     with open(file_path, 'w') as file:
-#         json.dump(summary_data, file, indent=4)
-
 
 #
 #
