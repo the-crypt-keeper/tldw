@@ -215,6 +215,10 @@ def load_and_log_configs():
         logging.debug(
             f"Loaded OpenRouter API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:] if openrouter_api_key else None}")
 
+        deepseek_api_key = config.get('API', 'deepseek_api_key', fallback=None)
+        logging.debug(
+            f"Loaded DeepSeek API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:] if deepseek_api_key else None}")
+
         # Models
         anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
         cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
@@ -222,6 +226,7 @@ def load_and_log_configs():
         openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
         huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
         openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
+        deepseek_model = config.get('API', 'deepseek_model', fallback='deepseek-chat')
 
         logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
         logging.debug(f"Loaded Cohere Model: {cohere_model}")
@@ -270,7 +275,8 @@ def load_and_log_configs():
                 'groq': groq_api_key,
                 'openai': openai_api_key,
                 'huggingface': huggingface_api_key,
-                'openrouter': openrouter_api_key
+                'openrouter': openrouter_api_key,
+                'deepseek': deepseek_api_key
             },
             'models': {
                 'anthropic': anthropic_model,
@@ -278,7 +284,8 @@ def load_and_log_configs():
                 'groq': groq_model,
                 'openai': openai_model,
                 'huggingface': huggingface_model,
-                'openrouter': openrouter_model
+                'openrouter': openrouter_model,
+                'deepseek': deepseek_model
             },
             'local_apis': {
                 'kobold': {'ip': kobold_api_IP, 'key': kobold_api_key},
@@ -816,8 +823,8 @@ def launch_ui(demo_mode=False):
             offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
                                      visible=False)
             api_name_input = gr.Dropdown(
-                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "OpenRouter", "Llama.cpp",
-                         "Kobold", "Ooba", "HuggingFace"],
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp",
+                         "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace",],
                 value=None,
                 label="API Name (Mandatory) --> Unless you just want a Transcription", visible=True)
             api_key_input = gr.Textbox(
@@ -1112,7 +1119,7 @@ def launch_ui(demo_mode=False):
                 lines=3
             )
             api_name_input = gr.Dropdown(
-                choices=[None, "huggingface", "openrouter", "openai", "anthropic", "cohere", "groq", "llama", "kobold",
+                choices=[None, "huggingface", "deepseek", "openrouter", "openai", "anthropic", "cohere", "groq", "llama", "kobold",
                          "ooba"],
                 value=None,
                 label="API Name (Mandatory for Summarization)"
@@ -1998,14 +2005,19 @@ def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key
             # def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
             summary = summarize_with_openrouter(api_key, text, custom_prompt_input)
 
+        elif api_name.lower() == "deepseek":
+            logging.debug(f"MAIN: Trying to summarize with DeepSeek")
+            # def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
+            summary = summarize_with_deepseek(api_key, text, custom_prompt_input)
+
         elif api_name.lower() == "llama.cpp":
             logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
-            #def summarize_with_llama(api_url, file_path, token, custom_prompt)
+            # def summarize_with_llama(api_url, file_path, token, custom_prompt)
             summary = summarize_with_llama(text, custom_prompt_input)
 
         elif api_name.lower() == "kobold":
             logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
-            #def summarize_with_kobold(input_data, kobold_api_token, custom_prompt_input, api_url):
+            # def summarize_with_kobold(input_data, kobold_api_token, custom_prompt_input, api_url):
             summary = summarize_with_kobold(text, api_key, custom_prompt_input)
 
         elif api_name.lower() == "ooba":

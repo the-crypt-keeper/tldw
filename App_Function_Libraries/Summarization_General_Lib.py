@@ -640,6 +640,90 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
         print(f"Error occurred while processing summary with huggingface: {str(e)}")
         return None
 
+
+def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
+    loaded_config_data = summarize.load_and_log_configs()
+    try:
+        # API key validation
+        if api_key is None or api_key.strip() == "":
+            logging.info("DeepSeek: API key not provided as parameter")
+            logging.info("DeepSeek: Attempting to use API key from config file")
+            api_key = loaded_config_data['api_keys']['deepseek']
+
+        if api_key is None or api_key.strip() == "":
+            logging.error("DeepSeek: API key not found or is empty")
+            return "DeepSeek: API Key Not Provided/Found in Config file or is empty"
+
+        logging.debug(f"DeepSeek: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        # Input data handling
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("DeepSeek: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("DeepSeek: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"DeepSeek: Loaded data: {data}")
+        logging.debug(f"DeepSeek: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("DeepSeek: Summary already exists in the loaded data")
+            return data['summary']
+
+        # Text extraction
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("DeepSeek: Invalid input data format")
+
+        deepseek_model = loaded_config_data['models']['deepseek'] or "deepseek-chat"
+
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        logging.debug(
+            f"Deepseek API Key: {api_key[:5]}...{api_key[-5:] if api_key else None}")
+        logging.debug("openai: Preparing data + prompt for submittal")
+        deepseek_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        data = {
+            "model": deepseek_model,
+            "messages": [
+                {"role": "system", "content": "You are a professional summarizer."},
+                {"role": "user", "content": deepseek_prompt}
+            ],
+            "stream": False,
+            "temperature": 0.8
+        }
+
+        logging.debug("DeepSeek: Posting request")
+        response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=data)
+
+        if response.status_code == 200:
+            response_data = response.json()
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                summary = response_data['choices'][0]['message']['content'].strip()
+                logging.debug("DeepSeek: Summarization successful")
+                return summary
+            else:
+                logging.warning("DeepSeek: Summary not found in the response data")
+                return "DeepSeek: Summary not available"
+        else:
+            logging.error(f"DeepSeek: Summarization failed with status code {response.status_code}")
+            logging.error(f"DeepSeek: Error response: {response.text}")
+            return f"DeepSeek: Failed to process summary. Status code: {response.status_code}"
+    except Exception as e:
+        logging.error(f"DeepSeek: Error in processing: {str(e)}", exc_info=True)
+        return f"DeepSeek: Error occurred while processing summary: {str(e)}"
+
+
 #
 #
 #######################################################################################################################
