@@ -192,64 +192,62 @@ def rolling_summarize_function(text: str,
         # Extracting the completion from the response
         try:
             if api_name.lower() == 'openai':
-                summary = summarize_with_openai(api_key, user_message_content, custom_prompt)
+                # def summarize_with_openai(api_key, input_data, custom_prompt_arg)
+                summary = summarize_with_openai(user_message_content, text, custom_prompt)
+
+            elif api_name.lower() == "anthropic":
+                # def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
+                summary = summarize_with_anthropic(user_message_content, text, custom_prompt)
             elif api_name.lower() == "cohere":
-                cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
-                if not cohere_api_key:
-                    logging.error("MAIN: Cohere API key not found.")
-                    return None
-                logging.debug(f"MAIN: Trying to summarize with cohere")
-                summary = summarize_with_cohere(cohere_api_key, user_message_content,
-                                                config.get('API', 'cohere_model', fallback='command-r-plus'),
-                                                custom_prompt)
+                # def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg)
+                summary = summarize_with_cohere(user_message_content, text, custom_prompt)
+
             elif api_name.lower() == "groq":
-                groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
-                if not groq_api_key:
-                    logging.error("MAIN: Groq API key not found.")
-                    return None
                 logging.debug(f"MAIN: Trying to summarize with groq")
-                summary = summarize_with_groq(groq_api_key, user_message_content, custom_prompt)
+                # def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
+                summary = summarize_with_groq(user_message_content, text, custom_prompt)
+
             elif api_name.lower() == "openrouter":
-                openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
-                if not openrouter_api_key:
-                    logging.error("MAIN: OpenRouter API key not found.")
-                    return None
                 logging.debug(f"MAIN: Trying to summarize with OpenRouter")
-                summary = summarize_with_openrouter(openrouter_api_key, user_message_content, custom_prompt)
-            elif api_name.lower() == "llama":
+                # def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
+                summary = summarize_with_openrouter(user_message_content, text, custom_prompt)
+
+            elif api_name.lower() == "deepseek":
+                logging.debug(f"MAIN: Trying to summarize with DeepSeek")
+                # def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
+                summary = summarize_with_deepseek(api_key, user_message_content,custom_prompt)
+
+            elif api_name.lower() == "llama.cpp":
                 logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
-                llama_token = api_key if api_key else config.get('Local-API', 'llama_token', fallback=None)
+                # def summarize_with_llama(api_url, file_path, token, custom_prompt)
                 summary = summarize_with_llama(user_message_content, custom_prompt)
+
             elif api_name.lower() == "kobold":
-                kobold_api_key = api_key if api_key else config.get('Local-API', 'kobold_api_key', fallback=None)
-                if not kobold_api_key:
-                    logging.error("MAIN: Kobold API key not found.")
-                    return None
                 logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
-                summary = summarize_with_kobold(kobold_api_key, user_message_content, custom_prompt)
+                # def summarize_with_kobold(input_data, kobold_api_token, custom_prompt_input, api_url):
+                summary = summarize_with_kobold(user_message_content, api_key, custom_prompt)
+
             elif api_name.lower() == "ooba":
-                ooba_token = api_key if api_key else config.get('Local-API', 'ooba_api_key', fallback=None)
-                ooba_ip = config.get('API', 'ooba_ip', fallback=None)
-                summary = summarize_with_oobabooga(ooba_ip, user_message_content, ooba_token, custom_prompt)
+                # def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url):
+                summary = summarize_with_oobabooga(user_message_content, api_key, custom_prompt)
+
             elif api_name.lower() == "tabbyapi":
-                tabbyapi_key = api_key if api_key else config.get('Local-API', 'tabbyapi_token', fallback=None)
-                tabby_model = config.get('Local-API', 'tabby_model', fallback=None)
-                summary = summarize_with_tabbyapi(tabby_api_key, config.get('Local-API', 'tabby_api_IP',
-                                                                            fallback='http://127.0.0.1:5000/api/v1/generate'),
-                                                  user_message_content, tabby_model, custom_prompt)
+                # def summarize_with_tabbyapi(input_data, tabby_model, custom_prompt_input, api_key=None, api_IP):
+                summary = summarize_with_tabbyapi(user_message_content, custom_prompt)
+
             elif api_name.lower() == "vllm":
                 logging.debug(f"MAIN: Trying to summarize with VLLM")
-                vllm_api_key = api_key if api_key else config.get('Local-API', 'vllm_api_key', fallback=None)
-                summary = summarize_with_vllm(
-                    config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions'),
-                    vllm_api_key, config.get('API', 'vllm_model', fallback=''), user_message_content, custom_prompt)
+                # def summarize_with_vllm(api_key, input_data, custom_prompt_input):
+                summary = summarize_with_vllm(user_message_content, custom_prompt)
+
             elif api_name.lower() == "local-llm":
                 logging.debug(f"MAIN: Trying to summarize with Local LLM")
                 summary = summarize_with_local_llm(user_message_content, custom_prompt)
+
             elif api_name.lower() == "huggingface":
                 logging.debug(f"MAIN: Trying to summarize with huggingface")
-                huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
-                summary = summarize_with_huggingface(huggingface_api_key, user_message_content, custom_prompt)
+                # def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
+                summarize_with_huggingface(api_key, user_message_content, custom_prompt)
             # Add additional API handlers here...
             else:
                 logging.warning(f"Unsupported API: {api_name}")

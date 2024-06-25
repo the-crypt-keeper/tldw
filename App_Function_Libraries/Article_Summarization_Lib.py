@@ -43,7 +43,7 @@ from SQLite_DB import *
 from App_Function_Libraries.Summarization_General_Lib import *
 from App_Function_Libraries.System_Checks_Lib import *
 from Tokenization_Methods_Lib import *
-from Video_DL_Ingestion_Lib import *
+from Video_DL_Ingestion_Lib import sanitize_filename
 from Web_UI_Lib import *
 
 #######################################################################################################################
@@ -153,58 +153,63 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
 
         try:
             if api_name.lower() == 'openai':
-                openai_api_key = api_key if api_key else config.get('API', 'openai_api_key', fallback=None)
-                logging.debug(f"Article_Summarizer: trying to summarize with openAI")
-                summary = summarize_with_openai(openai_api_key, json_file_path, article_custom_prompt)
+                # def summarize_with_openai(api_key, input_data, custom_prompt_arg)
+                summary = summarize_with_openai(api_key, json_file_path, article_custom_prompt)
+
             elif api_name.lower() == "anthropic":
-                anthropic_api_key = api_key if api_key else config.get('API', 'anthropic_api_key', fallback=None)
-                logging.debug(f"Article_Summarizer: Trying to summarize with anthropic")
-                summary = summarize_with_claude(anthropic_api_key, json_file_path, anthropic_model,
-                                                custom_prompt_arg=article_custom_prompt)
+                # def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
+                summary = summarize_with_anthropic(api_key, json_file_path, article_custom_prompt)
             elif api_name.lower() == "cohere":
-                cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
-                logging.debug(f"Article_Summarizer: Trying to summarize with cohere")
-                summary = summarize_with_cohere(cohere_api_key, json_file_path, cohere_model,
-                                                custom_prompt_arg=article_custom_prompt)
+                # def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg)
+                summary = summarize_with_cohere(api_key, json_file_path, article_custom_prompt)
+
             elif api_name.lower() == "groq":
-                groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
-                logging.debug(f"Article_Summarizer: Trying to summarize with Groq")
-                summary = summarize_with_groq(groq_api_key, json_file_path, groq_model,
-                                              custom_prompt_arg=article_custom_prompt)
-            elif api_name.lower() == "llama":
-                llama_token = api_key if api_key else config.get('API', 'llama_api_key', fallback=None)
-                llama_ip = llama_api_IP
-                logging.debug(f"Article_Summarizer: Trying to summarize with Llama.cpp")
-                summary = summarize_with_llama(llama_ip, json_file_path, llama_token, article_custom_prompt)
-            elif api_name.lower() == "kobold":
-                kobold_token = api_key if api_key else config.get('API', 'kobold_api_key', fallback=None)
-                kobold_ip = kobold_api_IP
-                logging.debug(f"Article_Summarizer: Trying to summarize with kobold.cpp")
-                summary = summarize_with_kobold(kobold_ip, json_file_path, kobold_token, article_custom_prompt)
-            elif api_name.lower() == "ooba":
-                ooba_token = api_key if api_key else config.get('API', 'ooba_api_key', fallback=None)
-                ooba_ip = ooba_api_IP
-                logging.debug(f"Article_Summarizer: Trying to summarize with oobabooga")
-                summary = summarize_with_oobabooga(ooba_ip, json_file_path, ooba_token, article_custom_prompt)
-            elif api_name.lower() == "tabbyapi":
-                tabbyapi_key = api_key if api_key else config.get('API', 'tabby_api_key', fallback=None)
-                tabbyapi_ip = tabby_api_IP
-                logging.debug(f"Article_Summarizer: Trying to summarize with tabbyapi")
-                tabby_model = summarize.llm_model
-                summary = summarize_with_tabbyapi(tabbyapi_key, tabbyapi_ip, json_file_path, tabby_model,
-                                                  article_custom_prompt)
-            elif api_name.lower() == "vllm":
-                logging.debug(f"Article_Summarizer: Trying to summarize with VLLM")
-                summary = summarize_with_vllm(vllm_api_url, vllm_api_key, summarize.llm_model, json_file_path,
-                                              article_custom_prompt)
-            elif api_name.lower() == "huggingface":
-                huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
-                logging.debug(f"Article_Summarizer: Trying to summarize with huggingface")
-                summary = summarize_with_huggingface(huggingface_api_key, json_file_path, article_custom_prompt)
+                logging.debug(f"MAIN: Trying to summarize with groq")
+                # def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
+                summary = summarize_with_groq(api_key, json_file_path, article_custom_prompt)
+
             elif api_name.lower() == "openrouter":
-                openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
-                logging.debug(f"Article_Summarizer: Trying to summarize with openrouter")
-                summary = summarize_with_openrouter(openrouter_api_key, json_file_path, article_custom_prompt)
+                logging.debug(f"MAIN: Trying to summarize with OpenRouter")
+                # def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
+                summary = summarize_with_openrouter(api_key, json_file_path, article_custom_prompt)
+
+            elif api_name.lower() == "deepseek":
+                logging.debug(f"MAIN: Trying to summarize with DeepSeek")
+                # def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
+                summary = summarize_with_deepseek(api_key, json_file_path, article_custom_prompt)
+
+            elif api_name.lower() == "llama.cpp":
+                logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
+                # def summarize_with_llama(api_url, file_path, token, custom_prompt)
+                summary = summarize_with_llama(json_file_path, article_custom_prompt)
+
+            elif api_name.lower() == "kobold":
+                logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
+                # def summarize_with_kobold(input_data, kobold_api_token, custom_prompt_input, api_url):
+                summary = summarize_with_kobold(json_file_path, api_key, article_custom_prompt)
+
+            elif api_name.lower() == "ooba":
+                # def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url):
+                summary = summarize_with_oobabooga(json_file_path, api_key, article_custom_prompt)
+
+            elif api_name.lower() == "tabbyapi":
+                # def summarize_with_tabbyapi(input_data, tabby_model, custom_prompt_input, api_key=None, api_IP):
+                summary = summarize_with_tabbyapi(json_file_path, article_custom_prompt)
+
+            elif api_name.lower() == "vllm":
+                logging.debug(f"MAIN: Trying to summarize with VLLM")
+                # def summarize_with_vllm(api_key, input_data, custom_prompt_input):
+                summary = summarize_with_vllm(json_file_path, article_custom_prompt)
+
+            elif api_name.lower() == "local-llm":
+                logging.debug(f"MAIN: Trying to summarize with Local LLM")
+                summary = summarize_with_local_llm(json_file_path, article_custom_prompt)
+
+            elif api_name.lower() == "huggingface":
+                logging.debug(f"MAIN: Trying to summarize with huggingface")
+                # def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
+                summarize_with_huggingface(api_key, json_file_path, article_custom_prompt)
+            # Add additional API handlers here...
         except requests.exceptions.ConnectionError as e:
             logging.error(f"Connection error while trying to summarize with {api_name}: {str(e)}")
 
