@@ -25,11 +25,13 @@ import os
 import logging
 from typing import Callable
 
+from openai import OpenAI
+
 # Import Local
 import summarize
 from App_Function_Libraries.Old_Chunking_Lib import client
 from App_Function_Libraries.SQLite_DB import logger
-from App_Function_Libraries.Summarization_General_Lib import extract_text_from_segments, summarize_with_claude
+from App_Function_Libraries.Summarization_General_Lib import extract_text_from_segments, summarize_with_anthropic
 from Article_Summarization_Lib import *
 from Article_Extractor_Lib import *
 from Audio_Transcription_Lib import *
@@ -46,26 +48,6 @@ from Tokenization_Methods_Lib import *
 from Video_DL_Ingestion_Lib import *
 from Web_UI_Lib import *
 
-# Read configuration from file
-config = configparser.ConfigParser()
-config.read('../config.txt')
-
-# Local-Models
-kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
-kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
-
-llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
-llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
-
-ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
-ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
-
-tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
-tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
-
-vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
-vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
-
 #######################################################################################################################
 # Function Definitions
 #
@@ -73,19 +55,19 @@ vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
 def summarize_with_local_llm(input_data, custom_prompt_arg):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("openai: Loading json data for summarization")
+            logging.debug("Local LLM: Loading json data for summarization")
             with open(input_data, 'r') as file:
                 data = json.load(file)
         else:
             logging.debug("openai: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"openai: Loaded data: {data}")
-        logging.debug(f"openai: Type of data: {type(data)}")
+        logging.debug(f"Local LLM: Loaded data: {data}")
+        logging.debug(f"Local LLM: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
             # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("openai: Summary already exists in the loaded data")
+            logging.debug("Local LLM: Summary already exists in the loaded data")
             return data['summary']
 
         # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
@@ -138,12 +120,22 @@ def summarize_with_local_llm(input_data, custom_prompt_arg):
         print("Error occurred while processing summary with Local LLM:", str(e))
         return "Local LLM: Error occurred while processing summary"
 
-def summarize_with_llama(api_url, input_data, token, custom_prompt):
+def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/completion", api_key=None):
+    loaded_config_data = summarize.load_and_log_configs()
     try:
-        api_url = llama_api_IP
-        token = llama_api_key
-        logging.debug("llama: Loading JSON data")
+        # API key validation
+        if api_key is None:
+            logging.info("llama.cpp: API key not provided as parameter")
+            logging.info("llama.cpp: Attempting to use API key from config file")
+            api_key = loaded_config_data['api_keys']['llama']
 
+        if api_key is None or api_key.strip() == "":
+            logging.info("llama.cpp: API key not found or is empty")
+
+        logging.debug(f"llama.cpp: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        # Load transcript
+        logging.debug("llama.cpp: Loading JSON data")
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Llama.cpp: Loading json data for summarization")
             with open(input_data, 'r') as file:
@@ -173,8 +165,8 @@ def summarize_with_llama(api_url, input_data, token, custom_prompt):
             'accept': 'application/json',
             'content-type': 'application/json',
         }
-        if len(token) > 5:
-            headers['Authorization'] = f'Bearer {token}'
+        if len(api_key) > 5:
+            headers['Authorization'] = f'Bearer {api_key}'
 
         llama_prompt = f"{text} \n\n\n\n{custom_prompt}"
         logging.debug("llama: Prompt being sent is {llama_prompt}")
@@ -197,17 +189,27 @@ def summarize_with_llama(api_url, input_data, token, custom_prompt):
             print("Summarization successful.")
             return summary
         else:
-            logging.error(f"llama: API request failed with status code {response.status_code}: {response.text}")
-            return f"llama: API request failed: {response.text}"
+            logging.error(f"Llama: API request failed with status code {response.status_code}: {response.text}")
+            return f"Llama: API request failed: {response.text}"
 
     except Exception as e:
-        logging.error("llama: Error in processing: %s", str(e))
-        return f"llama: Error occurred while processing summary with llama: {str(e)}"
+        logging.error("Llama: Error in processing: %s", str(e))
+        return f"Llama: Error occurred while processing summary with llama: {str(e)}"
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt_input):
+def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_IP="http://127.0.0.1:5001/api/v1/generate"):
+    loaded_config_data = summarize.load_and_log_configs()
     try:
+        # API key validation
+        if api_key is None:
+            logging.info("Kobold.cpp: API key not provided as parameter")
+            logging.info("Kobold.cpp: Attempting to use API key from config file")
+            api_key = loaded_config_data['api_keys']['kobold']
+
+        if api_key is None or api_key.strip() == "":
+            logging.info("Kobold.cpp: API key not found or is empty")
+
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Kobold.cpp: Loading json data for summarization")
             with open(input_data, 'r') as file:
@@ -251,7 +253,7 @@ def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt_i
 
         logging.debug("kobold: Submitting request to API endpoint")
         print("kobold: Submitting request to API endpoint")
-        response = requests.post(api_url, headers=headers, json=data)
+        response = requests.post(kobold_api_IP, headers=headers, json=data)
         response_data = response.json()
         logging.debug("kobold: API Response Data: %s", response_data)
 
@@ -260,8 +262,6 @@ def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt_i
                 summary = response_data['results'][0]['text'].strip()
                 logging.debug("kobold: Summarization successful")
                 print("Summarization successful.")
-                # FIXME - DEAD CODE, handled in summarize.py, line ?
-                #save_summary_to_file(summary, file_path)  # Save the summary to a file
                 return summary
             else:
                 logging.error("Expected data not found in API response.")
@@ -276,8 +276,18 @@ def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt_i
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(api_url, input_data, ooba_api_token, custom_prompt):
+def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions"):
+    loaded_config_data = summarize.load_and_log_configs()
     try:
+        # API key validation
+        if api_key is None:
+            logging.info("ooba: API key not provided as parameter")
+            logging.info("ooba: Attempting to use API key from config file")
+            api_key = loaded_config_data['api_keys']['ooba']
+
+        if api_key is None or api_key.strip() == "":
+            logging.info("ooba: API key not found or is empty")
+
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Oobabooga: Loading json data for summarization")
             with open(input_data, 'r') as file:
@@ -340,69 +350,33 @@ def summarize_with_oobabooga(api_url, input_data, ooba_api_token, custom_prompt)
         return f"ooba: Error occurred while processing summary with oobabooga: {str(e)}"
 
 
-# FIXME - https://docs.vllm.ai/en/latest/getting_started/quickstart.html .... Great docs.
-def summarize_with_vllm(vllm_api_url, vllm_api_key_function_arg, llm_model, input_data, vllm_custom_prompt_function_arg):
-    vllm_client = OpenAI(
-        base_url=vllm_api_url,
-        api_key=vllm_api_key_function_arg
-    )
-    if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("Oobabooga: Loading json data for summarization")
-        with open(input_data, 'r') as file:
-            data = json.load(file)
-    else:
-        logging.debug("Oobabooga: Using provided string data for summarization")
-        data = input_data
-
-    logging.debug(f"Oobabooga: Loaded data: {data}")
-    logging.debug(f"Oobabooga: Type of data: {type(data)}")
-
-    if isinstance(data, dict) and 'summary' in data:
-        # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("Oobabooga: Summary already exists in the loaded data")
-        return data['summary']
-
-    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-    if isinstance(data, list):
-        segments = data
-        text = extract_text_from_segments(segments)
-    elif isinstance(data, str):
-        text = data
-    else:
-        raise ValueError("Invalid input data format")
-
-
-    custom_prompt = vllm_custom_prompt_function_arg
-
-    completion = client.chat.completions.create(
-        model=llm_model,
-        messages=[
-            {"role": "system", "content": "You are a professional summarizer."},
-            {"role": "user", "content": f"{text} \n\n\n\n{custom_prompt}"}
-        ]
-    )
-    vllm_summary = completion.choices[0].message.content
-    return vllm_summary
-
-
 # FIXME - Install is more trouble than care to deal with right now.
-def summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, input_data, tabby_model, custom_prompt):
-    model = tabby_model
+def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:5000/v1/chat/completions"):
+    loaded_config_data = summarize.load_and_log_configs()
+    model = loaded_config_data['models']['tabby']
+    # API key validation
+    if api_key is None:
+        logging.info("tabby: API key not provided as parameter")
+        logging.info("tabby: Attempting to use API key from config file")
+        api_key = loaded_config_data['api_keys']['tabby']
+
+    if api_key is None or api_key.strip() == "":
+        logging.info("tabby: API key not found or is empty")
 
     if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("Oobabooga: Loading json data for summarization")
+        logging.debug("tabby: Loading json data for summarization")
         with open(input_data, 'r') as file:
             data = json.load(file)
     else:
-        logging.debug("Oobabooga: Using provided string data for summarization")
+        logging.debug("tabby: Using provided string data for summarization")
         data = input_data
 
-    logging.debug(f"Oobabooga: Loaded data: {data}")
-    logging.debug(f"Oobabooga: Type of data: {type(data)}")
+    logging.debug(f"tabby: Loaded data: {data}")
+    logging.debug(f"tabby: Type of data: {type(data)}")
 
     if isinstance(data, dict) and 'summary' in data:
         # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("Oobabooga: Summary already exists in the loaded data")
+        logging.debug("tabby: Summary already exists in the loaded data")
         return data['summary']
 
     # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
@@ -415,21 +389,78 @@ def summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, input_data, tabby_model
         raise ValueError("Invalid input data format")
 
     headers = {
-        'Authorization': f'Bearer {tabby_api_key}',
+        'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json'
     }
     data2 = {
         'text': text,
         'model': 'tabby'  # Specify the model if needed
     }
+    tabby_api_ip = loaded_config_data['local_apis']['tabby']['ip']
     try:
-        response = requests.post('https://api.tabbyapi.com/summarize', headers=headers, json=data2)
+        response = requests.post(tabby_api_ip, headers=headers, json=data2)
         response.raise_for_status()
         summary = response.json().get('summary', '')
         return summary
     except requests.exceptions.RequestException as e:
         logger.error(f"Error summarizing with TabbyAPI: {e}")
         return "Error summarizing with TabbyAPI."
+
+
+# FIXME - https://docs.vllm.ai/en/latest/getting_started/quickstart.html .... Great docs.
+def summarize_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions"):
+    loaded_config_data = summarize.load_and_log_configs()
+    llm_model = loaded_config_data['models']['vllm']
+    # API key validation
+    if api_key is None:
+        logging.info("vLLM: API key not provided as parameter")
+        logging.info("vLLM: Attempting to use API key from config file")
+        api_key = loaded_config_data['api_keys']['llama']
+
+    if api_key is None or api_key.strip() == "":
+        logging.info("vLLM: API key not found or is empty")
+    vllm_client = OpenAI(
+        base_url=vllm_api_url,
+        api_key=custom_prompt_input
+    )
+
+    if isinstance(input_data, str) and os.path.isfile(input_data):
+        logging.debug("vLLM: Loading json data for summarization")
+        with open(input_data, 'r') as file:
+            data = json.load(file)
+    else:
+        logging.debug("vLLM: Using provided string data for summarization")
+        data = input_data
+
+    logging.debug(f"vLLM: Loaded data: {data}")
+    logging.debug(f"vLLM: Type of data: {type(data)}")
+
+    if isinstance(data, dict) and 'summary' in data:
+        # If the loaded data is a dictionary and already contains a summary, return it
+        logging.debug("vLLM: Summary already exists in the loaded data")
+        return data['summary']
+
+    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+    if isinstance(data, list):
+        segments = data
+        text = extract_text_from_segments(segments)
+    elif isinstance(data, str):
+        text = data
+    else:
+        raise ValueError("Invalid input data format")
+
+
+    custom_prompt = custom_prompt_input
+
+    completion = client.chat.completions.create(
+        model=llm_model,
+        messages=[
+            {"role": "system", "content": "You are a professional summarizer."},
+            {"role": "user", "content": f"{text} \n\n\n\n{custom_prompt}"}
+        ]
+    )
+    vllm_summary = completion.choices[0].message.content
+    return vllm_summary
 
 
 def save_summary_to_file(summary, file_path):
