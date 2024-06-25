@@ -166,58 +166,136 @@ abc_xyz = """
 # Config loading
 #
 
-# Read configuration from file
-config = configparser.ConfigParser()
-config.read('config.txt')
+def load_comprehensive_config():
+    # Get the directory of the current script
+    current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# API Keys
-anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
-logging.debug(f"Loaded Anthropic API Key: {anthropic_api_key}")
+    # Construct the path to the config file in the current directory
+    config_path = os.path.join(current_dir, 'config.txt')
 
-cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
-logging.debug(f"Loaded cohere API Key: {cohere_api_key}")
+    # Create a ConfigParser object
+    config = configparser.ConfigParser()
 
-groq_api_key = config.get('API', 'groq_api_key', fallback=None)
-logging.debug(f"Loaded groq API Key: {groq_api_key}")
+    # Read the configuration file
+    files_read = config.read(config_path)
 
-openai_api_key = config.get('API', 'openai_api_key', fallback=None)
-logging.debug(f"Loaded openAI Face API Key: {openai_api_key}")
+    if not files_read:
+        raise FileNotFoundError(f"Config file not found at {config_path}")
 
-huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
-logging.debug(f"Loaded HuggingFace Face API Key: {huggingface_api_key}")
+    return config
 
-openrouter_api_key = config.get('Local-API', 'openrouter', fallback=None)
-logging.debug(f"Loaded OpenRouter API Key: {openrouter_api_key}")
 
-# Models
-anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
-cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
-groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
-openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
-huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
-openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
+def load_and_log_configs():
+    try:
+        config = load_comprehensive_config()
+        if config is None:
+            logging.error("Config is None, cannot proceed")
+            return None
+        # API Keys
+        anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
+        logging.debug(
+            f"Loaded Anthropic API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:] if anthropic_api_key else None}")
 
-# Local-Models
-kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
-kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
+        cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
+        logging.debug(
+            f"Loaded Cohere API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:] if cohere_api_key else None}")
 
-llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
-llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
+        groq_api_key = config.get('API', 'groq_api_key', fallback=None)
+        logging.debug(f"Loaded Groq API Key: {groq_api_key[:5]}...{groq_api_key[-5:] if groq_api_key else None}")
 
-ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
-ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
+        openai_api_key = config.get('API', 'openai_api_key', fallback=None)
+        logging.debug(
+            f"Loaded OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
 
-tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
-tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
+        huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
+        logging.debug(
+            f"Loaded HuggingFace API Key: {huggingface_api_key[:5]}...{huggingface_api_key[-5:] if huggingface_api_key else None}")
 
-vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
-vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
+        openrouter_api_key = config.get('API', 'openrouter_api_key', fallback=None)
+        logging.debug(
+            f"Loaded OpenRouter API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:] if openrouter_api_key else None}")
 
-# Retrieve output paths from the configuration file
-output_path = config.get('Paths', 'output_path', fallback='results')
+        # Models
+        anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
+        cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
+        groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
+        openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
+        huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
+        openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
 
-# Retrieve processing choice from the configuration file
-processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
+        logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
+        logging.debug(f"Loaded Cohere Model: {cohere_model}")
+        logging.debug(f"Loaded Groq Model: {groq_model}")
+        logging.debug(f"Loaded OpenAI Model: {openai_model}")
+        logging.debug(f"Loaded HuggingFace Model: {huggingface_model}")
+        logging.debug(f"Loaded OpenRouter Model: {openrouter_model}")
+
+        # Local-Models
+        kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+        kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
+
+        llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
+        llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
+
+        ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
+        ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
+
+        tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+        tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
+
+        vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
+        vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
+
+        logging.debug(f"Loaded Kobold API IP: {kobold_api_IP}")
+        logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
+        logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
+        logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
+        logging.debug(f"Loaded VLLM API URL: {vllm_api_url}")
+
+        # Retrieve output paths from the configuration file
+        output_path = config.get('Paths', 'output_path', fallback='results')
+        logging.debug(f"Output path set to: {output_path}")
+
+        # Retrieve processing choice from the configuration file
+        processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
+        logging.debug(f"Processing choice set to: {processing_choice}")
+
+        # Prompts - FIXME
+        prompt_path = config.get('Prompts', 'prompt_path', fallback='prompts.db')
+
+        return {
+            'api_keys': {
+                'anthropic': anthropic_api_key,
+                'cohere': cohere_api_key,
+                'groq': groq_api_key,
+                'openai': openai_api_key,
+                'huggingface': huggingface_api_key,
+                'openrouter': openrouter_api_key
+            },
+            'models': {
+                'anthropic': anthropic_model,
+                'cohere': cohere_model,
+                'groq': groq_model,
+                'openai': openai_model,
+                'huggingface': huggingface_model,
+                'openrouter': openrouter_model
+            },
+            'local_apis': {
+                'kobold': {'ip': kobold_api_IP, 'key': kobold_api_key},
+                'llama': {'ip': llama_api_IP, 'key': llama_api_key},
+                'ooba': {'ip': ooba_api_IP, 'key': ooba_api_key},
+                'tabby': {'ip': tabby_api_IP, 'key': tabby_api_key},
+                'vllm': {'ip': vllm_api_url, 'key': vllm_api_key}
+            },
+            'output_path': output_path,
+            'processing_choice': processing_choice
+        }
+
+    except Exception as e:
+        logging.error(f"Error loading config: {str(e)}")
+        return None
+
+
 
 # Log file
 # logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
@@ -415,7 +493,7 @@ def print_hello():
 # Function List
 # 1. extract_text_from_segments(segments: List[Dict]) -> str
 # 2. summarize_with_openai(api_key, file_path, custom_prompt_arg)
-# 3. summarize_with_claude(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5)
+# 3. summarize_with_anthropic(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5)
 # 4. summarize_with_cohere(api_key, file_path, model, custom_prompt_arg)
 # 5. summarize_with_groq(api_key, file_path, model, custom_prompt_arg)
 #
@@ -1671,7 +1749,7 @@ def process_url(
                 max_tokens=max_tokens
             )
         if api_name:
-            summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key, config)
+            summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key)
             if summary_text is None:
                 logging.error("Summary text is None. Check summarization function.")
                 summary_file_path = None  # Set summary_file_path to None if summary is not generated
@@ -1695,6 +1773,7 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
                        download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
                        keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
                        chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens):
+    global current_progress
     progress = []  # This must always be a list
     status = []  # This must always be a list
 
@@ -1795,13 +1874,6 @@ def handle_prompt_selection(prompt):
 # Helper Functions for Main() & process_url()
 #
 
-
-def extract_video_info(url):
-    info_dict = get_youtube(url)
-    title = info_dict.get('title', 'Untitled')
-    return info_dict, title
-
-
 def perform_transcription(video_path, offset, whisper_model, vad_filter):
     global segments_json_path
     audio_file_path = convert_to_wav(video_path, offset)
@@ -1881,13 +1953,14 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
     )
 
 
-def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key, config):
-    custom_prompt_input = (
-        "Above is the transcript of a video. Please read through the transcript carefully. Identify the "
-        "main topics that are discussed over the course of the transcript. Then, summarize the key points about each main "
-        "topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, "
-        "but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> "
-        "tags.")
+def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key):
+    # Load Config
+    loaded_config_data = load_and_log_configs()
+
+    if custom_prompt_input is None:
+        # FIXME - Setup proper default prompt & extract said prompt from config file or prompts.db file.
+        #custom_prompt_input = config.get('Prompts', 'video_summarize_prompt', fallback="Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary.")
+        custom_prompt_input = "Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary."
     summary = None
     try:
         if not json_file_path or not os.path.exists(json_file_path):
@@ -1905,63 +1978,48 @@ def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key
         text = extract_text_from_segments(segments)
 
         if api_name.lower() == 'openai':
+            #def summarize_with_openai(api_key, input_data, custom_prompt_arg)
             summary = summarize_with_openai(api_key, text, custom_prompt_input)
 
+        elif api_name.lower() == "anthropic":
+            # def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
+            summary = summarize_with_anthropic(api_key, text, custom_prompt_input)
         elif api_name.lower() == "cohere":
-            cohere_api_key = api_key if api_key else config.get('API', 'cohere_api_key', fallback=None)
-            if not cohere_api_key:
-                logging.error("Cohere API key not found.")
-                return None
-            summary = summarize_with_cohere(cohere_api_key, text, config.get('API', 'cohere_model', fallback='command-r-plus'), custom_prompt_input)
+            # def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg)
+            summary = summarize_with_cohere(api_key, text, custom_prompt_input)
 
         elif api_name.lower() == "groq":
-            groq_api_key = api_key if api_key else config.get('API', 'groq_api_key', fallback=None)
-            if not groq_api_key:
-                logging.error("MAIN: Groq API key not found.")
-                return None
             logging.debug(f"MAIN: Trying to summarize with groq")
-            summary = summarize_with_groq(groq_api_key, text, custom_prompt_input)
+            # def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
+            summary = summarize_with_groq(api_key, text, custom_prompt_input)
 
         elif api_name.lower() == "openrouter":
-            openrouter_api_key = api_key if api_key else config.get('API', 'openrouter_api_key', fallback=None)
-            if not openrouter_api_key:
-                logging.error("MAIN: OpenRouter API key not found.")
-                return None
             logging.debug(f"MAIN: Trying to summarize with OpenRouter")
-            summary = summarize_with_openrouter(openrouter_api_key, text, custom_prompt_input)
+            # def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
+            summary = summarize_with_openrouter(api_key, text, custom_prompt_input)
 
         elif api_name.lower() == "llama.cpp":
             logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
             #def summarize_with_llama(api_url, file_path, token, custom_prompt)
-            summary = summarize_with_llama(llama_api_IP, text, llama_api_key, custom_prompt_input)
+            summary = summarize_with_llama(text, custom_prompt_input)
 
         elif api_name.lower() == "kobold":
-            kobold_api_key = api_key if api_key else config.get('Local-API', 'kobold_api_key', fallback=None)
-            if not kobold_api_key:
-                logging.error("MAIN: Kobold API key not found.")
-                return None
             logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
-            #def summarize_with_kobold(api_url, input_data, kobold_api_token, custom_prompt_input):
-            summary = summarize_with_kobold(kobold_api_IP, text, kobold_api_key, custom_prompt_input)
+            #def summarize_with_kobold(input_data, kobold_api_token, custom_prompt_input, api_url):
+            summary = summarize_with_kobold(text, api_key, custom_prompt_input)
 
         elif api_name.lower() == "ooba":
-            ooba_token = api_key if api_key else config.get('Local-API', 'ooba_api_key', fallback=None)
-            ooba_ip = config.get('API', 'ooba_ip', fallback=None)
-            summary = summarize_with_oobabooga(ooba_ip, text, ooba_token, custom_prompt_input)
+            # def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url):
+            summary = summarize_with_oobabooga(text, api_key, custom_prompt_input)
 
         elif api_name.lower() == "tabbyapi":
-            tabbyapi_key = api_key if api_key else config.get('Local-API', 'tabbyapi_token', fallback=None)
-            tabby_model = config.get('Local-API', 'tabby_model', fallback=None)
-            summary = summarize_with_tabbyapi(tabby_api_key, config.get('Local-API', 'tabby_api_IP',
-                                                                        fallback='http://127.0.0.1:5000/api/v1/generate'),
-                                              text, tabby_model, custom_prompt_input)
+            # def summarize_with_tabbyapi(input_data, tabby_model, custom_prompt_input, api_key=None, api_IP):
+            summary = summarize_with_tabbyapi(text, custom_prompt_input)
 
         elif api_name.lower() == "vllm":
             logging.debug(f"MAIN: Trying to summarize with VLLM")
-            vllm_api_key = api_key if api_key else config.get('Local-API', 'vllm_api_key', fallback=None)
-            summary = summarize_with_vllm(
-                config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions'),
-                vllm_api_key, config.get('API', 'vllm_model', fallback=''), text, custom_prompt_input)
+            # def summarize_with_vllm(api_key, input_data, custom_prompt_input):
+            summary = summarize_with_vllm(text, custom_prompt_input)
 
         elif api_name.lower() == "local-llm":
             logging.debug(f"MAIN: Trying to summarize with Local LLM")
@@ -1969,8 +2027,8 @@ def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key
 
         elif api_name.lower() == "huggingface":
             logging.debug(f"MAIN: Trying to summarize with huggingface")
-            huggingface_api_key = api_key if api_key else config.get('API', 'huggingface_api_key', fallback=None)
-            summarize_with_huggingface(huggingface_api_key, text, custom_prompt_input)
+            # def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
+            summarize_with_huggingface(api_key, text, custom_prompt_input)
         # Add additional API handlers here...
 
         else:
@@ -2078,7 +2136,7 @@ def main(input_path, api_name=None, api_key=None,
                                                              )
 
                     elif api_name:
-                        summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key, config)
+                        summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key)
                     else:
                         summary = None
 
@@ -2109,7 +2167,7 @@ def main(input_path, api_name=None, api_key=None,
                                 text = extract_text_from_segments(segments)
                                 summary = summarize_with_detail_openai(text, detail=detail)
                             elif api_name:
-                                summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key, config)
+                                summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key)
                             else:
                                 summary = None
 
@@ -2142,7 +2200,7 @@ def main(input_path, api_name=None, api_key=None,
                         text = extract_text_from_segments(segments)
                         summary = summarize_with_detail_openai(text, detail=detail)
                     elif api_name:
-                        summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key, config)
+                        summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key)
                     else:
                         summary = None
 
@@ -2178,6 +2236,22 @@ if __name__ == "__main__":
 
     # Logging setup
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # Load Config
+    loaded_config_data = load_and_log_configs()
+
+    if loaded_config_data:
+        logging.info("Main: Configuration loaded successfully")
+        # You can access the configuration data like this:
+        # print(f"OpenAI API Key: {config_data['api_keys']['openai']}")
+        # print(f"Anthropic Model: {config_data['models']['anthropic']}")
+        # print(f"Kobold API IP: {config_data['local_apis']['kobold']['ip']}")
+        # print(f"Output Path: {config_data['output_path']}")
+        # print(f"Processing Choice: {config_data['processing_choice']}")
+    else:
+        print("Failed to load configuration")
+
+    # Print ascii_art
     print_hello()
 
     transcription_text = None
@@ -2307,7 +2381,7 @@ Sample commands:
 
         custom_prompt_input = args.custom_prompt
     else:
-        logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt} \n\nas the prompt")
+        logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt_input} \n\nas the prompt")
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
 
     # Check if the user wants to use the local LLM from the script
@@ -2342,18 +2416,18 @@ Sample commands:
         # logging.info(f'Save File location: {args.output_path}')
         # logging.info(f'Log File location: {args.log_file}')
 
-        # Get all API keys from the config
-        api_keys = {key: value for key, value in config.items('API') if key.endswith('_api_key')}
         global api_name
         api_name = args.api_name
 
         summary = None  # Initialize to ensure it's always defined
         if args.detail_level == None:
             args.detail_level = 0.01
-        if args.api_name and args.rolling_summarization and any(
-                key.startswith(args.api_name) and value is not None for key, value in api_keys.items()):
-            logging.info(f'MAIN: API used: {args.api_name}')
-            logging.info('MAIN: Rolling Summarization will be performed.')
+
+        # FIXME
+        # if args.api_name and args.rolling_summarization and any(
+        #         key.startswith(args.api_name) and value is not None for key, value in api_keys.items()):
+        #     logging.info(f'MAIN: API used: {args.api_name}')
+        #     logging.info('MAIN: Rolling Summarization will be performed.')
 
         elif args.api_name:
             logging.info(f'MAIN: API used: {args.api_name}')

@@ -10,7 +10,7 @@ import configparser
 #
 # 1. extract_text_from_segments(segments: List[Dict]) -> str
 # 2. summarize_with_openai(api_key, file_path, custom_prompt_arg)
-# 3. summarize_with_claude(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5)
+# 3. summarize_with_anthropic(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5)
 # 4. summarize_with_cohere(api_key, file_path, model, custom_prompt_arg)
 # 5. summarize_with_groq(api_key, file_path, model, custom_prompt_arg)
 #
@@ -47,36 +47,11 @@ from Video_DL_Ingestion_Lib import *
 #from Web_UI_Lib import *
 
 
-# Read configuration from file
-config = configparser.ConfigParser()
-config.read('../config.txt')
 
-# API Keys
-anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
-logging.debug(f"Loaded Anthropic API Key: {anthropic_api_key}")
 
-cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
-logging.debug(f"Loaded cohere API Key: {cohere_api_key}")
 
-groq_api_key = config.get('API', 'groq_api_key', fallback=None)
-logging.debug(f"Loaded groq API Key: {groq_api_key}")
 
-openai_api_key = config.get('API', 'openai_api_key', fallback=None)
-logging.debug(f"Loaded openAI Face API Key: {openai_api_key}")
 
-huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
-logging.debug(f"Loaded HuggingFace Face API Key: {huggingface_api_key}")
-
-openrouter_api_token = config.get('API', 'openrouter_api_token', fallback=None)
-logging.debug(f"Loaded OpenRouter API Key: {openrouter_api_token}")
-
-# Models
-anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
-cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
-groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
-openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
-huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
-openrouter_model = config.get('API', 'openrouter_model', fallback='mistralai/mistral-7b-instruct:free')
 
 
 #######################################################################################################################
@@ -127,57 +102,67 @@ def extract_text_from_segments(segments):
 
 
 def summarize_with_openai(api_key, input_data, custom_prompt_arg):
+    loaded_config_data = summarize.load_and_log_configs()
     try:
+        # API key validation
+        if api_key is None or api_key.strip() == "":
+            logging.info("OpenAI: API key not provided as parameter")
+            logging.info("OpenAI: Attempting to use API key from config file")
+            api_key = loaded_config_data['api_keys']['openai']
+
+        if api_key is None or api_key.strip() == "":
+            logging.error("OpenAI: API key not found or is empty")
+            return "OpenAI: API Key Not Provided/Found in Config file or is empty"
+
+        logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        # Input data handling
         if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("openai: Loading json data for summarization")
+            logging.debug("OpenAI: Loading json data for summarization")
             with open(input_data, 'r') as file:
                 data = json.load(file)
         else:
-            logging.debug("openai: Using provided string data for summarization")
+            logging.debug("OpenAI: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"openai: Loaded data: {data}")
-        logging.debug(f"openai: Type of data: {type(data)}")
+        logging.debug(f"OpenAI: Loaded data: {data}")
+        logging.debug(f"OpenAI: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
             # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("openai: Summary already exists in the loaded data")
+            logging.debug("OpenAI: Summary already exists in the loaded data")
             return data['summary']
 
-        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        # Text extraction
         if isinstance(data, list):
             segments = data
             text = extract_text_from_segments(segments)
         elif isinstance(data, str):
             text = data
         else:
-            raise ValueError("Invalid input data format")
+            raise ValueError("OpenAI: Invalid input data format")
 
-        open_ai_model = openai_model or 'gpt-4o'
+        openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
 
         headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json'
         }
 
-        logging.debug(f"openai: API Key is: {api_key}")
+        logging.debug(
+            f"OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
         logging.debug("openai: Preparing data + prompt for submittal")
         openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         data = {
-            "model": open_ai_model,
+            "model": openai_model,
             "messages": [
-                {
-                    "role": "system",
-                    "content": "You are a professional summarizer."
-                },
-                {
-                    "role": "user",
-                    "content": openai_prompt
-                }
+                {"role": "system", "content": "You are a professional summarizer."},
+                {"role": "user", "content": openai_prompt}
             ],
-            "max_tokens": 4096,  # Adjust tokens as needed
+            "max_tokens": 4096,
             "temperature": 0.1
         }
+
         logging.debug("openai: Posting request")
         response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
 
@@ -186,38 +171,49 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
                 logging.debug("openai: Summarization successful")
-                print("openai: Summarization successful.")
                 return summary
             else:
                 logging.warning("openai: Summary not found in the response data")
                 return "openai: Summary not available"
         else:
-            logging.debug("openai: Summarization failed")
-            print("openai: Failed to process summary:", response.text)
-            return "openai: Failed to process summary"
+            logging.error(f"openai: Summarization failed with status code {response.status_code}")
+            logging.error(f"openai: Error response: {response.text}")
+            return f"openai: Failed to process summary. Status code: {response.status_code}"
     except Exception as e:
-        logging.debug("openai: Error in processing: %s", str(e))
-        print("openai: Error occurred while processing summary with openai:", str(e))
-        return "openai: Error occurred while processing summary"
+        logging.error(f"openai: Error in processing: {str(e)}", exc_info=True)
+        return f"openai: Error occurred while processing summary: {str(e)}"
 
 
-
-def summarize_with_claude(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
+def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
     try:
+        loaded_config_data = summarize.load_and_log_configs()
+        global anthropic_api_key
+        # API key validation
+        if api_key is None:
+            logging.info("Anthropic: API key not provided as parameter")
+            logging.info("Anthropic: Attempting to use API key from config file")
+            anthropic_api_key = loaded_config_data['api_keys']['anthropic']
+
+        if api_key is None or api_key.strip() == "":
+            logging.error("Anthropic: API key not found or is empty")
+            return "Anthropic: API Key Not Provided/Found in Config file or is empty"
+
+        logging.debug(f"Anthropic: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
         if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("ClaudeAI: Loading json data for summarization")
+            logging.debug("AnthropicAI: Loading json data for summarization")
             with open(input_data, 'r') as file:
                 data = json.load(file)
         else:
-            logging.debug("ClaudeAI: Using provided string data for summarization")
+            logging.debug("AnthropicAI: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"ClaudeAI: Loaded data: {data}")
-        logging.debug(f"ClaudeAI: Type of data: {type(data)}")
+        logging.debug(f"AnthropicAI: Loaded data: {data}")
+        logging.debug(f"AnthropicAI: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
             # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("ClaudeAI: Summary already exists in the loaded data")
+            logging.debug("Anthropic: Summary already exists in the loaded data")
             return data['summary']
 
         # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
@@ -227,16 +223,18 @@ def summarize_with_claude(api_key, input_data, model, custom_prompt_arg, max_ret
         elif isinstance(data, str):
             text = data
         else:
-            raise ValueError("Invalid input data format")
+            raise ValueError("Anthropic: Invalid input data format")
+
+        anthropic_model = loaded_config_data['models']['anthropic']
 
         headers = {
-            'x-api-key': api_key,
+            'x-api-key': anthropic_api_key,
             'anthropic-version': '2023-06-01',
             'Content-Type': 'application/json'
         }
 
-        anthropic_prompt = custom_prompt_arg  # Sanitize the custom prompt
-        logging.debug(f"anthropic: Prompt is {anthropic_prompt}")
+        anthropic_prompt = custom_prompt_arg
+        logging.debug(f"Anthropic: Prompt is {anthropic_prompt}")
         user_message = {
             "role": "user",
             "content": f"{text} \n\n\n\n{anthropic_prompt}"
@@ -273,7 +271,7 @@ def summarize_with_claude(api_key, input_data, model, custom_prompt_arg, max_ret
                         return summary
                     except (IndexError, KeyError) as e:
                         logging.debug("anthropic: Unexpected data in response")
-                        print("Unexpected response format from Claude API:", response.text)
+                        print("Unexpected response format from Anthropic API:", response.text)
                         return None
                 elif response.status_code == 500:  # Handle internal server error specifically
                     logging.debug("anthropic: Internal server error")
@@ -291,14 +289,12 @@ def summarize_with_claude(api_key, input_data, model, custom_prompt_arg, max_ret
                     time.sleep(retry_delay)
                 else:
                     return f"anthropic: Network error: {str(e)}"
-
-#FIXME
     except FileNotFoundError as e:
-        logging.error(f"anthropic: File not found: {file_path}")
-        return f"anthropic: File not found: {file_path}"
+        logging.error(f"anthropic: File not found: {input_data}")
+        return f"anthropic: File not found: {input_data}"
     except json.JSONDecodeError as e:
-        logging.error(f"anthropic: Invalid JSON format in file: {file_path}")
-        return f"anthropic: Invalid JSON format in file: {file_path}"
+        logging.error(f"anthropic: Invalid JSON format in file: {input_data}")
+        return f"anthropic: Invalid JSON format in file: {input_data}"
     except Exception as e:
         logging.error(f"anthropic: Error in processing: {str(e)}")
         return f"anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
@@ -306,7 +302,20 @@ def summarize_with_claude(api_key, input_data, model, custom_prompt_arg, max_ret
 
 # Summarize with Cohere
 def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
+    loaded_config_data = summarize.load_and_log_configs()
     try:
+        # API key validation
+        if api_key is None:
+            logging.info("cohere: API key not provided as parameter")
+            logging.info("cohere: Attempting to use API key from config file")
+            cohere_api_key = loaded_config_data['api_keys']['cohere']
+
+        if api_key is None or api_key.strip() == "":
+            logging.error("cohere: API key not found or is empty")
+            return "cohere: API Key Not Provided/Found in Config file or is empty"
+
+        logging.debug(f"cohere: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Cohere: Loading json data for summarization")
             with open(input_data, 'r') as file:
@@ -332,10 +341,12 @@ def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
         else:
             raise ValueError("Invalid input data format")
 
+        cohere_model = loaded_config_data['models']['cohere']
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
-            'Authorization': f'Bearer {api_key}'
+            'Authorization': f'Bearer {cohere_api_key}'
         }
 
         cohere_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
@@ -376,8 +387,22 @@ def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
+def summarize_with_groq(api_key, input_data, custom_prompt_arg):
+    loaded_config_data = summarize.load_and_log_configs()
     try:
+        # API key validation
+        if api_key is None:
+            logging.info("groq: API key not provided as parameter")
+            logging.info("groq: Attempting to use API key from config file")
+            groq_api_key = loaded_config_data['api_keys']['groq']
+
+        if api_key is None or api_key.strip() == "":
+            logging.error("groq: API key not found or is empty")
+            return "groq: API Key Not Provided/Found in Config file or is empty"
+
+        logging.debug(f"groq: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        # Transcript data handling & Validation
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Groq: Loading json data for summarization")
             with open(input_data, 'r') as file:
@@ -403,6 +428,9 @@ def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
         else:
             raise ValueError("Groq: Invalid input data format")
 
+        # Set the model to be used
+        groq_model = loaded_config_data['models']['groq']
+
         headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json'
@@ -418,7 +446,7 @@ def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
                     "content": groq_prompt
                 }
             ],
-            "model": model
+            "model": groq_model
         }
 
         logging.debug("groq: Submitting request to API endpoint")
@@ -447,24 +475,36 @@ def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
 
 
 def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
+    loaded_config_data = summarize.load_and_log_configs()
     import requests
     import json
-    global openrouter_model
+    global openrouter_model, openrouter_api_key
+    # API key validation
+    if api_key is None:
+        logging.info("openrouter: API key not provided as parameter")
+        logging.info("openrouter: Attempting to use API key from config file")
+        openrouter_api_key = loaded_config_data['api_keys']['openrouter']
+
+    if api_key is None or api_key.strip() == "":
+        logging.error("openrouter: API key not found or is empty")
+        return "openrouter: API Key Not Provided/Found in Config file or is empty"
+
+    logging.debug(f"openai: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
     if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("openai: Loading json data for summarization")
+        logging.debug("openrouter: Loading json data for summarization")
         with open(input_data, 'r') as file:
             data = json.load(file)
     else:
-        logging.debug("openai: Using provided string data for summarization")
+        logging.debug("openrouter: Using provided string data for summarization")
         data = input_data
 
-    logging.debug(f"openai: Loaded data: {data}")
-    logging.debug(f"openai: Type of data: {type(data)}")
+    logging.debug(f"openrouter: Loaded data: {data}")
+    logging.debug(f"openrouter: Type of data: {type(data)}")
 
     if isinstance(data, dict) and 'summary' in data:
         # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("openai: Summary already exists in the loaded data")
+        logging.debug("openrouter: Summary already exists in the loaded data")
         return data['summary']
 
     # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
@@ -487,10 +527,6 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
     else:
         print("config.txt not found in the specified path or current directory.")
 
-    openrouter_api_token = config.get('API', 'openrouter_api_token', fallback=None)
-    if openrouter_model is None:
-        openrouter_model = "mistralai/mistral-7b-instruct:free"
-
     openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
 
     try:
@@ -499,7 +535,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {openrouter_api_token}",
+                "Authorization": f"Bearer {openrouter_api_key}",
             },
             data=json.dumps({
                 "model": f"{openrouter_model}",
@@ -529,8 +565,22 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
         return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
 
 def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
+    loaded_config_data = summarize.load_and_log_configs()
+    global huggingface_api_key
     logging.debug(f"huggingface: Summarization process starting...")
     try:
+        # API key validation
+        if api_key is None:
+            logging.info("HuggingFace: API key not provided as parameter")
+            logging.info("HuggingFace: Attempting to use API key from config file")
+            huggingface_api_key = loaded_config_data['api_keys']['openai']
+
+        if api_key is None or api_key.strip() == "":
+            logging.error("HuggingFace: API key not found or is empty")
+            return "HuggingFace: API Key Not Provided/Found in Config file or is empty"
+
+        logging.debug(f"HuggingFace: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("HuggingFace: Loading json data for summarization")
             with open(input_data, 'r') as file:
@@ -561,8 +611,8 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
             "Authorization": f"Bearer {api_key}"
         }
 
-        model = "microsoft/Phi-3-mini-128k-instruct"
-        API_URL = f"https://api-inference.huggingface.co/models/{model}"
+        huggingface_model = loaded_config_data['models']['huggingface']
+        API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}"
 
         huggingface_prompt = f"{text}\n\n\n\n{custom_prompt_arg}"
         logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
