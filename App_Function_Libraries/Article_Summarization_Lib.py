@@ -29,8 +29,6 @@ import torchvision
 import transformers
 # Local Imports
 import summarize
-import summarize
-from App_Function_Libraries.SQLite_DB import Database
 from App_Function_Libraries.Article_Extractor_Lib import *
 from Chunk_Lib import *
 from Diarization_Lib import *
@@ -44,7 +42,6 @@ from App_Function_Libraries.Summarization_General_Lib import *
 from App_Function_Libraries.System_Checks_Lib import *
 from Tokenization_Methods_Lib import *
 from Video_DL_Ingestion_Lib import sanitize_filename
-from Web_UI_Lib import *
 
 #######################################################################################################################
 # Function Definitions
