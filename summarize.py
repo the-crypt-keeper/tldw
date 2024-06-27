@@ -28,6 +28,7 @@ import zipfile
 # Local Module Imports (Libraries specific to this project)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
 from App_Function_Libraries import *
+from App_Function_Libraries.Audio_Files import *
 from App_Function_Libraries.Web_UI_Lib import *
 from App_Function_Libraries.Article_Extractor_Lib import *
 from App_Function_Libraries.Article_Summarization_Lib import *
@@ -149,7 +150,13 @@ abc_xyz = """
 #   2. ERROR: Could not install packages due to an OSError: [WinError 2] The system cannot find the file specified: 'C:\\Python312\\Scripts\\dateparser-download.exe' -> 'C:\\Python312\\Scripts\\dateparser-download.exe.deleteme'
 #       Resolved through adding --user to the pip install command
 #
-#   3. ?
+#   3. Windows: Could not locate cudnn_ops_infer64_8.dll. Please make sure it is in your library path!
+#
+#   4.
+#
+#   5. 
+#
+#
 #
 #######################
 
@@ -320,7 +327,7 @@ def load_and_log_configs():
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
-                  "distil-large-v2", "distil-medium.en", "distil-small.en", "distil-large-v3"]
+                  "distil-large-v2", "distil-medium.en", "distil-small.en"]
 source_languages = {
     "en": "English",
     "zh": "Chinese",
@@ -778,7 +785,7 @@ def display_search_results(query):
 # def gradio UI
 def launch_ui(demo_mode=False):
     whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
-                      "distil-large-v2", "distil-medium.en", "distil-small.en", "distil-large-v3"]
+                      "distil-large-v2", "distil-medium.en", "distil-small.en"]
     # Set theme value with https://www.gradio.app/guides/theming-guide - 'theme='
     my_theme = gr.Theme.from_hub("gradio/seafoam")
     global custom_prompt_input
@@ -807,7 +814,10 @@ def launch_ui(demo_mode=False):
             # Inputs to be shown or hidden
             num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)",
                                            visible=False)
-            whisper_model_input = gr.Dropdown(choices=whisper_models, value="small.en",
+            whisper_modelsA = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2",
+                              "large-v3",
+                              "distil-large-v2", "distil-medium.en", "distil-small.en"]
+            whisper_model_input = gr.Dropdown(choices=whisper_modelsA, value="medium",
                                               label="Whisper Model(This is the ML model used for transcription.)",
                                               visible=False)
             custom_prompt_input = gr.Textbox(
@@ -1098,13 +1108,45 @@ def launch_ui(demo_mode=False):
                 placeholder="Enter the URL of the audio file"
             )
             audio_file_input = gr.File(label="Upload Audio File", file_types=["audio/*"])
+
+            # New input for Whisper model selection
+            whisper_model_input = gr.Dropdown(
+                choices=["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2",
+                                "large-v3",
+                                "distil-large-v2", "distil-medium.en", "distil-small.en"],
+                value="medium",
+                label="Whisper Model"
+            )
+
+            # New inputs for API selection and key
+            api_name_input = gr.Dropdown(
+                choices=[None, "openai", "anthropic", "cohere", "groq", "deepseek", "openrouter", "llama.cpp",
+                         "kobold", "ooba", "tabbyapi", "vllm", "huggingface"],
+                value=None,
+                label="API for Summarization (Optional)"
+            )
+            api_key_input = gr.Textbox(
+                label="API Key (if required)",
+                placeholder="Enter your API key here",
+                type="password"
+            )
+
             process_audio_button = gr.Button("Process Audio File")
             audio_progress_output = gr.Textbox(label="Progress")
             audio_transcriptions_output = gr.Textbox(label="Transcriptions")
 
+            def process_audio_wrapper(audio_url, audio_file, whisper_model, api_name, api_key):
+                return process_audio_file(audio_url, audio_file, whisper_model, api_name, api_key)
+
             process_audio_button.click(
-                fn=process_audio_file,
-                inputs=[audio_url_input, audio_file_input],
+                fn=process_audio_wrapper,
+                inputs=[
+                    audio_url_input,
+                    audio_file_input,
+                    whisper_model_input,
+                    api_name_input,
+                    api_key_input
+                ],
                 outputs=[audio_progress_output, audio_transcriptions_output]
             )
 
@@ -1529,72 +1571,6 @@ def extract_video_info(url):
     return info_dict, title
 
 
-def download_audio_file(url, save_path):
-    response = requests.get(url, stream=True)
-    file_size = int(response.headers.get('content-length', 0))
-    if file_size > 500 * 1024 * 1024:  # 500 MB limit
-        raise ValueError("File size exceeds the 500MB limit.")
-    with open(save_path, 'wb') as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-    return save_path
-
-def process_audio_file(audio_url, audio_file):
-    progress = []
-    transcriptions = []
-
-    def update_progress(stage, message):
-        progress.append(f"{stage}: {message}")
-        return "\n".join(progress), "\n".join(transcriptions)
-
-    try:
-        if audio_url:
-            # Process audio file from URL
-            save_path = Path("downloaded_audio_file.wav")
-            download_audio_file(audio_url, save_path)
-        elif audio_file:
-            # Process uploaded audio file
-            audio_file_size = os.path.getsize(audio_file.name)
-            if audio_file_size > 500 * 1024 * 1024:  # 500 MB limit
-                return update_progress("Error", "File size exceeds the 500MB limit.")
-            save_path = Path(audio_file.name)
-        else:
-            return update_progress("Error", "No audio file provided.")
-
-        # Perform transcription and summarization
-        transcription, summary, json_file_path, summary_file_path, _, _ = process_url(
-            url=None,
-            num_speakers=2,
-            whisper_model="small.en",
-            custom_prompt_input=None,
-            offset=0,
-            api_name=None,
-            api_key=None,
-            vad_filter=False,
-            download_video_flag=False,
-            download_audio=False,
-            rolling_summarization=False,
-            detail_level=0.01,
-            question_box=None,
-            keywords="default,no_keyword_set",
-            chunk_text_by_words=False,
-            max_words=0,
-            chunk_text_by_sentences=False,
-            max_sentences=0,
-            chunk_text_by_paragraphs=False,
-            max_paragraphs=0,
-            chunk_text_by_tokens=False,
-            max_tokens=0,
-            local_file_path=str(save_path)
-        )
-        transcriptions.append(transcription)
-        progress.append("Processing complete.")
-    except Exception as e:
-        progress.append(f"Error: {str(e)}")
-
-    return "\n".join(progress), "\n".join(transcriptions)
-
-
 def process_url(
         url,
         num_speakers,
@@ -1951,21 +1927,6 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
 
     return json_file_path, summary_file_path
 
-def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model):
-    content = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
-    add_media_with_keywords(
-        url=url,
-        title=info_dict.get('title', 'Untitled'),
-        media_type='video',
-        content=content,
-        keywords=','.join(keywords),
-        prompt=custom_prompt_input or 'No prompt provided',
-        summary=summary or 'No summary provided',
-        transcription_model=whisper_model,
-        author=info_dict.get('uploader', 'Unknown'),
-        ingestion_date=datetime.now().strftime('%Y-%m-%d')
-    )
-
 
 def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key):
     # Load Config
@@ -2301,7 +2262,7 @@ Sample commands:
     parser.add_argument('-wm', '--whisper_model', type=str, default='small',
                         help='Whisper model (default: small)| Options: tiny.en, tiny, base.en, base, small.en, small, medium.en, '
                              'medium, large-v1, large-v2, large-v3, large, distil-large-v2, distil-medium.en, '
-                             'distil-small.en, distil-large-v3 ')
+                             'distil-small.en')
     parser.add_argument('-off', '--offset', type=int, default=0, help='Offset in seconds (default: 0)')
     parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
     parser.add_argument('-log', '--log_level', type=str, default='INFO',
