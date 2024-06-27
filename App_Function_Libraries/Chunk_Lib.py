@@ -1,12 +1,14 @@
+# Chunk_Lib.py
+#########################################
+# Chunking Library
+# This library is used to perform chunking of input files.
+# Currently, uses naive approaches. Nothing fancy.
+#
+####
+
 from transformers import GPT2Tokenizer
 import nltk
 import re
-
-
-
-
-
-
 
 
 # Import Local
@@ -14,16 +16,13 @@ import summarize
 from Article_Summarization_Lib import *
 from Article_Extractor_Lib import *
 from Audio_Transcription_Lib import *
-#from Chunk_Lib import *
 from Diarization_Lib import *
 from Video_DL_Ingestion_Lib import *
 from Local_File_Processing_Lib import *
 from Local_LLM_Inference_Engine_Lib import *
-from Local_Summarization_Lib import *
 from Old_Chunking_Lib import *
 from SQLite_DB import *
 from App_Function_Libraries.Local_Summarization_Lib import *
-from App_Function_Libraries.Summarization_General_Lib import *
 from App_Function_Libraries.Summarization_General_Lib import *
 from System_Checks_Lib import *
 from Tokenization_Methods_Lib import *

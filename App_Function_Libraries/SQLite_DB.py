@@ -566,6 +566,24 @@ def is_valid_date(date_string: str) -> bool:
     except ValueError:
         return False
 
+
+# Add ingested media to DB
+def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model):
+    content = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
+    add_media_with_keywords(
+        url=url,
+        title=info_dict.get('title', 'Untitled'),
+        media_type='video',
+        content=content,
+        keywords=','.join(keywords),
+        prompt=custom_prompt_input or 'No prompt provided',
+        summary=summary or 'No summary provided',
+        transcription_model=whisper_model,
+        author=info_dict.get('uploader', 'Unknown'),
+        ingestion_date=datetime.now().strftime('%Y-%m-%d')
+    )
+
+
 #
 #
 #######################################################################################################################

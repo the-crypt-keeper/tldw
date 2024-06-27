@@ -58,9 +58,6 @@ from Video_DL_Ingestion_Lib import *
 # Function Definitions
 #
 
-# def extract_text_from_segments(segments):
-#     text = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
-#     return text
 def extract_text_from_segments(segments):
     logging.debug(f"Segments received: {segments}")
     logging.debug(f"Type of segments: {type(segments)}")
@@ -79,26 +76,9 @@ def extract_text_from_segments(segments):
         logging.warning(f"Unexpected type of 'segments': {type(segments)}")
 
     return text.strip()
-    # FIXME - Dead code?
-    # if isinstance(segments, dict):
-    #     if 'segments' in segments:
-    #         segment_list = segments['segments']
-    #         if isinstance(segment_list, list):
-    #             for segment in segment_list:
-    #                 logging.debug(f"Current segment: {segment}")
-    #                 logging.debug(f"Type of segment: {type(segment)}")
-    #                 if 'Text' in segment:
-    #                     text += segment['Text'] + " "
-    #                 else:
-    #                     logging.warning(f"Skipping segment due to missing 'Text' key: {segment}")
-    #         else:
-    #             logging.warning(f"Unexpected type of 'segments' value: {type(segment_list)}")
-    #     else:
-    #         logging.warning("'segments' key not found in the dictionary")
-    # else:
-    #     logging.warning(f"Unexpected type of 'segments': {type(segments)}")
-    #
-    # return text.strip()
+
+
+
 
 
 def summarize_with_openai(api_key, input_data, custom_prompt_arg):
