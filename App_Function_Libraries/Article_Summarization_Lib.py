@@ -118,6 +118,19 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
         return str(e)
 
 
+def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles):
+    urls = [url.strip() for url in urls.split('\n') if url.strip()]
+    custom_titles = custom_article_titles.split('\n') if custom_article_titles else []
+
+    results = []
+    for i, url in enumerate(urls):
+        custom_title = custom_titles[i] if i < len(custom_titles) else None
+        result = scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_title)
+        results.append(f"Results for URL {i + 1}:\n{result}\n{'=' * 50}\n")
+
+    return "\n".join(results)
+
+
 def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_article_title):
     # Step 1: Scrape the article
     article_data = scrape_article(url)

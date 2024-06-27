@@ -1110,40 +1110,82 @@ def launch_ui(demo_mode=False):
 
         # Tab 3: Scrape & Summarize Articles/Websites
         with gr.Tab("Scrape & Summarize Articles/Websites"):
-            url_input = gr.Textbox(label="Article URL", placeholder="Enter the article URL here")
-            custom_article_title_input = gr.Textbox(label="Custom Article Title (Optional)",
-                                                    placeholder="Enter a custom title for the article")
+            url_input = gr.Textbox(
+                label="Article URLs",
+                placeholder="Enter article URLs here, one per line",
+                lines=5
+            )
+            custom_article_title_input = gr.Textbox(
+                label="Custom Article Titles (Optional, one per line)",
+                placeholder="Enter custom titles for the articles, one per line",
+                lines=5
+            )
             custom_prompt_input = gr.Textbox(
                 label="Custom Prompt (Optional)",
                 placeholder="Provide a custom prompt for summarization",
                 lines=3
             )
             api_name_input = gr.Dropdown(
-                choices=[None, "huggingface", "deepseek", "openrouter", "openai", "anthropic", "cohere", "groq", "llama", "kobold",
-                         "ooba"],
+                choices=[None, "huggingface", "deepseek", "openrouter", "openai", "anthropic", "cohere", "groq",
+                         "llama", "kobold", "ooba"],
                 value=None,
                 label="API Name (Mandatory for Summarization)"
             )
-            api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
-                                       placeholder="Enter your API key here; Ignore if using Local API or Built-in API")
-            keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
-                                        value="default,no_keyword_set", visible=True)
+            api_key_input = gr.Textbox(
+                label="API Key (Mandatory if API Name is specified)",
+                placeholder="Enter your API key here; Ignore if using Local API or Built-in API"
+            )
+            keywords_input = gr.Textbox(
+                label="Keywords",
+                placeholder="Enter keywords here (comma-separated)",
+                value="default,no_keyword_set",
+                visible=True
+            )
 
             scrape_button = gr.Button("Scrape and Summarize")
-            result_output = gr.Textbox(label="Result")
+            result_output = gr.Textbox(label="Result", lines=20)
 
-            scrape_button.click(scrape_and_summarize, inputs=[url_input, custom_prompt_input, api_name_input,
-                                                              api_key_input, keywords_input,
-                                                              custom_article_title_input], outputs=result_output)
-
-            gr.Markdown("### Or Paste Unstructured Text Below (Will use settings from above)")
-            text_input = gr.Textbox(label="Unstructured Text", placeholder="Paste unstructured text here", lines=10)
-            text_ingest_button = gr.Button("Ingest Unstructured Text")
-            text_ingest_result = gr.Textbox(label="Result")
-
-            text_ingest_button.click(ingest_unstructured_text,
-                                     inputs=[text_input, custom_prompt_input, api_name_input, api_key_input,
-                                             keywords_input, custom_article_title_input], outputs=text_ingest_result)
+            scrape_button.click(
+                scrape_and_summarize_multiple,
+                inputs=[url_input, custom_prompt_input, api_name_input, api_key_input, keywords_input,
+                        custom_article_title_input],
+                outputs=result_output
+            )
+        # with gr.Tab("Scrape & Summarize Articles/Websites"):
+        #     url_input = gr.Textbox(label="Article URL", placeholder="Enter the article URL here")
+        #     custom_article_title_input = gr.Textbox(label="Custom Article Title (Optional)",
+        #                                             placeholder="Enter a custom title for the article")
+        #     custom_prompt_input = gr.Textbox(
+        #         label="Custom Prompt (Optional)",
+        #         placeholder="Provide a custom prompt for summarization",
+        #         lines=3
+        #     )
+        #     api_name_input = gr.Dropdown(
+        #         choices=[None, "huggingface", "deepseek", "openrouter", "openai", "anthropic", "cohere", "groq", "llama", "kobold",
+        #                  "ooba"],
+        #         value=None,
+        #         label="API Name (Mandatory for Summarization)"
+        #     )
+        #     api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
+        #                                placeholder="Enter your API key here; Ignore if using Local API or Built-in API")
+        #     keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
+        #                                 value="default,no_keyword_set", visible=True)
+        #
+        #     scrape_button = gr.Button("Scrape and Summarize")
+        #     result_output = gr.Textbox(label="Result")
+        #
+        #     scrape_button.click(scrape_and_summarize, inputs=[url_input, custom_prompt_input, api_name_input,
+        #                                                       api_key_input, keywords_input,
+        #                                                       custom_article_title_input], outputs=result_output)
+        #
+        #     gr.Markdown("### Or Paste Unstructured Text Below (Will use settings from above)")
+        #     text_input = gr.Textbox(label="Unstructured Text", placeholder="Paste unstructured text here", lines=10)
+        #     text_ingest_button = gr.Button("Ingest Unstructured Text")
+        #     text_ingest_result = gr.Textbox(label="Result")
+        #
+        #     text_ingest_button.click(ingest_unstructured_text,
+        #                              inputs=[text_input, custom_prompt_input, api_name_input, api_key_input,
+        #                                      keywords_input, custom_article_title_input], outputs=text_ingest_result)
 
         # Tab 4: Ingest & Summarize Documents
         with gr.Tab("Ingest & Summarize Documents"):
