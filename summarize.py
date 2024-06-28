@@ -644,6 +644,30 @@ def fetch_items_by_content(search_query: str):
         raise DatabaseError(f"Error fetching items by content: {e}")
 
 
+def fetch_item_details_single(media_id: int):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT prompt, summary 
+                FROM MediaModifications 
+                WHERE media_id = ? 
+                ORDER BY modification_date DESC 
+                LIMIT 1
+            """, (media_id,))
+            prompt_summary_result = cursor.fetchone()
+            cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
+            content_result = cursor.fetchone()
+
+            prompt = prompt_summary_result[0] if prompt_summary_result else ""
+            summary = prompt_summary_result[1] if prompt_summary_result else ""
+            content = content_result[0] if content_result else ""
+
+            return prompt, summary, content
+    except sqlite3.Error as e:
+        raise Exception(f"Error fetching item details: {e}")
+
+
 def fetch_item_details(media_id: int):
     try:
         with db.get_connection() as conn:
@@ -782,9 +806,9 @@ def search_media_database(query: str) -> List[Tuple[int, str, str]]:
 def load_media_content(media_id: int) -> dict:
     prompt_summary_results, content = fetch_item_details(media_id)
     return {
-        "content": content,
-        "prompt": prompt_summary_results[-1][0] if prompt_summary_results else "",
-        "summary": prompt_summary_results[-1][1] if prompt_summary_results else ""
+        "content": content if content else "No content available",
+        "prompt": prompt_summary_results[-1][0] if prompt_summary_results else "No prompt available",
+        "summary": prompt_summary_results[-1][1] if prompt_summary_results else "No summary available"
     }
 
 def load_preset_prompts():
@@ -903,6 +927,7 @@ def update_media_content(media_id: int, content: str, prompt: str, summary: str)
         return "Content updated successfully"
     except sqlite3.Error as e:
         return f"Error updating content: {e}"
+
 
 #
 # End of Gradio Search Function-related stuff
@@ -1520,17 +1545,25 @@ def launch_ui(demo_mode=False):
             gr.Markdown("Not implemented. Have to wait until I get rid of Gradio")
             gr.HTML(html_content)
 
+
     # Top-Level Gradio Tab #4 - Remote LLM Chat
     with gr.Blocks() as media_prompt_chat_tab:
         gr.Markdown("# Media Search, Prompt Creation, and Chat")
 
-        with gr.Row():
-            search_input = gr.Textbox(label="Search Media Database")
+        with gr.Row("Search Ingested Materials / Detailed Entry View / Prompts"):
+            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                         label="Search By")
+
             search_button = gr.Button("Search")
+        with gr.Row():
+            items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+            item_mapping = gr.State({})
 
-        media_results = gr.Dropdown(label="Select Media", choices=[], interactive=True)
-
-        search_button.click(search_media_database, inputs=search_input, outputs=media_results)
+            search_button.click(fn=update_dropdown,
+                                inputs=[search_query_input, search_type_input],
+                                outputs=[items_output, item_mapping]
+                                )
 
         with gr.Row():
             use_content = gr.Checkbox(label="Use Content")
@@ -1573,59 +1606,25 @@ def launch_ui(demo_mode=False):
     save_button = gr.Button("Save Chat History")
     download_file = gr.File(label="Download Chat History")
 
-    def save_chat_history_wrapper(history, media_content, selected_parts, api_endpoint, prompt):
-        return save_chat_history(history, media_content, selected_parts, api_endpoint, prompt)
-
-        save_button.click(
-            save_chat_history_wrapper,
-            inputs=[
-                chat_history,
-                chat_interface.additional_inputs[0],  # media_content
-                chat_interface.additional_inputs[1],  # selected_parts
-                api_endpoint,
-                user_prompt
-            ],
-            outputs=[download_file]
-        )
-
-
-        def update_chat_inputs(media_id, use_content, use_summary, use_prompt):
-            media_content = load_media_content(media_id)
-            selected_parts = []
-            if use_content:
-                selected_parts.append("content")
-            if use_summary:
-                selected_parts.append("summary")
-            if use_prompt:
-                selected_parts.append("prompt")
-            return media_content, selected_parts, api_endpoint.value, api_key.value, user_prompt.value
-
-        media_results.change(update_chat_inputs,
-                             inputs=[media_results, use_content, use_summary, use_prompt],
-                             outputs=[chat_interface.additional_inputs[0], chat_interface.additional_inputs[1]])
-        use_content.change(update_chat_inputs,
-                           inputs=[media_results, use_content, use_summary, use_prompt],
-                           outputs=[chat_interface.additional_inputs[1]])
-        use_summary.change(update_chat_inputs,
-                           inputs=[media_results, use_content, use_summary, use_prompt],
-                           outputs=[chat_interface.additional_inputs[1]])
-        use_prompt.change(update_chat_inputs,
-                          inputs=[media_results, use_content, use_summary, use_prompt],
-                          outputs=[chat_interface.additional_inputs[1]])
-        api_endpoint.change(lambda x: x, inputs=api_endpoint, outputs=chat_interface.additional_inputs[2])
-        api_key.change(lambda x: x, inputs=api_key, outputs=chat_interface.additional_inputs[3])
-        user_prompt.change(lambda x: x, inputs=user_prompt, outputs=chat_interface.additional_inputs[4])
-
 
     # Top-Level Gradio Tab #5 - Notes
     with gr.Blocks() as media_edit_tab:
         gr.Markdown("# Search and Edit Media Items")
 
-        with gr.Row():
-            search_input = gr.Textbox(label="Search Media Database")
+        with gr.Row("Search Ingested Materials / Detailed Entry View"):
+            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                         label="Search By")
             search_button = gr.Button("Search")
 
-        media_results = gr.Dropdown(label="Select Media Item", choices=[], interactive=True)
+        with gr.Row():
+            items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+            item_mapping = gr.State({})
+
+            search_button.click(fn=update_dropdown,
+                                inputs=[search_query_input, search_type_input],
+                                outputs=[items_output, item_mapping]
+                                )
 
         content_input = gr.Textbox(label="Edit Content", lines=10)
         prompt_input = gr.Textbox(label="Edit Prompt", lines=3)
@@ -1635,29 +1634,52 @@ def launch_ui(demo_mode=False):
 
         status_message = gr.Textbox(label="Status", interactive=False)
 
-        def search_and_populate_dropdown(query):
-            results = search_media_database(query)
-            return gr.Dropdown.update(choices=[(str(id), f"{title} ({url})") for id, title, url in results])
+        def load_selected_media_content(selected_item, item_mapping):
+            print(f"Selected item: {selected_item}")
+            print(f"Item mapping: {item_mapping}")
 
-        def load_selected_media_content(media_id):
-            if media_id:
-                content = load_media_content(int(media_id))
-                return content["content"], content["prompt"], content["summary"]
-            return "", "", ""
+            if selected_item and item_mapping and selected_item in item_mapping:
+                media_id = item_mapping[selected_item]
+                print(f"Media ID: {media_id}")
 
-        def update_selected_media_content(media_id, content, prompt, summary):
-            if media_id:
-                result = update_media_content(int(media_id), content, prompt, summary)
-                return result
-            return "No media item selected"
+                try:
+                    prompt_summary_results, content = fetch_item_details(media_id)
 
-        search_button.click(search_and_populate_dropdown, inputs=search_input, outputs=media_results)
-        media_results.change(load_selected_media_content, inputs=media_results,
-                             outputs=[content_input, prompt_input, summary_input])
+                    # Get the most recent prompt and summary
+                    prompt = prompt_summary_results[-1][0] if prompt_summary_results else ""
+                    summary = prompt_summary_results[-1][1] if prompt_summary_results else ""
+
+                    print(f"Fetched content: {content[:100]}...")  # Print first 100 chars
+                    print(f"Fetched prompt: {prompt}")
+                    print(f"Fetched summary: {summary}")
+
+                    return content, prompt, summary
+                except Exception as e:
+                    print(f"Error loading media content: {str(e)}")
+                    return f"Error loading content: {str(e)}", "", ""
+            else:
+                print("Invalid selection or empty item mapping")
+                return "No item selected or invalid selection", "", ""
+
+        def update_selected_media_content(selected_item, item_mapping, content, prompt, summary):
+            if selected_item and item_mapping and selected_item in item_mapping:
+                media_id = item_mapping[selected_item]
+                try:
+                    result = update_media_content(media_id, content, prompt, summary)
+                    return f"Successfully updated media item (ID: {media_id})"
+                except Exception as e:
+                    return f"Error updating media item: {str(e)}"
+            return "No media item selected or invalid selection"
+
+        items_output.change(load_selected_media_content,
+                            inputs=[items_output, item_mapping],
+                            outputs=[content_input, prompt_input, summary_input])
         update_button.click(update_selected_media_content,
-                            inputs=[media_results, content_input, prompt_input, summary_input], outputs=status_message)
+                            inputs=[items_output, item_mapping, content_input, prompt_input, summary_input],
+                            outputs=status_message)
 
-    # Top-Level Gradio Tab #5 - Don't ask me how this is tabbed, but it is... #FIXME
+
+    # Top-Level Gradio Tab #6 - Keywords - tabbed because called out as being a tab below
     export_keywords_interface = gr.Interface(
         fn=export_keywords_to_csv,
         inputs=[],
