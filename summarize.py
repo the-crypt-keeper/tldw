@@ -154,7 +154,7 @@ abc_xyz = """
 #
 #   4.
 #
-#   5. 
+#   5.
 #
 #
 #
@@ -776,6 +776,25 @@ def display_search_results(query):
         return result_md
     return "No results found."
 
+def search_media_database(query: str) -> List[Tuple[int, str, str]]:
+    return browse_items(query, 'Title')
+
+def load_media_content(media_id: int) -> dict:
+    prompt_summary_results, content = fetch_item_details(media_id)
+    return {
+        "content": content,
+        "prompt": prompt_summary_results[-1][0] if prompt_summary_results else "",
+        "summary": prompt_summary_results[-1][1] if prompt_summary_results else ""
+    }
+
+def load_preset_prompts():
+    return list_prompts()
+
+def chat(message, history, media_content, selected_parts, api_endpoint, prompt):
+    # Implement chat functionality here
+    response = f"Chatbot: Received message '{message}'. Using {', '.join(selected_parts)} from media, API: {api_endpoint}, Prompt: {prompt}"
+    return response
+
 
 #
 # End of Gradio Search Function-related stuff
@@ -1120,8 +1139,8 @@ def launch_ui(demo_mode=False):
 
             # New inputs for API selection and key
             api_name_input = gr.Dropdown(
-                choices=[None, "openai", "anthropic", "cohere", "groq", "deepseek", "openrouter", "llama.cpp",
-                         "kobold", "ooba", "tabbyapi", "vllm", "huggingface"],
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp",
+                         "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace",],
                 value=None,
                 label="API for Summarization (Optional)"
             )
@@ -1200,13 +1219,7 @@ def launch_ui(demo_mode=False):
             gr.Markdown("Will ingest documents and store into SQLite DB")
             gr.Markdown("RAG here we come....:/")
 
-        # Function to update the visibility of the UI elements for Llamafile Settings
-        # def toggle_advanced_llamafile_mode(is_advanced):
-        #     if is_advanced:
-        #         return [gr.update(visible=True)] * 14
-        #     else:
-        #         return [gr.update(visible=False)] * 11 + [gr.update(visible=True)] * 3
-        # FIXME
+
         def toggle_advanced_mode(advanced_mode):
             # Show all elements if advanced mode is on
             if advanced_mode:
@@ -1400,7 +1413,75 @@ def launch_ui(demo_mode=False):
             gr.Markdown("Not implemented. Have to wait until I get rid of Gradio")
             gr.HTML(html_content)
 
-    # Top-Level Gradio Tab #4 - Don't ask me how this is tabbed, but it is... #FIXME
+    # Top-Level Gradio Tab #4 - Media Search, Prompt Creation, and Chat
+    with gr.Blocks() as media_prompt_chat_tab:
+        gr.Markdown("# Media Search, Prompt Creation, and Chat")
+
+        with gr.Row():
+            search_input = gr.Textbox(label="Search Media Database")
+            search_button = gr.Button("Search")
+
+        media_results = gr.Dropdown(label="Select Media", choices=[], interactive=True)
+
+        search_button.click(search_media_database, inputs=search_input, outputs=media_results)
+
+        with gr.Row():
+            use_content = gr.Checkbox(label="Use Content")
+            use_summary = gr.Checkbox(label="Use Summary")
+            use_prompt = gr.Checkbox(label="Use Prompt")
+
+        api_endpoint = gr.Dropdown(label="Select API Endpoint",
+                                   choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
+        api_key = gr.Textbox(label="API Key (if required)", type="password")
+        preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
+        user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
+
+        def update_user_prompt(preset_name):
+            details = fetch_prompt_details(preset_name)
+            if details:
+                return details[1]  # Return the system prompt
+            return ""
+
+        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+
+        chat_interface = gr.ChatInterface(
+            chat,
+            additional_inputs=[
+                gr.State(),  # For media_content
+                gr.State(),  # For selected_parts
+                api_endpoint,
+                user_prompt
+            ],
+            title="Chat based on Media and Prompt"
+        )
+
+        def update_chat_inputs(media_id, use_content, use_summary, use_prompt):
+            media_content = load_media_content(media_id)
+            selected_parts = []
+            if use_content:
+                selected_parts.append("content")
+            if use_summary:
+                selected_parts.append("summary")
+            if use_prompt:
+                selected_parts.append("prompt")
+            return media_content, selected_parts, api_endpoint.value, user_prompt.value
+
+        media_results.change(update_chat_inputs,
+                             inputs=[media_results, use_content, use_summary, use_prompt],
+                             outputs=[chat_interface.additional_inputs[0], chat_interface.additional_inputs[1]])
+        use_content.change(update_chat_inputs,
+                           inputs=[media_results, use_content, use_summary, use_prompt],
+                           outputs=[chat_interface.additional_inputs[1]])
+        use_summary.change(update_chat_inputs,
+                           inputs=[media_results, use_content, use_summary, use_prompt],
+                           outputs=[chat_interface.additional_inputs[1]])
+        use_prompt.change(update_chat_inputs,
+                          inputs=[media_results, use_content, use_summary, use_prompt],
+                          outputs=[chat_interface.additional_inputs[1]])
+        api_endpoint.change(lambda x: x, inputs=api_endpoint, outputs=chat_interface.additional_inputs[2])
+        user_prompt.change(lambda x: x, inputs=user_prompt, outputs=chat_interface.additional_inputs[3])
+
+    # Top-Level Gradio Tab #5 - Don't ask me how this is tabbed, but it is... #FIXME
     export_keywords_interface = gr.Interface(
         fn=export_keywords_to_csv,
         inputs=[],
@@ -1414,7 +1495,7 @@ def launch_ui(demo_mode=False):
         # Placeholder for actual import functionality
         return "Data imported successfully"
 
-    # Top-Level Gradio Tab #5 - Export/Import - Same deal as above, not sure why this is auto-tabbed
+    # Top-Level Gradio Tab #6 - Export/Import - Same deal as above, not sure why this is auto-tabbed
     import_interface = gr.Interface(
         fn=import_data,
         inputs=gr.File(label="Upload file for import"),
@@ -1423,7 +1504,7 @@ def launch_ui(demo_mode=False):
         description="Import data into the database from a CSV file."
     )
 
-    # Top-Level Gradio Tab #6 - Export/Import - Same deal as above, not sure why this is auto-tabbed
+    # Top-Level Gradio Tab #7 - Export/Import - Same deal as above, not sure why this is auto-tabbed
     import_export_tab = gr.TabbedInterface(
         [gr.TabbedInterface(
             [gr.Interface(
@@ -1539,9 +1620,9 @@ def launch_ui(demo_mode=False):
 
     # Combine interfaces into a tabbed interface
     tabbed_interface = gr.TabbedInterface(
-        [iface, search_interface, llamafile_interface, keyword_tab, import_export_tab, download_videos_interface],
+        [iface, search_interface, llamafile_interface, media_prompt_chat_tab, keyword_tab, import_export_tab, download_videos_interface],
         ["Transcription / Summarization / Ingestion", "Search / Detailed View",
-         "Local LLM with Llamafile", "Keywords", "Export/Import", "Download Video/Audio Files"])
+         "Local LLM with Llamafile", "Remote LLM Chat", "Keywords", "Export/Import", "Download Video/Audio Files"])
 
     # Launch the interface
     server_port_variable = 7860
