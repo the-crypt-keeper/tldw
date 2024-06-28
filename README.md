@@ -1,6 +1,6 @@
 # **TL/DW: Too Long, Didnt Watch**
 ## Download, Transcribe & Summarize: Video+Audio+Documents+Articles & Books(WIP). All automated 
-#### More: Full-Text-Search across everything ingested, Local LLM inference as part of the script for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
+#### More: Full-Text-Search across everything ingested, Local LLM inference as part of it for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
 #### Demo may be broken but should be working. If it's not, let me know. (HF dev spaces is touchy...)
 
@@ -15,7 +15,7 @@
 
 ### <a name="what"></a> What is this (TL/DW)?
 - **Don't care, give me code**
-  - Take a URL, a single video, a list of URLs, or list of local videos + URLs, one per line in a text file, and feed it into the script(or GUI) and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
+  - Take a URL, a single(or multiple) video, a list of URLs, or a list of local videos, one per line in a text file, and feed it into the script(or GUI) and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
   * `git clone https://github.com/rmusser01/tldw` -> `cd tldw` -> `python -m venv .\` -> `. .\scripts\activate.ps1` -> `pip install -r requirements.txt` -> 
     * CLI usage: `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api openai -k tag_one tag_two tag_three` 
     - GUI usage: `python summarize.py -gui`
@@ -31,14 +31,20 @@
   - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your finger tips in a moments notice.
   - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
   - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite (for now, would like to build a shim for ElasticSearch/Similar) DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it. (Plus act as a nice way of personally tagging data for possible future training of your personal AI agent :P)
-    * On the to-do list to see about creating some form of structure within the plain text to make review/reconstruction a little easier(markdown?) - Reconstruction being review of the data for raw consumption and not fed into an analysis pipeline.
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
 
-For commercial API usage, I recommend none honestly. They all will gaslight you and charge you money for it.
+For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek. Flipside I would say none honestly. The(the largest players) will gaslight you and charge you money for it. Fun.
 From @nrose 05/08/2024 on Threads:
 ```
-No, it’s a design. First they train it, then they optimize it. Optimize it for what- better answers? No. For efficiency. Per watt. Because they need all the compute they can get to train the next model.So it’s a sawtooth. The model declines over time, then the optimization makes it somewhat better, then in a sort of reverse asymptote, they dedicate all their “good compute” to the next bigger model.Which they then trim down over time, so they can train the next big model… etc etc.
-None of these companies exist to provide AI services in 2024. They’re only doing it to finance the things they want to build in 2025 and 2026 and so on, and the goal is to obsolete computing in general and become a hidden monopoly like the oil and electric companies. 2024 service quality is not a metric they want to optimize, they’re forced to, only to maintain some directional income
+No, it’s a design. First they train it, then they optimize it. Optimize it for what- better answers? No. For efficiency. 
+Per watt. Because they need all the compute they can get to train the next model.So it’s a sawtooth. 
+The model declines over time, then the optimization makes it somewhat better, then in a sort of reverse asymptote, 
+they dedicate all their “good compute” to the next bigger model.Which they then trim down over time, so they can train 
+the next big model… etc etc.
+None of these companies exist to provide AI services in 2024. They’re only doing it to finance the things they want to 
+build in 2025 and 2026 and so on, and the goal is to obsolete computing in general and become a hidden monopoly like 
+the oil and electric companies. 
+2024 service quality is not a metric they want to optimize, they’re forced to, only to maintain some directional income
 ```
 
 For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.2 model:
