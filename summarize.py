@@ -790,11 +790,119 @@ def load_media_content(media_id: int) -> dict:
 def load_preset_prompts():
     return list_prompts()
 
-def chat(message, history, media_content, selected_parts, api_endpoint, prompt):
-    # Implement chat functionality here
-    response = f"Chatbot: Received message '{message}'. Using {', '.join(selected_parts)} from media, API: {api_endpoint}, Prompt: {prompt}"
-    return response
+def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt):
+    try:
+        # Ensure selected_parts is a list
+        if not isinstance(selected_parts, (list, tuple)):
+            selected_parts = [selected_parts] if selected_parts else []
 
+        # Combine the selected parts of the media content
+        combined_content = " ".join([media_content.get(part, "") for part in selected_parts if part in media_content])
+
+        # Prepare the input for the API
+        input_data = f"{combined_content}\n\nUser: {message}\nAI:"
+
+        # Use the existing API request code based on the selected endpoint
+        if api_endpoint.lower() == 'openai':
+            response = summarize_with_openai(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "anthropic":
+            response = summarize_with_anthropic(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "cohere":
+            response = summarize_with_cohere(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "groq":
+            response = summarize_with_groq(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "openrouter":
+            response = summarize_with_openrouter(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "deepseek":
+            response = summarize_with_deepseek(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "llama.cpp":
+            response = summarize_with_llama(input_data, prompt)
+        elif api_endpoint.lower() == "kobold":
+            response = summarize_with_kobold(input_data, api_key, prompt)
+        elif api_endpoint.lower() == "ooba":
+            response = summarize_with_oobabooga(input_data, api_key, prompt)
+        elif api_endpoint.lower() == "tabbyapi":
+            response = summarize_with_tabbyapi(input_data, prompt)
+        elif api_endpoint.lower() == "vllm":
+            response = summarize_with_vllm(input_data, prompt)
+        elif api_endpoint.lower() == "local-llm":
+            response = summarize_with_local_llm(input_data, prompt)
+        elif api_endpoint.lower() == "huggingface":
+            response = summarize_with_huggingface(api_key, input_data, prompt)
+        else:
+            raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
+
+        return response
+
+    except Exception as e:
+        logging.error(f"Error in chat function: {str(e)}")
+        return f"An error occurred: {str(e)}"
+
+
+def save_chat_history(history: List[List[str]], media_content: Dict[str, str], selected_parts: List[str],
+                      api_endpoint: str, prompt: str):
+    """
+    Save the chat history along with context information to a JSON file.
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"chat_history_{timestamp}.json"
+
+    chat_data = {
+        "timestamp": timestamp,
+        "history": history,
+        "context": {
+            "selected_media": {
+                part: media_content.get(part, "") for part in selected_parts
+            },
+            "api_endpoint": api_endpoint,
+            "prompt": prompt
+        }
+    }
+
+    json_data = json.dumps(chat_data, indent=2)
+
+    return filename, json_data
+
+
+def search_media_database(query: str) -> List[Tuple[int, str, str]]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, url FROM Media WHERE title LIKE ?", (f'%{query}%',))
+            results = cursor.fetchall()
+        return results
+    except sqlite3.Error as e:
+        raise Exception(f"Error searching media database: {e}")
+
+def load_media_content(media_id: int) -> dict:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT content, prompt, summary FROM Media WHERE id = ?", (media_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    "content": result[0],
+                    "prompt": result[1],
+                    "summary": result[2]
+                }
+            return {"content": "", "prompt": "", "summary": ""}
+    except sqlite3.Error as e:
+        raise Exception(f"Error loading media content: {e}")
+
+def update_media_content(media_id: int, content: str, prompt: str, summary: str) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Media 
+                SET content = ?, prompt = ?, summary = ?
+                WHERE id = ?
+            """, (content, prompt, summary, media_id))
+            conn.commit()
+        return "Content updated successfully"
+    except sqlite3.Error as e:
+        return f"Error updating content: {e}"
 
 #
 # End of Gradio Search Function-related stuff
@@ -806,9 +914,8 @@ def launch_ui(demo_mode=False):
     whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
                       "distil-large-v2", "distil-medium.en", "distil-small.en"]
     # Set theme value with https://www.gradio.app/guides/theming-guide - 'theme='
-    my_theme = gr.Theme.from_hub("gradio/seafoam")
     global custom_prompt_input
-    with gr.Blocks(theme=my_theme) as iface:
+    with gr.Blocks() as iface:
         # Tab 1: Video Transcription + Summarization
         with gr.Tab("Video Transcription + Summarization"):
 
@@ -1120,7 +1227,7 @@ def launch_ui(demo_mode=False):
             )
 
 
-        # Tab 2: Transcribe & Summarize Audio file
+        # Sub-Tab 2: Transcribe & Summarize Audio file
         with gr.Tab("Audio File Processing"):
             audio_url_input = gr.Textbox(
                 label="Audio File URL",
@@ -1169,7 +1276,7 @@ def launch_ui(demo_mode=False):
                 outputs=[audio_progress_output, audio_transcriptions_output]
             )
 
-        # Tab 3: Scrape & Summarize Articles/Websites
+        # Sub-Tab 3: Scrape & Summarize Articles/Websites
         with gr.Tab("Scrape & Summarize Articles/Websites"):
             url_input = gr.Textbox(
                 label="Article URLs",
@@ -1213,7 +1320,7 @@ def launch_ui(demo_mode=False):
                 outputs=result_output
             )
 
-        # Tab 4: Ingest & Summarize Documents
+        # Sub-Tab 4: Ingest & Summarize Documents
         with gr.Tab("Ingest & Summarize Documents"):
             gr.Markdown("Plan to put ingestion form for documents here")
             gr.Markdown("Will ingest documents and store into SQLite DB")
@@ -1308,7 +1415,7 @@ def launch_ui(demo_mode=False):
                 outputs=add_prompt_output
             )
 
-    # Top-Level Gradio Tab #3
+    # Top-Level Gradio Tab #3 - 'Llamafile'
     with gr.Blocks() as llamafile_interface:
         with gr.Tab("Llamafile Settings"):
             gr.Markdown("Settings for Llamafile")
@@ -1413,7 +1520,7 @@ def launch_ui(demo_mode=False):
             gr.Markdown("Not implemented. Have to wait until I get rid of Gradio")
             gr.HTML(html_content)
 
-    # Top-Level Gradio Tab #4 - Media Search, Prompt Creation, and Chat
+    # Top-Level Gradio Tab #4 - Remote LLM Chat
     with gr.Blocks() as media_prompt_chat_tab:
         gr.Markdown("# Media Search, Prompt Creation, and Chat")
 
@@ -1443,17 +1550,44 @@ def launch_ui(demo_mode=False):
             return ""
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+    chat_history = gr.State([])
 
-        chat_interface = gr.ChatInterface(
+    chat_interface = gr.ChatInterface(
             chat,
             additional_inputs=[
                 gr.State(),  # For media_content
                 gr.State(),  # For selected_parts
                 api_endpoint,
+                api_key,
                 user_prompt
             ],
-            title="Chat based on Media and Prompt"
+            title="Chat based on Media and Prompt",
+            examples=[
+                ["Tell me about the main points in the selected media."],
+                ["What are the key arguments presented?"],
+                ["Can you summarize the content in bullet points?"]
+            ],
+            cache_examples=True,
         )
+
+    save_button = gr.Button("Save Chat History")
+    download_file = gr.File(label="Download Chat History")
+
+    def save_chat_history_wrapper(history, media_content, selected_parts, api_endpoint, prompt):
+        return save_chat_history(history, media_content, selected_parts, api_endpoint, prompt)
+
+        save_button.click(
+            save_chat_history_wrapper,
+            inputs=[
+                chat_history,
+                chat_interface.additional_inputs[0],  # media_content
+                chat_interface.additional_inputs[1],  # selected_parts
+                api_endpoint,
+                user_prompt
+            ],
+            outputs=[download_file]
+        )
+
 
         def update_chat_inputs(media_id, use_content, use_summary, use_prompt):
             media_content = load_media_content(media_id)
@@ -1464,7 +1598,7 @@ def launch_ui(demo_mode=False):
                 selected_parts.append("summary")
             if use_prompt:
                 selected_parts.append("prompt")
-            return media_content, selected_parts, api_endpoint.value, user_prompt.value
+            return media_content, selected_parts, api_endpoint.value, api_key.value, user_prompt.value
 
         media_results.change(update_chat_inputs,
                              inputs=[media_results, use_content, use_summary, use_prompt],
@@ -1479,7 +1613,49 @@ def launch_ui(demo_mode=False):
                           inputs=[media_results, use_content, use_summary, use_prompt],
                           outputs=[chat_interface.additional_inputs[1]])
         api_endpoint.change(lambda x: x, inputs=api_endpoint, outputs=chat_interface.additional_inputs[2])
-        user_prompt.change(lambda x: x, inputs=user_prompt, outputs=chat_interface.additional_inputs[3])
+        api_key.change(lambda x: x, inputs=api_key, outputs=chat_interface.additional_inputs[3])
+        user_prompt.change(lambda x: x, inputs=user_prompt, outputs=chat_interface.additional_inputs[4])
+
+
+    # Top-Level Gradio Tab #5 - Notes
+    with gr.Blocks() as media_edit_tab:
+        gr.Markdown("# Search and Edit Media Items")
+
+        with gr.Row():
+            search_input = gr.Textbox(label="Search Media Database")
+            search_button = gr.Button("Search")
+
+        media_results = gr.Dropdown(label="Select Media Item", choices=[], interactive=True)
+
+        content_input = gr.Textbox(label="Edit Content", lines=10)
+        prompt_input = gr.Textbox(label="Edit Prompt", lines=3)
+        summary_input = gr.Textbox(label="Edit Summary", lines=5)
+
+        update_button = gr.Button("Update Media Content")
+
+        status_message = gr.Textbox(label="Status", interactive=False)
+
+        def search_and_populate_dropdown(query):
+            results = search_media_database(query)
+            return gr.Dropdown.update(choices=[(str(id), f"{title} ({url})") for id, title, url in results])
+
+        def load_selected_media_content(media_id):
+            if media_id:
+                content = load_media_content(int(media_id))
+                return content["content"], content["prompt"], content["summary"]
+            return "", "", ""
+
+        def update_selected_media_content(media_id, content, prompt, summary):
+            if media_id:
+                result = update_media_content(int(media_id), content, prompt, summary)
+                return result
+            return "No media item selected"
+
+        search_button.click(search_and_populate_dropdown, inputs=search_input, outputs=media_results)
+        media_results.change(load_selected_media_content, inputs=media_results,
+                             outputs=[content_input, prompt_input, summary_input])
+        update_button.click(update_selected_media_content,
+                            inputs=[media_results, content_input, prompt_input, summary_input], outputs=status_message)
 
     # Top-Level Gradio Tab #5 - Don't ask me how this is tabbed, but it is... #FIXME
     export_keywords_interface = gr.Interface(
@@ -1608,7 +1784,7 @@ def launch_ui(demo_mode=False):
            "a webm file for you to download. </br><em>If you want a full-featured one:</em> " \
            "<strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>"
 
-    # Sixth Top Tab - Download Video/Audio Files
+    # Eighth Top Tab - Download Video/Audio Files
     download_videos_interface = gr.Interface(
         fn=gradio_download_youtube_video,
         inputs=gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here"),
@@ -1618,11 +1794,13 @@ def launch_ui(demo_mode=False):
         allow_flagging="never"
     )
 
+
+
     # Combine interfaces into a tabbed interface
     tabbed_interface = gr.TabbedInterface(
-        [iface, search_interface, llamafile_interface, media_prompt_chat_tab, keyword_tab, import_export_tab, download_videos_interface],
+        [iface, search_interface, llamafile_interface, media_prompt_chat_tab, media_edit_tab, keyword_tab, import_export_tab, download_videos_interface],
         ["Transcription / Summarization / Ingestion", "Search / Detailed View",
-         "Local LLM with Llamafile", "Remote LLM Chat", "Keywords", "Export/Import", "Download Video/Audio Files"])
+         "Local LLM with Llamafile", "Remote LLM Chat", "Notes/Writing", "Keywords", "Export/Import", "Download Video/Audio Files"])
 
     # Launch the interface
     server_port_variable = 7860
