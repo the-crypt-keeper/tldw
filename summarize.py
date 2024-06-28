@@ -1550,20 +1550,16 @@ def launch_ui(demo_mode=False):
     with gr.Blocks() as media_prompt_chat_tab:
         gr.Markdown("# Media Search, Prompt Creation, and Chat")
 
-        with gr.Row("Search Ingested Materials / Detailed Entry View / Prompts"):
-            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
-                                         label="Search By")
-
-            search_button = gr.Button("Search")
         with gr.Row():
-            items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
-            item_mapping = gr.State({})
+            with gr.Column(scale=1):
+                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                             label="Search By")
+                search_button = gr.Button("Search")
 
-            search_button.click(fn=update_dropdown,
-                                inputs=[search_query_input, search_type_input],
-                                outputs=[items_output, item_mapping]
-                                )
+            with gr.Column(scale=2):
+                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                item_mapping = gr.State({})
 
         with gr.Row():
             use_content = gr.Checkbox(label="Use Content")
@@ -1571,10 +1567,50 @@ def launch_ui(demo_mode=False):
             use_prompt = gr.Checkbox(label="Use Prompt")
 
         api_endpoint = gr.Dropdown(label="Select API Endpoint",
-                                   choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
+                                   choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek",
+                                            "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM",
+                                            "HuggingFace"])
         api_key = gr.Textbox(label="API Key (if required)", type="password")
         preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
         user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
+
+        chatbot = gr.Chatbot(height=500)
+        msg = gr.Textbox(label="Enter your message")
+        clear = gr.Button("Clear")
+        submit = gr.Button("Submit")
+
+        chat_history = gr.State([])
+        media_content = gr.State()
+        selected_parts = gr.State([])
+
+        save_button = gr.Button("Save Chat History")
+        download_file = gr.File(label="Download Chat History")
+
+        def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
+            bot_message = chat(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
+            history.append((message, bot_message))
+            return "", history
+
+        submit.click(
+            chat_wrapper,
+            inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
+            outputs=[msg, chatbot]
+        )
+
+        clear.click(lambda: ([], []), outputs=[chatbot, chat_history])
+
+        def save_chat_history(history):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"chat_history_{timestamp}.json"
+            with open(filename, "w") as f:
+                json.dump(history, f)
+            return filename
+
+        save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
+
+        search_button.click(fn=update_dropdown,
+                            inputs=[search_query_input, search_type_input],
+                            outputs=[items_output, item_mapping])
 
         def update_user_prompt(preset_name):
             details = fetch_prompt_details(preset_name)
@@ -1583,28 +1619,26 @@ def launch_ui(demo_mode=False):
             return ""
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
-    chat_history = gr.State([])
 
-    chat_interface = gr.ChatInterface(
-            chat,
-            additional_inputs=[
-                gr.State(),  # For media_content
-                gr.State(),  # For selected_parts
-                api_endpoint,
-                api_key,
-                user_prompt
-            ],
-            title="Chat based on Media and Prompt",
-            examples=[
-                ["Tell me about the main points in the selected media."],
-                ["What are the key arguments presented?"],
-                ["Can you summarize the content in bullet points?"]
-            ],
-            cache_examples=True,
+        def update_chat_content(selected_item, use_content, use_summary, use_prompt):
+            if selected_item in item_mapping:
+                media_id = item_mapping[selected_item]
+                content = load_media_content(media_id)
+                selected_parts = []
+                if use_content:
+                    selected_parts.append("content")
+                if use_summary:
+                    selected_parts.append("summary")
+                if use_prompt:
+                    selected_parts.append("prompt")
+                return content, selected_parts
+            return None, []
+
+        items_output.change(
+            update_chat_content,
+            inputs=[items_output, use_content, use_summary, use_prompt],
+            outputs=[media_content, selected_parts]
         )
-
-    save_button = gr.Button("Save Chat History")
-    download_file = gr.File(label="Download Chat History")
 
 
     # Top-Level Gradio Tab #5 - Notes
