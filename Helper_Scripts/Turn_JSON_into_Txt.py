@@ -25,7 +25,13 @@ def extract_transcription(input_path, output_folder):
             data = json.load(file)
 
         # Extract the segments
-        segments = data.get('segments', [])
+        if isinstance(data, dict):
+            segments = data.get('segments', [])
+        elif isinstance(data, list):
+            segments = data
+        else:
+            print(f"Unexpected data format in {json_file.name}")
+            continue
 
         # Define the output text file path
         output_text_path = Path(output_folder) / (json_file.stem + '_transcription.txt')
