@@ -48,7 +48,7 @@ def extract_transcription(input_path, output_folder):
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("Usage: python extract_transcription.py <input_file_or_folder> <output_folder>")
+        print("Usage: python Turn_JSON_into_Txt.py <input_file_or_folder> <output_folder>")
         sys.exit(1)
 
     input_path = sys.argv[1]
