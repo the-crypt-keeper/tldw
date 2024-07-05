@@ -4,15 +4,18 @@
 # This library is used to perform summarization.
 #
 ####
-import configparser
 ####################
 # Function List
 #
 # 1. extract_text_from_segments(segments: List[Dict]) -> str
-# 2. summarize_with_openai(api_key, file_path, custom_prompt_arg)
-# 3. summarize_with_anthropic(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5)
-# 4. summarize_with_cohere(api_key, file_path, model, custom_prompt_arg)
-# 5. summarize_with_groq(api_key, file_path, model, custom_prompt_arg)
+# 2. chat_with_openai(api_key, file_path, custom_prompt_arg)
+# 3. chat_with_anthropic(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5)
+# 4. chat_with_cohere(api_key, file_path, model, custom_prompt_arg)
+# 5. chat_with_groq(api_key, input_data, custom_prompt_arg, system_prompt=None):
+# 6. chat_with_openrouter(api_key, input_data, custom_prompt_arg, system_prompt=None)
+# 7. chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None)
+# 8. chat_with_deepseek(api_key, input_data, custom_prompt_arg, system_prompt=None)
+# 9. chat_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions", system_prompt=None)
 #
 #
 ####################
@@ -23,30 +26,12 @@ import os
 import logging
 import time
 import requests
-from typing import List, Dict
-import json
 import configparser
 from requests import RequestException
 
 # Import Local
 import summarize
-from Article_Summarization_Lib import *
-from Article_Extractor_Lib import *
-from Audio_Transcription_Lib import *
-from Chunk_Lib import *
-from Diarization_Lib import *
-from Local_File_Processing_Lib import *
-from Local_LLM_Inference_Engine_Lib import *
-from Local_Summarization_Lib import *
-from Old_Chunking_Lib import *
-from SQLite_DB import *
-#from Summarization_General_Lib import *
-from System_Checks_Lib import *
 from Tokenization_Methods_Lib import *
-from Video_DL_Ingestion_Lib import *
-#from Web_UI_Lib import *
-
-
 
 
 
@@ -78,7 +63,10 @@ def extract_text_from_segments(segments):
     return text.strip()
 
 
-def summarize_with_openai(api_key, input_data, custom_prompt_arg):
+
+
+
+def chat_with_openai(api_key, input_data, custom_prompt_arg, system_prompt=None):
     loaded_config_data = summarize.load_and_log_configs()
     try:
         # API key validation
@@ -93,31 +81,18 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
 
         logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
-        # Input data handling
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("OpenAI: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
-        else:
-            logging.debug("OpenAI: Using provided string data for summarization")
-            data = input_data
+        logging.debug("OpenAI: Using provided string data for chat input")
+        data = input_data
 
         logging.debug(f"OpenAI: Loaded data: {data}")
         logging.debug(f"OpenAI: Type of data: {type(data)}")
 
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("OpenAI: Summary already exists in the loaded data")
-            return data['summary']
-
-        # Text extraction
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
-        elif isinstance(data, str):
-            text = data
+        if system_prompt is not None:
+            logging.debug(f"OpenAI: Using provided system prompt:\n\n {system_prompt}")
+            pass
         else:
-            raise ValueError("OpenAI: Invalid input data format")
+            system_prompt = "You are a helpful assistant"
+            logging.debug(f"OpenAI: Using default system prompt:\n\n {system_prompt}")
 
         openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
 
@@ -129,11 +104,11 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
         logging.debug(
             f"OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
         logging.debug("openai: Preparing data + prompt for submittal")
-        openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        openai_prompt = f"{data} \n\n\n\n{custom_prompt_arg}"
         data = {
             "model": openai_model,
             "messages": [
-                {"role": "system", "content": "You are a professional summarizer."},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": openai_prompt}
             ],
             "max_tokens": 4096,
@@ -146,22 +121,22 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
         if response.status_code == 200:
             response_data = response.json()
             if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("openai: Summarization successful")
-                return summary
+                chat_response = response_data['choices'][0]['message']['content'].strip()
+                logging.debug("openai: Chat Sent successfully")
+                return chat_response
             else:
-                logging.warning("openai: Summary not found in the response data")
-                return "openai: Summary not available"
+                logging.warning("openai: Chat response not found in the response data")
+                return "openai: Chat not available"
         else:
-            logging.error(f"openai: Summarization failed with status code {response.status_code}")
+            logging.error(f"openai: Chat request failed with status code {response.status_code}")
             logging.error(f"openai: Error response: {response.text}")
-            return f"openai: Failed to process summary. Status code: {response.status_code}"
+            return f"openai: Failed to process chat request. Status code: {response.status_code}"
     except Exception as e:
         logging.error(f"openai: Error in processing: {str(e)}", exc_info=True)
-        return f"openai: Error occurred while processing summary: {str(e)}"
+        return f"openai: Error occurred while processing chat request: {str(e)}"
 
 
-def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
+def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None):
     try:
         loaded_config_data = summarize.load_and_log_configs()
         global anthropic_api_key
@@ -177,30 +152,14 @@ def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_
 
         logging.debug(f"Anthropic: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("AnthropicAI: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
+        if system_prompt is not None:
+            logging.debug("Anthropic: Using provided system prompt")
+            pass
         else:
-            logging.debug("AnthropicAI: Using provided string data for summarization")
-            data = input_data
+            system_prompt = "You are a helpful assistant"
 
-        logging.debug(f"AnthropicAI: Loaded data: {data}")
-        logging.debug(f"AnthropicAI: Type of data: {type(data)}")
-
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("Anthropic: Summary already exists in the loaded data")
-            return data['summary']
-
-        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError("Anthropic: Invalid input data format")
+        logging.debug(f"AnthropicAI: Loaded data: {input_data}")
+        logging.debug(f"AnthropicAI: Type of data: {type(input_data)}")
 
         anthropic_model = loaded_config_data['models']['anthropic']
 
@@ -210,11 +169,11 @@ def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_
             'Content-Type': 'application/json'
         }
 
-        anthropic_prompt = custom_prompt_arg
-        logging.debug(f"Anthropic: Prompt is {anthropic_prompt}")
+        anthropic_user_prompt = custom_prompt_arg
+        logging.debug(f"Anthropic: User Prompt is {anthropic_user_prompt}")
         user_message = {
             "role": "user",
-            "content": f"{text} \n\n\n\n{anthropic_prompt}"
+            "content": f"{input_data} \n\n\n\n{anthropic_user_prompt}"
         }
 
         data = {
@@ -229,7 +188,7 @@ def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_
                 "user_id": "example_user_id",
             },
             "stream": False,
-            "system": "You are a professional summarizer."
+            "system": f"{system_prompt}"
         }
 
         for attempt in range(max_retries):
@@ -242,10 +201,10 @@ def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_
                     logging.debug("anthropic: Post submittal successful")
                     response_data = response.json()
                     try:
-                        summary = response_data['content'][0]['text'].strip()
-                        logging.debug("anthropic: Summarization successful")
-                        print("Summary processed successfully.")
-                        return summary
+                        chat_response = response_data['content'][0]['text'].strip()
+                        logging.debug("anthropic: Chat request successful")
+                        print("Chat request processed successfully.")
+                        return chat_response
                     except (IndexError, KeyError) as e:
                         logging.debug("anthropic: Unexpected data in response")
                         print("Unexpected response format from Anthropic API:", response.text)
@@ -256,8 +215,8 @@ def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_
                     time.sleep(retry_delay)
                 else:
                     logging.debug(
-                        f"anthropic: Failed to summarize, status code {response.status_code}: {response.text}")
-                    print(f"Failed to process summary, status code {response.status_code}: {response.text}")
+                        f"anthropic: Failed to process chat request, status code {response.status_code}: {response.text}")
+                    print(f"Failed to process chat request, status code {response.status_code}: {response.text}")
                     return None
 
             except RequestException as e:
@@ -266,19 +225,14 @@ def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_
                     time.sleep(retry_delay)
                 else:
                     return f"anthropic: Network error: {str(e)}"
-    except FileNotFoundError as e:
-        logging.error(f"anthropic: File not found: {input_data}")
-        return f"anthropic: File not found: {input_data}"
-    except json.JSONDecodeError as e:
-        logging.error(f"anthropic: Invalid JSON format in file: {input_data}")
-        return f"anthropic: Invalid JSON format in file: {input_data}"
     except Exception as e:
         logging.error(f"anthropic: Error in processing: {str(e)}")
         return f"anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
 
 
 # Summarize with Cohere
-def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
+def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_prompt=None):
+    global cohere_api_key
     loaded_config_data = summarize.load_and_log_configs()
     try:
         # API key validation
@@ -293,30 +247,8 @@ def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
 
         logging.debug(f"cohere: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("Cohere: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
-        else:
-            logging.debug("Cohere: Using provided string data for summarization")
-            data = input_data
-
-        logging.debug(f"Cohere: Loaded data: {data}")
-        logging.debug(f"Cohere: Type of data: {type(data)}")
-
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("Cohere: Summary already exists in the loaded data")
-            return data['summary']
-
-        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError("Invalid input data format")
+        logging.debug(f"Cohere: Loaded data: {input_data}")
+        logging.debug(f"Cohere: Type of data: {type(input_data)}")
 
         cohere_model = loaded_config_data['models']['cohere']
 
@@ -326,14 +258,22 @@ def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
             'Authorization': f'Bearer {cohere_api_key}'
         }
 
-        cohere_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
-        logging.debug("cohere: Prompt being sent is {cohere_prompt}")
+        if system_prompt is not None:
+            logging.debug("Anthropic: Using provided system prompt")
+            pass
+        else:
+            system_prompt = "You are a helpful assistant"
+
+        cohere_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
+        logging.debug(f"cohere: User Prompt being sent is {cohere_prompt}")
+
+        logging.debug(f"cohere: System Prompt being sent is {system_prompt}")
 
         data = {
             "chat_history": [
-                {"role": "USER", "message": cohere_prompt}
+                {"role": "SYSTEM", "message": f"system_prompt"},
             ],
-            "message": "Please provide a summary.",
+            "message": f"{cohere_prompt}",
             "model": model,
             "connectors": [{"id": "web-search"}]
         }
@@ -346,10 +286,10 @@ def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
 
         if response.status_code == 200:
             if 'text' in response_data:
-                summary = response_data['text'].strip()
-                logging.debug("cohere: Summarization successful")
-                print("Summary processed successfully.")
-                return summary
+                chat_response = response_data['text'].strip()
+                logging.debug("cohere: Chat request successful")
+                print("Chat request processed successfully.")
+                return chat_response
             else:
                 logging.error("Expected data not found in API response.")
                 return "Expected data not found in API response."
@@ -364,7 +304,7 @@ def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, input_data, custom_prompt_arg):
+def chat_with_groq(api_key, input_data, custom_prompt_arg, system_prompt=None):
     loaded_config_data = summarize.load_and_log_configs()
     try:
         # API key validation
@@ -379,31 +319,8 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
 
         logging.debug(f"groq: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
-        # Transcript data handling & Validation
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("Groq: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
-        else:
-            logging.debug("Groq: Using provided string data for summarization")
-            data = input_data
-
-        logging.debug(f"Groq: Loaded data: {data}")
-        logging.debug(f"Groq: Type of data: {type(data)}")
-
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("Groq: Summary already exists in the loaded data")
-            return data['summary']
-
-        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError("Groq: Invalid input data format")
+        logging.debug(f"Groq: Loaded data: {input_data}")
+        logging.debug(f"Groq: Type of data: {type(input_data)}")
 
         # Set the model to be used
         groq_model = loaded_config_data['models']['groq']
@@ -413,11 +330,23 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
             'Content-Type': 'application/json'
         }
 
-        groq_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
-        logging.debug("groq: Prompt being sent is {groq_prompt}")
+        if system_prompt is not None:
+            logging.debug("Groq: Using provided system prompt")
+            pass
+        else:
+            system_prompt = "You are a helpful assistant"
+
+        groq_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
+        logging.debug("groq: User Prompt being sent is {groq_prompt}")
+
+        logging.debug("groq: System Prompt being sent is {system_prompt}")
 
         data = {
             "messages": [
+                {
+                    "role": "system",
+                    "content": f"{system_prompt}"
+                },
                 {
                     "role": "user",
                     "content": groq_prompt
@@ -451,7 +380,7 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
 
 
-def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
+def chat_with_openrouter(api_key, input_data, custom_prompt_arg, system_prompt=None):
     loaded_config_data = summarize.load_and_log_configs()
     import requests
     import json
@@ -468,30 +397,8 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
 
     logging.debug(f"openai: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
-    if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("openrouter: Loading json data for summarization")
-        with open(input_data, 'r') as file:
-            data = json.load(file)
-    else:
-        logging.debug("openrouter: Using provided string data for summarization")
-        data = input_data
-
-    logging.debug(f"openrouter: Loaded data: {data}")
-    logging.debug(f"openrouter: Type of data: {type(data)}")
-
-    if isinstance(data, dict) and 'summary' in data:
-        # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("openrouter: Summary already exists in the loaded data")
-        return data['summary']
-
-    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-    if isinstance(data, list):
-        segments = data
-        text = extract_text_from_segments(segments)
-    elif isinstance(data, str):
-        text = data
-    else:
-        raise ValueError("Invalid input data format")
+    logging.debug(f"openrouter: Loaded data: {input_data}")
+    logging.debug(f"openrouter: Type of data: {type(input_data)}")
 
     config = configparser.ConfigParser()
     file_path = 'config.txt'
@@ -503,8 +410,18 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
         config.read('../config.txt')
     else:
         print("config.txt not found in the specified path or current directory.")
+    openrouter_model = loaded_config_data['models']['openrouter']
+
+    if system_prompt is not None:
+        logging.debug("OpenRouter: Using provided system prompt")
+        pass
+    else:
+        system_prompt = "You are a helpful assistant"
 
     openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
+    logging.debug(f"openrouter: User Prompt being sent is {openrouter_prompt}")
+
+    logging.debug(f"openrouter: System Prompt being sent is {system_prompt}")
 
     try:
         logging.debug("openrouter: Submitting request to API endpoint")
@@ -517,6 +434,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
             data=json.dumps({
                 "model": f"{openrouter_model}",
                 "messages": [
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": openrouter_prompt}
                 ]
             })
@@ -528,8 +446,8 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
         if response.status_code == 200:
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("openrouter: Summarization successful")
-                print("openrouter: Summarization successful.")
+                logging.debug("openrouter: Chat request successful")
+                print("openrouter: Chat request successful.")
                 return summary
             else:
                 logging.error("openrouter: Expected data not found in API response.")
@@ -539,9 +457,10 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
             return f"openrouter: API request failed: {response.text}"
     except Exception as e:
         logging.error("openrouter: Error in processing: %s", str(e))
-        return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
+        return f"openrouter: Error occurred while processing chat request with openrouter: {str(e)}"
 
-def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
+# FIXME: This function is not yet implemented properly
+def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None):
     loaded_config_data = summarize.load_and_log_configs()
     global huggingface_api_key
     logging.debug(f"huggingface: Summarization process starting...")
@@ -551,74 +470,49 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
             logging.info("HuggingFace: API key not provided as parameter")
             logging.info("HuggingFace: Attempting to use API key from config file")
             huggingface_api_key = loaded_config_data['api_keys']['openai']
-
         if api_key is None or api_key.strip() == "":
             logging.error("HuggingFace: API key not found or is empty")
             return "HuggingFace: API Key Not Provided/Found in Config file or is empty"
-
         logging.debug(f"HuggingFace: Using API Key: {api_key[:5]}...{api_key[-5:]}")
-
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("HuggingFace: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
-        else:
-            logging.debug("HuggingFace: Using provided string data for summarization")
-            data = input_data
-
-        logging.debug(f"HuggingFace: Loaded data: {data}")
-        logging.debug(f"HuggingFace: Type of data: {type(data)}")
-
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("HuggingFace: Summary already exists in the loaded data")
-            return data['summary']
-
-        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError("HuggingFace: Invalid input data format")
-
-        print(f"HuggingFace: lets make sure the HF api key exists...\n\t {api_key}")
         headers = {
             "Authorization": f"Bearer {api_key}"
         }
 
+        # Setup model
         huggingface_model = loaded_config_data['models']['huggingface']
-        API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}"
 
-        huggingface_prompt = f"{text}\n\n\n\n{custom_prompt_arg}"
+        API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}"
+        if system_prompt is not None:
+            logging.debug("HuggingFace: Using provided system prompt")
+            pass
+        else:
+            system_prompt = "You are a helpful assistant"
+
+        huggingface_prompt = f"{input_data}\n\n\n\n{custom_prompt_arg}"
         logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
         data = {
-            "inputs": text,
-            "parameters": {"max_length": 512, "min_length": 100}  # You can adjust max_length and min_length as needed
+            "inputs": f"{input_data}",
+            "parameters": {"max_length": 8192, "min_length": 100}  # You can adjust max_length and min_length as needed
         }
-
-        print(f"huggingface: lets make sure the HF api key is the same..\n\t {huggingface_api_key}")
-
         logging.debug("huggingface: Submitting request...")
 
         response = requests.post(API_URL, headers=headers, json=data)
 
         if response.status_code == 200:
             summary = response.json()[0]['summary_text']
-            logging.debug("huggingface: Summarization successful")
-            print("Summarization successful.")
+            logging.debug("huggingface: Chat request successful")
+            print("Chat request successful.")
             return summary
         else:
-            logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
-            return f"Failed to process summary, status code {response.status_code}: {response.text}"
+            logging.error(f"huggingface: Chat request failed with status code {response.status_code}: {response.text}")
+            return f"Failed to process chat request, status code {response.status_code}: {response.text}"
     except Exception as e:
         logging.error("huggingface: Error in processing: %s", str(e))
-        print(f"Error occurred while processing summary with huggingface: {str(e)}")
+        print(f"Error occurred while processing chat request with huggingface: {str(e)}")
         return None
 
 
-def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
+def chat_with_deepseek(api_key, input_data, custom_prompt_arg, system_prompt=None):
     loaded_config_data = summarize.load_and_log_configs()
     try:
         # API key validation
@@ -633,32 +527,6 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
 
         logging.debug(f"DeepSeek: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
-        # Input data handling
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("DeepSeek: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
-        else:
-            logging.debug("DeepSeek: Using provided string data for summarization")
-            data = input_data
-
-        logging.debug(f"DeepSeek: Loaded data: {data}")
-        logging.debug(f"DeepSeek: Type of data: {type(data)}")
-
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("DeepSeek: Summary already exists in the loaded data")
-            return data['summary']
-
-        # Text extraction
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError("DeepSeek: Invalid input data format")
-
         deepseek_model = loaded_config_data['models']['deepseek'] or "deepseek-chat"
 
         headers = {
@@ -666,14 +534,20 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
             'Content-Type': 'application/json'
         }
 
+        if system_prompt is not None:
+            logging.debug(f"Deepseek: Using provided system prompt: {system_prompt}")
+            pass
+        else:
+            system_prompt = "You are a helpful assistant"
+
         logging.debug(
             f"Deepseek API Key: {api_key[:5]}...{api_key[-5:] if api_key else None}")
         logging.debug("openai: Preparing data + prompt for submittal")
-        deepseek_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        deepseek_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
         data = {
             "model": deepseek_model,
             "messages": [
-                {"role": "system", "content": "You are a professional summarizer."},
+                {"role": "system", "content": f"{system_prompt}"},
                 {"role": "user", "content": deepseek_prompt}
             ],
             "stream": False,
@@ -687,18 +561,77 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
             response_data = response.json()
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("DeepSeek: Summarization successful")
+                logging.debug("DeepSeek: Chat request successful")
                 return summary
             else:
-                logging.warning("DeepSeek: Summary not found in the response data")
-                return "DeepSeek: Summary not available"
+                logging.warning("DeepSeek: Chat response not found in the response data")
+                return "DeepSeek: Chat response not available"
         else:
-            logging.error(f"DeepSeek: Summarization failed with status code {response.status_code}")
+            logging.error(f"DeepSeek: Chat request failed with status code {response.status_code}")
             logging.error(f"DeepSeek: Error response: {response.text}")
-            return f"DeepSeek: Failed to process summary. Status code: {response.status_code}"
+            return f"DeepSeek: Failed to chat request summary. Status code: {response.status_code}"
     except Exception as e:
         logging.error(f"DeepSeek: Error in processing: {str(e)}", exc_info=True)
-        return f"DeepSeek: Error occurred while processing summary: {str(e)}"
+        return f"DeepSeek: Error occurred while processing chat request: {str(e)}"
+
+
+
+# Stashed in here since OpenAI usage.... #FIXME
+# FIXME - https://docs.vllm.ai/en/latest/getting_started/quickstart.html .... Great docs.
+def chat_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions", system_prompt=None):
+    loaded_config_data = summarize.load_and_log_configs()
+    llm_model = loaded_config_data['models']['vllm']
+    # API key validation
+    if api_key is None:
+        logging.info("vLLM: API key not provided as parameter")
+        logging.info("vLLM: Attempting to use API key from config file")
+        api_key = loaded_config_data['api_keys']['llama']
+
+    if api_key is None or api_key.strip() == "":
+        logging.info("vLLM: API key not found or is empty")
+    vllm_client = OpenAI(
+        base_url=vllm_api_url,
+        api_key=custom_prompt_input
+    )
+
+    if isinstance(input_data, str) and os.path.isfile(input_data):
+        logging.debug("vLLM: Loading json data for summarization")
+        with open(input_data, 'r') as file:
+            data = json.load(file)
+    else:
+        logging.debug("vLLM: Using provided string data for summarization")
+        data = input_data
+
+    logging.debug(f"vLLM: Loaded data: {data}")
+    logging.debug(f"vLLM: Type of data: {type(data)}")
+
+    if isinstance(data, dict) and 'summary' in data:
+        # If the loaded data is a dictionary and already contains a summary, return it
+        logging.debug("vLLM: Summary already exists in the loaded data")
+        return data['summary']
+
+    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+    if isinstance(data, list):
+        segments = data
+        text = extract_text_from_segments(segments)
+    elif isinstance(data, str):
+        text = data
+    else:
+        raise ValueError("Invalid input data format")
+
+
+    custom_prompt = custom_prompt_input
+
+    completion = client.chat.completions.create(
+        model=llm_model,
+        messages=[
+            {"role": "system", "content": f"{system_prompt}"},
+            {"role": "user", "content": f"{text} \n\n\n\n{custom_prompt}"}
+        ]
+    )
+    vllm_summary = completion.choices[0].message.content
+    return vllm_summary
+
 
 
 #
