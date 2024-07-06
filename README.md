@@ -109,6 +109,15 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
       * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
       * So everything you might consume during your path of research, tracked and assimilated and tagged.
       * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
+
+- **Convert an epub book to text and ingest it into the DB**
+  1. Download/Install pandoc for your platform:
+    * https://pandoc.org/installing.html
+  2. Convert your epub to a text file:
+     * `$ pandoc -f epub -t plain -o filename.txt filename.epub`
+  3. Ingest your converted epub into the DB:
+     * `python summarize.py path/to/your/textfile.txt --ingest_text_file --text_title "Book Title" --text_author "Author Name" -k additional,keywords`
+
 ----------
 ### <a name="setup"></a>Setting it up
 - **Requirements**

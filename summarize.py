@@ -44,6 +44,7 @@ from App_Function_Libraries.System_Checks_Lib import *
 from App_Function_Libraries.Tokenization_Methods_Lib import *
 from App_Function_Libraries.Video_DL_Ingestion_Lib import *
 from App_Function_Libraries.Video_DL_Ingestion_Lib import normalize_title
+from App_Function_Libraries.Book_Ingestion_Lib import ingest_text_file, ingest_folder
 # from App_Function_Libraries.Web_UI_Lib import *
 
 # 3rd-Party Module Imports
@@ -2379,6 +2380,12 @@ def main(input_path, api_name=None, api_key=None,
          set_max_txt_chunk_paragraphs=0,
          set_chunk_txt_by_tokens=False,
          set_max_txt_chunk_tokens=0,
+         ingest_text_file=False,
+         chunk=False,
+         max_chunk_size=2000,
+         chunk_overlap=100,
+         chunk_unit='tokens',
+         summarize_chunks=None
          ):
     global detail_level_number, summary, audio_file, transcription_text, info_dict
 
@@ -2444,42 +2451,116 @@ def main(input_path, api_name=None, api_key=None,
                     add_media_to_database(path, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model)
                 else:
                     logging.error(f"Failed to download video: {path}")
+
+            # FIXME - Need to update so that chunking is fully handled.
+            elif chunk and path.lower().endswith('.txt'):
+                chunks = chunk_text_file(path, max_chunk_size, chunk_overlap, chunk_unit)
+                if chunks:
+                    chunks_data = {
+                        "file_path": path,
+                        "chunk_unit": chunk_unit,
+                        "max_chunk_size": max_chunk_size,
+                        "chunk_overlap": chunk_overlap,
+                        "chunks": []
+                    }
+                    summaries_data = {
+                        "file_path": path,
+                        "summarization_method": summarize_chunks,
+                        "summaries": []
+                    }
+
+                    for i, chunk_text in enumerate(chunks):
+                        chunk_info = {
+                            "chunk_id": i + 1,
+                            "text": chunk_text
+                        }
+                        chunks_data["chunks"].append(chunk_info)
+
+                        if summarize_chunks:
+                            summary = None
+                            if summarize_chunks == 'openai':
+                                summary = summarize_with_openai(api_key, chunk_text, custom_prompt)
+                            elif summarize_chunks == 'anthropic':
+                                summary = summarize_with_anthropic(api_key, chunk_text, custom_prompt)
+                            elif summarize_chunks == 'cohere':
+                                summary = summarize_with_cohere(api_key, chunk_text, custom_prompt)
+                            elif summarize_chunks == 'groq':
+                                summary = summarize_with_groq(api_key, chunk_text, custom_prompt)
+                            elif summarize_chunks == 'local-llm':
+                                summary = summarize_with_local_llm(chunk_text, custom_prompt)
+                            # Add more summarization methods as needed
+
+                            if summary:
+                                summary_info = {
+                                    "chunk_id": i + 1,
+                                    "summary": summary
+                                }
+                                summaries_data["summaries"].append(summary_info)
+                            else:
+                                logging.warning(f"Failed to generate summary for chunk {i + 1}")
+
+                    # Save chunks to a single JSON file
+                    chunks_file_path = f"{path}_chunks.json"
+                    with open(chunks_file_path, 'w', encoding='utf-8') as f:
+                        json.dump(chunks_data, f, ensure_ascii=False, indent=2)
+                    logging.info(f"All chunks saved to {chunks_file_path}")
+
+                    # Save summaries to a single JSON file (if summarization was performed)
+                    if summarize_chunks:
+                        summaries_file_path = f"{path}_summaries.json"
+                        with open(summaries_file_path, 'w', encoding='utf-8') as f:
+                            json.dump(summaries_data, f, ensure_ascii=False, indent=2)
+                        logging.info(f"All summaries saved to {summaries_file_path}")
+
+                    logging.info(f"File {path} chunked into {len(chunks)} parts using {chunk_unit} as the unit.")
+                else:
+                    logging.error(f"Failed to chunk file {path}")
+
+            # Handle downloading of URLs from a text file or processing local video/audio files
             else:
                 download_path, info_dict, urls_or_media_file = process_local_file(path)
                 if isinstance(urls_or_media_file, list):
                     # Text file containing URLs
                     for url in urls_or_media_file:
-                        info_dict, title = extract_video_info(url)
-                        download_path = create_download_directory(title)
-                        video_path = download_video(url, download_path, info_dict, download_video_flag)
+                        for item in urls_or_media_file:
+                            if item.startswith(('http://', 'https://')):
+                                info_dict, title = extract_video_info(url)
+                                download_path = create_download_directory(title)
+                                video_path = download_video(url, download_path, info_dict, download_video_flag)
 
-                        if video_path:
-                            audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
-                            # FIXME - V1
-                            #transcription_text = {'video_path': url, 'audio_file': audio_file, 'transcription': segments}
-                            transcription_text = {'audio_file': audio_file, 'transcription': segments}
-                            if rolling_summarization:
-                                text = extract_text_from_segments(segments)
-                                summary = summarize_with_detail_openai(text, detail=detail)
-                            elif api_name:
-                                summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key)
-                            else:
-                                summary = None
+                                if video_path:
+                                    audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+                                    # FIXME - V1
+                                    #transcription_text = {'video_path': url, 'audio_file': audio_file, 'transcription': segments}
+                                    transcription_text = {'audio_file': audio_file, 'transcription': segments}
+                                    if rolling_summarization:
+                                        text = extract_text_from_segments(segments)
+                                        summary = summarize_with_detail_openai(text, detail=detail)
+                                    elif api_name:
+                                        summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key)
+                                    else:
+                                        summary = None
 
-                            if summary:
-                                # Save the summary file in the download_path directory
-                                summary_file_path = os.path.join(download_path, f"{transcription_text}_summary.txt")
-                                with open(summary_file_path, 'w') as file:
-                                    file.write(summary)
+                                    if summary:
+                                        # Save the summary file in the download_path directory
+                                        summary_file_path = os.path.join(download_path, f"{transcription_text}_summary.txt")
+                                        with open(summary_file_path, 'w') as file:
+                                            file.write(summary)
 
-                            add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model)
-                        else:
-                            logging.error(f"Failed to download video: {url}")
+                                    add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model)
+                                else:
+                                    logging.error(f"Failed to download video: {url}")
+
                 else:
-                    # Video or audio file
+                    # Video or audio or txt file
                     media_path = urls_or_media_file
 
-                    if media_path.lower().endswith(('.mp4', '.avi', '.mov')):
+                    if media_path.lower().endswith(('.txt', '.md')):
+                        if media_path.lower().endswith('.txt'):
+                            # Handle text file ingestion
+                            result = ingest_text_file(media_path)
+                            logging.info(result)
+                    elif media_path.lower().endswith(('.mp4', '.avi', '.mov')):
                         # Video file
                         audio_file, segments = perform_transcription(media_path, offset, whisper_model, vad_filter)
                     elif media_path.lower().endswith(('.wav', '.mp3', '.m4a')):
@@ -2606,6 +2687,11 @@ Sample commands:
     parser.add_argument('--share_public', type=int, default=7860,
                         help="This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)")
     parser.add_argument('--port', type=int, default=7860, help='Port to run the server on')
+    parser.add_argument('--ingest_text_file', action='store_true',
+                        help='Ingest .txt files as content instead of treating them as URL lists')
+    parser.add_argument('--text_title', type=str, help='Title for the text file being ingested')
+    parser.add_argument('--text_author', type=str, help='Author of the text file being ingested')
+
     # parser.add_argument('--offload', type=int, default=20, help='Numbers of layers to offload to GPU for Llamafile usage')
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
 
@@ -2683,6 +2769,19 @@ Sample commands:
     local_llm = args.local_llm
     logging.info(f'Local LLM flag: {local_llm}')
 
+    # Check if the user wants to ingest a text file (singular or multiple from a folder)
+    if args.input_path is not None:
+        if os.path.isdir(args.input_path) and args.ingest_text_file:
+            results = ingest_folder(args.input_path, keywords=args.keywords)
+            for result in results:
+                print(result)
+        elif args.input_path.lower().endswith('.txt') and args.ingest_text_file:
+            result = ingest_text_file(args.input_path, title=args.text_title, author=args.text_author,
+                                      keywords=args.keywords)
+            print(result)
+        sys.exit(0)
+
+    # Launch the GUI
     if args.user_interface:
         if local_llm:
             local_llm_function()

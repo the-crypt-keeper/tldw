@@ -23,6 +23,7 @@ import os
 import logging
 # Import Local
 import summarize
+from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav
 from App_Function_Libraries.Video_DL_Ingestion_Lib import *
 from App_Function_Libraries.Video_DL_Ingestion_Lib import get_youtube
 from Article_Summarization_Lib import *
@@ -68,27 +69,34 @@ def process_path(path):
         return None
 
 
-# FIXME
-
-def process_local_file(file_path):
+# FIXME - ingest_text is not used, need to confirm.
+def process_local_file(file_path, ingest_text=False):
     logging.info(f"Processing local file: {file_path}")
     file_extension = os.path.splitext(file_path)[1].lower()
 
-    if file_extension == '.txt':
-        # Handle text file containing URLs
-        with open(file_path, 'r') as file:
-            urls = file.read().splitlines()
-        return None, None, urls
+    if os.path.isfile(file_path):
+        if file_path.lower().endswith('.txt'):
+            if ingest_text:
+                # Treat as content to be ingested
+                return os.path.dirname(file_path), {'title': os.path.basename(file_path)}, file_path
+            else:
+                # Treat as potential list of URLs
+                with open(file_path, 'r') as file:
+                    urls = file.read().splitlines()
+                return None, None, urls
+        elif file_path.lower().endswith(('.mp4', '.avi', '.mov', '.wav', '.mp3', '.m4a')):
+            # Handle video and audio files (existing code)
+            title = normalize_title(os.path.splitext(os.path.basename(file_path))[0])
+            info_dict = {'title': title}
+            logging.debug(f"Creating {title} directory...")
+            download_path = create_download_directory(title)
+            logging.debug(f"Converting '{title}' to an audio file (wav).")
+            audio_file = convert_to_wav(file_path)
+            logging.debug(f"'{title}' successfully converted to an audio file (wav).")
+            return download_path, info_dict, audio_file
     else:
-        # Handle video file
-        title = normalize_title(os.path.splitext(os.path.basename(file_path))[0])
-        info_dict = {'title': title}
-        logging.debug(f"Creating {title} directory...")
-        download_path = create_download_directory(title)
-        logging.debug(f"Converting '{title}' to an audio file (wav).")
-        audio_file = convert_to_wav(file_path)
-        logging.debug(f"'{title}' successfully converted to an audio file (wav).")
-        return download_path, info_dict, audio_file
+        logging.error(f"File not found: {file_path}")
+        return None, None, None
 
 
 
