@@ -38,26 +38,23 @@ import requests
 #######################
 # Logging Setup
 #
-
 log_level = "DEBUG"
 logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
-
+#
 #############
 # Global variables setup
-
 custom_prompt_input = ("Above is the transcript of a video. Please read through the transcript carefully. Identify the "
 "main topics that are discussed over the course of the transcript. Then, summarize the key points about each main "
 "topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, "
 "but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> "
 "tags.")
-
+#
 # Global variables
 whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
                   "distil-large-v2", "distil-medium.en", "distil-small.en"]
 server_mode = False
 share_public = False
-
 #
 #
 #######################
@@ -65,8 +62,6 @@ share_public = False
 #######################
 # Function Sections
 #
-
-
 abc_xyz = """
     Database Setup
     Config Loading
@@ -82,12 +77,9 @@ abc_xyz = """
     Gradio UI
     Main
 """
-
 #
 #
 #######################
-
-
 #######################
 #
 #       TL/DW: Too Long Didn't Watch
