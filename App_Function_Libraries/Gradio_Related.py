@@ -983,6 +983,10 @@ def create_utilities_tab():
 
 
 def launch_ui(demo_mode=False):
+    if demo_mode == False:
+        share_public = False
+    else:
+        share_public = True
     with gr.Blocks() as iface:
         gr.Markdown("# Video Transcription and Summarization")
 
@@ -1022,7 +1026,7 @@ def launch_ui(demo_mode=False):
 
     # Launch the interface
     server_port_variable = 7860
-    if share_public:
+    if share_public is not None and share_public:
         iface.launch(share=True)
     elif server_mode and not share_public:
         iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
