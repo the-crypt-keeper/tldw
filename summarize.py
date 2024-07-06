@@ -1231,9 +1231,11 @@ def launch_ui(demo_mode=False):
                     </style>
                     """
 
+            # I hate this UI so much....
             # Set the event listener for the Light/Dark mode toggle switch
-            theme_toggle.change(fn=toggle_light, inputs=theme_toggle, outputs=gr.HTML())
+            #theme_toggle.change(fn=toggle_light, inputs=theme_toggle, outputs=gr.HTML())
 
+            # Chunk toggle switch
             ui_frontpage_mode_toggle.change(fn=toggle_frontpage_ui, inputs=ui_frontpage_mode_toggle, outputs=inputs)
 
             # Combine URL input and inputs lists
@@ -1248,13 +1250,13 @@ def launch_ui(demo_mode=False):
                 title="Video Transcription and Summarization",
                 description="Submit a video URL for transcription and summarization. Ensure you input all necessary "
                             "information including API keys.",
-                theme='freddyaboulton/dracula_revamped',
                 allow_flagging="never"
             )
 
 
         # Sub-Tab 2: Transcribe & Summarize Audio file
         with gr.Tab("Audio File Processing"):
+            gr.Markdown("# Transcribe & Summarize Audio Files from URLs or Local Files!")
             audio_url_input = gr.Textbox(
                 label="Audio File URL",
                 placeholder="Enter the URL of the audio file"
@@ -1304,6 +1306,8 @@ def launch_ui(demo_mode=False):
 
         # Sub-Tab 3: Scrape & Summarize Articles/Websites
         with gr.Tab("Scrape & Summarize Articles/Websites"):
+            gr.Markdown("# Scrape Websites & Summarize Articles using a Headless Chrome Browser!")
+            gr.Markdown("In the plans to add support for custom cookies/logins...")
             url_input = gr.Textbox(
                 label="Article URLs",
                 placeholder="Enter article URLs here, one per line",
@@ -1346,12 +1350,18 @@ def launch_ui(demo_mode=False):
                 outputs=result_output
             )
 
-        # Sub-Tab 4: Ingest & Summarize Documents
+        # FIXME - Notes/Writing overlap?
+        # Sub-Tab 4: Ingest & Summarize Text
+        with gr.Tab("Ingest & Summarize Text"):
+            gr.Markdown("# Ingest & Summarize Text")
+            gr.Markdown("Overlap with notes?")
+
+        # Sub-Tab 5: Ingest & Summarize Documents
         with gr.Tab("Ingest & Summarize Documents"):
+            gr.Markdown("# Ingest & Summarize Office Documents")
             gr.Markdown("Plan to put ingestion form for documents here")
             gr.Markdown("Will ingest documents and store into SQLite DB")
             gr.Markdown("RAG here we come....:/")
-
 
         def toggle_advanced_mode(advanced_mode):
             # Show all elements if advanced mode is on
@@ -1363,7 +1373,8 @@ def launch_ui(demo_mode=False):
 
     # Top-Level Gradio Tab #2 - 'Search / Detailed View'
     with gr.Blocks() as search_interface:
-        with gr.Tab("Search Ingested Materials / Detailed Entry View / Prompts"):
+        with gr.Tab("Search Ingested Materials / Detailed Entry View"):
+            gr.Markdown("# Search across all ingested items in the Database by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
             search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
             search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
                                          label="Search By")
@@ -1386,6 +1397,7 @@ def launch_ui(demo_mode=False):
                                 )
         # sub-tab #2 for Search / Detailed view
         with gr.Tab("View Prompts"):
+            gr.Markdown("# List and view every single prompt stored in the 'prompts.db' file.")
             with gr.Column():
                 prompt_dropdown = gr.Dropdown(
                     label="Select Prompt (Thanks to the 'Fabric' project for this initial set: https://github.com/danielmiessler/fabric",
@@ -1404,9 +1416,10 @@ def launch_ui(demo_mode=False):
                     outputs=prompt_dropdown
                 )
 
-        # FIXME
+        # FIXME - this is broken...
         # Sub-tab #3 for Search / Detailed view
         with gr.Tab("Search Prompts"):
+            gr.Markdown("# Search and review Prompts from the 'prompts.db' file")
             with gr.Column():
                 search_query_input = gr.Textbox(label="Search Query (It's broken)",
                                                 placeholder="Enter your search query...")
@@ -1444,7 +1457,7 @@ def launch_ui(demo_mode=False):
     # Top-Level Gradio Tab #3 - 'Llamafile'
     with gr.Blocks() as llamafile_interface:
         with gr.Tab("Llamafile Settings"):
-            gr.Markdown("Settings for Llamafile")
+            gr.Markdown("# Settings for Llamafile")
 
             # Toggle switch for Advanced/Simple mode
             am_noob = gr.Checkbox(
@@ -1511,7 +1524,7 @@ def launch_ui(demo_mode=False):
 
         # Second sub-tab for Llamafile
         with gr.Tab("Llamafile Chat Interface"):
-            gr.Markdown("Page to interact with Llamafile Server (iframe to Llamafile server port)")
+            gr.Markdown("# Page to interact with Llamafile Server (iframe to Llamafile server port)")
             # Define the HTML content with the iframe
             html_content = """
             <!DOCTYPE html>
@@ -1543,13 +1556,13 @@ def launch_ui(demo_mode=False):
         # Third sub-tab for Llamafile
         # https://github.com/lmg-anon/mikupad/releases
         with gr.Tab("Mikupad Chat Interface"):
-            gr.Markdown("Not implemented. Have to wait until I get rid of Gradio")
+            gr.Markdown("# Not implemented. Have to wait until I get rid of Gradio, or I learn better web dev skills.")
             gr.HTML(html_content)
 
 
     # Top-Level Gradio Tab #4 - Remote LLM Chat
     with gr.Blocks() as media_prompt_chat_tab:
-        gr.Markdown("# Media Search, Prompt Creation, and Chat")
+        gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -1841,23 +1854,44 @@ def launch_ui(demo_mode=False):
            "a webm file for you to download. </br><em>If you want a full-featured one:</em> " \
            "<strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>"
 
-    # Eighth Top Tab - Download Video/Audio Files
-    download_videos_interface = gr.Interface(
-        fn=gradio_download_youtube_video,
-        inputs=gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here"),
-        outputs=gr.File(label="Download Video"),
-        title="YouTube Video Downloader",
-        description=desc,
-        allow_flagging="never"
-    )
+    # Eighth Top Tab - Utilities
+    with gr.Blocks() as utilities_interface:
+        with gr.Tab("Utilities"):
+            with gr.Tab("YouTube Video Downloader"):
+                gr.Markdown(desc)
+                youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
+                download_button = gr.Button("Download Video")
+                output_file = gr.File(label="Download Video")
+
+                download_button.click(
+                    fn=gradio_download_youtube_video,
+                    inputs=youtube_url_input,
+                    outputs=output_file
+                )
+            #FIXME - Implement this functionality
+            with gr.Tab("YouTube Audio Downloader"):
+                gr.Markdown(desc)
+                youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
+                download_button = gr.Button("Download Audio")
+                output_file = gr.File(label="Download Audio")
+
+                # download_button.click(
+                #     fn=gradio_download_youtube_audio,
+                #     inputs=youtube_url_input,
+                #     outputs=output_file
+                # )
+
+            #FIXME _ Implement this functionality
+            with gr.Tab("Grammar Checker"):
+                gr.Markdown("# Grammar Check Utility to be added...")
 
 
 
     # Combine interfaces into a tabbed interface
     tabbed_interface = gr.TabbedInterface(
-        [iface, search_interface, llamafile_interface, media_prompt_chat_tab, media_edit_tab, keyword_tab, import_export_tab, download_videos_interface],
+        [iface, search_interface, llamafile_interface, media_prompt_chat_tab, media_edit_tab, keyword_tab, import_export_tab, utilities_interface],
         ["Transcription / Summarization / Ingestion", "Search / Detailed View",
-         "Local LLM with Llamafile", "Remote LLM Chat", "Notes/Writing", "Keywords", "Export/Import", "Download Video/Audio Files"])
+         "Local LLM with Llamafile", "Remote LLM Chat", "Edit Existing Items", "Keywords", "Export/Import", "Utilities"])
 
     # Launch the interface
     server_port_variable = 7860
