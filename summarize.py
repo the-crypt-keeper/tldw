@@ -1854,6 +1854,11 @@ def launch_ui(demo_mode=False):
            "a webm file for you to download. </br><em>If you want a full-featured one:</em> " \
            "<strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>"
 
+    desc2 =  "<h3>Youtube Video Downloader</h3><p>This Input takes a Youtube URL as input and creates " \
+           "a (mp3/ogg/aac? not decided yet...why not an option for all three?) file for you to download. </br><em>If you want a full-featured one:</em> " \
+           "<strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>"
+
+
     # Eighth Top Tab - Utilities
     with gr.Blocks() as utilities_interface:
         with gr.Tab("Utilities"):
@@ -1870,7 +1875,7 @@ def launch_ui(demo_mode=False):
                 )
             #FIXME - Implement this functionality
             with gr.Tab("YouTube Audio Downloader"):
-                gr.Markdown(desc)
+                gr.Markdown(desc2)
                 youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
                 download_button = gr.Button("Download Audio")
                 output_file = gr.File(label="Download Audio")
