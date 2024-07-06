@@ -15,11 +15,16 @@
 #########################################
 #
 # Built-In Imports
-from typing import Dict
+import sqlite3
+from datetime import datetime
+
+import gradio as gr
 import json
+import logging
 import os.path
 from pathlib import Path
-import requests
+import re
+from typing import Dict, List, Tuple
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 # Imports
@@ -36,7 +41,8 @@ from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama,
 from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_cohere, \
     summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface, process_url
-from App_Function_Libraries.SQLite_DB import *
+from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
+    fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, export_to_csv, export_keywords_to_csv
 from App_Function_Libraries.Utils import sanitize_filename, create_download_directory, extract_text_from_segments, \
     load_and_log_configs, clean_youtube_url
 from App_Function_Libraries.Video_DL_Ingestion_Lib import get_youtube, download_video, extract_video_info
@@ -121,6 +127,7 @@ def search_media(query, fields, keyword, page):
         results = search_and_display(query, fields, keyword, page)
         return results
     except Exception as e:
+        logger = logging.getLogger()
         logger.error(f"Error searching media: {e}")
         return str(e)
 
