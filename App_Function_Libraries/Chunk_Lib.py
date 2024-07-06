@@ -8,7 +8,10 @@
 
 from transformers import GPT2Tokenizer
 import nltk
-import re
+from nltk.tokenize import sent_tokenize, word_tokenize
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 
 # Import Local
@@ -42,7 +45,7 @@ tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 def load_document(file_path):
     with open(file_path, 'r') as file:
         text = file.read()
-    return re.sub('\s+', ' ', text).strip()
+    return re.sub('\\s+', ' ', text).strip()
 
 
 # Chunk based on maximum number of words, using ' ' (space) as a delimiter
@@ -300,3 +303,70 @@ Natural language processing has its roots in the 1950s. Already in 1950, Alan Tu
 #
 # print("\nHybrid chunking:")
 # print(chunk_text_hybrid(sample_text, max_tokens=50))
+
+
+
+#######################################################################################################################
+#
+# Experimental Semantic Chunking
+#
+
+# Chunk text into segments based on semantic similarity
+def count_units(text, unit='tokens'):
+    if unit == 'words':
+        return len(text.split())
+    elif unit == 'tokens':
+        return len(word_tokenize(text))
+    elif unit == 'characters':
+        return len(text)
+    else:
+        raise ValueError("Invalid unit. Choose 'words', 'tokens', or 'characters'.")
+
+
+def semantic_chunking(text, max_chunk_size=2000, unit='words'):
+    nltk.download('punkt', quiet=True)
+    sentences = sent_tokenize(text)
+    vectorizer = TfidfVectorizer()
+    sentence_vectors = vectorizer.fit_transform(sentences)
+
+    chunks = []
+    current_chunk = []
+    current_size = 0
+
+    for i, sentence in enumerate(sentences):
+        sentence_size = count_units(sentence, unit)
+        if current_size + sentence_size > max_chunk_size and current_chunk:
+            chunks.append(' '.join(current_chunk))
+            overlap_size = count_units(' '.join(current_chunk[-3:]), unit)  # Use last 3 sentences for overlap
+            current_chunk = current_chunk[-3:]  # Keep last 3 sentences for overlap
+            current_size = overlap_size
+
+        current_chunk.append(sentence)
+        current_size += sentence_size
+
+        if i + 1 < len(sentences):
+            current_vector = sentence_vectors[i]
+            next_vector = sentence_vectors[i + 1]
+            similarity = cosine_similarity(current_vector, next_vector)[0][0]
+            if similarity < 0.5 and current_size >= max_chunk_size // 2:
+                chunks.append(' '.join(current_chunk))
+                overlap_size = count_units(' '.join(current_chunk[-3:]), unit)
+                current_chunk = current_chunk[-3:]
+                current_size = overlap_size
+
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
+
+    return chunks
+
+
+def chunk_text_file(file_path, max_chunk_size=1000, overlap=100):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+
+        chunks = semantic_chunking(content, max_chunk_size, overlap)
+        return chunks
+    except Exception as e:
+        logging.error(f"Error chunking text file: {str(e)}")
+        return None
