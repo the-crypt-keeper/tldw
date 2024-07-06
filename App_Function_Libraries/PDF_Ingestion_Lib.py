@@ -14,13 +14,15 @@
 
 
 # Import necessary libraries
-import os
-import subprocess
 from datetime import datetime
+import logging
+import subprocess
+import os
+
 
 
 # Import Local
-from App_Function_Libraries.SQLite_DB import *
+from App_Function_Libraries.SQLite_DB import add_media_with_keywords
 
 #######################################################################################################################
 # Function Definitions

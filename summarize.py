@@ -1,73 +1,26 @@
 #!/usr/bin/env python3
 # Std Lib Imports
 import argparse
-import asyncio
-import atexit
-import configparser
-from datetime import datetime
-import hashlib
-import json
-import logging
 import os
-from pathlib import Path
-import platform
-import re
-import shutil
 import signal
-import sqlite3
-import subprocess
 import sys
-import time
-import unicodedata
-from multiprocessing import process
-from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import webbrowser
-import zipfile
-
-from App_Function_Libraries.PDF_Ingestion_Lib import ingest_pdf_file
-
 # Local Module Imports (Libraries specific to this project)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
-from App_Function_Libraries import *
 from App_Function_Libraries.Audio_Files import *
-from App_Function_Libraries.Web_UI_Lib import *
-from App_Function_Libraries.Article_Extractor_Lib import *
-from App_Function_Libraries.Article_Summarization_Lib import *
-from App_Function_Libraries.Audio_Transcription_Lib import *
-from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav
-from App_Function_Libraries.Chunk_Lib import *
-from App_Function_Libraries.Diarization_Lib import *
-from App_Function_Libraries.Gradio_Related import *
-from App_Function_Libraries.Local_File_Processing_Lib import *
-from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import *
-from App_Function_Libraries.Local_Summarization_Lib import *
-from App_Function_Libraries.Summarization_General_Lib import *
-from App_Function_Libraries.System_Checks_Lib import *
-from App_Function_Libraries.Tokenization_Methods_Lib import *
-from App_Function_Libraries.Video_DL_Ingestion_Lib import *
-from App_Function_Libraries.Video_DL_Ingestion_Lib import normalize_title
 from App_Function_Libraries.Book_Ingestion_Lib import ingest_text_file, ingest_folder
-# from App_Function_Libraries.Web_UI_Lib import *
-
+from App_Function_Libraries.Chunk_Lib import *
+from App_Function_Libraries.Gradio_Related import *
+from App_Function_Libraries.Tokenization_Methods_Lib import *
+from App_Function_Libraries.Utils import load_and_log_configs
+from App_Function_Libraries.Video_DL_Ingestion_Lib import *
 # 3rd-Party Module Imports
-from bs4 import BeautifulSoup
-import gradio as gr
-import nltk
-from playwright.async_api import async_playwright
 import requests
-from requests.exceptions import RequestException
-import trafilatura
-import yt_dlp
-
 # OpenAI Tokenizer support
-from openai import OpenAI
-from tqdm import tqdm
-import tiktoken
-
+#
 # Other Tokenizers
-from transformers import GPT2Tokenizer
-
+#
 #######################
 # Logging Setup
 #
@@ -182,148 +135,8 @@ abc_xyz = """
 #######################
 # Config loading
 #
-
-def load_comprehensive_config():
-    # Get the directory of the current script
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Construct the path to the config file in the current directory
-    config_path = os.path.join(current_dir, 'config.txt')
-
-    # Create a ConfigParser object
-    config = configparser.ConfigParser()
-
-    # Read the configuration file
-    files_read = config.read(config_path)
-
-    if not files_read:
-        raise FileNotFoundError(f"Config file not found at {config_path}")
-
-    return config
-
-
-def load_and_log_configs():
-    try:
-        config = load_comprehensive_config()
-        if config is None:
-            logging.error("Config is None, cannot proceed")
-            return None
-        # API Keys
-        anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Anthropic API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:] if anthropic_api_key else None}")
-
-        cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Cohere API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:] if cohere_api_key else None}")
-
-        groq_api_key = config.get('API', 'groq_api_key', fallback=None)
-        logging.debug(f"Loaded Groq API Key: {groq_api_key[:5]}...{groq_api_key[-5:] if groq_api_key else None}")
-
-        openai_api_key = config.get('API', 'openai_api_key', fallback=None)
-        logging.debug(
-            f"Loaded OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
-
-        huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
-        logging.debug(
-            f"Loaded HuggingFace API Key: {huggingface_api_key[:5]}...{huggingface_api_key[-5:] if huggingface_api_key else None}")
-
-        openrouter_api_key = config.get('API', 'openrouter_api_key', fallback=None)
-        logging.debug(
-            f"Loaded OpenRouter API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:] if openrouter_api_key else None}")
-
-        deepseek_api_key = config.get('API', 'deepseek_api_key', fallback=None)
-        logging.debug(
-            f"Loaded DeepSeek API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:] if deepseek_api_key else None}")
-
-        # Models
-        anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
-        cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
-        groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
-        openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
-        huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
-        openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
-        deepseek_model = config.get('API', 'deepseek_model', fallback='deepseek-chat')
-
-        logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
-        logging.debug(f"Loaded Cohere Model: {cohere_model}")
-        logging.debug(f"Loaded Groq Model: {groq_model}")
-        logging.debug(f"Loaded OpenAI Model: {openai_model}")
-        logging.debug(f"Loaded HuggingFace Model: {huggingface_model}")
-        logging.debug(f"Loaded OpenRouter Model: {openrouter_model}")
-
-        # Local-Models
-        kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
-        kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
-
-        llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
-        llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
-
-        ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
-        ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
-
-        tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
-        tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
-
-        vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
-        vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
-
-        logging.debug(f"Loaded Kobold API IP: {kobold_api_IP}")
-        logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
-        logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
-        logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
-        logging.debug(f"Loaded VLLM API URL: {vllm_api_url}")
-
-        # Retrieve output paths from the configuration file
-        output_path = config.get('Paths', 'output_path', fallback='results')
-        logging.debug(f"Output path set to: {output_path}")
-
-        # Retrieve processing choice from the configuration file
-        processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
-        logging.debug(f"Processing choice set to: {processing_choice}")
-
-        # Prompts - FIXME
-        prompt_path = config.get('Prompts', 'prompt_path', fallback='prompts.db')
-
-        return {
-            'api_keys': {
-                'anthropic': anthropic_api_key,
-                'cohere': cohere_api_key,
-                'groq': groq_api_key,
-                'openai': openai_api_key,
-                'huggingface': huggingface_api_key,
-                'openrouter': openrouter_api_key,
-                'deepseek': deepseek_api_key
-            },
-            'models': {
-                'anthropic': anthropic_model,
-                'cohere': cohere_model,
-                'groq': groq_model,
-                'openai': openai_model,
-                'huggingface': huggingface_model,
-                'openrouter': openrouter_model,
-                'deepseek': deepseek_model
-            },
-            'local_apis': {
-                'kobold': {'ip': kobold_api_IP, 'key': kobold_api_key},
-                'llama': {'ip': llama_api_IP, 'key': llama_api_key},
-                'ooba': {'ip': ooba_api_IP, 'key': ooba_api_key},
-                'tabby': {'ip': tabby_api_IP, 'key': tabby_api_key},
-                'vllm': {'ip': vllm_api_url, 'key': vllm_api_key}
-            },
-            'output_path': output_path,
-            'processing_choice': processing_choice
-        }
-
-    except Exception as e:
-        logging.error(f"Error loading config: {str(e)}")
-        return None
-
-
-
-# Log file
-# logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
-
+# 1.
+# 2.
 #
 #
 #######################

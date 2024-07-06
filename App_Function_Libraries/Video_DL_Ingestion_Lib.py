@@ -22,20 +22,14 @@
 #
 #
 ####################
-
-
 # Import necessary libraries to run solo for testing
 import logging
 import os
-import re
 import sys
-import unicodedata
 # 3rd-Party Imports
 import yt_dlp
 # Import Local
-
-
-
+#
 #######################################################################################################################
 # Function Definitions
 #
@@ -53,36 +47,6 @@ def get_video_info(url: str) -> dict:
         except Exception as e:
             logging.error(f"Error extracting video info: {e}")
             return None
-
-
-def create_download_directory(title):
-    base_dir = "Results"
-    # Remove characters that are illegal in Windows filenames and normalize
-    safe_title = normalize_title(title)
-    logging.debug(f"{title} successfully normalized")
-    session_path = os.path.join(base_dir, safe_title)
-    if not os.path.exists(session_path):
-        os.makedirs(session_path, exist_ok=True)
-        logging.debug(f"Created directory for downloaded video: {session_path}")
-    else:
-        logging.debug(f"Directory already exists for downloaded video: {session_path}")
-    return session_path
-
-
-def sanitize_filename(filename):
-    # Remove invalid characters and replace spaces with underscores
-    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
-    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
-    return sanitized
-
-
-def normalize_title(title):
-    # Normalize the string to 'NFKD' form and encode to 'ascii' ignoring non-ascii characters
-    title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('ascii')
-    title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '').replace('*', '').replace('?',
-                                                                                                                   '').replace(
-        '<', '').replace('>', '').replace('|', '')
-    return title
 
 
 def get_youtube(video_url):

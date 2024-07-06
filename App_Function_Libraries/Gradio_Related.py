@@ -15,32 +15,23 @@
 #########################################
 #
 # Built-In Imports
+from typing import Dict
+import json
 import os.path
 from pathlib import Path
 # Imports
-import gradio
+import yt_dlp
 #
 # Local Imports
-import summarize
-from summarize import perform_transcription, perform_summarization, save_transcription_and_summary, process_url
-import SQLite_DB
+from summarize import process_url
+from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_file
-from App_Function_Libraries.Article_Extractor_Lib import *
-from App_Function_Libraries.Article_Summarization_Lib import *
-from App_Function_Libraries.Audio_Transcription_Lib import *
-from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav
-from App_Function_Libraries.Chunk_Lib import *
-from App_Function_Libraries.Diarization_Lib import *
-from App_Function_Libraries.Local_File_Processing_Lib import *
-from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import *
-from App_Function_Libraries.Local_Summarization_Lib import *
 from App_Function_Libraries.PDF_Ingestion_Lib import ingest_pdf_file
-from App_Function_Libraries.Summarization_General_Lib import *
-from App_Function_Libraries.System_Checks_Lib import *
-from App_Function_Libraries.Tokenization_Methods_Lib import *
-from App_Function_Libraries.Video_DL_Ingestion_Lib import *
-from App_Function_Libraries.Video_DL_Ingestion_Lib import normalize_title
-from App_Function_Libraries.Web_UI_Lib import *
+from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import summarize_with_local_llm, local_llm_gui_function
+from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm
+from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_cohere, summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, summarize_with_huggingface
+from App_Function_Libraries.SQLite_DB import *
+from App_Function_Libraries.Utils import sanitize_filename
 
 #########################################
 whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
@@ -988,7 +979,7 @@ def launch_ui(demo_mode=False):
     else:
         share_public = True
     with gr.Blocks() as iface:
-        gr.Markdown("# Video Transcription and Summarization")
+        gr.Markdown("# TL/DW: Too Long, Didn't Watch - Your Personal Research Multi-Tool")
 
         with gr.Tabs():
             with gr.TabItem("Transcription / Summarization / Ingestion"):
