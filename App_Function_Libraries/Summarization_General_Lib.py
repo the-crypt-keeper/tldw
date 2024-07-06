@@ -23,28 +23,11 @@ import os
 import logging
 import time
 import requests
-from typing import List, Dict
 import json
-import configparser
 from requests import RequestException
 
 # Import Local
-import summarize
-from Article_Summarization_Lib import *
-from Article_Extractor_Lib import *
-from Audio_Transcription_Lib import *
-from Chunk_Lib import *
-from Diarization_Lib import *
-from Local_File_Processing_Lib import *
-from Local_LLM_Inference_Engine_Lib import *
-from Local_Summarization_Lib import *
-from Old_Chunking_Lib import *
-from SQLite_DB import *
-#from Summarization_General_Lib import *
-from System_Checks_Lib import *
-from Tokenization_Methods_Lib import *
-from Video_DL_Ingestion_Lib import *
-#from Web_UI_Lib import *
+from App_Function_Libraries.Utils import load_and_log_configs, load_comprehensive_config
 
 
 
@@ -57,6 +40,8 @@ from Video_DL_Ingestion_Lib import *
 #######################################################################################################################
 # Function Definitions
 #
+config = load_comprehensive_config()
+openai_api_key = config.get('API', 'openai_api_key', fallback=None)
 
 def extract_text_from_segments(segments):
     logging.debug(f"Segments received: {segments}")
@@ -79,7 +64,7 @@ def extract_text_from_segments(segments):
 
 
 def summarize_with_openai(api_key, input_data, custom_prompt_arg):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None or api_key.strip() == "":
@@ -163,7 +148,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
 
 def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
     try:
-        loaded_config_data = summarize.load_and_log_configs()
+        loaded_config_data = load_and_log_configs()
         global anthropic_api_key
         # API key validation
         if api_key is None:
@@ -279,7 +264,7 @@ def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_
 
 # Summarize with Cohere
 def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -365,7 +350,7 @@ def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg):
 
 # https://console.groq.com/docs/quickstart
 def summarize_with_groq(api_key, input_data, custom_prompt_arg):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -452,7 +437,7 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
 
 
 def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     import requests
     import json
     global openrouter_model, openrouter_api_key
@@ -542,7 +527,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
         return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
 
 def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     global huggingface_api_key
     logging.debug(f"huggingface: Summarization process starting...")
     try:
@@ -619,7 +604,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
 
 
 def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None or api_key.strip() == "":

@@ -1,3 +1,47 @@
+# SQLite_DB.py
+#########################################
+# SQLite_DB Library
+# This library is used to perform any/all DB operations related to SQLite.
+#
+####
+
+####################
+# Function List
+# FIXME - UPDATE Function Arguments
+# 1. get_connection(self)
+# 2. execute_query(self, query: str, params: Tuple = ())
+# 3. create_tables()
+# 4. add_keyword(keyword: str)
+# 5. delete_keyword(keyword: str)
+# 6. add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author, ingestion_date)
+# 7. fetch_all_keywords()
+# 8. keywords_browser_interface()
+# 9. display_keywords()
+# 10. export_keywords_to_csv()
+# 11. browse_items(search_query, search_type)
+# 12. fetch_item_details(media_id: int)
+# 13. add_media_version(media_id: int, prompt: str, summary: str)
+# 14. search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10)
+# 15. search_and_display(search_query, search_fields, keywords, page)
+# 16. display_details(index, results)
+# 17. get_details(index, dataframe)
+# 18. format_results(results)
+# 19. export_to_csv(search_query: str, search_fields: List[str], keyword: str, page: int = 1, results_per_file: int = 1000)
+# 20. is_valid_url(url: str) -> bool
+# 21. is_valid_date(date_string: str) -> bool
+# 22. add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model)
+# 23. create_prompts_db()
+# 24. add_prompt(name, details, system, user=None)
+# 25. fetch_prompt_details(name)
+# 26. list_prompts()
+# 27. insert_prompt_to_db(title, description, system_prompt, user_prompt)
+#
+#
+#
+#
+#####################
+#
+# Import necessary libraries
 import csv
 import logging
 import os
@@ -7,12 +51,14 @@ import time
 from contextlib import contextmanager
 from datetime import datetime
 from typing import List, Tuple
-
+# Third-Party Libraries
 import gradio as gr
 import pandas as pd
-
-# Import Local
-
+# Import Local Libraries
+#
+#######################################################################################################################
+# Function Definitions
+#
 
 # Set up logging
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

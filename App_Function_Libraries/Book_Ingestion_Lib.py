@@ -20,7 +20,7 @@ import logging
 
 
 # Import Local
-from SQLite_DB import *
+from SQLite_DB import add_media_with_keywords
 
 #######################################################################################################################
 # Function Definitions

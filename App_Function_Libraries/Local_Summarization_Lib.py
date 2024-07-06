@@ -21,36 +21,29 @@
 
 
 # Import necessary libraries
-import os
+import json
 import logging
+import os
+import requests
 from typing import Callable
 
 from openai import OpenAI
 
-# Import Local
-import summarize
 from App_Function_Libraries.Old_Chunking_Lib import client
-from App_Function_Libraries.SQLite_DB import logger
-from App_Function_Libraries.Summarization_General_Lib import extract_text_from_segments, summarize_with_anthropic
-from Article_Summarization_Lib import *
-from Article_Extractor_Lib import *
-from Audio_Transcription_Lib import *
-from Chunk_Lib import *
-from Diarization_Lib import *
-from Local_File_Processing_Lib import *
-from Local_LLM_Inference_Engine_Lib import *
-#from Local_Summarization_Lib import *
-from Old_Chunking_Lib import *
-from SQLite_DB import *
-from Summarization_General_Lib import *
-from System_Checks_Lib import *
-from Tokenization_Methods_Lib import *
-from Video_DL_Ingestion_Lib import *
-from Web_UI_Lib import *
+# Import Local
+from summarize import load_and_log_configs
+from App_Function_Libraries.Utils import extract_text_from_segments
+
 
 #######################################################################################################################
 # Function Definitions
 #
+
+logger = logging.getLogger()
+
+# Dirty hack for vLLM
+openai_api_key = "Fake_key"
+client = OpenAI(api_key=openai_api_key)
 
 def summarize_with_local_llm(input_data, custom_prompt_arg):
     try:
@@ -121,7 +114,7 @@ def summarize_with_local_llm(input_data, custom_prompt_arg):
         return "Local LLM: Error occurred while processing summary"
 
 def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/completion", api_key=None):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -199,7 +192,7 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
 def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_IP="http://127.0.0.1:5001/api/v1/generate"):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -277,7 +270,7 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
 def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions"):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -352,7 +345,7 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http:/
 
 # FIXME - Install is more trouble than care to deal with right now.
 def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:5000/v1/chat/completions"):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     model = loaded_config_data['models']['tabby']
     # API key validation
     if api_key is None:
@@ -409,7 +402,7 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_I
 
 # FIXME - https://docs.vllm.ai/en/latest/getting_started/quickstart.html .... Great docs.
 def summarize_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions"):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     llm_model = loaded_config_data['models']['vllm']
     # API key validation
     if api_key is None:

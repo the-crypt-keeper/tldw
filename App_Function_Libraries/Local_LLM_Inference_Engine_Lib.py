@@ -6,8 +6,6 @@
 #
 #
 ####
-import atexit
-import hashlib
 ####################
 # Function List
 #
@@ -22,38 +20,19 @@ import hashlib
 # 9. launch_in_new_terminal_mac(executable, args)
 #
 ####################
-
 # Import necessary libraries
-import json
-import logging
 from asyncio import subprocess
-from multiprocessing import Process as MpProcess
-import requests
+import atexit
+import re
 import sys
-import os
+import time
 # Import 3rd-pary Libraries
-import gradio as gr
-from tqdm import tqdm
-
+#
 # Import Local
-import summarize
 from Article_Summarization_Lib import *
-from Article_Extractor_Lib import *
-from Audio_Transcription_Lib import *
-from Chunk_Lib import *
-from Diarization_Lib import *
-from Local_File_Processing_Lib import *
-#from Local_LLM_Inference_Engine_Lib import *
-from Local_Summarization_Lib import *
-from Old_Chunking_Lib import *
-from SQLite_DB import *
-from Summarization_General_Lib import *
-from System_Checks_Lib import *
-from Tokenization_Methods_Lib import *
-from Video_DL_Ingestion_Lib import *
-from Web_UI_Lib import *
-
-
+from App_Function_Libraries.Utils import download_file
+#
+#
 #######################################################################################################################
 # Function Definitions
 #
@@ -395,51 +374,7 @@ def download_latest_llamafile(repo, asset_name_prefix, output_filename):
     return output_filename
 
 
-def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5):
-    temp_path = dest_path + '.tmp'
 
-    for attempt in range(max_retries):
-        try:
-            # Check if a partial download exists and get its size
-            resume_header = {}
-            if os.path.exists(temp_path):
-                resume_header = {'Range': f'bytes={os.path.getsize(temp_path)}-'}
-
-            response = requests.get(url, stream=True, headers=resume_header)
-            response.raise_for_status()
-
-            # Get the total file size from headers
-            total_size = int(response.headers.get('content-length', 0))
-            initial_pos = os.path.getsize(temp_path) if os.path.exists(temp_path) else 0
-
-            mode = 'ab' if 'Range' in response.headers else 'wb'
-            with open(temp_path, mode) as temp_file, tqdm(
-                total=total_size, unit='B', unit_scale=True, desc=dest_path, initial=initial_pos, ascii=True
-            ) as pbar:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:  # filter out keep-alive new chunks
-                        temp_file.write(chunk)
-                        pbar.update(len(chunk))
-
-            # Verify the checksum if provided
-            if expected_checksum:
-                if not verify_checksum(temp_path, expected_checksum):
-                    os.remove(temp_path)
-                    raise ValueError("Downloaded file's checksum does not match the expected checksum")
-
-            # Move the file to the final destination
-            os.rename(temp_path, dest_path)
-            print("Download complete and verified!")
-            return dest_path
-
-        except Exception as e:
-            print(f"Attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                print(f"Retrying in {delay} seconds...")
-                time.sleep(delay)
-            else:
-                print("Max retries reached. Download failed.")
-                raise
 
 # FIXME / IMPLEMENT FULLY
 # File download verification
@@ -455,14 +390,6 @@ def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5
 #global samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256
 #samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
 
-
-
-def verify_checksum(file_path, expected_checksum):
-    sha256_hash = hashlib.sha256()
-    with open(file_path, 'rb') as f:
-        for byte_block in iter(lambda: f.read(4096), b''):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest() == expected_checksum
 
 process = None
 # Function to close out llamafile process on script exit.
