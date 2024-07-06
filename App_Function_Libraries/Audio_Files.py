@@ -21,11 +21,11 @@ import json
 import logging
 import requests
 import os
+
+from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
+    perform_summarization
 #
 # Local Imports
-import summarize
-from summarize import perform_transcription, perform_summarization, save_transcription_and_summary
-from App_Function_Libraries.Chunk_Lib import rolling_summarize_function
 from App_Function_Libraries.SQLite_DB import add_media_to_database
 from App_Function_Libraries.Utils import extract_text_from_segments, download_file, create_download_directory
 #########################################
@@ -106,22 +106,24 @@ def process_audio(
         # Perform summarization
         summary_text = None
         if api_name:
-            if rolling_summarization:
-                summary_text = rolling_summarize_function(
-                    transcription_text,
-                    detail=detail_level,
-                    api_name=api_name,
-                    api_key=api_key,
-                    custom_prompt=custom_prompt_input,
-                    chunk_by_words=chunk_text_by_words,
-                    max_words=max_words,
-                    chunk_by_sentences=chunk_text_by_sentences,
-                    max_sentences=max_sentences,
-                    chunk_by_paragraphs=chunk_text_by_paragraphs,
-                    max_paragraphs=max_paragraphs,
-                    chunk_by_tokens=chunk_text_by_tokens,
-                    max_tokens=max_tokens
-                )
+            if rolling_summarization is not None:
+                pass
+                # FIXME rolling summarization
+                # summary_text = rolling_summarize_function(
+                #     transcription_text,
+                #     detail=detail_level,
+                #     api_name=api_name,
+                #     api_key=api_key,
+                #     custom_prompt=custom_prompt_input,
+                #     chunk_by_words=chunk_text_by_words,
+                #     max_words=max_words,
+                #     chunk_by_sentences=chunk_text_by_sentences,
+                #     max_sentences=max_sentences,
+                #     chunk_by_paragraphs=chunk_text_by_paragraphs,
+                #     max_paragraphs=max_paragraphs,
+                #     chunk_by_tokens=chunk_text_by_tokens,
+                #     max_tokens=max_tokens
+                # )
             else:
                 summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key)
 

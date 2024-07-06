@@ -19,18 +19,20 @@
 #
 #
 ####################
-
-
+import json
 # Import necessary libraries
 import os
 import logging
 import time
 import requests
 import configparser
+
+from openai import OpenAI
 from requests import RequestException
 
-# Import Local
-import summarize
+from App_Function_Libraries.Local_Summarization_Lib import openai_api_key, client
+from App_Function_Libraries.Utils import load_and_log_configs
+# Import Local Libraries
 from Tokenization_Methods_Lib import *
 
 
@@ -67,7 +69,7 @@ def extract_text_from_segments(segments):
 
 
 def chat_with_openai(api_key, input_data, custom_prompt_arg, system_prompt=None):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None or api_key.strip() == "":
@@ -138,7 +140,7 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, system_prompt=None)
 
 def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None):
     try:
-        loaded_config_data = summarize.load_and_log_configs()
+        loaded_config_data = load_and_log_configs()
         global anthropic_api_key
         # API key validation
         if api_key is None:
@@ -233,7 +235,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 # Summarize with Cohere
 def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_prompt=None):
     global cohere_api_key
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -305,7 +307,7 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
 
 # https://console.groq.com/docs/quickstart
 def chat_with_groq(api_key, input_data, custom_prompt_arg, system_prompt=None):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -381,7 +383,7 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, system_prompt=None):
 
 
 def chat_with_openrouter(api_key, input_data, custom_prompt_arg, system_prompt=None):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     import requests
     import json
     global openrouter_model, openrouter_api_key
@@ -461,7 +463,7 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, system_prompt=N
 
 # FIXME: This function is not yet implemented properly
 def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     global huggingface_api_key
     logging.debug(f"huggingface: Summarization process starting...")
     try:
@@ -513,7 +515,7 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
 
 
 def chat_with_deepseek(api_key, input_data, custom_prompt_arg, system_prompt=None):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None or api_key.strip() == "":
@@ -579,7 +581,7 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, system_prompt=Non
 # Stashed in here since OpenAI usage.... #FIXME
 # FIXME - https://docs.vllm.ai/en/latest/getting_started/quickstart.html .... Great docs.
 def chat_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions", system_prompt=None):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     llm_model = loaded_config_data['models']['vllm']
     # API key validation
     if api_key is None:

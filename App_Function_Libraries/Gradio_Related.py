@@ -19,20 +19,29 @@ from typing import Dict
 import json
 import os.path
 from pathlib import Path
+import requests
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
 # Imports
 import yt_dlp
 #
 # Local Imports
-from summarize import process_url
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_file
+from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text, convert_to_wav
 from App_Function_Libraries.PDF_Ingestion_Lib import ingest_pdf_file
-from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import summarize_with_local_llm, local_llm_gui_function
-from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm
-from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_cohere, summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, summarize_with_huggingface
+from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
+from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
+    summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
+from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_cohere, \
+    summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
+    summarize_with_huggingface, process_url
 from App_Function_Libraries.SQLite_DB import *
-from App_Function_Libraries.Utils import sanitize_filename
+from App_Function_Libraries.Utils import sanitize_filename, create_download_directory, extract_text_from_segments, \
+    load_and_log_configs, clean_youtube_url
+from App_Function_Libraries.Video_DL_Ingestion_Lib import get_youtube, download_video, extract_video_info
 
+#
 #########################################
 whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
                   "distil-large-v2", "distil-medium.en", "distil-small.en"]
@@ -317,21 +326,6 @@ def display_prompt_details(selected_prompt):
     return "No details available."
 
 
-def insert_prompt_to_db(title, description, system_prompt, user_prompt):
-    try:
-        conn = sqlite3.connect('prompts.db')
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO Prompts (name, details, system, user) VALUES (?, ?, ?, ?)",
-            (title, description, system_prompt, user_prompt)
-        )
-        conn.commit()
-        conn.close()
-        return "Prompt added successfully!"
-    except sqlite3.Error as e:
-        return f"Error adding prompt: {e}"
-
-
 def display_search_results(query):
     if not query.strip():
         return "Please enter a search query."
@@ -441,47 +435,6 @@ def save_chat_history(history: List[List[str]], media_content: Dict[str, str], s
     json_data = json.dumps(chat_data, indent=2)
 
     return filename, json_data
-
-
-def search_media_database(query: str) -> List[Tuple[int, str, str]]:
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, title, url FROM Media WHERE title LIKE ?", (f'%{query}%',))
-            results = cursor.fetchall()
-        return results
-    except sqlite3.Error as e:
-        raise Exception(f"Error searching media database: {e}")
-
-def load_media_content(media_id: int) -> dict:
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT content, prompt, summary FROM Media WHERE id = ?", (media_id,))
-            result = cursor.fetchone()
-            if result:
-                return {
-                    "content": result[0],
-                    "prompt": result[1],
-                    "summary": result[2]
-                }
-            return {"content": "", "prompt": "", "summary": ""}
-    except sqlite3.Error as e:
-        raise Exception(f"Error loading media content: {e}")
-
-def update_media_content(media_id: int, content: str, prompt: str, summary: str) -> str:
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE Media 
-                SET content = ?, prompt = ?, summary = ?
-                WHERE id = ?
-            """, (content, prompt, summary, media_id))
-            conn.commit()
-        return "Content updated successfully"
-    except sqlite3.Error as e:
-        return f"Error updating content: {e}"
 
 
 def generate_timestamped_url(url, hours, minutes, seconds):
@@ -1071,3 +1024,35 @@ def stop_llamafile():
     # Code to stop llamafile
     # ...
     return "Llamafile stopped"
+
+# FIXME - Prompt sample box
+
+# Sample data
+prompts_category_1 = [
+    "What are the key points discussed in the video?",
+    "Summarize the main arguments made by the speaker.",
+    "Describe the conclusions of the study presented."
+]
+
+prompts_category_2 = [
+    "How does the proposed solution address the problem?",
+    "What are the implications of the findings?",
+    "Can you explain the theory behind the observed phenomenon?"
+]
+
+all_prompts = prompts_category_1 + prompts_category_2
+
+
+# Search function
+def search_prompts(query):
+    filtered_prompts = [prompt for prompt in all_prompts if query.lower() in prompt.lower()]
+    return "\n".join(filtered_prompts)
+
+
+# Handle prompt selection
+def handle_prompt_selection(prompt):
+    return f"You selected: {prompt}"
+
+
+
+

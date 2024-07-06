@@ -22,12 +22,16 @@
 import configparser
 import hashlib
 import logging
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
 import requests
 import time
 from tqdm import tqdm
 import os
 import re
 import unicodedata
+
+from App_Function_Libraries.Video_DL_Ingestion_Lib import get_youtube
 
 
 #######################################################################################################################
@@ -140,6 +144,44 @@ def normalize_title(title):
 
 
 
+
+def clean_youtube_url(url):
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+    if 'list' in query_params:
+        query_params.pop('list')
+    cleaned_query = urlencode(query_params, doseq=True)
+    cleaned_url = urlunparse(parsed_url._replace(query=cleaned_query))
+    return cleaned_url
+
+
+def extract_video_info(url):
+    info_dict = get_youtube(url)
+    title = info_dict.get('title', 'Untitled')
+    return info_dict, title
+
+
+def clean_youtube_url(url):
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+    if 'list' in query_params:
+        query_params.pop('list')
+    cleaned_query = urlencode(query_params, doseq=True)
+    cleaned_url = urlunparse(parsed_url._replace(query=cleaned_query))
+    return cleaned_url
+
+def extract_video_info(url):
+    info_dict = get_youtube(url)
+    title = info_dict.get('title', 'Untitled')
+    return info_dict, title
+
+def import_data(file):
+    # Implement this function to import data from a file
+    pass
+
+
+
+
 #######################
 # Config loading
 #
@@ -147,19 +189,16 @@ def normalize_title(title):
 def load_comprehensive_config():
     # Get the directory of the current script
     current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Construct the path to the config file in the current directory
-    config_path = os.path.join(current_dir, 'config.txt')
-
+    # Go up one level to the project root directory
+    project_root = os.path.dirname(current_dir)
+    # Construct the path to the config file in the project root directory
+    config_path = os.path.join(project_root, 'config.txt')
     # Create a ConfigParser object
     config = configparser.ConfigParser()
-
     # Read the configuration file
     files_read = config.read(config_path)
-
     if not files_read:
         raise FileNotFoundError(f"Config file not found at {config_path}")
-
     return config
 
 

@@ -5,7 +5,7 @@
 # Currently, uses a combination of beatifulsoup4 and trafilatura to extract article text.
 # Firecrawl would be a better option for this, but it is not yet implemented.
 ####
-
+#
 ####################
 # Function List
 #
@@ -14,11 +14,8 @@
 # 3. get_article_title(article_url_arg)
 #
 ####################
-
-
-
+#
 # Import necessary libraries
-import os
 import logging
 import huggingface_hub
 import tokenizers
@@ -32,8 +29,6 @@ from bs4 import BeautifulSoup
 import requests
 import trafilatura
 # Import Local
-import summarize
-from Article_Summarization_Lib import *
 
 
 

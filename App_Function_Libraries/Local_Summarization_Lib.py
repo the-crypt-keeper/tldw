@@ -28,10 +28,8 @@ import requests
 from typing import Callable
 
 from openai import OpenAI
-
-from App_Function_Libraries.Old_Chunking_Lib import client
 # Import Local
-from summarize import load_and_log_configs
+from App_Function_Libraries.Utils import load_and_log_configs
 from App_Function_Libraries.Utils import extract_text_from_segments
 
 
