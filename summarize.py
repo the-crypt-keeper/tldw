@@ -1119,8 +1119,9 @@ def launch_ui(demo_mode=False):
                     command.extend(['-t', str(threads_value)])
                 if http_threads_checked and http_threads_value is not None:
                     command.extend(['--threads', str(http_threads_value)])
-                if model_checked is not None and model_value is not None:
-                    command.extend(['-m', model_value])
+                if model_checked and model_value is not None:
+                    model_path = model_value.name
+                    command.extend(['-m', model_path])
                 if hf_repo_checked and hf_repo_value is not None:
                     command.extend(['-hfr', hf_repo_value])
                 if hf_file_checked and hf_file_value is not None:
@@ -1492,7 +1493,7 @@ def launch_ui(demo_mode=False):
 
             # Simple mode elements
             model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
-            model_value = gr.Textbox(label="Path to Local Model File", value="", visible=True)
+            model_value = gr.File(label="Select Local Model File", file_types=[".gguf"], visible=True)
             ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
             ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
 
@@ -1929,7 +1930,39 @@ def launch_ui(demo_mode=False):
             with gr.Tab("Grammar Checker"):
                 gr.Markdown("# Grammar Check Utility to be added...")
 
+        def generate_timestamped_url(url, hours, minutes, seconds):
+            # Extract video ID from the URL
+            video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
+            if not video_id_match:
+                return "Invalid YouTube URL"
 
+            video_id = video_id_match.group(1)
+
+            # Calculate total seconds
+            total_seconds = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
+
+            # Generate the new URL
+            new_url = f"https://www.youtube.com/watch?v={video_id}&t={total_seconds}s"
+
+            return new_url
+
+        # Meh, this is easier.
+        with gr.Tab("YouTube Timestamp URL Generator"):
+            gr.Markdown("## Generate YouTube URL with Timestamp")
+            with gr.Row():
+                url_input = gr.Textbox(label="YouTube URL")
+                hours_input = gr.Number(label="Hours", value=0, minimum=0, precision=0)
+                minutes_input = gr.Number(label="Minutes", value=0, minimum=0, maximum=59, precision=0)
+                seconds_input = gr.Number(label="Seconds", value=0, minimum=0, maximum=59, precision=0)
+
+            generate_button = gr.Button("Generate URL")
+            output_url = gr.Textbox(label="Timestamped URL")
+
+            generate_button.click(
+                fn=generate_timestamped_url,
+                inputs=[url_input, hours_input, minutes_input, seconds_input],
+                outputs=output_url
+            )
 
     # Combine interfaces into a tabbed interface
     tabbed_interface = gr.TabbedInterface(
