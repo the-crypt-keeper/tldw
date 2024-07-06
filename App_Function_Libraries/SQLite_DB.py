@@ -35,8 +35,11 @@
 # 25. fetch_prompt_details(name)
 # 26. list_prompts()
 # 27. insert_prompt_to_db(title, description, system_prompt, user_prompt)
-#
-#
+# 28. update_media_content(media_id: int, content: str, prompt: str, summary: str)
+# 29. search_media_database(query: str) -> List[Tuple[int, str, str]]
+# 30. load_media_content(media_id: int)
+# 31.
+# 32.
 #
 #
 #####################
@@ -427,7 +430,7 @@ def fetch_item_details(media_id: int):
             content = content_result[0] if content_result else ""
             return prompt_summary_results, content
     except sqlite3.Error as e:
-        raise Exception(f"Error fetching item details: {e}")
+        raise DatabaseError(f"Error fetching item details: {e}")
 
 #
 #
@@ -710,3 +713,122 @@ def insert_prompt_to_db(title, description, system_prompt, user_prompt):
 #######################################################################################################################
 
 
+def update_media_content(media_id: int, content: str, prompt: str, summary: str) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Media 
+                SET content = ?, prompt = ?, summary = ?
+                WHERE id = ?
+            """, (content, prompt, summary, media_id))
+            conn.commit()
+        return "Content updated successfully"
+    except sqlite3.Error as e:
+        return f"Error updating content: {e}"
+
+def search_media_database(query: str) -> List[Tuple[int, str, str]]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, url FROM Media WHERE title LIKE ?", (f'%{query}%',))
+            results = cursor.fetchall()
+        return results
+    except sqlite3.Error as e:
+        raise Exception(f"Error searching media database: {e}")
+
+def load_media_content(media_id: int) -> dict:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT content, prompt, summary FROM Media WHERE id = ?", (media_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    "content": result[0],
+                    "prompt": result[1],
+                    "summary": result[2]
+                }
+            return {"content": "", "prompt": "", "summary": ""}
+    except sqlite3.Error as e:
+        raise Exception(f"Error loading media content: {e}")
+
+def insert_prompt_to_db(title, description, system_prompt, user_prompt):
+    try:
+        conn = sqlite3.connect('prompts.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO Prompts (name, details, system, user) VALUES (?, ?, ?, ?)",
+            (title, description, system_prompt, user_prompt)
+        )
+        conn.commit()
+        conn.close()
+        return "Prompt added successfully!"
+    except sqlite3.Error as e:
+        return f"Error adding prompt: {e}"
+
+
+def fetch_items_by_title_or_url(search_query: str, search_type: str):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            if search_type == 'Title':
+                cursor.execute("SELECT id, title, url FROM Media WHERE title LIKE ?", (f'%{search_query}%',))
+            elif search_type == 'URL':
+                cursor.execute("SELECT id, title, url FROM Media WHERE url LIKE ?", (f'%{search_query}%',))
+            results = cursor.fetchall()
+            return results
+    except sqlite3.Error as e:
+        raise DatabaseError(f"Error fetching items by {search_type}: {e}")
+
+
+def fetch_items_by_keyword(search_query: str):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT m.id, m.title, m.url
+                FROM Media m
+                JOIN MediaKeywords mk ON m.id = mk.media_id
+                JOIN Keywords k ON mk.keyword_id = k.id
+                WHERE k.keyword LIKE ?
+            """, (f'%{search_query}%',))
+            results = cursor.fetchall()
+            return results
+    except sqlite3.Error as e:
+        raise DatabaseError(f"Error fetching items by keyword: {e}")
+
+
+def fetch_items_by_content(search_query: str):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, url FROM Media WHERE content LIKE ?", (f'%{search_query}%',))
+            results = cursor.fetchall()
+            return results
+    except sqlite3.Error as e:
+        raise DatabaseError(f"Error fetching items by content: {e}")
+
+
+def fetch_item_details_single(media_id: int):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT prompt, summary 
+                FROM MediaModifications 
+                WHERE media_id = ? 
+                ORDER BY modification_date DESC 
+                LIMIT 1
+            """, (media_id,))
+            prompt_summary_result = cursor.fetchone()
+            cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
+            content_result = cursor.fetchone()
+
+            prompt = prompt_summary_result[0] if prompt_summary_result else ""
+            summary = prompt_summary_result[1] if prompt_summary_result else ""
+            content = content_result[0] if content_result else ""
+
+            return prompt, summary, content
+    except sqlite3.Error as e:
+        raise Exception(f"Error fetching item details: {e}")

@@ -26,6 +26,8 @@
 import logging
 import os
 import sys
+
+import unicodedata
 # 3rd-Party Imports
 import yt_dlp
 # Import Local
@@ -33,6 +35,14 @@ import yt_dlp
 #######################################################################################################################
 # Function Definitions
 #
+
+def normalize_title(title):
+    # Normalize the string to 'NFKD' form and encode to 'ascii' ignoring non-ascii characters
+    title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('ascii')
+    title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '').replace('*', '').replace('?',
+                                                                                                                   '').replace(
+        '<', '').replace('>', '').replace('|', '')
+    return title
 
 def get_video_info(url: str) -> dict:
     ydl_opts = {
@@ -157,7 +167,10 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
         return None
 
 
-
+def extract_video_info(url):
+    info_dict = get_youtube(url)
+    title = info_dict.get('title', 'Untitled')
+    return info_dict, title
 
 def save_to_file(video_urls, filename):
     with open(filename, 'w') as file:
