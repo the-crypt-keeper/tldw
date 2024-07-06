@@ -3648,6 +3648,42 @@ def launch_ui(demo_mode=False):
     #     ["Export", "Import"]
     # )
 
+    # Second sub-tab for Keywords tab
+    keyword_add_interface = gr.Interface(
+        fn=add_keyword,
+        inputs=gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here..."),
+        outputs="text",
+        title="Add Keywords",
+        description="Add one, or multiple keywords to the database.",
+        allow_flagging="never"
+    )
+
+    # Third sub-tab for Keywords tab
+    keyword_delete_interface = gr.Interface(
+        fn=delete_keyword,
+        inputs=gr.Textbox(label="Delete Keyword", placeholder="Enter keyword to delete here..."),
+        outputs="text",
+        title="Delete Keyword",
+        description="Delete a keyword from the database.",
+        allow_flagging="never"
+    )
+
+    # First sub-tab for Keywords tab
+    browse_keywords_interface = gr.Interface(
+        fn=keywords_browser_interface,
+        inputs=[],
+        outputs="markdown",
+        title="Browse Keywords",
+        description="View all keywords currently stored in the database."
+    )
+
+    # Combine the keyword interfaces into a tabbed interface
+    # So this is how it works... #FIXME
+    keyword_tab = gr.TabbedInterface(
+        [browse_keywords_interface, keyword_add_interface, keyword_delete_interface],
+        ["Browse Keywords", "Add Keywords", "Delete Keywords"]
+    )
+
     def ensure_dir_exists(path):
         if not os.path.exists(path):
             os.makedirs(path)
@@ -3704,9 +3740,9 @@ def launch_ui(demo_mode=False):
 
     # Combine interfaces into a tabbed interface
     tabbed_interface = gr.TabbedInterface(
-        [iface, search_interface, llamafile_interface, download_videos_interface],
+        [iface, search_interface, llamafile_interface, keyword_tab, import_export_tab, download_videos_interface],
         ["Transcription / Summarization / Ingestion", "Search / Detailed View",
-         "Local LLM with Llamafile", "Export/Import", "Download Video/Audio Files"])
+         "Local LLM with Llamafile", "Keywords", "Export/Import", "Download Video/Audio Files"])
 
     # Launch the interface
     server_port_variable = 7860
