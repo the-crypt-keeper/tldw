@@ -189,6 +189,31 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
        - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
        - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
 
+- **Setting up Epub to Markdown conversion with Pandoc**
+    - **Linux / MacOS / Windows**
+        - Download and install from: https://pandoc.org/installing.html
+- **Converting Epub to markdown**
+    - `pandoc -f epub -t markdown -o output.md input.epub`
+- **Setting up PDF to Markdown conversion with Marker** 
+    - **Linux**
+        1. `sudo apt install python3-venv`
+        2. `python3 -m venv ./Helper_Scripts/marker_venv`
+        3. `source ./Helper_Scripts/marker_venv/bin/activate`  
+        4. `pip install marker`
+    - **Windows**
+        1. Install python3 from https://www.python.org/downloads/
+        2. `python Helper_Scripts\marker_venv\Scripts\activate\activate.ps1`
+        3. `pip install marker`
+- **Converting PDF to markdown**
+    - Convert a Single PDF to Markdown:
+        * `marker_single /path/to/file.pdf /path/to/output/folder --batch_multiplier 2 --langs English`
+    - Convert a Folder of PDFs to Markdown:
+        * `marker /path/to/folder/with/pdfs /path/to/output/folder --batch_multiplier 2 --langs English`
+- **Ingest Converted text files en-masse**
+    - `python summarize.py <path_to_text_file> --ingest_text_file --text_title "Title" --text_author "Author Name" -k additional,keywords`
+
+
+
 ----------
 ### <a name="using"></a>Using tldw
 - Single file (remote URL) transcription

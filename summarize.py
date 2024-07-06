@@ -25,6 +25,8 @@ from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import webbrowser
 import zipfile
 
+from App_Function_Libraries.PDF_Ingestion_Lib import ingest_pdf_file
+
 # Local Module Imports (Libraries specific to this project)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
 from App_Function_Libraries import *
@@ -1356,7 +1358,28 @@ def launch_ui(demo_mode=False):
             gr.Markdown("# Ingest & Summarize Text")
             gr.Markdown("Overlap with notes?")
 
-        # Sub-Tab 5: Ingest & Summarize Documents
+        # Sub-Tab 5: Ingest & Summarize PDFs
+        with gr.Blocks() as iface:
+            with gr.Tab("PDF Ingestion"):
+                pdf_file_input = gr.File(label="Upload PDF File", file_types=[".pdf"])
+                pdf_title_input = gr.Textbox(label="Title (Optional)")
+                pdf_author_input = gr.Textbox(label="Author (Optional)")
+                pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
+                pdf_ingest_button = gr.Button("Ingest PDF")
+                pdf_result_output = gr.Textbox(label="Result")
+
+                def pdf_ingest_wrapper(file, author, title, keywords):
+                    if file is None:
+                        return "No file uploaded."
+                    return ingest_pdf_file(file.name, author, title, keywords)
+
+                pdf_ingest_button.click(
+                    fn=pdf_ingest_wrapper,
+                    inputs=[pdf_file_input, pdf_author_input, pdf_title_input, pdf_keywords_input],
+                    outputs=pdf_result_output
+                )
+
+        # Sub-Tab 6: Ingest & Summarize Office Documents
         with gr.Tab("Ingest & Summarize Documents"):
             gr.Markdown("# Ingest & Summarize Office Documents")
             gr.Markdown("Plan to put ingestion form for documents here")
@@ -1565,7 +1588,7 @@ def launch_ui(demo_mode=False):
                 with open(html_file_path, 'r', encoding='utf-8') as file:
                     html_content = file.read()
                     logging.debug(f"HTML content loaded from file: {html_file_path}")
-                    logging.debug(f"HTML content is: {html_content}")
+                    #logging.debug(f"HTML content is: {html_content}")
             except FileNotFoundError:
                 html_content = "<p>Error: HTML file not found.</p>"
             except Exception as e:
