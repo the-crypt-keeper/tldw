@@ -28,7 +28,6 @@ import huggingface_hub
 import tokenizers
 import torchvision
 import transformers
-from typing import Callable, Dict, List, Optional, Tuple
 # 3rd-Party Imports
 import asyncio
 import playwright
@@ -36,6 +35,7 @@ from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 import requests
 import trafilatura
+from typing import Callable, Dict, List, Optional, Tuple
 
 
 #######################################################################################################################
@@ -599,7 +599,7 @@ def chunk_text_hybrid(text, max_tokens=1000):
 # Thanks openai
 def chunk_on_delimiter(input_string: str,
                        max_tokens: int,
-                       delimiter: str) -> List[str]:
+                       delimiter: str) -> list[str]:
     chunks = input_string.split(delimiter)
     combined_chunks, _, dropped_chunk_count = combine_chunks_with_no_minimum(
         chunks, max_tokens, chunk_delimiter=delimiter, add_ellipsis_for_overflow=True)
@@ -2090,7 +2090,7 @@ def get_chat_completion(messages, model='gpt-4-turbo'):
 # This function chunks a text into smaller pieces based on a maximum token count and a delimiter
 def chunk_on_delimiter(input_string: str,
                        max_tokens: int,
-                       delimiter: str) -> List[str]:
+                       delimiter: str) -> list[str]:
     chunks = input_string.split(delimiter)
     combined_chunks, _, dropped_chunk_count = combine_chunks_with_no_minimum(
         chunks, max_tokens, chunk_delimiter=delimiter, add_ellipsis_for_overflow=True)
@@ -2103,12 +2103,12 @@ def chunk_on_delimiter(input_string: str,
 # This function combines text chunks into larger blocks without exceeding a specified token count.
 #   It returns the combined chunks, their original indices, and the number of dropped chunks due to overflow.
 def combine_chunks_with_no_minimum(
-        chunks: List[str],
+        chunks: list[str],
         max_tokens: int,
         chunk_delimiter="\n\n",
         header: Optional[str] = None,
         add_ellipsis_for_overflow=False,
-) -> Tuple[List[str], List[int]]:
+) -> Tuple[list[str], list[int]]:
     dropped_chunk_count = 0
     output = []  # list to hold the final combined chunks
     output_indices = []  # list to hold the indices of the final combined chunks
@@ -2259,26 +2259,6 @@ from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import webbrowser
 import zipfile
-
-# Local Module Imports (Libraries specific to this project)
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
-from App_Function_Libraries import *
-from App_Function_Libraries.Web_UI_Lib import *
-from App_Function_Libraries.Article_Extractor_Lib import *
-from App_Function_Libraries.Article_Summarization_Lib import *
-from App_Function_Libraries.Audio_Transcription_Lib import *
-from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav
-from App_Function_Libraries.Chunk_Lib import *
-from App_Function_Libraries.Diarization_Lib import *
-from App_Function_Libraries.Local_File_Processing_Lib import *
-from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import *
-from App_Function_Libraries.Local_Summarization_Lib import *
-from App_Function_Libraries.Summarization_General_Lib import *
-from App_Function_Libraries.System_Checks_Lib import *
-from App_Function_Libraries.Tokenization_Methods_Lib import *
-from App_Function_Libraries.Video_DL_Ingestion_Lib import *
-from App_Function_Libraries.Video_DL_Ingestion_Lib import normalize_title
-# from App_Function_Libraries.Web_UI_Lib import *
 
 # 3rd-Party Module Imports
 from bs4 import BeautifulSoup
@@ -3465,6 +3445,22 @@ def launch_ui(demo_mode=False):
                     outputs=[search_results_output]
                 )
 
+        def add_prompt(name, details, system, user=None):
+            try:
+                conn = sqlite3.connect('prompts.db')
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO Prompts (name, details, system, user)
+                    VALUES (?, ?, ?, ?)
+                ''', (name, details, system, user))
+                conn.commit()
+                conn.close()
+                return "Prompt added successfully."
+            except sqlite3.IntegrityError:
+                return "Prompt with this name already exists."
+            except sqlite3.Error as e:
+                return f"Database error: {e}"
+
         # Sub-tab #4 for Search / Detailed view
         with gr.Tab("Add Prompts"):
             gr.Markdown("### Add Prompt")
@@ -4637,7 +4633,7 @@ Sample commands:
 
 
 
-    if args.user_interface:
+    if not args.user_interface:
         if local_llm:
             local_llm_function()
             time.sleep(2)
@@ -4728,7 +4724,7 @@ Sample commands:
 
 ######### Words-per-second Chunking #########
 # FIXME - WHole section needs to be re-written
-def chunk_transcript(transcript: str, chunk_duration: int, words_per_second) -> List[str]:
+def chunk_transcript(transcript: str, chunk_duration: int, words_per_second) -> list[str]:
     words = transcript.split()
     words_per_chunk = chunk_duration * words_per_second
     chunks = [' '.join(words[i:i + words_per_chunk]) for i in range(0, len(words), words_per_chunk)]
@@ -5106,7 +5102,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
         raise DatabaseError(f"Unexpected error: {e}")
 
 
-def fetch_all_keywords() -> List[str]:
+def fetch_all_keywords() -> list[str]:
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -6330,7 +6326,7 @@ def download_ffmpeg():
 #
 #######################################################################################################################
 import tiktoken
-def openai_tokenize(text: str) -> List[str]:
+def openai_tokenize(text: str) -> list[str]:
     encoding = tiktoken.encoding_for_model('gpt-4-turbo')
     return encoding.encode(text)
 

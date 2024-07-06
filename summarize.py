@@ -932,8 +932,23 @@ def update_media_content(media_id: int, content: str, prompt: str, summary: str)
         return f"Error updating content: {e}"
 
 
+def generate_timestamped_url(url, hours, minutes, seconds):
+    # Extract video ID from the URL
+    video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
+    if not video_id_match:
+        return "Invalid YouTube URL"
+
+    video_id = video_id_match.group(1)
+
+    # Calculate total seconds
+    total_seconds = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
+
+    # Generate the new URL
+    new_url = f"https://www.youtube.com/watch?v={video_id}&t={total_seconds}s"
+
+    return new_url
 #
-# End of Gradio Search Function-related stuff
+# End of Gradio-related Functions
 ############################################################
 
 
@@ -1493,7 +1508,7 @@ def launch_ui(demo_mode=False):
 
             # Simple mode elements
             model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
-            model_value = gr.File(label="Select Local Model File", file_types=[".gguf"], visible=True)
+            model_value = gr.Textbox(label="Select Local Model File", value="", visible=True)
             ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
             ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
 
@@ -1582,22 +1597,22 @@ def launch_ui(demo_mode=False):
         with gr.Tab("Mikupad Chat Interface"):
             gr.Markdown("# Mikupad Chat Interface")
             gr.Markdown("It's busted. I don't know why.")
-            html_file_path = os.path.join('Helper_Scripts', 'mikupad_compiled.html')
-            #html_file_url = f"file://{os.path.abspath(html_file_path)}"
-            #gr.HTML(f'<iframe src="{html_file_url}" width="100%" height="600px"></iframe>')
-            try:
-                with open(html_file_path, 'r', encoding='utf-8') as file:
-                    html_content = file.read()
-                    logging.debug(f"HTML content loaded from file: {html_file_path}")
-                    #logging.debug(f"HTML content is: {html_content}")
-            except FileNotFoundError:
-                html_content = "<p>Error: HTML file not found.</p>"
-            except Exception as e:
-                html_content = f"<p>Error loading HTML file: {str(e)}</p>"
-            if html_content.strip():
-                gr.HTML(html_content)
-            else:
-                gr.Markdown("No HTML content loaded. Please check the file path and contents.")
+            # html_file_path = os.path.join('Helper_Scripts', 'mikupad_compiled.html')
+            # #html_file_url = f"file://{os.path.abspath(html_file_path)}"
+            # #gr.HTML(f'<iframe src="{html_file_url}" width="100%" height="600px"></iframe>')
+            # try:
+            #     with open(html_file_path, 'r', encoding='utf-8') as file:
+            #         html_content = file.read()
+            #         logging.debug(f"HTML content loaded from file: {html_file_path}")
+            #         #logging.debug(f"HTML content is: {html_content}")
+            # except FileNotFoundError:
+            #     html_content = "<p>Error: HTML file not found.</p>"
+            # except Exception as e:
+            #     html_content = f"<p>Error loading HTML file: {str(e)}</p>"
+            # if html_content.strip():
+            #     gr.HTML(html_content)
+            # else:
+            #     gr.Markdown("No HTML content loaded. Please check the file path and contents.")
 
 
     # Top-Level Gradio Tab #4 - Remote LLM Chat
@@ -1930,22 +1945,6 @@ def launch_ui(demo_mode=False):
             with gr.Tab("Grammar Checker"):
                 gr.Markdown("# Grammar Check Utility to be added...")
 
-        def generate_timestamped_url(url, hours, minutes, seconds):
-            # Extract video ID from the URL
-            video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
-            if not video_id_match:
-                return "Invalid YouTube URL"
-
-            video_id = video_id_match.group(1)
-
-            # Calculate total seconds
-            total_seconds = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
-
-            # Generate the new URL
-            new_url = f"https://www.youtube.com/watch?v={video_id}&t={total_seconds}s"
-
-            return new_url
-
         # Meh, this is easier.
         with gr.Tab("YouTube Timestamp URL Generator"):
             gr.Markdown("## Generate YouTube URL with Timestamp")
@@ -1980,7 +1979,6 @@ def launch_ui(demo_mode=False):
         tabbed_interface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
     else:
         tabbed_interface.launch(share=False, )
-        #tabbed_interface.launch(share=True, )
 
 
 def clean_youtube_url(url):
