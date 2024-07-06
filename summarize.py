@@ -1556,8 +1556,24 @@ def launch_ui(demo_mode=False):
         # Third sub-tab for Llamafile
         # https://github.com/lmg-anon/mikupad/releases
         with gr.Tab("Mikupad Chat Interface"):
-            gr.Markdown("# Not implemented. Have to wait until I get rid of Gradio, or I learn better web dev skills.")
-            gr.HTML(html_content)
+            gr.Markdown("# Mikupad Chat Interface")
+            gr.Markdown("It's busted. I don't know why.")
+            html_file_path = os.path.join('Helper_Scripts', 'mikupad_compiled.html')
+            #html_file_url = f"file://{os.path.abspath(html_file_path)}"
+            #gr.HTML(f'<iframe src="{html_file_url}" width="100%" height="600px"></iframe>')
+            try:
+                with open(html_file_path, 'r', encoding='utf-8') as file:
+                    html_content = file.read()
+                    logging.debug(f"HTML content loaded from file: {html_file_path}")
+                    logging.debug(f"HTML content is: {html_content}")
+            except FileNotFoundError:
+                html_content = "<p>Error: HTML file not found.</p>"
+            except Exception as e:
+                html_content = f"<p>Error loading HTML file: {str(e)}</p>"
+            if html_content.strip():
+                gr.HTML(html_content)
+            else:
+                gr.Markdown("No HTML content loaded. Please check the file path and contents.")
 
 
     # Top-Level Gradio Tab #4 - Remote LLM Chat
@@ -2290,7 +2306,23 @@ def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key
     if custom_prompt_input is None:
         # FIXME - Setup proper default prompt & extract said prompt from config file or prompts.db file.
         #custom_prompt_input = config.get('Prompts', 'video_summarize_prompt', fallback="Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary.")
-        custom_prompt_input = "Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary."
+        custom_prompt_input = """
+        You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
     summary = None
     try:
         if not json_file_path or not os.path.exists(json_file_path):
