@@ -4,108 +4,77 @@
 # This library is used to perform diarization of audio files.
 # Currently, uses FIXME for transcription.
 #
-####
-
+####################
 ####################
 # Function List
 #
 # 1. speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embedding", embedding_size=512, num_speakers=0)
 #
 ####################
-
-
-
-# FIXME - Need to replace the following imports with the correct ones
-# Need to replace sklearn with scikit-learn
-
-
-
-
-
 # Import necessary libraries
 import configparser
 import json
 import logging
 import os
-from pathlib import *
+from pathlib import Path
 import time
 # Import Local
+from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 #
 # Import 3rd Party
-from pyannote.audio import Pipeline
-
-from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
-
-
+from pyannote.audio import Model
+from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
+import yaml
+#
 #######################################################################################################################
 # Function Definitions
 #
 
-def combine_transcription_and_diarization(audio_file_path):
-    logging.info('combine-transcription-and-diarization: Starting transcription and diarization...')
-
-    # Run the transcription function
-    transcription_result = speech_to_text(audio_file_path)
-
-    # Run the diarization function
-    diarization_result = audio_diarization(audio_file_path)
-
-    # Combine the results
-    combined_result = []
-    for transcription_segment in transcription_result:
-        for diarization_segment in diarization_result:
-            if transcription_segment['Time_Start'] >= diarization_segment['Time_Start'] and transcription_segment[
-                'Time_End'] <= diarization_segment['Time_End']:
-                combined_segment = {
-                    "Time_Start": transcription_segment['Time_Start'],
-                    "Time_End": transcription_segment['Time_End'],
-                    "Speaker": diarization_segment['Speaker'],
-                    "Text": transcription_segment['Text']
-                }
-                combined_result.append(combined_segment)
-                break
-
-    # Save the combined result to a JSON file
-    _, file_ending = os.path.splitext(audio_file_path)
-    out_file = audio_file_path.replace(file_ending, ".combined.json")
-    prettified_out_file = audio_file_path.replace(file_ending, ".combined_pretty.json")
-
-    logging.info("combine-transcription-and-diarization: Saving prettified JSON to %s", prettified_out_file)
-    with open(prettified_out_file, 'w') as f:
-        json.dump(combined_result, f, indent=2)
-
-    logging.info("combine-transcription-and-diarization: Saving JSON to %s", out_file)
-    with open(out_file, 'w') as f:
-        json.dump(combined_result, f)
-
-    return combined_result
-
-def load_pipeline_from_pretrained(path_to_config: str | Path) -> Pipeline:
-    path_to_config = Path(path_to_config)
-
+def load_pipeline_from_pretrained(path_to_config: str | Path) -> SpeakerDiarization:
+    path_to_config = Path(path_to_config).resolve()
     print(f"Loading pyannote pipeline from {path_to_config}...")
-    # the paths in the config are relative to the current working directory
-    # so we need to change the working directory to the model path
-    # and then change it back
 
-    cwd = Path.cwd().resolve()  # store current working directory
+    if not path_to_config.exists():
+        raise FileNotFoundError(f"Config file not found: {path_to_config}")
 
-    # first .parent is the folder of the config, second .parent is the folder containing the 'models' folder
-    cd_to = path_to_config.parent.parent.resolve()
+    # Load the YAML configuration
+    with open(path_to_config, 'r') as config_file:
+        config = yaml.safe_load(config_file)
 
+    # Store current working directory
+    cwd = Path.cwd().resolve()
+
+    # Change to the directory containing the config file
+    cd_to = path_to_config.parent.resolve()
     print(f"Changing working directory to {cd_to}")
     os.chdir(cd_to)
 
-    pipeline = Pipeline.from_pretrained(path_to_config)
+    try:
+        # Create a SpeakerDiarization pipeline
+        pipeline = SpeakerDiarization()
 
-    print(f"Changing working directory back to {cwd}")
-    os.chdir(cwd)
+        # Load models explicitly
+        embedding_path = Path(config['pipeline']['params']['embedding']).resolve()
+        segmentation_path = Path(config['pipeline']['params']['segmentation']).resolve()
+
+        pipeline.embedding = Model.from_pretrained(embedding_path)
+        pipeline.segmentation = Model.from_pretrained(segmentation_path)
+
+        # Set other parameters
+        pipeline.clustering = config['pipeline']['params']['clustering']
+        pipeline.embedding_batch_size = config['pipeline']['params']['embedding_batch_size']
+        pipeline.embedding_exclude_overlap = config['pipeline']['params']['embedding_exclude_overlap']
+        pipeline.segmentation_batch_size = config['pipeline']['params']['segmentation_batch_size']
+
+        # Set additional parameters
+        pipeline.instantiate(config['params'])
+
+    finally:
+        # Change back to the original working directory
+        print(f"Changing working directory back to {cwd}")
+        os.chdir(cwd)
 
     return pipeline
-
-PATH_TO_CONFIG = "../models/config.yaml"
-pipeline = load_pipeline_from_pretrained(PATH_TO_CONFIG)
-
 
 def audio_diarization(audio_file_path):
     logging.info('audio-diarization: Loading pyannote pipeline')
@@ -114,7 +83,11 @@ def audio_diarization(audio_file_path):
     config.read('config.txt')
     processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
-    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization")
+    # Get the base directory of the script
+    base_dir = Path(__file__).parent.resolve()
+    config_path = base_dir / 'models' / 'config.yaml'
+    pipeline = load_pipeline_from_pretrained(config_path)
+
     time_start = time.time()
     if audio_file_path is None:
         raise ValueError("audio-diarization: No audio file provided")
@@ -163,135 +136,59 @@ def audio_diarization(audio_file_path):
         raise RuntimeError("audio-diarization: Error performing diarization")
     return segments
 
-model_location = "..\models\config.yaml"
-load_pipeline_from_pretrained(f"model_location")
+def combine_transcription_and_diarization(audio_file_path):
+    logging.info('combine-transcription-and-diarization: Starting transcription and diarization...')
 
-# Example use of speech_to_text function
-audio_file_path = "example_audio.wav"
-transcription_result = speech_to_text(audio_file_path)
-print("Transcription Result:", transcription_result)
+    # Run the transcription function
+    transcription_result = speech_to_text(audio_file_path)
 
+    # Run the diarization function
+    diarization_result = audio_diarization(audio_file_path)
 
-# Example use of audio_diarization function
-audio_file_path = "example_audio.wav"
-diarization_result = audio_diarization(audio_file_path)
-print("Diarization Result:", diarization_result)
+    # Combine the results
+    combined_result = []
+    for transcription_segment in transcription_result:
+        for diarization_segment in diarization_result:
+            if transcription_segment['Time_Start'] >= diarization_segment['Time_Start'] and transcription_segment[
+                'Time_End'] <= diarization_segment['Time_End']:
+                combined_segment = {
+                    "Time_Start": transcription_segment['Time_Start'],
+                    "Time_End": transcription_segment['Time_End'],
+                    "Speaker": diarization_segment['Speaker'],
+                    "Text": transcription_segment['Text']
+                }
+                combined_result.append(combined_segment)
+                break
 
+    # Save the combined result to a JSON file
+    _, file_ending = os.path.splitext(audio_file_path)
+    out_file = audio_file_path.replace(file_ending, ".combined.json")
+    prettified_out_file = audio_file_path.replace(file_ending, ".combined_pretty.json")
 
-# Example use of combine_transcription_and_diarization function
-audio_file_path = "example_audio.wav"
-combined_result = combine_transcription_and_diarization(audio_file_path)
-print("Combined Result:", combined_result)
+    logging.info("combine-transcription-and-diarization: Saving prettified JSON to %s", prettified_out_file)
+    with open(prettified_out_file, 'w') as f:
+        json.dump(combined_result, f, indent=2)
 
+    logging.info("combine-transcription-and-diarization: Saving JSON to %s", out_file)
+    with open(out_file, 'w') as f:
+        json.dump(combined_result, f)
 
+    return combined_result
 
-
-
-
+# # Example usage
+# audio_file_path = "example_audio.wav"
 #
-# # OLD FUNCTION
-# # TODO: https://huggingface.co/pyannote/speaker-diarization-3.1
-# # FIXME
-# embedding_model = "pyannote/embedding", embedding_size=512
-# embedding_model = "speechbrain/spkrec-ecapa-voxceleb", embedding_size=192
-# def speaker_diarize(video_file_path, segments, embedding_model = "pyannote/embedding", embedding_size=512, num_speakers=0):
-#     """
-#     1. Generating speaker embeddings for each segments.
-#     2. Applying agglomerative clustering on the embeddings to identify the speaker for each segment.
-#     """
-#     try:
-#         embedding_model = PretrainedSpeakerEmbedding( embedding_model, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+# # Transcription
+# transcription_result = speech_to_text(audio_file_path)
+# print("Transcription Result:", transcription_result)
 #
-#         _,file_ending = os.path.splitext(f'{video_file_path}')
-#         audio_file = video_file_path.replace(file_ending, ".wav")
-#         out_file = video_file_path.replace(file_ending, ".diarize.json")
+# # Diarization
+# diarization_result = audio_diarization(audio_file_path)
+# print("Diarization Result:", diarization_result)
 #
-#         logging.debug("getting duration of audio file")
-#         with contextlib.closing(wave.open(audio_file,'r')) as f:
-#             frames = f.getnframes()
-#             rate = f.getframerate()
-#             duration = frames / float(rate)
-#         logging.debug("duration of audio file obtained")
-#         print(f"duration of audio file: {duration}")
-#
-#         def segment_embedding(segment):
-#             logging.debug("Creating embedding")
-#             audio = Audio()
-#             start = segment["start"]
-#             end = segment["end"]
-#
-#             # Enforcing a minimum segment length
-#             if end-start < 0.3:
-#                 padding = 0.3-(end-start)
-#                 start -= padding/2
-#                 end += padding/2
-#                 print('Padded segment because it was too short:',segment)
-#
-#             # Whisper overshoots the end timestamp in the last segment
-#             end = min(duration, end)
-#             # clip audio and embed
-#             clip = Segment(start, end)
-#             waveform, sample_rate = audio.crop(audio_file, clip)
-#             return embedding_model(waveform[None])
-#
-#         embeddings = np.zeros(shape=(len(segments), embedding_size))
-#         for i, segment in enumerate(tqdm.tqdm(segments)):
-#             embeddings[i] = segment_embedding(segment)
-#         embeddings = np.nan_to_num(embeddings)
-#         print(f'Embedding shape: {embeddings.shape}')
-#
-#         if num_speakers == 0:
-#         # Find the best number of speakers
-#             score_num_speakers = {}
-#
-#             for num_speakers in range(2, 10+1):
-#                 clustering = AgglomerativeClustering(num_speakers).fit(embeddings)
-#                 score = silhouette_score(embeddings, clustering.labels_, metric='euclidean')
-#                 score_num_speakers[num_speakers] = score
-#             best_num_speaker = max(score_num_speakers, key=lambda x:score_num_speakers[x])
-#             print(f"The best number of speakers: {best_num_speaker} with {score_num_speakers[best_num_speaker]} score")
-#         else:
-#             best_num_speaker = num_speakers
-#
-#         # Assign speaker label
-#         clustering = AgglomerativeClustering(best_num_speaker).fit(embeddings)
-#         labels = clustering.labels_
-#         for i in range(len(segments)):
-#             segments[i]["speaker"] = 'SPEAKER ' + str(labels[i] + 1)
-#
-#         with open(out_file,'w') as f:
-#             f.write(json.dumps(segments, indent=2))
-#
-#         # Make CSV output
-#         def convert_time(secs):
-#             return datetime.timedelta(seconds=round(secs))
-#
-#         objects = {
-#             'Start' : [],
-#             'End': [],
-#             'Speaker': [],
-#             'Text': []
-#         }
-#         text = ''
-#         for (i, segment) in enumerate(segments):
-#             if i == 0 or segments[i - 1]["speaker"] != segment["speaker"]:
-#                 objects['Start'].append(str(convert_time(segment["start"])))
-#                 objects['Speaker'].append(segment["speaker"])
-#                 if i != 0:
-#                     objects['End'].append(str(convert_time(segments[i - 1]["end"])))
-#                     objects['Text'].append(text)
-#                     text = ''
-#             text += segment["text"] + ' '
-#         objects['End'].append(str(convert_time(segments[i - 1]["end"])))
-#         objects['Text'].append(text)
-#
-#         save_path = video_file_path.replace(file_ending, ".csv")
-#         df_results = pd.DataFrame(objects)
-#         df_results.to_csv(save_path)
-#         return df_results, save_path
-#
-#     except Exception as e:
-#         raise RuntimeError("Error Running inference with local model", e)
+# # Combine transcription and diarization
+# combined_result = combine_transcription_and_diarization(audio_file_path)
+# print("Combined Result:", combined_result)
 
 #
 #
