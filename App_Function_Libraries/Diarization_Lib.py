@@ -24,6 +24,7 @@ from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 # Import 3rd Party
 from pyannote.audio import Model
 from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
+import torch
 import yaml
 #
 #######################################################################################################################
@@ -53,12 +54,18 @@ def load_pipeline_from_pretrained(path_to_config: str | Path) -> SpeakerDiarizat
         # Create a SpeakerDiarization pipeline
         pipeline = SpeakerDiarization()
 
-        # Load models explicitly
+        # Load models explicitly from local paths
         embedding_path = Path(config['pipeline']['params']['embedding']).resolve()
         segmentation_path = Path(config['pipeline']['params']['segmentation']).resolve()
 
-        pipeline.embedding = Model.from_pretrained(embedding_path)
-        pipeline.segmentation = Model.from_pretrained(segmentation_path)
+        if not embedding_path.exists():
+            raise FileNotFoundError(f"Embedding model file not found: {embedding_path}")
+        if not segmentation_path.exists():
+            raise FileNotFoundError(f"Segmentation model file not found: {segmentation_path}")
+
+        # Load the models from local paths using pyannote's Model class
+        pipeline.embedding = Model.from_pretrained(str(embedding_path), map_location=torch.device('cpu'))
+        pipeline.segmentation = Model.from_pretrained(str(segmentation_path), map_location=torch.device('cpu'))
 
         # Set other parameters
         pipeline.clustering = config['pipeline']['params']['clustering']
@@ -78,12 +85,10 @@ def load_pipeline_from_pretrained(path_to_config: str | Path) -> SpeakerDiarizat
 
 def audio_diarization(audio_file_path):
     logging.info('audio-diarization: Loading pyannote pipeline')
-    # Retrieve processing choice from the configuration file
     config = configparser.ConfigParser()
     config.read('config.txt')
     processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
-    # Get the base directory of the script
     base_dir = Path(__file__).parent.resolve()
     config_path = base_dir / 'models' / 'config.yaml'
     pipeline = load_pipeline_from_pretrained(config_path)
@@ -118,15 +123,12 @@ def audio_diarization(audio_file_path):
             segments.append(chunk)
         logging.info("audio-diarization: Diarization completed with pyannote")
 
-        # Create a dictionary with the 'segments' key
         output_data = {'segments': segments}
 
-        # Save prettified JSON
         logging.info("audio-diarization: Saving prettified JSON to %s", prettified_out_file)
         with open(prettified_out_file, 'w') as f:
             json.dump(output_data, f, indent=2)
 
-        # Save non-prettified JSON
         logging.info("audio-diarization: Saving JSON to %s", out_file)
         with open(out_file, 'w') as f:
             json.dump(output_data, f)
@@ -139,13 +141,10 @@ def audio_diarization(audio_file_path):
 def combine_transcription_and_diarization(audio_file_path):
     logging.info('combine-transcription-and-diarization: Starting transcription and diarization...')
 
-    # Run the transcription function
     transcription_result = speech_to_text(audio_file_path)
 
-    # Run the diarization function
     diarization_result = audio_diarization(audio_file_path)
 
-    # Combine the results
     combined_result = []
     for transcription_segment in transcription_result:
         for diarization_segment in diarization_result:
@@ -160,7 +159,6 @@ def combine_transcription_and_diarization(audio_file_path):
                 combined_result.append(combined_segment)
                 break
 
-    # Save the combined result to a JSON file
     _, file_ending = os.path.splitext(audio_file_path)
     out_file = audio_file_path.replace(file_ending, ".combined.json")
     prettified_out_file = audio_file_path.replace(file_ending, ".combined_pretty.json")
@@ -174,22 +172,6 @@ def combine_transcription_and_diarization(audio_file_path):
         json.dump(combined_result, f)
 
     return combined_result
-
-# # Example usage
-# audio_file_path = "example_audio.wav"
-#
-# # Transcription
-# transcription_result = speech_to_text(audio_file_path)
-# print("Transcription Result:", transcription_result)
-#
-# # Diarization
-# diarization_result = audio_diarization(audio_file_path)
-# print("Diarization Result:", diarization_result)
-#
-# # Combine transcription and diarization
-# combined_result = combine_transcription_and_diarization(audio_file_path)
-# print("Combined Result:", combined_result)
-
 #
 #
 #######################################################################################################################

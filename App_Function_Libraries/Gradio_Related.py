@@ -523,7 +523,7 @@ def create_video_transcription_tab():
             inputs=[url_input, num_speakers_input, whisper_model_input, custom_prompt_input, offset_input,
                     api_name_input, api_key_input, vad_filter_input, download_video_input, download_audio_input,
                     rolling_summarization_input, detail_level_input, question_box_input,
-                    keywords_input, diarize_input] + chunking_inputs,
+                    keywords_input, local_file_path_input, diarize_input] + chunking_inputs,
             outputs=outputs
         )
 
