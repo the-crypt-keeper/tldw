@@ -13,22 +13,21 @@
 #
 #
 #########################################
-#
-#
 # Imports
-from pathlib import Path
 import json
 import logging
 import requests
 import os
-
-from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
-    perform_summarization
 #
 # Local Imports
 from App_Function_Libraries.SQLite_DB import add_media_to_database
 from App_Function_Libraries.Utils import extract_text_from_segments, download_file, create_download_directory
-#########################################
+from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
+    perform_summarization
+#
+#######################################################################################################################
+# Function Definitions
+#
 
 
 def download_audio_file(url, save_path):

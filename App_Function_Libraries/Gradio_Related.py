@@ -15,25 +15,22 @@
 #########################################
 #
 # Built-In Imports
-import sqlite3
 from datetime import datetime
-
-import gradio as gr
 import json
 import logging
 import os.path
 from pathlib import Path
 import re
+import sqlite3
 from typing import Dict, List, Tuple
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
-
-# Imports
+#
+# Import 3rd-Party Libraries
 import yt_dlp
+import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_file
-from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text, convert_to_wav
 from App_Function_Libraries.PDF_Ingestion_Lib import ingest_pdf_file
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
@@ -43,12 +40,12 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     summarize_with_huggingface, process_url
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, export_to_csv, export_keywords_to_csv
-from App_Function_Libraries.Utils import sanitize_filename, create_download_directory, extract_text_from_segments, \
-    load_and_log_configs, clean_youtube_url
-from App_Function_Libraries.Video_DL_Ingestion_Lib import get_youtube, download_video, extract_video_info
-
+from App_Function_Libraries.Utils import sanitize_filename
 #
-#########################################
+#######################################################################################################################
+# Function Definitions
+#
+
 whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
                   "distil-large-v2", "distil-medium.en", "distil-small.en"]
 custom_prompt_input = None
@@ -56,12 +53,8 @@ server_mode = False
 share_public = False
 
 
-
-
-
 def load_preset_prompts():
     return list_prompts()
-
 
 
 def gradio_download_youtube_video(url):
@@ -488,7 +481,7 @@ def create_video_transcription_tab():
 
         url_input = gr.Textbox(label="URL (Mandatory)",
                                placeholder="Enter the video URL here. Multiple at once supported, one per line")
-
+        diarize_input = gr.Checkbox(label="Enable Speaker Diarization", visible=True)
         num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)",
                                        visible=False)
         whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model", visible=False)

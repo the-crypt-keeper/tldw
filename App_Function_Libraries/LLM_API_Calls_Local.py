@@ -18,25 +18,14 @@
 #
 #
 ####################
-
-
 # Import necessary libraries
 import json
-import requests
-import os
-import logging
-from typing import Callable
-
-from openai import OpenAI
-
 # Import Local
-import summarize
 from Utils import *
-
+#
 #######################################################################################################################
 # Function Definitions
 #
-
 
 
 def chat_with_local_llm(input_data, user_prompt, system_prompt=None):
@@ -88,7 +77,7 @@ def chat_with_local_llm(input_data, user_prompt, system_prompt=None):
         return "Local LLM: Error occurred while processing Chat response"
 
 def chat_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/completion", api_key=None, system_prompt=None):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -148,7 +137,7 @@ def chat_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/co
 # System prompts not supported through API requests.
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
 def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_IP="http://127.0.0.1:5001/api/v1/generate"):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -201,7 +190,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_IP="ht
 # System prompt doesn't work. FIXME
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
 def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions", system_prompt=None):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     try:
         # API key validation
         if api_key is None:
@@ -254,7 +243,7 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.
 
 # FIXME - Install is more trouble than care to deal with right now.
 def chat_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:5000/v1/chat/completions"):
-    loaded_config_data = summarize.load_and_log_configs()
+    loaded_config_data = load_and_log_configs()
     model = loaded_config_data['models']['tabby']
     # API key validation
     if api_key is None:
@@ -310,8 +299,8 @@ def chat_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="ht
 
 
 # FIXME aphrodite engine - code was literally tab complete in one go from copilot... :/
-def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://" + summarize.load_and_log_configs()['local_apis']['aphrodite']['ip']):
-    loaded_config_data = summarize.load_and_log_configs()
+def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://" + load_and_log_configs()['local_apis']['aphrodite']['ip']):
+    loaded_config_data = load_and_log_configs()
     model = loaded_config_data['models']['aphrodite']
     # API key validation
     if api_key is None:

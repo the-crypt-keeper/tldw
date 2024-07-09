@@ -23,8 +23,7 @@ import sys
 import subprocess
 import time
 # Import Local
-
-
+#
 #######################################################################################################################
 # Function Definitions
 #
@@ -94,7 +93,7 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 
 
 # Transcribe .wav into .segments.json
-def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False):
+def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, diarize=False):
     logging.info('speech-to-text: Loading faster_whisper model: %s', whisper_model)
     from faster_whisper import WhisperModel
     # Retrieve processing choice from the configuration file

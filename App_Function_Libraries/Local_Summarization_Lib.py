@@ -4,7 +4,7 @@
 # This library is used to perform summarization with a 'local' inference engine.
 #
 ####
-
+#
 ####################
 # Function List
 # FIXME - UPDATE Function Arguments
@@ -16,23 +16,18 @@
 # 6. summarize_with_tabbyapi(tabby_api_key, tabby_api_IP, text, tabby_model, custom_prompt)
 # 7. save_summary_to_file(summary, file_path)
 #
-#
-####################
-
-
+###############################
 # Import necessary libraries
 import json
 import logging
 import os
 import requests
-from typing import Callable
-
+# Import 3rd-party Libraries
 from openai import OpenAI
 # Import Local
 from App_Function_Libraries.Utils import load_and_log_configs
 from App_Function_Libraries.Utils import extract_text_from_segments
-
-
+#
 #######################################################################################################################
 # Function Definitions
 #
