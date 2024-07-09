@@ -1117,7 +1117,6 @@ def process_url(
         logging.debug(f"Process_URL: Transcription audio_file: {audio_file_path}")
         logging.debug(f"Process_URL: Transcription segments: {segments}")
 
-        transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
         logging.debug(f"Process_URL: Transcription text: {transcription_text}")
 
         # FIXME - rolling summarization
