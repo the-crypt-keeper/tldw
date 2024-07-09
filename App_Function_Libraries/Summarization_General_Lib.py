@@ -25,6 +25,7 @@ import json
 from requests import RequestException
 
 from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav, speech_to_text
+from App_Function_Libraries.Diarization_Lib import combine_transcription_and_diarization
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
 from App_Function_Libraries.SQLite_DB import is_valid_url, add_media_to_database
@@ -745,33 +746,58 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
     return current_progress, success_message, None, None, None, None
 
 
-
-def perform_transcription(video_path, offset, whisper_model, vad_filter):
+# stuff
+def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False):
     global segments_json_path
     audio_file_path = convert_to_wav(video_path, offset)
     segments_json_path = audio_file_path.replace('.wav', '.segments.json')
 
-    # Check if segments JSON already exists
+    if diarize:
+        diarized_json_path = audio_file_path.replace('.wav', '.diarized.json')
+
+        # Check if diarized JSON already exists
+        if os.path.exists(diarized_json_path):
+            logging.info(f"Diarized file already exists: {diarized_json_path}")
+            try:
+                with open(diarized_json_path, 'r') as file:
+                    diarized_segments = json.load(file)
+                if not diarized_segments:
+                    logging.warning(f"Diarized JSON file is empty, re-generating: {diarized_json_path}")
+                    raise ValueError("Empty diarized JSON file")
+                logging.debug(f"Loaded diarized segments from {diarized_json_path}")
+                return audio_file_path, diarized_segments
+            except (json.JSONDecodeError, ValueError) as e:
+                logging.error(f"Failed to read or parse the diarized JSON file: {e}")
+                os.remove(diarized_json_path)
+
+        # If diarized file doesn't exist or was corrupted, generate new diarized transcription
+        logging.info(f"Generating diarized transcription for {audio_file_path}")
+        diarized_segments = combine_transcription_and_diarization(audio_file_path)
+
+        # Save diarized segments
+        with open(diarized_json_path, 'w') as file:
+            json.dump(diarized_segments, file, indent=2)
+
+        return audio_file_path, diarized_segments
+
+    # Non-diarized transcription (existing functionality)
     if os.path.exists(segments_json_path):
         logging.info(f"Segments file already exists: {segments_json_path}")
         try:
             with open(segments_json_path, 'r') as file:
                 segments = json.load(file)
-            if not segments:  # Check if the loaded JSON is empty
+            if not segments:
                 logging.warning(f"Segments JSON file is empty, re-generating: {segments_json_path}")
                 raise ValueError("Empty segments JSON file")
             logging.debug(f"Loaded segments from {segments_json_path}")
         except (json.JSONDecodeError, ValueError) as e:
             logging.error(f"Failed to read or parse the segments JSON file: {e}")
-            # Remove the corrupted file
             os.remove(segments_json_path)
-            # Re-generate the transcription
             logging.info(f"Re-generating transcription for {audio_file_path}")
             audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
             if segments is None:
                 return None, None
     else:
-        # Perform speech to text transcription
         audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
 
     return audio_file_path, segments
@@ -781,7 +807,6 @@ def re_generate_transcription(audio_file_path, whisper_model, vad_filter):
     try:
         segments = speech_to_text(audio_file_path, whisper_model=whisper_model, vad_filter=vad_filter)
         # Save segments to JSON
-        segments_json_path = audio_file_path.replace('.wav', '.segments.json')
         with open(segments_json_path, 'w') as file:
             json.dump(segments, file, indent=2)
         logging.debug(f"Transcription segments saved to {segments_json_path}")
@@ -808,6 +833,9 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
         summary_file_path = None
 
     return json_file_path, summary_file_path
+
+
+
 
 
 def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key):
@@ -958,7 +986,8 @@ def process_url(
         max_paragraphs,
         chunk_text_by_tokens,
         max_tokens,
-        local_file_path=None
+        local_file_path=None,
+        diarize=False
 ):
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
@@ -1073,6 +1102,13 @@ def process_url(
         video_path = download_video(url, download_path, info_dict, download_video_flag)
         global segments
         audio_file_path, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+
+        if diarize:
+            transcription_text = combine_transcription_and_diarization(audio_file_path)
+        else:
+            audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+            transcription_text = {'audio_file': audio_file, 'transcription': segments}
+
 
         if audio_file_path is None or segments is None:
             logging.error("Process_URL: Transcription failed or segments not available.")

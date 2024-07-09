@@ -8,7 +8,6 @@ import os
 import signal
 import sys
 import time
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import webbrowser
 #
 # Local Library Imports
@@ -432,7 +431,8 @@ def main(input_path, api_name=None, api_key=None,
          max_chunk_size=2000,
          chunk_overlap=100,
          chunk_unit='tokens',
-         summarize_chunks=None
+         summarize_chunks=None,
+         diarize=False
          ):
     global detail_level_number, summary, audio_file, transcription_text, info_dict
 
@@ -447,6 +447,13 @@ def main(input_path, api_name=None, api_key=None,
     paths = [input_path] if not os.path.isfile(input_path) else read_paths_from_file(input_path)
     results = []
 
+    # FIXME - Diarization
+    # if diarize:
+    #     transcription_text = combine_transcription_and_diarization(audio_file_path)
+    # else:
+    #     audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+    #     transcription_text = {'audio_file': audio_file, 'transcription': segments}
+
     for path in paths:
         try:
             if path.startswith('http'):
@@ -455,10 +462,12 @@ def main(input_path, api_name=None, api_key=None,
                 video_path = download_video(path, download_path, info_dict, download_video_flag)
 
                 if video_path:
-                    audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
-                    transcription_text = {'audio_file': audio_file, 'transcription': segments}
-                    # FIXME - V1
-                    #transcription_text = {'video_path': path, 'audio_file': audio_file, 'transcription': segments}
+                    if diarize:
+                        audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=True)
+                        transcription_text = {'audio_file': audio_file, 'transcription': segments}
+                    else:
+                        audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+                        transcription_text = {'audio_file': audio_file, 'transcription': segments}
 
                     # FIXME rolling summarization
                     if rolling_summarization == True:
@@ -485,6 +494,7 @@ def main(input_path, api_name=None, api_key=None,
                     #                                          max_paragraphs, chunk_text_by_tokens,
                     #                                          max_tokens, summarize_recursively, verbose
                     #                                          )
+
 
                     elif api_name:
                         summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key)
@@ -537,7 +547,7 @@ def main(input_path, api_name=None, api_key=None,
                                 summary = summarize_with_groq(api_key, chunk_text, custom_prompt)
                             elif summarize_chunks == 'local-llm':
                                 summary = summarize_with_local_llm(chunk_text, custom_prompt)
-                            # Add more summarization methods as needed
+                            # FIXME - Add more summarization methods as needed
 
                             if summary:
                                 summary_info = {
@@ -578,9 +588,11 @@ def main(input_path, api_name=None, api_key=None,
                                 video_path = download_video(url, download_path, info_dict, download_video_flag)
 
                                 if video_path:
-                                    audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
-                                    # FIXME - V1
-                                    #transcription_text = {'video_path': url, 'audio_file': audio_file, 'transcription': segments}
+                                    if diarize:
+                                        audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=True)
+                                    else:
+                                        audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
+
                                     transcription_text = {'audio_file': audio_file, 'transcription': segments}
                                     if rolling_summarization:
                                         text = extract_text_from_segments(segments)
@@ -611,11 +623,15 @@ def main(input_path, api_name=None, api_key=None,
                             result = ingest_text_file(media_path)
                             logging.info(result)
                     elif media_path.lower().endswith(('.mp4', '.avi', '.mov')):
-                        # Video file
-                        audio_file, segments = perform_transcription(media_path, offset, whisper_model, vad_filter)
+                        if diarize:
+                            audio_file, segments = perform_transcription(media_path, offset, whisper_model, vad_filter, diarize=True)
+                        else:
+                            audio_file, segments = perform_transcription(media_path, offset, whisper_model, vad_filter)
                     elif media_path.lower().endswith(('.wav', '.mp3', '.m4a')):
-                        # Audio file
-                        segments = speech_to_text(media_path, whisper_model=whisper_model, vad_filter=vad_filter)
+                        if diarize:
+                            segments = speech_to_text(media_path, whisper_model=whisper_model, vad_filter=vad_filter, diarize=True)
+                        else:
+                            segments = speech_to_text(media_path, whisper_model=whisper_model, vad_filter=vad_filter)
                     else:
                         logging.error(f"Unsupported media file format: {media_path}")
                         continue
@@ -743,7 +759,7 @@ Sample commands:
                         help='Ingest .txt files as content instead of treating them as URL lists')
     parser.add_argument('--text_title', type=str, help='Title for the text file being ingested')
     parser.add_argument('--text_author', type=str, help='Author of the text file being ingested')
-
+    parser.add_argument('--diarize', action='store_true', help='Enable speaker diarization')
     # parser.add_argument('--offload', type=int, default=20, help='Numbers of layers to offload to GPU for Llamafile usage')
     # parser.add_argument('-o', '--output_path', type=str, help='Path to save the output file')
 

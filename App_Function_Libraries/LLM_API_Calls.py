@@ -26,21 +26,13 @@ import logging
 import time
 import requests
 import configparser
-
+# Import 3rd-Party Libraries
 from openai import OpenAI
 from requests import RequestException
-
+# Import Local libraries
 from App_Function_Libraries.Local_Summarization_Lib import openai_api_key, client
 from App_Function_Libraries.Utils import load_and_log_configs
-# Import Local Libraries
-from Tokenization_Methods_Lib import *
-
-
-
-
-
-
-
+#
 #######################################################################################################################
 # Function Definitions
 #
