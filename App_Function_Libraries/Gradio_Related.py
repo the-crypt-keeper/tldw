@@ -32,7 +32,7 @@ import gradio as gr
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_file
 from App_Function_Libraries.Chunk_Lib import semantic_chunk_long_file
-from App_Function_Libraries.PDF_Ingestion_Lib import ingest_pdf_file
+from App_Function_Libraries.PDF_Ingestion_Lib import ingest_pdf_file, process_and_ingest_pdf, process_and_cleanup_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
@@ -579,20 +579,22 @@ def create_website_scraping_tab():
                 outputs=result_output
             )
 
-
 def create_pdf_ingestion_tab():
     with gr.TabItem("PDF Ingestion"):
         with gr.Group():
-            pdf_file_input = gr.File(label="Upload PDF File", file_types=[".pdf"])
+            pdf_file_input = gr.File(label="Uploaded PDF File", file_types=[".pdf"], visible=False)
+            pdf_upload_button = gr.UploadButton("Click to Upload PDF", file_types=[".pdf"])
             pdf_title_input = gr.Textbox(label="Title (Optional)")
             pdf_author_input = gr.Textbox(label="Author (Optional)")
             pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
             pdf_ingest_button = gr.Button("Ingest PDF")
             pdf_result_output = gr.Textbox(label="Result")
 
+            pdf_upload_button.upload(fn=lambda file: file, inputs=pdf_upload_button, outputs=pdf_file_input)
+
             pdf_ingest_button.click(
-                fn=ingest_pdf_file,
-                inputs=[pdf_file_input, pdf_author_input, pdf_title_input, pdf_keywords_input],
+                fn=process_and_cleanup_pdf,
+                inputs=[pdf_file_input, pdf_title_input, pdf_author_input, pdf_keywords_input],
                 outputs=pdf_result_output
             )
 
