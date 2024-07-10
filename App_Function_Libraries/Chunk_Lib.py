@@ -22,8 +22,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 #
 # Import Local
-from App_Function_Libraries.Summarization_General_Lib import openai_api_key
 from App_Function_Libraries.Tokenization_Methods_Lib import openai_tokenize
+from App_Function_Libraries.Utils import load_comprehensive_config
+
+
 #
 #######################################################################################################################
 # Function Definitions
@@ -37,6 +39,9 @@ def ntlk_prep():
 # Load GPT2 tokenizer
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 
+# Load Config file for API keys
+config = load_comprehensive_config()
+openai_api_key = config.get('API', 'openai_api_key', fallback=None)
 
 def load_document(file_path):
     with open(file_path, 'r') as file:
