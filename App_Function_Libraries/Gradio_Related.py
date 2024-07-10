@@ -478,14 +478,13 @@ def create_video_transcription_tab():
     with gr.TabItem("Video Transcription + Summarization"):
         with gr.Row():
             ui_frontpage_mode_toggle = gr.Radio(choices=["Simple List", "Advanced List"], value="Simple List", label="UI Mode Options Toggle")
-            chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"], value="Non-Chunked", label="Summarization Mode")
 
         with gr.Row():
             with gr.Column():
                 url_input = gr.Textbox(label="URL (Mandatory)", placeholder="Enter the video URL here. Multiple at once supported, one per line")
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=True)
                 num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)", visible=False)
-                whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model", visible=False)
+                whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model", visible=True)
                 custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3, visible=True)
                 offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)", visible=False)
                 api_name_input = gr.Dropdown(
