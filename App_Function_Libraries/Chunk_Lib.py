@@ -356,7 +356,7 @@ def semantic_chunking(text, max_chunk_size=2000, unit='words'):
     return chunks
 
 
-def chunk_text_file(file_path, max_chunk_size=1000, overlap=100):
+def semantic_chunk_long_file(file_path, max_chunk_size=1000, overlap=100):
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             content = file.read()

@@ -25,6 +25,7 @@ import json
 from requests import RequestException
 
 from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav, speech_to_text
+from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summarize
 from App_Function_Libraries.Diarization_Lib import combine_transcription_and_diarization
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
@@ -700,7 +701,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
 def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_input, offset, api_name, api_key, vad_filter,
                        download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
                        keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
-                       chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens):
+                       chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens,  chunk_by_semantic, semantic_chunk_size, semantic_chunk_overlap):
     global current_progress
     progress = []  # This must always be a list
     status = []  # This must always be a list
@@ -730,12 +731,15 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
                 keywords=keywords,
                 chunk_text_by_words=chunk_text_by_words,
                 max_words=max_words,
-                chunk_text_by_sentences=max_sentences,
+                chunk_text_by_sentences=chunk_text_by_sentences,
                 max_sentences=max_sentences,
                 chunk_text_by_paragraphs=chunk_text_by_paragraphs,
                 max_paragraphs=max_paragraphs,
                 chunk_text_by_tokens=chunk_text_by_tokens,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                chunk_by_semantic=chunk_by_semantic,
+                semantic_chunk_size=semantic_chunk_size,
+                semantic_chunk_overlap=semantic_chunk_overlap
             )
             # Update progress and transcription properly
             current_progress, current_status = update_progress(index, url, "Video processed and ingested into the database.")
@@ -986,6 +990,9 @@ def process_url(
         max_paragraphs,
         chunk_text_by_tokens,
         max_tokens,
+        chunk_by_semantic,
+        semantic_chunk_size,
+        semantic_chunk_overlap,
         local_file_path=None,
         diarize=False
 ):
@@ -998,6 +1005,9 @@ def process_url(
     set_max_txt_chunk_paragraphs = max_paragraphs
     set_chunk_txt_by_tokens = chunk_text_by_tokens
     set_max_txt_chunk_tokens = max_tokens
+    set_chunk_txt_by_semantic = chunk_by_semantic
+    set_semantic_chunk_size = semantic_chunk_size
+    set_semantic_chunk_overlap = semantic_chunk_overlap
 
     progress = []
     success_message = "All videos processed successfully. Transcriptions and summaries have been ingested into the database."
@@ -1014,7 +1024,7 @@ def process_url(
             return process_video_urls(urls, num_speakers, whisper_model, custom_prompt_input, offset, api_name, api_key, vad_filter,
                                       download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
                                       keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
-                                      chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens)
+                                      chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens, chunk_by_semantic, semantic_chunk_size, semantic_chunk_overlap)
         else:
             urls = [url]
 
@@ -1057,7 +1067,8 @@ def process_url(
             #
             # transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
             # logging.debug(f"Process_URL: Transcription text: {transcription_text}")
-            #
+
+            # Rolling Summarization Processing
             # if rolling_summarization:
             #     text = extract_text_from_segments(segments)
             #     summary_text = rolling_summarize_function(
@@ -1119,8 +1130,23 @@ def process_url(
 
         logging.debug(f"Process_URL: Transcription text: {transcription_text}")
 
+        # FIXME - Implement chunking calls here
+        # Implement chunking calls here
+        chunked_transcriptions = []
+        if chunk_text_by_words:
+            chunked_transcriptions = chunk_text_by_words(transcription_text['transcription'], max_words)
+        elif chunk_text_by_sentences:
+            chunked_transcriptions = chunk_text_by_sentences(transcription_text['transcription'], max_sentences)
+        elif chunk_text_by_paragraphs:
+            chunked_transcriptions = chunk_text_by_paragraphs(transcription_text['transcription'], max_paragraphs)
+        elif chunk_text_by_tokens:
+            chunked_transcriptions = chunk_text_by_tokens(transcription_text['transcription'], max_tokens)
+        elif chunk_by_semantic:
+            chunked_transcriptions = semantic_chunking(transcription_text['transcription'], semantic_chunk_size, 'tokens')
+
+        # If we did chunking, we now have the chunked transcripts in 'chunked_transcriptions'
+        elif rolling_summarization:
         # FIXME - rolling summarization
-        # if rolling_summarization:
         #     text = extract_text_from_segments(segments)
         #     summary_text = rolling_summarize_function(
         #         transcription_text,
@@ -1137,7 +1163,62 @@ def process_url(
         #         chunk_by_tokens=chunk_text_by_tokens,
         #         max_tokens=max_tokens
         #     )
-        if api_name:
+            pass
+        else:
+            pass
+
+        summarized_chunk_transcriptions = []
+
+        if chunk_text_by_words or chunk_text_by_sentences or chunk_text_by_paragraphs or chunk_text_by_tokens or chunk_by_semantic and api_name:
+            # Perform summarization based on chunks
+            # FIXME - do stuff to chunks - Fixup Functions
+            for chunk in chunked_transcriptions:
+                summarized_chunks = []
+                if api_name == "anthropic":
+                    summary = summarize_with_anthropic(api_key, chunk, custom_prompt_input)
+                elif api_name == "cohere":
+                    summary = summarize_with_cohere(api_key, chunk, custom_prompt_input)
+                elif api_name == "openai":
+                    summary = summarize_with_openai(api_key, chunk, custom_prompt_input)
+                elif api_name == "Groq":
+                    summary = summarize_with_groq(api_key, chunk, custom_prompt_input)
+                elif api_name == "DeepSeek":
+                    summary = summarize_with_deepseek(api_key, chunk, custom_prompt_input)
+                elif api_name == "OpenRouter":
+                    summary = summarize_with_openrouter(api_key, chunk, custom_prompt_input)
+                elif api_name == "Llama.cpp":
+                    summary = summarize_with_llama(chunk, custom_prompt_input)
+                elif api_name == "Kobold":
+                    summary = summarize_with_kobold(chunk, custom_prompt_input)
+                elif api_name == "Ooba":
+                    summary = summarize_with_oobabooga(chunk, custom_prompt_input)
+                elif api_name == "Tabbyapi":
+                    summary = summarize_with_tabbyapi(chunk, custom_prompt_input)
+                elif api_name == "VLLM":
+                    summary = summarize_with_vllm(chunk, custom_prompt_input)
+                summarized_chunk_transcriptions.append(summary)
+
+        # Combine chunked transcriptions into a single file
+        combined_transcription_text = '\n\n'.join(chunked_transcriptions)
+        combined_transcription_file_path = os.path.join(download_path, 'combined_transcription.txt')
+        with open(combined_transcription_file_path, 'w') as f:
+            f.write(combined_transcription_text)
+
+        # Combine summarized chunk transcriptions into a single file
+        combined_summary_text = '\n\n'.join(summarized_chunk_transcriptions)
+        combined_summary_file_path = os.path.join(download_path, 'combined_summary.txt')
+        with open(combined_summary_file_path, 'w') as f:
+            f.write(combined_summary_text)
+
+        # Handle rolling summarization
+        if rolling_summarization:
+            summary_text = rolling_summarize(
+                text=combined_transcription_text,
+                detail=detail_level,
+                model='gpt-4-turbo',
+                additional_instructions=custom_prompt_input
+            )
+        elif api_name:
             summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key)
             if summary_text is None:
                 logging.error("Summary text is None. Check summarization function.")
@@ -1146,11 +1227,17 @@ def process_url(
             summary_text = 'Summary not available'
             summary_file_path = None  # Set summary_file_path to None if summary is not generated
 
-        json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path)
-
-        add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
-
-        return transcription_text, summary_text, json_file_path, summary_file_path, None, None
+        # Check to see if chunking was performed, and if so, return that instead
+        if chunk_text_by_words or chunk_text_by_sentences or chunk_text_by_paragraphs or chunk_text_by_tokens or chunk_by_semantic:
+            # Combine chunked transcriptions into a single file
+            # FIXME - validate this works....
+            json_file_path, summary_file_path = save_transcription_and_summary(combined_transcription_file_path, combined_summary_file_path, download_path)
+            add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
+            return transcription_text, summary_text, json_file_path, summary_file_path, None, None
+        else:
+            json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path)
+            add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
+            return transcription_text, summary_text, json_file_path, summary_file_path, None, None
 
     except Exception as e:
         logging.error(f": {e}")
