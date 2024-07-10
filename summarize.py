@@ -13,7 +13,7 @@ import webbrowser
 # Local Library Imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
 from App_Function_Libraries.Book_Ingestion_Lib import ingest_folder, ingest_text_file
-from App_Function_Libraries.Chunk_Lib import  chunk_text_file#, rolling_summarize_function,
+from App_Function_Libraries.Chunk_Lib import  semantic_chunk_long_file#, rolling_summarize_function,
 from App_Function_Libraries.Gradio_Related import launch_ui
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import cleanup_process, local_llm_function
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
@@ -447,13 +447,6 @@ def main(input_path, api_name=None, api_key=None,
     paths = [input_path] if not os.path.isfile(input_path) else read_paths_from_file(input_path)
     results = []
 
-    # FIXME - Diarization
-    # if diarize:
-    #     transcription_text = combine_transcription_and_diarization(audio_file_path)
-    # else:
-    #     audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
-    #     transcription_text = {'audio_file': audio_file, 'transcription': segments}
-
     for path in paths:
         try:
             if path.startswith('http'):
@@ -511,9 +504,10 @@ def main(input_path, api_name=None, api_key=None,
                 else:
                     logging.error(f"Failed to download video: {path}")
 
+            # FIXME - make sure this doesn't break ingesting multiple videos vs multiple text files
             # FIXME - Need to update so that chunking is fully handled.
             elif chunk and path.lower().endswith('.txt'):
-                chunks = chunk_text_file(path, max_chunk_size, chunk_overlap)
+                chunks = semantic_chunk_long_file(path, max_chunk_size, chunk_overlap)
                 if chunks:
                     chunks_data = {
                         "file_path": path,

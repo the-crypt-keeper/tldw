@@ -31,6 +31,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_file
+from App_Function_Libraries.Chunk_Lib import semantic_chunk_long_file
 from App_Function_Libraries.PDF_Ingestion_Lib import ingest_pdf_file
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
@@ -458,65 +459,62 @@ def generate_timestamped_url(url, hours, minutes, seconds):
 
 
 def create_chunking_inputs():
-    chunk_text_by_words_checkbox = gr.Checkbox(label="Chunk Text by Words", value=False, visible=False)
-    max_words_input = gr.Number(label="Max Words", value=300, precision=0, visible=False)
-    chunk_text_by_sentences_checkbox = gr.Checkbox(label="Chunk Text by Sentences", value=False, visible=False)
-    max_sentences_input = gr.Number(label="Max Sentences", value=10, precision=0, visible=False)
-    chunk_text_by_paragraphs_checkbox = gr.Checkbox(label="Chunk Text by Paragraphs", value=False, visible=False)
-    max_paragraphs_input = gr.Number(label="Max Paragraphs", value=5, precision=0, visible=False)
-    chunk_text_by_tokens_checkbox = gr.Checkbox(label="Chunk Text by Tokens", value=False, visible=False)
-    max_tokens_input = gr.Number(label="Max Tokens", value=1000, precision=0, visible=False)
+    chunk_text_by_words_checkbox = gr.Checkbox(label="Chunk Text by Words", value=False, visible=True)
+    max_words_input = gr.Number(label="Max Words", value=300, precision=0, visible=True)
+    chunk_text_by_sentences_checkbox = gr.Checkbox(label="Chunk Text by Sentences", value=False, visible=True)
+    max_sentences_input = gr.Number(label="Max Sentences", value=10, precision=0, visible=True)
+    chunk_text_by_paragraphs_checkbox = gr.Checkbox(label="Chunk Text by Paragraphs", value=False, visible=True)
+    max_paragraphs_input = gr.Number(label="Max Paragraphs", value=5, precision=0, visible=True)
+    chunk_text_by_tokens_checkbox = gr.Checkbox(label="Chunk Text by Tokens", value=False, visible=True)
+    max_tokens_input = gr.Number(label="Max Tokens", value=1000, precision=0, visible=True)
+    gr_semantic_chunk_long_file = gr.Checkbox(label="Semantic Chunking by Sentence similarity", value=False, visible=True)
+    gr_semantic_chunk_long_file_size = gr.Number(label="Max Chunk Size", value=2000, visible=True)
+    gr_semantic_chunk_long_file_overlap = gr.Number(label="Max Chunk Overlap Size", value=100, visible=True)
     return [chunk_text_by_words_checkbox, max_words_input, chunk_text_by_sentences_checkbox, max_sentences_input,
             chunk_text_by_paragraphs_checkbox, max_paragraphs_input, chunk_text_by_tokens_checkbox, max_tokens_input]
 
 
 def create_video_transcription_tab():
-    with gr.Group():
+    with gr.TabItem("Video Transcription + Summarization"):
         with gr.Row():
-            theme_toggle = gr.Radio(choices=["Light", "Dark"], value="Light", label="Light/Dark Mode Toggle")
-            ui_frontpage_mode_toggle = gr.Radio(choices=["Simple List", "Advanced List"], value="Simple List",
-                                                label="UI Mode Options Toggle")
-            chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"], value="Non-Chunked",
-                                                  label="Summarization Mode")
+            ui_frontpage_mode_toggle = gr.Radio(choices=["Simple List", "Advanced List"], value="Simple List", label="UI Mode Options Toggle")
+            chunk_summarization_toggle = gr.Radio(choices=["Non-Chunked", "Chunked-Summarization"], value="Non-Chunked", label="Summarization Mode")
 
-        url_input = gr.Textbox(label="URL (Mandatory)",
-                               placeholder="Enter the video URL here. Multiple at once supported, one per line")
-        diarize_input = gr.Checkbox(label="Enable Speaker Diarization", visible=True)
-        num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)",
-                                       visible=False)
-        whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model", visible=False)
-        custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3,
-                                         visible=True)
-        offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)",
-                                 visible=False)
-        api_name_input = gr.Dropdown(
-            choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp",
-                     "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"], value=None, label="API Name (Mandatory)",
-            visible=True)
-        api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here", visible=True)
-        vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False, visible=False)
-        rolling_summarization_input = gr.Checkbox(label="Enable Rolling Summarization", value=False, visible=False)
-        download_video_input = gr.Checkbox(label="Download Video", value=False, visible=False)
-        download_audio_input = gr.Checkbox(label="Download Audio", value=False, visible=False)
-        detail_level_input = gr.Slider(minimum=0.01, maximum=1.0, value=0.01, step=0.01, interactive=True,
-                                       label="Summary Detail Level", visible=False)
-        keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
-                                    value="default,no_keyword_set", visible=True)
-        question_box_input = gr.Textbox(label="Question", placeholder="Enter a question to ask about the transcription",
-                                        visible=False)
-        local_file_path_input = gr.Textbox(label="Local File Path", placeholder="Enter the path to a local file", visible=False)
-        chunking_inputs = create_chunking_inputs()
+        with gr.Row():
+            with gr.Column():
+                url_input = gr.Textbox(label="URL (Mandatory)", placeholder="Enter the video URL here. Multiple at once supported, one per line")
+                diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=True)
+                num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)", visible=False)
+                whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model", visible=False)
+                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3, visible=True)
+                offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)", visible=False)
+                api_name_input = gr.Dropdown(
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                    value=None, label="API Name (Mandatory)", visible=True)
+                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here", visible=True)
+                vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False, visible=False)
+                rolling_summarization_input = gr.Checkbox(label="Enable Rolling Summarization", value=False, visible=False)
+                download_video_input = gr.Checkbox(label="Download Video", value=False, visible=False)
+                download_audio_input = gr.Checkbox(label="Download Audio", value=False, visible=False)
+                detail_level_input = gr.Slider(minimum=0.01, maximum=1.0, value=0.01, step=0.01, interactive=True, label="Summary Detail Level", visible=False)
+                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)", value="default,no_keyword_set", visible=True)
+                question_box_input = gr.Textbox(label="Question", placeholder="Enter a question to ask about the transcription", visible=False)
+                local_file_path_input = gr.Textbox(label="Local File Path", placeholder="Enter the path to a local file", visible=False)
+                chunking_inputs = create_chunking_inputs()
 
-        outputs = [
-            gr.Textbox(label="Transcription"),
-            gr.Textbox(label="Summary or Status Message"),
-            gr.File(label="Download Transcription as JSON"),
-            gr.File(label="Download Summary as Text"),
-            gr.File(label="Download Video", visible=False),
-            gr.File(label="Download Audio", visible=False),
-        ]
+                outputs = [
+                    # Just always keep these hidden
+                    gr.File(label="Download Video", visible=False),
+                    gr.File(label="Download Audio", visible=False),
+                ]
 
-        process_button = gr.Button("Process Video")
+                process_button = gr.Button("Process Video")
+
+            with gr.Column():
+                transcription_output = gr.Textbox(label="Transcription")
+                summary_output = gr.Textbox(label="Summary or Status Message")
+                download_transcription = gr.File(label="-Download Transcription as JSON-")
+                download_summary = gr.File(label="-Download Summary as Text-")
 
         process_button.click(
             fn=process_url,
@@ -524,126 +522,130 @@ def create_video_transcription_tab():
                     api_name_input, api_key_input, vad_filter_input, download_video_input, download_audio_input,
                     rolling_summarization_input, detail_level_input, question_box_input,
                     keywords_input, local_file_path_input, diarize_input] + chunking_inputs,
-            outputs=outputs
+            outputs=[transcription_output, summary_output, download_transcription, download_summary]
         )
 
 
 def create_audio_processing_tab():
-    with gr.Group():
-        gr.Markdown("# Transcribe & Summarize Audio Files from URLs or Local Files!")
-        audio_url_input = gr.Textbox(label="Audio File URL", placeholder="Enter the URL of the audio file")
-        audio_file_input = gr.File(label="Upload Audio File", file_types=["audio/*"])
-        whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
-        api_name_input = gr.Dropdown(
-            choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp",
-                     "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"], value=None,
-            label="API for Summarization (Optional)")
-        api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here",
-                                   type="password")
+    with gr.TabItem("Audio File Processing"):
+        with gr.Group():
+            gr.Markdown("# Transcribe & Summarize Audio Files from URLs or Local Files!")
+            audio_url_input = gr.Textbox(label="Audio File URL", placeholder="Enter the URL of the audio file")
+            audio_file_input = gr.File(label="Upload Audio File", file_types=["audio/*"])
+            whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+            api_name_input = gr.Dropdown(
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp",
+                         "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"], value=None,
+                label="API for Summarization (Optional)")
+            api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here",
+                                       type="password")
 
-        process_audio_button = gr.Button("Process Audio File")
-        audio_progress_output = gr.Textbox(label="Progress")
-        audio_transcriptions_output = gr.Textbox(label="Transcriptions")
+            process_audio_button = gr.Button("Process Audio File")
+            audio_progress_output = gr.Textbox(label="Progress")
+            audio_transcriptions_output = gr.Textbox(label="Transcriptions")
 
-        process_audio_button.click(
-            fn=process_audio_file,
-            inputs=[audio_url_input, audio_file_input, whisper_model_input, api_name_input, api_key_input],
-            outputs=[audio_progress_output, audio_transcriptions_output]
-        )
+            process_audio_button.click(
+                fn=process_audio_file,
+                inputs=[audio_url_input, audio_file_input, whisper_model_input, api_name_input, api_key_input],
+                outputs=[audio_progress_output, audio_transcriptions_output]
+            )
 
 
 def create_website_scraping_tab():
-    with gr.Group():
-        gr.Markdown("# Scrape Websites & Summarize Articles using a Headless Chrome Browser!")
-        gr.Markdown("In the plans to add support for custom cookies/logins...")
-        url_input = gr.Textbox(label="Article URLs", placeholder="Enter article URLs here, one per line", lines=5)
-        custom_article_title_input = gr.Textbox(label="Custom Article Titles (Optional, one per line)",
-                                                placeholder="Enter custom titles for the articles, one per line",
-                                                lines=5)
-        custom_prompt_input = gr.Textbox(label="Custom Prompt (Optional)",
-                                         placeholder="Provide a custom prompt for summarization", lines=3)
-        api_name_input = gr.Dropdown(
-            choices=[None, "huggingface", "deepseek", "openrouter", "openai", "anthropic", "cohere", "groq", "llama",
-                     "kobold", "ooba"], value=None, label="API Name (Mandatory for Summarization)")
-        api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
-                                   placeholder="Enter your API key here; Ignore if using Local API or Built-in API")
-        keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
-                                    value="default,no_keyword_set", visible=True)
+    with gr.TabItem("Website Scraping"):
+        with gr.Group():
+            gr.Markdown("# Scrape Websites & Summarize Articles using a Headless Chrome Browser!")
+            gr.Markdown("In the plans to add support for custom cookies/logins...")
+            url_input = gr.Textbox(label="Article URLs", placeholder="Enter article URLs here, one per line", lines=5)
+            custom_article_title_input = gr.Textbox(label="Custom Article Titles (Optional, one per line)",
+                                                    placeholder="Enter custom titles for the articles, one per line",
+                                                    lines=5)
+            custom_prompt_input = gr.Textbox(label="Custom Prompt (Optional)",
+                                             placeholder="Provide a custom prompt for summarization", lines=3)
+            api_name_input = gr.Dropdown(
+                choices=[None, "huggingface", "deepseek", "openrouter", "openai", "anthropic", "cohere", "groq", "llama",
+                         "kobold", "ooba"], value=None, label="API Name (Mandatory for Summarization)")
+            api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
+                                       placeholder="Enter your API key here; Ignore if using Local API or Built-in API")
+            keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
+                                        value="default,no_keyword_set", visible=True)
 
-        scrape_button = gr.Button("Scrape and Summarize")
-        result_output = gr.Textbox(label="Result", lines=20)
+            scrape_button = gr.Button("Scrape and Summarize")
+            result_output = gr.Textbox(label="Result", lines=20)
 
-        scrape_button.click(
-            fn=scrape_and_summarize_multiple,
-            inputs=[url_input, custom_prompt_input, api_name_input, api_key_input, keywords_input,
-                    custom_article_title_input],
-            outputs=result_output
-        )
+            scrape_button.click(
+                fn=scrape_and_summarize_multiple,
+                inputs=[url_input, custom_prompt_input, api_name_input, api_key_input, keywords_input,
+                        custom_article_title_input],
+                outputs=result_output
+            )
 
 
 def create_pdf_ingestion_tab():
-    with gr.Group():
-        pdf_file_input = gr.File(label="Upload PDF File", file_types=[".pdf"])
-        pdf_title_input = gr.Textbox(label="Title (Optional)")
-        pdf_author_input = gr.Textbox(label="Author (Optional)")
-        pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
-        pdf_ingest_button = gr.Button("Ingest PDF")
-        pdf_result_output = gr.Textbox(label="Result")
+    with gr.TabItem("PDF Ingestion"):
+        with gr.Group():
+            pdf_file_input = gr.File(label="Upload PDF File", file_types=[".pdf"])
+            pdf_title_input = gr.Textbox(label="Title (Optional)")
+            pdf_author_input = gr.Textbox(label="Author (Optional)")
+            pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
+            pdf_ingest_button = gr.Button("Ingest PDF")
+            pdf_result_output = gr.Textbox(label="Result")
 
-        pdf_ingest_button.click(
-            fn=ingest_pdf_file,
-            inputs=[pdf_file_input, pdf_author_input, pdf_title_input, pdf_keywords_input],
-            outputs=pdf_result_output
-        )
+            pdf_ingest_button.click(
+                fn=ingest_pdf_file,
+                inputs=[pdf_file_input, pdf_author_input, pdf_title_input, pdf_keywords_input],
+                outputs=pdf_result_output
+            )
 
 
 def create_search_tab():
-    with gr.Group():
-        gr.Markdown(
-            "# Search across all ingested items in the Database by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
-        search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-        search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
-        search_button = gr.Button("Search")
-        items_output = gr.Dropdown(label="Select Item", choices=[])
-        item_mapping = gr.State({})
-        prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
-        content_output = gr.Markdown(label="Content", visible=True)
+    with gr.TabItem("Search / Detailed View"):
+        with gr.Group():
+            gr.Markdown("# Search across all ingested items in the Database by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
+            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+            search_button = gr.Button("Search")
+            items_output = gr.Dropdown(label="Select Item", choices=[])
+            item_mapping = gr.State({})
+            prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
+            content_output = gr.Markdown(label="Content", visible=True)
 
-        search_button.click(
-            fn=update_dropdown,
-            inputs=[search_query_input, search_type_input],
-            outputs=[items_output, item_mapping]
-        )
+            search_button.click(
+                fn=update_dropdown,
+                inputs=[search_query_input, search_type_input],
+                outputs=[items_output, item_mapping]
+            )
 
-        items_output.change(
-            fn=update_detailed_view,
-            inputs=[items_output, item_mapping],
-            outputs=[prompt_summary_output, content_output]
-        )
+            items_output.change(
+                fn=update_detailed_view,
+                inputs=[items_output, item_mapping],
+                outputs=[prompt_summary_output, content_output]
+            )
 
 
 def create_llamafile_settings_tab():
-    with gr.Group():
-        gr.Markdown("# Settings for Llamafile")
-        am_noob = gr.Checkbox(label="Check this to enable sane defaults", value=False, visible=True)
-        advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Enable to show all settings", value=False)
+    with gr.TabItem("Local LLM with Llamafile"):
+        with gr.Group():
+            gr.Markdown("# Settings for Llamafile")
+            am_noob = gr.Checkbox(label="Check this to enable sane defaults", value=False, visible=True)
+            advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Enable to show all settings", value=False)
 
-        model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
-        model_value = gr.Textbox(label="Select Local Model File", value="", visible=True)
-        ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
-        ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
+            model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
+            model_value = gr.Textbox(label="Select Local Model File", value="", visible=True)
+            ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
+            ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
 
-        advanced_inputs = create_llamafile_advanced_inputs()
+            advanced_inputs = create_llamafile_advanced_inputs()
 
-        start_button = gr.Button("Start Llamafile")
-        stop_button = gr.Button("Stop Llamafile")
-        output_display = gr.Markdown()
+            start_button = gr.Button("Start Llamafile")
+            stop_button = gr.Button("Stop Llamafile")
+            output_display = gr.Markdown()
 
-        start_button.click(
-            fn=start_llamafile,
-            inputs=[am_noob, model_checked, model_value, ngl_checked, ngl_value] + advanced_inputs,
-            outputs=output_display
-        )
+            start_button.click(
+                fn=start_llamafile,
+                inputs=[am_noob, model_checked, model_value, ngl_checked, ngl_value] + advanced_inputs,
+                outputs=output_display
+            )
 
 
 def create_llamafile_advanced_inputs():
@@ -669,169 +671,168 @@ def create_llamafile_advanced_inputs():
 
 
 def create_chat_interface():
-    with gr.Group():
-        gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
+    with gr.TabItem("Remote LLM Chat"):
+        with gr.Group():
+            gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
 
-        with gr.Row():
-            with gr.Column(scale=1):
-                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
-                                             label="Search By")
-                search_button = gr.Button("Search")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                    search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+                    search_button = gr.Button("Search")
 
-            with gr.Column(scale=2):
-                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
-                item_mapping = gr.State({})
+                with gr.Column(scale=2):
+                    items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                    item_mapping = gr.State({})
 
-        with gr.Row():
-            use_content = gr.Checkbox(label="Use Content")
-            use_summary = gr.Checkbox(label="Use Summary")
-            use_prompt = gr.Checkbox(label="Use Prompt")
+            with gr.Row():
+                use_content = gr.Checkbox(label="Use Content")
+                use_summary = gr.Checkbox(label="Use Summary")
+                use_prompt = gr.Checkbox(label="Use Prompt")
 
-        api_endpoint = gr.Dropdown(label="Select API Endpoint",
-                                   choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek",
-                                            "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM",
-                                            "HuggingFace"])
-        api_key = gr.Textbox(label="API Key (if required)", type="password")
-        preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
-        user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
+            api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
+            api_key = gr.Textbox(label="API Key (if required)", type="password")
+            preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
+            user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
 
-        chatbot = gr.Chatbot(height=500)
-        msg = gr.Textbox(label="Enter your message")
-        clear = gr.Button("Clear")
-        submit = gr.Button("Submit")
+            chatbot = gr.Chatbot(height=500)
+            msg = gr.Textbox(label="Enter your message")
+            clear = gr.Button("Clear")
+            submit = gr.Button("Submit")
 
-        chat_history = gr.State([])
-        media_content = gr.State()
-        selected_parts = gr.State([])
+            chat_history = gr.State([])
+            media_content = gr.State()
+            selected_parts = gr.State([])
 
-        save_button = gr.Button("Save Chat History")
-        download_file = gr.File(label="Download Chat History")
+            save_button = gr.Button("Save Chat History")
+            download_file = gr.File(label="Download Chat History")
 
-        def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
-            bot_message = chat(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
-            history.append((message, bot_message))
-            return "", history
+            def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
+                bot_message = chat(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
+                history.append((message, bot_message))
+                return "", history
 
-        submit.click(
-            chat_wrapper,
-            inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
-            outputs=[msg, chatbot]
-        )
+            submit.click(
+                chat_wrapper,
+                inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
+                outputs=[msg, chatbot]
+            )
 
-        clear.click(lambda: ([], []), outputs=[chatbot, chat_history])
+            clear.click(lambda: ([], []), outputs=[chatbot, chat_history])
 
-        def save_chat_history(history):
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"chat_history_{timestamp}.json"
-            with open(filename, "w") as f:
-                json.dump(history, f)
-            return filename
+            def save_chat_history(history):
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"chat_history_{timestamp}.json"
+                with open(filename, "w") as f:
+                    json.dump(history, f)
+                return filename
 
-        save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
+            save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
 
-        search_button.click(
-            fn=update_dropdown,
-            inputs=[search_query_input, search_type_input],
-            outputs=[items_output, item_mapping]
-        )
+            search_button.click(
+                fn=update_dropdown,
+                inputs=[search_query_input, search_type_input],
+                outputs=[items_output, item_mapping]
+            )
 
-        def update_user_prompt(preset_name):
-            details = fetch_prompt_details(preset_name)
-            if details:
-                return details[1]  # Return the system prompt
-            return ""
+            def update_user_prompt(preset_name):
+                details = fetch_prompt_details(preset_name)
+                if details:
+                    return details[1]  # Return the system prompt
+                return ""
 
-        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+            preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
 
-        def update_chat_content(selected_item, use_content, use_summary, use_prompt):
-            if selected_item in item_mapping:
-                media_id = item_mapping[selected_item]
-                content = load_media_content(media_id)
-                selected_parts = []
-                if use_content:
-                    selected_parts.append("content")
-                if use_summary:
-                    selected_parts.append("summary")
-                if use_prompt:
-                    selected_parts.append("prompt")
-                return content, selected_parts
-            return None, []
+            def update_chat_content(selected_item, use_content, use_summary, use_prompt):
+                if selected_item in item_mapping:
+                    media_id = item_mapping[selected_item]
+                    content = load_media_content(media_id)
+                    selected_parts = []
+                    if use_content:
+                        selected_parts.append("content")
+                    if use_summary:
+                        selected_parts.append("summary")
+                    if use_prompt:
+                        selected_parts.append("prompt")
+                    return content, selected_parts
+                return None, []
 
-        items_output.change(
-            update_chat_content,
-            inputs=[items_output, use_content, use_summary, use_prompt],
-            outputs=[media_content, selected_parts]
-        )
+            items_output.change(
+                update_chat_content,
+                inputs=[items_output, use_content, use_summary, use_prompt],
+                outputs=[media_content, selected_parts]
+            )
+
 
 
 def create_media_edit_tab():
-    with gr.Group():
-        gr.Markdown("# Search and Edit Media Items")
+    with gr.TabItem("Edit Existing Items"):
+        with gr.Group():
+            gr.Markdown("# Search and Edit Media Items")
 
-        with gr.Row():
-            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
-                                         label="Search By")
-            search_button = gr.Button("Search")
+            with gr.Row():
+                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+                search_button = gr.Button("Search")
 
-        with gr.Row():
-            items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
-            item_mapping = gr.State({})
+            with gr.Row():
+                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                item_mapping = gr.State({})
 
-        content_input = gr.Textbox(label="Edit Content", lines=10)
-        prompt_input = gr.Textbox(label="Edit Prompt", lines=3)
-        summary_input = gr.Textbox(label="Edit Summary", lines=5)
+            content_input = gr.Textbox(label="Edit Content", lines=10)
+            prompt_input = gr.Textbox(label="Edit Prompt", lines=3)
+            summary_input = gr.Textbox(label="Edit Summary", lines=5)
 
-        update_button = gr.Button("Update Media Content")
-        status_message = gr.Textbox(label="Status", interactive=False)
+            update_button = gr.Button("Update Media Content")
+            status_message = gr.Textbox(label="Status", interactive=False)
 
-        search_button.click(
-            fn=update_dropdown,
-            inputs=[search_query_input, search_type_input],
-            outputs=[items_output, item_mapping]
-        )
+            search_button.click(
+                fn=update_dropdown,
+                inputs=[search_query_input, search_type_input],
+                outputs=[items_output, item_mapping]
+            )
 
-        def load_selected_media_content(selected_item, item_mapping):
-            if selected_item and item_mapping and selected_item in item_mapping:
-                media_id = item_mapping[selected_item]
-                content, prompt, summary = fetch_item_details(media_id)
-                return content, prompt, summary
-            return "No item selected or invalid selection", "", ""
+            def load_selected_media_content(selected_item, item_mapping):
+                if selected_item and item_mapping and selected_item in item_mapping:
+                    media_id = item_mapping[selected_item]
+                    content, prompt, summary = fetch_item_details(media_id)
+                    return content, prompt, summary
+                return "No item selected or invalid selection", "", ""
 
-        items_output.change(
-            fn=load_selected_media_content,
-            inputs=[items_output, item_mapping],
-            outputs=[content_input, prompt_input, summary_input]
-        )
+            items_output.change(
+                fn=load_selected_media_content,
+                inputs=[items_output, item_mapping],
+                outputs=[content_input, prompt_input, summary_input]
+            )
 
-        update_button.click(
-            fn=update_media_content,
-            inputs=[items_output, item_mapping, content_input, prompt_input, summary_input],
-            outputs=status_message
-        )
+            update_button.click(
+                fn=update_media_content,
+                inputs=[items_output, item_mapping, content_input, prompt_input, summary_input],
+                outputs=status_message
+            )
 
 
 def create_keyword_tab():
-    with gr.Group():
-        gr.Markdown("# Keyword Management")
+    with gr.TabItem("Keywords"):
+        with gr.Group():
+            gr.Markdown("# Keyword Management")
 
-        with gr.Tab("Browse Keywords"):
-            browse_output = gr.Markdown()
-            browse_button = gr.Button("Browse Keywords")
-            browse_button.click(fn=keywords_browser_interface, outputs=browse_output)
+            with gr.Tab("Browse Keywords"):
+                browse_output = gr.Markdown()
+                browse_button = gr.Button("Browse Keywords")
+                browse_button.click(fn=keywords_browser_interface, outputs=browse_output)
 
-        with gr.Tab("Add Keywords"):
-            add_input = gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here...")
-            add_button = gr.Button("Add Keywords")
-            add_output = gr.Textbox(label="Result")
-            add_button.click(fn=add_keyword, inputs=add_input, outputs=add_output)
+            with gr.Tab("Add Keywords"):
+                add_input = gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here...")
+                add_button = gr.Button("Add Keywords")
+                add_output = gr.Textbox(label="Result")
+                add_button.click(fn=add_keyword, inputs=add_input, outputs=add_output)
 
-        with gr.Tab("Delete Keywords"):
-            delete_input = gr.Textbox(label="Delete Keyword", placeholder="Enter keyword to delete here...")
-            delete_button = gr.Button("Delete Keyword")
-            delete_output = gr.Textbox(label="Result")
-            delete_button.click(fn=delete_keyword, inputs=delete_input, outputs=delete_output)
+            with gr.Tab("Delete Keywords"):
+                delete_input = gr.Textbox(label="Delete Keyword", placeholder="Enter keyword to delete here...")
+                delete_button = gr.Button("Delete Keyword")
+                delete_output = gr.Textbox(label="Result")
+                delete_button.click(fn=delete_keyword, inputs=delete_input, outputs=delete_output)
 
 
 
@@ -839,46 +840,49 @@ def import_data(file):
     # Placeholder for actual import functionality
     return "Data imported successfully"
 
+
 def create_import_export_tab():
-    with gr.Group():
-        with gr.Tab("Export"):
-            with gr.Tab("Export Search Results"):
-                search_query = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-                search_fields = gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"])
-                keyword_input = gr.Textbox(
-                    label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )",
-                    placeholder="Enter keywords here...")
-                page_input = gr.Number(label="Page", value=1, precision=0)
-                results_per_file_input = gr.Number(label="Results per File", value=1000, precision=0)
-                export_search_button = gr.Button("Export Search Results")
-                export_search_output = gr.Textbox(label="Export Status")
+    with gr.TabItem("Export/Import"):
+        with gr.Group():
+            with gr.Tab("Export"):
+                with gr.Tab("Export Search Results"):
+                    search_query = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                    search_fields = gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"],
+                                                     value=["Title"])
+                    keyword_input = gr.Textbox(
+                        label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )",
+                        placeholder="Enter keywords here...")
+                    page_input = gr.Number(label="Page", value=1, precision=0)
+                    results_per_file_input = gr.Number(label="Results per File", value=1000, precision=0)
+                    export_search_button = gr.Button("Export Search Results")
+                    export_search_output = gr.Textbox(label="Export Status")
 
-                export_search_button.click(
-                    fn=export_to_csv,
-                    inputs=[search_query, search_fields, keyword_input, page_input, results_per_file_input],
-                    outputs=export_search_output
+                    export_search_button.click(
+                        fn=export_to_csv,
+                        inputs=[search_query, search_fields, keyword_input, page_input, results_per_file_input],
+                        outputs=export_search_output
+                    )
+
+                with gr.Tab("Export Keywords"):
+                    export_keywords_button = gr.Button("Export Keywords")
+                    export_keywords_output = gr.File(label="Download Exported Keywords")
+                    export_keywords_status = gr.Textbox(label="Export Status")
+
+                    export_keywords_button.click(
+                        fn=export_keywords_to_csv,
+                        outputs=[export_keywords_output, export_keywords_status]
+                    )
+
+            with gr.Tab("Import"):
+                import_file = gr.File(label="Upload file for import")
+                import_button = gr.Button("Import Data")
+                import_output = gr.Textbox(label="Import Status")
+
+                import_button.click(
+                    fn=import_data,
+                    inputs=import_file,
+                    outputs=import_output
                 )
-
-            with gr.Tab("Export Keywords"):
-                export_keywords_button = gr.Button("Export Keywords")
-                export_keywords_output = gr.File(label="Download Exported Keywords")
-                export_keywords_status = gr.Textbox(label="Export Status")
-
-                export_keywords_button.click(
-                    fn=export_keywords_to_csv,
-                    outputs=[export_keywords_output, export_keywords_status]
-                )
-
-        with gr.Tab("Import"):
-            import_file = gr.File(label="Upload file for import")
-            import_button = gr.Button("Import Data")
-            import_output = gr.Textbox(label="Import Status")
-
-            import_button.click(
-                fn=import_data,
-                inputs=import_file,
-                outputs=import_output
-            )
 
 
 def create_utilities_tab():
@@ -925,57 +929,6 @@ def create_utilities_tab():
                 outputs=output_url
             )
 
-
-def launch_ui(demo_mode=False):
-    if demo_mode == False:
-        share_public = False
-    else:
-        share_public = True
-    with gr.Blocks() as iface:
-        gr.Markdown("# TL/DW: Too Long, Didn't Watch - Your Personal Research Multi-Tool")
-
-        with gr.Tabs():
-            with gr.TabItem("Transcription / Summarization / Ingestion"):
-                create_video_transcription_tab()
-
-            with gr.TabItem("Audio Processing"):
-                create_audio_processing_tab()
-
-            with gr.TabItem("Website Scraping"):
-                create_website_scraping_tab()
-
-            with gr.TabItem("PDF Ingestion"):
-                create_pdf_ingestion_tab()
-
-            with gr.TabItem("Search / Detailed View"):
-                create_search_tab()
-
-            with gr.TabItem("Local LLM with Llamafile"):
-                create_llamafile_settings_tab()
-
-            with gr.TabItem("Remote LLM Chat"):
-                create_chat_interface()
-
-            with gr.TabItem("Edit Existing Items"):
-                create_media_edit_tab()
-
-            with gr.TabItem("Keywords"):
-                create_keyword_tab()
-
-            with gr.TabItem("Export/Import"):
-                create_import_export_tab()
-
-            with gr.TabItem("Utilities"):
-                create_utilities_tab()
-
-    # Launch the interface
-    server_port_variable = 7860
-    if share_public is not None and share_public:
-        iface.launch(share=True)
-    elif server_mode and not share_public:
-        iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
-    else:
-        iface.launch(share=False)
 
 def start_llamafile(*args):
     # Unpack arguments
@@ -1054,5 +1007,48 @@ def handle_prompt_selection(prompt):
     return f"You selected: {prompt}"
 
 
+def launch_ui(demo_mode=False):
+    if demo_mode == False:
+        share_public = False
+    else:
+        share_public = True
+    with gr.Blocks() as iface:
+        gr.Markdown("# TL/DW: Too Long, Didn't Watch - Your Personal Research Multi-Tool")
+        with gr.Tabs():
+            with gr.TabItem("Transcription / Summarization / Ingestion"):
+                with gr.Tabs():
+                    create_video_transcription_tab()
+                    create_audio_processing_tab()
+                    create_website_scraping_tab()
+                    create_pdf_ingestion_tab()
 
+            with gr.TabItem("Search / Detailed View"):
+                create_search_tab()
+
+            with gr.TabItem("Local LLM with Llamafile"):
+                create_llamafile_settings_tab()
+
+            with gr.TabItem("Remote LLM Chat"):
+                create_chat_interface()
+
+            with gr.TabItem("Edit Existing Items"):
+                create_media_edit_tab()
+
+            with gr.TabItem("Keywords"):
+                create_keyword_tab()
+
+            with gr.TabItem("Export/Import"):
+                create_import_export_tab()
+
+            with gr.TabItem("Utilities"):
+                create_utilities_tab()
+
+    # Launch the interface
+    server_port_variable = 7860
+    if share_public is not None and share_public:
+        iface.launch(share=True)
+    elif server_mode and not share_public:
+        iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
+    else:
+        iface.launch(share=False)
 
