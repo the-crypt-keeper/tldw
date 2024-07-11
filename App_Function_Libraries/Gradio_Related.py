@@ -40,7 +40,8 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface, process_url
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
-    fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, export_to_csv, export_keywords_to_csv
+    fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
+    export_keywords_to_csv, export_to_file
 from App_Function_Libraries.Utils import sanitize_filename
 #
 #######################################################################################################################
@@ -843,26 +844,25 @@ def import_data(file):
 
 
 def create_import_export_tab():
-    with gr.TabItem("Export/Import"):
-        with gr.Group():
-            with gr.Tab("Export"):
-                with gr.Tab("Export Search Results"):
-                    search_query = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-                    search_fields = gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"],
-                                                     value=["Title"])
-                    keyword_input = gr.Textbox(
-                        label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )",
-                        placeholder="Enter keywords here...")
-                    page_input = gr.Number(label="Page", value=1, precision=0)
-                    results_per_file_input = gr.Number(label="Results per File", value=1000, precision=0)
-                    export_search_button = gr.Button("Export Search Results")
-                    export_search_output = gr.Textbox(label="Export Status")
+    with gr.Group():
+        with gr.Tab("Export"):
+            with gr.Tab("Export Search Results"):
+                search_query = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_fields = gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"])
+                keyword_input = gr.Textbox(
+                    label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )",
+                    placeholder="Enter keywords here...")
+                page_input = gr.Number(label="Page", value=1, precision=0)
+                results_per_file_input = gr.Number(label="Results per File", value=1000, precision=0)
+                export_format = gr.Radio(label="Export Format", choices=["csv", "markdown"], value="csv")
+                export_search_button = gr.Button("Export Search Results")
+                export_search_output = gr.Textbox(label="Export Status")
 
-                    export_search_button.click(
-                        fn=export_to_csv,
-                        inputs=[search_query, search_fields, keyword_input, page_input, results_per_file_input],
-                        outputs=export_search_output
-                    )
+                export_search_button.click(
+                    fn=export_to_file,
+                    inputs=[search_query, search_fields, keyword_input, page_input, results_per_file_input, export_format],
+                    outputs=export_search_output
+                )
 
                 with gr.Tab("Export Keywords"):
                     export_keywords_button = gr.Button("Export Keywords")

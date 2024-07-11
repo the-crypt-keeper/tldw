@@ -582,13 +582,44 @@ def format_results(results):
 
     return df
 
-# Function to export search results to CSV with pagination
-def export_to_csv(search_query: str, search_fields: List[str], keyword: str, page: int = 1, results_per_file: int = 1000):
+
+# Function to export search results to CSV or markdown with pagination
+def export_to_file(search_query: str, search_fields: List[str], keyword: str, page: int = 1, results_per_file: int = 1000, export_format: str = 'csv'):
     try:
         results = search_db(search_query, search_fields, keyword, page, results_per_file)
-        df = format_results(results)
-        filename = f'search_results_page_{page}.csv'
-        df.to_csv(filename, index=False)
+        if not results:
+            return "No results found to export."
+
+        # Create an 'exports' directory if it doesn't exist
+        if not os.path.exists('exports'):
+            os.makedirs('exports')
+
+        if export_format == 'csv':
+            filename = f'exports/search_results_page_{page}.csv'
+            with open(filename, 'w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                writer.writerow(['URL', 'Title', 'Type', 'Content', 'Author', 'Ingestion Date', 'Prompt', 'Summary'])
+                for row in results:
+                    writer.writerow(row)
+        elif export_format == 'markdown':
+            filename = f'exports/search_results_page_{page}.md'
+            with open(filename, 'w', encoding='utf-8') as file:
+                for item in results:
+                    markdown_content = convert_to_markdown({
+                        'title': item[1],
+                        'url': item[0],
+                        'type': item[2],
+                        'content': item[3],
+                        'author': item[4],
+                        'ingestion_date': item[5],
+                        'summary': item[7],
+                        'keywords': item[8].split(',') if item[8] else []
+                    })
+                    file.write(markdown_content)
+                    file.write("\n---\n\n")  # Separator between items
+        else:
+            return f"Unsupported export format: {export_format}"
+
         return f"Results exported to {filename}"
     except (DatabaseError, InputError) as e:
         return str(e)
@@ -832,3 +863,18 @@ def fetch_item_details_single(media_id: int):
             return prompt, summary, content
     except sqlite3.Error as e:
         raise Exception(f"Error fetching item details: {e}")
+
+
+
+def convert_to_markdown(item):
+    markdown = f"# {item['title']}\n\n"
+    markdown += f"**URL:** {item['url']}\n\n"
+    markdown += f"**Author:** {item['author']}\n\n"
+    markdown += f"**Ingestion Date:** {item['ingestion_date']}\n\n"
+    markdown += f"**Type:** {item['type']}\n\n"
+    markdown += f"**Keywords:** {', '.join(item['keywords'])}\n\n"
+    markdown += "## Summary\n\n"
+    markdown += f"{item['summary']}\n\n"
+    markdown += "## Content\n\n"
+    markdown += f"{item['content']}\n\n"
+    return markdown
