@@ -344,7 +344,8 @@ By default, videos, transcriptions and summaries are stored in a folder with the
     * GGUF Quants: https://huggingface.co/pjh64/Phi-3-mini-128K-Instruct.gguf
   2. Meta Llama3-8B - 8B Model/16GB base, 8.5GB Q8  - https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
     * GGUF Quants: https://huggingface.co/lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF
-
+- **Evaluating a Local Model via MMLU-Pro and Llama.cpp**
+  1. https://github.com/chigkim/Ollama-MMLU-Pro
 
 ----------
 
