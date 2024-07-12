@@ -306,19 +306,19 @@ if __name__ == "__main__":
 #             logger.error(f"Failed to add documents in batch: {e}")
 #             raise RAGException(f"Batch document addition failed: {e}")
 #
-#     async def get_documents(self) -> List[Tuple[int, str, str, np.ndarray]]:
-#         try:
-#             async with aiosqlite.connect(self.db_path) as db:
-#                 async with db.execute('SELECT id, title, content, embedding FROM documents') as cursor:
-#                     documents = [
-#                         (id, title, content, np.frombuffer(embedding, dtype=np.float32))
-#                         async for id, title, content, embedding in cursor
-#                     ]
-#             logger.info(f"Retrieved {len(documents)} documents")
-#             return documents
-#         except aiosqlite.Error as e:
-#             logger.error(f"Failed to retrieve documents: {e}")
-#             raise RAGException(f"Document retrieval failed: {e}")
+# async def get_documents(self) -> List[Tuple[int, str, str, np.ndarray, str]]:
+#     try:
+#         async with aiosqlite.connect(self.db_path) as db:
+#             async with db.execute('SELECT id, title, content, embedding, source FROM documents') as cursor:
+#                 documents = [
+#                     (id, title, content, np.frombuffer(embedding, dtype=np.float32), source)
+#                     async for id, title, content, embedding, source in cursor
+#                 ]
+#         logger.info(f"Retrieved {len(documents)} documents")
+#         return documents
+#     except aiosqlite.Error as e:
+#         logger.error(f"Failed to retrieve documents: {e}")
+#         raise RAGException(f"Document retrieval failed: {e}")
 #
 #
 # class AsyncStandardRAGSystem(BaseRAGSystem):
@@ -340,9 +340,9 @@ if __name__ == "__main__":
 #     async def rag_query(self, query: str, llm_function: Callable[[str], str], top_k: int = 3) -> str:
 #         try:
 #             relevant_docs = await self.get_relevant_documents(query, top_k)
-#             context = "\n\n".join([f"Title: {title}\nContent: {content}" for _, title, content, _ in relevant_docs])
+#             context = "\n\n".join([f"Title: {title}\nContent: {content}\nSource: {source}" for _, title, content, _, source in relevant_docs])
 #
-#             llm_prompt = f"Based on the following context, please answer the query:\n\nContext:\n{context}\n\nQuery: {query}"
+#             llm_prompt = f"Based on the following context, please answer the query. Include citations in your response using [Source] format:\n\nContext:\n{context}\n\nQuery: {query}"
 #
 #             response = llm_function(llm_prompt)
 #             logger.info("Generated response for query")
@@ -467,6 +467,29 @@ if __name__ == "__main__":
 ############################################################################################
 # Using FAISS
 #
+#
+#
+# Update DB
+# async def init_db(self):
+#     try:
+#         async with aiosqlite.connect(self.db_path) as db:
+#             await db.execute('''
+#             CREATE TABLE IF NOT EXISTS documents (
+#                 id INTEGER PRIMARY KEY,
+#                 title TEXT,
+#                 content TEXT,
+#                 embedding BLOB,
+#                 source TEXT
+#             )
+#             ''')
+#             await db.commit()
+#         logger.info("Initialized database schema")
+#     except aiosqlite.Error as e:
+#         logger.error(f"Failed to initialize database schema: {e}")
+#         raise RAGException(f"Database schema initialization failed: {e}")
+#
+#
+
 # import os
 # import asyncio
 # from typing import List, Tuple, Callable, Optional
@@ -518,41 +541,32 @@ if __name__ == "__main__":
 #             logger.error(f"Failed to initialize database schema: {e}")
 #             raise RAGException(f"Database schema initialization failed: {e}")
 #
-#     async def add_documents(self, documents: List[Tuple[str, str]]):
-#         try:
-#             embeddings = self.model.encode([content for _, content in documents])
+# async def add_documents(self, documents: List[Tuple[str, str, str]]):
+#     try:
+#         embeddings = self.model.encode([content for _, content, _ in documents])
+#         async with aiosqlite.connect(self.db_path) as db:
+#             await db.executemany(
+#                 'INSERT INTO documents (title, content, embedding, source) VALUES (?, ?, ?, ?)',
+#                 [(title, content, embedding.tobytes(), source) for (title, content, source), embedding in
+#                  zip(documents, embeddings)]
+#             )
+#             await db.commit()
+#         logger.info(f"Added {len(documents)} documents in batch")
+#     except Exception as e:
+#         logger.error(f"Failed to add documents in batch: {e}")
+#         raise RAGException(f"Batch document addition failed: {e}")
 #
-#             if self.index is None:
-#                 self.index = faiss.IndexFlatL2(embeddings.shape[1])
-#
-#             async with aiosqlite.connect(self.db_path) as db:
-#                 for (title, content), embedding in zip(documents, embeddings):
-#                     await db.execute('INSERT INTO documents (title, content) VALUES (?, ?)', (title, content))
-#                     doc_id = await db.execute('SELECT last_insert_rowid()')
-#                     doc_id = await doc_id.fetchone()
-#                     doc_id = doc_id[0]
-#                     self.document_lookup[doc_id] = (title, content)
-#                     self.index.add(np.array([embedding]))
-#                 await db.commit()
-#
-#             logger.info(f"Added {len(documents)} documents to database and FAISS index")
-#         except Exception as e:
-#             logger.error(f"Failed to add documents: {e}")
-#             raise RAGException(f"Document addition failed: {e}")
-#
-#     async def get_relevant_documents(self, query: str, top_k: int = 3) -> List[Tuple[int, str, str, float]]:
+#     async def get_relevant_documents(self, query: str, top_k: int = 3) -> List[Tuple[int, str, str, float, str]]:
 #         try:
 #             query_embedding = self.model.encode([query])[0]
-#             distances, indices = self.index.search(np.array([query_embedding]), top_k)
-#
-#             results = []
-#             for i, idx in enumerate(indices[0]):
-#                 doc_id = list(self.document_lookup.keys())[idx]
-#                 title, content = self.document_lookup[doc_id]
-#                 results.append((doc_id, title, content, distances[0][i]))
-#
+#             documents = await self.get_documents()
+#             similarities = [
+#                 (id, title, content, cosine_similarity([query_embedding], [doc_embedding])[0][0], source)
+#                 for id, title, content, doc_embedding, source in documents
+#             ]
+#             similarities.sort(key=lambda x: x[3], reverse=True)
 #             logger.info(f"Retrieved top {top_k} relevant documents for query")
-#             return results
+#             return similarities[:top_k]
 #         except Exception as e:
 #             logger.error(f"Error in getting relevant documents: {e}")
 #             raise RAGException(f"Retrieval of relevant documents failed: {e}")
@@ -674,3 +688,125 @@ If you're dealing with a very large number of documents, you might want to imple
 
 This FAISS-integrated version should provide better performance for similarity search, especially as your document collection grows larger
 """
+
+
+###############################################################################################################
+# Web Search
+# Output from Sonnet 3.5 regarding how to add web searches to the RAG system
+# Integrating web search into your RAG system can significantly enhance its capabilities by providing up-to-date information. Here's how you can modify your RAG system to include web search:
+#
+# First, you'll need to choose a web search API. Some popular options include:
+#
+# Google Custom Search API
+# Bing Web Search API
+# DuckDuckGo API
+# SerpAPI (which can interface with multiple search engines)
+#
+#
+#
+# For this example, let's use the DuckDuckGo API, as it's free and doesn't require authentication.
+#
+# Install the required library:
+# `pip install duckduckgo-search`
+#
+# Add a new method to your RAG system for web search:
+# ```
+# from duckduckgo_search import ddg
+#
+# class AsyncRAGSystem:
+#     # ... (existing code) ...
+#
+#     async def web_search(self, query: str, num_results: int = 3) -> List[Dict[str, str]]:
+#         try:
+#             results = ddg(query, max_results=num_results)
+#             return [{'title': r['title'], 'content': r['body'], 'source': r['href']} for r in results]
+#         except Exception as e:
+#             logger.error(f"Error in web search: {e}")
+#             raise RAGException(f"Web search failed: {e}")
+#
+#     async def add_web_results_to_db(self, results: List[Dict[str, str]]):
+#         try:
+#             documents = [(r['title'], r['content'], r['source']) for r in results]
+#             await self.add_documents(documents)
+#             logger.info(f"Added {len(documents)} web search results to the database")
+#         except Exception as e:
+#             logger.error(f"Error adding web search results to database: {e}")
+#             raise RAGException(f"Adding web search results failed: {e}")
+#
+#     async def rag_query_with_web_search(self, query: str, llm_function: Callable[[str], str], top_k: int = 3,
+#                                         use_web_search: bool = True, num_web_results: int = 3) -> str:
+#         try:
+#             if use_web_search:
+#                 web_results = await self.web_search(query, num_web_results)
+#                 await self.add_web_results_to_db(web_results)
+#
+#             relevant_docs = await self.get_relevant_documents(query, top_k)
+#             context = "\n\n".join([f"Title: {title}\nContent: {content}\nSource: {source}"
+#                                    for _, title, content, _, source in relevant_docs])
+#
+#             llm_prompt = f"Based on the following context, please answer the query. Include citations in your response using [Source] format:\n\nContext:\n{context}\n\nQuery: {query}"
+#
+#             response = llm_function(llm_prompt)
+#             logger.info("Generated response for query with web search")
+#             return response
+#         except Exception as e:
+#             logger.error(f"Error in RAG query with web search: {e}")
+#             raise RAGException(f"RAG query with web search failed: {e}")
+# ```
+#
+# Update your main function to use the new web search capability:
+# ```
+# async def main():
+#     use_hyde = False  # Set this to True when you want to enable HyDE
+#     use_web_search = True  # Set this to False if you don't want to use web search
+#
+#     try:
+#         if use_hyde:
+#             rag_system = AsyncHyDERAGSystem('rag_database.db')
+#             logger.info("Using Async HyDE RAG System")
+#         else:
+#             rag_system = AsyncStandardRAGSystem('rag_database.db')
+#             logger.info("Using Async Standard RAG System")
+#
+#         await rag_system.init_db()
+#
+#         # Add sample documents
+#         sample_docs = [
+#             ("Paris", "Paris is the capital of France and is known for the Eiffel Tower.", "Local Database"),
+#             ("London", "London is the capital of the United Kingdom and home to Big Ben.", "Local Database"),
+#             ("Tokyo", "Tokyo is the capital of Japan and is famous for its bustling city life.", "Local Database")
+#         ]
+#
+#         await rag_system.add_documents(sample_docs)
+#
+#         query = "What is the capital of France?"
+#         result = await rag_system.rag_query_with_web_search(query, mock_llm, use_web_search=use_web_search)
+#         print(f"Query: {query}")
+#         print(f"Result: {result}")
+#
+#     except RAGException as e:
+#         logger.error(f"RAG system error: {e}")
+#         print(f"An error occurred: {e}")
+#     except Exception as e:
+#         logger.error(f"Unexpected error: {e}")
+#         print(f"An unexpected error occurred: {e}")
+# ```
+#
+#
+# This implementation does the following:
+#
+# It adds a web_search method that uses the DuckDuckGo API to perform web searches.
+# It adds an add_web_results_to_db method that adds the web search results to your existing database.
+# It modifies the rag_query method (now called rag_query_with_web_search) to optionally perform a web search before retrieving relevant documents.
+#
+# When use_web_search is set to True, the system will:
+#
+# Perform a web search for the given query.
+# Add the web search results to the database.
+# Retrieve relevant documents (which now may include the newly added web search results).
+# Use these documents to generate a response.
+#
+# This approach allows your RAG system to combine information from your existing database with fresh information from the web, potentially providing more up-to-date and comprehensive answers.
+# Remember to handle rate limiting and respect the terms of service of the web search API you choose to use. Also, be aware that adding web search results to your database will increase its size over time, so you may need to implement a strategy to manage this growth (e.g., removing old web search results periodically).
+
+
