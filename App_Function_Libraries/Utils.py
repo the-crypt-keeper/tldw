@@ -22,6 +22,7 @@
 import configparser
 import hashlib
 import logging
+from datetime import timedelta
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 import requests
@@ -323,4 +324,89 @@ def load_and_log_configs():
 
 # Log file
 # logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
+
+
+
+
+
+
+
+def format_metadata_as_text(metadata):
+    if not metadata:
+        return "No metadata available"
+
+    formatted_text = "Video Metadata:\n"
+    for key, value in metadata.items():
+        if value is not None:
+            if isinstance(value, list):
+                # Join list items with commas
+                formatted_value = ", ".join(str(item) for item in value)
+            elif key == 'upload_date' and len(str(value)) == 8:
+                # Format date as YYYY-MM-DD
+                formatted_value = f"{value[:4]}-{value[4:6]}-{value[6:]}"
+            elif key in ['view_count', 'like_count']:
+                # Format large numbers with commas
+                formatted_value = f"{value:,}"
+            elif key == 'duration':
+                # Convert seconds to HH:MM:SS format
+                hours, remainder = divmod(value, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                formatted_value = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            else:
+                formatted_value = str(value)
+
+            formatted_text += f"{key.capitalize()}: {formatted_value}\n"
+
+    return formatted_text.strip()
+
+# # Example usage:
+# example_metadata = {
+#     'title': 'Sample Video Title',
+#     'uploader': 'Channel Name',
+#     'upload_date': '20230615',
+#     'view_count': 1000000,
+#     'like_count': 50000,
+#     'duration': 3725,  # 1 hour, 2 minutes, 5 seconds
+#     'tags': ['tag1', 'tag2', 'tag3'],
+#     'description': 'This is a sample video description.'
+# }
+#
+# print(format_metadata_as_text(example_metadata))
+
+
+
+def convert_to_seconds(time_str):
+    if not time_str:
+        return 0
+
+    # If it's already a number, assume it's in seconds
+    if time_str.isdigit():
+        return int(time_str)
+
+    # Parse time string in format HH:MM:SS, MM:SS, or SS
+    time_parts = time_str.split(':')
+    if len(time_parts) == 3:
+        return int(timedelta(hours=int(time_parts[0]),
+                             minutes=int(time_parts[1]),
+                             seconds=int(time_parts[2])).total_seconds())
+    elif len(time_parts) == 2:
+        return int(timedelta(minutes=int(time_parts[0]),
+                             seconds=int(time_parts[1])).total_seconds())
+    elif len(time_parts) == 1:
+        return int(time_parts[0])
+    else:
+        raise ValueError(f"Invalid time format: {time_str}")
+
+
+def save_to_file(video_urls, filename):
+    with open(filename, 'w') as file:
+        file.write('\n'.join(video_urls))
+    print(f"Video URLs saved to {filename}")
+
+
+
+
+
+
+
 
