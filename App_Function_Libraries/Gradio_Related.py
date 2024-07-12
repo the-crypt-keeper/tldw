@@ -32,7 +32,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast
-from App_Function_Libraries.Chunk_Lib import semantic_chunk_long_file
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 from App_Function_Libraries.PDF_Ingestion_Lib import process_and_cleanup_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
@@ -486,9 +486,6 @@ def create_video_transcription_tab():
                 url_input = gr.Textbox(label="URL(s) (Mandatory)",
                                        placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, and playlists.",
                                        lines=5)
-                start_time_input = gr.Textbox(label="Start Time (Optional)",
-                                              placeholder="e.g., 1:30 or 90 (in seconds)")
-                end_time_input = gr.Textbox(label="End Time (Optional)", placeholder="e.g., 5:45 or 345 (in seconds)")
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
                 custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3)
@@ -499,11 +496,59 @@ def create_video_transcription_tab():
                 api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set")
-                batch_size_input = gr.Slider(minimum=1, maximum=10, value=3, step=1,
+                batch_size_input = gr.Slider(minimum=1, maximum=10, value=1, step=1,
                                              label="Batch Size (Number of videos to process simultaneously)")
                 timestamp_option = gr.Radio(choices=["Include Timestamps", "Exclude Timestamps"],
                                             value="Include Timestamps", label="Timestamp Option")
+                # First, create a checkbox to toggle the chunking options
+                chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
+                use_cookies_input = gr.Checkbox(label="Use cookies for audio download", value=False)
+                use_time_input = gr.Checkbox(label="Use Start and End Time", value=False)
 
+                with gr.Row(visible=False) as time_input_box:
+                    gr.Markdown("### Start and End time")
+                    with gr.Column():
+                        start_time_input = gr.Textbox(label="Start Time (Optional)",
+                                              placeholder="e.g., 1:30 or 90 (in seconds)")
+                        end_time_input = gr.Textbox(label="End Time (Optional)", placeholder="e.g., 5:45 or 345 (in seconds)")
+
+                use_time_input.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[use_time_input],
+                    outputs=[time_input_box]
+                )
+
+                cookies_input = gr.Textbox(
+                    label="User Session Cookies",
+                    placeholder="Paste your cookies here (JSON format)",
+                    lines=3,
+                    visible=False
+                )
+
+                use_cookies_input.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[use_cookies_input],
+                    outputs=[cookies_input]
+                )
+                # Then, create a Box to group the chunking options
+                with gr.Row(visible=False) as chunking_options_box:
+                    gr.Markdown("### Chunking Options")
+                    with gr.Column():
+                        chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens'],
+                                                   label="Chunking Method")
+                        max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
+                        chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
+                        use_adaptive_chunking = gr.Checkbox(label="Use Adaptive Chunking")
+                        use_multi_level_chunking = gr.Checkbox(label="Use Multi-level Chunking")
+                        chunk_language = gr.Dropdown(choices=['english', 'french', 'german', 'spanish'],
+                                                     label="Chunking Language")
+
+                # Add JavaScript to toggle the visibility of the chunking options box
+                chunking_options_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[chunking_options_checkbox],
+                    outputs=[chunking_options_box]
+                )
                 process_button = gr.Button("Process Videos")
 
             with gr.Column():
@@ -517,80 +562,145 @@ def create_video_transcription_tab():
                 metadata_output = gr.JSON(label="Video Metadata (Editable)")
 
             @error_handler
-            def process_videos_with_error_handling(urls, start_time, end_time, diarize, whisper_model, custom_prompt,
-                                                   api_name, api_key, keywords, batch_size, timestamp_option, metadata,
+            def process_videos_with_error_handling(urls, start_time, end_time, diarize, whisper_model,
+                                                   custom_prompt_checkbox, custom_prompt,
+                                                   api_name, api_key, keywords, chunking_options_checkbox, chunk_method,
+                                                   max_chunk_size,
+                                                   chunk_overlap, use_adaptive_chunking, use_multi_level_chunking,
+                                                   chunk_language,
+                                                   use_cookies, cookies, batch_size, timestamp_option, metadata,
                                                    progress=gr.Progress()):
-                expanded_urls = parse_and_expand_urls(urls)
-                total_videos = len(expanded_urls)
-                results = []
-                errors = []
+                try:
+                    # Input validation
+                    if not urls:
+                        raise ValueError("No URLs provided")
 
-                for i in range(0, total_videos, batch_size):
-                    batch = expanded_urls[i:i + batch_size]
-                    batch_results = []
+                    # Ensure batch_size is an integer
+                    try:
+                        batch_size = int(batch_size)
+                    except (ValueError, TypeError):
+                        batch_size = 1  # Default to processing one video at a time if invalid
 
-                    for url in batch:
-                        try:
-                            start_seconds = convert_to_seconds(start_time)
-                            end_seconds = convert_to_seconds(end_time) if end_time else None
+                    expanded_urls = parse_and_expand_urls(urls)
+                    total_videos = len(expanded_urls)
+                    results = []
+                    errors = []
 
-                            video_metadata = metadata.get(url) if metadata and url in metadata else extract_metadata(
-                                url)
-                            if not video_metadata:
-                                raise ValueError(f"Failed to extract metadata for {url}")
+                    for i in range(0, total_videos, batch_size):
+                        batch = expanded_urls[i:i + batch_size]
+                        batch_results = []
 
-                            result = process_url_with_metadata(url, 2, whisper_model, custom_prompt, start_seconds,
-                                                               api_name, api_key,
-                                                               False, False, False, False, 0.01, None, keywords, None,
-                                                               diarize,
-                                                               end_time=end_seconds, include_timestamps=(
-                                            timestamp_option == "Include Timestamps"),
-                                                               metadata=video_metadata)
+                        for url in batch:
+                            try:
+                                start_seconds = convert_to_seconds(start_time)
+                                end_seconds = convert_to_seconds(end_time) if end_time else None
 
-                            if isinstance(result, dict) and 'error' in result:
-                                batch_results.append((url, result['error'], "Error", video_metadata))
-                                errors.append(f"Error processing {url}: {result['error']}")
-                            else:
-                                batch_results.append((url, result[1], "Success", video_metadata))
-                        except Exception as e:
-                            error_message = f"Error processing {url}: {str(e)}"
-                            batch_results.append((url, error_message, "Error", {}))
-                            errors.append(error_message)
+                                video_metadata = metadata.get(
+                                    url) if metadata and url in metadata else extract_metadata(url, use_cookies,
+                                                                                               cookies)
+                                if not video_metadata:
+                                    raise ValueError(f"Failed to extract metadata for {url}")
 
-                    results.extend(batch_results)
-                    progress((i + len(batch)) / total_videos, f"Processed {i + len(batch)}/{total_videos} videos")
+                                chunk_options = {
+                                    'method': chunk_method,
+                                    'max_size': max_chunk_size,
+                                    'overlap': chunk_overlap,
+                                    'adaptive': use_adaptive_chunking,
+                                    'multi_level': use_multi_level_chunking,
+                                    'language': chunk_language
+                                } if chunking_options_checkbox else None
 
-                # Process transcriptions:
-                transcriptions = [[url, trans, status] for url, trans, _, status, _ in results]
-                # This creates a list of lists, each containing [url, transcription, status]
+                                result = process_url_with_metadata(
+                                    url, 2, whisper_model,
+                                    custom_prompt if custom_prompt_checkbox else None,
+                                    start_seconds, api_name, api_key,
+                                    False, False, False, False, 0.01, None, keywords, None, diarize,
+                                    end_time=end_seconds,
+                                    include_timestamps=(timestamp_option == "Include Timestamps"),
+                                    metadata=video_metadata,
+                                    use_chunking=chunking_options_checkbox,
+                                    chunk_options=chunk_options
+                                )
 
-                # Process summaries (only for successful processes):
-                summaries = [[url, summary, status] for url, _, summary, status, _ in results if status == "Success"]
-                # This creates a list of lists, each containing [url, summary, status] for successful processes
+                                if isinstance(result, dict) and 'error' in result:
+                                    batch_results.append((url, result['error'], "Error", video_metadata))
+                                    errors.append(f"Error processing {url}: {result['error']}")
+                                else:
+                                    batch_results.append((url, result[1], "Success", video_metadata))
+                            except Exception as e:
+                                error_message = f"Error processing {url}: {str(e)}"
+                                batch_results.append((url, error_message, "Error", {}))
+                                errors.append(error_message)
 
-                # Collect all metadata:
-                all_metadata = {url: meta for url, _, _, _, meta in results}
-                # This creates a dictionary with url as key and metadata as value
+                        results.extend(batch_results)
+                        if isinstance(progress, gr.Progress):
+                            progress((i + len(batch)) / total_videos,
+                                     f"Processed {i + len(batch)}/{total_videos} videos")
 
-                error_summary = "\n".join(errors) if errors else "No errors occurred."
+                    transcriptions = [[url, trans, status] for url, trans, status, _ in results]
+                    summaries = [[url, summary, status] for url, _, summary, status, _ in results if
+                                 status == "Success"]
+                    all_metadata = {url: meta for url, _, _, _, meta in results}
 
-                return (
-                    f"Processed {total_videos} videos. {len(errors)} errors occurred.",
-                    error_summary,
-                    transcriptions,
-                    summaries,
-                    None,  # Placeholder for download_transcription
-                    None,  # Placeholder for download_summary
-                    all_metadata
-                )
+                    error_summary = "\n".join(errors) if errors else "No errors occurred."
+
+                    return (
+                        f"Processed {total_videos} videos. {len(errors)} errors occurred.",
+                        error_summary,
+                        transcriptions,
+                        summaries,
+                        None,  # Placeholder for download_transcription
+                        None,  # Placeholder for download_summary
+                        all_metadata
+                    )
+                except Exception as e:
+                    # Catch any unexpected errors and return a structured response
+                    error_message = f"An unexpected error occurred: {str(e)}"
+                    return (
+                        error_message,
+                        error_message,
+                        [],  # Empty transcriptions
+                        [],  # Empty summaries
+                        None,
+                        None,
+                        {}  # Empty metadata
+                    )
 
             @error_handler
             def process_url_with_metadata(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key,
                                           vad_filter, download_video, download_audio, rolling_summarization,
                                           detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
-                                          include_timestamps=True, metadata=None):
+                                          include_timestamps=True, metadata=None, use_chunking=False,
+                                          chunk_options=None):
+                # Download video if necessary, using cookies if provided
+                if download_video or download_audio:
+                    ydl_opts = {
+                        'format': 'bestaudio/best' if download_audio else 'bestvideo+bestaudio/best',
+                        'postprocessors': [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'wav',
+                        }] if download_audio else [],
+                        'outtmpl': '%(title)s.%(ext)s'
+                    }
+                    if use_chunking and chunk_options.get('use_cookies') and chunk_options.get('cookies'):
+                        try:
+                            cookie_dict = json.loads(chunk_options['cookies'])
+                            ydl_opts['cookiefile'] = cookie_dict
+                        except json.JSONDecodeError:
+                            logging.warning("Invalid cookie format. Proceeding without cookies.")
+
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([url])
+
+                    # Update local_file_path with the downloaded file
+                    local_file_path = ydl.prepare_filename(ydl.extract_info(url, download=False))
+
+                # FIXME - perform_transcription should only be used against existing wav files, with its
+                #  function signature as the following:
+                # perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False):
                 # Perform transcription
-                audio_file_path, segments = perform_transcription(url, offset, whisper_model, vad_filter, end_time)
+                audio_file_path, segments = perform_transcription(local_file_path or url, offset, whisper_model,
+                                                                  vad_filter, end_time)
 
                 if audio_file_path is None or segments is None:
                     raise ValueError("Transcription failed or segments not available.")
@@ -601,6 +711,12 @@ def create_video_transcription_tab():
                 else:
                     stripped_segments = [{'Text': segment['Text']} for segment in segments]
                     transcription_text = {'audio_file': audio_file_path, 'transcription': stripped_segments}
+
+                # Apply chunking if enabled
+                if use_chunking and chunk_options:
+                    text = extract_text_from_segments(transcription_text['transcription'])
+                    chunks_with_metadata = improved_chunking_process(text, chunk_options)
+                    transcription_text['transcription'] = chunks_with_metadata
 
                 metadata_text = format_metadata_as_text(metadata)
                 full_content = f"{metadata_text}\n\nTranscription:\n" + extract_text_from_segments(
@@ -635,12 +751,11 @@ def create_video_transcription_tab():
             process_button.click(
                 fn=process_videos_with_error_handling,
                 inputs=[url_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
-                        custom_prompt_input,
-                        api_name_input, api_key_input, keywords_input, batch_size_input, timestamp_option,
-                        metadata_output],
+                        custom_prompt_input, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap,
+        use_adaptive_chunking, use_multi_level_chunking, chunk_language, api_name_input, api_key_input, keywords_input,
+                        batch_size_input, timestamp_option, metadata_output],
                 outputs=[progress_output, error_output, transcription_output, summary_output, download_transcription,
-                         download_summary, metadata_output]
-            )
+                         download_summary, metadata_output])
 
 
 def create_audio_processing_tab():

@@ -21,6 +21,7 @@
 # Import necessary libraries
 import configparser
 import hashlib
+import json
 import logging
 from datetime import timedelta
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -404,6 +405,28 @@ def save_to_file(video_urls, filename):
     print(f"Video URLs saved to {filename}")
 
 
+def save_segments_to_json(segments, file_name="transcription_segments.json"):
+    """
+    Save transcription segments to a JSON file.
+
+    Parameters:
+    segments (list): List of transcription segments
+    file_name (str): Name of the JSON file to save (default: "transcription_segments.json")
+
+    Returns:
+    str: Path to the saved JSON file
+    """
+    # Ensure the Results directory exists
+    os.makedirs("Results", exist_ok=True)
+
+    # Full path for the JSON file
+    json_file_path = os.path.join("Results", file_name)
+
+    # Save segments to JSON file
+    with open(json_file_path, 'w', encoding='utf-8') as json_file:
+        json.dump(segments, json_file, ensure_ascii=False, indent=4)
+
+    return json_file_path
 
 
 

@@ -5,7 +5,7 @@
 # It also handles the ingestion of the videos into the database.
 # It uses yt-dlp to extract video information and download the videos.
 ####
-
+import json
 ####################
 # Function List
 #
@@ -216,13 +216,21 @@ def parse_and_expand_urls(url_input):
     return expanded_urls
 
 
-def extract_metadata(url):
+def extract_metadata(url, use_cookies=False, cookies=None):
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'extract_flat': True,
         'skip_download': True,
     }
+
+    if use_cookies and cookies:
+        try:
+            cookie_dict = json.loads(cookies)
+            ydl_opts['cookiefile'] = cookie_dict
+        except json.JSONDecodeError:
+            logging.warning("Invalid cookie format. Proceeding without cookies.")
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
