@@ -18,9 +18,13 @@ import json
 import logging
 import requests
 import os
+
+import yt_dlp
+
+from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 #
 # Local Imports
-from App_Function_Libraries.SQLite_DB import add_media_to_database
+from App_Function_Libraries.SQLite_DB import add_media_to_database, add_media_with_keywords
 from App_Function_Libraries.Utils import extract_text_from_segments, download_file, create_download_directory
 from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
@@ -205,59 +209,77 @@ def process_audio_file(audio_url, audio_file, whisper_model="small.en", api_name
 
 
 
-# OLD FIXME: This function is not used in the current implementation. It should be removed.
-# def process_audio_file(audio_url, audio_file):
-#     progress = []
-#     transcriptions = []
-#
-#     def update_progress(stage, message):
-#         progress.append(f"{stage}: {message}")
-#         return "\n".join(progress), "\n".join(transcriptions)
-#
-#     try:
-#         if audio_url:
-#             # Process audio file from URL
-#             save_path = Path("downloaded_audio_file.wav")
-#             download_audio_file(audio_url, save_path)
-#         elif audio_file:
-#             # Process uploaded audio file
-#             audio_file_size = os.path.getsize(audio_file.name)
-#             if audio_file_size > 500 * 1024 * 1024:  # 500 MB limit
-#                 return update_progress("Error", "File size exceeds the 500MB limit.")
-#             save_path = Path(audio_file.name)
-#         else:
-#             return update_progress("Error", "No audio file provided.")
-#
-#         # Perform transcription and summarization
-#         transcription, summary, json_file_path, summary_file_path, _, _ = process_url(
-#             url=None,
-#             num_speakers=2,
-#             whisper_model="small.en",
-#             custom_prompt_input=None,
-#             offset=0,
-#             api_name=None,
-#             api_key=None,
-#             vad_filter=False,
-#             download_video_flag=False,
-#             download_audio=False,
-#             rolling_summarization=False,
-#             detail_level=0.01,
-#             question_box=None,
-#             keywords="default,no_keyword_set",
-#             chunk_text_by_words=False,
-#             max_words=0,
-#             chunk_text_by_sentences=False,
-#             max_sentences=0,
-#             chunk_text_by_paragraphs=False,
-#             max_paragraphs=0,
-#             chunk_text_by_tokens=False,
-#             max_tokens=0,
-#             local_file_path=str(save_path)
-#         )
-#         transcriptions.append(transcription)
-#         progress.append("Processing complete.")
-#     except Exception as e:
-#         progress.append(f"Error: {str(e)}")
-#
-#     return "\n".join(progress), "\n".join(transcriptions)
+def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model):
+    progress = []
+    def update_progress(message):
+        progress.append(message)
+        return "\n".join(progress)
 
+    try:
+        # Download podcast using yt-dlp
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'wav',
+            }],
+            'outtmpl': 'downloaded_podcast.%(ext)s'
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            audio_file = ydl.prepare_filename(info_dict).replace('.webm', '.wav')
+
+        update_progress("Podcast downloaded successfully.")
+
+        # Attempt to extract metadata
+        detected_title = info_dict.get('title', '')
+        detected_author = info_dict.get('uploader', '')
+        detected_series = info_dict.get('series', '')
+
+        # Use detected metadata if not provided by user
+        title = title or detected_title or "Unknown Podcast"
+        author = author or detected_author or "Unknown Author"
+
+        # Add detected series to keywords if not already present
+        if detected_series and detected_series.lower() not in keywords.lower():
+            keywords = f"{keywords},series:{detected_series}" if keywords else f"series:{detected_series}"
+
+        update_progress(f"Metadata detected/set - Title: {title}, Author: {author}, Keywords: {keywords}")
+
+        # Transcribe the podcast
+        segments = speech_to_text(audio_file, whisper_model=whisper_model)
+        transcription = " ".join([segment['Text'] for segment in segments])
+        update_progress("Podcast transcribed successfully.")
+
+        # Summarize if API is provided
+        summary = None
+        if api_name and api_key:
+            summary = perform_summarization(api_name, transcription, custom_prompt, api_key)
+            update_progress("Podcast summarized successfully.")
+
+        # Add to database
+        add_media_with_keywords(
+            url=url,
+            title=title,
+            media_type='podcast',
+            content=transcription,
+            keywords=keywords,
+            prompt=custom_prompt,
+            summary=summary or "No summary available",
+            transcription_model=whisper_model,
+            author=author,
+            ingestion_date=None  # This will use the current date
+        )
+        update_progress("Podcast added to database successfully.")
+
+        return (update_progress("Processing complete."), transcription, summary or "No summary generated.",
+                title, author, keywords)
+
+    except Exception as e:
+        error_message = f"Error processing podcast: {str(e)}"
+        logging.error(error_message)
+        return update_progress(error_message), "", "", "", "", ""
+
+#
+#
+#######################################################################################################################
