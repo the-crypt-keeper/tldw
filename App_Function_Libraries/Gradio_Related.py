@@ -792,13 +792,13 @@ def create_video_transcription_tab():
                             'uploader': None,
                             'upload_date': None
                         }
-                        logging.debug(f"Local file info_dict: {info_dict}")
+                        logging.debug(f"Local file info_dict: {info_dict[:200]}")
                     else:
                         # Extract video information
                         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                             try:
                                 full_info = ydl.extract_info(url, download=False)
-                                logging.debug(f"Full info extracted: {full_info}")
+                                logging.debug(f"Full info extracted: {full_info[:200]}")
                             except Exception as e:
                                 logging.error(f"Error extracting video info: {str(e)}")
                                 return None, None, None, None, None, None
@@ -815,7 +815,7 @@ def create_video_transcription_tab():
                                 'uploader': full_info.get('uploader'),
                                 'upload_date': full_info.get('upload_date')
                             }
-                            logging.debug(f"Filtered info_dict: {info_dict}")
+                            logging.debug(f"Filtered info_dict: {info_dict[:200]}")
                         else:
                             logging.error("Failed to extract video information")
                             return None, None, None, None, None, None
