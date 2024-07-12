@@ -935,18 +935,18 @@ def import_data(file):
 
 def create_import_item_tab():
     with gr.TabItem("Import Items"):
-        with gr.Markdown("Import Text file (Markdown/txt) into the Database"):
-            with gr.Row():
-                import_file = gr.File(label="Upload file for import")
-                import_button = gr.Button("Import Data")
-            with gr.Row():
-                import_output = gr.Textbox(label="Import Status")
+        gr.Markdown("Import a markdown or text file into the Database")
+        with gr.Row():
+            import_file = gr.File(label="Upload file for import")
+            import_button = gr.Button("Import Data")
+        with gr.Row():
+            import_output = gr.Textbox(label="Import Status")
 
-            import_button.click(
-                fn=import_data,
-                inputs=import_file,
-                outputs=import_output
-            )
+        import_button.click(
+            fn=import_data,
+            inputs=import_file,
+            outputs=import_output
+        )
 
 def create_export_tab():
     with gr.Group():
