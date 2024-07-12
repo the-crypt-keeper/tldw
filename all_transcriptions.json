@@ -1,1 +1,27 @@
-{}
+{
+  "https://www.youtube.com/watch?v=-E0t_s6bT_4": {
+    "audio_file": "Results\\Video_Downloads\\Phantom of the ADAS_ Securing Advanced Driver-Assistance Systems from Split Second Phantom Attacks.wav",
+    "transcription": [
+      {
+        "Time_Start": 0.0,
+        "Time_End": 2.06,
+        "Text": " you"
+      },
+      {
+        "Time_Start": 30.0,
+        "Time_End": 32.06,
+        "Text": " you"
+      },
+      {
+        "Time_Start": 60.0,
+        "Time_End": 63.06,
+        "Text": " you"
+      },
+      {
+        "Time_Start": 90.0,
+        "Time_End": 93.06,
+        "Text": " you"
+      }
+    ]
+  }
+}

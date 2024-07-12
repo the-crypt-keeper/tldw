@@ -581,8 +581,6 @@ def create_video_transcription_tab():
 
                     logging.debug("Input URL(s) is(are) valid")
 
-                    metadata = {}
-
                     # Ensure batch_size is an integer
                     try:
                         batch_size = int(batch_size)
@@ -609,9 +607,7 @@ def create_video_transcription_tab():
                                 start_seconds = convert_to_seconds(start_time)
                                 end_seconds = convert_to_seconds(end_time) if end_time else None
 
-                                video_metadata = metadata.get(
-                                    url) if metadata and url in metadata else extract_metadata(url, use_cookies,
-                                                                                               cookies)
+                                video_metadata = extract_metadata(url, use_cookies, cookies)
                                 if not video_metadata:
                                     raise ValueError(f"Failed to extract metadata for {url}")
 
@@ -643,14 +639,12 @@ def create_video_transcription_tab():
                                 else:
                                     url, transcription, summary, json_file, summary_file, result_metadata = result
                                     if transcription is None:
-                                        error_message = f"Processing failed for {url}"
+                                        error_message = f"Processing failed for {url}: Transcription is None"
                                         batch_results.append((url, error_message, "Error", result_metadata, None, None))
                                         errors.append(error_message)
                                     else:
                                         batch_results.append(
                                             (url, transcription, "Success", result_metadata, json_file, summary_file))
-                                    batch_results.append(
-                                        (url, transcription, "Success", result_metadata, json_file, summary_file))
 
                             except Exception as e:
                                 error_message = f"Error processing {url}: {str(e)}"
@@ -666,8 +660,11 @@ def create_video_transcription_tab():
                     for url, transcription, status, metadata, json_file, summary_file in results:
                         if status == "Success":
                             title = metadata.get('title', 'Unknown Title')
-                            transcription_text = ' '.join(
-                                [segment['Text'] for segment in transcription['transcription']])
+                            if isinstance(transcription, dict) and 'transcription' in transcription:
+                                transcription_text = ' '.join(
+                                    [segment.get('Text', '') for segment in transcription['transcription']])
+                            else:
+                                transcription_text = "Transcription format error"
                             summary = open(summary_file, 'r').read() if summary_file else "No summary available"
 
                             results_html += f"""
@@ -776,12 +773,12 @@ def create_video_transcription_tab():
                     else:
                         # Extract video information
                         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-                            full_info = ydl.extract_info(url, download=False)
-
-                        # After extracting metadata
-                        logging.info(f"Metadata extracted: {info_dict}")
-                        if not info_dict:
-                            return url, None, None, None, None, {}
+                            try:
+                                full_info = ydl.extract_info(url, download=False)
+                                logging.debug(f"Full info extracted: {full_info}")
+                            except Exception as e:
+                                logging.error(f"Error extracting video info: {str(e)}")
+                                return None, None, None, None, None, None
 
                         # Filter the required metadata
                         info_dict = {
@@ -794,30 +791,25 @@ def create_video_transcription_tab():
                             'uploader': full_info.get('uploader'),
                             'upload_date': full_info.get('upload_date')
                         }
-
-                        # Debugging: Check the info_dict dictionary
-                        logging.debug(f"Info dict: {info_dict}")
+                        logging.debug(f"Filtered info_dict: {info_dict}")
 
                         # Download video/audio
+                        logging.info("Downloading video/audio...")
                         video_file_path = download_video(url, download_path, full_info, download_video_flag)
-                        logging.info(f"Video downloaded: {video_file_path}")
                         if not video_file_path:
-                            #return url, None, None, None, None, info_dict
-                            raise ValueError(f"Failed to download video/audio from {url}")
+                            logging.error(f"Failed to download video/audio from {url}")
+                            return None, None, None, None, None, None
 
                     logging.info(f"Processing file: {video_file_path}")
 
                     # Perform transcription
+                    logging.info("Starting transcription...")
                     audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
                                                                       vad_filter, diarize)
 
-                    # After transcription
-                    logging.info(f"Transcription completed: {len(segments)} segments")
-                    if not segments:
-                        return url, None, None, None, None, info_dict
-
                     if audio_file_path is None or segments is None:
-                        raise ValueError("Transcription failed or segments not available.")
+                        logging.error("Transcription failed or segments not available.")
+                        return None, None, None, None, None, None
 
                     logging.info(f"Transcription completed. Number of segments: {len(segments)}")
 
@@ -831,22 +823,22 @@ def create_video_transcription_tab():
 
                     # Apply chunking if enabled
                     if use_chunking and chunk_options:
-                        # Implement chunking logic here
                         logging.info("Chunking is enabled, but not implemented yet.")
-                        pass
+                        # Implement chunking logic here if needed
 
                     # Extract text from segments
                     full_text = extract_text_from_segments(segments)
-                    logging.debug(f"Full text extracted: {full_text}")
+                    logging.debug(f"Full text extracted: {full_text[:100]}...")  # Log first 100 characters
 
                     # Perform summarization if API is provided
                     summary_text = None
                     if api_name and api_key:
+                        logging.info(f"Starting summarization with {api_name}...")
                         summary_text = perform_summarization(api_name, full_text, custom_prompt, api_key)
-                    # After summarization
-                    logging.info(f"Summarization completed: {len(summary_text) if summary_text else 0} characters")
+                        logging.debug(f"Summarization completed: {summary_text[:100]}...")  # Log first 100 characters
 
                     # Save transcription and summary
+                    logging.info("Saving transcription and summary...")
                     download_path = create_download_directory("Audio_Processing")
                     json_file_path, summary_file_path = save_transcription_and_summary(full_text, summary_text,
                                                                                        download_path, info_dict)
@@ -862,14 +854,12 @@ def create_video_transcription_tab():
                         keywords_list = []
                     logging.info(f"Keywords prepared: {keywords_list}")
 
-                    # Add to database (use the filtered info_dict)
+                    # Add to database
+                    logging.info("Adding to database...")
                     add_media_to_database(info_dict['webpage_url'], info_dict, segments, summary_text,
-                                          keywords_list,
-                                          custom_prompt, whisper_model)
+                                          keywords_list, custom_prompt, whisper_model)
                     logging.info(f"Media added to database: {info_dict['webpage_url']}")
 
-                    # Return the transcription_text as is, without additional JSON encoding
-                  # return url, transcription_text, summary_text, json_file_path, summary_file_path, info_dict
                     return info_dict[
                         'webpage_url'], transcription_text, summary_text, json_file_path, summary_file_path, info_dict
 
