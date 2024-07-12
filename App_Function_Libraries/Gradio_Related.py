@@ -43,12 +43,12 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     perform_transcription
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
-    export_keywords_to_csv, export_to_file
+    export_keywords_to_csv, export_to_file, add_media_to_database
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     format_metadata_as_text, convert_to_seconds
 from App_Function_Libraries.SQLite_DB import add_media_with_keywords
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
-    generate_timestamped_url, extract_metadata
+    generate_timestamped_url, extract_metadata, download_video
 
 #
 #######################################################################################################################
@@ -623,13 +623,19 @@ def create_video_transcription_tab():
                                 )
 
                                 if isinstance(result, dict) and 'error' in result:
-                                    batch_results.append((url, result['error'], "Error", video_metadata))
+                                    batch_results.append((url, result['error'], "Error", video_metadata, None, None))
                                     errors.append(f"Error processing {url}: {result['error']}")
+                                elif result[0] is not None:
+                                    url, transcription, summary, json_file, summary_file, result_metadata = result
+                                    batch_results.append(
+                                        (url, transcription, "Success", result_metadata, json_file, summary_file))
                                 else:
-                                    batch_results.append((url, result[1], "Success", video_metadata))
+                                    error_message = "Processing failed without specific error"
+                                    batch_results.append((url, error_message, "Error", video_metadata, None, None))
+                                    errors.append(f"Error processing {url}: {error_message}")
                             except Exception as e:
                                 error_message = f"Error processing {url}: {str(e)}"
-                                batch_results.append((url, error_message, "Error", {}))
+                                batch_results.append((url, error_message, "Error", {}, None, None))
                                 errors.append(error_message)
 
                         results.extend(batch_results)
@@ -637,10 +643,10 @@ def create_video_transcription_tab():
                             progress((i + len(batch)) / total_videos,
                                      f"Processed {i + len(batch)}/{total_videos} videos")
 
-                    transcriptions = [[url, trans, status] for url, trans, status, _ in results]
-                    summaries = [[url, summary, status] for url, _, summary, status, _ in results if
-                                 status == "Success"]
-                    all_metadata = {url: meta for url, _, _, _, meta in results}
+                    transcriptions = [[url, trans, status] for url, trans, status, _, _, _ in results]
+                    summaries = [[url, summary, status] for url, _, status, _, _, summary in results if
+                                 status == "Success" and summary is not None]
+                    all_metadata = {url: meta for url, _, _, meta, _, _ in results if meta}
 
                     error_summary = "\n".join(errors) if errors else "No errors occurred."
 
@@ -666,87 +672,90 @@ def create_video_transcription_tab():
                         {}  # Empty metadata
                     )
 
+            # FIXME - remove dead args
             @error_handler
             def process_url_with_metadata(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key,
-                                          vad_filter, download_video, download_audio, rolling_summarization,
+                                          vad_filter, download_video_flag, download_audio, rolling_summarization,
                                           detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
                                           include_timestamps=True, metadata=None, use_chunking=False,
                                           chunk_options=None):
-                # Download video if necessary, using cookies if provided
-                if download_video or download_audio:
-                    ydl_opts = {
-                        'format': 'bestaudio/best' if download_audio else 'bestvideo+bestaudio/best',
-                        'postprocessors': [{
-                            'key': 'FFmpegExtractAudio',
-                            'preferredcodec': 'wav',
-                        }] if download_audio else [],
-                        'outtmpl': '%(title)s.%(ext)s'
-                    }
-                    if use_chunking and chunk_options.get('use_cookies') and chunk_options.get('cookies'):
-                        try:
-                            cookie_dict = json.loads(chunk_options['cookies'])
-                            ydl_opts['cookiefile'] = cookie_dict
-                        except json.JSONDecodeError:
-                            logging.warning("Invalid cookie format. Proceeding without cookies.")
+                try:
+                    # Create download path
+                    download_path = create_download_directory("Video_Downloads")
 
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([url])
+                    # Initialize info_dict
+                    info_dict = {}
 
-                    # Update local_file_path with the downloaded file
-                    local_file_path = ydl.prepare_filename(ydl.extract_info(url, download=False))
+                    # Handle URL or local file
+                    if local_file_path:
+                        video_file_path = local_file_path
+                        # Extract basic info from local file
+                        info_dict = {
+                            'title': os.path.basename(local_file_path),
+                            'ext': os.path.splitext(local_file_path)[1][1:]  # Remove the leading dot
+                        }
+                    else:
+                        # Extract video information
+                        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                            info_dict = ydl.extract_info(url, download=False)
 
-                # FIXME - perform_transcription should only be used against existing wav files, with its
-                #  function signature as the following:
-                # perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False):
-                # Perform transcription
-                audio_file_path, segments = perform_transcription(local_file_path or url, offset, whisper_model,
-                                                                  vad_filter, end_time)
+                        # Download video/audio
+                        video_file_path = download_video(url, download_path, info_dict, download_video_flag)
+                        if not video_file_path:
+                            raise ValueError(f"Failed to download video/audio from {url}")
 
-                if audio_file_path is None or segments is None:
-                    raise ValueError("Transcription failed or segments not available.")
+                    logging.info(f"Processing file: {video_file_path}")
 
-                # Process segments based on the timestamp option
-                if include_timestamps:
+                    # Perform transcription
+                    audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
+                                                                      vad_filter, diarize)
+
+                    if audio_file_path is None or segments is None:
+                        raise ValueError("Transcription failed or segments not available.")
+
+                    # Process segments based on the timestamp option
+                    if not include_timestamps:
+                        segments = [{'Text': segment['Text']} for segment in segments]
+
                     transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
-                else:
-                    stripped_segments = [{'Text': segment['Text']} for segment in segments]
-                    transcription_text = {'audio_file': audio_file_path, 'transcription': stripped_segments}
 
-                # Apply chunking if enabled
-                if use_chunking and chunk_options:
-                    text = extract_text_from_segments(transcription_text['transcription'])
-                    chunks_with_metadata = improved_chunking_process(text, chunk_options)
-                    transcription_text['transcription'] = chunks_with_metadata
+                    # Apply chunking if enabled
+                    if use_chunking and chunk_options:
+                        # Implement chunking logic here
+                        logging.info("Chunking is enabled, but not implemented yet.")
+                        pass
 
-                metadata_text = format_metadata_as_text(metadata)
-                full_content = f"{metadata_text}\n\nTranscription:\n" + extract_text_from_segments(
-                    transcription_text['transcription'])
+                    # Extract text from segments
+                    full_text = extract_text_from_segments(segments)
 
-                # Perform summarization (if API is provided)
-                summary_text = None
-                if api_name:
-                    summary_text = perform_summarization(api_name, full_content, custom_prompt, api_key)
+                    # Perform summarization if API is provided
+                    summary_text = None
+                    if api_name and api_key:
+                        summary_text = perform_summarization(api_name, full_text, custom_prompt, api_key)
 
-                # Save transcription and summary
-                download_path = create_download_directory("Audio_Processing")
-                json_file_path, summary_file_path = save_transcription_and_summary(full_content, summary_text,
-                                                                                   download_path)
+                    # Save transcription and summary
+                    download_path = create_download_directory("Audio_Processing")
+                    json_file_path, summary_file_path = save_transcription_and_summary(full_text, summary_text,
+                                                                                       download_path, info_dict)
 
-                # Add to database with full content (including metadata)
-                add_media_with_keywords(
-                    url=url,
-                    title=metadata.get('title', 'Video from URL'),
-                    media_type='video',
-                    content=full_content,
-                    keywords=keywords,
-                    prompt=custom_prompt,
-                    summary=summary_text,
-                    transcription_model=whisper_model,
-                    author=metadata.get('uploader', 'Unknown'),
-                    ingestion_date=None  # This will use the current date
-                )
+                    # Prepare keywords for database
+                    if isinstance(keywords, str):
+                        keywords_list = [kw.strip() for kw in keywords.split(',') if kw.strip()]
+                    elif isinstance(keywords, (list, tuple)):
+                        keywords_list = keywords
+                    else:
+                        keywords_list = []
 
-                return url, json.dumps(transcription_text), summary_text, json_file_path, summary_file_path, None
+                    # Add to database
+                    add_media_to_database(url or local_file_path, info_dict, segments, summary_text, keywords_list,
+                                          custom_prompt, whisper_model)
+
+                    return url or local_file_path, json.dumps(
+                        transcription_text), summary_text, json_file_path, summary_file_path, info_dict
+
+                except Exception as e:
+                    logging.error(f"Error in process_url_with_metadata: {str(e)}", exc_info=True)
+                    return None, None, None, None, None, None
 
             process_button.click(
                 fn=process_videos_with_error_handling,
