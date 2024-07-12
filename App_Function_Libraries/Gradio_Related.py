@@ -691,16 +691,34 @@ def create_video_transcription_tab():
                         video_file_path = local_file_path
                         # Extract basic info from local file
                         info_dict = {
+                            'webpage_url': local_file_path,
                             'title': os.path.basename(local_file_path),
-                            'ext': os.path.splitext(local_file_path)[1][1:]  # Remove the leading dot
+                            'description': "Local file",
+                            'channel_url': None,
+                            'duration': None,
+                            'channel': None,
+                            'uploader': None,
+                            'upload_date': None
                         }
                     else:
                         # Extract video information
                         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-                            info_dict = ydl.extract_info(url, download=False)
+                            full_info = ydl.extract_info(url, download=False)
+
+                        # Filter the required metadata
+                        info_dict = {
+                            'webpage_url': full_info.get('webpage_url', url),
+                            'title': full_info.get('title'),
+                            'description': full_info.get('description'),
+                            'channel_url': full_info.get('channel_url'),
+                            'duration': full_info.get('duration'),
+                            'channel': full_info.get('channel'),
+                            'uploader': full_info.get('uploader'),
+                            'upload_date': full_info.get('upload_date')
+                        }
 
                         # Download video/audio
-                        video_file_path = download_video(url, download_path, info_dict, download_video_flag)
+                        video_file_path = download_video(url, download_path, full_info, download_video_flag)
                         if not video_file_path:
                             raise ValueError(f"Failed to download video/audio from {url}")
 
@@ -746,11 +764,12 @@ def create_video_transcription_tab():
                     else:
                         keywords_list = []
 
-                    # Add to database
-                    add_media_to_database(url or local_file_path, info_dict, segments, summary_text, keywords_list,
+                    # Add to database (use the filtered info_dict)
+                    add_media_to_database(info_dict['webpage_url'], info_dict, segments, summary_text,
+                                          keywords_list,
                                           custom_prompt, whisper_model)
 
-                    return url or local_file_path, json.dumps(
+                    return info_dict['webpage_url'], json.dumps(
                         transcription_text), summary_text, json_file_path, summary_file_path, info_dict
 
                 except Exception as e:
