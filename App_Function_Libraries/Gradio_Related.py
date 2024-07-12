@@ -622,17 +622,15 @@ def create_video_transcription_tab():
                                     chunk_options=chunk_options
                                 )
 
-                                if isinstance(result, dict) and 'error' in result:
-                                    batch_results.append((url, result['error'], "Error", video_metadata, None, None))
-                                    errors.append(f"Error processing {url}: {result['error']}")
-                                elif result[0] is not None:
-                                    url, transcription, summary, json_file, summary_file, result_metadata = result
-                                    batch_results.append(
-                                        (url, transcription, "Success", result_metadata, json_file, summary_file))
-                                else:
+                                if isinstance(result[0], type(None)):  # Check if the first return value is None
                                     error_message = "Processing failed without specific error"
                                     batch_results.append((url, error_message, "Error", video_metadata, None, None))
                                     errors.append(f"Error processing {url}: {error_message}")
+                                else:
+                                    url, transcription, summary, json_file, summary_file, result_metadata = result
+                                    batch_results.append((url, json.dumps(transcription), "Success", result_metadata,
+                                                          json_file, summary_file))
+
                             except Exception as e:
                                 error_message = f"Error processing {url}: {str(e)}"
                                 batch_results.append((url, error_message, "Error", {}, None, None))
@@ -769,8 +767,9 @@ def create_video_transcription_tab():
                                           keywords_list,
                                           custom_prompt, whisper_model)
 
-                    return info_dict['webpage_url'], json.dumps(
-                        transcription_text), summary_text, json_file_path, summary_file_path, info_dict
+                    # Return the transcription_text as is, without additional JSON encoding
+                    return info_dict[
+                        'webpage_url'], transcription_text, summary_text, json_file_path, summary_file_path, info_dict
 
                 except Exception as e:
                     logging.error(f"Error in process_url_with_metadata: {str(e)}", exc_info=True)
