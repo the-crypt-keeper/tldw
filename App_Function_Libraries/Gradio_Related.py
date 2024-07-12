@@ -656,7 +656,6 @@ def create_video_transcription_tab():
                             progress((i + len(batch)) / total_videos,
                                      f"Processed {i + len(batch)}/{total_videos} videos")
 
-                    # Generate HTML for results
                     for url, transcription, status, metadata, json_file, summary_file in results:
                         if status == "Success":
                             title = metadata.get('title', 'Unknown Title')
@@ -667,11 +666,16 @@ def create_video_transcription_tab():
                                 transcription_text = "Transcription format error"
                             summary = open(summary_file, 'r').read() if summary_file else "No summary available"
 
+                            # Format metadata as text
+                            metadata_text = format_metadata_as_text(metadata)
+
                             results_html += f"""
                             <div class="result-box">
                                 <gradio-accordion>
                                     <gradio-accordion-item label="{title}">
                                         <p><strong>URL:</strong> <a href="{url}" target="_blank">{url}</a></p>
+                                        <h4>Metadata:</h4>
+                                        <pre>{metadata_text}</pre>
                                         <h4>Transcription:</h4>
                                         <div class="transcription">{transcription_text}</div>
                                         <h4>Summary:</h4>
@@ -682,7 +686,7 @@ def create_video_transcription_tab():
                             """
 
                             all_transcriptions[url] = transcription
-                            all_summaries += f"Title: {title}\nURL: {url}\n\n{summary}\n\n---\n\n"
+                            all_summaries += f"Title: {title}\nURL: {url}\n\nMetadata:\n{metadata_text}\n\nSummary:\n{summary}\n\n---\n\n"
                         else:
                             results_html += f"""
                             <div class="result-box error">
@@ -860,8 +864,7 @@ def create_video_transcription_tab():
                                           keywords_list, custom_prompt, whisper_model)
                     logging.info(f"Media added to database: {info_dict['webpage_url']}")
 
-                    return info_dict[
-                        'webpage_url'], transcription_text, summary_text, json_file_path, summary_file_path, info_dict
+                    return info_dict['webpage_url'], transcription_text, summary_text, json_file_path, summary_file_path, info_dict
 
                 except Exception as e:
                     logging.error(f"Error in process_url_with_metadata: {str(e)}", exc_info=True)
