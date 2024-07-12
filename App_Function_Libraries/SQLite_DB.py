@@ -423,14 +423,25 @@ def fetch_item_details(media_id: int):
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT prompt, summary FROM MediaModifications WHERE media_id = ?", (media_id,))
-            prompt_summary_results = cursor.fetchall()
+            cursor.execute("""
+                SELECT prompt, summary 
+                FROM MediaModifications 
+                WHERE media_id = ? 
+                ORDER BY modification_date DESC 
+                LIMIT 1
+            """, (media_id,))
+            prompt_summary_result = cursor.fetchone()
             cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
             content_result = cursor.fetchone()
+
+            prompt = prompt_summary_result[0] if prompt_summary_result else ""
+            summary = prompt_summary_result[1] if prompt_summary_result else ""
             content = content_result[0] if content_result else ""
-            return prompt_summary_results, content
+
+            return content, prompt, summary
     except sqlite3.Error as e:
-        raise DatabaseError(f"Error fetching item details: {e}")
+        logging.error(f"Error fetching item details: {e}")
+        return "", "", ""  # Return empty strings if there's an error
 
 #
 #
@@ -744,19 +755,33 @@ def insert_prompt_to_db(title, description, system_prompt, user_prompt):
 #######################################################################################################################
 
 
-def update_media_content(media_id: int, content: str, prompt: str, summary: str) -> str:
+def update_media_content(selected_item, item_mapping, content_input, prompt_input, summary_input):
     try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE Media 
-                SET content = ?, prompt = ?, summary = ?
-                WHERE id = ?
-            """, (content, prompt, summary, media_id))
-            conn.commit()
-        return "Content updated successfully"
-    except sqlite3.Error as e:
-        return f"Error updating content: {e}"
+        if selected_item and item_mapping and selected_item in item_mapping:
+            media_id = item_mapping[selected_item]
+
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Update the main content in the Media table
+                cursor.execute("UPDATE Media SET content = ? WHERE id = ?", (content_input, media_id))
+
+                # Update or insert the prompt and summary in the MediaModifications table
+                cursor.execute("""
+                    INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(media_id) DO UPDATE SET
+                    prompt = excluded.prompt,
+                    summary = excluded.summary,
+                    modification_date = CURRENT_TIMESTAMP
+                """, (media_id, prompt_input, summary_input))
+
+            return f"Content updated successfully for media ID: {media_id}"
+        else:
+            return "No item selected or invalid selection"
+    except Exception as e:
+        logging.error(f"Error updating media content: {e}")
+        return f"Error updating content: {str(e)}"
 
 def search_media_database(query: str) -> List[Tuple[int, str, str]]:
     try:
