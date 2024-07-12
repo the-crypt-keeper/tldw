@@ -22,14 +22,14 @@ from datetime import datetime
 
 import requests
 import os
-
+from gradio import gradio
 import yt_dlp
 
 from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 #
 # Local Imports
 from App_Function_Libraries.SQLite_DB import add_media_to_database, add_media_with_keywords
-from App_Function_Libraries.Utils import extract_text_from_segments, download_file, create_download_directory
+from App_Function_Libraries.Utils import create_download_directory
 from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
 #
@@ -157,59 +157,154 @@ def process_audio(
         return str(e), None, None, None, None, None
 
 
-def process_audio_file(audio_url, audio_file, whisper_model="small.en", api_name=None, api_key=None):
-    progress = []
-    transcriptions = []
+MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB in bytes
 
-    def update_progress(stage, message):
-        progress.append(f"{stage}: {message}")
-        return "\n".join(progress), "\n".join(transcriptions)
+
+def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key, use_cookies, cookies, keep_original,
+                        custom_keywords):
+    progress = []
+    temp_files = []
+    all_transcriptions = []
+    all_summaries = []
+
+    def update_progress(message):
+        progress.append(message)
+        return gradio.update(value="\n".join(progress))
+
+    def cleanup_files():
+        for file in temp_files:
+            try:
+                if os.path.exists(file):
+                    os.remove(file)
+                    update_progress(f"Temporary file {file} removed.")
+            except Exception as e:
+                update_progress(f"Failed to remove temporary file {file}: {str(e)}")
 
     try:
-        if audio_url:
-            # Process audio file from URL
-            save_path = os.path.join(create_download_directory("Audio_Downloads"), "downloaded_audio_file.wav")
-            try:
-                download_file(audio_url, save_path)
-                if os.path.getsize(save_path) > 500 * 1024 * 1024:  # 500 MB limit
-                    return update_progress("Error", "Downloaded file size exceeds the 500MB limit.")
-            except Exception as e:
-                return update_progress("Error", f"Failed to download audio file: {str(e)}")
-        elif audio_file:
-            # Process uploaded audio file
-            try:
-                if os.path.getsize(audio_file.name) > 500 * 1024 * 1024:  # 500 MB limit
-                    return update_progress("Error", "Uploaded file size exceeds the 500MB limit.")
-                save_path = audio_file.name
-            except Exception as e:
-                return update_progress("Error", f"Failed to process uploaded file: {str(e)}")
-        else:
-            return update_progress("Error", "No audio file provided.")
+        # Process multiple URLs
+        urls = [url.strip() for url in audio_urls.split('\n') if url.strip()]
 
-        # Perform transcription and summarization using process_audio
-        try:
-            transcription, summary, json_file_path, summary_file_path, _, _ = process_audio(
-                audio_file_path=save_path,
-                whisper_model=whisper_model,
-                api_name=api_name,
-                api_key=api_key
-            )
+        for i, url in enumerate(urls):
+            update_progress(f"Processing URL {i + 1}/{len(urls)}: {url}")
 
-            if isinstance(transcription, dict) and 'transcription' in transcription:
-                transcriptions.append(extract_text_from_segments(transcription['transcription']))
+            # Create a unique directory for this audio file
+            audio_dir = os.path.join('downloads', f'audio_{uuid.uuid4().hex[:8]}')
+            os.makedirs(audio_dir, exist_ok=True)
+
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'wav',
+                }],
+                'outtmpl': os.path.join(audio_dir, '%(title)s.%(ext)s')
+            }
+
+            # Add cookies if provided
+            if use_cookies and cookies:
+                try:
+                    cookies_dict = json.loads(cookies)
+                    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_cookie_file:
+                        json.dump(cookies_dict, temp_cookie_file)
+                        temp_cookie_file_path = temp_cookie_file.name
+                    ydl_opts['cookiefile'] = temp_cookie_file_path
+                    temp_files.append(temp_cookie_file_path)
+                    update_progress("Cookies applied to audio download.")
+                except json.JSONDecodeError:
+                    update_progress("Invalid cookie format. Proceeding without cookies.")
+
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info_dict = ydl.extract_info(url, download=True)
+                    audio_file_path = ydl.prepare_filename(info_dict).rsplit('.', 1)[0] + '.wav'
+                temp_files.append(audio_file_path)
+                update_progress("Audio file downloaded successfully.")
+            except yt_dlp.DownloadError as e:
+                update_progress(f"Failed to download audio file: {str(e)}")
+                continue
+
+            # Check file size
+            if os.path.getsize(audio_file_path) > MAX_FILE_SIZE:
+                update_progress(f"File size exceeds the maximum limit of 200MB. Skipping this file.")
+                continue
+
+            # Process the audio file
+            yield from process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original,
+                                            custom_keywords, url)
+
+        # Process uploaded file if provided
+        if audio_file:
+            if os.path.getsize(audio_file.name) > MAX_FILE_SIZE:
+                update_progress(f"Uploaded file size exceeds the maximum limit of 200MB. Skipping this file.")
             else:
-                transcriptions.append(str(transcription))
+                yield from process_single_audio(audio_file.name, whisper_model, api_name, api_key, keep_original,
+                                                custom_keywords, "Uploaded File")
 
-            progress.append("Processing complete.")
-            if summary:
-                progress.append(f"Summary: {summary}")
-        except Exception as e:
-            return update_progress("Error", f"Failed to process audio: {str(e)}")
+        # Final cleanup
+        if not keep_original:
+            cleanup_files()
+
+        return update_progress("All processing complete."), "\n\n".join(all_transcriptions), "\n\n".join(all_summaries)
 
     except Exception as e:
-        progress.append(f"Unexpected error: {str(e)}")
+        logging.error(f"Error processing audio files: {str(e)}")
+        cleanup_files()
+        return update_progress(f"Processing failed: {str(e)}"), None, None
 
-    return "\n".join(progress), "\n".join(transcriptions)
+
+def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original, custom_keywords, source):
+    progress = []
+    progress = []
+    all_transcriptions = []
+    all_summaries = []
+    def update_progress(message):
+        progress.append(message)
+        return "\n".join(progress)
+    try:
+        # Perform transcription
+        yield update_progress("Starting transcription...")
+        segments = speech_to_text(audio_file_path, whisper_model=whisper_model)
+        transcription = " ".join([segment['Text'] for segment in segments])
+        yield update_progress("Audio transcribed successfully.")
+        all_transcriptions.append(f"Transcription for {source}:\n{transcription}")
+
+        # Perform summarization if API is provided
+        summary = None
+        if api_name and api_key:
+            yield update_progress("Starting summarization...")
+            summary = perform_summarization(api_name, transcription, "Summarize the following audio transcript",
+                                            api_key)
+            yield update_progress("Audio summarized successfully.")
+            all_summaries.append(f"Summary for {source}:\n{summary}")
+
+        # Prepare keywords
+        keywords = "audio,transcription"
+        if custom_keywords:
+            keywords += f",{custom_keywords}"
+
+        # Add to database
+        add_media_with_keywords(
+            url=source,
+            title=os.path.basename(audio_file_path),
+            media_type='audio',
+            content=transcription,
+            keywords=keywords,
+            prompt="Summarize the following audio transcript",
+            summary=summary or "No summary available",
+            transcription_model=whisper_model,
+            author="Unknown",
+            ingestion_date=None  # This will use the current date
+        )
+        yield update_progress("Audio file added to database successfully.")
+
+        if not keep_original and source != "Uploaded File":
+            os.remove(audio_file_path)
+            yield update_progress(f"Temporary file {audio_file_path} removed.")
+        elif keep_original and source != "Uploaded File":
+            yield update_progress(f"Original audio file kept at: {audio_file_path}")
+
+    except Exception as e:
+        yield update_progress(f"Error processing {source}: {str(e)}")
 
 
 def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model,
