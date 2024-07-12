@@ -483,6 +483,7 @@ def create_video_transcription_tab():
         with gr.Row():
             with gr.Column():
                 url_input = gr.Textbox(label="URL (Mandatory)", placeholder="Enter the video URL here. Multiple at once supported, one per line")
+                # Cookie support
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False, visible=True)
                 num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)", visible=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model", visible=True)
@@ -501,6 +502,19 @@ def create_video_transcription_tab():
                 question_box_input = gr.Textbox(label="Question", placeholder="Enter a question to ask about the transcription", visible=False)
                 local_file_path_input = gr.Textbox(label="Local File Path", placeholder="Enter the path to a local file", visible=False)
                 chunking_inputs = create_chunking_inputs()
+                use_cookies_input = gr.Checkbox(label="Use cookies for video download", value=False)
+                cookies_input = gr.Textbox(
+                    label="Video Download Cookies",
+                    placeholder="Paste your cookies here (JSON format)",
+                    lines=3,
+                    visible=False
+                )
+                # JavaScript to toggle cookies input visibility
+                use_cookies_input.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[use_cookies_input],
+                    outputs=[cookies_input]
+                )
 
                 outputs = [
                     # Just always keep these hidden
@@ -511,6 +525,7 @@ def create_video_transcription_tab():
                 process_button = gr.Button("Process Video")
 
             with gr.Column():
+                progress_output = gr.Textbox(label="Progress")
                 transcription_output = gr.Textbox(label="Transcription")
                 summary_output = gr.Textbox(label="Summary or Status Message")
                 download_transcription = gr.File(label="-Download Transcription as JSON-")
@@ -521,8 +536,8 @@ def create_video_transcription_tab():
             inputs=[url_input, num_speakers_input, whisper_model_input, custom_prompt_input, offset_input,
                     api_name_input, api_key_input, vad_filter_input, download_video_input, download_audio_input,
                     rolling_summarization_input, detail_level_input, question_box_input,
-                    keywords_input, local_file_path_input, diarize_input] + chunking_inputs,
-            outputs=[transcription_output, summary_output, download_transcription, download_summary]
+                    keywords_input, local_file_path_input, diarize_input] + chunking_inputs + [cookies_input],
+            outputs=[progress_output,transcription_output, summary_output, download_transcription, download_summary]
         )
 
 
