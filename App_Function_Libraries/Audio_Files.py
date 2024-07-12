@@ -49,29 +49,6 @@ def download_audio_file(url, save_path):
     return save_path
 
 
-def save_segments_to_json(segments, file_name="transcription_segments.json"):
-    """
-    Save transcription segments to a JSON file.
-
-    Parameters:
-    segments (list): List of transcription segments
-    file_name (str): Name of the JSON file to save (default: "transcription_segments.json")
-
-    Returns:
-    str: Path to the saved JSON file
-    """
-    # Ensure the Results directory exists
-    os.makedirs("Results", exist_ok=True)
-
-    # Full path for the JSON file
-    json_file_path = os.path.join("Results", file_name)
-
-    # Save segments to JSON file
-    with open(json_file_path, 'w', encoding='utf-8') as json_file:
-        json.dump(segments, json_file, ensure_ascii=False, indent=4)
-
-    return json_file_path
-
 def process_audio(
         audio_file_path,
         num_speakers=2,
@@ -305,6 +282,23 @@ def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep
 
     except Exception as e:
         yield update_progress(f"Error processing {source}: {str(e)}")
+
+
+
+def download_youtube_audio(url: str) -> str:
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'wav',
+            'preferredquality': '192',
+        }],
+        'outtmpl': '%(title)s.%(ext)s'
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        filename = ydl.prepare_filename(info)
+        return filename.rsplit('.', 1)[0] + '.wav'
 
 
 def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model,

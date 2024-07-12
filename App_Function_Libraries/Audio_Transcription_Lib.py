@@ -13,8 +13,7 @@ import configparser
 # 2. speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='small.en', vad_filter=False)
 #
 ####################
-
-
+#
 # Import necessary libraries to run solo for testing
 import json
 import logging
@@ -22,6 +21,7 @@ import os
 import sys
 import subprocess
 import time
+
 # Import Local
 #
 #######################################################################################################################
@@ -150,8 +150,6 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         logging.error("speech-to-text: Error transcribing audio: %s", str(e))
         raise RuntimeError("speech-to-text: Error transcribing audio")
     return segments
-
-
 
 #
 #

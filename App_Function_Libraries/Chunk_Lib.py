@@ -9,7 +9,7 @@
 import logging
 import re
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 
 from openai import OpenAI
 from tqdm import tqdm
@@ -49,32 +49,124 @@ def load_document(file_path):
     return re.sub('\\s+', ' ', text).strip()
 
 
-# Chunk based on maximum number of words, using ' ' (space) as a delimiter
-def chunk_text_by_words(text, max_words=300):
+def improved_chunking_process(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:
+    chunk_method = chunk_options.get('method', 'words')
+    max_chunk_size = chunk_options.get('max_size', 300)
+    overlap = chunk_options.get('overlap', 0)
+    language = chunk_options.get('language', 'english')
+    adaptive = chunk_options.get('adaptive', False)
+    multi_level = chunk_options.get('multi_level', False)
+
+    if adaptive:
+        max_chunk_size = adaptive_chunk_size(text, max_chunk_size)
+
+    if multi_level:
+        chunks = multi_level_chunking(text, chunk_method, max_chunk_size, overlap, language)
+    else:
+        if chunk_method == 'words':
+            chunks = chunk_text_by_words(text, max_chunk_size, overlap)
+        elif chunk_method == 'sentences':
+            chunks = chunk_text_by_sentences(text, max_chunk_size, overlap, language)
+        elif chunk_method == 'paragraphs':
+            chunks = chunk_text_by_paragraphs(text, max_chunk_size, overlap)
+        elif chunk_method == 'tokens':
+            chunks = chunk_text_by_tokens(text, max_chunk_size, overlap)
+        else:
+            chunks = [text]  # No chunking applied
+
+    return [{'text': chunk, 'metadata': get_chunk_metadata(chunk, text)} for chunk in chunks]
+
+
+def adaptive_chunk_size(text: str, base_size: int) -> int:
+    # Simple adaptive logic: adjust chunk size based on text complexity
+    avg_word_length = sum(len(word) for word in text.split()) / len(text.split())
+    if avg_word_length > 6:  # Arbitrary threshold for "complex" text
+        return int(base_size * 0.8)  # Reduce chunk size for complex text
+    return base_size
+
+
+def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, language: str) -> List[str]:
+    # First level: chunk by paragraphs
+    paragraphs = chunk_text_by_paragraphs(text, max_size * 2, overlap)
+
+    # Second level: chunk each paragraph further
+    chunks = []
+    for para in paragraphs:
+        if method == 'words':
+            chunks.extend(chunk_text_by_words(para, max_size, overlap))
+        elif method == 'sentences':
+            chunks.extend(chunk_text_by_sentences(para, max_size, overlap, language))
+        else:
+            chunks.append(para)
+
+    return chunks
+
+
+def chunk_text_by_words(text: str, max_words: int = 300, overlap: int = 0) -> List[str]:
     words = text.split()
-    chunks = [' '.join(words[i:i + max_words]) for i in range(0, len(words), max_words)]
-    return chunks
+    chunks = []
+    for i in range(0, len(words), max_words - overlap):
+        chunk = ' '.join(words[i:i + max_words])
+        chunks.append(chunk)
+    return post_process_chunks(chunks)
 
 
-# Chunk based on sentences, not exceeding a max amount, using nltk
-def chunk_text_by_sentences(text, max_sentences=10):
-    sentences = nltk.tokenize.sent_tokenize(text)
-    chunks = [' '.join(sentences[i:i + max_sentences]) for i in range(0, len(sentences), max_sentences)]
-    return chunks
+def chunk_text_by_sentences(text: str, max_sentences: int = 10, overlap: int = 0, language: str = 'english') -> List[
+    str]:
+    nltk.download('punkt', quiet=True)
+    sentences = nltk.sent_tokenize(text, language=language)
+    chunks = []
+    for i in range(0, len(sentences), max_sentences - overlap):
+        chunk = ' '.join(sentences[i:i + max_sentences])
+        chunks.append(chunk)
+    return post_process_chunks(chunks)
 
 
-# Chunk text by paragraph, marking paragraphs by (delimiter) '\n\n'
-def chunk_text_by_paragraphs(text, max_paragraphs=5):
-    paragraphs = text.split('\n\n')
-    chunks = ['\n\n'.join(paragraphs[i:i + max_paragraphs]) for i in range(0, len(paragraphs), max_paragraphs)]
-    return chunks
+def chunk_text_by_paragraphs(text: str, max_paragraphs: int = 5, overlap: int = 0) -> List[str]:
+    paragraphs = re.split(r'\n\s*\n', text)
+    chunks = []
+    for i in range(0, len(paragraphs), max_paragraphs - overlap):
+        chunk = '\n\n'.join(paragraphs[i:i + max_paragraphs])
+        chunks.append(chunk)
+    return post_process_chunks(chunks)
 
 
-# Naive chunking based on token count
-def chunk_text_by_tokens(text, max_tokens=1000):
-    tokens = tokenizer.encode(text)
-    chunks = [tokenizer.decode(tokens[i:i + max_tokens]) for i in range(0, len(tokens), max_tokens)]
-    return chunks
+def chunk_text_by_tokens(text: str, max_tokens: int = 1000, overlap: int = 0) -> List[str]:
+    # This is a simplified token-based chunking. For more accurate tokenization,
+    # consider using a proper tokenizer like GPT-2 TokenizerFast
+    words = text.split()
+    chunks = []
+    current_chunk = []
+    current_token_count = 0
+
+    for word in words:
+        word_token_count = len(word) // 4 + 1  # Rough estimate of token count
+        if current_token_count + word_token_count > max_tokens and current_chunk:
+            chunks.append(' '.join(current_chunk))
+            current_chunk = current_chunk[-overlap:] if overlap > 0 else []
+            current_token_count = sum(len(w) // 4 + 1 for w in current_chunk)
+
+        current_chunk.append(word)
+        current_token_count += word_token_count
+
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
+
+    return post_process_chunks(chunks)
+
+
+def post_process_chunks(chunks: List[str]) -> List[str]:
+    return [chunk.strip() for chunk in chunks if chunk.strip()]
+
+
+def get_chunk_metadata(chunk: str, full_text: str) -> Dict[str, Any]:
+    start_index = full_text.index(chunk)
+    return {
+        'start_index': start_index,
+        'end_index': start_index + len(chunk),
+        'word_count': len(chunk.split()),
+        'char_count': len(chunk)
+    }
 
 
 # Hybrid approach, chunk each sentence while ensuring total token size does not exceed a maximum number
@@ -110,168 +202,6 @@ def chunk_on_delimiter(input_string: str,
         print(f"Warning: {dropped_chunk_count} chunks were dropped due to exceeding the token limit.")
     combined_chunks = [f"{chunk}{delimiter}" for chunk in combined_chunks]
     return combined_chunks
-
-
-# def rolling_summarize_function(text: str,
-#                                 detail: float = 0,
-#                                 api_name: str = None,
-#                                 api_key: str = None,
-#                                 model: str = None,
-#                                 custom_prompt: str = None,
-#                                 chunk_by_words: bool = False,
-#                                 max_words: int = 300,
-#                                 chunk_by_sentences: bool = False,
-#                                 max_sentences: int = 10,
-#                                 chunk_by_paragraphs: bool = False,
-#                                 max_paragraphs: int = 5,
-#                                 chunk_by_tokens: bool = False,
-#                                 max_tokens: int = 1000,
-#                                 summarize_recursively=False,
-#                                 verbose=False):
-#     """
-#     Summarizes a given text by splitting it into chunks, each of which is summarized individually.
-#     Allows selecting the method for chunking (words, sentences, paragraphs, tokens).
-#
-#     Parameters:
-#         - text (str): The text to be summarized.
-#         - detail (float, optional): A value between 0 and 1 indicating the desired level of detail in the summary.
-#         - api_name (str, optional): Name of the API to use for summarization.
-#         - api_key (str, optional): API key for the specified API.
-#         - model (str, optional): Model identifier for the summarization engine.
-#         - custom_prompt (str, optional): Custom prompt for the summarization.
-#         - chunk_by_words (bool, optional): If True, chunks the text by words.
-#         - max_words (int, optional): Maximum number of words per chunk.
-#         - chunk_by_sentences (bool, optional): If True, chunks the text by sentences.
-#         - max_sentences (int, optional): Maximum number of sentences per chunk.
-#         - chunk_by_paragraphs (bool, optional): If True, chunks the text by paragraphs.
-#         - max_paragraphs (int, optional): Maximum number of paragraphs per chunk.
-#         - chunk_by_tokens (bool, optional): If True, chunks the text by tokens.
-#         - max_tokens (int, optional): Maximum number of tokens per chunk.
-#         - summarize_recursively (bool, optional): If True, summaries are generated recursively.
-#         - verbose (bool, optional): If verbose, prints additional output.
-#
-#     Returns:
-#         - str: The final compiled summary of the text.
-#     """
-#
-#     def extract_text_from_segments(segments):
-#         text = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
-#         return text
-#     # Validate input
-#     if not text:
-#         raise ValueError("Input text cannot be empty.")
-#     if any([max_words <= 0, max_sentences <= 0, max_paragraphs <= 0, max_tokens <= 0]):
-#         raise ValueError("All maximum chunk size parameters must be positive integers.")
-#     global segments
-#
-#     if isinstance(text, dict) and 'transcription' in text:
-#         text = extract_text_from_segments(text['transcription'])
-#     elif isinstance(text, list):
-#         text = extract_text_from_segments(text)
-#
-#     # Select the chunking function based on the method specified
-#     if chunk_by_words:
-#         chunks = chunk_text_by_words(text, max_words)
-#     elif chunk_by_sentences:
-#         chunks = chunk_text_by_sentences(text, max_sentences)
-#     elif chunk_by_paragraphs:
-#         chunks = chunk_text_by_paragraphs(text, max_paragraphs)
-#     elif chunk_by_tokens:
-#         chunks = chunk_text_by_tokens(text, max_tokens)
-#     else:
-#         chunks = [text]
-#
-#     # Process each chunk for summarization
-#     accumulated_summaries = []
-#     for chunk in chunks:
-#         if summarize_recursively and accumulated_summaries:
-#             # Creating a structured prompt for recursive summarization
-#             previous_summaries = '\n\n'.join(accumulated_summaries)
-#             user_message_content = f"Previous summaries:\n\n{previous_summaries}\n\nText to summarize next:\n\n{chunk}"
-#         else:
-#             # Directly passing the chunk for summarization without recursive context
-#             user_message_content = chunk
-#
-#         # Extracting the completion from the response
-#         try:
-#             if api_name.lower() == 'openai':
-#                 # def summarize_with_openai(api_key, input_data, custom_prompt_arg)
-#                 summary = summarize_with_openai(user_message_content, text, custom_prompt)
-#
-#             elif api_name.lower() == "anthropic":
-#                 # def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
-#                 summary = summarize_with_anthropic(user_message_content, text, custom_prompt)
-#             elif api_name.lower() == "cohere":
-#                 # def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg)
-#                 summary = summarize_with_cohere(user_message_content, text, custom_prompt)
-#
-#             elif api_name.lower() == "groq":
-#                 logging.debug(f"MAIN: Trying to summarize with groq")
-#                 # def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
-#                 summary = summarize_with_groq(user_message_content, text, custom_prompt)
-#
-#             elif api_name.lower() == "openrouter":
-#                 logging.debug(f"MAIN: Trying to summarize with OpenRouter")
-#                 # def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
-#                 summary = summarize_with_openrouter(user_message_content, text, custom_prompt)
-#
-#             elif api_name.lower() == "deepseek":
-#                 logging.debug(f"MAIN: Trying to summarize with DeepSeek")
-#                 # def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
-#                 summary = summarize_with_deepseek(api_key, user_message_content,custom_prompt)
-#
-#             elif api_name.lower() == "llama.cpp":
-#                 logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
-#                 # def summarize_with_llama(api_url, file_path, token, custom_prompt)
-#                 summary = summarize_with_llama(user_message_content, custom_prompt)
-#
-#             elif api_name.lower() == "kobold":
-#                 logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
-#                 # def summarize_with_kobold(input_data, kobold_api_token, custom_prompt_input, api_url):
-#                 summary = summarize_with_kobold(user_message_content, api_key, custom_prompt)
-#
-#             elif api_name.lower() == "ooba":
-#                 # def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url):
-#                 summary = summarize_with_oobabooga(user_message_content, api_key, custom_prompt)
-#
-#             elif api_name.lower() == "tabbyapi":
-#                 # def summarize_with_tabbyapi(input_data, tabby_model, custom_prompt_input, api_key=None, api_IP):
-#                 summary = summarize_with_tabbyapi(user_message_content, custom_prompt)
-#
-#             elif api_name.lower() == "vllm":
-#                 logging.debug(f"MAIN: Trying to summarize with VLLM")
-#                 # def summarize_with_vllm(api_key, input_data, custom_prompt_input):
-#                 summary = summarize_with_vllm(user_message_content, custom_prompt)
-#
-#             elif api_name.lower() == "local-llm":
-#                 logging.debug(f"MAIN: Trying to summarize with Local LLM")
-#                 summary = summarize_with_local_llm(user_message_content, custom_prompt)
-#
-#             elif api_name.lower() == "huggingface":
-#                 logging.debug(f"MAIN: Trying to summarize with huggingface")
-#                 # def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
-#                 summarize_with_huggingface(api_key, user_message_content, custom_prompt)
-#             # Add additional API handlers here...
-#             else:
-#                 logging.warning(f"Unsupported API: {api_name}")
-#                 summary = None
-#         except requests.exceptions.ConnectionError:
-#             logging.error("Connection error while summarizing")
-#             summary = None
-#         except Exception as e:
-#             logging.error(f"Error summarizing with {api_name}: {str(e)}")
-#             summary = None
-#
-#         if summary:
-#             logging.info(f"Summary generated using {api_name} API")
-#             accumulated_summaries.append(summary)
-#         else:
-#             logging.warning(f"Failed to generate summary using {api_name} API")
-#
-#     # Compile final summary from partial summaries
-#     final_summary = '\n\n'.join(accumulated_summaries)
-#     return final_summary
-
 
 
 # Sample text for testing

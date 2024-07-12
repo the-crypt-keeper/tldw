@@ -839,16 +839,46 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
     return json_file_path, summary_file_path
 
 
-
+def summarize_chunk(api_name, text, custom_prompt_input, api_key):
+    try:
+        if api_name.lower() == 'openai':
+            return summarize_with_openai(api_key, text, custom_prompt_input)
+        elif api_name.lower() == "anthropic":
+            return summarize_with_anthropic(api_key, text, custom_prompt_input)
+        elif api_name.lower() == "cohere":
+            return summarize_with_cohere(api_key, text, custom_prompt_input)
+        elif api_name.lower() == "groq":
+            return summarize_with_groq(api_key, text, custom_prompt_input)
+        elif api_name.lower() == "openrouter":
+            return summarize_with_openrouter(api_key, text, custom_prompt_input)
+        elif api_name.lower() == "deepseek":
+            return summarize_with_deepseek(api_key, text, custom_prompt_input)
+        elif api_name.lower() == "llama.cpp":
+            return summarize_with_llama(text, custom_prompt_input)
+        elif api_name.lower() == "kobold":
+            return summarize_with_kobold(text, api_key, custom_prompt_input)
+        elif api_name.lower() == "ooba":
+            return summarize_with_oobabooga(text, api_key, custom_prompt_input)
+        elif api_name.lower() == "tabbyapi":
+            return summarize_with_tabbyapi(text, custom_prompt_input)
+        elif api_name.lower() == "vllm":
+            return summarize_with_vllm(text, custom_prompt_input)
+        elif api_name.lower() == "local-llm":
+            return summarize_with_local_llm(text, custom_prompt_input)
+        elif api_name.lower() == "huggingface":
+            return summarize_with_huggingface(api_key, text, custom_prompt_input)
+        else:
+            logging.warning(f"Unsupported API: {api_name}")
+            return None
+    except Exception as e:
+        logging.error(f"Error in summarize_chunk with {api_name}: {str(e)}")
+        return None
 
 
 def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key):
-    # Load Config
     loaded_config_data = load_and_log_configs()
 
     if custom_prompt_input is None:
-        # FIXME - Setup proper default prompt & extract said prompt from config file or prompts.db file.
-        #custom_prompt_input = config.get('Prompts', 'video_summarize_prompt', fallback="Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary.")
         custom_prompt_input = """
         You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
 **Bulleted Note Creation Guidelines**
@@ -866,7 +896,7 @@ def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key
 **Review**:
 - Ensure adherence to specified format
 - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
-    summary = None
+
     try:
         if not json_file_path or not os.path.exists(json_file_path):
             logging.error(f"JSON file does not exist: {json_file_path}")
@@ -875,94 +905,42 @@ def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key
         with open(json_file_path, 'r') as file:
             data = json.load(file)
 
-        segments = data
+        if isinstance(data, dict) and 'transcription' in data:
+            segments = data['transcription']
+        else:
+            segments = data
+
         if not isinstance(segments, list):
             logging.error(f"Segments is not a list: {type(segments)}")
             return None
 
-        text = extract_text_from_segments(segments)
-
-        if api_name.lower() == 'openai':
-            #def summarize_with_openai(api_key, input_data, custom_prompt_arg)
-            summary = summarize_with_openai(api_key, text, custom_prompt_input)
-
-        elif api_name.lower() == "anthropic":
-            # def summarize_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5):
-            summary = summarize_with_anthropic(api_key, text, custom_prompt_input)
-        elif api_name.lower() == "cohere":
-            # def summarize_with_cohere(api_key, input_data, model, custom_prompt_arg)
-            summary = summarize_with_cohere(api_key, text, custom_prompt_input)
-
-        elif api_name.lower() == "groq":
-            logging.debug(f"MAIN: Trying to summarize with groq")
-            # def summarize_with_groq(api_key, input_data, model, custom_prompt_arg):
-            summary = summarize_with_groq(api_key, text, custom_prompt_input)
-
-        elif api_name.lower() == "openrouter":
-            logging.debug(f"MAIN: Trying to summarize with OpenRouter")
-            # def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
-            summary = summarize_with_openrouter(api_key, text, custom_prompt_input)
-
-        elif api_name.lower() == "deepseek":
-            logging.debug(f"MAIN: Trying to summarize with DeepSeek")
-            # def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
-            summary = summarize_with_deepseek(api_key, text, custom_prompt_input)
-
-        elif api_name.lower() == "llama.cpp":
-            logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
-            # def summarize_with_llama(api_url, file_path, token, custom_prompt)
-            summary = summarize_with_llama(text, custom_prompt_input)
-
-        elif api_name.lower() == "kobold":
-            logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
-            # def summarize_with_kobold(input_data, kobold_api_token, custom_prompt_input, api_url):
-            summary = summarize_with_kobold(text, api_key, custom_prompt_input)
-
-        elif api_name.lower() == "ooba":
-            # def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url):
-            summary = summarize_with_oobabooga(text, api_key, custom_prompt_input)
-
-        elif api_name.lower() == "tabbyapi":
-            # def summarize_with_tabbyapi(input_data, tabby_model, custom_prompt_input, api_key=None, api_IP):
-            summary = summarize_with_tabbyapi(text, custom_prompt_input)
-
-        elif api_name.lower() == "vllm":
-            logging.debug(f"MAIN: Trying to summarize with VLLM")
-            # def summarize_with_vllm(api_key, input_data, custom_prompt_input):
-            summary = summarize_with_vllm(text, custom_prompt_input)
-
-        elif api_name.lower() == "local-llm":
-            logging.debug(f"MAIN: Trying to summarize with Local LLM")
-            summary = summarize_with_local_llm(text, custom_prompt_input)
-
-        elif api_name.lower() == "huggingface":
-            logging.debug(f"MAIN: Trying to summarize with huggingface")
-            # def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
-            summarize_with_huggingface(api_key, text, custom_prompt_input)
-        # Add additional API handlers here...
-
+        # Check if the segments are in the new chunked format
+        if segments and isinstance(segments[0], dict) and 'text' in segments[0] and 'metadata' in segments[0]:
+            summaries = []
+            for chunk in segments:
+                chunk_summary = summarize_chunk(api_name, chunk['text'], custom_prompt_input, api_key)
+                summaries.append(chunk_summary)
+            summary = "\n\n".join(summaries)
         else:
-            logging.warning(f"Unsupported API: {api_name}")
-
-        if summary is None:
-            logging.debug("Summarization did not return valid text.")
+            text = extract_text_from_segments(segments)
+            summary = summarize_chunk(api_name, text, custom_prompt_input, api_key)
 
         if summary:
             logging.info(f"Summary generated using {api_name} API")
-            # Save the summary file in the same directory as the JSON file
             summary_file_path = json_file_path.replace('.json', '_summary.txt')
             with open(summary_file_path, 'w') as file:
                 file.write(summary)
         else:
             logging.warning(f"Failed to generate summary using {api_name} API")
+
         return summary
 
     except requests.exceptions.ConnectionError:
-            logging.error("Connection error while summarizing")
+        logging.error("Connection error while summarizing")
     except Exception as e:
         logging.error(f"Error summarizing with {api_name}: {str(e)}")
 
-    return summary
+    return None
 
 
 
