@@ -21,7 +21,7 @@ import logging
 import os.path
 from pathlib import Path
 import sqlite3
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 import traceback
 from functools import wraps
 #
@@ -474,6 +474,7 @@ def create_chunking_inputs():
             chunk_text_by_paragraphs_checkbox, max_paragraphs_input, chunk_text_by_tokens_checkbox, max_tokens_input]
 
 
+
 def create_video_transcription_tab():
     with gr.TabItem("Video Transcription + Summarization"):
         gr.Markdown("# Transcribe & Summarize Videos from URLs")
@@ -488,7 +489,13 @@ def create_video_transcription_tab():
                                        lines=5)
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False)
                 custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3)
+                custom_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[custom_prompt_checkbox],
+                    outputs=[custom_prompt_input]
+                )
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
@@ -554,26 +561,27 @@ def create_video_transcription_tab():
             with gr.Column():
                 progress_output = gr.Textbox(label="Progress")
                 error_output = gr.Textbox(label="Errors", visible=False)
-                overall_progress_bar = gr.Progress()
-                transcription_output = gr.Dataframe(headers=["URL", "Transcription", "Status"], label="Transcriptions")
-                summary_output = gr.Dataframe(headers=["URL", "Summary", "Status"], label="Summaries")
-                download_transcription = gr.File(label="Download Transcriptions as JSON")
-                download_summary = gr.File(label="Download Summaries as Text")
-                metadata_output = gr.JSON(label="Video Metadata (Editable)")
+                results_output = gr.HTML(label="Results")
+                download_transcription = gr.File(label="Download All Transcriptions as JSON")
+                download_summary = gr.File(label="Download All Summaries as Text")
 
             @error_handler
             def process_videos_with_error_handling(urls, start_time, end_time, diarize, whisper_model,
-                                                   custom_prompt_checkbox, custom_prompt,
-                                                   api_name, api_key, keywords, chunking_options_checkbox, chunk_method,
-                                                   max_chunk_size,
-                                                   chunk_overlap, use_adaptive_chunking, use_multi_level_chunking,
-                                                   chunk_language,
-                                                   use_cookies, cookies, batch_size, timestamp_option, metadata,
-                                                   progress=gr.Progress()):
+                                                   custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
+                                                   chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
+                                                   use_multi_level_chunking, chunk_language, api_name,
+                                                   api_key, keywords, use_cookies, cookies, batch_size,
+                                                   timestamp_option, progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
-                    # Input validation
+                    logging.info("Entering process_videos_with_error_handling")
+                    logging.info(f"Received URLs: {urls}")
+
                     if not urls:
                         raise ValueError("No URLs provided")
+
+                    logging.debug("Input URL(s) is(are) valid")
+
+                    metadata = {}
 
                     # Ensure batch_size is an integer
                     try:
@@ -582,9 +590,15 @@ def create_video_transcription_tab():
                         batch_size = 1  # Default to processing one video at a time if invalid
 
                     expanded_urls = parse_and_expand_urls(urls)
+                    logging.info(f"Expanded URLs: {expanded_urls}")
+
                     total_videos = len(expanded_urls)
+                    logging.info(f"Total videos to process: {total_videos}")
                     results = []
                     errors = []
+                    results_html = ""
+                    all_transcriptions = {}
+                    all_summaries = ""
 
                     for i in range(0, total_videos, batch_size):
                         batch = expanded_urls[i:i + batch_size]
@@ -622,14 +636,21 @@ def create_video_transcription_tab():
                                     chunk_options=chunk_options
                                 )
 
-                                if isinstance(result[0], type(None)):  # Check if the first return value is None
+                                if result[0] is None:  # Check if the first return value is None
                                     error_message = "Processing failed without specific error"
                                     batch_results.append((url, error_message, "Error", video_metadata, None, None))
                                     errors.append(f"Error processing {url}: {error_message}")
                                 else:
                                     url, transcription, summary, json_file, summary_file, result_metadata = result
-                                    batch_results.append((url, json.dumps(transcription), "Success", result_metadata,
-                                                          json_file, summary_file))
+                                    if transcription is None:
+                                        error_message = f"Processing failed for {url}"
+                                        batch_results.append((url, error_message, "Error", result_metadata, None, None))
+                                        errors.append(error_message)
+                                    else:
+                                        batch_results.append(
+                                            (url, transcription, "Success", result_metadata, json_file, summary_file))
+                                    batch_results.append(
+                                        (url, transcription, "Success", result_metadata, json_file, summary_file))
 
                             except Exception as e:
                                 error_message = f"Error processing {url}: {str(e)}"
@@ -641,36 +662,87 @@ def create_video_transcription_tab():
                             progress((i + len(batch)) / total_videos,
                                      f"Processed {i + len(batch)}/{total_videos} videos")
 
-                    transcriptions = [[url, trans, status] for url, trans, status, _, _, _ in results]
-                    summaries = [[url, summary, status] for url, _, status, _, _, summary in results if
-                                 status == "Success" and summary is not None]
-                    all_metadata = {url: meta for url, _, _, meta, _, _ in results if meta}
+                    # Generate HTML for results
+                    for url, transcription, status, metadata, json_file, summary_file in results:
+                        if status == "Success":
+                            title = metadata.get('title', 'Unknown Title')
+                            transcription_text = ' '.join(
+                                [segment['Text'] for segment in transcription['transcription']])
+                            summary = open(summary_file, 'r').read() if summary_file else "No summary available"
+
+                            results_html += f"""
+                            <div class="result-box">
+                                <gradio-accordion>
+                                    <gradio-accordion-item label="{title}">
+                                        <p><strong>URL:</strong> <a href="{url}" target="_blank">{url}</a></p>
+                                        <h4>Transcription:</h4>
+                                        <div class="transcription">{transcription_text}</div>
+                                        <h4>Summary:</h4>
+                                        <div class="summary">{summary}</div>
+                                    </gradio-accordion-item>
+                                </gradio-accordion>
+                            </div>
+                            """
+
+                            all_transcriptions[url] = transcription
+                            all_summaries += f"Title: {title}\nURL: {url}\n\n{summary}\n\n---\n\n"
+                        else:
+                            results_html += f"""
+                            <div class="result-box error">
+                                <h3>Error processing {url}</h3>
+                                <p>{transcription}</p>
+                            </div>
+                            """
+
+                    # Save all transcriptions and summaries to files
+                    with open('all_transcriptions.json', 'w') as f:
+                        json.dump(all_transcriptions, f, indent=2)
+
+                    with open('all_summaries.txt', 'w') as f:
+                        f.write(all_summaries)
 
                     error_summary = "\n".join(errors) if errors else "No errors occurred."
 
                     return (
                         f"Processed {total_videos} videos. {len(errors)} errors occurred.",
                         error_summary,
-                        transcriptions,
-                        summaries,
-                        None,  # Placeholder for download_transcription
-                        None,  # Placeholder for download_summary
-                        all_metadata
+                        results_html,
+                        'all_transcriptions.json',
+                        'all_summaries.txt'
                     )
                 except Exception as e:
-                    # Catch any unexpected errors and return a structured response
-                    error_message = f"An unexpected error occurred: {str(e)}"
+                    logging.error(f"Unexpected error in process_videos_with_error_handling: {str(e)}", exc_info=True)
                     return (
-                        error_message,
-                        error_message,
-                        [],  # Empty transcriptions
-                        [],  # Empty summaries
+                        f"An unexpected error occurred: {str(e)}",
+                        str(e),
+                        "<div class='result-box error'><h3>Unexpected Error</h3><p>" + str(e) + "</p></div>",
                         None,
-                        None,
-                        {}  # Empty metadata
+                        None
                     )
 
-            # FIXME - remove dead args
+            def process_videos_wrapper(urls, start_time, end_time, diarize, whisper_model,
+                                       custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
+                                       chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
+                                       use_multi_level_chunking, chunk_language, api_name,
+                                       api_key, keywords, use_cookies, cookies, batch_size,
+                                       timestamp_option):
+                try:
+                    logging.info("process_videos_wrapper called")
+                    result = process_videos_with_error_handling(
+                        urls, start_time, end_time, diarize, whisper_model,
+                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
+                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
+                        use_multi_level_chunking, chunk_language, api_name,
+                        api_key, keywords, use_cookies, cookies, batch_size,
+                        timestamp_option
+                    )
+                    logging.info("process_videos_with_error_handling completed")
+                    return result
+                except Exception as e:
+                    logging.error(f"Error in process_videos_wrapper: {str(e)}", exc_info=True)
+                    return ("An error occurred", str(e), f"<div class='error'>Error: {str(e)}</div>", None, None)
+
+            # FIXME - remove dead args for process_url_with_metadata
             @error_handler
             def process_url_with_metadata(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key,
                                           vad_filter, download_video_flag, download_audio, rolling_summarization,
@@ -678,8 +750,10 @@ def create_video_transcription_tab():
                                           include_timestamps=True, metadata=None, use_chunking=False,
                                           chunk_options=None):
                 try:
+                    logging.info(f"Starting process_url_metadata for URL: {url}")
                     # Create download path
                     download_path = create_download_directory("Video_Downloads")
+                    logging.info(f"Download path created at: {download_path}")
 
                     # Initialize info_dict
                     info_dict = {}
@@ -698,10 +772,16 @@ def create_video_transcription_tab():
                             'uploader': None,
                             'upload_date': None
                         }
+                        logging.debug(f"Local file info_dict: {info_dict}")
                     else:
                         # Extract video information
                         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                             full_info = ydl.extract_info(url, download=False)
+
+                        # After extracting metadata
+                        logging.info(f"Metadata extracted: {info_dict}")
+                        if not info_dict:
+                            return url, None, None, None, None, {}
 
                         # Filter the required metadata
                         info_dict = {
@@ -715,9 +795,14 @@ def create_video_transcription_tab():
                             'upload_date': full_info.get('upload_date')
                         }
 
+                        # Debugging: Check the info_dict dictionary
+                        logging.debug(f"Info dict: {info_dict}")
+
                         # Download video/audio
                         video_file_path = download_video(url, download_path, full_info, download_video_flag)
+                        logging.info(f"Video downloaded: {video_file_path}")
                         if not video_file_path:
+                            #return url, None, None, None, None, info_dict
                             raise ValueError(f"Failed to download video/audio from {url}")
 
                     logging.info(f"Processing file: {video_file_path}")
@@ -726,12 +811,21 @@ def create_video_transcription_tab():
                     audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
                                                                       vad_filter, diarize)
 
+                    # After transcription
+                    logging.info(f"Transcription completed: {len(segments)} segments")
+                    if not segments:
+                        return url, None, None, None, None, info_dict
+
                     if audio_file_path is None or segments is None:
                         raise ValueError("Transcription failed or segments not available.")
+
+                    logging.info(f"Transcription completed. Number of segments: {len(segments)}")
 
                     # Process segments based on the timestamp option
                     if not include_timestamps:
                         segments = [{'Text': segment['Text']} for segment in segments]
+
+                    logging.info(f"Segments processed for timestamp inclusion: {segments}")
 
                     transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
 
@@ -743,16 +837,21 @@ def create_video_transcription_tab():
 
                     # Extract text from segments
                     full_text = extract_text_from_segments(segments)
+                    logging.debug(f"Full text extracted: {full_text}")
 
                     # Perform summarization if API is provided
                     summary_text = None
                     if api_name and api_key:
                         summary_text = perform_summarization(api_name, full_text, custom_prompt, api_key)
+                    # After summarization
+                    logging.info(f"Summarization completed: {len(summary_text) if summary_text else 0} characters")
 
                     # Save transcription and summary
                     download_path = create_download_directory("Audio_Processing")
                     json_file_path, summary_file_path = save_transcription_and_summary(full_text, summary_text,
                                                                                        download_path, info_dict)
+                    logging.info(
+                        f"Transcription and summary saved. JSON file: {json_file_path}, Summary file: {summary_file_path}")
 
                     # Prepare keywords for database
                     if isinstance(keywords, str):
@@ -761,13 +860,16 @@ def create_video_transcription_tab():
                         keywords_list = keywords
                     else:
                         keywords_list = []
+                    logging.info(f"Keywords prepared: {keywords_list}")
 
                     # Add to database (use the filtered info_dict)
                     add_media_to_database(info_dict['webpage_url'], info_dict, segments, summary_text,
                                           keywords_list,
                                           custom_prompt, whisper_model)
+                    logging.info(f"Media added to database: {info_dict['webpage_url']}")
 
                     # Return the transcription_text as is, without additional JSON encoding
+                  # return url, transcription_text, summary_text, json_file_path, summary_file_path, info_dict
                     return info_dict[
                         'webpage_url'], transcription_text, summary_text, json_file_path, summary_file_path, info_dict
 
@@ -776,13 +878,17 @@ def create_video_transcription_tab():
                     return None, None, None, None, None, None
 
             process_button.click(
-                fn=process_videos_with_error_handling,
-                inputs=[url_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
-                        custom_prompt_input, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap,
-        use_adaptive_chunking, use_multi_level_chunking, chunk_language, api_name_input, api_key_input, keywords_input,
-                        batch_size_input, timestamp_option, metadata_output],
-                outputs=[progress_output, error_output, transcription_output, summary_output, download_transcription,
-                         download_summary, metadata_output])
+                fn=process_videos_wrapper,
+                inputs=[
+                    url_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
+                    custom_prompt_checkbox, custom_prompt_input, chunking_options_checkbox,
+                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
+                    use_multi_level_chunking, chunk_language, api_name_input, api_key_input,
+                    keywords_input, use_cookies_input, cookies_input, batch_size_input,
+                    timestamp_option
+                ],
+                outputs=[progress_output, error_output, results_output, download_transcription, download_summary]
+            )
 
 
 def create_audio_processing_tab():
@@ -1382,7 +1488,27 @@ def launch_ui(demo_mode=False):
         share_public = False
     else:
         share_public = True
-    with gr.Blocks() as iface:
+
+    css = """
+    .result-box {
+        margin-bottom: 20px;
+        border: 1px solid #ddd;
+        padding: 10px;
+    }
+    .result-box.error {
+        border-color: #ff0000;
+        background-color: #ffeeee;
+    }
+    .transcription, .summary {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        padding: 10px;
+        margin-top: 10px;
+    }
+    """
+
+    with gr.Blocks(css=css) as iface:
         gr.Markdown("# TL/DW: Too Long, Didn't Watch - Your Personal Research Multi-Tool")
         with gr.Tabs():
             with gr.TabItem("Transcription / Summarization / Ingestion"):
