@@ -518,7 +518,7 @@ def create_video_transcription_tab():
                                             value="Include Timestamps", label="Timestamp Option")
                 # First, create a checkbox to toggle the chunking options
                 chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
-                use_cookies_input = gr.Checkbox(label="Use cookies for audio download", value=False)
+                use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
                 use_time_input = gr.Checkbox(label="Use Start and End Time", value=False)
 
                 with gr.Row(visible=False) as time_input_box:
@@ -914,7 +914,7 @@ def create_audio_processing_tab():
                                              placeholder="Enter the URL(s) of the audio file(s), one per line")
                 audio_file_input = gr.File(label="Upload Audio File", file_types=["audio/*"])
 
-                use_cookies_input = gr.Checkbox(label="Use cookies for audio download", value=False)
+                use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
                 cookies_input = gr.Textbox(
                     label="Audio Download Cookies",
                     placeholder="Paste your cookies here (JSON format)",
@@ -1084,7 +1084,8 @@ def create_search_tab():
     with gr.TabItem("Search / Detailed View"):
         with gr.Row():
             with gr.Column():
-                gr.Markdown("# Search across all ingested items in the Database by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
+                gr.Markdown("# Search across all ingested items in the Database")
+                gr.Markdown(" by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
                 search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
                 search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
                 search_button = gr.Button("Search")
