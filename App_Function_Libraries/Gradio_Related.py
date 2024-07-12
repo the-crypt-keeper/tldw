@@ -244,16 +244,25 @@ def fetch_item_details(media_id: int):
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT prompt, summary FROM MediaModifications WHERE media_id = ?", (media_id,))
-            prompt_summary_results = cursor.fetchall()
-
+            cursor.execute("""
+                SELECT prompt, summary 
+                FROM MediaModifications 
+                WHERE media_id = ? 
+                ORDER BY modification_date DESC 
+                LIMIT 1
+            """, (media_id,))
+            prompt_summary_result = cursor.fetchone()
             cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
             content_result = cursor.fetchone()
+
+            prompt = prompt_summary_result[0] if prompt_summary_result else ""
+            summary = prompt_summary_result[1] if prompt_summary_result else ""
             content = content_result[0] if content_result else ""
 
-            return prompt_summary_results, content
+            return content, prompt, summary
     except sqlite3.Error as e:
-        raise DatabaseError(f"Error fetching item details: {e}")
+        logging.error(f"Error fetching item details: {e}")
+        return "", "", ""  # Return empty strings if there's an error
 
 
 def browse_items(search_query, search_type):
@@ -295,11 +304,12 @@ def update_detailed_view(item, item_mapping):
     if item:
         item_id = item_mapping.get(item)
         if item_id:
-            prompt_summary_results, content = fetch_item_details(item_id)
-            if prompt_summary_results:
+            content, prompt, summary = fetch_item_details(item_id)
+            if content or prompt or summary:
                 details_html = "<h4>Details:</h4>"
-                for prompt, summary in prompt_summary_results:
+                if prompt:
                     details_html += f"<h4>Prompt:</h4>{prompt}</p>"
+                if summary:
                     details_html += f"<h4>Summary:</h4>{summary}</p>"
                 # Format the transcription content for better readability
                 content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{format_transcription(content)}</div>"
