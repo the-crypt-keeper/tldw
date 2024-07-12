@@ -820,23 +820,26 @@ def re_generate_transcription(audio_file_path, whisper_model, vad_filter):
         return None, None
 
 
-def save_transcription_and_summary(transcription_text, summary_text, download_path):
-    video_title = sanitize_filename(info_dict.get('title', 'Untitled'))
+def save_transcription_and_summary(transcription_text, summary_text, download_path, info_dict):
+    try:
+        video_title = sanitize_filename(info_dict.get('title', 'Untitled'))
 
-    json_file_path = os.path.join(download_path, f"{video_title}.segments.json")
-    summary_file_path = os.path.join(download_path, f"{video_title}_summary.txt")
+        # Save transcription
+        transcription_file_path = os.path.join(download_path, f"{video_title}_transcription.txt")
+        with open(transcription_file_path, 'w', encoding='utf-8') as f:
+            f.write(transcription_text)
 
-    with open(json_file_path, 'w') as json_file:
-        json.dump(transcription_text['transcription'], json_file, indent=2)
-
-    if summary_text is not None:
-        with open(summary_file_path, 'w') as file:
-            file.write(summary_text)
-    else:
-        logging.warning("Summary text is None. Skipping summary file creation.")
+        # Save summary if available
         summary_file_path = None
+        if summary_text:
+            summary_file_path = os.path.join(download_path, f"{video_title}_summary.txt")
+            with open(summary_file_path, 'w', encoding='utf-8') as f:
+                f.write(summary_text)
 
-    return json_file_path, summary_file_path
+        return transcription_file_path, summary_file_path
+    except Exception as e:
+        logging.error(f"Error in save_transcription_and_summary: {str(e)}", exc_info=True)
+        return None, None
 
 
 def summarize_chunk(api_name, text, custom_prompt_input, api_key):
