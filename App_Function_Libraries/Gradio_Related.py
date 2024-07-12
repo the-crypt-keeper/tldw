@@ -516,6 +516,7 @@ def create_video_transcription_tab():
                                              label="Batch Size (Number of videos to process simultaneously)")
                 timestamp_option = gr.Radio(choices=["Include Timestamps", "Exclude Timestamps"],
                                             value="Include Timestamps", label="Timestamp Option")
+                keep_original_audio = gr.Checkbox(label="Keep Original Audio", value=False)
                 # First, create a checkbox to toggle the chunking options
                 chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
@@ -580,7 +581,8 @@ def create_video_transcription_tab():
                                                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                                    use_multi_level_chunking, chunk_language, api_name,
                                                    api_key, keywords, use_cookies, cookies, batch_size,
-                                                   timestamp_option, progress: gr.Progress = gr.Progress()) -> tuple:
+                                                   timestamp_option, keep_original_audio=False,
+                                                   progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
                     logging.info("Entering process_videos_with_error_handling")
                     logging.info(f"Received URLs: {urls}")
@@ -638,7 +640,8 @@ def create_video_transcription_tab():
                                     include_timestamps=(timestamp_option == "Include Timestamps"),
                                     metadata=video_metadata,
                                     use_chunking=chunking_options_checkbox,
-                                    chunk_options=chunk_options
+                                    chunk_options=chunk_options,
+                                    keep_original_audio=keep_original_audio
                                 )
 
                                 if result[0] is None:  # Check if the first return value is None
@@ -742,7 +745,7 @@ def create_video_transcription_tab():
                                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                        use_multi_level_chunking, chunk_language, api_name,
                                        api_key, keywords, use_cookies, cookies, batch_size,
-                                       timestamp_option):
+                                       timestamp_option, keep_original_audio):
                 try:
                     logging.info("process_videos_wrapper called")
                     result = process_videos_with_error_handling(
@@ -751,7 +754,7 @@ def create_video_transcription_tab():
                         chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                         use_multi_level_chunking, chunk_language, api_name,
                         api_key, keywords, use_cookies, cookies, batch_size,
-                        timestamp_option
+                        timestamp_option, keep_original_audio
                     )
                     logging.info("process_videos_with_error_handling completed")
                     return result
@@ -765,7 +768,7 @@ def create_video_transcription_tab():
                                           vad_filter, download_video_flag, download_audio, rolling_summarization,
                                           detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
                                           include_timestamps=True, metadata=None, use_chunking=False,
-                                          chunk_options=None):
+                                          chunk_options=None, keep_original_audio=False):
                 try:
                     logging.info(f"Starting process_url_metadata for URL: {url}")
                     # Create download path
@@ -837,6 +840,41 @@ def create_video_transcription_tab():
 
                     logging.info(f"Transcription completed. Number of segments: {len(segments)}")
 
+                    # Add metadata to segments
+                    segments_with_metadata = {
+                        "metadata": info_dict,
+                        "segments": segments
+                    }
+
+                    # Save segments with metadata to JSON file
+                    segments_json_path = os.path.splitext(audio_file_path)[0] + ".segments.json"
+                    with open(segments_json_path, 'w') as f:
+                        json.dump(segments_with_metadata, f, indent=2)
+
+                    # Delete the .wav file after successful transcription
+                    files_to_delete = [audio_file_path]
+                    for file_path in files_to_delete:
+                        if file_path and os.path.exists(file_path):
+                            try:
+                                os.remove(file_path)
+                                logging.info(f"Successfully deleted file: {file_path}")
+                            except Exception as e:
+                                logging.warning(f"Failed to delete file {file_path}: {str(e)}")
+
+                    # Delete the mp4 file after successful transcription if not keeping original audio
+                    if not keep_original_audio:
+                        files_to_delete = [video_file_path]
+                        for file_path in files_to_delete:
+                            if file_path and os.path.exists(file_path):
+                                try:
+                                    os.remove(file_path)
+                                    logging.info(f"Successfully deleted file: {file_path}")
+                                except Exception as e:
+                                    logging.warning(f"Failed to delete file {file_path}: {str(e)}")
+                    else:
+                        logging.info(f"Keeping original video file: {video_file_path}")
+                        logging.info(f"Keeping original audio file: {audio_file_path}")
+
                     # Process segments based on the timestamp option
                     if not include_timestamps:
                         segments = [{'Text': segment['Text']} for segment in segments]
@@ -899,7 +937,7 @@ def create_video_transcription_tab():
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                     use_multi_level_chunking, chunk_language, api_name_input, api_key_input,
                     keywords_input, use_cookies_input, cookies_input, batch_size_input,
-                    timestamp_option
+                    timestamp_option, keep_original_audio
                 ],
                 outputs=[progress_output, error_output, results_output, download_transcription, download_summary]
             )
@@ -1300,7 +1338,8 @@ def import_data(file):
 
 def create_import_item_tab():
     with gr.TabItem("Import Items"):
-        gr.Markdown("Import a markdown or text file into the Database")
+        gr.Markdown("# Import a markdown file or text file into the database")
+        gr.Markdown("...and have it tagged + summarized")
         with gr.Row():
             import_file = gr.File(label="Upload file for import", file_types=["txt", "md"])
         with gr.Row():
