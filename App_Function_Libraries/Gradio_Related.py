@@ -30,7 +30,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
-from App_Function_Libraries.Audio_Files import process_audio_file
+from App_Function_Libraries.Audio_Files import process_audio_file, process_podcast
 from App_Function_Libraries.Chunk_Lib import semantic_chunk_long_file
 from App_Function_Libraries.PDF_Ingestion_Lib import ingest_pdf_file, process_and_ingest_pdf, process_and_cleanup_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
@@ -550,6 +550,42 @@ def create_audio_processing_tab():
                 outputs=[audio_progress_output, audio_transcriptions_output]
             )
 
+def create_podcast_tab():
+    with gr.TabItem("Podcast"):
+        with gr.Group():
+            gr.Markdown("# Podcast Transcription and Ingestion")
+            podcast_url_input = gr.Textbox(label="Podcast URL", placeholder="Enter the podcast URL here")
+            podcast_title_input = gr.Textbox(label="Podcast Title", placeholder="Will be auto-detected if possible")
+            podcast_author_input = gr.Textbox(label="Podcast Author", placeholder="Will be auto-detected if possible")
+            podcast_keywords_input = gr.Textbox(label="Keywords",
+                                                placeholder="Enter keywords here (comma-separated, include series name if applicable)",
+                                                value="podcast,audio")
+            podcast_custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt for summarization (optional)",
+                                                     lines=3)
+            podcast_api_name_input = gr.Dropdown(
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                         "Llama.cpp",
+                         "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                value=None,
+                label="API Name for Summarization (Optional)"
+            )
+            podcast_api_key_input = gr.Textbox(label="API Key (if required)", type="password")
+            podcast_whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+
+            podcast_process_button = gr.Button("Process Podcast")
+            podcast_progress_output = gr.Textbox(label="Progress")
+            podcast_transcription_output = gr.Textbox(label="Transcription")
+            podcast_summary_output = gr.Textbox(label="Summary")
+
+            podcast_process_button.click(
+                fn=process_podcast,
+                inputs=[podcast_url_input, podcast_title_input, podcast_author_input,
+                        podcast_keywords_input, podcast_custom_prompt_input, podcast_api_name_input,
+                        podcast_api_key_input, podcast_whisper_model_input],
+                outputs=[podcast_progress_output, podcast_transcription_output, podcast_summary_output,
+                         podcast_title_input, podcast_author_input, podcast_keywords_input]
+            )
 
 def create_website_scraping_tab():
     with gr.TabItem("Website Scraping"):
@@ -843,7 +879,20 @@ def import_data(file):
     return "Data imported successfully"
 
 
-def create_import_export_tab():
+def create_import_item_tab():
+    with gr.Group():
+        with gr.Tab("Import Item (Markdown/txt)"):
+            import_file = gr.File(label="Upload file for import")
+            import_button = gr.Button("Import Data")
+            import_output = gr.Textbox(label="Import Status")
+
+            import_button.click(
+                fn=import_data,
+                inputs=import_file,
+                outputs=import_output
+            )
+
+def create_export_tab():
     with gr.Group():
         with gr.Tab("Export"):
             with gr.Tab("Export Search Results"):
@@ -856,34 +905,26 @@ def create_import_export_tab():
                 results_per_file_input = gr.Number(label="Results per File", value=1000, precision=0)
                 export_format = gr.Radio(label="Export Format", choices=["csv", "markdown"], value="csv")
                 export_search_button = gr.Button("Export Search Results")
-                export_search_output = gr.Textbox(label="Export Status")
+                export_search_output = gr.File(label="Download Exported Keywords")
+                export_search_status = gr.Textbox(label="Export Status")
 
                 export_search_button.click(
                     fn=export_to_file,
                     inputs=[search_query, search_fields, keyword_input, page_input, results_per_file_input, export_format],
-                    outputs=export_search_output
+                    outputs=[export_search_status, export_search_output]
                 )
 
-                with gr.Tab("Export Keywords"):
-                    export_keywords_button = gr.Button("Export Keywords")
-                    export_keywords_output = gr.File(label="Download Exported Keywords")
-                    export_keywords_status = gr.Textbox(label="Export Status")
+def create_export_keywords_tab():
+    with gr.Group():
+        with gr.Tab("Export Keywords"):
+            export_keywords_button = gr.Button("Export Keywords")
+            export_keywords_output = gr.File(label="Download Exported Keywords")
+            export_keywords_status = gr.Textbox(label="Export Status")
 
-                    export_keywords_button.click(
-                        fn=export_keywords_to_csv,
-                        outputs=[export_keywords_output, export_keywords_status]
-                    )
-
-            with gr.Tab("Import"):
-                import_file = gr.File(label="Upload file for import")
-                import_button = gr.Button("Import Data")
-                import_output = gr.Textbox(label="Import Status")
-
-                import_button.click(
-                    fn=import_data,
-                    inputs=import_file,
-                    outputs=import_output
-                )
+            export_keywords_button.click(
+                fn=export_keywords_to_csv,
+                outputs=[export_keywords_status, export_keywords_output]
+            )
 
 
 def create_utilities_tab():
@@ -1020,6 +1061,7 @@ def launch_ui(demo_mode=False):
                 with gr.Tabs():
                     create_video_transcription_tab()
                     create_audio_processing_tab()
+                    create_podcast_tab()
                     create_website_scraping_tab()
                     create_pdf_ingestion_tab()
 
@@ -1036,10 +1078,13 @@ def launch_ui(demo_mode=False):
                 create_media_edit_tab()
 
             with gr.TabItem("Keywords"):
-                create_keyword_tab()
+                with gr.Tabs():
+                    create_keyword_tab()
+                    create_export_keywords_tab()
 
-            with gr.TabItem("Export/Import"):
-                create_import_export_tab()
+            with gr.TabItem("Import/Export"):
+                create_import_item_tab()
+                create_export_tab()
 
             with gr.TabItem("Utilities"):
                 create_utilities_tab()
