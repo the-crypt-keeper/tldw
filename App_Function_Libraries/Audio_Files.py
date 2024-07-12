@@ -16,6 +16,10 @@
 # Imports
 import json
 import logging
+import tempfile
+import uuid
+from datetime import datetime
+
 import requests
 import os
 
@@ -208,77 +212,156 @@ def process_audio_file(audio_url, audio_file, whisper_model="small.en", api_name
     return "\n".join(progress), "\n".join(transcriptions)
 
 
-
-def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model):
+def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model,
+                    keep_original=False, enable_diarization=False, custom_vocabulary=None,
+                    summary_type="short", summary_length=300, use_cookies=False, cookies=None):
     progress = []
+    error_message = ""
+    temp_files = []
+
     def update_progress(message):
         progress.append(message)
         return "\n".join(progress)
 
+    def cleanup_files():
+        for file in temp_files:
+            try:
+                if os.path.exists(file):
+                    os.remove(file)
+                    update_progress(f"Temporary file {file} removed.")
+            except Exception as e:
+                update_progress(f"Failed to remove temporary file {file}: {str(e)}")
+
     try:
-        # Download podcast using yt-dlp
+        # Create a unique directory for this podcast
+        podcast_dir = os.path.join('downloads', f'podcast_{uuid.uuid4().hex[:8]}')
+        os.makedirs(podcast_dir, exist_ok=True)
+
+        # Set up yt-dlp options
         ydl_opts = {
             'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'wav',
             }],
-            'outtmpl': 'downloaded_podcast.%(ext)s'
+            'outtmpl': os.path.join(podcast_dir, '%(title)s.%(ext)s')
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=True)
-            audio_file = ydl.prepare_filename(info_dict).replace('.webm', '.wav')
 
-        update_progress("Podcast downloaded successfully.")
+        # Add cookies if provided
+        if use_cookies and cookies:
+            try:
+                cookies_dict = json.loads(cookies)
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_cookie_file:
+                    json.dump(cookies_dict, temp_cookie_file)
+                    temp_cookie_file_path = temp_cookie_file.name
+                ydl_opts['cookiefile'] = temp_cookie_file_path
+                temp_files.append(temp_cookie_file_path)
+                update_progress("Cookies applied to yt-dlp.")
+            except json.JSONDecodeError:
+                update_progress("Invalid cookie format. Proceeding without cookies.")
 
-        # Attempt to extract metadata
+        # Download podcast using yt-dlp
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(url, download=True)
+                audio_file = ydl.prepare_filename(info_dict).replace('.webm', '.wav')
+            temp_files.append(audio_file)
+            update_progress("Podcast downloaded successfully.")
+        except yt_dlp.DownloadError as e:
+            error_message = f"Failed to download podcast: {str(e)}"
+            raise
+
+        # Expanded metadata extraction
         detected_title = info_dict.get('title', '')
         detected_author = info_dict.get('uploader', '')
         detected_series = info_dict.get('series', '')
+        detected_description = info_dict.get('description', '')
+        detected_upload_date = info_dict.get('upload_date', '')
+        detected_duration = info_dict.get('duration', '')
+        detected_episode = info_dict.get('episode', '')
+        detected_season = info_dict.get('season', '')
 
         # Use detected metadata if not provided by user
         title = title or detected_title or "Unknown Podcast"
         author = author or detected_author or "Unknown Author"
 
-        # Add detected series to keywords if not already present
-        if detected_series and detected_series.lower() not in keywords.lower():
-            keywords = f"{keywords},series:{detected_series}" if keywords else f"series:{detected_series}"
+        # Format metadata for storage
+        metadata_text = f"""
+Metadata:
+Title: {title}
+Author: {author}
+Series: {detected_series}
+Episode: {detected_episode}
+Season: {detected_season}
+Upload Date: {detected_upload_date}
+Duration: {detected_duration} seconds
+Description: {detected_description}
 
-        update_progress(f"Metadata detected/set - Title: {title}, Author: {author}, Keywords: {keywords}")
+"""
+
+        # Add detected series and other metadata to keywords
+        new_keywords = []
+        if detected_series:
+            new_keywords.append(f"series:{detected_series}")
+        if detected_episode:
+            new_keywords.append(f"episode:{detected_episode}")
+        if detected_season:
+            new_keywords.append(f"season:{detected_season}")
+
+        keywords = f"{keywords},{','.join(new_keywords)}" if keywords else ','.join(new_keywords)
+
+        update_progress(f"Metadata extracted - Title: {title}, Author: {author}, Keywords: {keywords}")
 
         # Transcribe the podcast
-        segments = speech_to_text(audio_file, whisper_model=whisper_model)
-        transcription = " ".join([segment['Text'] for segment in segments])
-        update_progress("Podcast transcribed successfully.")
+        try:
+            segments = speech_to_text(audio_file, whisper_model=whisper_model)
+            transcription = " ".join([segment['Text'] for segment in segments])
+            update_progress("Podcast transcribed successfully.")
+        except Exception as e:
+            error_message = f"Transcription failed: {str(e)}"
+            raise
+
+        # Combine metadata and transcription
+        full_content = metadata_text + "\n\nTranscription:\n" + transcription
 
         # Summarize if API is provided
         summary = None
         if api_name and api_key:
-            summary = perform_summarization(api_name, transcription, custom_prompt, api_key)
-            update_progress("Podcast summarized successfully.")
+            try:
+                summary = perform_summarization(api_name, full_content, custom_prompt, api_key)
+                update_progress("Podcast summarized successfully.")
+            except requests.RequestException as e:
+                error_message = f"API request failed during summarization: {str(e)}"
+                raise
+            except Exception as e:
+                error_message = f"Summarization failed: {str(e)}"
+                raise
 
         # Add to database
-        add_media_with_keywords(
-            url=url,
-            title=title,
-            media_type='podcast',
-            content=transcription,
-            keywords=keywords,
-            prompt=custom_prompt,
-            summary=summary or "No summary available",
-            transcription_model=whisper_model,
-            author=author,
-            ingestion_date=None  # This will use the current date
-        )
-        update_progress("Podcast added to database successfully.")
+        try:
+            add_media_with_keywords(
+                url=url,
+                title=title,
+                media_type='podcast',
+                content=full_content,
+                keywords=keywords,
+                prompt=custom_prompt,
+                summary=summary or "No summary available",
+                transcription_model=whisper_model,
+                author=author,
+                ingestion_date=datetime.now().strftime('%Y-%m-%d')
+            )
+            update_progress("Podcast added to database successfully.")
+        except Exception as e:
+            logging.error(f"Error processing podcast: {str(e)}")
+            cleanup_files()
+            return update_progress("Processing failed. See error message for details."), "", "", "", "", "", error_message
 
-        return (update_progress("Processing complete."), transcription, summary or "No summary generated.",
-                title, author, keywords)
+    finally:
+        cleanup_files()
 
-    except Exception as e:
-        error_message = f"Error processing podcast: {str(e)}"
-        logging.error(error_message)
-        return update_progress(error_message), "", "", "", "", ""
+    return (update_progress("Processing complete."), full_content, summary or "No summary generated.",
+            title, author, keywords, error_message)
 
 #
 #
