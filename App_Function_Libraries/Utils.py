@@ -357,7 +357,6 @@ def format_metadata_as_text(metadata):
                 formatted_value = str(value)
 
             formatted_text += f"{key.capitalize()}: {formatted_value}\n"
-
     return formatted_text.strip()
 
 # # Example usage:

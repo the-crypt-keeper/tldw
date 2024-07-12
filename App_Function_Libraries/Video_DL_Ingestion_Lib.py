@@ -263,6 +263,7 @@ def extract_metadata(url, use_cookies=False, cookies=None):
                 'tags': info.get('tags'),
                 'description': info.get('description')
             }
+            logging.info(f"Extracted metadata for {url}: {metadata}")
             return metadata
         except Exception as e:
             logging.error(f"Error extracting metadata for {url}: {str(e)}")
