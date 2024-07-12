@@ -187,32 +187,51 @@ def get_youtube_playlist_urls(playlist_id):
 
 
 def parse_and_expand_urls(url_input):
+    logging.info(f"Starting parse_and_expand_urls with input: {url_input}")
     urls = [url.strip() for url in url_input.split('\n') if url.strip()]
+    logging.info(f"Parsed URLs: {urls}")
     expanded_urls = []
 
     for url in urls:
-        parsed_url = urlparse(url)
+        try:
+            logging.info(f"Processing URL: {url}")
+            parsed_url = urlparse(url)
+            logging.debug(f"Parsed URL components: {parsed_url}")
 
-        # YouTube playlist handling
-        if 'youtube.com' in parsed_url.netloc and 'list' in parsed_url.query:
-            playlist_id = parse_qs(parsed_url.query)['list'][0]
-            expanded_urls.extend(get_youtube_playlist_urls(playlist_id))
+            # YouTube playlist handling
+            if 'youtube.com' in parsed_url.netloc and 'list' in parsed_url.query:
+                playlist_id = parse_qs(parsed_url.query)['list'][0]
+                logging.info(f"Detected YouTube playlist with ID: {playlist_id}")
+                playlist_urls = get_youtube_playlist_urls(playlist_id)
+                logging.info(f"Expanded playlist URLs: {playlist_urls}")
+                expanded_urls.extend(playlist_urls)
 
-        # YouTube short URL handling
-        elif 'youtu.be' in parsed_url.netloc:
-            video_id = parsed_url.path.lstrip('/')
-            expanded_urls.append(f'https://www.youtube.com/watch?v={video_id}')
+            # YouTube short URL handling
+            elif 'youtu.be' in parsed_url.netloc:
+                video_id = parsed_url.path.lstrip('/')
+                full_url = f'https://www.youtube.com/watch?v={video_id}'
+                logging.info(f"Expanded YouTube short URL to: {full_url}")
+                expanded_urls.append(full_url)
 
-        # Vimeo handling
-        elif 'vimeo.com' in parsed_url.netloc:
-            video_id = parsed_url.path.lstrip('/')
-            expanded_urls.append(f'https://vimeo.com/{video_id}')
+            # Vimeo handling
+            elif 'vimeo.com' in parsed_url.netloc:
+                video_id = parsed_url.path.lstrip('/')
+                full_url = f'https://vimeo.com/{video_id}'
+                logging.info(f"Processed Vimeo URL: {full_url}")
+                expanded_urls.append(full_url)
 
-        # Add more platform-specific handling here
+            # Add more platform-specific handling here
 
-        else:
-            expanded_urls.append(url)
+            else:
+                logging.info(f"URL not recognized as special case, adding as-is: {url}")
+                expanded_urls.append(url)
 
+        except Exception as e:
+            logging.error(f"Error processing URL {url}: {str(e)}", exc_info=True)
+            # Optionally, you might want to add the problematic URL to expanded_urls
+            # expanded_urls.append(url)
+
+    logging.info(f"Final expanded URLs: {expanded_urls}")
     return expanded_urls
 
 
