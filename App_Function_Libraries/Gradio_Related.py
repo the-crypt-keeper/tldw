@@ -550,42 +550,72 @@ def create_audio_processing_tab():
                 outputs=[audio_progress_output, audio_transcriptions_output]
             )
 
+
+
 def create_podcast_tab():
     with gr.TabItem("Podcast"):
-        with gr.Group():
-            gr.Markdown("# Podcast Transcription and Ingestion")
-            podcast_url_input = gr.Textbox(label="Podcast URL", placeholder="Enter the podcast URL here")
-            podcast_title_input = gr.Textbox(label="Podcast Title", placeholder="Will be auto-detected if possible")
-            podcast_author_input = gr.Textbox(label="Podcast Author", placeholder="Will be auto-detected if possible")
-            podcast_keywords_input = gr.Textbox(label="Keywords",
-                                                placeholder="Enter keywords here (comma-separated, include series name if applicable)",
-                                                value="podcast,audio")
-            podcast_custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                     placeholder="Enter custom prompt for summarization (optional)",
-                                                     lines=3)
-            podcast_api_name_input = gr.Dropdown(
-                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                         "Llama.cpp",
-                         "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                value=None,
-                label="API Name for Summarization (Optional)"
-            )
-            podcast_api_key_input = gr.Textbox(label="API Key (if required)", type="password")
-            podcast_whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+        gr.Markdown("# Podcast Transcription and Ingestion")
+        podcast_url_input = gr.Textbox(label="Podcast URL", placeholder="Enter the podcast URL here")
+        podcast_title_input = gr.Textbox(label="Podcast Title", placeholder="Will be auto-detected if possible")
+        podcast_author_input = gr.Textbox(label="Podcast Author", placeholder="Will be auto-detected if possible")
 
-            podcast_process_button = gr.Button("Process Podcast")
-            podcast_progress_output = gr.Textbox(label="Progress")
-            podcast_transcription_output = gr.Textbox(label="Transcription")
-            podcast_summary_output = gr.Textbox(label="Summary")
+        podcast_keywords_input = gr.Textbox(
+            label="Keywords",
+            placeholder="Enter keywords here (comma-separated, include series name if applicable)",
+            value="podcast,audio",
+            elem_id="podcast-keywords-input"
+        )
 
-            podcast_process_button.click(
-                fn=process_podcast,
-                inputs=[podcast_url_input, podcast_title_input, podcast_author_input,
-                        podcast_keywords_input, podcast_custom_prompt_input, podcast_api_name_input,
-                        podcast_api_key_input, podcast_whisper_model_input],
-                outputs=[podcast_progress_output, podcast_transcription_output, podcast_summary_output,
-                         podcast_title_input, podcast_author_input, podcast_keywords_input]
-            )
+        podcast_custom_prompt_input = gr.Textbox(
+            label="Custom Prompt",
+            placeholder="Enter custom prompt for summarization (optional)",
+            lines=3
+        )
+        podcast_api_name_input = gr.Dropdown(
+            choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp",
+                     "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+            value=None,
+            label="API Name for Summarization (Optional)"
+        )
+        podcast_api_key_input = gr.Textbox(label="API Key (if required)", type="password")
+        podcast_whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+
+        # File retention option
+        keep_original_input = gr.Checkbox(label="Keep original audio file", value=False)
+
+        # Transcription options
+        enable_diarization_input = gr.Checkbox(label="Enable speaker diarization", value=False)
+        # New input for yt-dlp cookies
+        use_cookies_input = gr.Checkbox(label="Use cookies for yt-dlp", value=False)
+        cookies_input = gr.Textbox(
+            label="yt-dlp Cookies",
+            placeholder="Paste your cookies here (JSON format)",
+            lines=3,
+            visible=False
+        )
+
+        # JavaScript to toggle cookies input visibility
+        use_cookies_input.change(
+            fn=lambda x: gr.update(visible=x),
+            inputs=[use_cookies_input],
+            outputs=[cookies_input]
+        )
+
+        podcast_process_button = gr.Button("Process Podcast")
+        podcast_progress_output = gr.Textbox(label="Progress")
+        podcast_error_output = gr.Textbox(label="Error Messages")
+        podcast_transcription_output = gr.Textbox(label="Transcription")
+        podcast_summary_output = gr.Textbox(label="Summary")
+    podcast_process_button.click(
+        fn=process_podcast,
+        inputs=[podcast_url_input, podcast_title_input, podcast_author_input,
+                podcast_keywords_input, podcast_custom_prompt_input, podcast_api_name_input,
+                podcast_api_key_input, podcast_whisper_model_input, keep_original_input,
+                enable_diarization_input, use_cookies_input, cookies_input],  # Added new inputs
+        outputs=[podcast_progress_output, podcast_transcription_output, podcast_summary_output,
+                 podcast_title_input, podcast_author_input, podcast_keywords_input, podcast_error_output]
+    )
+
 
 def create_website_scraping_tab():
     with gr.TabItem("Website Scraping"):
