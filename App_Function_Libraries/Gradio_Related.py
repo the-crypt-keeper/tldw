@@ -20,9 +20,10 @@ import json
 import logging
 import os.path
 from pathlib import Path
-import re
 import sqlite3
 from typing import Dict, List, Tuple
+import traceback
+from functools import wraps
 #
 # Import 3rd-Party Libraries
 import yt_dlp
@@ -38,11 +39,17 @@ from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama,
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
 from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_cohere, \
     summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
-    summarize_with_huggingface, process_url
+    summarize_with_huggingface, perform_summarization, save_transcription_and_summary, \
+    perform_transcription
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, export_to_file
-from App_Function_Libraries.Utils import sanitize_filename
+from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
+    format_metadata_as_text, convert_to_seconds
+from App_Function_Libraries.SQLite_DB import add_media_with_keywords
+from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
+    generate_timestamped_url, extract_metadata
+
 #
 #######################################################################################################################
 # Function Definitions
@@ -439,24 +446,16 @@ def save_chat_history(history: List[List[str]], media_content: Dict[str, str], s
     return filename, json_data
 
 
-def generate_timestamped_url(url, hours, minutes, seconds):
-    # Extract video ID from the URL
-    video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
-    if not video_id_match:
-        return "Invalid YouTube URL"
-
-    video_id = video_id_match.group(1)
-
-    # Calculate total seconds
-    total_seconds = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
-
-    # Generate the new URL
-    new_url = f"https://www.youtube.com/watch?v={video_id}&t={total_seconds}s"
-
-    return new_url
-
-
-
+def error_handler(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            error_message = f"Error in {func.__name__}: {str(e)}"
+            logging.error(f"{error_message}\n{traceback.format_exc()}")
+            return {"error": error_message, "details": traceback.format_exc()}
+    return wrapper
 
 
 def create_chunking_inputs():
@@ -477,70 +476,171 @@ def create_chunking_inputs():
 
 def create_video_transcription_tab():
     with gr.TabItem("Video Transcription + Summarization"):
-        gr.Markdown("# Transcribe & Summarize Videos from URLs (Like Youtube)!")
+        gr.Markdown("# Transcribe & Summarize Videos from URLs")
         with gr.Row():
-            # Todo - Fix this to use JS to hide inputs based on simple or advanced like what is done for the cookie hiding
-            ui_frontpage_mode_toggle = gr.Radio(choices=["Simple", "Advanced"], value="Simple", label="Options Display Toggle")
+            ui_frontpage_mode_toggle = gr.Radio(choices=["Simple", "Advanced"], value="Simple",
+                                                label="Options Display Toggle")
 
         with gr.Row():
             with gr.Column():
-                url_input = gr.Textbox(label="URL (Mandatory)", placeholder="Enter the video URL here. Multiple at once supported, one per line")
-                # Cookie support
-                diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False, visible=True)
-                num_speakers_input = gr.Number(value=2, label="Number of Speakers(Optional - Currently has no effect)", visible=False)
-                whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model", visible=True)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3, visible=True)
-                offset_input = gr.Number(value=0, label="Offset (Seconds into the video to start transcribing at)", visible=False)
+                url_input = gr.Textbox(label="URL(s) (Mandatory)",
+                                       placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, and playlists.",
+                                       lines=5)
+                start_time_input = gr.Textbox(label="Start Time (Optional)",
+                                              placeholder="e.g., 1:30 or 90 (in seconds)")
+                end_time_input = gr.Textbox(label="End Time (Optional)", placeholder="e.g., 5:45 or 345 (in seconds)")
+                diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
+                whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3)
                 api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                    value=None, label="API Name (Mandatory)", visible=True)
-                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here", visible=True)
-                vad_filter_input = gr.Checkbox(label="VAD Filter (WIP)", value=False, visible=False)
-                rolling_summarization_input = gr.Checkbox(label="Enable Rolling Summarization", value=False, visible=False)
-                download_video_input = gr.Checkbox(label="Download Video", value=False, visible=False)
-                download_audio_input = gr.Checkbox(label="Download Audio", value=False, visible=False)
-                detail_level_input = gr.Slider(minimum=0.01, maximum=1.0, value=0.01, step=0.01, interactive=True, label="Summary Detail Level", visible=False)
-                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)", value="default,no_keyword_set", visible=True)
-                question_box_input = gr.Textbox(label="Question", placeholder="Enter a question to ask about the transcription", visible=False)
-                local_file_path_input = gr.Textbox(label="Local File Path", placeholder="Enter the path to a local file", visible=False)
-                chunking_inputs = create_chunking_inputs()
-                use_cookies_input = gr.Checkbox(label="Use cookies for video download", value=False)
-                cookies_input = gr.Textbox(
-                    label="Video Download Cookies",
-                    placeholder="Paste your cookies here (JSON format)",
-                    lines=3,
-                    visible=False
-                )
-                # JavaScript to toggle cookies input visibility
-                use_cookies_input.change(
-                    fn=lambda x: gr.update(visible=x),
-                    inputs=[use_cookies_input],
-                    outputs=[cookies_input]
-                )
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                    value=None, label="API Name (Mandatory)")
+                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here")
+                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
+                                            value="default,no_keyword_set")
+                batch_size_input = gr.Slider(minimum=1, maximum=10, value=3, step=1,
+                                             label="Batch Size (Number of videos to process simultaneously)")
+                timestamp_option = gr.Radio(choices=["Include Timestamps", "Exclude Timestamps"],
+                                            value="Include Timestamps", label="Timestamp Option")
 
-                outputs = [
-                    # Just always keep these hidden
-                    gr.File(label="Download Video", visible=False),
-                    gr.File(label="Download Audio", visible=False),
-                ]
-
-                process_button = gr.Button("Process Video")
+                process_button = gr.Button("Process Videos")
 
             with gr.Column():
                 progress_output = gr.Textbox(label="Progress")
-                transcription_output = gr.Textbox(label="Transcription")
-                summary_output = gr.Textbox(label="Summary or Status Message")
-                download_transcription = gr.File(label="-Download Transcription as JSON-")
-                download_summary = gr.File(label="-Download Summary as Text-")
+                error_output = gr.Textbox(label="Errors", visible=False)
+                overall_progress_bar = gr.Progress()
+                transcription_output = gr.Dataframe(headers=["URL", "Transcription", "Status"], label="Transcriptions")
+                summary_output = gr.Dataframe(headers=["URL", "Summary", "Status"], label="Summaries")
+                download_transcription = gr.File(label="Download Transcriptions as JSON")
+                download_summary = gr.File(label="Download Summaries as Text")
+                metadata_output = gr.JSON(label="Video Metadata (Editable)")
 
-        process_button.click(
-            fn=process_url,
-            inputs=[url_input, num_speakers_input, whisper_model_input, custom_prompt_input, offset_input,
-                    api_name_input, api_key_input, vad_filter_input, download_video_input, download_audio_input,
-                    rolling_summarization_input, detail_level_input, question_box_input,
-                    keywords_input, local_file_path_input, diarize_input] + chunking_inputs + [cookies_input],
-            outputs=[progress_output,transcription_output, summary_output, download_transcription, download_summary]
-        )
+            @error_handler
+            def process_videos_with_error_handling(urls, start_time, end_time, diarize, whisper_model, custom_prompt,
+                                                   api_name, api_key, keywords, batch_size, timestamp_option, metadata,
+                                                   progress=gr.Progress()):
+                expanded_urls = parse_and_expand_urls(urls)
+                total_videos = len(expanded_urls)
+                results = []
+                errors = []
+
+                for i in range(0, total_videos, batch_size):
+                    batch = expanded_urls[i:i + batch_size]
+                    batch_results = []
+
+                    for url in batch:
+                        try:
+                            start_seconds = convert_to_seconds(start_time)
+                            end_seconds = convert_to_seconds(end_time) if end_time else None
+
+                            video_metadata = metadata.get(url) if metadata and url in metadata else extract_metadata(
+                                url)
+                            if not video_metadata:
+                                raise ValueError(f"Failed to extract metadata for {url}")
+
+                            result = process_url_with_metadata(url, 2, whisper_model, custom_prompt, start_seconds,
+                                                               api_name, api_key,
+                                                               False, False, False, False, 0.01, None, keywords, None,
+                                                               diarize,
+                                                               end_time=end_seconds, include_timestamps=(
+                                            timestamp_option == "Include Timestamps"),
+                                                               metadata=video_metadata)
+
+                            if isinstance(result, dict) and 'error' in result:
+                                batch_results.append((url, result['error'], "Error", video_metadata))
+                                errors.append(f"Error processing {url}: {result['error']}")
+                            else:
+                                batch_results.append((url, result[1], "Success", video_metadata))
+                        except Exception as e:
+                            error_message = f"Error processing {url}: {str(e)}"
+                            batch_results.append((url, error_message, "Error", {}))
+                            errors.append(error_message)
+
+                    results.extend(batch_results)
+                    progress((i + len(batch)) / total_videos, f"Processed {i + len(batch)}/{total_videos} videos")
+
+                # Process transcriptions:
+                transcriptions = [[url, trans, status] for url, trans, _, status, _ in results]
+                # This creates a list of lists, each containing [url, transcription, status]
+
+                # Process summaries (only for successful processes):
+                summaries = [[url, summary, status] for url, _, summary, status, _ in results if status == "Success"]
+                # This creates a list of lists, each containing [url, summary, status] for successful processes
+
+                # Collect all metadata:
+                all_metadata = {url: meta for url, _, _, _, meta in results}
+                # This creates a dictionary with url as key and metadata as value
+
+                error_summary = "\n".join(errors) if errors else "No errors occurred."
+
+                return (
+                    f"Processed {total_videos} videos. {len(errors)} errors occurred.",
+                    error_summary,
+                    transcriptions,
+                    summaries,
+                    None,  # Placeholder for download_transcription
+                    None,  # Placeholder for download_summary
+                    all_metadata
+                )
+
+            @error_handler
+            def process_url_with_metadata(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key,
+                                          vad_filter, download_video, download_audio, rolling_summarization,
+                                          detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
+                                          include_timestamps=True, metadata=None):
+                # Perform transcription
+                audio_file_path, segments = perform_transcription(url, offset, whisper_model, vad_filter, end_time)
+
+                if audio_file_path is None or segments is None:
+                    raise ValueError("Transcription failed or segments not available.")
+
+                # Process segments based on the timestamp option
+                if include_timestamps:
+                    transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
+                else:
+                    stripped_segments = [{'Text': segment['Text']} for segment in segments]
+                    transcription_text = {'audio_file': audio_file_path, 'transcription': stripped_segments}
+
+                metadata_text = format_metadata_as_text(metadata)
+                full_content = f"{metadata_text}\n\nTranscription:\n" + extract_text_from_segments(
+                    transcription_text['transcription'])
+
+                # Perform summarization (if API is provided)
+                summary_text = None
+                if api_name:
+                    summary_text = perform_summarization(api_name, full_content, custom_prompt, api_key)
+
+                # Save transcription and summary
+                download_path = create_download_directory("Audio_Processing")
+                json_file_path, summary_file_path = save_transcription_and_summary(full_content, summary_text,
+                                                                                   download_path)
+
+                # Add to database with full content (including metadata)
+                add_media_with_keywords(
+                    url=url,
+                    title=metadata.get('title', 'Video from URL'),
+                    media_type='video',
+                    content=full_content,
+                    keywords=keywords,
+                    prompt=custom_prompt,
+                    summary=summary_text,
+                    transcription_model=whisper_model,
+                    author=metadata.get('uploader', 'Unknown'),
+                    ingestion_date=None  # This will use the current date
+                )
+
+                return url, json.dumps(transcription_text), summary_text, json_file_path, summary_file_path, None
+
+            process_button.click(
+                fn=process_videos_with_error_handling,
+                inputs=[url_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
+                        custom_prompt_input,
+                        api_name_input, api_key_input, keywords_input, batch_size_input, timestamp_option,
+                        metadata_output],
+                outputs=[progress_output, error_output, transcription_output, summary_output, download_transcription,
+                         download_summary, metadata_output]
+            )
 
 
 def create_audio_processing_tab():

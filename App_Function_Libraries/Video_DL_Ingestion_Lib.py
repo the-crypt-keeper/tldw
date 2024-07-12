@@ -25,7 +25,9 @@
 # Import necessary libraries to run solo for testing
 import logging
 import os
+import re
 import sys
+from urllib.parse import urlparse, parse_qs
 
 import unicodedata
 # 3rd-Party Imports
@@ -172,10 +174,91 @@ def extract_video_info(url):
     title = info_dict.get('title', 'Untitled')
     return info_dict, title
 
-def save_to_file(video_urls, filename):
-    with open(filename, 'w') as file:
-        file.write('\n'.join(video_urls))
-    print(f"Video URLs saved to {filename}")
+
+def get_youtube_playlist_urls(playlist_id):
+    ydl_opts = {
+        'extract_flat': True,
+        'quiet': True,
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        result = ydl.extract_info(f'https://www.youtube.com/playlist?list={playlist_id}', download=False)
+        return [entry['url'] for entry in result['entries'] if entry.get('url')]
+
+
+def parse_and_expand_urls(url_input):
+    urls = [url.strip() for url in url_input.split('\n') if url.strip()]
+    expanded_urls = []
+
+    for url in urls:
+        parsed_url = urlparse(url)
+
+        # YouTube playlist handling
+        if 'youtube.com' in parsed_url.netloc and 'list' in parsed_url.query:
+            playlist_id = parse_qs(parsed_url.query)['list'][0]
+            expanded_urls.extend(get_youtube_playlist_urls(playlist_id))
+
+        # YouTube short URL handling
+        elif 'youtu.be' in parsed_url.netloc:
+            video_id = parsed_url.path.lstrip('/')
+            expanded_urls.append(f'https://www.youtube.com/watch?v={video_id}')
+
+        # Vimeo handling
+        elif 'vimeo.com' in parsed_url.netloc:
+            video_id = parsed_url.path.lstrip('/')
+            expanded_urls.append(f'https://vimeo.com/{video_id}')
+
+        # Add more platform-specific handling here
+
+        else:
+            expanded_urls.append(url)
+
+    return expanded_urls
+
+
+def extract_metadata(url):
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'extract_flat': True,
+        'skip_download': True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(url, download=False)
+            metadata = {
+                'title': info.get('title'),
+                'uploader': info.get('uploader'),
+                'upload_date': info.get('upload_date'),
+                'view_count': info.get('view_count'),
+                'like_count': info.get('like_count'),
+                'duration': info.get('duration'),
+                'tags': info.get('tags'),
+                'description': info.get('description')
+            }
+            return metadata
+        except Exception as e:
+            logging.error(f"Error extracting metadata for {url}: {str(e)}")
+            return None
+
+
+def generate_timestamped_url(url, hours, minutes, seconds):
+    # Extract video ID from the URL
+    video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
+    if not video_id_match:
+        return "Invalid YouTube URL"
+
+    video_id = video_id_match.group(1)
+
+    # Calculate total seconds
+    total_seconds = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
+
+    # Generate the new URL
+    new_url = f"https://www.youtube.com/watch?v={video_id}&t={total_seconds}s"
+
+    return new_url
+
+
 
 #
 #
