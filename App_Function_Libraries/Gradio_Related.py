@@ -479,7 +479,8 @@ def create_video_transcription_tab():
     with gr.TabItem("Video Transcription + Summarization"):
         gr.Markdown("# Transcribe & Summarize Videos from URLs (Like Youtube)!")
         with gr.Row():
-            ui_frontpage_mode_toggle = gr.Radio(choices=["Simple List", "Advanced List"], value="Simple List", label="UI Mode Options Toggle")
+            # Todo - Fix this to use JS to hide inputs based on simple or advanced like what is done for the cookie hiding
+            ui_frontpage_mode_toggle = gr.Radio(choices=["Simple", "Advanced"], value="Simple", label="Options Display Toggle")
 
         with gr.Row():
             with gr.Column():
@@ -579,6 +580,7 @@ def create_audio_processing_tab():
                                                    placeholder="Enter custom keywords, comma-separated")
 
                 process_audio_button = gr.Button("Process Audio File(s)")
+            with gr.Column():
                 audio_progress_output = gr.Textbox(label="Progress")
                 audio_transcription_output = gr.Textbox(label="Transcription")
                 audio_summary_output = gr.Textbox(label="Summary")
@@ -949,26 +951,25 @@ def create_import_item_tab():
         )
 
 def create_export_tab():
-    with gr.Group():
-        with gr.Tab("Export"):
-            with gr.Tab("Export Search Results"):
-                search_query = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-                search_fields = gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"])
-                keyword_input = gr.Textbox(
-                    label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )",
-                    placeholder="Enter keywords here...")
-                page_input = gr.Number(label="Page", value=1, precision=0)
-                results_per_file_input = gr.Number(label="Results per File", value=1000, precision=0)
-                export_format = gr.Radio(label="Export Format", choices=["csv", "markdown"], value="csv")
-                export_search_button = gr.Button("Export Search Results")
-                export_search_output = gr.File(label="Download Exported Keywords")
-                export_search_status = gr.Textbox(label="Export Status")
+    with gr.Tab("Export"):
+        with gr.Tab("Export Search Results"):
+            search_query = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_fields = gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"])
+            keyword_input = gr.Textbox(
+                label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )",
+                placeholder="Enter keywords here...")
+            page_input = gr.Number(label="Page", value=1, precision=0)
+            results_per_file_input = gr.Number(label="Results per File", value=1000, precision=0)
+            export_format = gr.Radio(label="Export Format", choices=["csv", "markdown"], value="csv")
+            export_search_button = gr.Button("Export Search Results")
+            export_search_output = gr.File(label="Download Exported Keywords")
+            export_search_status = gr.Textbox(label="Export Status")
 
-                export_search_button.click(
-                    fn=export_to_file,
-                    inputs=[search_query, search_fields, keyword_input, page_input, results_per_file_input, export_format],
-                    outputs=[export_search_status, export_search_output]
-                )
+            export_search_button.click(
+                fn=export_to_file,
+                inputs=[search_query, search_fields, keyword_input, page_input, results_per_file_input, export_format],
+                outputs=[export_search_status, export_search_output]
+            )
 
 def create_export_keywords_tab():
     with gr.Group():
