@@ -1,27 +1,3 @@
 {
-  "https://www.youtube.com/watch?v=-E0t_s6bT_4": {
-    "audio_file": "Results\\Video_Downloads\\Phantom of the ADAS_ Securing Advanced Driver-Assistance Systems from Split Second Phantom Attacks.wav",
-    "transcription": [
-      {
-        "Time_Start": 0.0,
-        "Time_End": 2.06,
-        "Text": " you"
-      },
-      {
-        "Time_Start": 30.0,
-        "Time_End": 32.06,
-        "Text": " you"
-      },
-      {
-        "Time_Start": 60.0,
-        "Time_End": 63.06,
-        "Text": " you"
-      },
-      {
-        "Time_Start": 90.0,
-        "Time_End": 93.06,
-        "Text": " you"
-      }
-    ]
-  }
+  "https://www.youtube.com/watch?v=-E0t_s6bT_4": "{\n  \"webpage_url\": \"https://www.youtube.com/watch?v=-E0t_s6bT_4\",\n  \"title\": \"Phantom of the ADAS: Securing Advanced Driver-Assistance Systems from Split Second Phantom Attacks\",\n  \"description\": \"Read more at: https://www.nassiben.com/phantoms\",\n  \"channel_url\": \"https://www.youtube.com/channel/UCjCSvlOcENVup0Xeiim1u0g\",\n  \"duration\": 119,\n  \"channel\": \"Cyber Security Labs @ Ben Gurion University\",\n  \"uploader\": \"Cyber Security Labs @ Ben Gurion University\",\n  \"upload_date\": \"20201011\"\n}\n\nyou  you  you  you"
 }

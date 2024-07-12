@@ -21,7 +21,7 @@ import logging
 import os.path
 from pathlib import Path
 import sqlite3
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple
 import traceback
 from functools import wraps
 #
@@ -45,8 +45,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, export_to_file, add_media_to_database
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
-    format_metadata_as_text, convert_to_seconds
-from App_Function_Libraries.SQLite_DB import add_media_with_keywords
+    convert_to_seconds
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
     generate_timestamped_url, extract_metadata, download_video
 
@@ -656,18 +655,25 @@ def create_video_transcription_tab():
                             progress((i + len(batch)) / total_videos,
                                      f"Processed {i + len(batch)}/{total_videos} videos")
 
+                    # Generate HTML for results
                     for url, transcription, status, metadata, json_file, summary_file in results:
                         if status == "Success":
                             title = metadata.get('title', 'Unknown Title')
-                            if isinstance(transcription, dict) and 'transcription' in transcription:
-                                transcription_text = ' '.join(
-                                    [segment.get('Text', '') for segment in transcription['transcription']])
-                            else:
-                                transcription_text = "Transcription format error"
-                            summary = open(summary_file, 'r').read() if summary_file else "No summary available"
 
-                            # Format metadata as text
-                            metadata_text = format_metadata_as_text(metadata)
+                            # Check if transcription is a string (which it should be now)
+                            if isinstance(transcription, str):
+                                # Split the transcription into metadata and actual transcription
+                                parts = transcription.split('\n\n', 1)
+                                if len(parts) == 2:
+                                    metadata_text, transcription_text = parts
+                                else:
+                                    metadata_text = "Metadata not found"
+                                    transcription_text = transcription
+                            else:
+                                metadata_text = "Metadata format error"
+                                transcription_text = "Transcription format error"
+
+                            summary = open(summary_file, 'r').read() if summary_file else "No summary available"
 
                             results_html += f"""
                             <div class="result-box">
@@ -686,7 +692,7 @@ def create_video_transcription_tab():
                             """
 
                             all_transcriptions[url] = transcription
-                            all_summaries += f"Title: {title}\nURL: {url}\n\nMetadata:\n{metadata_text}\n\nSummary:\n{summary}\n\n---\n\n"
+                            all_summaries += f"Title: {title}\nURL: {url}\n\n{metadata_text}\n\nTranscription:\n{transcription_text}\n\nSummary:\n{summary}\n\n---\n\n"
                         else:
                             results_html += f"""
                             <div class="result-box error">
@@ -785,17 +791,21 @@ def create_video_transcription_tab():
                                 return None, None, None, None, None, None
 
                         # Filter the required metadata
-                        info_dict = {
-                            'webpage_url': full_info.get('webpage_url', url),
-                            'title': full_info.get('title'),
-                            'description': full_info.get('description'),
-                            'channel_url': full_info.get('channel_url'),
-                            'duration': full_info.get('duration'),
-                            'channel': full_info.get('channel'),
-                            'uploader': full_info.get('uploader'),
-                            'upload_date': full_info.get('upload_date')
-                        }
-                        logging.debug(f"Filtered info_dict: {info_dict}")
+                        if full_info:
+                            info_dict = {
+                                'webpage_url': full_info.get('webpage_url', url),
+                                'title': full_info.get('title'),
+                                'description': full_info.get('description'),
+                                'channel_url': full_info.get('channel_url'),
+                                'duration': full_info.get('duration'),
+                                'channel': full_info.get('channel'),
+                                'uploader': full_info.get('uploader'),
+                                'upload_date': full_info.get('upload_date')
+                            }
+                            logging.debug(f"Filtered info_dict: {info_dict}")
+                        else:
+                            logging.error("Failed to extract video information")
+                            return None, None, None, None, None, None
 
                         # Download video/audio
                         logging.info("Downloading video/audio...")
@@ -823,28 +833,28 @@ def create_video_transcription_tab():
 
                     logging.info(f"Segments processed for timestamp inclusion: {segments}")
 
-                    transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
-
-                    # Apply chunking if enabled
-                    if use_chunking and chunk_options:
-                        logging.info("Chunking is enabled, but not implemented yet.")
-                        # Implement chunking logic here if needed
-
                     # Extract text from segments
                     full_text = extract_text_from_segments(segments)
-                    logging.debug(f"Full text extracted: {full_text[:100]}...")  # Log first 100 characters
+
+                    # Prepend raw metadata to the full text
+                    metadata_text = json.dumps(info_dict, indent=2)  # Convert metadata to a JSON string
+                    full_text_with_metadata = f"{metadata_text}\n\n{full_text}"
+
+                    logging.debug(
+                        f"Full text with metadata extracted: {full_text_with_metadata[:200]}...")  # Log first 200 characters
 
                     # Perform summarization if API is provided
                     summary_text = None
                     if api_name and api_key:
                         logging.info(f"Starting summarization with {api_name}...")
-                        summary_text = perform_summarization(api_name, full_text, custom_prompt, api_key)
+                        summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key)
                         logging.debug(f"Summarization completed: {summary_text[:100]}...")  # Log first 100 characters
 
                     # Save transcription and summary
                     logging.info("Saving transcription and summary...")
                     download_path = create_download_directory("Audio_Processing")
-                    json_file_path, summary_file_path = save_transcription_and_summary(full_text, summary_text,
+                    json_file_path, summary_file_path = save_transcription_and_summary(full_text_with_metadata,
+                                                                                       summary_text,
                                                                                        download_path, info_dict)
                     logging.info(
                         f"Transcription and summary saved. JSON file: {json_file_path}, Summary file: {summary_file_path}")
@@ -860,11 +870,12 @@ def create_video_transcription_tab():
 
                     # Add to database
                     logging.info("Adding to database...")
-                    add_media_to_database(info_dict['webpage_url'], info_dict, segments, summary_text,
+                    add_media_to_database(info_dict['webpage_url'], info_dict, full_text_with_metadata, summary_text,
                                           keywords_list, custom_prompt, whisper_model)
                     logging.info(f"Media added to database: {info_dict['webpage_url']}")
 
-                    return info_dict['webpage_url'], transcription_text, summary_text, json_file_path, summary_file_path, info_dict
+                    return info_dict[
+                        'webpage_url'], full_text_with_metadata, summary_text, json_file_path, summary_file_path, info_dict
 
                 except Exception as e:
                     logging.error(f"Error in process_url_with_metadata: {str(e)}", exc_info=True)
