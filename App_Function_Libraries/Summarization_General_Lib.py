@@ -746,6 +746,25 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
     progress = []  # This must always be a list
     status = []  # This must always be a list
 
+    if custom_prompt_input is None:
+        custom_prompt_input = """
+            You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
+    **Bulleted Note Creation Guidelines**
+
+    **Headings**:
+    - Based on referenced topics, not categories like quotes or terms
+    - Surrounded by **bold** formatting 
+    - Not listed as bullet points
+    - No space between headings and list items underneath
+
+    **Emphasis**:
+    - **Important terms** set in bold font
+    - **Text ending in a colon**: also bolded
+
+    **Review**:
+    - Ensure adherence to specified format
+    - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
+
     def update_progress(index, url, message):
         progress.append(f"Processing {index + 1}/{len(url_list)}: {url}")  # Append to list
         status.append(message)  # Append to list
@@ -1100,6 +1119,24 @@ def process_url(
     progress = []
     success_message = "All videos processed successfully. Transcriptions and summaries have been ingested into the database."
 
+    if custom_prompt_input is None:
+        custom_prompt_input = """
+            You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
+    **Bulleted Note Creation Guidelines**
+
+    **Headings**:
+    - Based on referenced topics, not categories like quotes or terms
+    - Surrounded by **bold** formatting 
+    - Not listed as bullet points
+    - No space between headings and list items underneath
+
+    **Emphasis**:
+    - **Important terms** set in bold font
+    - **Text ending in a colon**: also bolded
+
+    **Review**:
+    - Ensure adherence to specified format
+    - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
 
     # Validate input
     if not url and not local_file_path:
@@ -1259,7 +1296,6 @@ def process_url(
 
         if chunk_text_by_words or chunk_text_by_sentences or chunk_text_by_paragraphs or chunk_text_by_tokens or chunk_by_semantic and api_name:
             # Perform summarization based on chunks
-            # FIXME - do stuff to chunks - Fixup Functions
             for chunk in chunked_transcriptions:
                 summarized_chunks = []
                 if api_name == "anthropic":
