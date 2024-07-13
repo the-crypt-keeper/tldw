@@ -896,6 +896,51 @@ def summarize_chunk(api_name, text, custom_prompt_input, api_key):
         return None
 
 
+def extract_metadata_and_content(input_data):
+    metadata = {}
+    content = ""
+
+    if isinstance(input_data, str):
+        if os.path.exists(input_data):
+            with open(input_data, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+        else:
+            try:
+                data = json.loads(input_data)
+            except json.JSONDecodeError:
+                return {}, input_data
+    elif isinstance(input_data, dict):
+        data = input_data
+    else:
+        return {}, str(input_data)
+
+    # Extract metadata
+    metadata['title'] = data.get('title', 'No title available')
+    metadata['author'] = data.get('author', 'Unknown author')
+
+    # Extract content
+    if 'transcription' in data:
+        content = extract_text_from_segments(data['transcription'])
+    elif 'segments' in data:
+        content = extract_text_from_segments(data['segments'])
+    elif 'content' in data:
+        content = data['content']
+    else:
+        content = json.dumps(data)
+
+    return metadata, content
+
+def extract_text_from_segments(segments):
+    if isinstance(segments, list):
+        return ' '.join([seg.get('Text', '') for seg in segments if 'Text' in seg])
+    return str(segments)
+
+def format_input_with_metadata(metadata, content):
+    formatted_input = f"Title: {metadata.get('title', 'No title available')}\n"
+    formatted_input += f"Author: {metadata.get('author', 'Unknown author')}\n\n"
+    formatted_input += content
+    return formatted_input
+
 def perform_summarization(api_name, input_data, custom_prompt_input, api_key):
     loaded_config_data = load_and_log_configs()
 
@@ -922,19 +967,23 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key):
         logging.debug(f"Input data type: {type(input_data)}")
         logging.debug(f"Input data (first 500 chars): {str(input_data)[:500]}...")
 
-        # Extract text from input_data
-        extracted_text = extract_text_from_input(input_data)
+        # Extract metadata and content
+        metadata, content = extract_metadata_and_content(input_data)
 
-        logging.debug(f"Extracted text (first 500 chars): {extracted_text[:500]}...")
+        logging.debug(f"Extracted metadata: {metadata}")
+        logging.debug(f"Extracted content (first 500 chars): {content[:500]}...")
 
-        # Perform summarization on the extracted text
-        summary = summarize_chunk(api_name, extracted_text, custom_prompt_input, api_key)
+        # Prepare a structured input for summarization
+        structured_input = format_input_with_metadata(metadata, content)
+
+        # Perform summarization on the structured input
+        summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key)
 
         if summary:
             logging.info(f"Summary generated using {api_name} API")
             if isinstance(input_data, str) and os.path.exists(input_data):
                 summary_file_path = input_data.replace('.json', '_summary.txt')
-                with open(summary_file_path, 'w') as file:
+                with open(summary_file_path, 'w', encoding='utf-8') as file:
                     file.write(summary)
         else:
             logging.warning(f"Failed to generate summary using {api_name} API")
