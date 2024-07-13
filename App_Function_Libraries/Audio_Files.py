@@ -337,8 +337,13 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
             else:
                 segments = speech_to_text(wav_file_path, whisper_model=whisper_model)
 
-            transcription = " ".join([segment['Text'] for segment in segments])
-            update_progress("Audio transcribed successfully.")
+            if isinstance(segments, list):
+                transcription = " ".join([segment.get('Text', '') for segment in segments])
+                update_progress("Audio transcribed successfully.")
+            else:
+                update_progress("Unexpected segments format received from speech_to_text.")
+                logging.error(f"Unexpected segments format: {segments}")
+                continue
 
             if not transcription.strip():
                 update_progress("Transcription is empty.")
@@ -406,7 +411,12 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 else:
                     segments = speech_to_text(wav_file_path, whisper_model=whisper_model)
 
-                transcription = " ".join([segment['Text'] for segment in segments])
+                if isinstance(segments, list):
+                    transcription = " ".join([segment.get('Text', '') for segment in segments])
+                else:
+                    update_progress("Unexpected segments format received from speech_to_text.")
+                    logging.error(f"Unexpected segments format: {segments}")
+
                 chunked_text = improved_chunking_process(transcription, chunk_options)
 
                 if api_name and api_key:
