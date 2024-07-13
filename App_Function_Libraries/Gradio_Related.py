@@ -101,12 +101,13 @@ def gradio_download_youtube_video(url):
 
 
 
+
 def format_transcription(content):
     # Add extra space after periods for better readability
     content = content.replace('.', '. ').replace('.  ', '. ')
-    # Split the content into lines for multiline display; assuming simple logic here
+    # Split the content into lines for multiline display
     lines = content.split('. ')
-    # Join lines with HTML line break for better presentation in HTML
+    # Join lines with HTML line break for better presentation in Markdown
     formatted_content = "<br>".join(lines)
     return formatted_content
 
@@ -618,9 +619,11 @@ def create_video_transcription_tab():
                                 start_seconds = convert_to_seconds(start_time)
                                 end_seconds = convert_to_seconds(end_time) if end_time else None
 
+                                logging.info(f"Attempting to extract metadata for {url}")
                                 video_metadata = extract_metadata(url, use_cookies, cookies)
                                 if not video_metadata:
                                     raise ValueError(f"Failed to extract metadata for {url}")
+                                logging.info(f"Successfully extracted metadata for {url}")
 
                                 chunk_options = {
                                     'method': chunk_method,
@@ -660,6 +663,7 @@ def create_video_transcription_tab():
 
                             except Exception as e:
                                 error_message = f"Error processing {url}: {str(e)}"
+                                logging.error(error_message, exc_info=True)
                                 batch_results.append((url, error_message, "Error", {}, None, None))
                                 errors.append(error_message)
 
@@ -688,57 +692,99 @@ def create_video_transcription_tab():
 
                             summary = open(summary_file, 'r').read() if summary_file else "No summary available"
 
-                            results_html += f"""
-                            <div class="result-box">
-                                <gradio-accordion>
-                                    <gradio-accordion-item label="{title}">
-                                        <p><strong>URL:</strong> <a href="{url}" target="_blank">{url}</a></p>
-                                        <h4>Metadata:</h4>
-                                        <pre>{metadata_text}</pre>
-                                        <h4>Transcription:</h4>
-                                        <div class="transcription">{transcription_text}</div>
-                                        <h4>Summary:</h4>
-                                        <div class="summary">{summary}</div>
-                                    </gradio-accordion-item>
-                                </gradio-accordion>
-                            </div>
-                            """
+                            results_html = ""
+                            all_transcriptions = {}
+                            all_summaries = ""
 
-                            all_transcriptions[url] = transcription
-                            all_summaries += f"Title: {title}\nURL: {url}\n\n{metadata_text}\n\nTranscription:\n{transcription_text}\n\nSummary:\n{summary}\n\n---\n\n"
-                        else:
-                            results_html += f"""
-                            <div class="result-box error">
-                                <h3>Error processing {url}</h3>
-                                <p>{transcription}</p>
-                            </div>
-                            """
+                            for url, _, status, metadata, _, _ in results:
+                                if status == "Success":
+                                    # Fetch the processed data from the database
+                                    items = browse_items(url, 'URL')
+                                    if items:
+                                        media_id = items[0][0]
+                                        prompt_summary_results, content = fetch_item_details(media_id)
 
-                    # Save all transcriptions and summaries to files
-                    with open('all_transcriptions.json', 'w') as f:
-                        json.dump(all_transcriptions, f, indent=2)
+                                        title = metadata.get('title', 'Unknown Title')
 
-                    with open('all_summaries.txt', 'w') as f:
-                        f.write(all_summaries)
+                                        if content:
+                                            # Split the content into metadata and actual transcription
+                                            parts = content.split('\n\n', 1)
+                                            if len(parts) == 2:
+                                                metadata_text, transcription_text = parts
+                                            else:
+                                                metadata_text = "Metadata not found"
+                                                transcription_text = content
+                                        else:
+                                            metadata_text = "Content not found"
+                                            transcription_text = "Transcription not available"
 
-                    error_summary = "\n".join(errors) if errors else "No errors occurred."
+                                        summary = prompt_summary_results[-1][
+                                            1] if prompt_summary_results else "No summary available"
 
-                    return (
-                        f"Processed {total_videos} videos. {len(errors)} errors occurred.",
-                        error_summary,
-                        results_html,
-                        'all_transcriptions.json',
-                        'all_summaries.txt'
-                    )
+                                        # Format the content for better readability
+                                        formatted_transcription = format_transcription(transcription_text)
+                                        formatted_summary = format_transcription(summary)
+
+                                        results_html += f"""
+                                            <div class="result-box">
+                                                <gradio-accordion>
+                                                    <gradio-accordion-item label="{title}">
+                                                        <p><strong>URL:</strong> <a href="{url}" target="_blank">{url}</a></p>
+                                                        <h4>Metadata:</h4>
+                                                        <pre>{metadata_text}</pre>
+                                                        <h4>Transcription:</h4>
+                                                        <div class="transcription">{formatted_transcription}</div>
+                                                        <h4>Summary:</h4>
+                                                        <div class="summary">{formatted_summary}</div>
+                                                    </gradio-accordion-item>
+                                                </gradio-accordion>
+                                            </div>
+                                            """
+
+                                        # Add to all_transcriptions and all_summaries for download
+                                        all_transcriptions[url] = transcription_text
+                                        all_summaries += f"Title: {title}\nURL: {url}\n\n{metadata_text}\n\nTranscription:\n{transcription_text}\n\nSummary:\n{summary}\n\n---\n\n"
+                                    else:
+                                        results_html += f"""
+                                            <div class="result-box error">
+                                                <h3>Error retrieving data for {url}</h3>
+                                                <p>Data not found in the database.</p>
+                                            </div>
+                                            """
+                                else:
+                                    results_html += f"""
+                                        <div class="result-box error">
+                                            <h3>Error processing {url}</h3>
+                                            <p>{_}</p>
+                                        </div>
+                                        """
+
+                            # Save all transcriptions and summaries to files
+                            with open('all_transcriptions.json', 'w') as f:
+                                json.dump(all_transcriptions, f, indent=2)
+
+                            with open('all_summaries.txt', 'w') as f:
+                                f.write(all_summaries)
+
+                            error_summary = "\n".join(errors) if errors else "No errors occurred."
+
+                            return (
+                                f"Processed {total_videos} videos. {len(errors)} errors occurred.",
+                                "\n".join(errors) if errors else "No errors occurred.",
+                                results_html,
+                                'all_transcriptions.json' if all_transcriptions else None,
+                                'all_summaries.txt' if all_summaries else None
+                            )
+
                 except Exception as e:
-                    logging.error(f"Unexpected error in process_videos_with_error_handling: {str(e)}", exc_info=True)
+                    logging.error(f"Unexpected error in process_videos_with_error_handling: {str(e)}",exc_info=True)
                     return (
-                        f"An unexpected error occurred: {str(e)}",
-                        str(e),
-                        "<div class='result-box error'><h3>Unexpected Error</h3><p>" + str(e) + "</p></div>",
-                        None,
-                        None
-                    )
+                            f"An unexpected error occurred: {str(e)}",
+                            str(e),
+                            f"<div class='result-box error'><h3>Unexpected Error</h3><p>{str(e)}</p></div>",
+                            None,
+                            None
+                        )
 
             def process_videos_wrapper(urls, start_time, end_time, diarize, whisper_model,
                                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
@@ -757,10 +803,23 @@ def create_video_transcription_tab():
                         timestamp_option, keep_original_audio
                     )
                     logging.info("process_videos_with_error_handling completed")
+
+                    # Ensure that result is a tuple with 5 elements
+                    if not isinstance(result, tuple) or len(result) != 5:
+                        raise ValueError(
+                            f"Expected 5 outputs, but got {len(result) if isinstance(result, tuple) else 1}")
+
                     return result
                 except Exception as e:
                     logging.error(f"Error in process_videos_wrapper: {str(e)}", exc_info=True)
-                    return ("An error occurred", str(e), f"<div class='error'>Error: {str(e)}</div>", None, None)
+                    # Return a tuple with 5 elements in case of any error
+                    return (
+                        f"An error occurred: {str(e)}",  # progress_output
+                        str(e),  # error_output
+                        f"<div class='error'>Error: {str(e)}</div>",  # results_output
+                        None,  # download_transcription
+                        None  # download_summary
+                    )
 
             # FIXME - remove dead args for process_url_with_metadata
             @error_handler

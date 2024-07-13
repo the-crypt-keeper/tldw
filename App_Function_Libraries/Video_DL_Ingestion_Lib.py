@@ -170,9 +170,22 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
 
 
 def extract_video_info(url):
-    info_dict = get_youtube(url)
-    title = info_dict.get('title', 'Untitled')
-    return info_dict, title
+    try:
+        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+            # Log only a subset of the info to avoid overwhelming the logs
+            log_info = {
+                'title': info.get('title'),
+                'duration': info.get('duration'),
+                'upload_date': info.get('upload_date')
+            }
+            logging.debug(f"Extracted info for {url}: {log_info}")
+
+            return info
+    except Exception as e:
+        logging.error(f"Error extracting video info for {url}: {str(e)}", exc_info=True)
+        return None
 
 
 def get_youtube_playlist_urls(playlist_id):
@@ -264,9 +277,15 @@ def extract_metadata(url, use_cookies=False, cookies=None):
                 'description': info.get('description')
             }
             logging.info(f"Extracted metadata for {url}: {metadata}")
-            return metadata
+            # Instead of returning the full metadata, return a subset
+            return {
+                'title': metadata.get('title'),
+                'duration': metadata.get('duration'),
+                'upload_date': metadata.get('upload_date'),
+                # Add other relevant fields
+            }
         except Exception as e:
-            logging.error(f"Error extracting metadata for {url}: {str(e)}")
+            logging.error(f"Error extracting metadata for {url}: {str(e)}", exc_info=True)
             return None
 
 
