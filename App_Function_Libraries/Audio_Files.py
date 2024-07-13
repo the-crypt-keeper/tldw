@@ -16,6 +16,7 @@
 # Imports
 import json
 import logging
+import sys
 import tempfile
 import uuid
 from datetime import datetime
@@ -29,13 +30,15 @@ from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 #
 # Local Imports
 from App_Function_Libraries.SQLite_DB import add_media_to_database, add_media_with_keywords
-from App_Function_Libraries.Utils import create_download_directory
+from App_Function_Libraries.Utils import create_download_directory, save_segments_to_json
 from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
 #
 #######################################################################################################################
 # Function Definitions
 #
+
+MAX_FILE_SIZE = 500 * 1024 * 1024
 
 
 def download_audio_file(url, save_path):
@@ -71,6 +74,7 @@ def process_audio(
         max_tokens=0
 ):
     try:
+
         # Perform transcription
         audio_file_path, segments = perform_transcription(audio_file_path, offset, whisper_model, vad_filter)
 
@@ -134,7 +138,69 @@ def process_audio(
         return str(e), None, None, None, None, None
 
 
-MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB in bytes
+def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original, custom_keywords, source):
+    progress = []
+    transcription = ""
+    summary = ""
+
+    def update_progress(message):
+        progress.append(message)
+        return "\n".join(progress)
+
+    try:
+        # Check file size before processing
+        file_size = os.path.getsize(audio_file_path)
+        if file_size > MAX_FILE_SIZE:
+            update_progress(f"File size ({file_size / (1024 * 1024):.2f} MB) exceeds the maximum limit of {MAX_FILE_SIZE / (1024 * 1024):.2f} MB. Skipping this file.")
+            return "\n".join(progress), "", ""
+
+        # Perform transcription
+        update_progress("Starting transcription...")
+        segments = speech_to_text(audio_file_path, whisper_model=whisper_model)
+        transcription = " ".join([segment['Text'] for segment in segments])
+        update_progress("Audio transcribed successfully.")
+
+        # Perform summarization if API is provided
+        if api_name and api_key:
+            update_progress("Starting summarization...")
+            summary = perform_summarization(api_name, transcription, "Summarize the following audio transcript",
+                                            api_key)
+            update_progress("Audio summarized successfully.")
+        else:
+            summary = "No summary available"
+
+        # Prepare keywords
+        keywords = "audio,transcription"
+        if custom_keywords:
+            keywords += f",{custom_keywords}"
+
+        # Add to database
+        add_media_with_keywords(
+            url=source,
+            title=os.path.basename(audio_file_path),
+            media_type='audio',
+            content=transcription,
+            keywords=keywords,
+            prompt="Summarize the following audio transcript",
+            summary=summary,
+            transcription_model=whisper_model,
+            author="Unknown",
+            ingestion_date=None  # This will use the current date
+        )
+        update_progress("Audio file added to database successfully.")
+
+        if not keep_original and source != "Uploaded File":
+            os.remove(audio_file_path)
+            update_progress(f"Temporary file {audio_file_path} removed.")
+        elif keep_original and source != "Uploaded File":
+            update_progress(f"Original audio file kept at: {audio_file_path}")
+
+    except Exception as e:
+        update_progress(f"Error processing {source}: {str(e)}")
+        transcription = f"Error: {str(e)}"
+        summary = "No summary due to error"
+
+    return "\n".join(progress), transcription, summary
 
 
 def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key, use_cookies, cookies, keep_original,
@@ -146,7 +212,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
 
     def update_progress(message):
         progress.append(message)
-        return gradio.update(value="\n".join(progress))
+        return "\n".join(progress)
 
     def cleanup_files():
         for file in temp_files:
@@ -164,17 +230,41 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
         for i, url in enumerate(urls):
             update_progress(f"Processing URL {i + 1}/{len(urls)}: {url}")
 
+            # Get the absolute path to the script's directory
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            script_dir = os.path.dirname(current_dir)
+
+            # Setup path handling for ffmpeg & ffprobe on different OSs
+            if sys.platform.startswith('win'):
+                ffmpeg_path = os.path.join(script_dir, 'Bin', 'ffmpeg.exe')
+                ffprobe_path = os.path.join(script_dir, 'Bin', 'ffprobe.exe')
+            elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+                ffmpeg_path = 'ffmpeg'
+                ffprobe_path = 'ffprobe'
+            else:
+                raise OSError("Unsupported operating system")
+
+            # Ensure the ffmpeg file exists
+            if not os.path.exists(ffmpeg_path):
+                raise FileNotFoundError(f"ffmpeg not found at {ffmpeg_path}")
+
+            # Ensure the ffprobe file exists
+            if not os.path.exists(ffprobe_path):
+                raise FileNotFoundError(f"ffprobe not found at {ffprobe_path}")
+
             # Create a unique directory for this audio file
             audio_dir = os.path.join('downloads', f'audio_{uuid.uuid4().hex[:8]}')
             os.makedirs(audio_dir, exist_ok=True)
 
+            # Set up yt-dlp options
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'wav',
                 }],
-                'outtmpl': os.path.join(audio_dir, '%(title)s.%(ext)s')
+                'outtmpl': os.path.join(audio_dir, '%(title)s.%(ext)s'),
+                'ffmpeg_location': ffmpeg_path
             }
 
             # Add cookies if provided
@@ -200,90 +290,38 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 update_progress(f"Failed to download audio file: {str(e)}")
                 continue
 
-            # Check file size
-            if os.path.getsize(audio_file_path) > MAX_FILE_SIZE:
-                update_progress(f"File size exceeds the maximum limit of 200MB. Skipping this file.")
-                continue
-
             # Process the audio file
-            yield from process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original,
-                                            custom_keywords, url)
+            result = process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original,
+                                          custom_keywords, url)
+            all_transcriptions.append(result[1])
+            all_summaries.append(result[2])
+            update_progress(result[0])
 
         # Process uploaded file if provided
         if audio_file:
             if os.path.getsize(audio_file.name) > MAX_FILE_SIZE:
                 update_progress(f"Uploaded file size exceeds the maximum limit of 200MB. Skipping this file.")
             else:
-                yield from process_single_audio(audio_file.name, whisper_model, api_name, api_key, keep_original,
-                                                custom_keywords, "Uploaded File")
+                result = process_single_audio(audio_file.name, whisper_model, api_name, api_key, keep_original,
+                                              custom_keywords, "Uploaded File")
+                all_transcriptions.append(result[1])
+                all_summaries.append(result[2])
+                update_progress(result[0])
 
         # Final cleanup
         if not keep_original:
             cleanup_files()
 
-        return update_progress("All processing complete."), "\n\n".join(all_transcriptions), "\n\n".join(all_summaries)
+        final_progress = update_progress("All processing complete.")
+        final_transcriptions = "\n\n".join(all_transcriptions)
+        final_summaries = "\n\n".join(all_summaries)
+
+        return final_progress, final_transcriptions, final_summaries
 
     except Exception as e:
         logging.error(f"Error processing audio files: {str(e)}")
         cleanup_files()
-        return update_progress(f"Processing failed: {str(e)}"), None, None
-
-
-def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original, custom_keywords, source):
-    progress = []
-    progress = []
-    all_transcriptions = []
-    all_summaries = []
-    def update_progress(message):
-        progress.append(message)
-        return "\n".join(progress)
-    try:
-        # Perform transcription
-        yield update_progress("Starting transcription...")
-        segments = speech_to_text(audio_file_path, whisper_model=whisper_model)
-        transcription = " ".join([segment['Text'] for segment in segments])
-        yield update_progress("Audio transcribed successfully.")
-        all_transcriptions.append(f"Transcription for {source}:\n{transcription}")
-
-        # Perform summarization if API is provided
-        summary = None
-        if api_name and api_key:
-            yield update_progress("Starting summarization...")
-            summary = perform_summarization(api_name, transcription, "Summarize the following audio transcript",
-                                            api_key)
-            yield update_progress("Audio summarized successfully.")
-            all_summaries.append(f"Summary for {source}:\n{summary}")
-
-        # Prepare keywords
-        keywords = "audio,transcription"
-        if custom_keywords:
-            keywords += f",{custom_keywords}"
-
-        # Add to database
-        add_media_with_keywords(
-            url=source,
-            title=os.path.basename(audio_file_path),
-            media_type='audio',
-            content=transcription,
-            keywords=keywords,
-            prompt="Summarize the following audio transcript",
-            summary=summary or "No summary available",
-            transcription_model=whisper_model,
-            author="Unknown",
-            ingestion_date=None  # This will use the current date
-        )
-        yield update_progress("Audio file added to database successfully.")
-
-        if not keep_original and source != "Uploaded File":
-            os.remove(audio_file_path)
-            yield update_progress(f"Temporary file {audio_file_path} removed.")
-        elif keep_original and source != "Uploaded File":
-            yield update_progress(f"Original audio file kept at: {audio_file_path}")
-
-    except Exception as e:
-        yield update_progress(f"Error processing {source}: {str(e)}")
-
-
+        return update_progress(f"Processing failed: {str(e)}"), "", ""
 
 def download_youtube_audio(url: str) -> str:
     ydl_opts = {
@@ -304,6 +342,7 @@ def download_youtube_audio(url: str) -> str:
 def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model,
                     keep_original=False, enable_diarization=False, custom_vocabulary=None,
                     summary_type="short", summary_length=300, use_cookies=False, cookies=None):
+    global ffmpeg_path
     progress = []
     error_message = ""
     temp_files = []
@@ -326,14 +365,43 @@ def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_k
         podcast_dir = os.path.join('downloads', f'podcast_{uuid.uuid4().hex[:8]}')
         os.makedirs(podcast_dir, exist_ok=True)
 
+        # Get the absolute path to the script's directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Setup path handling for ffmpeg & ffprobe on different OSs
+        if sys.platform.startswith('win'):
+            # Add Bin directory to PATH
+            bin_dir = os.path.join(script_dir, 'Bin')
+            os.environ['PATH'] = bin_dir + os.pathsep + os.environ['PATH']
+            if 'ffmpeg' not in os.listdir(bin_dir):
+                raise FileNotFoundError("ffmpeg not found in Bin directory")
+            ffmpeg_path = os.path.join(script_dir, 'Bin', 'ffmpeg.exe')
+            ffprobe_path = os.path.join(script_dir, 'Bin', 'ffprobe.exe')
+        elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+            ffmpeg_path = 'ffmpeg'
+            ffprobe_path = 'ffprobe'
+        else:
+            raise OSError("Unsupported operating system")
+
+        # Ensure the ffmpeg file exists
+        if not os.path.exists(ffmpeg_path):
+            raise FileNotFoundError(f"ffmpeg not found at {ffmpeg_path}")
+
+        # Ensure the ffprobe file exists
+        if not os.path.exists(ffprobe_path):
+            raise FileNotFoundError(f"ffprobe not found at {ffprobe_path}")
+
         # Set up yt-dlp options
         ydl_opts = {
+            'ffmpeg-location': ffmpeg_path,
             'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'wav',
             }],
-            'outtmpl': os.path.join(podcast_dir, '%(title)s.%(ext)s')
+            'outtmpl': os.path.join('downloads', 'audio_%(id)s', '%(title)s.%(ext)s'),
+            'ffmpeg_location': ffmpeg_path,
+            'ffprobe_location': ffprobe_path,
         }
 
         # Add cookies if provided
