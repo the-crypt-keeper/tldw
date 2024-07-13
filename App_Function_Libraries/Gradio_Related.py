@@ -623,7 +623,6 @@ def create_video_transcription_tab():
                                 video_metadata = extract_metadata(url, use_cookies, cookies)
                                 if not video_metadata:
                                     raise ValueError(f"Failed to extract metadata for {url}")
-                                logging.info(f"Successfully extracted metadata for {url}")
 
                                 chunk_options = {
                                     'method': chunk_method,
@@ -692,99 +691,57 @@ def create_video_transcription_tab():
 
                             summary = open(summary_file, 'r').read() if summary_file else "No summary available"
 
-                            results_html = ""
-                            all_transcriptions = {}
-                            all_summaries = ""
+                            results_html += f"""
+                            <div class="result-box">
+                                <gradio-accordion>
+                                    <gradio-accordion-item label="{title}">
+                                        <p><strong>URL:</strong> <a href="{url}" target="_blank">{url}</a></p>
+                                        <h4>Metadata:</h4>
+                                        <pre>{metadata_text}</pre>
+                                        <h4>Transcription:</h4>
+                                        <div class="transcription">{transcription_text}</div>
+                                        <h4>Summary:</h4>
+                                        <div class="summary">{summary}</div>
+                                    </gradio-accordion-item>
+                                </gradio-accordion>
+                            </div>
+                            """
 
-                            for url, _, status, metadata, _, _ in results:
-                                if status == "Success":
-                                    # Fetch the processed data from the database
-                                    items = browse_items(url, 'URL')
-                                    if items:
-                                        media_id = items[0][0]
-                                        prompt_summary_results, content = fetch_item_details(media_id)
+                            all_transcriptions[url] = transcription
+                            all_summaries += f"Title: {title}\nURL: {url}\n\n{metadata_text}\n\nTranscription:\n{transcription_text}\n\nSummary:\n{summary}\n\n---\n\n"
+                        else:
+                            results_html += f"""
+                            <div class="result-box error">
+                                <h3>Error processing {url}</h3>
+                                <p>{transcription}</p>
+                            </div>
+                            """
 
-                                        title = metadata.get('title', 'Unknown Title')
+                    # Save all transcriptions and summaries to files
+                    with open('all_transcriptions.json', 'w') as f:
+                        json.dump(all_transcriptions, f, indent=2)
 
-                                        if content:
-                                            # Split the content into metadata and actual transcription
-                                            parts = content.split('\n\n', 1)
-                                            if len(parts) == 2:
-                                                metadata_text, transcription_text = parts
-                                            else:
-                                                metadata_text = "Metadata not found"
-                                                transcription_text = content
-                                        else:
-                                            metadata_text = "Content not found"
-                                            transcription_text = "Transcription not available"
+                    with open('all_summaries.txt', 'w') as f:
+                        f.write(all_summaries)
 
-                                        summary = prompt_summary_results[-1][
-                                            1] if prompt_summary_results else "No summary available"
+                    error_summary = "\n".join(errors) if errors else "No errors occurred."
 
-                                        # Format the content for better readability
-                                        formatted_transcription = format_transcription(transcription_text)
-                                        formatted_summary = format_transcription(summary)
-
-                                        results_html += f"""
-                                            <div class="result-box">
-                                                <gradio-accordion>
-                                                    <gradio-accordion-item label="{title}">
-                                                        <p><strong>URL:</strong> <a href="{url}" target="_blank">{url}</a></p>
-                                                        <h4>Metadata:</h4>
-                                                        <pre>{metadata_text}</pre>
-                                                        <h4>Transcription:</h4>
-                                                        <div class="transcription">{formatted_transcription}</div>
-                                                        <h4>Summary:</h4>
-                                                        <div class="summary">{formatted_summary}</div>
-                                                    </gradio-accordion-item>
-                                                </gradio-accordion>
-                                            </div>
-                                            """
-
-                                        # Add to all_transcriptions and all_summaries for download
-                                        all_transcriptions[url] = transcription_text
-                                        all_summaries += f"Title: {title}\nURL: {url}\n\n{metadata_text}\n\nTranscription:\n{transcription_text}\n\nSummary:\n{summary}\n\n---\n\n"
-                                    else:
-                                        results_html += f"""
-                                            <div class="result-box error">
-                                                <h3>Error retrieving data for {url}</h3>
-                                                <p>Data not found in the database.</p>
-                                            </div>
-                                            """
-                                else:
-                                    results_html += f"""
-                                        <div class="result-box error">
-                                            <h3>Error processing {url}</h3>
-                                            <p>{_}</p>
-                                        </div>
-                                        """
-
-                            # Save all transcriptions and summaries to files
-                            with open('all_transcriptions.json', 'w') as f:
-                                json.dump(all_transcriptions, f, indent=2)
-
-                            with open('all_summaries.txt', 'w') as f:
-                                f.write(all_summaries)
-
-                            error_summary = "\n".join(errors) if errors else "No errors occurred."
-
-                            return (
-                                f"Processed {total_videos} videos. {len(errors)} errors occurred.",
-                                "\n".join(errors) if errors else "No errors occurred.",
-                                results_html,
-                                'all_transcriptions.json' if all_transcriptions else None,
-                                'all_summaries.txt' if all_summaries else None
-                            )
-
-                except Exception as e:
-                    logging.error(f"Unexpected error in process_videos_with_error_handling: {str(e)}",exc_info=True)
                     return (
-                            f"An unexpected error occurred: {str(e)}",
-                            str(e),
-                            f"<div class='result-box error'><h3>Unexpected Error</h3><p>{str(e)}</p></div>",
-                            None,
-                            None
-                        )
+                        f"Processed {total_videos} videos. {len(errors)} errors occurred.",
+                        error_summary,
+                        results_html,
+                        'all_transcriptions.json',
+                        'all_summaries.txt'
+                    )
+                except Exception as e:
+                    logging.error(f"Unexpected error in process_videos_with_error_handling: {str(e)}", exc_info=True)
+                    return (
+                        f"An unexpected error occurred: {str(e)}",
+                        str(e),
+                        "<div class='result-box error'><h3>Unexpected Error</h3><p>" + str(e) + "</p></div>",
+                        None,
+                        None
+                    )
 
             def process_videos_wrapper(urls, start_time, end_time, diarize, whisper_model,
                                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
@@ -851,13 +808,22 @@ def create_video_transcription_tab():
                             'uploader': None,
                             'upload_date': None
                         }
-                        logging.debug(f"Local file info_dict: {info_dict[:200]}")
                     else:
                         # Extract video information
                         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                             try:
                                 full_info = ydl.extract_info(url, download=False)
-                                logging.debug(f"Full info extracted: {full_info[:200]}")
+
+                                # Create a safe subset of info to log
+                                safe_info = {
+                                    'title': full_info.get('title', 'No title'),
+                                    'duration': full_info.get('duration', 'Unknown duration'),
+                                    'upload_date': full_info.get('upload_date', 'Unknown upload date'),
+                                    'uploader': full_info.get('uploader', 'Unknown uploader'),
+                                    'view_count': full_info.get('view_count', 'Unknown view count')
+                                }
+
+                                logging.debug(f"Full info extracted for {url}: {safe_info}")
                             except Exception as e:
                                 logging.error(f"Error extracting video info: {str(e)}")
                                 return None, None, None, None, None, None
@@ -874,7 +840,7 @@ def create_video_transcription_tab():
                                 'uploader': full_info.get('uploader'),
                                 'upload_date': full_info.get('upload_date')
                             }
-                            logging.debug(f"Filtered info_dict: {info_dict[:200]}")
+                            logging.debug(f"Filtered info_dict: {info_dict}")
                         else:
                             logging.error("Failed to extract video information")
                             return None, None, None, None, None, None
@@ -948,7 +914,7 @@ def create_video_transcription_tab():
                     full_text_with_metadata = f"{metadata_text}\n\n{full_text}"
 
                     logging.debug(
-                        f"Full text with metadata extracted: {full_text_with_metadata[:200]}...")  # Log first 200 characters
+                        f"Full text with metadata extracted: {full_text_with_metadata[:100]}...")
 
                     # Perform summarization if API is provided
                     summary_text = None

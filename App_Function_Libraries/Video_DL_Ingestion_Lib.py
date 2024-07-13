@@ -276,14 +276,17 @@ def extract_metadata(url, use_cookies=False, cookies=None):
                 'tags': info.get('tags'),
                 'description': info.get('description')
             }
-            logging.info(f"Extracted metadata for {url}: {metadata}")
-            # Instead of returning the full metadata, return a subset
-            return {
-                'title': metadata.get('title'),
-                'duration': metadata.get('duration'),
-                'upload_date': metadata.get('upload_date'),
-                # Add other relevant fields
+
+            # Create a safe subset of metadata to log
+            safe_metadata = {
+                'title': metadata.get('title', 'No title'),
+                'duration': metadata.get('duration', 'Unknown duration'),
+                'upload_date': metadata.get('upload_date', 'Unknown upload date'),
+                'uploader': metadata.get('uploader', 'Unknown uploader')
             }
+
+            logging.info(f"Successfully extracted metadata for {url}: {safe_metadata}")
+            return metadata
         except Exception as e:
             logging.error(f"Error extracting metadata for {url}: {str(e)}", exc_info=True)
             return None
