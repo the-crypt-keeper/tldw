@@ -131,7 +131,9 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
             }
             logging.debug("Segment: %s", chunk)
             segments.append(chunk)
-        logging.info("speech-to-text: Transcription completed with faster_whisper")
+        if not segments:
+            raise RuntimeError("No transcription produced. The audio file may be invalid or empty.")
+        logging.info("speech-to-text: Transcription completed in %.2f seconds", time.time() - time_start)
 
         # Create a dictionary with the 'segments' key
         output_data = {'segments': segments}

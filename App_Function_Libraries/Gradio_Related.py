@@ -497,8 +497,8 @@ def create_video_transcription_tab():
                                        lines=5)
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
-                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3)
+                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
+                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3, visible=False)
                 custom_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[custom_prompt_checkbox],
@@ -978,8 +978,7 @@ def create_audio_processing_tab():
         gr.Markdown("# Transcribe & Summarize Audio Files from URLs or Local Files!")
         with gr.Row():
             with gr.Column():
-                audio_url_input = gr.Textbox(label="Audio File URL(s)",
-                                             placeholder="Enter the URL(s) of the audio file(s), one per line")
+                audio_url_input = gr.Textbox(label="Audio File URL(s)", placeholder="Enter the URL(s) of the audio file(s), one per line")
                 audio_file_input = gr.File(label="Upload Audio File", file_types=["audio/*"])
 
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
@@ -996,31 +995,59 @@ def create_audio_processing_tab():
                     outputs=[cookies_input]
                 )
 
+                diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
+                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3, visible=False)
+                custom_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[custom_prompt_checkbox],
+                    outputs=[custom_prompt_input]
+                )
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
                     value=None,
                     label="API for Summarization (Optional)"
                 )
-                api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here",
-                                           type="password")
+                api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here", type="password")
+                custom_keywords_input = gr.Textbox(label="Custom Keywords", placeholder="Enter custom keywords, comma-separated")
                 keep_original_input = gr.Checkbox(label="Keep original audio file", value=False)
-                custom_keywords_input = gr.Textbox(label="Custom Keywords",
-                                                   placeholder="Enter custom keywords, comma-separated")
+
+                chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
+                with gr.Row(visible=False) as chunking_options_box:
+                    gr.Markdown("### Chunking Options")
+                    with gr.Column():
+                        chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens'], label="Chunking Method")
+                        max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
+                        chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
+                        use_adaptive_chunking = gr.Checkbox(label="Use Adaptive Chunking")
+                        use_multi_level_chunking = gr.Checkbox(label="Use Multi-level Chunking")
+                        chunk_language = gr.Dropdown(choices=['english', 'french', 'german', 'spanish'], label="Chunking Language")
+
+                chunking_options_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[chunking_options_checkbox],
+                    outputs=[chunking_options_box]
+                )
 
                 process_audio_button = gr.Button("Process Audio File(s)")
+
             with gr.Column():
                 audio_progress_output = gr.Textbox(label="Progress")
                 audio_transcription_output = gr.Textbox(label="Transcription")
                 audio_summary_output = gr.Textbox(label="Summary")
+                download_transcription = gr.File(label="Download All Transcriptions as JSON")
+                download_summary = gr.File(label="Download All Summaries as Text")
 
-                process_audio_button.click(
-                    fn=process_audio_files,
-                    inputs=[audio_url_input, audio_file_input, whisper_model_input, api_name_input, api_key_input,
-                            use_cookies_input, cookies_input, keep_original_input, custom_keywords_input],
-                    outputs=[audio_progress_output, audio_transcription_output, audio_summary_output]
-                )
+        process_audio_button.click(
+            fn=process_audio_files,
+            inputs=[audio_url_input, audio_file_input, whisper_model_input, api_name_input, api_key_input,
+                    use_cookies_input, cookies_input, keep_original_input, custom_keywords_input, custom_prompt_input,
+                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking, use_multi_level_chunking,
+                    chunk_language, diarize_input],
+            outputs=[audio_progress_output, audio_transcription_output, audio_summary_output]
+        )
 
 
 def create_podcast_tab():
@@ -1039,11 +1066,19 @@ def create_podcast_tab():
                     elem_id="podcast-keywords-input"
                 )
 
+                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
                 podcast_custom_prompt_input = gr.Textbox(
                     label="Custom Prompt",
                     placeholder="Enter custom prompt for summarization (optional)",
-                    lines=3
+                    lines=3,
+                    visible=False
                 )
+                custom_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[custom_prompt_checkbox],
+                    outputs=[podcast_custom_prompt_input]
+                )
+
                 podcast_api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp",
                              "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
@@ -1053,12 +1088,9 @@ def create_podcast_tab():
                 podcast_api_key_input = gr.Textbox(label="API Key (if required)", type="password")
                 podcast_whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
 
-                # File retention option
                 keep_original_input = gr.Checkbox(label="Keep original audio file", value=False)
-
-                # Transcription options
                 enable_diarization_input = gr.Checkbox(label="Enable speaker diarization", value=False)
-                # New input for yt-dlp cookies
+
                 use_cookies_input = gr.Checkbox(label="Use cookies for yt-dlp", value=False)
                 cookies_input = gr.Textbox(
                     label="yt-dlp Cookies",
@@ -1067,28 +1099,51 @@ def create_podcast_tab():
                     visible=False
                 )
 
-                # JavaScript to toggle cookies input visibility
                 use_cookies_input.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[use_cookies_input],
                     outputs=[cookies_input]
                 )
 
+                chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
+                with gr.Row(visible=False) as chunking_options_box:
+                    gr.Markdown("### Chunking Options")
+                    with gr.Column():
+                        chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens'], label="Chunking Method")
+                        max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
+                        chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
+                        use_adaptive_chunking = gr.Checkbox(label="Use Adaptive Chunking")
+                        use_multi_level_chunking = gr.Checkbox(label="Use Multi-level Chunking")
+                        chunk_language = gr.Dropdown(choices=['english', 'french', 'german', 'spanish'], label="Chunking Language")
+
+                chunking_options_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[chunking_options_checkbox],
+                    outputs=[chunking_options_box]
+                )
+
                 podcast_process_button = gr.Button("Process Podcast")
+
             with gr.Column():
                 podcast_progress_output = gr.Textbox(label="Progress")
                 podcast_error_output = gr.Textbox(label="Error Messages")
                 podcast_transcription_output = gr.Textbox(label="Transcription")
                 podcast_summary_output = gr.Textbox(label="Summary")
-            podcast_process_button.click(
-                fn=process_podcast,
-                inputs=[podcast_url_input, podcast_title_input, podcast_author_input,
-                        podcast_keywords_input, podcast_custom_prompt_input, podcast_api_name_input,
-                        podcast_api_key_input, podcast_whisper_model_input, keep_original_input,
-                        enable_diarization_input, use_cookies_input, cookies_input],  # Added new inputs
-                outputs=[podcast_progress_output, podcast_transcription_output, podcast_summary_output,
-                         podcast_title_input, podcast_author_input, podcast_keywords_input, podcast_error_output]
-            )
+                download_transcription = gr.File(label="Download Transcription as JSON")
+                download_summary = gr.File(label="Download Summary as Text")
+
+        podcast_process_button.click(
+            fn=process_podcast,
+            inputs=[podcast_url_input, podcast_title_input, podcast_author_input,
+                    podcast_keywords_input, podcast_custom_prompt_input, podcast_api_name_input,
+                    podcast_api_key_input, podcast_whisper_model_input, keep_original_input,
+                    enable_diarization_input, use_cookies_input, cookies_input,
+                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
+                    use_multi_level_chunking, chunk_language],
+            outputs=[podcast_progress_output, podcast_transcription_output, podcast_summary_output,
+                     podcast_title_input, podcast_author_input, podcast_keywords_input, podcast_error_output,
+                     download_transcription, download_summary]
+        )
 
 
 def create_website_scraping_tab():
