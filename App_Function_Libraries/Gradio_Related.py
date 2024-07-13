@@ -706,7 +706,7 @@ def create_video_transcription_tab():
                                 </gradio-accordion>
                             </div>
                             """
-
+                            logging.debug(f"Transcription for {url}: {transcription[:200]}...")
                             all_transcriptions[url] = transcription
                             all_summaries += f"Title: {title}\nURL: {url}\n\n{metadata_text}\n\nTranscription:\n{transcription_text}\n\nSummary:\n{summary}\n\n---\n\n"
                         else:
@@ -857,7 +857,7 @@ def create_video_transcription_tab():
                     # Perform transcription
                     logging.info("Starting transcription...")
                     audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
-                                                                      vad_filter, diarize)
+                                                                      vad_filter)
 
                     if audio_file_path is None or segments is None:
                         logging.error("Transcription failed or segments not available.")
@@ -907,14 +907,16 @@ def create_video_transcription_tab():
                     logging.info(f"Segments processed for timestamp inclusion: {segments}")
 
                     # Extract text from segments
-                    full_text = extract_text_from_segments(segments)
+                    transcription_text = extract_text_from_segments(segments)
 
-                    # Prepend raw metadata to the full text
-                    metadata_text = json.dumps(info_dict, indent=2)  # Convert metadata to a JSON string
-                    full_text_with_metadata = f"{metadata_text}\n\n{full_text}"
+                    if transcription_text.startswith("Error:"):
+                        logging.error(f"Failed to extract transcription: {transcription_text}")
+                        return None, None, None, None, None, None
 
-                    logging.debug(
-                        f"Full text with metadata extracted: {full_text_with_metadata[:100]}...")
+                    # Use transcription_text instead of segments for further processing
+                    full_text_with_metadata = f"{json.dumps(info_dict, indent=2)}\n\n{transcription_text}"
+
+                    logging.debug(f"Full text with metadata extracted: {full_text_with_metadata[:100]}...")
 
                     # Perform summarization if API is provided
                     summary_text = None
