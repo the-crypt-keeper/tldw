@@ -922,63 +922,13 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key):
         logging.debug(f"Input data type: {type(input_data)}")
         logging.debug(f"Input data (first 500 chars): {str(input_data)[:500]}...")
 
-        # Handle different input types
-        if isinstance(input_data, str):
-            if input_data.strip().startswith('{'):
-                # It's likely a JSON string
-                try:
-                    # Try to parse the JSON string
-                    data = json.loads(input_data)
-                except json.JSONDecodeError as e:
-                    logging.warning(f"Error parsing JSON string: {str(e)}")
-                    # If parsing fails, treat the entire input as plain text
-                    data = {'text': input_data}
-            elif os.path.exists(input_data):
-                # It's a file path
-                with open(input_data, 'r') as file:
-                    data = json.load(file)
-            else:
-                # It's a plain text
-                data = {'text': input_data}
-        elif isinstance(input_data, dict):
-            data = input_data
-        else:
-            logging.error(f"Unsupported input data type: {type(input_data)}")
-            return None
+        # Extract text from input_data
+        extracted_text = extract_text_from_input(input_data)
 
-        logging.debug(f"Processed data type: {type(data)}")
-        logging.debug(f"Processed data (first 500 chars): {str(data)[:500]}...")
+        logging.debug(f"Extracted text (first 500 chars): {extracted_text[:500]}...")
 
-        # Extract text from the data
-        if 'transcription' in data:
-            segments = data['transcription']
-        elif 'segments' in data:
-            segments = data['segments']
-        elif 'text' in data:
-            segments = [{'Text': data['text']}]
-        else:
-            segments = data
-
-        if isinstance(segments, list):
-            # Check if the segments are in the new chunked format
-            if segments and isinstance(segments[0], dict) and 'text' in segments[0] and 'metadata' in segments[0]:
-                summaries = []
-                for chunk in segments:
-                    chunk_summary = summarize_chunk(api_name, chunk['text'], custom_prompt_input, api_key)
-                    summaries.append(chunk_summary)
-                summary = "\n\n".join(summaries)
-            else:
-                text = extract_text_from_segments(segments)
-                summary = summarize_chunk(api_name, text, custom_prompt_input, api_key)
-        elif isinstance(segments, str):
-            summary = summarize_chunk(api_name, segments, custom_prompt_input, api_key)
-        elif isinstance(segments, dict):
-            # If segments is a dictionary, try to extract text from it
-            text = json.dumps(segments)  # Convert the entire dictionary to a string
-            summary = summarize_chunk(api_name, text, custom_prompt_input, api_key)
-        else:
-            logging.error(f"Unsupported segments type: {type(segments)}")
-            return None
+        # Perform summarization on the extracted text
+        summary = summarize_chunk(api_name, extracted_text, custom_prompt_input, api_key)
 
         if summary:
             logging.info(f"Summary generated using {api_name} API")
@@ -997,6 +947,39 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key):
         logging.error(f"Error summarizing with {api_name}: {str(e)}", exc_info=True)
 
     return None
+
+def extract_text_from_input(input_data):
+    if isinstance(input_data, str):
+        try:
+            # Try to parse as JSON
+            data = json.loads(input_data)
+        except json.JSONDecodeError:
+            # If not valid JSON, treat as plain text
+            return input_data
+    elif isinstance(input_data, dict):
+        data = input_data
+    else:
+        return str(input_data)
+
+    # Extract relevant fields from the JSON object
+    text_parts = []
+    if 'title' in data:
+        text_parts.append(f"Title: {data['title']}")
+    if 'description' in data:
+        text_parts.append(f"Description: {data['description']}")
+    if 'transcription' in data:
+        if isinstance(data['transcription'], list):
+            transcription_text = ' '.join([segment.get('Text', '') for segment in data['transcription']])
+        elif isinstance(data['transcription'], str):
+            transcription_text = data['transcription']
+        else:
+            transcription_text = str(data['transcription'])
+        text_parts.append(f"Transcription: {transcription_text}")
+    elif 'segments' in data:
+        segments_text = extract_text_from_segments(data['segments'])
+        text_parts.append(f"Segments: {segments_text}")
+
+    return '\n\n'.join(text_parts)
 
 
 
