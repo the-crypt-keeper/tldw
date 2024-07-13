@@ -205,10 +205,21 @@ def create_tables() -> None:
         ''',
         '''
         CREATE INDEX IF NOT EXISTS idx_media_version_media_id ON MediaVersion(media_id);
+        ''',
         '''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_id ON MediaModifications(media_id);
+        ''',
+        '''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url);
+        ''',
+        '''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id);
+        ''',
     ]
     for query in table_queries:
         db.execute_query(query)
+
+    logging.info("All tables and indexes created successfully.")
 
 create_tables()
 
@@ -766,15 +777,25 @@ def update_media_content(selected_item, item_mapping, content_input, prompt_inpu
                 # Update the main content in the Media table
                 cursor.execute("UPDATE Media SET content = ? WHERE id = ?", (content_input, media_id))
 
-                # Update or insert the prompt and summary in the MediaModifications table
-                cursor.execute("""
-                    INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(media_id) DO UPDATE SET
-                    prompt = excluded.prompt,
-                    summary = excluded.summary,
-                    modification_date = CURRENT_TIMESTAMP
-                """, (media_id, prompt_input, summary_input))
+                # Check if a row already exists in MediaModifications for this media_id
+                cursor.execute("SELECT COUNT(*) FROM MediaModifications WHERE media_id = ?", (media_id,))
+                exists = cursor.fetchone()[0] > 0
+
+                if exists:
+                    # Update existing row
+                    cursor.execute("""
+                        UPDATE MediaModifications
+                        SET prompt = ?, summary = ?, modification_date = CURRENT_TIMESTAMP
+                        WHERE media_id = ?
+                    """, (prompt_input, summary_input, media_id))
+                else:
+                    # Insert new row
+                    cursor.execute("""
+                        INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    """, (media_id, prompt_input, summary_input))
+
+                conn.commit()
 
             return f"Content updated successfully for media ID: {media_id}"
         else:
