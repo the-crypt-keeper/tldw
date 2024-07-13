@@ -65,45 +65,56 @@ def extract_text_from_segments(segments):
 def summarize_with_openai(api_key, input_data, custom_prompt_arg):
     loaded_config_data = load_and_log_configs()
     try:
-        # API key validation
-        if api_key is None or api_key.strip() == "":
-            logging.info("OpenAI: API key not provided as parameter")
-            logging.info("OpenAI: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['openai']
-
-        if api_key is None or api_key.strip() == "":
-            logging.error("OpenAI: API key not found or is empty")
-            return "OpenAI: API Key Not Provided/Found in Config file or is empty"
-
-        logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        # API key validation (keep this part as is)
 
         # Input data handling
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("OpenAI: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
+        logging.debug(f"OpenAI: Raw input data type: {type(input_data)}")
+        logging.debug(f"OpenAI: Raw input data (first 500 chars): {str(input_data)[:500]}...")
+
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                # It's likely a JSON string
+                logging.debug("OpenAI: Parsing provided JSON string data for summarization")
+                try:
+                    data = json.loads(input_data)
+                except json.JSONDecodeError as e:
+                    logging.error(f"OpenAI: Error parsing JSON string: {str(e)}")
+                    return f"OpenAI: Error parsing JSON input: {str(e)}"
+            elif os.path.isfile(input_data):
+                logging.debug("OpenAI: Loading JSON data from file for summarization")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                logging.debug("OpenAI: Using provided string data for summarization")
+                data = input_data
         else:
-            logging.debug("OpenAI: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"OpenAI: Loaded data: {data}")
-        logging.debug(f"OpenAI: Type of data: {type(data)}")
-
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("OpenAI: Summary already exists in the loaded data")
-            return data['summary']
+        logging.debug(f"OpenAI: Processed data type: {type(data)}")
+        logging.debug(f"OpenAI: Processed data (first 500 chars): {str(data)[:500]}...")
 
         # Text extraction
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
+        if isinstance(data, dict):
+            if 'summary' in data:
+                logging.debug("OpenAI: Summary already exists in the loaded data")
+                return data['summary']
+            elif 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)  # Convert dict to string if no specific format
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
         elif isinstance(data, str):
             text = data
         else:
-            raise ValueError("OpenAI: Invalid input data format")
+            raise ValueError(f"OpenAI: Invalid input data format: {type(data)}")
 
         openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
+        logging.debug(f"OpenAI: Extracted text (first 500 chars): {text[:500]}...")
+        logging.debug(f"OpenAI: Custom prompt: {custom_prompt_arg}")
+
+        openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
+        logging.debug(f"OpenAI: Using model: {openai_model}")
 
         headers = {
             'Authorization': f'Bearer {api_key}',
@@ -124,25 +135,32 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
             "temperature": 0.1
         }
 
-        logging.debug("openai: Posting request")
+        logging.debug("OpenAI: Posting request")
         response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
 
         if response.status_code == 200:
             response_data = response.json()
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("openai: Summarization successful")
+                logging.debug("OpenAI: Summarization successful")
+                logging.debug(f"OpenAI: Summary (first 500 chars): {summary[:500]}...")
                 return summary
             else:
-                logging.warning("openai: Summary not found in the response data")
-                return "openai: Summary not available"
+                logging.warning("OpenAI: Summary not found in the response data")
+                return "OpenAI: Summary not available"
         else:
-            logging.error(f"openai: Summarization failed with status code {response.status_code}")
-            logging.error(f"openai: Error response: {response.text}")
-            return f"openai: Failed to process summary. Status code: {response.status_code}"
+            logging.error(f"OpenAI: Summarization failed with status code {response.status_code}")
+            logging.error(f"OpenAI: Error response: {response.text}")
+            return f"OpenAI: Failed to process summary. Status code: {response.status_code}"
+    except json.JSONDecodeError as e:
+        logging.error(f"OpenAI: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"OpenAI: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"OpenAI: Error making API request: {str(e)}", exc_info=True)
+        return f"OpenAI: Error making API request: {str(e)}"
     except Exception as e:
-        logging.error(f"openai: Error in processing: {str(e)}", exc_info=True)
-        return f"openai: Error occurred while processing summary: {str(e)}"
+        logging.error(f"OpenAI: Unexpected error: {str(e)}", exc_info=True)
+        return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
 def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries=3, retry_delay=5):
@@ -878,7 +896,7 @@ def summarize_chunk(api_name, text, custom_prompt_input, api_key):
         return None
 
 
-def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key):
+def perform_summarization(api_name, input_data, custom_prompt_input, api_key):
     loaded_config_data = load_and_log_configs()
 
     if custom_prompt_input is None:
@@ -901,38 +919,73 @@ def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key
 - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
 
     try:
-        if not json_file_path or not os.path.exists(json_file_path):
-            logging.error(f"JSON file does not exist: {json_file_path}")
+        logging.debug(f"Input data type: {type(input_data)}")
+        logging.debug(f"Input data (first 500 chars): {str(input_data)[:500]}...")
+
+        # Handle different input types
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                # It's likely a JSON string
+                try:
+                    # Try to parse the JSON string
+                    data = json.loads(input_data)
+                except json.JSONDecodeError as e:
+                    logging.warning(f"Error parsing JSON string: {str(e)}")
+                    # If parsing fails, treat the entire input as plain text
+                    data = {'text': input_data}
+            elif os.path.exists(input_data):
+                # It's a file path
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                # It's a plain text
+                data = {'text': input_data}
+        elif isinstance(input_data, dict):
+            data = input_data
+        else:
+            logging.error(f"Unsupported input data type: {type(input_data)}")
             return None
 
-        with open(json_file_path, 'r') as file:
-            data = json.load(file)
+        logging.debug(f"Processed data type: {type(data)}")
+        logging.debug(f"Processed data (first 500 chars): {str(data)[:500]}...")
 
-        if isinstance(data, dict) and 'transcription' in data:
+        # Extract text from the data
+        if 'transcription' in data:
             segments = data['transcription']
+        elif 'segments' in data:
+            segments = data['segments']
+        elif 'text' in data:
+            segments = [{'Text': data['text']}]
         else:
             segments = data
 
-        if not isinstance(segments, list):
-            logging.error(f"Segments is not a list: {type(segments)}")
-            return None
-
-        # Check if the segments are in the new chunked format
-        if segments and isinstance(segments[0], dict) and 'text' in segments[0] and 'metadata' in segments[0]:
-            summaries = []
-            for chunk in segments:
-                chunk_summary = summarize_chunk(api_name, chunk['text'], custom_prompt_input, api_key)
-                summaries.append(chunk_summary)
-            summary = "\n\n".join(summaries)
-        else:
-            text = extract_text_from_segments(segments)
+        if isinstance(segments, list):
+            # Check if the segments are in the new chunked format
+            if segments and isinstance(segments[0], dict) and 'text' in segments[0] and 'metadata' in segments[0]:
+                summaries = []
+                for chunk in segments:
+                    chunk_summary = summarize_chunk(api_name, chunk['text'], custom_prompt_input, api_key)
+                    summaries.append(chunk_summary)
+                summary = "\n\n".join(summaries)
+            else:
+                text = extract_text_from_segments(segments)
+                summary = summarize_chunk(api_name, text, custom_prompt_input, api_key)
+        elif isinstance(segments, str):
+            summary = summarize_chunk(api_name, segments, custom_prompt_input, api_key)
+        elif isinstance(segments, dict):
+            # If segments is a dictionary, try to extract text from it
+            text = json.dumps(segments)  # Convert the entire dictionary to a string
             summary = summarize_chunk(api_name, text, custom_prompt_input, api_key)
+        else:
+            logging.error(f"Unsupported segments type: {type(segments)}")
+            return None
 
         if summary:
             logging.info(f"Summary generated using {api_name} API")
-            summary_file_path = json_file_path.replace('.json', '_summary.txt')
-            with open(summary_file_path, 'w') as file:
-                file.write(summary)
+            if isinstance(input_data, str) and os.path.exists(input_data):
+                summary_file_path = input_data.replace('.json', '_summary.txt')
+                with open(summary_file_path, 'w') as file:
+                    file.write(summary)
         else:
             logging.warning(f"Failed to generate summary using {api_name} API")
 
@@ -941,7 +994,7 @@ def perform_summarization(api_name, json_file_path, custom_prompt_input, api_key
     except requests.exceptions.ConnectionError:
         logging.error("Connection error while summarizing")
     except Exception as e:
-        logging.error(f"Error summarizing with {api_name}: {str(e)}")
+        logging.error(f"Error summarizing with {api_name}: {str(e)}", exc_info=True)
 
     return None
 

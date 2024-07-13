@@ -920,10 +920,15 @@ def create_video_transcription_tab():
 
                     # Perform summarization if API is provided
                     summary_text = None
-                    if api_name and api_key:
+                    if api_name:
+                        # API key resolution handled at base of function if none provided
+                        api_key = api_key if api_key else None
                         logging.info(f"Starting summarization with {api_name}...")
                         summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key)
-                        logging.debug(f"Summarization completed: {summary_text[:100]}...")  # Log first 100 characters
+                        if summary_text is None:
+                            logging.error("Summarization failed.")
+                            return None, None, None, None, None, None
+                        logging.debug(f"Summarization completed: {summary_text[:100]}...")
 
                     # Save transcription and summary
                     logging.info("Saving transcription and summary...")
