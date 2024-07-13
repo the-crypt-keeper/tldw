@@ -207,14 +207,14 @@ def create_tables() -> None:
         CREATE INDEX IF NOT EXISTS idx_media_version_media_id ON MediaVersion(media_id);
         ''',
         '''
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_id ON MediaModifications(media_id);
+        CREATE INDEX IF NOT EXISTS idx_mediamodifications_media_id ON MediaModifications(media_id);
         ''',
         '''
         CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url);
         ''',
         '''
         CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id);
-        ''',
+        '''
     ]
     for query in table_queries:
         db.execute_query(query)
@@ -270,7 +270,8 @@ def delete_keyword(keyword: str) -> str:
 
 
 # Function to add media with keywords
-def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author, ingestion_date):
+def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author,
+                            ingestion_date):
     # Set default values for missing fields
     url = url or 'Unknown'
     title = title or 'Untitled'
@@ -293,9 +294,6 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     if ingestion_date and not is_valid_date(ingestion_date):
         raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")
 
-    if not ingestion_date:
-        ingestion_date = datetime.now().strftime('%Y-%m-%d')
-
     # Split keywords correctly by comma
     keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
 
@@ -303,7 +301,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     logging.info(f"Title: {title}")
     logging.info(f"Media Type: {media_type}")
     logging.info(f"Keywords: {keywords}")
-    logging.info(f"Content: {content}")
+    logging.info(f"Content: {content[:500]}...")  # Log first 500 characters of content
     logging.info(f"Prompt: {prompt}")
     logging.info(f"Summary: {summary}")
     logging.info(f"Author: {author}")
@@ -314,9 +312,6 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
         with db.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Initialize keyword_list
-            keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
-
             # Check if media already exists
             cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
             existing_media = cursor.fetchone()
@@ -325,12 +320,14 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
                 media_id = existing_media[0]
                 logger.info(f"Existing media found with ID: {media_id}")
 
-                # Insert new prompt and summary into MediaModifications
+                # Update existing media content
                 cursor.execute('''
-                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-                VALUES (?, ?, ?, ?)
-                ''', (media_id, prompt, summary, ingestion_date))
-                logger.info("New summary and prompt added to MediaModifications")
+                UPDATE Media 
+                SET content = ?, transcription_model = ?
+                WHERE id = ?
+                ''', (content, transcription_model, media_id))
+                logger.info("Existing media content updated")
+
             else:
                 logger.info("New media entry being created")
 
@@ -341,30 +338,32 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
                 ''', (url, title, media_type, content, author, ingestion_date, transcription_model))
                 media_id = cursor.lastrowid
 
-                # Insert keywords and associate with media item
-                for keyword in keyword_list:
-                    keyword = keyword.strip().lower()
-                    cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
-                    cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-                    keyword_id = cursor.fetchone()[0]
-                    cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
-                cursor.execute('INSERT INTO media_fts (rowid, title, content) VALUES (?, ?, ?)', (media_id, title, content))
+            # Always insert a new row into MediaModifications
+            cursor.execute('''
+            INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+            VALUES (?, ?, ?, ?)
+            ''', (media_id, prompt, summary, ingestion_date))
+            logger.info("New modification added to MediaModifications")
 
-                # Also insert the initial prompt and summary into MediaModifications
-                cursor.execute('''
-                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-                VALUES (?, ?, ?, ?)
-                ''', (media_id, prompt, summary, ingestion_date))
+            # Insert keywords and associate with media item
+            for keyword in keyword_list:
+                keyword = keyword.strip().lower()
+                cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+                cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                keyword_id = cursor.fetchone()[0]
+                cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)',
+                               (media_id, keyword_id))
+
+            # Update full-text search index
+            cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
+                           (media_id, title, content))
 
             conn.commit()
 
-            # Insert initial version of the prompt and summary
+            # Insert new version
             add_media_version(media_id, prompt, summary)
 
-            return f"Media '{title}' added successfully with keywords: {', '.join(keyword_list)}"
-    except sqlite3.IntegrityError as e:
-        logger.error(f"Integrity Error: {e}")
-        raise DatabaseError(f"Integrity error adding media with keywords: {e}")
+            return f"Media '{title}' added/updated successfully with keywords: {', '.join(keyword_list)}"
     except sqlite3.Error as e:
         logger.error(f"SQL Error: {e}")
         raise DatabaseError(f"Error adding media with keywords: {e}")
@@ -671,7 +670,21 @@ def is_valid_date(date_string: str) -> bool:
 
 # Add ingested media to DB
 def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model):
-    content = ' '.join([segment['Text'] for segment in segments if 'Text' in segment])
+    # Extract content from segments
+    if isinstance(segments, list):
+        content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
+    elif isinstance(segments, dict):
+        content = segments.get('text', '') or segments.get('content', '')
+    else:
+        content = str(segments)
+
+    # # Trim content if it's too long (adjust the limit as needed)
+    # max_content_length = 1000000  # For example, 1 million characters
+    # if len(content) > max_content_length:
+    #     content = content[:max_content_length] + "... (truncated)"
+
+    logging.debug(f"Extracted content (first 500 chars): {content[:500]}")
+
     add_media_with_keywords(
         url=url,
         title=info_dict.get('title', 'Untitled'),
