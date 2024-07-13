@@ -32,7 +32,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast
-from App_Function_Libraries.Chunk_Lib import improved_chunking_process
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process, get_chat_completion
 from App_Function_Libraries.PDF_Ingestion_Lib import process_and_cleanup_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
@@ -40,12 +40,12 @@ from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama,
 from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_cohere, \
     summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface, perform_summarization, save_transcription_and_summary, \
-    perform_transcription
+    perform_transcription, summarize_chunk
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, export_to_file, add_media_to_database
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
-    convert_to_seconds
+    convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
     generate_timestamped_url, extract_metadata, download_video
 
@@ -1146,6 +1146,194 @@ def create_pdf_ingestion_tab():
                 inputs=[pdf_file_input, pdf_title_input, pdf_author_input, pdf_keywords_input],
                 outputs=pdf_result_output
             )
+#
+#
+############################
+# Functions for Re-Summarization
+#
+
+
+
+def create_resummary_tab():
+    with gr.TabItem("Re-Summarize"):
+        gr.Markdown("# Re-Summarize Existing Content")
+        with gr.Row():
+            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+            search_button = gr.Button("Search")
+
+        items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+        item_mapping = gr.State({})
+
+        with gr.Row():
+            api_name_input = gr.Dropdown(
+                choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                value="Local-LLM", label="API Name")
+            api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here")
+
+        chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)
+        with gr.Row(visible=False) as chunking_options_box:
+            chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens'],
+                                       label="Chunking Method", value='words')
+            max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
+            chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
+
+        custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False)
+        custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3, visible=False)
+
+        resummary_button = gr.Button("Re-Summarize")
+
+        result_output = gr.Textbox(label="Result")
+
+    # Connect the UI elements
+    search_button.click(
+        fn=update_resummary_dropdown,
+        inputs=[search_query_input, search_type_input],
+        outputs=[items_output, item_mapping]
+    )
+
+    chunking_options_checkbox.change(
+        fn=lambda x: gr.update(visible=x),
+        inputs=[chunking_options_checkbox],
+        outputs=[chunking_options_box]
+    )
+
+    custom_prompt_checkbox.change(
+        fn=lambda x: gr.update(visible=x),
+        inputs=[custom_prompt_checkbox],
+        outputs=[custom_prompt_input]
+    )
+
+    resummary_button.click(
+        fn=resummary_content_wrapper,
+        inputs=[items_output, item_mapping, api_name_input, api_key_input, chunking_options_checkbox, chunk_method,
+                max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt_input],
+        outputs=result_output
+    )
+
+    return search_query_input, search_type_input, search_button, items_output, item_mapping, api_name_input, api_key_input, chunking_options_checkbox, chunking_options_box, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt_input, resummary_button, result_output
+
+
+def update_resummary_dropdown(search_query, search_type):
+    if search_type in ['Title', 'URL']:
+        results = fetch_items_by_title_or_url(search_query, search_type)
+    elif search_type == 'Keyword':
+        results = fetch_items_by_keyword(search_query)
+    else:  # Content
+        results = fetch_items_by_content(search_query)
+
+    item_options = [f"{item[1]} ({item[2]})" for item in results]
+    item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}
+    return gr.update(choices=item_options), item_mapping
+
+
+def resummary_content_wrapper(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method,
+                              max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
+    if not selected_item or not api_name or not api_key:
+        return "Please select an item and provide API details."
+
+    media_id = item_mapping.get(selected_item)
+    if not media_id:
+        return "Invalid selection."
+
+    content, old_prompt, old_summary = fetch_item_details(media_id)
+
+    if not content:
+        return "No content available for re-summarization."
+
+    # Prepare chunking options
+    chunk_options = {
+        'method': chunk_method,
+        'max_size': int(max_chunk_size),
+        'overlap': int(chunk_overlap),
+        'language': 'english',
+        'adaptive': True,
+        'multi_level': False,
+    } if chunking_options_checkbox else None
+
+    # Prepare summarization prompt
+    summarization_prompt = custom_prompt if custom_prompt_checkbox and custom_prompt else None
+
+    # Call the resummary_content function
+    result = resummary_content(media_id, content, api_name, api_key, chunk_options, summarization_prompt)
+
+    return result
+
+
+def update_resummary_dropdown(search_query, search_type):
+    results = browse_items(search_query, search_type)
+    item_options = [f"{item[1]} ({item[2]})" for item in results]
+    item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}
+    return gr.update(choices=item_options), item_mapping
+
+def resummary_content(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
+    if not selected_item or not api_name or not api_key:
+        return "Please select an item and provide API details."
+
+    media_id = item_mapping.get(selected_item)
+    if not media_id:
+        return "Invalid selection."
+
+    content, old_prompt, old_summary = fetch_item_details(media_id)
+
+    if not content:
+        return "No content available for re-summarization."
+
+    # Load configuration
+    config = load_comprehensive_config()
+
+    # Prepare chunking options
+    chunk_options = {
+        'method': chunk_method,
+        'max_size': int(max_chunk_size),
+        'overlap': int(chunk_overlap),
+        'language': 'english',
+        'adaptive': True,
+        'multi_level': False,
+    }
+
+    # Chunking logic
+    if chunking_options_checkbox:
+        chunks = improved_chunking_process(content, chunk_options)
+    else:
+        chunks = [{'text': content, 'metadata': {}}]
+
+    # Prepare summarization prompt
+    if custom_prompt_checkbox and custom_prompt:
+        summarization_prompt = custom_prompt
+    else:
+        summarization_prompt = config.get('Prompts', 'default_summary_prompt', fallback="Summarize the following text:")
+
+    # Summarization logic
+    summaries = []
+    for chunk in chunks:
+        chunk_text = chunk['text']
+        try:
+            chunk_summary = summarize_chunk(api_name, chunk_text, summarization_prompt, api_key)
+            if chunk_summary:
+                summaries.append(chunk_summary)
+            else:
+                logging.warning(f"Summarization failed for chunk: {chunk_text[:100]}...")
+        except Exception as e:
+            logging.error(f"Error during summarization: {str(e)}")
+            return f"Error during summarization: {str(e)}"
+
+    if not summaries:
+        return "Summarization failed for all chunks."
+
+    new_summary = " ".join(summaries)
+
+    # Update the database with the new summary
+    try:
+        update_result = update_media_content(selected_item, item_mapping, content, summarization_prompt, new_summary)
+        if "successfully" in update_result.lower():
+            return f"Re-summarization complete. New summary: {new_summary[:500]}..."
+        else:
+            return f"Error during database update: {update_result}"
+    except Exception as e:
+        logging.error(f"Error updating database: {str(e)}")
+        return f"Error updating database: {str(e)}"
 
 
 
@@ -1666,6 +1854,7 @@ def launch_ui(demo_mode=False):
                     create_podcast_tab()
                     create_website_scraping_tab()
                     create_pdf_ingestion_tab()
+                    create_resummary_tab()
 
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
