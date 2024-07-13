@@ -300,6 +300,16 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
         if not os.path.exists(ffmpeg_cmd) and os.name == "nt":
             raise FileNotFoundError(f"ffmpeg executable not found at path: {ffmpeg_cmd}")
 
+        # Define chunk options early to avoid undefined errors
+        chunk_options = {
+            'method': chunk_method,
+            'max_size': max_chunk_size,
+            'overlap': chunk_overlap,
+            'adaptive': use_adaptive_chunking,
+            'multi_level': use_multi_level_chunking,
+            'language': chunk_language
+        }
+
         # Process multiple URLs
         urls = [url.strip() for url in audio_urls.split('\n') if url.strip()]
 
@@ -331,11 +341,18 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
 
             temp_files.append(wav_file_path)
 
+            # Initialize transcription
+            transcription = ""
+
             # Transcribe audio
             if diarize:
                 segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=True)
             else:
                 segments = speech_to_text(wav_file_path, whisper_model=whisper_model)
+
+            # Handle segments nested under 'segments' key
+            if isinstance(segments, dict) and 'segments' in segments:
+                segments = segments['segments']
 
             if isinstance(segments, list):
                 transcription = " ".join([segment.get('Text', '') for segment in segments])
@@ -349,14 +366,6 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 update_progress("Transcription is empty.")
             else:
                 # Apply chunking
-                chunk_options = {
-                    'method': chunk_method,
-                    'max_size': max_chunk_size,
-                    'overlap': chunk_overlap,
-                    'adaptive': use_adaptive_chunking,
-                    'multi_level': use_multi_level_chunking,
-                    'language': chunk_language
-                }
                 chunked_text = improved_chunking_process(transcription, chunk_options)
 
                 # Summarize
@@ -406,10 +415,17 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
 
                 temp_files.append(wav_file_path)
 
+                # Initialize transcription
+                transcription = ""
+
                 if diarize:
                     segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=True)
                 else:
                     segments = speech_to_text(wav_file_path, whisper_model=whisper_model)
+
+                # Handle segments nested under 'segments' key
+                if isinstance(segments, dict) and 'segments' in segments:
+                    segments = segments['segments']
 
                 if isinstance(segments, list):
                     transcription = " ".join([segment.get('Text', '') for segment in segments])
