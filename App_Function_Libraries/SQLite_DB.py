@@ -288,8 +288,8 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     if not is_valid_url(url):
         url = 'localhost'
 
-    if media_type not in ['document', 'video', 'article']:
-        raise InputError("Invalid media type. Allowed types: document, video, article.")
+    if media_type not in ['audio', 'article', 'document', 'podcast', 'video', 'unknown']:
+        raise InputError("Invalid media type. Allowed types: article, audio file, document, podcast, video.")
 
     if ingestion_date and not is_valid_date(ingestion_date):
         raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")

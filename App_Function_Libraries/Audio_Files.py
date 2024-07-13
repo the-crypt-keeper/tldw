@@ -16,6 +16,7 @@
 # Imports
 import json
 import logging
+import subprocess
 import sys
 import tempfile
 import uuid
@@ -27,12 +28,15 @@ from gradio import gradio
 import yt_dlp
 
 from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 # Local Imports
 from App_Function_Libraries.SQLite_DB import add_media_to_database, add_media_with_keywords
 from App_Function_Libraries.Utils import create_download_directory, save_segments_to_json
 from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
+from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
+
 #
 #######################################################################################################################
 # Function Definitions
@@ -41,15 +45,51 @@ from App_Function_Libraries.Summarization_General_Lib import save_transcription_
 MAX_FILE_SIZE = 500 * 1024 * 1024
 
 
-def download_audio_file(url, save_path):
-    response = requests.get(url, stream=True)
-    file_size = int(response.headers.get('content-length', 0))
-    if file_size > 500 * 1024 * 1024:  # 500 MB limit
-        raise ValueError("File size exceeds the 500MB limit.")
-    with open(save_path, 'wb') as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-    return save_path
+def download_audio_file(url, use_cookies=False, cookies=None):
+    try:
+        # Set up the request headers
+        headers = {}
+        if use_cookies and cookies:
+            try:
+                cookie_dict = json.loads(cookies)
+                headers['Cookie'] = '; '.join([f'{k}={v}' for k, v in cookie_dict.items()])
+            except json.JSONDecodeError:
+                logging.warning("Invalid cookie format. Proceeding without cookies.")
+
+        # Make the request
+        response = requests.get(url, headers=headers, stream=True)
+        response.raise_for_status()  # Raise an exception for bad status codes
+
+        # Get the file size
+        file_size = int(response.headers.get('content-length', 0))
+        if file_size > 500 * 1024 * 1024:  # 500 MB limit
+            raise ValueError("File size exceeds the 500MB limit.")
+
+        # Generate a unique filename
+        file_name = f"audio_{uuid.uuid4().hex[:8]}.mp3"
+        save_path = os.path.join('downloads', file_name)
+
+        # Ensure the downloads directory exists
+        os.makedirs('downloads', exist_ok=True)
+
+        # Download the file
+        with open(save_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+        logging.info(f"Audio file downloaded successfully: {save_path}")
+        return save_path
+
+    except requests.RequestException as e:
+        logging.error(f"Error downloading audio file: {str(e)}")
+        raise
+    except ValueError as e:
+        logging.error(str(e))
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error downloading audio file: {str(e)}")
+        raise
 
 
 def process_audio(
@@ -127,6 +167,7 @@ def process_audio(
         json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text,
                                                                            download_path)
 
+        # Update function call to add_media_to_database so that it properly applies the title, author and file type
         # Add to database
         add_media_to_database(None, {'title': 'Audio File', 'author': 'Unknown'}, segments, summary_text, keywords,
                               custom_prompt_input, whisper_model)
@@ -138,7 +179,9 @@ def process_audio(
         return str(e), None, None, None, None, None
 
 
-def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original, custom_keywords, source):
+def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original,custom_keywords, source,
+                         custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
+                         use_multi_level_chunking, chunk_language):
     progress = []
     transcription = ""
     summary = ""
@@ -204,7 +247,8 @@ def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep
 
 
 def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key, use_cookies, cookies, keep_original,
-                        custom_keywords):
+                        custom_keywords, custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap,
+                        use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize):
     progress = []
     temp_files = []
     all_transcriptions = []
@@ -223,90 +267,169 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
             except Exception as e:
                 update_progress(f"Failed to remove temporary file {file}: {str(e)}")
 
+    def reencode_mp3(mp3_file_path):
+        try:
+            reencoded_mp3_path = mp3_file_path.replace(".mp3", "_reencoded.mp3")
+            subprocess.run([ffmpeg_cmd, '-i', mp3_file_path, '-codec:a', 'libmp3lame', reencoded_mp3_path], check=True)
+            update_progress(f"Re-encoded {mp3_file_path} to {reencoded_mp3_path}.")
+            return reencoded_mp3_path
+        except subprocess.CalledProcessError as e:
+            update_progress(f"Error re-encoding {mp3_file_path}: {str(e)}")
+            raise
+
+    def convert_mp3_to_wav(mp3_file_path):
+        try:
+            wav_file_path = mp3_file_path.replace(".mp3", ".wav")
+            subprocess.run([ffmpeg_cmd, '-i', mp3_file_path, wav_file_path], check=True)
+            update_progress(f"Converted {mp3_file_path} to {wav_file_path}.")
+            return wav_file_path
+        except subprocess.CalledProcessError as e:
+            update_progress(f"Error converting {mp3_file_path} to WAV: {str(e)}")
+            raise
+
     try:
+        # Check and set the ffmpeg command
+        global ffmpeg_cmd
+        if os.name == "nt":
+            logging.debug("Running on Windows")
+            ffmpeg_cmd = os.path.join(os.getcwd(), "Bin", "ffmpeg.exe")
+        else:
+            ffmpeg_cmd = 'ffmpeg'  # Assume 'ffmpeg' is in PATH for non-Windows systems
+
+        # Ensure ffmpeg is accessible
+        if not os.path.exists(ffmpeg_cmd) and os.name == "nt":
+            raise FileNotFoundError(f"ffmpeg executable not found at path: {ffmpeg_cmd}")
+
         # Process multiple URLs
         urls = [url.strip() for url in audio_urls.split('\n') if url.strip()]
 
         for i, url in enumerate(urls):
             update_progress(f"Processing URL {i + 1}/{len(urls)}: {url}")
 
-            # Get the absolute path to the script's directory
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            script_dir = os.path.dirname(current_dir)
-
-            # Setup path handling for ffmpeg & ffprobe on different OSs
-            if sys.platform.startswith('win'):
-                ffmpeg_path = os.path.join(script_dir, 'Bin', 'ffmpeg.exe')
-                ffprobe_path = os.path.join(script_dir, 'Bin', 'ffprobe.exe')
-            elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-                ffmpeg_path = 'ffmpeg'
-                ffprobe_path = 'ffprobe'
-            else:
-                raise OSError("Unsupported operating system")
-
-            # Ensure the ffmpeg file exists
-            if not os.path.exists(ffmpeg_path):
-                raise FileNotFoundError(f"ffmpeg not found at {ffmpeg_path}")
-
-            # Ensure the ffprobe file exists
-            if not os.path.exists(ffprobe_path):
-                raise FileNotFoundError(f"ffprobe not found at {ffprobe_path}")
-
-            # Create a unique directory for this audio file
-            audio_dir = os.path.join('downloads', f'audio_{uuid.uuid4().hex[:8]}')
-            os.makedirs(audio_dir, exist_ok=True)
-
-            # Set up yt-dlp options
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'wav',
-                }],
-                'outtmpl': os.path.join(audio_dir, '%(title)s.%(ext)s'),
-                'ffmpeg_location': ffmpeg_path
-            }
-
-            # Add cookies if provided
-            if use_cookies and cookies:
-                try:
-                    cookies_dict = json.loads(cookies)
-                    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_cookie_file:
-                        json.dump(cookies_dict, temp_cookie_file)
-                        temp_cookie_file_path = temp_cookie_file.name
-                    ydl_opts['cookiefile'] = temp_cookie_file_path
-                    temp_files.append(temp_cookie_file_path)
-                    update_progress("Cookies applied to audio download.")
-                except json.JSONDecodeError:
-                    update_progress("Invalid cookie format. Proceeding without cookies.")
-
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info_dict = ydl.extract_info(url, download=True)
-                    audio_file_path = ydl.prepare_filename(info_dict).rsplit('.', 1)[0] + '.wav'
-                temp_files.append(audio_file_path)
-                update_progress("Audio file downloaded successfully.")
-            except yt_dlp.DownloadError as e:
-                update_progress(f"Failed to download audio file: {str(e)}")
+            # Download and process audio file
+            audio_file_path = download_audio_file(url, use_cookies, cookies)
+            if not os.path.exists(audio_file_path):
+                update_progress(f"Downloaded file not found: {audio_file_path}")
                 continue
 
-            # Process the audio file
-            result = process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original,
-                                          custom_keywords, url)
-            all_transcriptions.append(result[1])
-            all_summaries.append(result[2])
-            update_progress(result[0])
+            temp_files.append(audio_file_path)
+            update_progress("Audio file downloaded successfully.")
+
+            # Re-encode MP3 to fix potential issues
+            reencoded_mp3_path = reencode_mp3(audio_file_path)
+            if not os.path.exists(reencoded_mp3_path):
+                update_progress(f"Re-encoded file not found: {reencoded_mp3_path}")
+                continue
+
+            temp_files.append(reencoded_mp3_path)
+
+            # Convert re-encoded MP3 to WAV
+            wav_file_path = convert_mp3_to_wav(reencoded_mp3_path)
+            if not os.path.exists(wav_file_path):
+                update_progress(f"Converted WAV file not found: {wav_file_path}")
+                continue
+
+            temp_files.append(wav_file_path)
+
+            # Transcribe audio
+            if diarize:
+                segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=True)
+            else:
+                segments = speech_to_text(wav_file_path, whisper_model=whisper_model)
+
+            transcription = " ".join([segment['Text'] for segment in segments])
+            update_progress("Audio transcribed successfully.")
+
+            if not transcription.strip():
+                update_progress("Transcription is empty.")
+            else:
+                # Apply chunking
+                chunk_options = {
+                    'method': chunk_method,
+                    'max_size': max_chunk_size,
+                    'overlap': chunk_overlap,
+                    'adaptive': use_adaptive_chunking,
+                    'multi_level': use_multi_level_chunking,
+                    'language': chunk_language
+                }
+                chunked_text = improved_chunking_process(transcription, chunk_options)
+
+                # Summarize
+                if api_name and api_key:
+                    summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
+                    update_progress("Audio summarized successfully.")
+                else:
+                    summary = "No summary available (API not provided)"
+
+                all_transcriptions.append(transcription)
+                all_summaries.append(summary)
+
+                # Add to database
+                add_media_with_keywords(
+                    url=url,
+                    title=os.path.basename(wav_file_path),
+                    media_type='audio',
+                    content=transcription,
+                    keywords=custom_keywords,
+                    prompt=custom_prompt_input,
+                    summary=summary,
+                    transcription_model=whisper_model,
+                    author="Unknown",
+                    ingestion_date=datetime.now().strftime('%Y-%m-%d')
+                )
+                update_progress("Audio file processed and added to database.")
 
         # Process uploaded file if provided
         if audio_file:
             if os.path.getsize(audio_file.name) > MAX_FILE_SIZE:
-                update_progress(f"Uploaded file size exceeds the maximum limit of 200MB. Skipping this file.")
+                update_progress(
+                    f"Uploaded file size exceeds the maximum limit of {MAX_FILE_SIZE / (1024 * 1024):.2f}MB. Skipping this file.")
             else:
-                result = process_single_audio(audio_file.name, whisper_model, api_name, api_key, keep_original,
-                                              custom_keywords, "Uploaded File")
-                all_transcriptions.append(result[1])
-                all_summaries.append(result[2])
-                update_progress(result[0])
+                # Re-encode MP3 to fix potential issues
+                reencoded_mp3_path = reencode_mp3(audio_file.name)
+                if not os.path.exists(reencoded_mp3_path):
+                    update_progress(f"Re-encoded file not found: {reencoded_mp3_path}")
+                    return update_progress("Processing failed: Re-encoded file not found"), "", ""
+
+                temp_files.append(reencoded_mp3_path)
+
+                # Convert re-encoded MP3 to WAV
+                wav_file_path = convert_mp3_to_wav(reencoded_mp3_path)
+                if not os.path.exists(wav_file_path):
+                    update_progress(f"Converted WAV file not found: {wav_file_path}")
+                    return update_progress("Processing failed: Converted WAV file not found"), "", ""
+
+                temp_files.append(wav_file_path)
+
+                if diarize:
+                    segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=True)
+                else:
+                    segments = speech_to_text(wav_file_path, whisper_model=whisper_model)
+
+                transcription = " ".join([segment['Text'] for segment in segments])
+                chunked_text = improved_chunking_process(transcription, chunk_options)
+
+                if api_name and api_key:
+                    summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
+                else:
+                    summary = "No summary available (API not provided)"
+
+                all_transcriptions.append(transcription)
+                all_summaries.append(summary)
+
+                add_media_with_keywords(
+                    url="Uploaded File",
+                    title=os.path.basename(wav_file_path),
+                    media_type='audio',
+                    content=transcription,
+                    keywords=custom_keywords,
+                    prompt=custom_prompt_input,
+                    summary=summary,
+                    transcription_model=whisper_model,
+                    author="Unknown",
+                    ingestion_date=datetime.now().strftime('%Y-%m-%d')
+                )
+                update_progress("Uploaded file processed and added to database.")
 
         # Final cleanup
         if not keep_original:
@@ -322,6 +445,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
         logging.error(f"Error processing audio files: {str(e)}")
         cleanup_files()
         return update_progress(f"Processing failed: {str(e)}"), "", ""
+
 
 def download_youtube_audio(url: str) -> str:
     ydl_opts = {
@@ -340,9 +464,9 @@ def download_youtube_audio(url: str) -> str:
 
 
 def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model,
-                    keep_original=False, enable_diarization=False, custom_vocabulary=None,
-                    summary_type="short", summary_length=300, use_cookies=False, cookies=None):
-    global ffmpeg_path
+                    keep_original=False, enable_diarization=False, use_cookies=False, cookies=None,
+                    chunk_method=None, max_chunk_size=300, chunk_overlap=0, use_adaptive_chunking=False,
+                    use_multi_level_chunking=False, chunk_language='english'):
     progress = []
     error_message = ""
     temp_files = []
@@ -352,118 +476,47 @@ def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_k
         return "\n".join(progress)
 
     def cleanup_files():
-        for file in temp_files:
-            try:
-                if os.path.exists(file):
-                    os.remove(file)
-                    update_progress(f"Temporary file {file} removed.")
-            except Exception as e:
-                update_progress(f"Failed to remove temporary file {file}: {str(e)}")
+        if not keep_original:
+            for file in temp_files:
+                try:
+                    if os.path.exists(file):
+                        os.remove(file)
+                        update_progress(f"Temporary file {file} removed.")
+                except Exception as e:
+                    update_progress(f"Failed to remove temporary file {file}: {str(e)}")
 
     try:
-        # Create a unique directory for this podcast
-        podcast_dir = os.path.join('downloads', f'podcast_{uuid.uuid4().hex[:8]}')
-        os.makedirs(podcast_dir, exist_ok=True)
+        # Download podcast
+        audio_file = download_audio_file(url, use_cookies, cookies)
+        temp_files.append(audio_file)
+        update_progress("Podcast downloaded successfully.")
 
-        # Get the absolute path to the script's directory
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-
-        # Setup path handling for ffmpeg & ffprobe on different OSs
-        if sys.platform.startswith('win'):
-            # Add Bin directory to PATH
-            bin_dir = os.path.join(script_dir, 'Bin')
-            os.environ['PATH'] = bin_dir + os.pathsep + os.environ['PATH']
-            if 'ffmpeg' not in os.listdir(bin_dir):
-                raise FileNotFoundError("ffmpeg not found in Bin directory")
-            ffmpeg_path = os.path.join(script_dir, 'Bin', 'ffmpeg.exe')
-            ffprobe_path = os.path.join(script_dir, 'Bin', 'ffprobe.exe')
-        elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-            ffmpeg_path = 'ffmpeg'
-            ffprobe_path = 'ffprobe'
-        else:
-            raise OSError("Unsupported operating system")
-
-        # Ensure the ffmpeg file exists
-        if not os.path.exists(ffmpeg_path):
-            raise FileNotFoundError(f"ffmpeg not found at {ffmpeg_path}")
-
-        # Ensure the ffprobe file exists
-        if not os.path.exists(ffprobe_path):
-            raise FileNotFoundError(f"ffprobe not found at {ffprobe_path}")
-
-        # Set up yt-dlp options
-        ydl_opts = {
-            'ffmpeg-location': ffmpeg_path,
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'wav',
-            }],
-            'outtmpl': os.path.join('downloads', 'audio_%(id)s', '%(title)s.%(ext)s'),
-            'ffmpeg_location': ffmpeg_path,
-            'ffprobe_location': ffprobe_path,
-        }
-
-        # Add cookies if provided
-        if use_cookies and cookies:
-            try:
-                cookies_dict = json.loads(cookies)
-                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_cookie_file:
-                    json.dump(cookies_dict, temp_cookie_file)
-                    temp_cookie_file_path = temp_cookie_file.name
-                ydl_opts['cookiefile'] = temp_cookie_file_path
-                temp_files.append(temp_cookie_file_path)
-                update_progress("Cookies applied to yt-dlp.")
-            except json.JSONDecodeError:
-                update_progress("Invalid cookie format. Proceeding without cookies.")
-
-        # Download podcast using yt-dlp
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_dict = ydl.extract_info(url, download=True)
-                audio_file = ydl.prepare_filename(info_dict).replace('.webm', '.wav')
-            temp_files.append(audio_file)
-            update_progress("Podcast downloaded successfully.")
-        except yt_dlp.DownloadError as e:
-            error_message = f"Failed to download podcast: {str(e)}"
-            raise
-
-        # Expanded metadata extraction
-        detected_title = info_dict.get('title', '')
-        detected_author = info_dict.get('uploader', '')
-        detected_series = info_dict.get('series', '')
-        detected_description = info_dict.get('description', '')
-        detected_upload_date = info_dict.get('upload_date', '')
-        detected_duration = info_dict.get('duration', '')
-        detected_episode = info_dict.get('episode', '')
-        detected_season = info_dict.get('season', '')
-
-        # Use detected metadata if not provided by user
-        title = title or detected_title or "Unknown Podcast"
-        author = author or detected_author or "Unknown Author"
+        # Extract metadata
+        metadata = extract_metadata(url)
+        title = title or metadata.get('title', 'Unknown Podcast')
+        author = author or metadata.get('uploader', 'Unknown Author')
 
         # Format metadata for storage
         metadata_text = f"""
 Metadata:
 Title: {title}
 Author: {author}
-Series: {detected_series}
-Episode: {detected_episode}
-Season: {detected_season}
-Upload Date: {detected_upload_date}
-Duration: {detected_duration} seconds
-Description: {detected_description}
-
+Series: {metadata.get('series', 'N/A')}
+Episode: {metadata.get('episode', 'N/A')}
+Season: {metadata.get('season', 'N/A')}
+Upload Date: {metadata.get('upload_date', 'N/A')}
+Duration: {metadata.get('duration', 'N/A')} seconds
+Description: {metadata.get('description', 'N/A')}
 """
 
-        # Add detected series and other metadata to keywords
+        # Update keywords
         new_keywords = []
-        if detected_series:
-            new_keywords.append(f"series:{detected_series}")
-        if detected_episode:
-            new_keywords.append(f"episode:{detected_episode}")
-        if detected_season:
-            new_keywords.append(f"season:{detected_season}")
+        if metadata.get('series'):
+            new_keywords.append(f"series:{metadata['series']}")
+        if metadata.get('episode'):
+            new_keywords.append(f"episode:{metadata['episode']}")
+        if metadata.get('season'):
+            new_keywords.append(f"season:{metadata['season']}")
 
         keywords = f"{keywords},{','.join(new_keywords)}" if keywords else ','.join(new_keywords)
 
@@ -471,12 +524,26 @@ Description: {detected_description}
 
         # Transcribe the podcast
         try:
-            segments = speech_to_text(audio_file, whisper_model=whisper_model)
+            if enable_diarization:
+                segments = speech_to_text(audio_file, whisper_model=whisper_model, diarize=True)
+            else:
+                segments = speech_to_text(audio_file, whisper_model=whisper_model)
             transcription = " ".join([segment['Text'] for segment in segments])
             update_progress("Podcast transcribed successfully.")
         except Exception as e:
             error_message = f"Transcription failed: {str(e)}"
             raise
+
+        # Apply chunking
+        chunk_options = {
+            'method': chunk_method,
+            'max_size': max_chunk_size,
+            'overlap': chunk_overlap,
+            'adaptive': use_adaptive_chunking,
+            'multi_level': use_multi_level_chunking,
+            'language': chunk_language
+        }
+        chunked_text = improved_chunking_process(transcription, chunk_options)
 
         # Combine metadata and transcription
         full_content = metadata_text + "\n\nTranscription:\n" + transcription
@@ -485,11 +552,8 @@ Description: {detected_description}
         summary = None
         if api_name and api_key:
             try:
-                summary = perform_summarization(api_name, full_content, custom_prompt, api_key)
+                summary = perform_summarization(api_name, chunked_text, custom_prompt, api_key)
                 update_progress("Podcast summarized successfully.")
-            except requests.RequestException as e:
-                error_message = f"API request failed during summarization: {str(e)}"
-                raise
             except Exception as e:
                 error_message = f"Summarization failed: {str(e)}"
                 raise
@@ -510,15 +574,20 @@ Description: {detected_description}
             )
             update_progress("Podcast added to database successfully.")
         except Exception as e:
-            logging.error(f"Error processing podcast: {str(e)}")
-            cleanup_files()
-            return update_progress("Processing failed. See error message for details."), "", "", "", "", "", error_message
+            error_message = f"Error adding podcast to database: {str(e)}"
+            raise
 
-    finally:
+        # Cleanup
         cleanup_files()
 
-    return (update_progress("Processing complete."), full_content, summary or "No summary generated.",
-            title, author, keywords, error_message)
+        return (update_progress("Processing complete."), full_content, summary or "No summary generated.",
+                title, author, keywords, error_message)
+
+    except Exception as e:
+        logging.error(f"Error processing podcast: {str(e)}")
+        cleanup_files()
+        return update_progress(f"Processing failed: {str(e)}"), "", "", "", "", "", str(e)
+
 
 #
 #
