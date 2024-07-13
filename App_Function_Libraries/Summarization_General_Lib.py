@@ -65,7 +65,17 @@ def extract_text_from_segments(segments):
 def summarize_with_openai(api_key, input_data, custom_prompt_arg):
     loaded_config_data = load_and_log_configs()
     try:
-        # API key validation (keep this part as is)
+        # API key validation
+        if api_key is None or api_key.strip() == "":
+            logging.info("OpenAI: API key not provided as parameter")
+            logging.info("OpenAI: Attempting to use API key from config file")
+            api_key = loaded_config_data['api_keys']['openai']
+
+        if api_key is None or api_key.strip() == "":
+            logging.error("OpenAI: API key not found or is empty")
+            return "OpenAI: API Key Not Provided/Found in Config file or is empty"
+
+        logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
         # Input data handling
         logging.debug(f"OpenAI: Raw input data type: {type(input_data)}")
@@ -117,7 +127,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
         logging.debug(f"OpenAI: Using model: {openai_model}")
 
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'Authorization': f'Bearer {openai_api_key}',
             'Content-Type': 'application/json'
         }
 
