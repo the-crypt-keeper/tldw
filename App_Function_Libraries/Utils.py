@@ -44,20 +44,26 @@ def extract_text_from_segments(segments):
     logging.debug(f"Segments received: {segments}")
     logging.debug(f"Type of segments: {type(segments)}")
 
-    text = ""
+    def extract_text_recursive(data):
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if key == 'Text':
+                    return value
+                elif isinstance(value, (dict, list)):
+                    result = extract_text_recursive(value)
+                    if result:
+                        return result
+        elif isinstance(data, list):
+            return ' '.join(filter(None, [extract_text_recursive(item) for item in data]))
+        return None
 
-    if isinstance(segments, list):
-        for segment in segments:
-            logging.debug(f"Current segment: {segment}")
-            logging.debug(f"Type of segment: {type(segment)}")
-            if 'Text' in segment:
-                text += segment['Text'] + " "
-            else:
-                logging.warning(f"Skipping segment due to missing 'Text' key: {segment}")
+    text = extract_text_recursive(segments)
+
+    if text:
+        return text.strip()
     else:
-        logging.warning(f"Unexpected type of 'segments': {type(segments)}")
-
-    return text.strip()
+        logging.error(f"Unable to extract text from segments: {segments}")
+        return "Error: Unable to extract transcription"
 
 
 def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5):
