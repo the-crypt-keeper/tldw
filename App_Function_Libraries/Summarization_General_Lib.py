@@ -176,13 +176,13 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
 def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries=3, retry_delay=5):
     try:
         loaded_config_data = load_and_log_configs()
-        global anthropic_api_key
         # API key validation
-        if api_key is None:
+        if api_key is None or api_key.strip() == "":
             logging.info("Anthropic: API key not provided as parameter")
             logging.info("Anthropic: Attempting to use API key from config file")
             anthropic_api_key = loaded_config_data['api_keys']['anthropic']
 
+        # Sanity check to ensure API key is not empty in the config file
         if api_key is None or api_key.strip() == "":
             logging.error("Anthropic: API key not found or is empty")
             return "Anthropic: API Key Not Provided/Found in Config file or is empty"
@@ -296,16 +296,16 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
-        if api_key is None:
-            logging.info("cohere: API key not provided as parameter")
-            logging.info("cohere: Attempting to use API key from config file")
+        if api_key is None or api_key.strip() == "":
+            logging.info("Cohere: API key not provided as parameter")
+            logging.info("Cohere: Attempting to use API key from config file")
             cohere_api_key = loaded_config_data['api_keys']['cohere']
 
         if api_key is None or api_key.strip() == "":
-            logging.error("cohere: API key not found or is empty")
-            return "cohere: API Key Not Provided/Found in Config file or is empty"
+            logging.error("Cohere: API key not found or is empty")
+            return "Cohere: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"cohere: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        logging.debug(f"Cohere: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Cohere: Loading json data for summarization")
@@ -384,16 +384,16 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
-        if api_key is None:
-            logging.info("groq: API key not provided as parameter")
-            logging.info("groq: Attempting to use API key from config file")
-            groq_api_key = loaded_config_data['api_keys']['groq']
+        if api_key is None or api_key.strip() == "":
+            logging.info("Groq: API key not provided as parameter")
+            logging.info("Groq: Attempting to use API key from config file")
+            api_key = loaded_config_data['api_keys']['groq']
 
         if api_key is None or api_key.strip() == "":
-            logging.error("groq: API key not found or is empty")
-            return "groq: API Key Not Provided/Found in Config file or is empty"
+            logging.error("Groq: API key not found or is empty")
+            return "Groq: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"groq: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        logging.debug(f"Groq: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
         # Transcript data handling & Validation
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -473,14 +473,26 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
     import json
     global openrouter_model, openrouter_api_key
     # API key validation
-    if api_key is None:
-        logging.info("openrouter: API key not provided as parameter")
-        logging.info("openrouter: Attempting to use API key from config file")
+    if api_key is None or api_key.strip() == "":
+        logging.info("OpenRouter: API key not provided as parameter")
+        logging.info("OpenRouter: Attempting to use API key from config file")
         openrouter_api_key = loaded_config_data['api_keys']['openrouter']
 
     if api_key is None or api_key.strip() == "":
-        logging.error("openrouter: API key not found or is empty")
-        return "openrouter: API Key Not Provided/Found in Config file or is empty"
+        logging.error("OpenRouter: API key not found or is empty")
+        return "OpenRouter: API Key Not Provided/Found in Config file or is empty"
+
+    # Model Selection validation
+    if openrouter_model is None or openrouter_model.strip() == "":
+        logging.info("OpenRouter: model not provided as parameter")
+        logging.info("OpenRouter: Attempting to use model from config file")
+        openrouter_model = loaded_config_data['api_keys']['openrouter_model']
+
+    if api_key is None or api_key.strip() == "":
+        logging.error("OpenAI: API key not found or is empty")
+        return "OpenAI: API Key Not Provided/Found in Config file or is empty"
+
+    logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
     logging.debug(f"openai: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
@@ -563,10 +575,10 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
     logging.debug(f"huggingface: Summarization process starting...")
     try:
         # API key validation
-        if api_key is None:
+        if api_key is None or api_key.strip() == "":
             logging.info("HuggingFace: API key not provided as parameter")
             logging.info("HuggingFace: Attempting to use API key from config file")
-            huggingface_api_key = loaded_config_data['api_keys']['openai']
+            api_key = loaded_config_data['api_keys']['huggingface']
 
         if api_key is None or api_key.strip() == "":
             logging.error("HuggingFace: API key not found or is empty")
