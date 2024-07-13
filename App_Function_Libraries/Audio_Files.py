@@ -369,9 +369,13 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 chunked_text = improved_chunking_process(transcription, chunk_options)
 
                 # Summarize
-                if api_name and api_key:
-                    summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
-                    update_progress("Audio summarized successfully.")
+                if api_name:
+                    try:
+                        summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
+                        update_progress("Audio summarized successfully.")
+                    except Exception as e:
+                        logging.error(f"Error during summarization: {str(e)}")
+                        summary = "Summary generation failed"
                 else:
                     summary = "No summary available (API not provided)"
 
@@ -436,7 +440,12 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 chunked_text = improved_chunking_process(transcription, chunk_options)
 
                 if api_name and api_key:
-                    summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
+                    try:
+                        summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
+                        update_progress("Audio summarized successfully.")
+                    except Exception as e:
+                        logging.error(f"Error during summarization: {str(e)}")
+                        summary = "Summary generation failed"
                 else:
                     summary = "No summary available (API not provided)"
 
