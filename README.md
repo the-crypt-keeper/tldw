@@ -398,7 +398,7 @@ By default, videos, transcriptions and summaries are stored in a folder with the
 - [ffmpeg](https://github.com/FFmpeg/FFmpeg)
 - [faster_whisper](https://github.com/SYSTRAN/faster-whisper)
 - [pyannote](https://github.com/pyannote/pyannote-audio)
-- Thank you cognitivetech for the system prompt(not yet implemented...): https://github.com/cognitivetech/llm-long-text-summarization/tree/main?tab=readme-ov-file#one-shot-prompting
+- Thank you cognitivetech for the system prompt: https://github.com/cognitivetech/llm-long-text-summarization/tree/main?tab=readme-ov-file#one-shot-prompting
 - [Fabric](https://github.com/danielmiessler/fabric)
 - [Llamafile](https://github.com/Mozilla-Ocho/llamafile) - For the local LLM inference engine
 - [Mikupad](https://github.com/lmg-anon/mikupad) - Because I'm not going to write a whole new frontend for non-chat writing.
