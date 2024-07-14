@@ -40,7 +40,7 @@ from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama,
 from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_cohere, \
     summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface, perform_summarization, save_transcription_and_summary, \
-    perform_transcription, summarize_chunk
+    perform_transcription, summarize_chunk, perform_recursive_summarization
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, export_to_file, add_media_to_database
@@ -518,6 +518,7 @@ def create_video_transcription_tab():
                 keep_original_video = gr.Checkbox(label="Keep Original Video", value=False)
                 # First, create a checkbox to toggle the chunking options
                 chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
+                summarize_recursively = gr.Checkbox(label="Enable Recursive Summarization", value=False)
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
                 use_time_input = gr.Checkbox(label="Use Start and End Time", value=False)
 
@@ -580,7 +581,7 @@ def create_video_transcription_tab():
                                                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                                    use_multi_level_chunking, chunk_language, api_name,
                                                    api_key, keywords, use_cookies, cookies, batch_size,
-                                                   timestamp_option, keep_original_video=False,
+                                                   timestamp_option, keep_original_video, summarize_recursively,
                                                    progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
                     logging.info("Entering process_videos_with_error_handling")
@@ -641,7 +642,7 @@ def create_video_transcription_tab():
                                     metadata=video_metadata,
                                     use_chunking=chunking_options_checkbox,
                                     chunk_options=chunk_options,
-                                    keep_original_audio=keep_original_audio
+                                    keep_original_video=keep_original_video
                                 )
 
                                 if result[0] is None:  # Check if the first return value is None
@@ -744,9 +745,9 @@ def create_video_transcription_tab():
             def process_videos_wrapper(urls, start_time, end_time, diarize, whisper_model,
                                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                                       use_multi_level_chunking, chunk_language, api_name,
+                                       use_multi_level_chunking, chunk_language, summarize_recursively, api_name,
                                        api_key, keywords, use_cookies, cookies, batch_size,
-                                       timestamp_option, keep_original_audio):
+                                       timestamp_option, keep_original_video):
                 try:
                     logging.info("process_videos_wrapper called")
                     result = process_videos_with_error_handling(
@@ -755,7 +756,7 @@ def create_video_transcription_tab():
                         chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                         use_multi_level_chunking, chunk_language, api_name,
                         api_key, keywords, use_cookies, cookies, batch_size,
-                        timestamp_option, keep_original_audio
+                        timestamp_option, keep_original_video, summarize_recursively
                     )
                     logging.info("process_videos_with_error_handling completed")
 
@@ -782,7 +783,8 @@ def create_video_transcription_tab():
                                           vad_filter, download_video_flag, download_audio, rolling_summarization,
                                           detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
                                           include_timestamps=True, metadata=None, use_chunking=False,
-                                          chunk_options=None, keep_original_audio=False):
+                                          chunk_options=None, keep_original_video=False):
+
                 try:
                     logging.info(f"Starting process_url_metadata for URL: {url}")
                     # Create download path
@@ -885,8 +887,9 @@ def create_video_transcription_tab():
                                 logging.warning(f"Failed to delete file {file_path}: {str(e)}")
 
                     # Delete the mp4 file after successful transcription if not keeping original audio
-                    if not keep_original_audio:
-                        files_to_delete = [video_file_path]
+                    # Modify the file deletion logic to respect keep_original_video
+                    if not keep_original_video:
+                        files_to_delete = [audio_file_path, video_file_path]
                         for file_path in files_to_delete:
                             if file_path and os.path.exists(file_path):
                                 try:
@@ -965,9 +968,9 @@ def create_video_transcription_tab():
                     url_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
                     custom_prompt_checkbox, custom_prompt_input, chunking_options_checkbox,
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                    use_multi_level_chunking, chunk_language, api_name_input, api_key_input,
+                    use_multi_level_chunking, chunk_language, summarize_recursively, api_name_input, api_key_input,
                     keywords_input, use_cookies_input, cookies_input, batch_size_input,
-                    timestamp_option, keep_original_audio
+                    timestamp_option, keep_original_video
                 ],
                 outputs=[progress_output, error_output, results_output, download_transcription, download_summary]
             )

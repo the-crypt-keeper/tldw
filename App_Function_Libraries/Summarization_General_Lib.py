@@ -25,7 +25,8 @@ import json
 from requests import RequestException
 
 from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav, speech_to_text
-from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summarize
+from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summarize, recursive_summarize_chunks, \
+    improved_chunking_process
 from App_Function_Libraries.Diarization_Lib import combine_transcription_and_diarization
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
@@ -741,7 +742,8 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
 def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_input, offset, api_name, api_key, vad_filter,
                        download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
                        keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
-                       chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens,  chunk_by_semantic, semantic_chunk_size, semantic_chunk_overlap):
+                       chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens,  chunk_by_semantic,
+                       semantic_chunk_size, semantic_chunk_overlap, recursive_summarization):
     global current_progress
     progress = []  # This must always be a list
     status = []  # This must always be a list
@@ -798,7 +800,8 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
                 max_tokens=max_tokens,
                 chunk_by_semantic=chunk_by_semantic,
                 semantic_chunk_size=semantic_chunk_size,
-                semantic_chunk_overlap=semantic_chunk_overlap
+                semantic_chunk_overlap=semantic_chunk_overlap,
+                recursive_summarization=recursive_summarization
             )
             # Update progress and transcription properly
             current_progress, current_status = update_progress(index, url, "Video processed and ingested into the database.")
@@ -982,7 +985,7 @@ def format_input_with_metadata(metadata, content):
     formatted_input += content
     return formatted_input
 
-def perform_summarization(api_name, input_data, custom_prompt_input, api_key):
+def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False):
     loaded_config_data = load_and_log_configs()
 
     if custom_prompt_input is None:
@@ -1018,7 +1021,21 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key):
         structured_input = format_input_with_metadata(metadata, content)
 
         # Perform summarization on the structured input
-        summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key)
+        if recursive_summarization:
+            chunk_options = {
+                'method': 'words',  # or 'sentences', 'paragraphs', 'tokens' based on your preference
+                'max_size': 1000,  # adjust as needed
+                'overlap': 100,  # adjust as needed
+                'adaptive': False,
+                'multi_level': False,
+                'language': 'english'
+            }
+            chunks = improved_chunking_process(structured_input, chunk_options)
+            summary = recursive_summarize_chunks([chunk['text'] for chunk in chunks],
+                                                 lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key),
+                                                 custom_prompt_input)
+        else:
+            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key)
 
         if summary:
             logging.info(f"Summary generated using {api_name} API")
@@ -1035,7 +1052,7 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key):
         logging.error("Connection error while summarizing")
     except Exception as e:
         logging.error(f"Error summarizing with {api_name}: {str(e)}", exc_info=True)
-
+        return f"An error occurred during summarization: {str(e)}"
     return None
 
 def extract_text_from_input(input_data):
@@ -1101,7 +1118,8 @@ def process_url(
         semantic_chunk_size,
         semantic_chunk_overlap,
         local_file_path=None,
-        diarize=False
+        diarize=False,
+        recursive_summarization=False
 ):
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
@@ -1337,19 +1355,17 @@ def process_url(
         # Handle rolling summarization
         if rolling_summarization:
             summary_text = rolling_summarize(
-                text=combined_transcription_text,
+                text=extract_text_from_segments(segments),
                 detail=detail_level,
                 model='gpt-4-turbo',
-                additional_instructions=custom_prompt_input
+                additional_instructions=custom_prompt_input,
+                summarize_recursively=recursive_summarization
             )
         elif api_name:
-            summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key)
-            if summary_text is None:
-                logging.error("Summary text is None. Check summarization function.")
-                summary_file_path = None  # Set summary_file_path to None if summary is not generated
+            summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key,
+                                                 recursive_summarization)
         else:
             summary_text = 'Summary not available'
-            summary_file_path = None  # Set summary_file_path to None if summary is not generated
 
         # Check to see if chunking was performed, and if so, return that instead
         if chunk_text_by_words or chunk_text_by_sentences or chunk_text_by_paragraphs or chunk_text_by_tokens or chunk_by_semantic:
@@ -1367,6 +1383,14 @@ def process_url(
         logging.error(f": {e}")
         return str(e), 'process_url: Error processing the request.', None, None, None, None
 
+
+def perform_recursive_summarization(api_name, text, custom_prompt, api_key, max_iterations=3, target_length=500):
+    current_summary = text
+    for i in range(max_iterations):
+        if len(current_summary) <= target_length:
+            break
+        current_summary = perform_summarization(api_name, current_summary, custom_prompt, api_key)
+    return current_summary
 
 #
 #

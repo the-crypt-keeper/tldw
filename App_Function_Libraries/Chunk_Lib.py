@@ -204,6 +204,22 @@ def chunk_on_delimiter(input_string: str,
     return combined_chunks
 
 
+def recursive_summarize_chunks(chunks, summarize_func, custom_prompt):
+    summarized_chunks = []
+    current_summary = ""
+
+    for i, chunk in enumerate(chunks):
+        if i == 0:
+            current_summary = summarize_func(chunk, custom_prompt)
+        else:
+            combined_text = current_summary + "\n\n" + chunk
+            current_summary = summarize_func(combined_text, custom_prompt)
+
+        summarized_chunks.append(current_summary)
+
+    return summarized_chunks
+
+
 # Sample text for testing
 sample_text = """
 Natural language processing (NLP) is a subfield of linguistics, computer science, and artificial intelligence 
@@ -422,33 +438,30 @@ def rolling_summarize(text: str,
         # FIXME MAKE NOT OPENAI SPECIFIC
         print(f"Chunk lengths are {[len(openai_tokenize(x)) for x in text_chunks]}")
 
-    # set system message
+    # set system message - FIXME
     system_message_content = "Rewrite this text in summarized form."
     if additional_instructions is not None:
         system_message_content += f"\n\n{additional_instructions}"
 
     accumulated_summaries = []
-    for chunk in tqdm(text_chunks):
+    for i, chunk in enumerate(tqdm(text_chunks)):
         if summarize_recursively and accumulated_summaries:
-            # Creating a structured prompt for recursive summarization
-            accumulated_summaries_string = '\n\n'.join(accumulated_summaries)
-            user_message_content = f"Previous summaries:\n\n{accumulated_summaries_string}\n\nText to summarize next:\n\n{chunk}"
+            # Combine previous summary with current chunk for recursive summarization
+            combined_text = accumulated_summaries[-1] + "\n\n" + chunk
+            user_message_content = f"Previous summary and new content to summarize:\n\n{combined_text}"
         else:
-            # Directly passing the chunk for summarization without recursive context
             user_message_content = chunk
 
-        # Constructing messages based on whether recursive summarization is applied
         messages = [
             {"role": "system", "content": system_message_content},
             {"role": "user", "content": user_message_content}
         ]
 
-        # Assuming this function gets the completion and works as expected
         response = get_chat_completion(messages, model=model)
         accumulated_summaries.append(response)
 
-    # Compile final summary from partial summaries
-    global final_summary
     final_summary = '\n\n'.join(accumulated_summaries)
-
     return final_summary
+
+
+
