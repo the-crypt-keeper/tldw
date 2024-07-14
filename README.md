@@ -2,7 +2,6 @@
 ## Download, Transcribe & Summarize: Video+Audio+Documents+Articles & Books(WIP). All automated 
 #### More: Full-Text-Search across everything ingested, Local LLM inference as part of it for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
-#### My idea is that this repo will hold 'working' versions that one can reliably use. My fork will contain the dev version (git branches? whats that?)
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
 #### Demo may be broken but should be working. If it's not, let me know. (HF dev spaces is touchy...)
 
@@ -11,7 +10,7 @@
 ----------
 
 ### Table of Contents
-- [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#what) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits)
+- [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#whatbox) | [Helpful Terms and Things to Know](#helpful) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits)
 
 ----------
 
@@ -56,13 +55,22 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   directional income
 ```
 
-For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.2 model:
-  * https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
-  * Reason being is that its 'good enough', otherwise would recommend Command-R+, either self-hosted, or through a personal API key (it's free for 1k requests a month...)
+For offline LLM usage, I recommend the following models(in no particular order past the first):
+  1. Samantha-Mistral-instruct-7B-Bulleted-Notes - https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
+     * Reason being is that its 'good enough', otherwise would recommend Command-R+, either self-hosted, or through a personal API key (it's free for 1k requests a month...)
+  2. Inkbot-13B-8k-0.2
+     * https://huggingface.co/Tostino/Inkbot-13B-8k-0.2
+  3. Microsfot Phi-3-mini-4k-Instruct
+     * https://huggingface.co/microsoft/Phi-3-mini-4k-instruct / GGUF: https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
+     * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-mini-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3.1-mini-128k-instruct-GGUF
+  4. Cohere Command-R+
+     * https://huggingface.co/cohere-ai/Command-R-plus / GGUF: https://huggingface.co/dranger003/c4ai-command-r-plus-iMat.GGUF
+  5. Phi-3-Medium-4k-Instruct
+     * https://huggingface.co/microsoft/Phi-3-medium-4k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-4k-instruct-GGUF
+     * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-medium-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-128k-instruct-GGUF
+  6. Hermes-2-Theta-Llama-3-8B
+     * https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B / GGUF: https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B-GGUF
 
-Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct, which you can get in a GGUF format from here: https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
-  * Or you can let the script download and run a local server for you, using llama.cpp/llamafile and one of the above models. 
-    * (It'll ask you if you want to download one, and if so, which one out of a choice of 3) 
 ----------
 
 **CLI Screenshot**
@@ -338,6 +346,64 @@ By default, videos, transcriptions and summaries are stored in a folder with the
 
 ------------
 
+### <a name="helpful"></a> Helpful Terms and Things to Know
+- Purpose of this section is to help bring awareness to certain concepts and terms that are used in the field of AI/ML/NLP, as well as to provide some resources for learning more about them.
+- Also because some of those things are extremely relevant and important to know if you care about accuracy and the effectiveness of the LLMs you're using.
+- Some of this stuff may be 101 level, but I'm going to include it anyways. This repo is aimed at people from a lot of different fields, so I want to make sure everyone can understand what's going on. Or at least has an idea.
+- LLMs 101(coming from a tech background): https://vinija.ai/models/LLM/
+- LLM Fundamentals / LLM Scientist / LLM Engineer courses(Free): https://github.com/mlabonne/llm-course
+- **Phrases & Terms**
+  - **LLM** - Large Language Model - A type of neural network that can generate human-like text.
+  - **API** - Application Programming Interface - A set of rules and protocols that allows one software application to communicate with another.
+  - **API Wrapper** - A set of functions that provide a simplified interface to a larger body of code.
+  - **API Key** - A unique identifier that is used to authenticate a user, developer, or calling program to an API.
+  - **GUI** - Graphical User Interface
+  - **CLI** - Command Line Interface
+  - **DB** - Database
+  - **SQLite** - A C-language library that implements a small, fast, self-contained, high-reliability, full-featured, SQL database engine.
+  - **Prompt Engineering** - The process of designing prompts that are used to guide the output of a language model.
+  - **Quantization** - The process of converting a continuous range of values into a finite range of discrete values.
+  - **GGUF Files** - GGUF is a binary format that is designed for fast loading and saving of models, and for ease of reading. Models are traditionally developed using PyTorch or another framework, and then converted to GGUF for use in GGML. https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
+  - **Inference Engine** - A software system that is designed to execute a model that has been trained by a machine learning algorithm. Llama.cpp and Kobold.cpp are examples of inference engines.
+- **Papers & Concepts**
+  1. Lost in the Middle: How Language Models Use Long Contexts
+    - https://arxiv.org/abs/2307.03172
+    - `We analyze the performance of language models on two tasks that require identifying relevant information in their input contexts: multi-document question answering and key-value retrieval. We find that performance can degrade significantly when changing the position of relevant information, indicating that current language models do not robustly make use of information in long input contexts. In particular, we observe that performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts, even for explicitly long-context models`
+  2. RULER: What's the Real Context Size of Your Long-Context Language Models?
+    - https://arxiv.org/abs/2404.06654
+    - `The needle-in-a-haystack (NIAH) test, which examines the ability to retrieve a piece of information (the "needle") from long distractor texts (the "haystack"), has been widely adopted to evaluate long-context language models (LMs). However, this simple retrieval-based test is indicative of only a superficial form of long-context understanding. To provide a more comprehensive evaluation of long-context LMs, we create a new synthetic benchmark RULER with flexible configurations for customized sequence length and task complexity. RULER expands upon the vanilla NIAH test to encompass variations with diverse types and quantities of needles. Moreover, RULER introduces new task categories multi-hop tracing and aggregation to test behaviors beyond searching from context. We evaluate ten long-context LMs with 13 representative tasks in RULER. Despite achieving nearly perfect accuracy in the vanilla NIAH test, all models exhibit large performance drops as the context length increases. While these models all claim context sizes of 32K tokens or greater, only four models (GPT-4, Command-R, Yi-34B, and Mixtral) can maintain satisfactory performance at the length of 32K. Our analysis of Yi-34B, which supports context length of 200K, reveals large room for improvement as we increase input length and task complexity.`
+  3. Same Task, More Tokens: the Impact of Input Length on the Reasoning Performance of Large Language Models
+     - https://arxiv.org/abs/2402.14848
+     - `Our findings show a notable degradation in LLMs' reasoning performance at much shorter input lengths than their technical maximum. We show that the degradation trend appears in every version of our dataset, although at different intensities. Additionally, our study reveals that the traditional metric of next word prediction correlates negatively with performance of LLMs' on our reasoning dataset. We analyse our results and identify failure modes that can serve as useful guides for future research, potentially informing strategies to address the limitations observed in LLMs.`
+  4. Abliteration (Uncensoring LLMs)
+     - [Uncensor any LLM with abliteration - Maxime Labonne(2024)](https://huggingface.co/blog/mlabonne/abliteration)
+  5. Retrieval-Augmented-Generation
+        - [Retrieval-Augmented Generation for Large Language Models: A Survey](https://arxiv.org/abs/2312.10997)
+        - https://arxiv.org/abs/2312.10997
+        - `Retrieval-Augmented Generation (RAG) has emerged as a promising solution by incorporating knowledge from external databases. This enhances the accuracy and credibility of the generation, particularly for knowledge-intensive tasks, and allows for continuous knowledge updates and integration of domain-specific information. RAG synergistically merges LLMs' intrinsic knowledge with the vast, dynamic repositories of external databases. This comprehensive review paper offers a detailed examination of the progression of RAG paradigms, encompassing the Naive RAG, the Advanced RAG, and the Modular RAG. It meticulously scrutinizes the tripartite foundation of RAG frameworks, which includes the retrieval, the generation and the augmentation techniques. The paper highlights the state-of-the-art technologies embedded in each of these critical components, providing a profound understanding of the advancements in RAG systems. Furthermore, this paper introduces up-to-date evaluation framework and benchmark. At the end, this article delineates the challenges currently faced and points out prospective avenues for research and development. `
+  6. Prompt Engineering
+     - Prompt Engineering Guide: https://www.promptingguide.ai/ & https://github.com/dair-ai/Prompt-Engineering-Guide
+- **Tools & Libraries**
+  1. `llama.cpp` - A C++ inference engine. Highly recommend. 
+     * https://github.com/ggerganov/llama.cpp
+  2. `kobold.cpp` - A C++ inference engine. GUI wrapper of llama.cpp with some tweaks. 
+     * https://github.com/LostRuins/koboldcpp
+  3. `sillytavern` - A web-based interface for text generation models. Supports inference engines. Ignore the cat girls and weebness. This software is _powerful_ and _useful_. Also supports just about every API you could want.
+     * https://github.com/SillyTavern/SillyTavern
+  4. `llamafile` - A wrapper for llama.cpp that allows for easy use of local LLMs.
+     * Uses libcosomopolitan for cross-platform compatibility. 
+     * Can be used to run LLMs on Windows, Linux, and MacOS with a single binary wrapper around Llama.cpp.
+  5. `pytorch` - An open-source machine learning library based on the Torch library.
+  6. `ffmpeg` - A free software project consisting of a large suite of libraries and programs for handling video, audio, and other multimedia files and streams.
+  7. `pandoc` - A free and open-source document converter, widely used as a writing tool (especially by scholars) and as a basis for publishing workflows. 
+     * https://pandoc.org/
+  8. `marker` - A tool for converting PDFs(and other document types) to markdown. 
+     * https://github.com/VikParuchuri/marker
+  9. `faster_whisper` - A fast, lightweight, and accurate speech-to-text model. 
+      * https://github.com/SYSTRAN/faster-whisper
+
+------------
+
 ### <a name="localllm"></a>Setting up a Local LLM Inference Engine
 - **Setting up Local LLM Runner**
   - **Llama.cpp**
@@ -373,8 +439,7 @@ By default, videos, transcriptions and summaries are stored in a folder with the
     * GGUF Quants: https://huggingface.co/pjh64/Phi-3-mini-128K-Instruct.gguf
   2. Meta Llama3-8B - 8B Model/16GB base, 8.5GB Q8  - https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
     * GGUF Quants: https://huggingface.co/lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF
-- **Evaluating a Local Model via MMLU-Pro and Llama.cpp**
-  1. https://github.com/chigkim/Ollama-MMLU-Pro
+
 
 ----------
 
@@ -386,13 +451,12 @@ By default, videos, transcriptions and summaries are stored in a folder with the
   3. `requirements.txt` - Packages to install for Nvidia GPUs
   4. `AMD_requirements.txt` - Packages to install for AMD GPUs
   5. `llamafile` - Llama.cpp wrapper for local LLM inference, is multi-platform and multi-LLM compatible.
-  6. media_summary.db - SQLite DB that stores all the data ingested, transcribed, and summarized.
+  6. `media_summary.db` - SQLite DB that stores all the data ingested, transcribed, and summarized.
   7. `prompts.db` - SQLite DB that stores all the prompts.
-  8. `App_Function_Libraries` Folder - Folder containing all of the applications function libraries
+  8. `App_Function_Libraries` Folder - Folder containing the applications function libraries
   9. `Tests` Folder - Folder containing tests for the application (ha.)
   10. `Helper_Scripts` - Folder containing helper scripts for the application
-  11. `HF` - Docker file and requirements.txt for Huggingface Spaces hosting
-  12. `models` - Folder containing the models for the speaker diarization LLMs
+  11. `models` - Folder containing the models for the speaker diarization LLMs
   12. `tldw-original-scripts` - Original scripts from the original repo
 - **What's in the original repo?**
   - `summarize.py` - download, transcribe and summarize audio
