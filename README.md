@@ -14,10 +14,10 @@
 ----------
 
 ### <a name="what"></a> What is this (TL/DW)?
+- **101**
+  - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it.
+  - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
 - **Don't care, give me code**
-  - Ingest Text/Audio/Video -> Transcribed if audio/video -> Summarized -> Ingested into a DB with full text search. Then ask questions about ingested content using an LLM (RAG is planned but not implemented yet)
-  - Take a URL(or local audio/video/text file), a list of URLs((or a list of local audio/video/text files one per line in a text file), and feed it into the script(or GUI) and have each audio/video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
-    * If its just a text file then you don't really need to transcribe it...
   * `git clone https://github.com/rmusser01/tldw` -> `cd tldw` -> `python -m venv .\` -> `Linux: ./scripts/activate` / `Windows: . .\scripts\activate.ps1` -> `pip install -r requirements.txt` -> 
     * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three` 
     - GUI usage: `python summarize.py -gui`
@@ -25,11 +25,14 @@
   - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
     - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
 - **Short Summary**
-  - Ingest content from a URL or a local file. Can be done in batches with a text file containing a list of URLs or local files as well as from the GUI (GUI only does links, no local files for videos, but it will do local audio files).
-  - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, Triton and Aphrodite support planned)
-  - Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported. The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
+  - Ingest content from a URL or a local file. Can be done in batches with a text file containing a list of URLs or paths to local files as well as from the GUI.
+    - (GUI only does links, no local files for videos, but it will do local audio files)
+  - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
+    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, Triton and Aphrodite support planned)
+  - Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported. 
+    - The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
 - **Longer Summary/Goal**
-  - To be able to act as an ingestion tool for personal database storage. The idea being that there is so much data one comes across, and we can store it all as text.
+  - Act as a Multi-Purpose Research tool. The idea being that there is so much data one comes across, and we can store it all as text. (with tagging!)
   - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your fingertips at a moments notice.
   - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
   - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite (for now, would like to build a shim for ElasticSearch/Similar) DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it. (Plus act as a nice way of personally tagging data for possible future training of your personal AI agent :P)
