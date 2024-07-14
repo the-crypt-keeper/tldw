@@ -3,7 +3,6 @@
 #### More: Full-Text-Search across everything ingested, Local LLM inference as part of it for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
-#### Demo may be broken but should be working. If it's not, let me know. (HF dev spaces is touchy...)
 
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
@@ -13,6 +12,9 @@
 - [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#whatbox) | [Helpful Terms and Things to Know](#helpful) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits)
 
 ----------
+**GUI Screenshot**
+![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
+
 
 ### <a name="what"></a> What is this (TL/DW)?
 - **101**
@@ -70,15 +72,6 @@ For offline LLM usage, I recommend the following models(in no particular order p
      * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-medium-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-128k-instruct-GGUF
   6. Hermes-2-Theta-Llama-3-8B
      * https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B / GGUF: https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B-GGUF
-
-----------
-
-**CLI Screenshot**
-- **See [Using](#using)**
-
-
-**GUI Screenshot**
-![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
 
 ----------
 
