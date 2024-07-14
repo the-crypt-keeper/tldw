@@ -1,40 +1,101 @@
 # **TL/DW: Too Long, Didnt Watch**
-## Download, Transcribe & Summarize Videos. All automated
+## Download, Transcribe & Summarize: Video+Audio+Documents+Articles & Books(WIP). All automated 
+#### More: Full-Text-Search across everything ingested, Local LLM inference as part of it for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
+#### Demo may be broken but should be working. If it's not, let me know. (HF dev spaces is touchy...)
 
 ![License](https://img.shields.io/badge/license-apache2.0-green)
-
-### What is TL/DW?
-
-- Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
-- Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
-- Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported only through OpenAI currently, though the [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) will let you do it with exllama or vLLM.
-- Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. ( https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md )
-
-For commercial API usage, I personally recommend Sonnet. It's great quality and relatively inexpensive. 
-
-As for personal offline usage, Microsoft Phi-3 Mini 128k is great if you don't have a lot of VRAM and want to self-host. (I think it's better than anything up to 70B for summarization - I do not have actual evidence for this)
-
-### Application Demo
-CLI
-![tldw-summarization-cli-demo](cli-demo-video)
-
-GUI
-![tldw-summarization-gui-demo](./Tests/Capture.PNG)
 
 ----------
 
 ### Table of Contents
-- [What?](#what)
-- [Using](#using)
-- [Setup](#setup)
-- [Pieces/What's in the Repo](#what)
-- [Setting up a Local LLM Inference Engine](#localllm)
-- [Credits](#credits)
+- [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#what) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits)
+
+----------
+
+### <a name="what"></a> What is this (TL/DW)?
+- **101**
+  - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it.
+  - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
+- **Don't care, give me code**
+  * `git clone https://github.com/rmusser01/tldw` -> `cd tldw` -> `python -m venv .\` -> `Linux: ./scripts/activate` / `Windows: . .\scripts\activate.ps1` -> `pip install -r requirements.txt` -> 
+    * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three` 
+    - GUI usage: `python summarize.py -gui`
+    - GUI with local LLM: `python summarize.py -gui --local_llama` (will ask you questions about which model to download)
+  - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
+    - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
+- **Short Summary**
+  - Ingest content from a URL or a local file. Can be done in batches with a text file containing a list of URLs or paths to local files as well as from the GUI.
+    - (GUI only does links, no local files for videos, but it will do local audio files)
+  - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
+    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, Triton and Aphrodite support planned)
+  - Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported. 
+    - The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
+- **Longer Summary/Goal**
+  - Act as a Multi-Purpose Research tool. The idea being that there is so much data one comes across, and we can store it all as text. (with tagging!)
+  - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your fingertips at a moments notice.
+  - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
+  - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite (for now, would like to build a shim for ElasticSearch/Similar) DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it. (Plus act as a nice way of personally tagging data for possible future training of your personal AI agent :P)
+  - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
+
+For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek. Flipside I would say none honestly. The (largest players) will gaslight you and charge you money for it. Fun.
+From @nrose 05/08/2024 on Threads:
+```
+No, it’s a design. First they train it, then they optimize it. Optimize it for what- better answers?
+  No. For efficiency. 
+Per watt. Because they need all the compute they can get to train the next model.So it’s a sawtooth. 
+The model declines over time, then the optimization makes it somewhat better, then in a sort of 
+  reverse asymptote, they dedicate all their “good compute” to the next bigger model.Which they then 
+  trim down over time, so they can train the next big model… etc etc.
+None of these companies exist to provide AI services in 2024. They’re only doing it to finance the 
+ things they want to build in 2025 and 2026 and so on, and the goal is to obsolete computing in general
+  and become a hidden monopoly like the oil and electric companies. 
+2024 service quality is not a metric they want to optimize, they’re forced to, only to maintain some 
+  directional income
+```
+
+For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.2 model:
+  * https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
+  * Reason being is that its 'good enough', otherwise would recommend Command-R+, either self-hosted, or through a personal API key (it's free for 1k requests a month...)
+
+Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct, which you can get in a GGUF format from here: https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
+  * Or you can let the script download and run a local server for you, using llama.cpp/llamafile and one of the above models. 
+    * (It'll ask you if you want to download one, and if so, which one out of a choice of 3) 
+----------
+
+**CLI Screenshot**
+- **See [Using](#using)**
 
 
+**GUI Screenshot**
+![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
 
-### Quickstart after Installation
+----------
+
+### Quickstart
+  1. Update your drivers. (I.e. CUDA for Nvidia GPUs, or AMD drivers (ROCM) for AMD GPUs )
+     - Windows CUDA: https://developer.nvidia.com/cuda-downloads?target_os=Windows
+  2. Install Python3 for your platform - https://www.python.org/downloads/
+  3. Download the repo: `git clone https://github.com/rmusser01/tldw` or manually download it (Green code button, upper right corner -> Download ZIP) and extract it to a folder of your choice.
+  4. Open a terminal, navigate to the directory you cloned the repo to, or unzipped the downloaded zip file to, and run the following commands:
+     - Create a virtual env: `python -m venv .\`
+     - Launch/activate your virtual env: `Linux: ./scripts/activate` / `Windows: . .\scripts\activate.ps1`
+       * If you don't already have cuda installed(Nvidia), `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` (Last updated 6/2024)
+       * Or AMD (Windows): `pip install torch-directml`
+       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu` (Last updated 6/2024)
+     - `pip install -r requirements.txt` - may take a bit of time...
+  5. **You are Ready to Go!** Check out the below sample commands: 
+
+- **Run it as a WebApp**
+  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
+    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
+    * Has an option to download the generated transcript, and summary as text files from the UI.
+    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
+    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
+      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
+      * So everything you might consume during your path of research, tracked and assimilated and tagged.
+      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
+
 - **Transcribe audio from a Youtube URL:**
   * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
 
@@ -50,91 +111,142 @@ GUI
   * `python summarize.py -v ./local/file_on_your/system`
 
 - **Download a Video with Audio from a URL:**
-  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`
+  * `python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s`s
 
-- **Run it as a WebApp**
-  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
-    * It will expose every CLI option (not currently/is planned)
-    * Has an option to download the generated transcript, and summary as text files.
-    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
+- **Perform a summarization of a longer transcript using 'Chunking'**
+  * `python summarize.py -roll -detail 0.01 https://www.youtube.com/watch?v=4nd1CDZP21s`
+    * Detail can go from `0.01` to `1.00`, increments at a measure of `.01`.
 
-### <a name="what"></a>What?
-- **Use the script to (download->)transcribe(->summarize) a local file or remote (supported) url.**
-- **What can you transcribe and summarize?**
-  * **Any youtube video.** Or video hosted at any of these sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
-    * (Playlists you have to use the `Get_Playlist_URLs.py` with `Get_Playlist_URLs.py <Playlist URL>` and it'll create a text file with all the URLs for each video, so you can pass the text file as input and they'll all be downloaded. Pull requests are welcome.)
-    * Any url youtube-dl supports _should_ work.
-  * **Local Videos**
-    * Pass in the filepath to any local video file, and it will be transcribed.
-    * You can also pass in a text file containing a list of videos for batch processing.
-- **How does it Summarize?**
-  - **Remote Summarization**
-    * Pass an API name (anthropic/cohere/grok/openai/) as an argument, ex: `-api anthropic`
-    * Add your API key to the `config.txt` file
-    * The script when ran, will detect that you passed an API name, and will perform summarization of the resulting transcription.
-  - **Local Summarization**
-    * Alternatively, you can pass `llama`/`ooba`/`kobold`/`tabby` as the API name and have the script perform a request to your local API endpoint for summarization. 
-      * You will need to modify the `<endpoint_name>_api_IP` value in the `config.txt` to reflect the `IP:Port` of your local server.
-      * Or pass the `--api_url` argument with the `IP:Port` to avoid making changes to the `config.txt` file.
-      * If the self-hosted server requires an API key, modify the appropriate api_key variable in the `config.txt` file.
-  * The current approach to summarization is currently 'dumb'/naive, and will likely be replaced or additional functionality added to reflect actual practices and not just 'dump txt in and get an answer' approach. This works for big context LLMs, but not everyone has access to them, and some transcriptions may be even longer, so we need to have an approach that can handle those cases.
-- **APIs Currently Supported**
-  1. Anthropic - https://www.anthropic.com/api
-  2. Cohere - https://docs.cohere.com/reference/about
-  3. Groq - https://docs.api.groq.com/index.html
-  4. Llama.cpp - https://github.com/ggerganov/llama.cpp & https://github.com/ggerganov/llama.cpp/blob/master/examples/server/README.md
-  5. Kobold.cpp - https://github.com/LostRuins/koboldcpp
-  6. Oobabooga - https://github.com/oobabooga/text-generation-webui
-  7. HuggingFace - https://huggingface.co/docs/api-inference/en/index
-- **Planned to Support**
-  1. TabbyAPI - https://github.com/theroyallab/tabbyAPI
-  2. vLLM - https://github.com/vllm-project/vllm
+- **Convert an epub book to text and ingest it into the DB**
+  1. Download/Install pandoc for your platform:
+    * https://pandoc.org/installing.html
+  2. Convert your epub to a text file:
+     * `$ pandoc -f epub -t plain -o filename.txt filename.epub`
+  3. Ingest your converted epub into the DB:
+     * `python summarize.py path/to/your/textfile.txt --ingest_text_file --text_title "Book Title" --text_author "Author Name" -k additional,keywords`
 
 ----------
-
-### <a name="setup"></a>Setup
+### <a name="setup"></a>Setting it up
+- **Requirements**
+  - Python3
+  - ffmpeg
+  - pandoc (for epub to markdown conversion) - https://pandoc.org/installing.html
+    - `pandoc -f epub -t markdown -o output.md input.epub` -> Can then import/ingest the markdown file into the DB.
+    - If done from the CLI using the `--ingest_text_file` flag, you can specify the title and author of the book, as well as any additional keywords you'd like to tag it with. (if not a regex will attempt to identify it)
+    - Or just do it through the GUI, drag and drop the file into the UI, set the Title, Author, and any keywords and hit `Import Data`.
+  - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
+    - Apparently there is a ROCm version of PyTorch.
+      - MS Pytorch: https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
+      - Use the 'AMD_requests.txt' file to install the necessary packages for AMD GPU support. Simply rename it before use.
+      - AMD Pytorch: https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/wsl/install-pytorch.html
+  - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
+  - System RAM (8GB minimum, realistically 12GB)
+  - Disk Space (Depends on how much you ingest, but 6GB or so should be fine for the total size of the project + DB)
+    - This can balloon real quick. The whisper model used for transcription can be 1-2GB per.
+    - Pytorch + other ML libraries will also cause the size to increase.
+    - As such, I would say you want at least 8GB of free space on your system to devote to the app.
+    - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
 - **Linux**
-    1. Download necessary packages (Python3, ffmpeg[sudo apt install ffmpeg / dnf install ffmpeg], ?)
-    2. Create a virtual env: `python -m venv ./`
-    3. Launch/activate your virtual env: `. .\scripts\activate.sh`
-    4. See `Linux && Windows`
+    1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg / dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
+    2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
+    3. `git clone https://github.com/rmusser01/tldw`
+    4. `cd tldw`
+    5. Create a virtual env: `python -m venv ./`
+    6. Launch/activate your virtual environment: `source ./bin/activate`
+    7. Setup the necessary python packages:
+       * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
+       * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
+       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+       * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
+    8. Then see `Linux && Windows`
+- **MacOS**
+    1. I don't own a mac/have access to one reliably so I can't test this, but it should be the same as/similar to Linux.
 - **Windows**
-    1. Download necessary packages (Python3, [ffmpeg](https://www.gyan.dev/ffmpeg/builds/), ?)
-    2. Create a virtual env: `python -m venv .\`
-    3. Launch/activate your virtual env: `. .\scripts\activate.ps1`
-    4. See `Linux && Windows`
+    1. Download necessary packages ([Python3](https://www.python.org/downloads/windows/), Update your GPU drivers/CUDA drivers if you'll be running an LLM locally, ffmpeg will be installed by the script)
+    2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
+    3. `git clone https://github.com/rmusser01/tldw`
+    4. `cd tldw`
+    5. Create a virtual env: `python -m venv ./`
+    6. Launch/activate your virtual env: PowerShell: `. .\scripts\activate.ps1` or for CMD: `.\scripts\activate.bat`
+    7. Setup the necessary python packages:
+       - Cuda
+         * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/windows.html
+           * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
+       - CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+           * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
+       - AMD
+         * `pip install torch-directml`
+    8. See `Linux && Windows`
 - **Linux && Windows**
     1. `pip install -r requirements.txt` - may take a bit of time...
-    2. Run `python ./summarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
-    3. You'll then be asked if you'd like to run the transcription through GPU(1) or CPU(2).
-    4. Next, the video will be downloaded to the local directory by ytdl.
-    5. Then the video will be transcribed by faster_whisper. (You can see this in the console output)
-      * The resulting transcription output will be stored as both a json file with timestamps, as well as a txt file with no timestamps.
-    6. Finally, you can have the transcription summarized through feeding it into an LLM of your choice.
-    7. For running it locally, pass the '--local' argument into the script. This will download and launch a local inference server as part of the script. 
-      * This will take up at least 6 GB of space. (WIP - not in place yet)
+    2. **Script Usage:**
+       - Put your API keys and settings in the `config.txt` file.
+         - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
+       - (make sure your in the python venv - Run `./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+       - Run `python ./summarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
+       - You'll then be asked if you'd like to run the transcription through GPU(1) or CPU(2).
+         - Next, the video will be downloaded to the local directory by ytdl.
+         - Then the video will be transcribed by faster_whisper. (You can see this in the console output)
+           * The resulting transcription output will be stored as both a json file with timestamps, as well as a txt file with no timestamps.
+       - Finally, you can have the transcription summarized through feeding it into an LLM of your choice.
+    3. **GUI Usage:**
+       - Put your API keys and settings in the `config.txt` file.
+         - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
+       - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+       - Run `python ./summarize.py -gui` - This will launch a webapp that will allow you to interact with the script in a more user-friendly manner.
+         * You can pass in the API keys for the LLMs you want to use in the `config.txt` file, or pass them in when you use the GUI.
+         * You can also download the generated transcript and summary as text files from the UI.
+         * You can also download the video/audio as files from the UI. (WIP - doesn't currently work)
+         * You can also access the SQLite DB that backs the app, with search, tagging, and export functionality.
+    4. **Local LLM with the Script Usage:**
+       - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+       - I recognize some people may like the functionality and idea of it all, but don't necessarily know/want to know about LLMs/getting them working, so you can also have the script download and run a local model, using system RAM and llamafile/llama.cpp.
+       - Simply pass `--local_llm` to the script (`python summarize.py --local-llm`), and it'll ask you if you want to download a model, and which one you'd like to download.
+       - Then, after downloading and selecting a model, it'll launch the model using llamafile, so you'll have a browser window/tab opened with a frontend to the model/llama.cpp server.
+       - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
+       - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
+
+- **Setting up Epub to Markdown conversion with Pandoc**
+    - **Linux / MacOS / Windows**
+        - Download and install from: https://pandoc.org/installing.html
+- **Converting Epub to markdown**
+    - `pandoc -f epub -t markdown -o output.md input.epub`
+- **Setting up PDF to Markdown conversion with Marker** (Optional - Necessary to do PDF ingestion/conversion)
+    - **Linux**
+        1. `sudo apt install python3-venv`
+        2. `python3 -m venv ./Helper_Scripts/marker_venv`
+        3. `source ./Helper_Scripts/marker_venv/bin/activate`  
+        4. `pip install marker`
+    - **Windows**
+        1. Install python3 from https://www.python.org/downloads/
+        2. `python Helper_Scripts\marker_venv\Scripts\activate\activate.ps1`
+        3. `pip install marker`
+- **Converting PDF to markdown**
+    - Convert a Single PDF to Markdown:
+        * `marker_single /path/to/file.pdf /path/to/output/folder --batch_multiplier 2 --langs English`
+    - Convert a Folder of PDFs to Markdown:
+        * `marker /path/to/folder/with/pdfs /path/to/output/folder --batch_multiplier 2 --langs English`
+- **Ingest Converted text files en-masse**
+    - `python summarize.py <path_to_text_file> --ingest_text_file --text_title "Title" --text_author "Author Name" -k additional,keywords`
 
 
 
-
-
-### <a name="using"></a>Using
+----------
+### <a name="using"></a>Using tldw
 - Single file (remote URL) transcription
   * Single URL: `python summarize.py https://example.com/video.mp4`
 - Single file (local) transcription)
   * Transcribe a local file: `python summarize.py /path/to/your/localfile.mp4`
 - Multiple files (local & remote)
   * List of Files(can be URLs and local files mixed): `python summarize.py ./path/to/your/text_file.txt"`
-
+- Download and run an LLM using only your system RAM! (Need at least 8GB Ram, realistically 12GB)
+  * `python summarize.py -gui --local_llama`
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
-usage: summarize.py [-h] [-v] [-api API_NAME] [-key API_KEY] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET] [-vad]
-                    [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-ui] [-demo] [-prompt CUSTOM_PROMPT] [-overwrite] [-roll]
-                    [-detail DETAIL_LEVEL]
+usage: summarize.py [-h] [-v] [-api API_NAME] [-key API_KEY] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET] [-vad] [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-gui] [-demo] [-prompt CUSTOM_PROMPT] [-overwrite] [-roll] [-detail DETAIL_LEVEL] [-model LLM_MODEL]
+                    [-k KEYWORDS [KEYWORDS ...]] [--log_file LOG_FILE] [--local_llm] [--server_mode] [--share_public SHARE_PUBLIC] [--port PORT] [--ingest_text_file] [--text_title TEXT_TITLE] [--text_author TEXT_AUTHOR] [--diarize]
                     [input_path]
-
-Transcribe and summarize videos.
 
 positional arguments:
   input_path            Path or URL of the video
@@ -149,46 +261,77 @@ options:
   -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
                         Number of speakers (default: 2)
   -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
-                        Whisper model (default: small.en)
+                        Whisper model (default: small)| Options: tiny.en, tiny, base.en, base, small.en, small, medium.en, medium, large-v1, large-v2, large-v3, large, distil-large-v2, distil-medium.en, distil-small.en
   -off OFFSET, --offset OFFSET
                         Offset in seconds (default: 0)
   -vad, --vad_filter    Enable VAD filter
   -log {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                         Log level (default: INFO)
-  -ui, --user_interface
+  -gui, --user_interface
                         Launch the Gradio user interface
   -demo, --demo_mode    Enable demo mode
   -prompt CUSTOM_PROMPT, --custom_prompt CUSTOM_PROMPT
-                        Pass in a custom prompt to be used in place of the existing one. (Probably should just modify the script itself...)
+                        Pass in a custom prompt to be used in place of the existing one.
+                         (Probably should just modify the script itself...)
   -overwrite, --overwrite
                         Overwrite existing files
   -roll, --rolling_summarization
                         Enable rolling summarization
   -detail DETAIL_LEVEL, --detail_level DETAIL_LEVEL
-                        Mandatory if rolling summarization is enabled, defines the chunk size. Default is 0.01(lots of chunks) -> 1.00 (few
-                        chunks) Currently only OpenAI works.
+                        Mandatory if rolling summarization is enabled, defines the chunk  size.
+                         Default is 0.01(lots of chunks) -> 1.00 (few chunks)
+                         Currently only OpenAI works.
+  -model LLM_MODEL, --llm_model LLM_MODEL
+                        Model to use for LLM summarization (only used for vLLM/TabbyAPI)
+  -k KEYWORDS [KEYWORDS ...], --keywords KEYWORDS [KEYWORDS ...]
+                        Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)
+  --log_file LOG_FILE   Where to save logfile (non-default)
+  --local_llm           Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)
+  --server_mode         Run in server mode (This exposes the GUI/Server to the network)
+  --share_public SHARE_PUBLIC
+                        This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)
+  --port PORT           Port to run the server on
+  --ingest_text_file    Ingest .txt files as content instead of treating them as URL lists
+  --text_title TEXT_TITLE
+                        Title for the text file being ingested
+  --text_author TEXT_AUTHOR
+                        Author of the text file being ingested
+  --diarize             Enable speaker diarization
 
--Download Audio only from URL -> Transcribe audio:
+
+Sample commands:
+    1. Simple Sample command structure:
+        summarize.py <path_to_video> -api openai -k tag_one tag_two tag_three
+
+    2. Rolling Summary Sample command structure:
+        summarize.py <path_to_video> -api openai -prompt "custom_prompt_goes_here-is-appended-after-transcription" -roll -detail 0.01 -k tag_one tag_two tag_three
+
+    3. FULL Sample command structure:
+        summarize.py <path_to_video> -api openai -ns 2 -wm small.en -off 0 -vad -log INFO -prompt "custom_prompt" -overwrite -roll -detail 0.01 -k tag_one tag_two tag_three
+
+    4. Sample command structure for UI debug logging printed to console:
+        summarize.py -gui -log DEBUG
+```
+- Download Audio only from URL -> Transcribe audio:
   >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
 
--Transcribe audio from a Youtube URL & Summarize it using (anthropic/cohere/openai/llama (llama.cpp)/ooba (oobabooga/text-gen-webui)/kobold (kobold.cpp)/tabby (Tabbyapi)) API:
+- Transcribe audio from a Youtube URL & Summarize it using (anthropic/cohere/openai/llama (llama.cpp)/ooba (oobabooga/text-gen-webui)/kobold (kobold.cpp)/tabby (Tabbyapi)) API:
   >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api <your choice of API>
     - Make sure to put your API key into `config.txt` under the appropriate API variable
 
--Download Video with audio from URL -> Transcribe audio from Video:
+- Download Video with audio from URL -> Transcribe audio from Video:
   >python summarize.py -v https://www.youtube.com/watch?v=4nd1CDZP21s
 
--Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:
+- Download Audio+Video from a list of videos in a text file (can be file paths or URLs) and have them all summarized:
   >python summarize.py --video ./local/file_on_your/system --api_name <API_name>
 
--Transcribe & Summarize a List of Videos on your local filesytem with a text file:
+- Transcribe & Summarize a List of Videos on your local filesytem with a text file:
   >python summarize.py -v ./local/file_on_your/system
 
--Run it as a WebApp:
-  >python summarize.py -gui
+- Run it as a WebApp:
+  >`python summarize.py -gui
 
-By default videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
-```
+By default, videos, transcriptions and summaries are stored in a folder with the video's name under './Results', unless otherwise specified in the config file.
 
 
 ------------
@@ -228,39 +371,28 @@ By default videos, transcriptions and summaries are stored in a folder with the 
     * GGUF Quants: https://huggingface.co/pjh64/Phi-3-mini-128K-Instruct.gguf
   2. Meta Llama3-8B - 8B Model/16GB base, 8.5GB Q8  - https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
     * GGUF Quants: https://huggingface.co/lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF
-
+- **Evaluating a Local Model via MMLU-Pro and Llama.cpp**
+  1. https://github.com/chigkim/Ollama-MMLU-Pro
 
 ----------
 
 
-### <a name="pieces"></a>Pieces & What's in the repo?
-- **Workflow**
-  1. Setup python + packages
-  2. Setup ffmpeg
-  3. Run `python summarize.py <video_url>` or `python summarize.py <List_of_videos.txt>`
-  4. If you want summarization, add your API keys (if not using a local LLM) to the `config.txt` file, and then re-run the script, passing in the name of the API [or URL endpoint - to be added] to the script.
-    * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s --api_name anthropic` - This will attempt to download the video, then upload the resulting json file to the anthropic API endpoint, referring to values set in the config file (API key and model) to request summarization.
-    - Anthropic:
-      * `claude-3-opus-20240229`
-      * `claude-3-sonnet-20240229`
-      * `claude-3-haiku-20240307`
-    - Cohere: 
-      * `command-r`
-      * `command-r-plus`
-    - Groq
-      * `llama3-8b-8192`
-      * `llama3-70b-8192`
-      * `mixtral-8x7b-32768`
-    - HuggingFace:
-      * `CohereForAI/c4ai-command-r-plus`
-      * `meta-llama/Meta-Llama-3-70B-Instruct`
-      * `meta-llama/Meta-Llama-3-8B-Instruct`
-      * Supposedly you can use any model on there, but this is for reference for the free demo instance, in case you'd like to host your own.
-    - OpenAI:
-      * `gpt-4-turbo`
-      * `gpt-4-turbo-preview`
-      * `gpt-4`
-- **What's in the repo?**
+### <a name="pieces"></a>Pieces & What's in the original repo?
+- **What's in the Repo currently?**
+  1. `summarize.py` - Main script for downloading, transcribing, and summarizing videos, audio files, books and documents.
+  2. `config.txt` - Config file used for settings for main app.
+  3. `requirements.txt` - Packages to install for Nvidia GPUs
+  4. `AMD_requirements.txt` - Packages to install for AMD GPUs
+  5. `llamafile` - Llama.cpp wrapper for local LLM inference, is multi-platform and multi-LLM compatible.
+  6. media_summary.db - SQLite DB that stores all the data ingested, transcribed, and summarized.
+  7. `prompts.db` - SQLite DB that stores all the prompts.
+  8. `App_Function_Libraries` Folder - Folder containing all of the applications function libraries
+  9. `Tests` Folder - Folder containing tests for the application (ha.)
+  10. `Helper_Scripts` - Folder containing helper scripts for the application
+  11. `HF` - Docker file and requirements.txt for Huggingface Spaces hosting
+  12. `models` - Folder containing the models for the speaker diarization LLMs
+  12. `tldw-original-scripts` - Original scripts from the original repo
+- **What's in the original repo?**
   - `summarize.py` - download, transcribe and summarize audio
     1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
     2. Next, it uses [ffmpeg](https://github.com/FFmpeg/FFmpeg) to convert the resulting `.m4a` file to `.wav`
@@ -277,6 +409,14 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 ### Similar/Other projects:
 - https://github.com/Dicklesworthstone/bulk_transcribe_youtube_videos_from_playlist/tree/main
 - https://github.com/akashe/YoutubeSummarizer
+- https://github.com/fmeyer/tldw
+- https://github.com/pashpashpash/vault-ai <-- Closest I've found open source to what I'm looking to build, though I'm not looking to add RAG for a while, and I'm focused on just accumulation, I figure at some point in the future can tackle chunking of hte longer form items in a manner that makes sense/is effective, but until then, data storage is cheap and text is small. And SQLite is easy to share with people. Also, no commercial aspects, this project's goal is to be able to be ran completely offline/free from outside influence.
+- https://github.com/bugbakery/transcribee
+- https://github.com/fedirz/faster-whisper-server
+- https://github.com/transcriptionstream/transcriptionstream
+- Commercial offerings:
+  * Bit.ai 
+  * typeset.io/
 ------------
 
 ### <a name="credits"></a>Credits
@@ -285,3 +425,10 @@ By default videos, transcriptions and summaries are stored in a folder with the 
 - [ffmpeg](https://github.com/FFmpeg/FFmpeg)
 - [faster_whisper](https://github.com/SYSTRAN/faster-whisper)
 - [pyannote](https://github.com/pyannote/pyannote-audio)
+- Thank you cognitivetech for the system prompt: https://github.com/cognitivetech/llm-long-text-summarization/tree/main?tab=readme-ov-file#one-shot-prompting
+- [Fabric](https://github.com/danielmiessler/fabric)
+- [Llamafile](https://github.com/Mozilla-Ocho/llamafile) - For the local LLM inference engine
+- [Mikupad](https://github.com/lmg-anon/mikupad) - Because I'm not going to write a whole new frontend for non-chat writing.
+- The people who have helped me get to this point, and especially for those not around to see it(DT & CC).
+
+### 
