@@ -1,6 +1,8 @@
 # **TL/DW: Too Long, Didnt Watch**
 ## Download, Transcribe & Summarize: Video+Audio+Documents+Articles & Books(WIP). All automated 
 #### More: Full-Text-Search across everything ingested, Local LLM inference as part of it for those who don't want to mess with setting up an LLM, and a WebApp to interact with the script in a more user-friendly manner (all features are exposed through it).
+#### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
+#### My idea is that this repo will hold 'working' versions that one can reliably use. My fork will contain the dev version (git branches? whats that?)
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
 #### Demo may be broken but should be working. If it's not, let me know. (HF dev spaces is touchy...)
 
