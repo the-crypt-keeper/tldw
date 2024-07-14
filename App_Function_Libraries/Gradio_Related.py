@@ -518,6 +518,7 @@ def create_video_transcription_tab():
                 keep_original_video = gr.Checkbox(label="Keep Original Video", value=False)
                 # First, create a checkbox to toggle the chunking options
                 chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
+                summarize_recursively = gr.Checkbox(label="Enable Recursive Summarization", value=False)
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
                 use_time_input = gr.Checkbox(label="Use Start and End Time", value=False)
 
@@ -965,9 +966,9 @@ def create_video_transcription_tab():
                     url_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
                     custom_prompt_checkbox, custom_prompt_input, chunking_options_checkbox,
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                    use_multi_level_chunking, chunk_language, api_name_input, api_key_input,
+                    use_multi_level_chunking, chunk_language, summarize_recursively, api_name_input, api_key_input,
                     keywords_input, use_cookies_input, cookies_input, batch_size_input,
-                    timestamp_option, keep_original_audio
+                    timestamp_option, keep_original_video
                 ],
                 outputs=[progress_output, error_output, results_output, download_transcription, download_summary]
             )
