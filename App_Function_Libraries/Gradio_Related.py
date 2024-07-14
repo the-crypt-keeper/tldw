@@ -1609,8 +1609,30 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
         return "No file uploaded. Please upload a file."
 
     try:
-        # Read the content of the file
-        file_content = file.read().decode('utf-8')
+        logging.debug(f"File object type: {type(file)}")
+        logging.debug(f"File object attributes: {dir(file)}")
+
+        if hasattr(file, 'name'):
+            file_name = file.name
+        else:
+            file_name = 'unknown_file'
+
+        if isinstance(file, str):
+            # If file is a string, it's likely a file path
+            file_path = file
+            with open(file_path, 'r', encoding='utf-8') as f:
+                file_content = f.read()
+        elif hasattr(file, 'read'):
+            # If file has a 'read' method, it's likely a file-like object
+            file_content = file.read()
+            if isinstance(file_content, bytes):
+                file_content = file_content.decode('utf-8')
+        else:
+            # If it's neither a string nor a file-like object, try converting it to a string
+            file_content = str(file)
+
+        logging.debug(f"File name: {file_name}")
+        logging.debug(f"File content (first 100 chars): {file_content[:100]}")
 
         # Create info_dict
         info_dict = {
@@ -1632,16 +1654,17 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
 
         # Add to database
         add_media_to_database(
-            url=file.name,  # Using filename as URL
+            url=file_name,  # Using filename as URL
             info_dict=info_dict,
             segments=segments,
             summary=summary,
             keywords=keyword_list,
             custom_prompt_input=custom_prompt,
-            whisper_model="Imported"  # Indicating this was an imported file
+            whisper_model="Imported",  # Indicating this was an imported file,
+            media_type = "document"
         )
 
-        return f"File '{file.name}' successfully imported with title '{title}' and author '{author}'."
+        return f"File '{file_name}' successfully imported with title '{title}' and author '{author}'."
     except Exception as e:
         logging.error(f"Error importing file: {str(e)}")
         return f"Error importing file: {str(e)}"

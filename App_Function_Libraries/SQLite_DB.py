@@ -288,20 +288,23 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     if not is_valid_url(url):
         url = 'localhost'
 
-    if media_type not in ['audio', 'article', 'document', 'podcast', 'video', 'unknown']:
-        raise InputError("Invalid media type. Allowed types: article, audio file, document, podcast, video.")
+    if media_type not in ['article', 'audio', 'document', 'podcast', 'text', 'video', 'unknown']:
+        raise InputError("Invalid media type. Allowed types: article, audio file, document, podcast, text, video, unknown.")
 
     if ingestion_date and not is_valid_date(ingestion_date):
         raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")
 
-    # Split keywords correctly by comma
-    keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
+    # Handle keywords as either string or list
+    if isinstance(keywords, str):
+        keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
+    elif isinstance(keywords, list):
+        keyword_list = [keyword.strip().lower() for keyword in keywords]
+    else:
+        keyword_list = ['default']
 
-    logging.info(f"URL: {url}")
-    logging.info(f"Title: {title}")
-    logging.info(f"Media Type: {media_type}")
-    logging.info(f"Keywords: {keywords}")
-    logging.info(f"Content: {content[:500]}...")  # Log first 500 characters of content
+    logging.info(f"Adding/updating media: URL={url}, Title={title}, Type={media_type}")
+    logging.debug(f"Content (first 500 chars): {content[:500]}...")
+    logging.debug(f"Keywords: {keyword_list}")
     logging.info(f"Prompt: {prompt}")
     logging.info(f"Summary: {summary}")
     logging.info(f"Author: {author}")
@@ -310,6 +313,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
 
     try:
         with db.get_connection() as conn:
+            conn.execute("BEGIN TRANSACTION")
             cursor = conn.cursor()
 
             # Check if media already exists
@@ -318,27 +322,23 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
 
             if existing_media:
                 media_id = existing_media[0]
-                logger.info(f"Existing media found with ID: {media_id}")
+                logging.info(f"Updating existing media with ID: {media_id}")
 
-                # Update existing media content
                 cursor.execute('''
                 UPDATE Media 
-                SET content = ?, transcription_model = ?
+                SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?
                 WHERE id = ?
-                ''', (content, transcription_model, media_id))
-                logger.info("Existing media content updated")
-
+                ''', (content, transcription_model, title, media_type, author, ingestion_date, media_id))
             else:
-                logger.info("New media entry being created")
+                logging.info("Creating new media entry")
 
-                # Insert new media item
                 cursor.execute('''
                 INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (url, title, media_type, content, author, ingestion_date, transcription_model))
                 media_id = cursor.lastrowid
 
-            # Always insert a new row into MediaModifications
+            logging.info(f"Adding new modification to MediaModifications for media ID: {media_id}")
             cursor.execute('''
             INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
             VALUES (?, ?, ?, ?)
@@ -346,6 +346,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
             logger.info("New modification added to MediaModifications")
 
             # Insert keywords and associate with media item
+            logging.info("Processing keywords")
             for keyword in keyword_list:
                 keyword = keyword.strip().lower()
                 cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
@@ -355,20 +356,25 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
                                (media_id, keyword_id))
 
             # Update full-text search index
+            logging.info("Updating full-text search index")
             cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
                            (media_id, title, content))
 
-            conn.commit()
-
-            # Insert new version
+            logging.info("Adding new media version")
             add_media_version(media_id, prompt, summary)
 
+            conn.commit()
+            logging.info(f"Media '{title}' successfully added/updated with ID: {media_id}")
+
             return f"Media '{title}' added/updated successfully with keywords: {', '.join(keyword_list)}"
+
     except sqlite3.Error as e:
-        logger.error(f"SQL Error: {e}")
+        conn.rollback()
+        logging.error(f"SQL Error: {e}")
         raise DatabaseError(f"Error adding media with keywords: {e}")
     except Exception as e:
-        logger.error(f"Unexpected Error: {e}")
+        conn.rollback()
+        logging.error(f"Unexpected Error: {e}")
         raise DatabaseError(f"Unexpected error: {e}")
 
 
@@ -514,9 +520,12 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
 
         # Complete the query
         query = f'''
-        SELECT DISTINCT Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date, Media.prompt, Media.summary
+        SELECT DISTINCT Media.id, Media.url, Media.title, Media.type, Media.content, Media.author, Media.ingestion_date, 
+               MediaModifications.prompt, MediaModifications.summary
         FROM Media
+        LEFT JOIN MediaModifications ON Media.id = MediaModifications.media_id
         WHERE {where_clause}
+        ORDER BY Media.ingestion_date DESC
         LIMIT ? OFFSET ?
         '''
         params.extend([results_per_page, offset])
@@ -669,54 +678,59 @@ def is_valid_date(date_string: str) -> bool:
 
 
 # Add ingested media to DB
-def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model):
-    # Extract content from segments
-    if isinstance(segments, list):
-        content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
-    elif isinstance(segments, dict):
-        content = segments.get('text', '') or segments.get('content', '')
-    else:
-        content = str(segments)
+def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
+    try:
+        # Extract content from segments
+        if isinstance(segments, list):
+            content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
+        elif isinstance(segments, dict):
+            content = segments.get('text', '') or segments.get('content', '')
+        else:
+            content = str(segments)
 
-    # # Trim content if it's too long (adjust the limit as needed)
-    # max_content_length = 1000000  # For example, 1 million characters
-    # if len(content) > max_content_length:
-    #     content = content[:max_content_length] + "... (truncated)"
+        logging.debug(f"Extracted content (first 500 chars): {content[:500]}")
 
+        # Set default custom prompt if not provided
         if custom_prompt_input is None:
             custom_prompt_input = """
             You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
-    **Bulleted Note Creation Guidelines**
+            **Bulleted Note Creation Guidelines**
 
-    **Headings**:
-    - Based on referenced topics, not categories like quotes or terms
-    - Surrounded by **bold** formatting 
-    - Not listed as bullet points
-    - No space between headings and list items underneath
+            **Headings**:
+            - Based on referenced topics, not categories like quotes or terms
+            - Surrounded by **bold** formatting 
+            - Not listed as bullet points
+            - No space between headings and list items underneath
 
-    **Emphasis**:
-    - **Important terms** set in bold font
-    - **Text ending in a colon**: also bolded
+            **Emphasis**:
+            - **Important terms** set in bold font
+            - **Text ending in a colon**: also bolded
 
-    **Review**:
-    - Ensure adherence to specified format
-    - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
+            **Review**:
+            - Ensure adherence to specified format
+            - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
 
+        logging.info(f"Adding media to database: URL={url}, Title={info_dict.get('title', 'Untitled')}, Type={media_type}")
 
-    logging.debug(f"Extracted content (first 500 chars): {content[:500]}")
+        result = add_media_with_keywords(
+            url=url,
+            title=info_dict.get('title', 'Untitled'),
+            media_type=media_type,
+            content=content,
+            keywords=','.join(keywords) if isinstance(keywords, list) else keywords,
+            prompt=custom_prompt_input or 'No prompt provided',
+            summary=summary or 'No summary provided',
+            transcription_model=whisper_model,
+            author=info_dict.get('uploader', 'Unknown'),
+            ingestion_date=datetime.now().strftime('%Y-%m-%d')
+        )
 
-    add_media_with_keywords(
-        url=url,
-        title=info_dict.get('title', 'Untitled'),
-        media_type='video',
-        content=content,
-        keywords=','.join(keywords),
-        prompt=custom_prompt_input or 'No prompt provided',
-        summary=summary or 'No summary provided',
-        transcription_model=whisper_model,
-        author=info_dict.get('uploader', 'Unknown'),
-        ingestion_date=datetime.now().strftime('%Y-%m-%d')
-    )
+        logging.info(f"Media added successfully: {result}")
+        return result
+
+    except Exception as e:
+        logging.error(f"Error in add_media_to_database: {str(e)}")
+        raise
 
 
 #
