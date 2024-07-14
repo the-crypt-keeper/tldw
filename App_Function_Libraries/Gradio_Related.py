@@ -1513,7 +1513,8 @@ def create_chat_interface():
         api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
         api_key = gr.Textbox(label="API Key (if required)", type="password")
         preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
-        user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
+        user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
+                                       "be used as the next message instead)", lines=3)
 
         chatbot = gr.Chatbot(height=500)
         msg = gr.Textbox(label="Enter your message")
