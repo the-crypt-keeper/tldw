@@ -24,7 +24,7 @@
   * `git clone https://github.com/rmusser01/tldw` -> `cd tldw` -> `python -m venv .\` -> `Linux: ./scripts/activate` / `Windows: . .\scripts\activate.ps1` -> `pip install -r requirements.txt` -> 
     * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three` 
     - GUI usage: `python summarize.py -gui`
-    - GUI with local LLM: `python summarize.py -gui --local_llama` (will ask you questions about which model to download)
+    - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download)
   - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
     - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
 - **Short Summary**
@@ -243,7 +243,7 @@ For offline LLM usage, I recommend the following models(in no particular order p
 - Multiple files (local & remote)
   * List of Files(can be URLs and local files mixed): `python summarize.py ./path/to/your/text_file.txt"`
 - Download and run an LLM using only your system RAM! (Need at least 8GB Ram, realistically 12GB)
-  * `python summarize.py -gui --local_llama`
+  * `python summarize.py -gui --local_llm`
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
