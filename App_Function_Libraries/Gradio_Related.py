@@ -1604,9 +1604,47 @@ def create_media_edit_tab():
         )
 
 
-def import_data(file):
-    # Placeholder for actual import functionality
-    return "Data imported successfully"
+def import_data(file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
+    if file is None:
+        return "No file uploaded. Please upload a file."
+
+    try:
+        # Read the content of the file
+        file_content = file.read().decode('utf-8')
+
+        # Create info_dict
+        info_dict = {
+            'title': title or 'Untitled',
+            'uploader': author or 'Unknown',
+        }
+
+        # Create segments (assuming one segment for the entire content)
+        segments = [{'Text': file_content}]
+
+        # Process keywords
+        keyword_list = [kw.strip() for kw in keywords.split(',') if kw.strip()]
+
+        # Handle summarization
+        if auto_summarize and api_name and api_key:
+            summary = perform_summarization(api_name, file_content, custom_prompt, api_key)
+        elif not summary:
+            summary = "No summary provided"
+
+        # Add to database
+        add_media_to_database(
+            url=file.name,  # Using filename as URL
+            info_dict=info_dict,
+            segments=segments,
+            summary=summary,
+            keywords=keyword_list,
+            custom_prompt_input=custom_prompt,
+            whisper_model="Imported"  # Indicating this was an imported file
+        )
+
+        return f"File '{file.name}' successfully imported with title '{title}' and author '{author}'."
+    except Exception as e:
+        logging.error(f"Error importing file: {str(e)}")
+        return f"Error importing file: {str(e)}"
 
 
 def create_import_item_tab():
@@ -1637,48 +1675,6 @@ def create_import_item_tab():
             import_button = gr.Button("Import Data")
         with gr.Row():
             import_output = gr.Textbox(label="Import Status")
-
-        def import_data(file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
-            if file is None:
-                return "No file uploaded. Please upload a file."
-
-            try:
-                # Read the content of the file
-                file_content = file.read().decode('utf-8')
-
-                # Create info_dict
-                info_dict = {
-                    'title': title or 'Untitled',
-                    'uploader': author or 'Unknown',
-                }
-
-                # Create segments (assuming one segment for the entire content)
-                segments = [{'Text': file_content}]
-
-                # Process keywords
-                keyword_list = [kw.strip() for kw in keywords.split(',') if kw.strip()]
-
-                # Handle summarization
-                if auto_summarize and api_name and api_key:
-                    summary = perform_summarization(api_name, file_content, custom_prompt, api_key)
-                elif not summary:
-                    summary = "No summary provided"
-
-                # Add to database
-                add_media_to_database(
-                    url=file.name,  # Using filename as URL
-                    info_dict=info_dict,
-                    segments=segments,
-                    summary=summary,
-                    keywords=keyword_list,
-                    custom_prompt_input=custom_prompt,
-                    whisper_model="Imported"  # Indicating this was an imported file
-                )
-
-                return f"File '{file.name}' successfully imported with title '{title}' and author '{author}'."
-            except Exception as e:
-                logging.error(f"Error importing file: {str(e)}")
-                return f"Error importing file: {str(e)}"
 
         import_button.click(
             fn=import_data,
