@@ -15,36 +15,40 @@
 
 ### <a name="what"></a> What is this (TL/DW)?
 - **Don't care, give me code**
-  - Take a URL, a single(or multiple) video, a list of URLs, or a list of local videos, one per line in a text file, and feed it into the script(or GUI) and have each video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
-  * `git clone https://github.com/rmusser01/tldw` -> `cd tldw` -> `python -m venv .\` -> `. .\scripts\activate.ps1` -> `pip install -r requirements.txt` -> 
-    * CLI usage: `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s -api openai -k tag_one tag_two tag_three` 
+  - Ingest Text/Audio/Video -> Transcribed if audio/video -> Summarized -> Ingested into a DB with full text search. Then ask questions about ingested content using an LLM (RAG is planned but not implemented yet)
+  - Take a URL(or local audio/video/text file), a list of URLs((or a list of local audio/video/text files one per line in a text file), and feed it into the script(or GUI) and have each audio/video transcribed (faster-whisper), summarized (Your LLM of choice), and ingested into a SQLite DB.
+    * If its just a text file then you don't really need to transcribe it...
+  * `git clone https://github.com/rmusser01/tldw` -> `cd tldw` -> `python -m venv .\` -> `Linux: ./scripts/activate` / `Windows: . .\scripts\activate.ps1` -> `pip install -r requirements.txt` -> 
+    * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three` 
     - GUI usage: `python summarize.py -gui`
     - GUI with local LLM: `python summarize.py -gui --local_llama` (will ask you questions about which model to download)
   - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
     - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
 - **Short Summary**
-  - Take a URL, single video, list of URLs, or list of local videos + URLs and feed it into the script and have each video transcribed (and audio downloaded if not local) using faster-whisper. 
-  - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
-  - Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported only through OpenAI currently, though the [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) will let you do it with exllama or vLLM, using the scripts in there for the entire pipeline.
+  - Ingest content from a URL or a local file. Can be done in batches with a text file containing a list of URLs or local files as well as from the GUI (GUI only does links, no local files for videos, but it will do local audio files).
+  - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, Triton and Aphrodite support planned)
+  - Rolling summaries (i.e. chunking up input and doing a chain of summaries) is supported. The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
 - **Longer Summary/Goal**
   - To be able to act as an ingestion tool for personal database storage. The idea being that there is so much data one comes across, and we can store it all as text.
-  - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your finger tips in a moments notice.
+  - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your fingertips at a moments notice.
   - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
   - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite (for now, would like to build a shim for ElasticSearch/Similar) DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it. (Plus act as a nice way of personally tagging data for possible future training of your personal AI agent :P)
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
 
-For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek. Flipside I would say none honestly. The(the largest players) will gaslight you and charge you money for it. Fun.
+For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek. Flipside I would say none honestly. The (largest players) will gaslight you and charge you money for it. Fun.
 From @nrose 05/08/2024 on Threads:
 ```
-No, it’s a design. First they train it, then they optimize it. Optimize it for what- better answers? No. For efficiency. 
+No, it’s a design. First they train it, then they optimize it. Optimize it for what- better answers?
+  No. For efficiency. 
 Per watt. Because they need all the compute they can get to train the next model.So it’s a sawtooth. 
-The model declines over time, then the optimization makes it somewhat better, then in a sort of reverse asymptote, 
-they dedicate all their “good compute” to the next bigger model.Which they then trim down over time, so they can train 
-the next big model… etc etc.
-None of these companies exist to provide AI services in 2024. They’re only doing it to finance the things they want to 
-build in 2025 and 2026 and so on, and the goal is to obsolete computing in general and become a hidden monopoly like 
-the oil and electric companies. 
-2024 service quality is not a metric they want to optimize, they’re forced to, only to maintain some directional income
+The model declines over time, then the optimization makes it somewhat better, then in a sort of 
+  reverse asymptote, they dedicate all their “good compute” to the next bigger model.Which they then 
+  trim down over time, so they can train the next big model… etc etc.
+None of these companies exist to provide AI services in 2024. They’re only doing it to finance the 
+ things they want to build in 2025 and 2026 and so on, and the goal is to obsolete computing in general
+  and become a hidden monopoly like the oil and electric companies. 
+2024 service quality is not a metric they want to optimize, they’re forced to, only to maintain some 
+  directional income
 ```
 
 For offline LLM usage, I recommend the following fine-tuned Mistral-Instruct v0.2 model:
@@ -72,12 +76,22 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
   3. Download the repo: `git clone https://github.com/rmusser01/tldw` or manually download it (Green code button, upper right corner -> Download ZIP) and extract it to a folder of your choice.
   4. Open a terminal, navigate to the directory you cloned the repo to, or unzipped the downloaded zip file to, and run the following commands:
      - Create a virtual env: `python -m venv .\`
-     - Launch/activate your virtual env: `. .\scripts\activate.ps1`
-       * If you don't already have cuda installed(Nvidia), `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
+     - Launch/activate your virtual env: `Linux: ./scripts/activate` / `Windows: . .\scripts\activate.ps1`
+       * If you don't already have cuda installed(Nvidia), `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` (Last updated 6/2024)
        * Or AMD (Windows): `pip install torch-directml`
-       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu` (Last updated 6/2024)
      - `pip install -r requirements.txt` - may take a bit of time...
   5. **You are Ready to Go!** Check out the below sample commands: 
+
+- **Run it as a WebApp**
+  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
+    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
+    * Has an option to download the generated transcript, and summary as text files from the UI.
+    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
+    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
+      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
+      * So everything you might consume during your path of research, tracked and assimilated and tagged.
+      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
 
 - **Transcribe audio from a Youtube URL:**
   * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
@@ -100,16 +114,6 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
   * `python summarize.py -roll -detail 0.01 https://www.youtube.com/watch?v=4nd1CDZP21s`
     * Detail can go from `0.01` to `1.00`, increments at a measure of `.01`.
 
-- **Run it as a WebApp**
-  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
-    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
-    * Has an option to download the generated transcript, and summary as text files from the UI.
-    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
-    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
-      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
-      * So everything you might consume during your path of research, tracked and assimilated and tagged.
-      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
-
 - **Convert an epub book to text and ingest it into the DB**
   1. Download/Install pandoc for your platform:
     * https://pandoc.org/installing.html
@@ -123,6 +127,10 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
 - **Requirements**
   - Python3
   - ffmpeg
+  - pandoc (for epub to markdown conversion) - https://pandoc.org/installing.html
+    - `pandoc -f epub -t markdown -o output.md input.epub` -> Can then import/ingest the markdown file into the DB.
+    - If done from the CLI using the `--ingest_text_file` flag, you can specify the title and author of the book, as well as any additional keywords you'd like to tag it with. (if not a regex will attempt to identify it)
+    - Or just do it through the GUI, drag and drop the file into the UI, set the Title, Author, and any keywords and hit `Import Data`.
   - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
     - Apparently there is a ROCm version of PyTorch.
       - MS Pytorch: https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
@@ -130,7 +138,11 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
       - AMD Pytorch: https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/wsl/install-pytorch.html
   - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
   - System RAM (8GB minimum, realistically 12GB)
-  - Disk Space (Depends on how much you ingest, but a few GBs (4+) should be fine for the total size of the project + DB)
+  - Disk Space (Depends on how much you ingest, but 6GB or so should be fine for the total size of the project + DB)
+    - This can balloon real quick. The whisper model used for transcription can be 1-2GB per.
+    - Pytorch + other ML libraries will also cause the size to increase.
+    - As such, I would say you want at least 8GB of free space on your system to devote to the app.
+    - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
 - **Linux**
     1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg / dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
     2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
@@ -144,6 +156,8 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
        * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
        * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
     8. Then see `Linux && Windows`
+- **MacOS**
+    1. I don't own a mac/have access to one reliably so I can't test this, but it should be the same as/similar to Linux.
 - **Windows**
     1. Download necessary packages ([Python3](https://www.python.org/downloads/windows/), Update your GPU drivers/CUDA drivers if you'll be running an LLM locally, ffmpeg will be installed by the script)
     2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
@@ -194,7 +208,7 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
         - Download and install from: https://pandoc.org/installing.html
 - **Converting Epub to markdown**
     - `pandoc -f epub -t markdown -o output.md input.epub`
-- **Setting up PDF to Markdown conversion with Marker** 
+- **Setting up PDF to Markdown conversion with Marker** (Optional - Necessary to do PDF ingestion/conversion)
     - **Linux**
         1. `sudo apt install python3-venv`
         2. `python3 -m venv ./Helper_Scripts/marker_venv`
@@ -227,6 +241,10 @@ Alternatively, there is https://huggingface.co/microsoft/Phi-3-mini-4k-instruct,
 
 Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
 ```
+usage: summarize.py [-h] [-v] [-api API_NAME] [-key API_KEY] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET] [-vad] [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-gui] [-demo] [-prompt CUSTOM_PROMPT] [-overwrite] [-roll] [-detail DETAIL_LEVEL] [-model LLM_MODEL]
+                    [-k KEYWORDS [KEYWORDS ...]] [--log_file LOG_FILE] [--local_llm] [--server_mode] [--share_public SHARE_PUBLIC] [--port PORT] [--ingest_text_file] [--text_title TEXT_TITLE] [--text_author TEXT_AUTHOR] [--diarize]
+                    [input_path]
+
 positional arguments:
   input_path            Path or URL of the video
 
@@ -240,7 +258,7 @@ options:
   -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
                         Number of speakers (default: 2)
   -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
-                        Whisper model (default: small)| Options: tiny.en, tiny, base.en, base, small.en, small, medium.en, medium, large-v1, large-v2, large-v3, large, distil-large-v2, distil-medium.en, distil-small.en, distil-large-v3
+                        Whisper model (default: small)| Options: tiny.en, tiny, base.en, base, small.en, small, medium.en, medium, large-v1, large-v2, large-v3, large, distil-large-v2, distil-medium.en, distil-small.en
   -off OFFSET, --offset OFFSET
                         Offset in seconds (default: 0)
   -vad, --vad_filter    Enable VAD filter
@@ -269,7 +287,13 @@ options:
   --server_mode         Run in server mode (This exposes the GUI/Server to the network)
   --share_public SHARE_PUBLIC
                         This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)
-  --port PORT           Port to run the server on (default: 7860)
+  --port PORT           Port to run the server on
+  --ingest_text_file    Ingest .txt files as content instead of treating them as URL lists
+  --text_title TEXT_TITLE
+                        Title for the text file being ingested
+  --text_author TEXT_AUTHOR
+                        Author of the text file being ingested
+  --diarize             Enable speaker diarization
 
 
 Sample commands:
@@ -282,7 +306,7 @@ Sample commands:
     3. FULL Sample command structure:
         summarize.py <path_to_video> -api openai -ns 2 -wm small.en -off 0 -vad -log INFO -prompt "custom_prompt" -overwrite -roll -detail 0.01 -k tag_one tag_two tag_three
 
-    4. Sample command structure for UI:
+    4. Sample command structure for UI debug logging printed to console:
         summarize.py -gui -log DEBUG
 ```
 - Download Audio only from URL -> Transcribe audio:
