@@ -1384,6 +1384,14 @@ def process_url(
         return str(e), 'process_url: Error processing the request.', None, None, None, None
 
 
+def perform_recursive_summarization(api_name, text, custom_prompt, api_key, max_iterations=3, target_length=500):
+    current_summary = text
+    for i in range(max_iterations):
+        if len(current_summary) <= target_length:
+            break
+        current_summary = perform_summarization(api_name, current_summary, custom_prompt, api_key)
+    return current_summary
+
 #
 #
 ############################################################################################################################################
