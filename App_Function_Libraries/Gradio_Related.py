@@ -1558,8 +1558,6 @@ def create_chat_interface():
             outputs=[msg, chatbot]
         )
 
-        clear.click(lambda: ([], []), outputs=[chatbot, chat_history])
-
         def save_chat_history(history):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"chat_history_{timestamp}.json"
