@@ -515,7 +515,7 @@ def create_video_transcription_tab():
                                              label="Batch Size (Number of videos to process simultaneously)")
                 timestamp_option = gr.Radio(choices=["Include Timestamps", "Exclude Timestamps"],
                                             value="Include Timestamps", label="Timestamp Option")
-                keep_original_audio = gr.Checkbox(label="Keep Original Audio", value=False)
+                keep_original_video = gr.Checkbox(label="Keep Original Video", value=False)
                 # First, create a checkbox to toggle the chunking options
                 chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
@@ -580,7 +580,7 @@ def create_video_transcription_tab():
                                                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                                    use_multi_level_chunking, chunk_language, api_name,
                                                    api_key, keywords, use_cookies, cookies, batch_size,
-                                                   timestamp_option, keep_original_audio=False,
+                                                   timestamp_option, keep_original_video=False,
                                                    progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
                     logging.info("Entering process_videos_with_error_handling")
