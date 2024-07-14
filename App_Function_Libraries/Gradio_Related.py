@@ -641,7 +641,7 @@ def create_video_transcription_tab():
                                     metadata=video_metadata,
                                     use_chunking=chunking_options_checkbox,
                                     chunk_options=chunk_options,
-                                    keep_original_audio=keep_original_audio
+                                    keep_original_video=keep_original_video
                                 )
 
                                 if result[0] is None:  # Check if the first return value is None
@@ -746,7 +746,7 @@ def create_video_transcription_tab():
                                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                        use_multi_level_chunking, chunk_language, api_name,
                                        api_key, keywords, use_cookies, cookies, batch_size,
-                                       timestamp_option, keep_original_audio):
+                                       timestamp_option, keep_original_video):
                 try:
                     logging.info("process_videos_wrapper called")
                     result = process_videos_with_error_handling(
@@ -755,7 +755,7 @@ def create_video_transcription_tab():
                         chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                         use_multi_level_chunking, chunk_language, api_name,
                         api_key, keywords, use_cookies, cookies, batch_size,
-                        timestamp_option, keep_original_audio
+                        timestamp_option, keep_original_video
                     )
                     logging.info("process_videos_with_error_handling completed")
 
