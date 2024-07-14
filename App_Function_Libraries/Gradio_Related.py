@@ -288,11 +288,11 @@ def display_item_details(media_id):
 
 
 def update_dropdown(search_query, search_type):
-    # Function to update the dropdown choices
     results = browse_items(search_query, search_type)
     item_options = [f"{item[1]} ({item[2]})" for item in results]
-    item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}  # Map item display to media ID
-    return gr.update(choices=item_options), item_mapping
+    new_item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}
+    print(f"Debug - Update Dropdown - New Item Mapping: {new_item_mapping}")
+    return gr.update(choices=item_options), new_item_mapping
 
 
 
@@ -371,13 +371,27 @@ def display_search_results(query):
 def search_media_database(query: str) -> List[Tuple[int, str, str]]:
     return browse_items(query, 'Title')
 
+
 def load_media_content(media_id: int) -> dict:
-    prompt_summary_results, content = fetch_item_details(media_id)
-    return {
-        "content": content if content else "No content available",
-        "prompt": prompt_summary_results[-1][0] if prompt_summary_results else "No prompt available",
-        "summary": prompt_summary_results[-1][1] if prompt_summary_results else "No summary available"
-    }
+    try:
+        print(f"Debug - Load Media Content - Media ID: {media_id}")
+        item_details = fetch_item_details(media_id)
+        print(f"Debug - Load Media Content - Item Details: {item_details}")
+
+        if isinstance(item_details, tuple) and len(item_details) == 3:
+            content, prompt, summary = item_details
+        else:
+            print(f"Debug - Load Media Content - Unexpected item_details format: {item_details}")
+            content, prompt, summary = "", "", ""
+
+        return {
+            "content": content or "No content available",
+            "prompt": prompt or "No prompt available",
+            "summary": summary or "No summary available"
+        }
+    except Exception as e:
+        print(f"Debug - Load Media Content - Error: {str(e)}")
+        return {"content": "", "prompt": "", "summary": ""}
 
 def load_preset_prompts():
     return list_prompts()
@@ -397,7 +411,7 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         print(f"Debug - Chat Function - Selected Parts (after check): {selected_parts}")
 
         # Combine the selected parts of the media content
-        combined_content = " ".join([media_content.get(part, "") for part in selected_parts if part in media_content])
+        combined_content = "\n\n".join([f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if part in media_content])
         print(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")  # Print first 500 chars
 
         # Prepare the input for the API
@@ -1503,7 +1517,6 @@ def create_chat_interface():
 
         chatbot = gr.Chatbot(height=500)
         msg = gr.Textbox(label="Enter your message")
-        clear = gr.Button("Clear")
         submit = gr.Button("Submit")
 
         chat_history = gr.State([])
@@ -1520,23 +1533,21 @@ def create_chat_interface():
             print(f"Debug - Chat Wrapper - API Endpoint: {api_endpoint}")
             print(f"Debug - Chat Wrapper - User Prompt: {user_prompt}")
 
-            # Ensure selected_parts is a list
-            if not isinstance(selected_parts, (list, tuple)):
-                selected_parts = [selected_parts] if selected_parts else []
-            print(f"Debug - Chat Wrapper - Selected Parts (after check): {selected_parts}")
-
             selected_content = "\n\n".join(
-                [media_content.get(part, "") for part in selected_parts if part in media_content])
-            # Print first 500 chars
-            print(f"Debug - Chat Wrapper - Selected Content: {selected_content[:500]}...")
+                [f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if
+                 part in media_content])
+            print(f"Debug - Chat Wrapper - Selected Content: {selected_content[:500]}...")  # Print first 500 chars
 
             context = f"Selected content:\n{selected_content}\n\nUser message: {message}"
-            # Print first 500 chars
-            print(f"Debug - Chat Wrapper - Context: {context[:500]}...")
+            print(f"Debug - Chat Wrapper - Context: {context[:500]}...")  # Print first 500 chars
+
+            # Use a default API endpoint if none is selected
+            if not api_endpoint:
+                api_endpoint = "OpenAI"  # You can change this to any default endpoint you prefer
+                print(f"Debug - Chat Wrapper - Using default API Endpoint: {api_endpoint}")
 
             bot_message = chat(context, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
-            # Print first 500 chars
-            print(f"Debug - Chat Wrapper - Bot Message: {bot_message[:500]}...")
+            print(f"Debug - Chat Wrapper - Bot Message: {bot_message[:500]}...")  # Print first 500 chars
 
             history.append((message, bot_message))
             return "", history
@@ -1572,32 +1583,53 @@ def create_chat_interface():
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
 
-        def update_chat_content(selected_item, use_content, use_summary, use_prompt):
+        def update_chat_content(selected_item, use_content, use_summary, use_prompt, item_mapping):
             print(f"Debug - Update Chat Content - Selected Item: {selected_item}")
             print(f"Debug - Update Chat Content - Use Content: {use_content}")
             print(f"Debug - Update Chat Content - Use Summary: {use_summary}")
             print(f"Debug - Update Chat Content - Use Prompt: {use_prompt}")
+            print(f"Debug - Update Chat Content - Item Mapping: {item_mapping}")
 
             if selected_item and selected_item in item_mapping:
                 media_id = item_mapping[selected_item]
                 content = load_media_content(media_id)
                 selected_parts = []
-                if use_content:
+                if use_content and "content" in content:
                     selected_parts.append("content")
-                if use_summary:
+                if use_summary and "summary" in content:
                     selected_parts.append("summary")
-                if use_prompt:
+                if use_prompt and "prompt" in content:
                     selected_parts.append("prompt")
                 print(f"Debug - Update Chat Content - Content: {content}")
                 print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
                 return content, selected_parts
-            return {}, []
+            else:
+                print(f"Debug - Update Chat Content - No item selected or item not in mapping")
+                return {}, []
 
         items_output.change(
             update_chat_content,
-            inputs=[items_output, use_content, use_summary, use_prompt],
+            inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
             outputs=[media_content, selected_parts]
         )
+
+        def update_selected_parts(use_content, use_summary, use_prompt):
+            selected_parts = []
+            if use_content:
+                selected_parts.append("content")
+            if use_summary:
+                selected_parts.append("summary")
+            if use_prompt:
+                selected_parts.append("prompt")
+            print(f"Debug - Update Selected Parts: {selected_parts}")
+            return selected_parts
+
+        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                          outputs=[selected_parts])
 
         def update_selected_parts(use_content, use_summary, use_prompt):
             selected_parts = []
