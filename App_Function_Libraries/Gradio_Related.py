@@ -384,15 +384,25 @@ def load_preset_prompts():
 
 def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt):
     try:
+        print(f"Debug - Chat Function - Message: {message}")
+        print(f"Debug - Chat Function - Media Content: {media_content}")
+        print(f"Debug - Chat Function - Selected Parts: {selected_parts}")
+        print(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
+        print(f"Debug - Chat Function - Prompt: {prompt}")
+
         # Ensure selected_parts is a list
         if not isinstance(selected_parts, (list, tuple)):
             selected_parts = [selected_parts] if selected_parts else []
 
+        print(f"Debug - Chat Function - Selected Parts (after check): {selected_parts}")
+
         # Combine the selected parts of the media content
         combined_content = " ".join([media_content.get(part, "") for part in selected_parts if part in media_content])
+        print(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")  # Print first 500 chars
 
         # Prepare the input for the API
         input_data = f"{combined_content}\n\nUser: {message}\nAI:"
+        print(f"Debug - Chat Function - Input Data: {input_data[:500]}...")  # Print first 500 chars
 
         # Use the existing API request code based on the selected endpoint
         if api_endpoint.lower() == 'openai':
@@ -1497,14 +1507,37 @@ def create_chat_interface():
         submit = gr.Button("Submit")
 
         chat_history = gr.State([])
-        media_content = gr.State()
+        media_content = gr.State({})
         selected_parts = gr.State([])
 
         save_button = gr.Button("Save Chat History")
         download_file = gr.File(label="Download Chat History")
 
         def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
-            bot_message = chat(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
+            print(f"Debug - Chat Wrapper - Message: {message}")
+            print(f"Debug - Chat Wrapper - Media Content: {media_content}")
+            print(f"Debug - Chat Wrapper - Selected Parts: {selected_parts}")
+            print(f"Debug - Chat Wrapper - API Endpoint: {api_endpoint}")
+            print(f"Debug - Chat Wrapper - User Prompt: {user_prompt}")
+
+            # Ensure selected_parts is a list
+            if not isinstance(selected_parts, (list, tuple)):
+                selected_parts = [selected_parts] if selected_parts else []
+            print(f"Debug - Chat Wrapper - Selected Parts (after check): {selected_parts}")
+
+            selected_content = "\n\n".join(
+                [media_content.get(part, "") for part in selected_parts if part in media_content])
+            # Print first 500 chars
+            print(f"Debug - Chat Wrapper - Selected Content: {selected_content[:500]}...")
+
+            context = f"Selected content:\n{selected_content}\n\nUser message: {message}"
+            # Print first 500 chars
+            print(f"Debug - Chat Wrapper - Context: {context[:500]}...")
+
+            bot_message = chat(context, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
+            # Print first 500 chars
+            print(f"Debug - Chat Wrapper - Bot Message: {bot_message[:500]}...")
+
             history.append((message, bot_message))
             return "", history
 
@@ -1540,7 +1573,12 @@ def create_chat_interface():
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
 
         def update_chat_content(selected_item, use_content, use_summary, use_prompt):
-            if selected_item in item_mapping:
+            print(f"Debug - Update Chat Content - Selected Item: {selected_item}")
+            print(f"Debug - Update Chat Content - Use Content: {use_content}")
+            print(f"Debug - Update Chat Content - Use Summary: {use_summary}")
+            print(f"Debug - Update Chat Content - Use Prompt: {use_prompt}")
+
+            if selected_item and selected_item in item_mapping:
                 media_id = item_mapping[selected_item]
                 content = load_media_content(media_id)
                 selected_parts = []
@@ -1550,14 +1588,42 @@ def create_chat_interface():
                     selected_parts.append("summary")
                 if use_prompt:
                     selected_parts.append("prompt")
+                print(f"Debug - Update Chat Content - Content: {content}")
+                print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
                 return content, selected_parts
-            return None, []
+            return {}, []
 
         items_output.change(
             update_chat_content,
             inputs=[items_output, use_content, use_summary, use_prompt],
             outputs=[media_content, selected_parts]
         )
+
+        def update_selected_parts(use_content, use_summary, use_prompt):
+            selected_parts = []
+            if use_content:
+                selected_parts.append("content")
+            if use_summary:
+                selected_parts.append("summary")
+            if use_prompt:
+                selected_parts.append("prompt")
+            print(f"Debug - Update Selected Parts: {selected_parts}")
+            return selected_parts
+
+        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                          outputs=[selected_parts])
+
+        # Add debug output
+        def debug_output(media_content, selected_parts):
+            print(f"Debug - Media Content: {media_content}")
+            print(f"Debug - Selected Parts: {selected_parts}")
+            return ""
+
+        items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
 
 
 
