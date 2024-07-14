@@ -43,7 +43,7 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     perform_transcription, summarize_chunk
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
-    export_keywords_to_csv, export_to_file, add_media_to_database
+    export_keywords_to_csv, export_to_file, add_media_to_database, insert_prompt_to_db
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -1228,7 +1228,7 @@ def create_pdf_ingestion_tab():
             )
 #
 #
-############################
+################################################################################################################
 # Functions for Re-Summarization
 #
 
@@ -1341,12 +1341,6 @@ def resummary_content_wrapper(selected_item, item_mapping, api_name, api_key, ch
     return result
 
 
-def update_resummary_dropdown(search_query, search_type):
-    results = browse_items(search_query, search_type)
-    item_options = [f"{item[1]} ({item[2]})" for item in results]
-    item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}
-    return gr.update(choices=item_options), item_mapping
-
 def resummary_content(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
     if not selected_item or not api_name or not api_key:
         return "Please select an item and provide API details."
@@ -1415,7 +1409,64 @@ def resummary_content(selected_item, item_mapping, api_name, api_key, chunking_o
         logging.error(f"Error updating database: {str(e)}")
         return f"Error updating database: {str(e)}"
 
+# End of Re-Summarization Functions
+#
+##############################################################################################################
+#
+# Search Tab
 
+def add_or_update_prompt(title, description, system_prompt, user_prompt):
+    if not title:
+        return "Error: Title is required."
+
+    existing_prompt = fetch_prompt_details(title)
+    if existing_prompt:
+        # Update existing prompt
+        result = update_prompt_in_db(title, description, system_prompt, user_prompt)
+    else:
+        # Insert new prompt
+        result = insert_prompt_to_db(title, description, system_prompt, user_prompt)
+
+    # Refresh the prompt dropdown
+    update_prompt_dropdown()
+    return result
+
+
+def load_prompt_details(selected_prompt):
+    if selected_prompt:
+        details = fetch_prompt_details(selected_prompt)
+        if details:
+            return details[0], details[1], details[2], details[3] if len(details) > 3 else ""
+    return "", "", "", ""
+
+
+def update_prompt_in_db(title, description, system_prompt, user_prompt):
+    try:
+        conn = sqlite3.connect('prompts.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE Prompts SET details = ?, system = ?, user = ? WHERE name = ?",
+            (description, system_prompt, user_prompt, title)
+        )
+        conn.commit()
+        conn.close()
+        return "Prompt updated successfully!"
+    except sqlite3.Error as e:
+        return f"Error updating prompt: {e}"
+
+
+def search_prompts(query):
+    try:
+        conn = sqlite3.connect('prompts.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, details FROM Prompts WHERE name LIKE ? OR details LIKE ?",
+                       (f"%{query}%", f"%{query}%"))
+        results = cursor.fetchall()
+        conn.close()
+        return results
+    except sqlite3.Error as e:
+        print(f"Error searching prompts: {e}")
+        return []
 
 
 def create_search_tab():
@@ -1443,6 +1494,120 @@ def create_search_tab():
                     inputs=[items_output, item_mapping],
                     outputs=[prompt_summary_output, content_output]
                 )
+def create_prompt_view_tab():
+    with gr.TabItem("Search Prompts"):
+        with gr.Row():
+            with gr.Column():
+                search_query_input = gr.Textbox(label="Search Prompts", placeholder="Enter your search query...")
+                search_button = gr.Button("Search Prompts")
+            with gr.Column():
+                search_results_output = gr.Markdown()
+        search_button.click(
+            fn=display_search_results,
+            inputs=[search_query_input],
+            outputs=[search_results_output]
+        )
+
+def create_prompt_edit_tab():
+    with gr.TabItem("Edit Prompts"):
+        with gr.Row():
+            with gr.Column():
+                prompt_dropdown = gr.Dropdown(
+                    label="Select Prompt",
+                    choices=[],
+                    interactive=True
+                )
+                prompt_details_output = gr.HTML()
+                prompt_list_button = gr.Button("List Prompts")
+
+            with gr.Column():
+                title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
+                description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
+                system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
+                user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
+                add_prompt_button = gr.Button("Add/Update Prompt")
+                add_prompt_output = gr.HTML()
+
+        # Event handlers
+        prompt_dropdown.change(
+            fn=display_prompt_details,
+            inputs=prompt_dropdown,
+            outputs=prompt_details_output
+        )
+
+        prompt_list_button.click(
+            fn=update_prompt_dropdown,
+            outputs=prompt_dropdown
+        )
+
+        add_prompt_button.click(
+            fn=add_or_update_prompt,
+            inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
+            outputs=add_prompt_output
+        )
+
+        # Load prompt details when selected
+        prompt_dropdown.change(
+            fn=load_prompt_details,
+            inputs=[prompt_dropdown],
+            outputs=[title_input, description_input, system_prompt_input, user_prompt_input]
+        )
+
+
+# End of Search Tab Functions
+#
+################################################################################################################
+#
+# Llamafile Tab
+
+
+def start_llamafile(*args):
+    # Unpack arguments
+    (am_noob, verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
+     model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
+     ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value, port_checked,
+     port_value) = args
+
+    # Construct command based on checked values
+    command = []
+    if am_noob:
+        am_noob = True
+    if verbose_checked is not None and verbose_checked:
+        command.append('-v')
+    if threads_checked and threads_value is not None:
+        command.extend(['-t', str(threads_value)])
+    if http_threads_checked and http_threads_value is not None:
+        command.extend(['--threads', str(http_threads_value)])
+    if model_checked and model_value is not None:
+        model_path = model_value.name
+        command.extend(['-m', model_path])
+    if hf_repo_checked and hf_repo_value is not None:
+        command.extend(['-hfr', hf_repo_value])
+    if hf_file_checked and hf_file_value is not None:
+        command.extend(['-hff', hf_file_value])
+    if ctx_size_checked and ctx_size_value is not None:
+        command.extend(['-c', str(ctx_size_value)])
+    if ngl_checked and ngl_value is not None:
+        command.extend(['-ngl', str(ngl_value)])
+    if host_checked and host_value is not None:
+        command.extend(['--host', host_value])
+    if port_checked and port_value is not None:
+        command.extend(['--port', str(port_value)])
+
+    # Code to start llamafile with the provided configuration
+    local_llm_gui_function(am_noob, verbose_checked, threads_checked, threads_value,
+                           http_threads_checked, http_threads_value, model_checked,
+                           model_value, hf_repo_checked, hf_repo_value, hf_file_checked,
+                           hf_file_value, ctx_size_checked, ctx_size_value, ngl_checked,
+                           ngl_value, host_checked, host_value, port_checked, port_value, )
+
+    # Example command output to verify
+    return f"Command built and ran: {' '.join(command)} \n\nLlamafile started successfully."
+
+def stop_llamafile():
+    # Code to stop llamafile
+    # ...
+    return "Llamafile stopped"
 
 
 def create_llamafile_settings_tab():
@@ -1489,6 +1654,12 @@ def create_llamafile_advanced_inputs():
     return [verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
             hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value, ctx_size_checked, ctx_size_value,
             host_checked, host_value, port_checked, port_value]
+
+#
+# End of Llamafile Tab Functions
+################################################################################################################
+#
+# Chat Interface Tab Functions
 
 
 def create_chat_interface():
@@ -1656,7 +1827,11 @@ def create_chat_interface():
 
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
 
-
+#
+# End of Chat Interface Tab Functions
+################################################################################################################
+#
+# Media Edit Tab Functions
 
 def create_media_edit_tab():
     with gr.TabItem("Edit Existing Items"):
@@ -1702,6 +1877,11 @@ def create_media_edit_tab():
             inputs=[items_output, item_mapping, content_input, prompt_input, summary_input],
             outputs=status_message
         )
+#
+#
+################################################################################################################
+#
+# Import Items Tab Functions
 
 
 def import_data(file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
@@ -1806,6 +1986,13 @@ def create_import_item_tab():
             outputs=import_output
         )
 
+#
+# End of Import Items Tab Functions
+################################################################################################################
+#
+# Export Items Tab Functions
+
+
 def create_export_tab():
     with gr.Tab("Export"):
         with gr.Tab("Export Search Results"):
@@ -1826,6 +2013,12 @@ def create_export_tab():
                 inputs=[search_query, search_fields, keyword_input, page_input, results_per_file_input, export_format],
                 outputs=[export_search_status, export_search_output]
             )
+
+#
+# End of Export Items Tab Functions
+################################################################################################################
+#
+# Keyword Management Tab Functions
 
 def create_export_keywords_tab():
     with gr.Group():
@@ -1867,6 +2060,12 @@ def create_delete_keyword_tab():
         with gr.Row():
             delete_output = gr.Textbox(label="Result")
             delete_button.click(fn=delete_keyword, inputs=delete_input, outputs=delete_output)
+
+#
+# End of Keyword Management Tab Functions
+################################################################################################################
+#
+# Utilities Tab Functions
 
 
 def create_utilities_tab():
@@ -1913,82 +2112,26 @@ def create_utilities_tab():
                 outputs=output_url
             )
 
-
-def start_llamafile(*args):
-    # Unpack arguments
-    (am_noob, verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
-     model_checked, model_value, hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value,
-     ctx_size_checked, ctx_size_value, ngl_checked, ngl_value, host_checked, host_value, port_checked,
-     port_value) = args
-
-    # Construct command based on checked values
-    command = []
-    if am_noob:
-        am_noob = True
-    if verbose_checked is not None and verbose_checked:
-        command.append('-v')
-    if threads_checked and threads_value is not None:
-        command.extend(['-t', str(threads_value)])
-    if http_threads_checked and http_threads_value is not None:
-        command.extend(['--threads', str(http_threads_value)])
-    if model_checked and model_value is not None:
-        model_path = model_value.name
-        command.extend(['-m', model_path])
-    if hf_repo_checked and hf_repo_value is not None:
-        command.extend(['-hfr', hf_repo_value])
-    if hf_file_checked and hf_file_value is not None:
-        command.extend(['-hff', hf_file_value])
-    if ctx_size_checked and ctx_size_value is not None:
-        command.extend(['-c', str(ctx_size_value)])
-    if ngl_checked and ngl_value is not None:
-        command.extend(['-ngl', str(ngl_value)])
-    if host_checked and host_value is not None:
-        command.extend(['--host', host_value])
-    if port_checked and port_value is not None:
-        command.extend(['--port', str(port_value)])
-
-    # Code to start llamafile with the provided configuration
-    local_llm_gui_function(am_noob, verbose_checked, threads_checked, threads_value,
-                           http_threads_checked, http_threads_value, model_checked,
-                           model_value, hf_repo_checked, hf_repo_value, hf_file_checked,
-                           hf_file_value, ctx_size_checked, ctx_size_value, ngl_checked,
-                           ngl_value, host_checked, host_value, port_checked, port_value, )
-
-    # Example command output to verify
-    return f"Command built and ran: {' '.join(command)} \n\nLlamafile started successfully."
-
-def stop_llamafile():
-    # Code to stop llamafile
-    # ...
-    return "Llamafile stopped"
+#
+# End of Utilities Tab Functions
+################################################################################################################
 
 # FIXME - Prompt sample box
-
-# Sample data
-prompts_category_1 = [
-    "What are the key points discussed in the video?",
-    "Summarize the main arguments made by the speaker.",
-    "Describe the conclusions of the study presented."
-]
-
-prompts_category_2 = [
-    "How does the proposed solution address the problem?",
-    "What are the implications of the findings?",
-    "Can you explain the theory behind the observed phenomenon?"
-]
-
-all_prompts = prompts_category_1 + prompts_category_2
-
-
-# Search function
-def search_prompts(query):
-    filtered_prompts = [prompt for prompt in all_prompts if query.lower() in prompt.lower()]
-    return "\n".join(filtered_prompts)
-
-
-# Handle prompt selection
-def handle_prompt_selection(prompt):
-    return f"You selected: {prompt}"
+#
+# # Sample data
+# prompts_category_1 = [
+#     "What are the key points discussed in the video?",
+#     "Summarize the main arguments made by the speaker.",
+#     "Describe the conclusions of the study presented."
+# ]
+#
+# prompts_category_2 = [
+#     "How does the proposed solution address the problem?",
+#     "What are the implications of the findings?",
+#     "Can you explain the theory behind the observed phenomenon?"
+# ]
+#
+# all_prompts2 = prompts_category_1 + prompts_category_2
 
 
 def launch_ui(demo_mode=False):
@@ -2030,6 +2173,8 @@ def launch_ui(demo_mode=False):
 
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
+                create_prompt_view_tab()
+                create_prompt_edit_tab()
 
             with gr.TabItem("Local LLM with Llamafile"):
                 create_llamafile_settings_tab()
