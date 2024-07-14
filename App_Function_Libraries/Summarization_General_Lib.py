@@ -1052,7 +1052,7 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
         logging.error("Connection error while summarizing")
     except Exception as e:
         logging.error(f"Error summarizing with {api_name}: {str(e)}", exc_info=True)
-
+        return f"An error occurred during summarization: {str(e)}"
     return None
 
 def extract_text_from_input(input_data):
