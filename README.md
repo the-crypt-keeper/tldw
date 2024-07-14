@@ -9,7 +9,7 @@
 ----------
 
 ### Table of Contents
-- [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#whatbox) | [Helpful Terms and Things to Know](#helpful) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits)
+- [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#whatbox) | [Helpful Terms and Things to Know](#helpful) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits) | [Roadmap Plans](#plans) | 
 
 ----------
 **GUI Screenshot**
@@ -75,7 +75,7 @@ For offline LLM usage, I recommend the following models(in no particular order p
 
 ----------
 
-### Quickstart
+### <a name="quickstart">Quickstart</a>
   1. Update your drivers. (I.e. CUDA for Nvidia GPUs, or AMD drivers (ROCM) for AMD GPUs )
      - Windows CUDA: https://developer.nvidia.com/cuda-downloads?target_os=Windows
   2. Install Python3 for your platform - https://www.python.org/downloads/
@@ -236,6 +236,8 @@ For offline LLM usage, I recommend the following models(in no particular order p
 
 ----------
 ### <a name="using"></a>Using tldw
+- Run the GUI and get access to all the features of the script(+ more) in a more user-friendly manner.
+  * `python summarize.py -gui`
 - Single file (remote URL) transcription
   * Single URL: `python summarize.py https://example.com/video.mp4`
 - Single file (local) transcription)
@@ -490,4 +492,46 @@ By default, videos, transcriptions and summaries are stored in a folder with the
 - [Mikupad](https://github.com/lmg-anon/mikupad) - Because I'm not going to write a whole new frontend for non-chat writing.
 - The people who have helped me get to this point, and especially for those not around to see it(DT & CC).
 
-### 
+------------
+
+### <a name="roadmap"></a>Roadmap / Future Features
+- This is a free-time project, so I'm not going to be able to work on it all the time, but I do have some ideas for where I'd like to take it.
+  - I view this as a personal tool I'll ideally continue to use for some time until something better/more suited to my needs comes along.
+  - Until then, I plan to continue working on this project and improving as much as possible.
+  - If I can't get a "Young Lady's Illustrated Primer" in the immediate, I'll just have to hack together some poor imitation of one....
+- **Planned Features**
+  - Firstly, you can check all planned features on the issues page: https://github.com/rmusser01/tldw/issues
+  - Anything I come up with or hear about will either just be dropped in, or an issue will be created and then implemented.
+  - With that out of the way, I plan to add the following in the future in no particular order:
+    - RAG - Retrieval-Augmented Generation support. Do not want to use any existing libraries. Would prefer to do it all from scratch. 
+      - I plan to spend a few days diving deep and making it my sole focus and coming up with a more solid plan after that.
+    - More API support - I want to add support for more APIs, and I want to make it easier to select between private/Public endpoints in the UI
+    - Completely new UI - I want to make the UI more user-friendly and more intuitive. 
+      - Gradio is great as PoC, but I think I've shown that this has value and is worth the continued effort.
+    - Allow for drag and drop of video files into the UI for processing.
+    - Add support for 'streaming' answers, so it feels more 'real-time'
+    - Add TTS/STT support for the UI so you can ask questions directly to the model or have it speak out the results to you.
+      - Having something like this would be pretty fucking cool I think: https://github.com/smellslikeml/dolla_llama/tree/main (Need to look more into nemesis by specterops)
+    - Add some neat writing tools, since why not have some fun?
+      - https://github.com/the-crypt-keeper/the-muse 
+      - https://github.com/the-crypt-keeper/LLooM 
+      - https://github.com/lmg-anon/mikupad 
+      - https://github.com/datacrystals/AIStoryWriter
+    - Evaluations for Summarization process
+      - Setup eval for user-ran testing
+      - Do some prompt engineering
+    - Evaluations for whisper transcription accuracy
+      - Identify accuracy of used models.
+      - Set it up so users can test against their own datasets
+    - Offline diarization of speakers - Code is in, but there was some issue that was a headache so I said screw it.
+      - Should work if you give it an HF api key in the code though...
+    - PyInstaller for Windows/MacOS/Linux
+      - At some point. I'd like this to be installable/usable by non-technical individuals and it's current setup kind of prevents that.
+- **Next items of focus**
+  - Add UI option to upload video for transcription/summarization
+  - Bugfixes for stability and file handling(Making sure files are removed when they should be)
+  - Add support for more APIs
+  - Add functionality to select a custom prompt from the prompts database
+  - Add more prompts to the prompts database
+  - Fix prompt display under the 'Search / Detailed View'
+  - Poetry for package management and stop the package headaches
