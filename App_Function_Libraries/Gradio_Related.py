@@ -152,10 +152,7 @@ prompts_category_2 = [
 all_prompts = prompts_category_1 + prompts_category_2
 
 
-# Search function
-def search_prompts(query):
-    filtered_prompts = [prompt for prompt in all_prompts if query.lower() in prompt.lower()]
-    return "\n".join(filtered_prompts)
+
 
 
 # Handle prompt selection
@@ -367,6 +364,7 @@ def display_search_results(query):
                 result_md += "Error: Unexpected result format.\n\n---\n"
         return result_md
     return "No results found."
+
 
 def search_media_database(query: str) -> List[Tuple[int, str, str]]:
     return browse_items(query, 'Title')
@@ -1436,7 +1434,7 @@ def load_prompt_details(selected_prompt):
     if selected_prompt:
         details = fetch_prompt_details(selected_prompt)
         if details:
-            return details[0], details[1], details[2], details[3] if len(details) > 3 else ""
+            return details[0], details[1], details[2], details[3]
     return "", "", "", ""
 
 
@@ -1459,7 +1457,7 @@ def search_prompts(query):
     try:
         conn = sqlite3.connect('prompts.db')
         cursor = conn.cursor()
-        cursor.execute("SELECT name, details FROM Prompts WHERE name LIKE ? OR details LIKE ?",
+        cursor.execute("SELECT name, details, system, user FROM Prompts WHERE name LIKE ? OR details LIKE ?",
                        (f"%{query}%", f"%{query}%"))
         results = cursor.fetchall()
         conn.close()
@@ -1495,18 +1493,47 @@ def create_search_tab():
                     outputs=[prompt_summary_output, content_output]
                 )
 def create_prompt_view_tab():
+    def display_search_results(query):
+        if not query.strip():
+            return "Please enter a search query."
+
+        results = search_prompts(query)
+
+        print(f"Processed search results for query '{query}': {results}")
+
+        if results:
+            result_md = "## Search Results:\n"
+            for result in results:
+                print(f"Result item: {result}")
+
+                if len(result) == 4:
+                    name, details, system, user = result
+                    result_md += f"**Title:** {name}\n\n"
+                    result_md += f"**Description:** {details}\n\n"
+                    result_md += f"**System Prompt:** {system}\n\n"
+                    result_md += f"**User Prompt:** {user}\n\n"
+                    result_md += "---\n"
+                else:
+                    result_md += "Error: Unexpected result format.\n\n---\n"
+            return result_md
+        return "No results found."
     with gr.TabItem("Search Prompts"):
         with gr.Row():
             with gr.Column():
+                gr.Markdown("# Search and View Prompt Details")
+                gr.Markdown("Currently has all of the https://github.com/danielmiessler/fabric prompts already available)")
                 search_query_input = gr.Textbox(label="Search Prompts", placeholder="Enter your search query...")
                 search_button = gr.Button("Search Prompts")
             with gr.Column():
                 search_results_output = gr.Markdown()
+                prompt_details_output = gr.HTML()
         search_button.click(
             fn=display_search_results,
             inputs=[search_query_input],
             outputs=[search_results_output]
         )
+
+
 
 def create_prompt_edit_tab():
     with gr.TabItem("Edit Prompts"):
@@ -1517,7 +1544,6 @@ def create_prompt_edit_tab():
                     choices=[],
                     interactive=True
                 )
-                prompt_details_output = gr.HTML()
                 prompt_list_button = gr.Button("List Prompts")
 
             with gr.Column():
@@ -1529,12 +1555,6 @@ def create_prompt_edit_tab():
                 add_prompt_output = gr.HTML()
 
         # Event handlers
-        prompt_dropdown.change(
-            fn=display_prompt_details,
-            inputs=prompt_dropdown,
-            outputs=prompt_details_output
-        )
-
         prompt_list_button.click(
             fn=update_prompt_dropdown,
             outputs=prompt_dropdown
