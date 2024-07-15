@@ -782,7 +782,7 @@ def fetch_prompt_details(name):
     conn = sqlite3.connect('prompts.db')
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT details, system, user
+        SELECT name, details, system, user
         FROM Prompts
         WHERE name = ?
     ''', (name,))
