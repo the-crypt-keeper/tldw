@@ -1521,7 +1521,7 @@ def create_prompt_view_tab():
         with gr.Row():
             with gr.Column():
                 gr.Markdown("# Search and View Prompt Details")
-                gr.Markdown("Currently has all of the https://github.com/danielmiessler/fabric prompts already available)")
+                gr.Markdown("Currently has all of the https://github.com/danielmiessler/fabric prompts already available")
                 search_query_input = gr.Textbox(label="Search Prompts", placeholder="Enter your search query...")
                 search_button = gr.Button("Search Prompts")
             with gr.Column():
