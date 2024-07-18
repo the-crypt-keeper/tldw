@@ -2154,12 +2154,8 @@ def create_utilities_tab():
 # all_prompts2 = prompts_category_1 + prompts_category_2
 
 
-def launch_ui(demo_mode=False):
-    if demo_mode == False:
-        share_public = False
-    else:
-        share_public = True
-
+def launch_ui(share_public=None, server_mode=False):
+    share=share_public
     css = """
     .result-box {
         margin-bottom: 20px;
@@ -2221,7 +2217,7 @@ def launch_ui(demo_mode=False):
 
     # Launch the interface
     server_port_variable = 7860
-    if share_public is not None and share_public:
+    if share==True:
         iface.launch(share=True)
     elif server_mode and not share_public:
         iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
