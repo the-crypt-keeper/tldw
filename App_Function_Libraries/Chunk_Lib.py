@@ -71,6 +71,8 @@ def improved_chunking_process(text: str, chunk_options: Dict[str, Any]) -> List[
             chunks = chunk_text_by_paragraphs(text, max_chunk_size, overlap)
         elif chunk_method == 'tokens':
             chunks = chunk_text_by_tokens(text, max_chunk_size, overlap)
+        elif chunk_method == 'chapters':
+            return chunk_ebook_by_chapters(text, chunk_options)
         else:
             chunks = [text]  # No chunking applied
 
@@ -159,14 +161,19 @@ def post_process_chunks(chunks: List[str]) -> List[str]:
     return [chunk.strip() for chunk in chunks if chunk.strip()]
 
 
-def get_chunk_metadata(chunk: str, full_text: str) -> Dict[str, Any]:
+def get_chunk_metadata(chunk: str, full_text: str, chunk_type: str = "generic", chapter_number: Optional[int] = None, chapter_pattern: Optional[str] = None) -> Dict[str, Any]:
     start_index = full_text.index(chunk)
-    return {
+    metadata = {
         'start_index': start_index,
         'end_index': start_index + len(chunk),
         'word_count': len(chunk.split()),
-        'char_count': len(chunk)
+        'char_count': len(chunk),
+        'chunk_type': chunk_type
     }
+    if chunk_type == "chapter":
+        metadata['chapter_number'] = chapter_number
+        metadata['chapter_pattern'] = chapter_pattern
+    return metadata
 
 
 # Hybrid approach, chunk each sentence while ensuring total token size does not exceed a maximum number
@@ -463,5 +470,111 @@ def rolling_summarize(text: str,
     final_summary = '\n\n'.join(accumulated_summaries)
     return final_summary
 
+#
+#
+#######################################################################################################################
+#
+# Ebook Chapter Chunking
 
 
+def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:
+    max_chunk_size = chunk_options.get('max_size', 300)
+    overlap = chunk_options.get('overlap', 0)
+    custom_pattern = chunk_options.get('custom_chapter_pattern', None)
+
+    # List of chapter heading patterns to try, in order
+    chapter_patterns = [
+        custom_pattern,
+        r'^#{1,2}\s+',  # Markdown style: '# ' or '## '
+        r'^Chapter\s+\d+',  # 'Chapter ' followed by numbers
+        r'^\d+\.\s+',  # Numbered chapters: '1. ', '2. ', etc.
+        r'^[A-Z\s]+$'  # All caps headings
+    ]
+
+    chapter_positions = []
+    used_pattern = None
+
+    for pattern in chapter_patterns:
+        if pattern is None:
+            continue
+        chapter_regex = re.compile(pattern, re.MULTILINE | re.IGNORECASE)
+        chapter_positions = [match.start() for match in chapter_regex.finditer(text)]
+        if chapter_positions:
+            used_pattern = pattern
+            break
+
+    # If no chapters found, return the entire content as one chunk
+    if not chapter_positions:
+        return [{'text': text, 'metadata': get_chunk_metadata(text, text, chunk_type="whole_document")}]
+
+    # Split content into chapters
+    chunks = []
+    for i in range(len(chapter_positions)):
+        start = chapter_positions[i]
+        end = chapter_positions[i + 1] if i + 1 < len(chapter_positions) else None
+        chapter = text[start:end]
+
+        # Apply overlap if specified
+        if overlap > 0 and i > 0:
+            overlap_start = max(0, start - overlap)
+            chapter = text[overlap_start:end]
+
+        chunks.append(chapter)
+
+    # Post-process chunks
+    processed_chunks = post_process_chunks(chunks)
+
+    # Add metadata to chunks
+    return [{'text': chunk, 'metadata': get_chunk_metadata(chunk, text, chunk_type="chapter", chapter_number=i + 1,
+                                                           chapter_pattern=used_pattern)}
+            for i, chunk in enumerate(processed_chunks)]
+
+
+# # Example usage
+# if __name__ == "__main__":
+#     sample_ebook_content = """
+# # Chapter 1: Introduction
+#
+# This is the introduction.
+#
+# ## Section 1.1
+#
+# Some content here.
+#
+# # Chapter 2: Main Content
+#
+# This is the main content.
+#
+# ## Section 2.1
+#
+# More content here.
+#
+# CHAPTER THREE
+#
+# This is the third chapter.
+#
+# 4. Fourth Chapter
+#
+# This is the fourth chapter.
+# """
+#
+#     chunk_options = {
+#         'method': 'chapters',
+#         'max_size': 500,
+#         'overlap': 50,
+#         'custom_chapter_pattern': r'^CHAPTER\s+[A-Z]+'  # Custom pattern for 'CHAPTER THREE' style
+#     }
+#
+#     chunked_chapters = improved_chunking_process(sample_ebook_content, chunk_options)
+#
+#     for i, chunk in enumerate(chunked_chapters, 1):
+#         print(f"Chunk {i}:")
+#         print(chunk['text'])
+#         print(f"Metadata: {chunk['metadata']}\n")
+
+
+
+
+#
+# End of Chunking Library
+#######################################################################################################################
