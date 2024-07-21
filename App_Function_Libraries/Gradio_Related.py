@@ -2563,52 +2563,60 @@ def grammar_style_check(input_text, custom_prompt, api_name, api_key):
 def create_document_editing_tab():
     with gr.Group():
         with gr.Tab("Grammar and Style Check"):
-            with gr.Column():
-                input_text = gr.Textbox(label="Input Text")
-                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=3, visible=False)
-                custom_prompt_checkbox.change(
-                    fn=lambda x: gr.update(visible=x),
-                    inputs=[custom_prompt_checkbox],
-                    outputs=[custom_prompt_input]
-                )
-                api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                    value=None,
-                    label="API for Grammar Check"
-                )
-                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
-                                               type="password")
-            with gr.Column():
-                output_text = gr.Textbox(label="Grammar and Style Suggestions", lines=10)
-                check_grammar_button = gr.Button("Check Grammar and Style")
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("# Grammar and Style Check")
+                    gr.Markdown("This utility checks the grammar and style of the provided text by feeding it to an LLM and returning suggestions for improvement.")
+                    input_text = gr.Textbox(label="Input Text", lines=10)
+                    custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=5, visible=False)
+                    custom_prompt_checkbox.change(
+                        fn=lambda x: gr.update(visible=x),
+                        inputs=[custom_prompt_checkbox],
+                        outputs=[custom_prompt_input]
+                    )
+                    api_name_input = gr.Dropdown(
+                        choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                        value=None,
+                        label="API for Grammar Check"
+                    )
+                    api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                                                   type="password")
+                    check_grammar_button = gr.Button("Check Grammar and Style")
 
-            check_grammar_button.click(
-                fn=grammar_style_check,
-                inputs=[input_text, custom_prompt_input, api_name_input, api_key_input],
-                outputs=output_text
-            )
+                with gr.Column():
+                    gr.Markdown("# Resulting Suggestions")
+                    gr.Markdown("(Keep in mind the API used can affect the quality of the suggestions)")
 
-        with gr.Tab("Tone Analyzer & Editor"):
-            with gr.Column():
-                input_text = gr.Textbox(label="Input Text")
-                concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
-                casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
-                adjust_btn = gr.Button("Adjust Tone")
+                    output_text = gr.Textbox(label="Grammar and Style Suggestions", lines=15)
 
-            with gr.Column():
-                output_text = gr.Textbox(label="Adjusted Text")
-
-                adjust_btn.click(
-                    adjust_tone,
-                    inputs=[input_text, concise_slider, casual_slider],
+                check_grammar_button.click(
+                    fn=grammar_style_check,
+                    inputs=[input_text, custom_prompt_input, api_name_input, api_key_input],
                     outputs=output_text
                 )
 
+        with gr.Tab("Tone Analyzer & Editor"):
+            with gr.Row():
+                with gr.Column():
+                    input_text = gr.Textbox(label="Input Text", lines=10)
+                    concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
+                    casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
+                    adjust_btn = gr.Button("Adjust Tone")
+
+                with gr.Column():
+                    output_text = gr.Textbox(label="Adjusted Text", lines=15)
+
+                    adjust_btn.click(
+                        adjust_tone,
+                        inputs=[input_text, concise_slider, casual_slider],
+                        outputs=output_text
+                    )
+
 
         with gr.Tab("Creative Writing Assistant"):
-            gr.Markdown("# Grammar Check Utility to be added...")
+            gr.Markdown("# Utility to be added...")
 
         with gr.Tab("Mikupad"):
             gr.Markdown("I Wish. Gradio won't embed it successfully...")
