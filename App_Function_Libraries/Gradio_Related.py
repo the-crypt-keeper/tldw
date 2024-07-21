@@ -15,17 +15,22 @@
 #########################################
 #
 # Built-In Imports
+import math
+import re
 import shutil
 import tempfile
-from datetime import datetime
+import zipfile
+from datetime import datetime, time
 import json
 import logging
 import os.path
 from pathlib import Path
 import sqlite3
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import traceback
 from functools import wraps
+
+import pypandoc
 #
 # Import 3rd-Party Libraries
 import yt_dlp
@@ -34,7 +39,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast
-from App_Function_Libraries.Chunk_Lib import improved_chunking_process, get_chat_completion
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 from App_Function_Libraries.PDF_Ingestion_Lib import process_and_cleanup_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
@@ -45,7 +50,7 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     perform_transcription, summarize_chunk
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
-    export_keywords_to_csv, export_to_file, add_media_to_database, insert_prompt_to_db
+    export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -494,6 +499,7 @@ def create_video_transcription_tab():
                 url_input = gr.Textbox(label="URL(s) (Mandatory)",
                                        placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, and playlists.",
                                        lines=5)
+                video_file_input = gr.File(label="Upload Video File (Optional)", file_types=["video/*"])
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
                 custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
@@ -554,7 +560,7 @@ def create_video_transcription_tab():
                                                    label="Chunking Method")
                         max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
                         chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
-                        use_adaptive_chunking = gr.Checkbox(label="Use Adaptive Chunking")
+                        use_adaptive_chunking = gr.Checkbox(label="Use Adaptive Chunking (Adjust chunking based on text complexity)")
                         use_multi_level_chunking = gr.Checkbox(label="Use Multi-level Chunking")
                         chunk_language = gr.Dropdown(choices=['english', 'french', 'german', 'spanish'],
                                                      label="Chunking Language")
@@ -575,7 +581,7 @@ def create_video_transcription_tab():
                 download_summary = gr.File(label="Download All Summaries as Text")
 
             @error_handler
-            def process_videos_with_error_handling(urls, start_time, end_time, diarize, whisper_model,
+            def process_videos_with_error_handling(inputs, start_time, end_time, diarize, whisper_model,
                                                    custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                                                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                                    use_multi_level_chunking, chunk_language, api_name,
@@ -584,12 +590,12 @@ def create_video_transcription_tab():
                                                    progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
                     logging.info("Entering process_videos_with_error_handling")
-                    logging.info(f"Received URLs: {urls}")
+                    logging.info(f"Received inputs: {inputs}")
 
-                    if not urls:
-                        raise ValueError("No URLs provided")
+                    if not inputs:
+                        raise ValueError("No inputs provided")
 
-                    logging.debug("Input URL(s) is(are) valid")
+                    logging.debug("Input(s) is(are) valid")
 
                     # Ensure batch_size is an integer
                     try:
@@ -597,30 +603,60 @@ def create_video_transcription_tab():
                     except (ValueError, TypeError):
                         batch_size = 1  # Default to processing one video at a time if invalid
 
-                    expanded_urls = parse_and_expand_urls(urls)
-                    logging.info(f"Expanded URLs: {expanded_urls}")
+                    # Separate URLs and local files
+                    urls = [input for input in inputs if
+                            isinstance(input, str) and input.startswith(('http://', 'https://'))]
+                    local_files = [input for input in inputs if
+                                   isinstance(input, str) and not input.startswith(('http://', 'https://'))]
 
-                    total_videos = len(expanded_urls)
-                    logging.info(f"Total videos to process: {total_videos}")
+                    expanded_urls = parse_and_expand_urls(urls) if urls else []
+
+                    valid_local_files = []
+                    invalid_local_files = []
+
+                    for file_path in local_files:
+                        if os.path.exists(file_path):
+                            valid_local_files.append(file_path)
+                        else:
+                            invalid_local_files.append(file_path)
+                            error_message = f"Local file not found: {file_path}"
+                            logging.error(error_message)
+
+                    if invalid_local_files:
+                        logging.warning(f"Found {len(invalid_local_files)} invalid local file paths")
+                        # FIXME - Add more complete error handling for invalid local files
+
+                    all_inputs = expanded_urls + valid_local_files
+                    logging.info(f"Total valid inputs to process: {len(all_inputs)} "
+                                 f"({len(expanded_urls)} URLs, {len(valid_local_files)} local files)")
+
+                    all_inputs = expanded_urls + local_files
+                    logging.info(f"Total inputs to process: {len(all_inputs)}")
                     results = []
                     errors = []
                     results_html = ""
                     all_transcriptions = {}
                     all_summaries = ""
 
-                    for i in range(0, total_videos, batch_size):
-                        batch = expanded_urls[i:i + batch_size]
+                    for i in range(0, len(all_inputs), batch_size):
+                        batch = all_inputs[i:i + batch_size]
                         batch_results = []
 
-                        for url in batch:
+                        for input_item in batch:
                             try:
                                 start_seconds = convert_to_seconds(start_time)
                                 end_seconds = convert_to_seconds(end_time) if end_time else None
 
-                                logging.info(f"Attempting to extract metadata for {url}")
-                                video_metadata = extract_metadata(url, use_cookies, cookies)
-                                if not video_metadata:
-                                    raise ValueError(f"Failed to extract metadata for {url}")
+                                logging.info(f"Attempting to extract metadata for {input_item}")
+
+                                if input_item.startswith(('http://', 'https://')):
+                                    logging.info(f"Attempting to extract metadata for URL: {input_item}")
+                                    video_metadata = extract_metadata(input_item, use_cookies, cookies)
+                                    if not video_metadata:
+                                        raise ValueError(f"Failed to extract metadata for {input_item}")
+                                else:
+                                    logging.info(f"Processing local file: {input_item}")
+                                    video_metadata = {"title": os.path.basename(input_item), "url": input_item}
 
                                 chunk_options = {
                                     'method': chunk_method,
@@ -631,8 +667,9 @@ def create_video_transcription_tab():
                                     'language': chunk_language
                                 } if chunking_options_checkbox else None
 
+                                logging.debug("Gradio_Related.py: process_url_with_metadata being called")
                                 result = process_url_with_metadata(
-                                    url, 2, whisper_model,
+                                    input_item, 2, whisper_model,
                                     custom_prompt if custom_prompt_checkbox else None,
                                     start_seconds, api_name, api_key,
                                     False, False, False, False, 0.01, None, keywords, None, diarize,
@@ -644,32 +681,38 @@ def create_video_transcription_tab():
                                     keep_original_video=keep_original_video
                                 )
 
-                                if result[0] is None:  # Check if the first return value is None
+                                if result[0] is None:
                                     error_message = "Processing failed without specific error"
-                                    batch_results.append((url, error_message, "Error", video_metadata, None, None))
-                                    errors.append(f"Error processing {url}: {error_message}")
+                                    batch_results.append(
+                                        (input_item, error_message, "Error", video_metadata, None, None))
+                                    errors.append(f"Error processing {input_item}: {error_message}")
                                 else:
                                     url, transcription, summary, json_file, summary_file, result_metadata = result
                                     if transcription is None:
-                                        error_message = f"Processing failed for {url}: Transcription is None"
-                                        batch_results.append((url, error_message, "Error", result_metadata, None, None))
+                                        error_message = f"Processing failed for {input_item}: Transcription is None"
+                                        batch_results.append(
+                                            (input_item, error_message, "Error", result_metadata, None, None))
                                         errors.append(error_message)
                                     else:
                                         batch_results.append(
-                                            (url, transcription, "Success", result_metadata, json_file, summary_file))
+                                            (input_item, transcription, "Success", result_metadata, json_file,
+                                             summary_file))
+
 
                             except Exception as e:
-                                error_message = f"Error processing {url}: {str(e)}"
+                                error_message = f"Error processing {input_item}: {str(e)}"
                                 logging.error(error_message, exc_info=True)
-                                batch_results.append((url, error_message, "Error", {}, None, None))
+                                batch_results.append((input_item, error_message, "Error", {}, None, None))
                                 errors.append(error_message)
 
                         results.extend(batch_results)
+                        logging.debug(f"Processed {len(batch_results)} videos in batch")
                         if isinstance(progress, gr.Progress):
-                            progress((i + len(batch)) / total_videos,
-                                     f"Processed {i + len(batch)}/{total_videos} videos")
+                            progress((i + len(batch)) / len(all_inputs),
+                                     f"Processed {i + len(batch)}/{len(all_inputs)} videos")
 
                     # Generate HTML for results
+                    logging.debug(f"Generating HTML for {len(results)} results")
                     for url, transcription, status, metadata, json_file, summary_file in results:
                         if status == "Success":
                             title = metadata.get('title', 'Unknown Title')
@@ -716,6 +759,7 @@ def create_video_transcription_tab():
                             """
 
                     # Save all transcriptions and summaries to files
+                    logging.debug("Saving all transcriptions and summaries to files")
                     with open('all_transcriptions.json', 'w') as f:
                         json.dump(all_transcriptions, f, indent=2)
 
@@ -724,8 +768,9 @@ def create_video_transcription_tab():
 
                     error_summary = "\n".join(errors) if errors else "No errors occurred."
 
+                    total_inputs = len(all_inputs)
                     return (
-                        f"Processed {total_videos} videos. {len(errors)} errors occurred.",
+                        f"Processed {total_inputs} videos. {len(errors)} errors occurred.",
                         error_summary,
                         results_html,
                         'all_transcriptions.json',
@@ -741,7 +786,7 @@ def create_video_transcription_tab():
                         None
                     )
 
-            def process_videos_wrapper(urls, start_time, end_time, diarize, whisper_model,
+            def process_videos_wrapper(url_input, video_file, start_time, end_time, diarize, whisper_model,
                                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                        use_multi_level_chunking, chunk_language, summarize_recursively, api_name,
@@ -749,8 +794,19 @@ def create_video_transcription_tab():
                                        timestamp_option, keep_original_video):
                 try:
                     logging.info("process_videos_wrapper called")
+
+                    # Handle both URL input and file upload
+                    inputs = []
+                    if url_input:
+                        inputs.extend([url.strip() for url in url_input.split('\n') if url.strip()])
+                    if video_file is not None:
+                        inputs.append(video_file.name)  # Assuming video_file is a file object with a 'name' attribute
+
+                    if not inputs:
+                        raise ValueError("No input provided. Please enter URLs or upload a video file.")
+
                     result = process_videos_with_error_handling(
-                        urls, start_time, end_time, diarize, whisper_model,
+                        inputs, start_time, end_time, diarize, whisper_model,
                         custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                         chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                         use_multi_level_chunking, chunk_language, api_name,
@@ -778,14 +834,14 @@ def create_video_transcription_tab():
 
             # FIXME - remove dead args for process_url_with_metadata
             @error_handler
-            def process_url_with_metadata(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key,
+            def process_url_with_metadata(input_item, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key,
                                           vad_filter, download_video_flag, download_audio, rolling_summarization,
                                           detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
                                           include_timestamps=True, metadata=None, use_chunking=False,
                                           chunk_options=None, keep_original_video=False):
 
                 try:
-                    logging.info(f"Starting process_url_metadata for URL: {url}")
+                    logging.info(f"Starting process_url_metadata for URL: {input_item}")
                     # Create download path
                     download_path = create_download_directory("Video_Downloads")
                     logging.info(f"Download path created at: {download_path}")
@@ -794,12 +850,12 @@ def create_video_transcription_tab():
                     info_dict = {}
 
                     # Handle URL or local file
-                    if local_file_path:
-                        video_file_path = local_file_path
+                    if os.path.isfile(input_item):
+                        video_file_path = input_item
                         # Extract basic info from local file
                         info_dict = {
-                            'webpage_url': local_file_path,
-                            'title': os.path.basename(local_file_path),
+                            'webpage_url': input_item,
+                            'title': os.path.basename(input_item),
                             'description': "Local file",
                             'channel_url': None,
                             'duration': None,
@@ -811,7 +867,7 @@ def create_video_transcription_tab():
                         # Extract video information
                         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                             try:
-                                full_info = ydl.extract_info(url, download=False)
+                                full_info = ydl.extract_info(input_item, download=False)
 
                                 # Create a safe subset of info to log
                                 safe_info = {
@@ -822,7 +878,7 @@ def create_video_transcription_tab():
                                     'view_count': full_info.get('view_count', 'Unknown view count')
                                 }
 
-                                logging.debug(f"Full info extracted for {url}: {safe_info}")
+                                logging.debug(f"Full info extracted for {input_item}: {safe_info}")
                             except Exception as e:
                                 logging.error(f"Error extracting video info: {str(e)}")
                                 return None, None, None, None, None, None
@@ -830,7 +886,7 @@ def create_video_transcription_tab():
                         # Filter the required metadata
                         if full_info:
                             info_dict = {
-                                'webpage_url': full_info.get('webpage_url', url),
+                                'webpage_url': full_info.get('webpage_url', input_item),
                                 'title': full_info.get('title'),
                                 'description': full_info.get('description'),
                                 'channel_url': full_info.get('channel_url'),
@@ -846,9 +902,9 @@ def create_video_transcription_tab():
 
                         # Download video/audio
                         logging.info("Downloading video/audio...")
-                        video_file_path = download_video(url, download_path, full_info, download_video_flag)
+                        video_file_path = download_video(input_item, download_path, full_info, download_video_flag)
                         if not video_file_path:
-                            logging.error(f"Failed to download video/audio from {url}")
+                            logging.error(f"Failed to download video/audio from {input_item}")
                             return None, None, None, None, None, None
 
                     logging.info(f"Processing file: {video_file_path}")
@@ -856,7 +912,7 @@ def create_video_transcription_tab():
                     # Perform transcription
                     logging.info("Starting transcription...")
                     audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
-                                                                      vad_filter)
+                                                                      vad_filter, diarize)
 
                     if audio_file_path is None or segments is None:
                         logging.error("Transcription failed or segments not available.")
@@ -964,7 +1020,7 @@ def create_video_transcription_tab():
             process_button.click(
                 fn=process_videos_wrapper,
                 inputs=[
-                    url_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
+                    url_input, video_file_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
                     custom_prompt_checkbox, custom_prompt_input, chunking_options_checkbox,
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                     use_multi_level_chunking, chunk_language, summarize_recursively, api_name_input, api_key_input,
@@ -1229,7 +1285,7 @@ def create_resummary_tab():
 
         chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)
         with gr.Row(visible=False) as chunking_options_box:
-            chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens'],
+            chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens', 'chapters'],
                                        label="Chunking Method", value='words')
             max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
             chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
@@ -1889,6 +1945,89 @@ def create_media_edit_tab():
 #
 # Import Items Tab Functions
 
+def scan_obsidian_vault(vault_path):
+    markdown_files = []
+    for root, dirs, files in os.walk(vault_path):
+        for file in files:
+            if file.endswith('.md'):
+                markdown_files.append(os.path.join(root, file))
+    return markdown_files
+
+
+def parse_obsidian_note(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        content = file.read()
+
+    frontmatter = {}
+    frontmatter_match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
+    if frontmatter_match:
+        frontmatter_text = frontmatter_match.group(1)
+        import yaml
+        frontmatter = yaml.safe_load(frontmatter_text)
+        content = content[frontmatter_match.end():]
+
+    tags = re.findall(r'#(\w+)', content)
+    links = re.findall(r'\[\[(.*?)\]\]', content)
+
+    return {
+        'title': os.path.basename(file_path).replace('.md', ''),
+        'content': content,
+        'frontmatter': frontmatter,
+        'tags': tags,
+        'links': links,
+        'file_path': file_path  # Add this line
+    }
+
+
+def import_obsidian_vault(vault_path, progress=gr.Progress()):
+    try:
+        markdown_files = scan_obsidian_vault(vault_path)
+        total_files = len(markdown_files)
+        imported_files = 0
+        errors = []
+
+        for i, file_path in enumerate(markdown_files):
+            try:
+                note_data = parse_obsidian_note(file_path)
+                success, error_msg = import_obsidian_note_to_db(note_data)
+                if success:
+                    imported_files += 1
+                else:
+                    errors.append(error_msg)
+            except Exception as e:
+                error_msg = f"Error processing {file_path}: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+
+            progress((i + 1) / total_files, f"Imported {imported_files} of {total_files} files")
+            time.sleep(0.1)  # Small delay to prevent UI freezing
+
+        return imported_files, total_files, errors
+    except Exception as e:
+        error_msg = f"Error scanning vault: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        return 0, 0, [error_msg]
+
+
+def process_obsidian_zip(zip_file):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+
+            imported_files, total_files, errors = import_obsidian_vault(temp_dir)
+
+            return imported_files, total_files, errors
+        except zipfile.BadZipFile:
+            error_msg = "The uploaded file is not a valid zip file."
+            logger.error(error_msg)
+            return 0, 0, [error_msg]
+        except Exception as e:
+            error_msg = f"Error processing zip file: {str(e)}\n{traceback.format_exc()}"
+            logger.error(error_msg)
+            return 0, 0, [error_msg]
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 def import_data(file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
     if file is None:
@@ -1957,7 +2096,7 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
 
 
 def create_import_item_tab():
-    with gr.TabItem("Import Items"):
+    with gr.TabItem("Import Markdown/Text Files"):
         gr.Markdown("# Import a markdown file or text file into the database")
         gr.Markdown("...and have it tagged + summarized")
         with gr.Row():
@@ -1992,6 +2131,102 @@ def create_import_item_tab():
             outputs=import_output
         )
 
+def create_import_obsidian_vault_tab():
+    with gr.TabItem("Import Obsidian Vault"):
+        gr.Markdown("## Import Obsidian Vault")
+        with gr.Row():
+            vault_path_input = gr.Textbox(label="Obsidian Vault Path (Local)")
+            vault_zip_input = gr.File(label="Upload Obsidian Vault (Zip)")
+        import_vault_button = gr.Button("Import Obsidian Vault")
+        import_status = gr.Textbox(label="Import Status", interactive=False)
+
+
+    def import_vault(vault_path, vault_zip):
+        if vault_zip:
+            imported, total, errors = process_obsidian_zip(vault_zip.name)
+        elif vault_path:
+            imported, total, errors = import_obsidian_vault(vault_path)
+        else:
+            return "Please provide either a local vault path or upload a zip file."
+
+        status = f"Imported {imported} out of {total} files.\n"
+        if errors:
+            status += f"Encountered {len(errors)} errors:\n" + "\n".join(errors)
+        return status
+
+
+    import_vault_button.click(
+        fn=import_vault,
+        inputs=[vault_path_input, vault_zip_input],
+        outputs=[import_status],
+        show_progress=True
+    )
+
+
+# Using pypandoc to convert EPUB to Markdown
+def create_import_book_tab():
+    with gr.TabItem("Import .epub/ebook Files"):
+        gr.Markdown("# Import an .epub file into the database using pypandoc")
+        gr.Markdown("...and have it tagged + summarized")
+        gr.Markdown(
+            "Check out https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/ for info on removing DRM from your ebooks")
+        with gr.Row():
+            import_file = gr.File(label="Upload file for import", file_types=[".epub"])
+        with gr.Row():
+            title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+            author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+        with gr.Row():
+            keywords_input = gr.Textbox(label="Keywords(like genre or publish year)",
+                                        placeholder="Enter keywords, comma-separated")
+            custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                             placeholder="Enter a custom prompt for summarization (optional)")
+        with gr.Row():
+            summary_input = gr.Textbox(label="Summary",
+                                       placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
+        with gr.Row():
+            auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
+            api_name_input = gr.Dropdown(
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                label="API for Auto-summarization"
+            )
+            api_key_input = gr.Textbox(label="API Key", type="password")
+        with gr.Row():
+            import_button = gr.Button("Import Data")
+        with gr.Row():
+            import_output = gr.Textbox(label="Import Status")
+
+        def import_epub(epub_file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
+            try:
+                # Create a temporary directory to store the converted file
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    epub_path = epub_file.name
+                    md_path = os.path.join(temp_dir, "converted.md")
+
+                    # Use pypandoc to convert EPUB to Markdown
+                    output = pypandoc.convert_file(epub_path, 'md', outputfile=md_path)
+
+                    if output != "":
+                        return f"Error converting EPUB: {output}"
+
+                    # Read the converted markdown content
+                    with open(md_path, "r", encoding="utf-8") as md_file:
+                        content = md_file.read()
+
+                    # Now process the content as you would with a text file
+                    return import_data(content, title, author, keywords, custom_prompt,
+                                       summary, auto_summarize, api_name, api_key)
+            except Exception as e:
+                return f"Error processing EPUB: {str(e)}"
+
+        import_button.click(
+            fn=import_epub,
+            inputs=[import_file, title_input, author_input, keywords_input, custom_prompt_input,
+                    summary_input, auto_summarize_checkbox, api_name_input, api_key_input],
+            outputs=import_output
+        )
+
+
 #
 # End of Import Items Tab Functions
 ################################################################################################################
@@ -1999,7 +2234,7 @@ def create_import_item_tab():
 # Export Items Tab Functions
 logger = logging.getLogger(__name__)
 
-def export_item_as_markdown(media_id: int) -> str:
+def export_item_as_markdown(media_id: int) -> Tuple[Optional[str], str]:
     try:
         content, prompt, summary = fetch_item_details(media_id)
         title = f"Item {media_id}"  # You might want to fetch the actual title
@@ -2010,10 +2245,11 @@ def export_item_as_markdown(media_id: int) -> str:
             f.write(markdown_content)
 
         logger.info(f"Successfully exported item {media_id} to {filename}")
-        return filename
+        return filename, f"Successfully exported item {media_id} to {filename}"
     except Exception as e:
-        logger.error(f"Error exporting item {media_id}: {str(e)}")
-        return None
+        error_message = f"Error exporting item {media_id}: {str(e)}"
+        logger.error(error_message)
+        return None, error_message
 
 
 def export_items_by_keyword(keyword: str) -> str:
@@ -2054,48 +2290,83 @@ def export_items_by_keyword(keyword: str) -> str:
         return None
 
 
-def export_selected_items(selected_items: List[Dict]) -> str:
+def export_selected_items(selected_items: List[Dict]) -> Tuple[Optional[str], str]:
     try:
+        logger.debug(f"Received selected_items: {selected_items}")
         if not selected_items:
             logger.warning("No items selected for export")
-            return None
+            return None, "No items selected for export"
 
         markdown_content = "# Selected Items\n\n"
         for item in selected_items:
-            content, prompt, summary = fetch_item_details(item['id'])
-            markdown_content += f"## {item['title']}\n\n### Prompt\n{prompt}\n\n### Summary\n{summary}\n\n### Content\n{content}\n\n---\n\n"
+            logger.debug(f"Processing item: {item}")
+            try:
+                # Check if 'value' is a string (JSON) or already a dictionary
+                if isinstance(item, str):
+                    item_data = json.loads(item)
+                elif isinstance(item, dict) and 'value' in item:
+                    item_data = item['value'] if isinstance(item['value'], dict) else json.loads(item['value'])
+                else:
+                    item_data = item
+
+                logger.debug(f"Item data after processing: {item_data}")
+
+                if 'id' not in item_data:
+                    logger.error(f"'id' not found in item data: {item_data}")
+                    continue
+
+                content, prompt, summary = fetch_item_details(item_data['id'])
+                markdown_content += f"## {item_data.get('title', f'Item {item_data['id']}')}\n\n### Prompt\n{prompt}\n\n### Summary\n{summary}\n\n### Content\n{content}\n\n---\n\n"
+            except Exception as e:
+                logger.error(f"Error processing item {item}: {str(e)}")
+                markdown_content += f"## Error\n\nUnable to process this item.\n\n---\n\n"
 
         filename = "export_selected_items.md"
         with open(filename, "w", encoding='utf-8') as f:
             f.write(markdown_content)
 
         logger.info(f"Successfully exported {len(selected_items)} selected items to {filename}")
-        return filename
+        return filename, f"Successfully exported {len(selected_items)} items to {filename}"
     except Exception as e:
-        logger.error(f"Error exporting selected items: {str(e)}")
-        return None
+        error_message = f"Error exporting selected items: {str(e)}"
+        logger.error(error_message)
+        return None, error_message
 
 
-def display_search_results_export_tab(search_query: str, search_type: str):
-    logger.info(f"Searching with query: '{search_query}', type: '{search_type}'")
+def display_search_results_export_tab(search_query: str, search_type: str, page: int = 1, items_per_page: int = 10):
+    logger.info(f"Searching with query: '{search_query}', type: '{search_type}', page: {page}")
     try:
         results = browse_items(search_query, search_type)
         logger.info(f"browse_items returned {len(results)} results")
 
         if not results:
-            return [], f"No results found for query: '{search_query}'"
+            return [], f"No results found for query: '{search_query}'", 1, 1
 
-        checkbox_data = [{"name": f"{item['title']} ({item['url']})", "value": item} for item in results]
-        logger.info(f"Returning {len(checkbox_data)} items for checkbox")
-        return checkbox_data, f"Found {len(checkbox_data)} results"
+        total_pages = math.ceil(len(results) / items_per_page)
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+        paginated_results = results[start_index:end_index]
+
+        checkbox_data = [
+            {
+                "name": f"Name: {item[1]}\nURL: {item[2]}",
+                "value": {"id": item[0], "title": item[1], "url": item[2]}
+            }
+            for item in paginated_results
+        ]
+
+        logger.info(f"Returning {len(checkbox_data)} items for checkbox (page {page} of {total_pages})")
+        return checkbox_data, f"Found {len(results)} results (showing page {page} of {total_pages})", page, total_pages
+
     except DatabaseError as e:
         error_message = f"Error in display_search_results_export_tab: {str(e)}"
         logger.error(error_message)
-        return [], error_message
+        return [], error_message, 1, 1
     except Exception as e:
         error_message = f"Unexpected error in display_search_results_export_tab: {str(e)}"
         logger.error(error_message)
-        return [], error_message
+        return [], error_message, 1, 1
+
 
 def create_export_tab():
     with gr.Tab("Search and Export"):
@@ -2103,43 +2374,109 @@ def create_export_tab():
         search_type = gr.Radio(["Title", "URL", "Keyword", "Content"], label="Search By")
         search_button = gr.Button("Search")
 
-        search_results = gr.CheckboxGroup(label="Search Results")
+        with gr.Row():
+            prev_button = gr.Button("Previous Page")
+            next_button = gr.Button("Next Page")
+
+        current_page = gr.State(1)
+        total_pages = gr.State(1)
+
+        search_results = gr.CheckboxGroup(label="Search Results", choices=[])
         export_selected_button = gr.Button("Export Selected Items")
 
         keyword_input = gr.Textbox(label="Enter keyword for export")
         export_by_keyword_button = gr.Button("Export items by keyword")
 
         export_output = gr.File(label="Download Exported File")
-
         error_output = gr.Textbox(label="Status/Error Messages", interactive=False)
 
+    def search_and_update(query, search_type, page):
+        results, message, current, total = display_search_results_export_tab(query, search_type, page)
+        logger.debug(f"search_and_update results: {results}")
+        return results, message, current, total, gr.update(choices=results)
+
     search_button.click(
-        fn=display_search_results_export_tab,
-        inputs=[search_query, search_type],
-        outputs=[search_results, error_output]
+        fn=search_and_update,
+        inputs=[search_query, search_type, current_page],
+        outputs=[search_results, error_output, current_page, total_pages, search_results],
+        show_progress=True
     )
 
+
+    def update_page(current, total, direction):
+        new_page = max(1, min(total, current + direction))
+        return new_page
+
+    prev_button.click(
+        fn=update_page,
+        inputs=[current_page, total_pages, gr.State(-1)],
+        outputs=[current_page]
+    ).then(
+        fn=search_and_update,
+        inputs=[search_query, search_type, current_page],
+        outputs=[search_results, error_output, current_page, total_pages],
+        show_progress=True
+    )
+
+    next_button.click(
+        fn=update_page,
+        inputs=[current_page, total_pages, gr.State(1)],
+        outputs=[current_page]
+    ).then(
+        fn=search_and_update,
+        inputs=[search_query, search_type, current_page],
+        outputs=[search_results, error_output, current_page, total_pages],
+        show_progress=True
+    )
+
+    def handle_export_selected(selected_items):
+        logger.debug(f"Exporting selected items: {selected_items}")
+        return export_selected_items(selected_items)
+
     export_selected_button.click(
-        fn=lambda selected: (export_selected_items(selected), "Exported selected items") if selected else (
-            None, "No items selected"),
+        fn=handle_export_selected,
         inputs=[search_results],
-        outputs=[export_output, error_output]
+        outputs=[export_output, error_output],
+        show_progress=True
     )
 
     export_by_keyword_button.click(
-        fn=lambda keyword: (
-            export_items_by_keyword(keyword), f"Exported items for keyword: {keyword}") if keyword else (
-            None, "No keyword provided"),
+        fn=export_items_by_keyword,
         inputs=[keyword_input],
-        outputs=[export_output, error_output]
+        outputs=[export_output, error_output],
+        show_progress=True
     )
 
-    # Add functionality to export individual items
+    def handle_item_selection(selected_items):
+        logger.debug(f"Selected items: {selected_items}")
+        if not selected_items:
+            return None, "No item selected"
+
+        try:
+            # Assuming selected_items is a list of dictionaries
+            selected_item = selected_items[0]
+            logger.debug(f"First selected item: {selected_item}")
+
+            # Check if 'value' is a string (JSON) or already a dictionary
+            if isinstance(selected_item['value'], str):
+                item_data = json.loads(selected_item['value'])
+            else:
+                item_data = selected_item['value']
+
+            logger.debug(f"Item data: {item_data}")
+
+            item_id = item_data['id']
+            return export_item_as_markdown(item_id)
+        except Exception as e:
+            error_message = f"Error processing selected item: {str(e)}"
+            logger.error(error_message)
+            return None, error_message
+
     search_results.select(
-        fn=lambda item: (export_item_as_markdown(item['id']), f"Exported item: {item['title']}") if item else (
-            None, "No item selected"),
-        inputs=[gr.State(lambda: search_results.value)],
-        outputs=[export_output, error_output]
+        fn=handle_item_selection,
+        inputs=[search_results],
+        outputs=[export_output, error_output],
+        show_progress=True
     )
 
 
@@ -2194,6 +2531,101 @@ def create_delete_keyword_tab():
 # End of Keyword Management Tab Functions
 ################################################################################################################
 #
+# Document Editing Tab Functions
+
+
+def adjust_tone(text, concise, casual, api_name, api_key):
+    tones = [
+        {"tone": "concise", "weight": concise},
+        {"tone": "casual", "weight": casual},
+        {"tone": "professional", "weight": 1 - casual},
+        {"tone": "expanded", "weight": 1 - concise}
+    ]
+    tones = sorted(tones, key=lambda x: x['weight'], reverse=True)[:2]
+
+    tone_prompt = " and ".join([f"{t['tone']} (weight: {t['weight']:.2f})" for t in tones])
+
+    prompt = f"Rewrite the following text to match these tones: {tone_prompt}. Text: {text}"
+    # Performing tone adjustment request...
+    adjusted_text = perform_summarization(api_name, text, prompt, api_key)
+
+    return adjusted_text
+
+
+def grammar_style_check(input_text, custom_prompt, api_name, api_key):
+    default_prompt = "Please analyze the following text for grammar and style. Offer suggestions for improvement and point out any misused words or incorrect spellings:\n\n"
+    full_prompt = custom_prompt if custom_prompt else default_prompt
+    full_text = full_prompt + input_text
+
+    return perform_summarization(api_name, full_text, custom_prompt, api_key)
+
+
+def create_document_editing_tab():
+    with gr.Group():
+        with gr.Tab("Grammar and Style Check"):
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("# Grammar and Style Check")
+                    gr.Markdown("This utility checks the grammar and style of the provided text by feeding it to an LLM and returning suggestions for improvement.")
+                    input_text = gr.Textbox(label="Input Text", lines=10)
+                    custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=5, visible=False)
+                    custom_prompt_checkbox.change(
+                        fn=lambda x: gr.update(visible=x),
+                        inputs=[custom_prompt_checkbox],
+                        outputs=[custom_prompt_input]
+                    )
+                    api_name_input = gr.Dropdown(
+                        choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                        value=None,
+                        label="API for Grammar Check"
+                    )
+                    api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                                                   type="password")
+                    check_grammar_button = gr.Button("Check Grammar and Style")
+
+                with gr.Column():
+                    gr.Markdown("# Resulting Suggestions")
+                    gr.Markdown("(Keep in mind the API used can affect the quality of the suggestions)")
+
+                    output_text = gr.Textbox(label="Grammar and Style Suggestions", lines=15)
+
+                check_grammar_button.click(
+                    fn=grammar_style_check,
+                    inputs=[input_text, custom_prompt_input, api_name_input, api_key_input],
+                    outputs=output_text
+                )
+
+        with gr.Tab("Tone Analyzer & Editor"):
+            with gr.Row():
+                with gr.Column():
+                    input_text = gr.Textbox(label="Input Text", lines=10)
+                    concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
+                    casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
+                    adjust_btn = gr.Button("Adjust Tone")
+
+                with gr.Column():
+                    output_text = gr.Textbox(label="Adjusted Text", lines=15)
+
+                    adjust_btn.click(
+                        adjust_tone,
+                        inputs=[input_text, concise_slider, casual_slider],
+                        outputs=output_text
+                    )
+
+
+        with gr.Tab("Creative Writing Assistant"):
+            gr.Markdown("# Utility to be added...")
+
+        with gr.Tab("Mikupad"):
+            gr.Markdown("I Wish. Gradio won't embed it successfully...")
+
+
+#
+#
+################################################################################################################
+#
 # Utilities Tab Functions
 
 
@@ -2220,9 +2652,6 @@ def create_utilities_tab():
             output_file_audio = gr.File(label="Download Audio")
 
             # Implement the audio download functionality here
-
-        with gr.Tab("Grammar Checker"):
-            gr.Markdown("# Grammar Check Utility to be added...")
 
         with gr.Tab("YouTube Timestamp URL Generator"):
             gr.Markdown("## Generate YouTube URL with Timestamp")
@@ -2319,10 +2748,15 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Import/Export"):
                 create_import_item_tab()
+                create_import_obsidian_vault_tab()
                 create_export_tab()
+
+            with gr.TabItem("Document Editing"):
+                create_document_editing_tab()
 
             with gr.TabItem("Utilities"):
                 create_utilities_tab()
+
 
     # Launch the interface
     server_port_variable = 7860
