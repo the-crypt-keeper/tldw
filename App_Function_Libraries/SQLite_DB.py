@@ -428,10 +428,18 @@ def browse_items(search_query, search_type):
                 cursor.execute("SELECT id, title, url FROM Media WHERE title LIKE ?", (f'%{search_query}%',))
             elif search_type == 'URL':
                 cursor.execute("SELECT id, title, url FROM Media WHERE url LIKE ?", (f'%{search_query}%',))
+            elif search_type == 'Keyword':
+                return fetch_items_by_keyword(search_query)
+            elif search_type == 'Content':
+                cursor.execute("SELECT id, title, url FROM Media WHERE content LIKE ?", (f'%{search_query}%',))
+            else:
+                raise ValueError(f"Invalid search type: {search_type}")
+
             results = cursor.fetchall()
             return results
     except sqlite3.Error as e:
-        raise Exception(f"Error fetching items by {search_type}: {e}")
+        logger.error(f"Error fetching items by {search_type}: {e}")
+        raise DatabaseError(f"Error fetching items by {search_type}: {e}")
 
 
 # Function to fetch item details
