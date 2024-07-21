@@ -2552,44 +2552,70 @@ def adjust_tone(text, concise, casual, api_name, api_key):
     return adjusted_text
 
 
+def grammar_style_check(input_text, custom_prompt, api_name, api_key):
+    default_prompt = "Please analyze the following text for grammar and style. Offer suggestions for improvement and point out any misused words or incorrect spellings:\n\n"
+    full_prompt = custom_prompt if custom_prompt else default_prompt
+    full_text = full_prompt + input_text
+
+    return perform_summarization(api_name, full_text, custom_prompt, api_key)
+
 
 def create_document_editing_tab():
     with gr.Group():
         with gr.Tab("Grammar and Style Check"):
-            gr.Markdown(
-                "<h3>Youtube Video Downloader</h3><p>This Input takes a Youtube URL as input and creates a webm file for you to download. </br><em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
-            youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
-            download_button = gr.Button("Download Video")
-            output_file = gr.File(label="Download Video")
+            with gr.Column():
+                with gr.Row():
+                    input_text = gr.Textbox(label="Input Text")
+                    custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=3, visible=False)
+                    custom_prompt_checkbox.change(
+                        fn=lambda x: gr.update(visible=x),
+                        inputs=[custom_prompt_checkbox],
+                        outputs=[custom_prompt_input]
+                    )
+                    api_name_input = gr.Dropdown(
+                        choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                        value=None,
+                        label="API for Grammar Check"
+                    )
+                    api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                                               type="password")
+            with gr.Column():
+                with gr.Row():
+                    output_text = gr.Textbox(label="Grammar and Style Suggestions", lines=10)
+                check_grammar_button = gr.Button("Check Grammar and Style")
 
-            download_button.click(
-                fn=gradio_download_youtube_video,
-                inputs=youtube_url_input,
-                outputs=output_file
+            check_grammar_button.click(
+                fn=grammar_style_check,
+                inputs=[input_text, custom_prompt_input, api_name_input, api_key_input],
+                outputs=output_text
             )
 
         with gr.Tab("Tone Analyzer & Editor"):
-            with gr.Row():
-                input_text = gr.Textbox(label="Input Text")
-                concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
-                casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
-                adjust_btn = gr.Button("Adjust Tone")
+            with gr.Column():
+                with gr.Row():
+                    input_text = gr.Textbox(label="Input Text")
+                    concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
+                    casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
+                    adjust_btn = gr.Button("Adjust Tone")
 
-            with gr.Row():
-                output_text = gr.Textbox(label="Adjusted Text")
+            with gr.Column():
+                with gr.Row():
+                    output_text = gr.Textbox(label="Adjusted Text")
 
-            adjust_btn.click(
-                adjust_tone,
-                inputs=[input_text, concise_slider, casual_slider],
-                outputs=output_text
-            )
+                adjust_btn.click(
+                    adjust_tone,
+                    inputs=[input_text, concise_slider, casual_slider],
+                    outputs=output_text
+                )
+
 
         with gr.Tab("Creative Writing Assistant"):
             gr.Markdown("# Grammar Check Utility to be added...")
 
         with gr.Tab("Mikupad"):
             gr.Markdown("I Wish. Gradio won't embed it successfully...")
-
 
 
 #
