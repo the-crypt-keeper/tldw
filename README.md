@@ -64,13 +64,13 @@ For offline LLM usage, I recommend the following models(in no particular order p
      * https://huggingface.co/THUDM/glm-4-9b-chat-1m/blob/main/README_en.md / GGUF: 
   3. Microsoft Phi-3-mini-4k-Instruct
      * https://huggingface.co/microsoft/Phi-3-mini-4k-instruct / GGUF: https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
-     * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-mini-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3.1-mini-128k-instruct-GGUF
+     * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-mini-128k-instruct / Abliterated GGUF: https://huggingface.co/failspy/Phi-3-mini-128k-instruct-abliterated-v3-GGUF
   4. Cohere Command-R+
      * https://huggingface.co/cohere-ai/Command-R-plus / GGUF: https://huggingface.co/XelotX/c4ai-command-r-plus-XelotX-XelotX-iQuants
   5. Cohere Command-R (non-plus version)
      * https://huggingface.co/CohereForAI/c4ai-command-r-v01 / GGUF: https://huggingface.co/dranger003/c4ai-command-r-v01-iMat.GGUF
   6. Phi-3-Medium-4k-Instruct
-     * https://huggingface.co/microsoft/Phi-3-medium-4k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-4k-instruct-GGUF
+     * https://huggingface.co/microsoft/Phi-3-medium-4k-instruct / Abliterated GGUF:https://huggingface.co/failspy/Phi-3-medium-4k-instruct-abliterated-v3
        * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-medium-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-128k-instruct-GGUF
   6. Hermes-2-Theta-Llama-3-8B
      * https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B / GGUF: https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B-GGUF
@@ -154,11 +154,11 @@ For offline LLM usage, I recommend the following models(in no particular order p
     - As such, I would say you want at least 8GB of free space on your system to devote to the app.
     - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
 - **Linux**
-    1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg / dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
+    1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg` or `dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
     2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`
-    5. Create a virtual env: `python -m venv ./`
+    5. Create a virtual env: `sudo python3 -m venv ./`
     6. Launch/activate your virtual environment: `source ./bin/activate`
     7. Setup the necessary python packages:
        * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
@@ -173,7 +173,7 @@ For offline LLM usage, I recommend the following models(in no particular order p
     2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`
-    5. Create a virtual env: `python -m venv ./`
+    5. Create a virtual env: `python3 -m venv ./`
     6. Launch/activate your virtual env: PowerShell: `. .\scripts\activate.ps1` or for CMD: `.\scripts\activate.bat`
     7. Setup the necessary python packages:
        - Cuda
@@ -186,26 +186,16 @@ For offline LLM usage, I recommend the following models(in no particular order p
     8. See `Linux && Windows`
 - **Linux && Windows**
     1. `pip install -r requirements.txt` - may take a bit of time...
-    2. **Script Usage:**
-       - Put your API keys and settings in the `config.txt` file.
-         - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
-       - (make sure your in the python venv - Run `./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
-       - Run `python ./summarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
-       - You'll then be asked if you'd like to run the transcription through GPU(1) or CPU(2).
-         - Next, the video will be downloaded to the local directory by ytdl.
-         - Then the video will be transcribed by faster_whisper. (You can see this in the console output)
-           * The resulting transcription output will be stored as both a json file with timestamps, as well as a txt file with no timestamps.
-       - Finally, you can have the transcription summarized through feeding it into an LLM of your choice.
-    3. **GUI Usage:**
-       - Put your API keys and settings in the `config.txt` file.
-         - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
-       - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
-       - Run `python ./summarize.py -gui` - This will launch a webapp that will allow you to interact with the script in a more user-friendly manner.
-         * You can pass in the API keys for the LLMs you want to use in the `config.txt` file, or pass them in when you use the GUI.
-         * You can also download the generated transcript and summary as text files from the UI.
-         * You can also download the video/audio as files from the UI. (WIP - doesn't currently work)
-         * You can also access the SQLite DB that backs the app, with search, tagging, and export functionality.
-    4. **Local LLM with the Script Usage:**
+    2. **GUI Usage:**
+         - Put your API keys and settings in the `config.txt` file.
+           - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
+         - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+         - Run `python ./summarize.py -gui` - This will launch a webapp that will allow you to interact with the script in a more user-friendly manner.
+           * You can pass in the API keys for the LLMs you want to use in the `config.txt` file, or pass them in when you use the GUI.
+           * You can also download the generated transcript and summary as text files from the UI.
+           * You can also download the video/audio as files from the UI. (WIP - doesn't currently work)
+           * You can also access the SQLite DB that backs the app, with search, tagging, and export functionality.
+    3. **Local LLM with the Script Usage:**
        - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
        - I recognize some people may like the functionality and idea of it all, but don't necessarily know/want to know about LLMs/getting them working, so you can also have the script download and run a local model, using system RAM and llamafile/llama.cpp.
        - Simply pass `--local_llm` to the script (`python summarize.py --local-llm`), and it'll ask you if you want to download a model, and which one you'd like to download.

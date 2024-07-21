@@ -768,10 +768,6 @@ Sample commands:
     set_chunk_txt_by_tokens = False
     set_max_txt_chunk_tokens = 0
 
-    if args.share_public or args.share:
-        share_public = args.share_public
-    else:
-        share_public = None
     if args.server_mode:
         server_mode = args.server_mode
     else:
