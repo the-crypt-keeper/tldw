@@ -2484,6 +2484,71 @@ def create_delete_keyword_tab():
 # End of Keyword Management Tab Functions
 ################################################################################################################
 #
+# Document Editing Tab Functions
+
+
+def adjust_tone(text, concise, casual, api_name, api_key):
+    tones = [
+        {"tone": "concise", "weight": concise},
+        {"tone": "casual", "weight": casual},
+        {"tone": "professional", "weight": 1 - casual},
+        {"tone": "expanded", "weight": 1 - concise}
+    ]
+    tones = sorted(tones, key=lambda x: x['weight'], reverse=True)[:2]
+
+    tone_prompt = " and ".join([f"{t['tone']} (weight: {t['weight']:.2f})" for t in tones])
+
+    prompt = f"Rewrite the following text to match these tones: {tone_prompt}. Text: {text}"
+    # Performing tone adjustment request...
+    adjusted_text = perform_summarization(api_name, text, prompt, api_key)
+
+    return adjusted_text
+
+
+
+def create_document_editing_tab():
+    with gr.Group():
+        with gr.Tab("Grammar and Style Check"):
+            gr.Markdown(
+                "<h3>Youtube Video Downloader</h3><p>This Input takes a Youtube URL as input and creates a webm file for you to download. </br><em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
+            youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
+            download_button = gr.Button("Download Video")
+            output_file = gr.File(label="Download Video")
+
+            download_button.click(
+                fn=gradio_download_youtube_video,
+                inputs=youtube_url_input,
+                outputs=output_file
+            )
+
+        with gr.Tab("Tone Analyzer & Editor"):
+            with gr.Row():
+                input_text = gr.Textbox(label="Input Text")
+                concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
+                casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
+                adjust_btn = gr.Button("Adjust Tone")
+
+            with gr.Row():
+                output_text = gr.Textbox(label="Adjusted Text")
+
+            adjust_btn.click(
+                adjust_tone,
+                inputs=[input_text, concise_slider, casual_slider],
+                outputs=output_text
+            )
+
+        with gr.Tab("Creative Writing Assistant"):
+            gr.Markdown("# Grammar Check Utility to be added...")
+
+        with gr.Tab("Mikupad"):
+            gr.Markdown("I Wish. Gradio won't embed it successfully...")
+
+
+
+#
+#
+################################################################################################################
+#
 # Utilities Tab Functions
 
 
@@ -2614,6 +2679,9 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Utilities"):
                 create_utilities_tab()
+
+            with gr.TabItem("Document Editing"):
+                create_document_editing_tab()
 
     # Launch the interface
     server_port_variable = 7860
