@@ -2564,26 +2564,24 @@ def create_document_editing_tab():
     with gr.Group():
         with gr.Tab("Grammar and Style Check"):
             with gr.Column():
-                with gr.Row():
-                    input_text = gr.Textbox(label="Input Text")
-                    custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
-                    custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=3, visible=False)
-                    custom_prompt_checkbox.change(
-                        fn=lambda x: gr.update(visible=x),
-                        inputs=[custom_prompt_checkbox],
-                        outputs=[custom_prompt_input]
-                    )
-                    api_name_input = gr.Dropdown(
-                        choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                        value=None,
-                        label="API for Grammar Check"
-                    )
-                    api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                input_text = gr.Textbox(label="Input Text")
+                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
+                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=3, visible=False)
+                custom_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[custom_prompt_checkbox],
+                    outputs=[custom_prompt_input]
+                )
+                api_name_input = gr.Dropdown(
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                    value=None,
+                    label="API for Grammar Check"
+                )
+                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
                                                type="password")
             with gr.Column():
-                with gr.Row():
-                    output_text = gr.Textbox(label="Grammar and Style Suggestions", lines=10)
+                output_text = gr.Textbox(label="Grammar and Style Suggestions", lines=10)
                 check_grammar_button = gr.Button("Check Grammar and Style")
 
             check_grammar_button.click(
@@ -2594,15 +2592,13 @@ def create_document_editing_tab():
 
         with gr.Tab("Tone Analyzer & Editor"):
             with gr.Column():
-                with gr.Row():
-                    input_text = gr.Textbox(label="Input Text")
-                    concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
-                    casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
-                    adjust_btn = gr.Button("Adjust Tone")
+                input_text = gr.Textbox(label="Input Text")
+                concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
+                casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
+                adjust_btn = gr.Button("Adjust Tone")
 
             with gr.Column():
-                with gr.Row():
-                    output_text = gr.Textbox(label="Adjusted Text")
+                output_text = gr.Textbox(label="Adjusted Text")
 
                 adjust_btn.click(
                     adjust_tone,
