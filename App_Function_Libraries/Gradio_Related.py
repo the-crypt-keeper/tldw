@@ -15,6 +15,8 @@
 #########################################
 #
 # Built-In Imports
+import shutil
+import tempfile
 from datetime import datetime
 import json
 import logging
@@ -340,31 +342,6 @@ def display_prompt_details(selected_prompt):
             user_str = f"<h4>User:</h4><p>{details[2]}</p>" if details[2] else ""
             return details_str + system_str + user_str
     return "No details available."
-
-
-def display_search_results(query):
-    if not query.strip():
-        return "Please enter a search query."
-
-    results = search_prompts(query)
-
-    # Debugging: Print the results to the console to see what is being returned
-    print(f"Processed search results for query '{query}': {results}")
-
-    if results:
-        result_md = "## Search Results:\n"
-        for result in results:
-            # Debugging: Print each result to see its format
-            print(f"Result item: {result}")
-
-            if len(result) == 2:
-                name, details = result
-                result_md += f"**Title:** {name}\n\n**Description:** {details}\n\n---\n"
-            else:
-                result_md += "Error: Unexpected result format.\n\n---\n"
-        return result_md
-    return "No results found."
-
 
 def search_media_database(query: str) -> List[Tuple[int, str, str]]:
     return browse_items(query, 'Title')
@@ -1409,7 +1386,7 @@ def resummary_content(selected_item, item_mapping, api_name, api_key, chunking_o
 
 # End of Re-Summarization Functions
 #
-##############################################################################################################
+############################################################################################################################################################################################################################
 #
 # Search Tab
 
@@ -1492,31 +1469,41 @@ def create_search_tab():
                     inputs=[items_output, item_mapping],
                     outputs=[prompt_summary_output, content_output]
                 )
+
+
+def display_search_results(query):
+    if not query.strip():
+        return "Please enter a search query."
+
+    results = search_prompts(query)
+
+    # Debugging: Print the results to the console to see what is being returned
+    print(f"Processed search results for query '{query}': {results}")
+
+    if results:
+        result_md = "## Search Results:\n"
+        for result in results:
+            # Debugging: Print each result to see its format
+            print(f"Result item: {result}")
+
+            if len(result) == 2:
+                name, details = result
+                result_md += f"**Title:** {name}\n\n**Description:** {details}\n\n---\n"
+
+            elif len(result) == 4:
+                name, details, system, user = result
+                result_md += f"**Title:** {name}\n\n"
+                result_md += f"**Description:** {details}\n\n"
+                result_md += f"**System Prompt:** {system}\n\n"
+                result_md += f"**User Prompt:** {user}\n\n"
+                result_md += "---\n"
+            else:
+                result_md += "Error: Unexpected result format.\n\n---\n"
+        return result_md
+    return "No results found."
+
+
 def create_prompt_view_tab():
-    def display_search_results(query):
-        if not query.strip():
-            return "Please enter a search query."
-
-        results = search_prompts(query)
-
-        print(f"Processed search results for query '{query}': {results}")
-
-        if results:
-            result_md = "## Search Results:\n"
-            for result in results:
-                print(f"Result item: {result}")
-
-                if len(result) == 4:
-                    name, details, system, user = result
-                    result_md += f"**Title:** {name}\n\n"
-                    result_md += f"**Description:** {details}\n\n"
-                    result_md += f"**System Prompt:** {system}\n\n"
-                    result_md += f"**User Prompt:** {user}\n\n"
-                    result_md += "---\n"
-                else:
-                    result_md += "Error: Unexpected result format.\n\n---\n"
-            return result_md
-        return "No results found."
     with gr.TabItem("Search Prompts"):
         with gr.Row():
             with gr.Column():
@@ -1532,7 +1519,6 @@ def create_prompt_view_tab():
             inputs=[search_query_input],
             outputs=[search_results_output]
         )
-
 
 
 def create_prompt_edit_tab():
@@ -1576,7 +1562,7 @@ def create_prompt_edit_tab():
 
 # End of Search Tab Functions
 #
-################################################################################################################
+##############################################################################################################################################################################################################################
 #
 # Llamafile Tab
 
@@ -1677,7 +1663,7 @@ def create_llamafile_advanced_inputs():
 
 #
 # End of Llamafile Tab Functions
-################################################################################################################
+##############################################################################################################################################################################################################################
 #
 # Chat Interface Tab Functions
 
@@ -1849,7 +1835,7 @@ def create_chat_interface():
 
 #
 # End of Chat Interface Tab Functions
-################################################################################################################
+################################################################################################################################################################################################################################
 #
 # Media Edit Tab Functions
 
@@ -2011,28 +1997,151 @@ def create_import_item_tab():
 ################################################################################################################
 #
 # Export Items Tab Functions
+logger = logging.getLogger(__name__)
 
+def export_item_as_markdown(media_id: int) -> str:
+    try:
+        content, prompt, summary = fetch_item_details(media_id)
+        title = f"Item {media_id}"  # You might want to fetch the actual title
+        markdown_content = f"# {title}\n\n## Prompt\n{prompt}\n\n## Summary\n{summary}\n\n## Content\n{content}"
+
+        filename = f"export_item_{media_id}.md"
+        with open(filename, "w", encoding='utf-8') as f:
+            f.write(markdown_content)
+
+        logger.info(f"Successfully exported item {media_id} to {filename}")
+        return filename
+    except Exception as e:
+        logger.error(f"Error exporting item {media_id}: {str(e)}")
+        return None
+
+
+def export_items_by_keyword(keyword: str) -> str:
+    try:
+        items = fetch_items_by_keyword(keyword)
+        if not items:
+            logger.warning(f"No items found for keyword: {keyword}")
+            return None
+
+        # Create a temporary directory to store individual markdown files
+        with tempfile.TemporaryDirectory() as temp_dir:
+            folder_name = f"export_keyword_{keyword}"
+            export_folder = os.path.join(temp_dir, folder_name)
+            os.makedirs(export_folder)
+
+            for item in items:
+                content, prompt, summary = fetch_item_details(item['id'])
+                markdown_content = f"# {item['title']}\n\n## Prompt\n{prompt}\n\n## Summary\n{summary}\n\n## Content\n{content}"
+
+                # Create individual markdown file for each item
+                file_name = f"{item['id']}_{item['title'][:50]}.md"  # Limit filename length
+                file_path = os.path.join(export_folder, file_name)
+                with open(file_path, "w", encoding='utf-8') as f:
+                    f.write(markdown_content)
+
+            # Create a zip file containing all markdown files
+            zip_filename = f"{folder_name}.zip"
+            shutil.make_archive(os.path.join(temp_dir, folder_name), 'zip', export_folder)
+
+            # Move the zip file to a location accessible by Gradio
+            final_zip_path = os.path.join(os.getcwd(), zip_filename)
+            shutil.move(os.path.join(temp_dir, zip_filename), final_zip_path)
+
+        logger.info(f"Successfully exported {len(items)} items for keyword '{keyword}' to {zip_filename}")
+        return final_zip_path
+    except Exception as e:
+        logger.error(f"Error exporting items for keyword '{keyword}': {str(e)}")
+        return None
+
+
+def export_selected_items(selected_items: List[Dict]) -> str:
+    try:
+        if not selected_items:
+            logger.warning("No items selected for export")
+            return None
+
+        markdown_content = "# Selected Items\n\n"
+        for item in selected_items:
+            content, prompt, summary = fetch_item_details(item['id'])
+            markdown_content += f"## {item['title']}\n\n### Prompt\n{prompt}\n\n### Summary\n{summary}\n\n### Content\n{content}\n\n---\n\n"
+
+        filename = "export_selected_items.md"
+        with open(filename, "w", encoding='utf-8') as f:
+            f.write(markdown_content)
+
+        logger.info(f"Successfully exported {len(selected_items)} selected items to {filename}")
+        return filename
+    except Exception as e:
+        logger.error(f"Error exporting selected items: {str(e)}")
+        return None
+
+
+def display_search_results_export_tab(search_query: str, search_type: str):
+    logger.info(f"Searching with query: '{search_query}', type: '{search_type}'")
+    try:
+        results = browse_items(search_query, search_type)
+        logger.info(f"browse_items returned {len(results)} results")
+
+        if not results:
+            return [], f"No results found for query: '{search_query}'"
+
+        checkbox_data = [{"name": f"{item['title']} ({item['url']})", "value": item} for item in results]
+        logger.info(f"Returning {len(checkbox_data)} items for checkbox")
+        return checkbox_data, f"Found {len(checkbox_data)} results"
+    except DatabaseError as e:
+        error_message = f"Error in display_search_results_export_tab: {str(e)}"
+        logger.error(error_message)
+        return [], error_message
+    except Exception as e:
+        error_message = f"Unexpected error in display_search_results_export_tab: {str(e)}"
+        logger.error(error_message)
+        return [], error_message
 
 def create_export_tab():
-    with gr.Tab("Export"):
-        with gr.Tab("Export Search Results"):
-            search_query = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-            search_fields = gr.CheckboxGroup(label="Search Fields", choices=["Title", "Content"], value=["Title"])
-            keyword_input = gr.Textbox(
-                label="Keyword (Match ALL, can use multiple keywords, separated by ',' (comma) )",
-                placeholder="Enter keywords here...")
-            page_input = gr.Number(label="Page", value=1, precision=0)
-            results_per_file_input = gr.Number(label="Results per File", value=1000, precision=0)
-            export_format = gr.Radio(label="Export Format", choices=["csv", "markdown"], value="csv")
-            export_search_button = gr.Button("Export Search Results")
-            export_search_output = gr.File(label="Download Exported Keywords")
-            export_search_status = gr.Textbox(label="Export Status")
+    with gr.Tab("Search and Export"):
+        search_query = gr.Textbox(label="Search Query")
+        search_type = gr.Radio(["Title", "URL", "Keyword", "Content"], label="Search By")
+        search_button = gr.Button("Search")
 
-            export_search_button.click(
-                fn=export_to_file,
-                inputs=[search_query, search_fields, keyword_input, page_input, results_per_file_input, export_format],
-                outputs=[export_search_status, export_search_output]
-            )
+        search_results = gr.CheckboxGroup(label="Search Results")
+        export_selected_button = gr.Button("Export Selected Items")
+
+        keyword_input = gr.Textbox(label="Enter keyword for export")
+        export_by_keyword_button = gr.Button("Export items by keyword")
+
+        export_output = gr.File(label="Download Exported File")
+
+        error_output = gr.Textbox(label="Status/Error Messages", interactive=False)
+
+    search_button.click(
+        fn=display_search_results_export_tab,
+        inputs=[search_query, search_type],
+        outputs=[search_results, error_output]
+    )
+
+    export_selected_button.click(
+        fn=lambda selected: (export_selected_items(selected), "Exported selected items") if selected else (
+            None, "No items selected"),
+        inputs=[search_results],
+        outputs=[export_output, error_output]
+    )
+
+    export_by_keyword_button.click(
+        fn=lambda keyword: (
+            export_items_by_keyword(keyword), f"Exported items for keyword: {keyword}") if keyword else (
+            None, "No keyword provided"),
+        inputs=[keyword_input],
+        outputs=[export_output, error_output]
+    )
+
+    # Add functionality to export individual items
+    search_results.select(
+        fn=lambda item: (export_item_as_markdown(item['id']), f"Exported item: {item['title']}") if item else (
+            None, "No item selected"),
+        inputs=[gr.State(lambda: search_results.value)],
+        outputs=[export_output, error_output]
+    )
+
 
 #
 # End of Export Items Tab Functions
@@ -2154,12 +2263,8 @@ def create_utilities_tab():
 # all_prompts2 = prompts_category_1 + prompts_category_2
 
 
-def launch_ui(demo_mode=False):
-    if demo_mode == False:
-        share_public = False
-    else:
-        share_public = True
-
+def launch_ui(share_public=None, server_mode=False):
+    share=share_public
     css = """
     .result-box {
         margin-bottom: 20px;
@@ -2221,7 +2326,7 @@ def launch_ui(demo_mode=False):
 
     # Launch the interface
     server_port_variable = 7860
-    if share_public is not None and share_public:
+    if share==True:
         iface.launch(share=True)
     elif server_mode and not share_public:
         iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
