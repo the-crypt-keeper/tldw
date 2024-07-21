@@ -91,6 +91,7 @@ For offline LLM usage, I recommend the following models(in no particular order p
        * Or AMD (Windows): `pip install torch-directml`
        * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu` (Last updated 6/2024)
      - `pip install -r requirements.txt` - may take a bit of time...
+       - Also be sure to change `cuda` to `cpu` in `config.txt`
   5. **You are Ready to Go!** Check out the below sample commands: 
 
 - **Run it as a WebApp**
@@ -164,6 +165,7 @@ For offline LLM usage, I recommend the following models(in no particular order p
        * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
        * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
        * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+         * Also be sure to change `cuda` to `cpu` in `config.txt`
        * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
     8. Then see `Linux && Windows`
 - **MacOS**
@@ -181,6 +183,7 @@ For offline LLM usage, I recommend the following models(in no particular order p
            * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
        - CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
            * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
+           * Also be sure to change `cuda` to `cpu` in `config.txt`
        - AMD
          * `pip install torch-directml`
     8. See `Linux && Windows`
@@ -453,7 +456,7 @@ By default, videos, transcriptions and summaries are stored in a folder with the
     1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
     2. Next, it uses [ffmpeg](https://github.com/FFmpeg/FFmpeg) to convert the resulting `.m4a` file to `.wav`
     3. Then it uses [faster_whisper](https://github.com/SYSTRAN/faster-whisper) to transcribe the `.wav` file to `.txt`
-    4. After that, it uses [pyannote](https://github.com/pyannote/pyannote-audio) to perform 'diarorization'
+    4. After that, it uses [pyannote](https://github.com/pyannote/pyannote-audio) to perform 'diarization'
     5. Finally, it'll send the resulting txt to an LLM endpoint of your choice for summarization of the text.
   - `chunker.py` - break text into parts and prepare each part for LLM summarization
   - `roller-*.py` - rolling summarization
