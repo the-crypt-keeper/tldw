@@ -2653,9 +2653,6 @@ def create_utilities_tab():
 
             # Implement the audio download functionality here
 
-        with gr.Tab("Grammar Checker"):
-            gr.Markdown("# Grammar Check Utility to be added...")
-
         with gr.Tab("YouTube Timestamp URL Generator"):
             gr.Markdown("## Generate YouTube URL with Timestamp")
             with gr.Row():
@@ -2754,11 +2751,12 @@ def launch_ui(share_public=None, server_mode=False):
                 create_import_obsidian_vault_tab()
                 create_export_tab()
 
+            with gr.TabItem("Document Editing"):
+                create_document_editing_tab()
+
             with gr.TabItem("Utilities"):
                 create_utilities_tab()
 
-            with gr.TabItem("Document Editing"):
-                create_document_editing_tab()
 
     # Launch the interface
     server_port_variable = 7860
