@@ -29,6 +29,8 @@ import sqlite3
 from typing import Dict, List, Tuple, Optional
 import traceback
 from functools import wraps
+
+import pypandoc
 #
 # Import 3rd-Party Libraries
 import yt_dlp
@@ -2047,7 +2049,7 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
 
 
 def create_import_item_tab():
-    with gr.TabItem("Import Items"):
+    with gr.TabItem("Import Markdown/Text Files"):
         gr.Markdown("# Import a markdown file or text file into the database")
         gr.Markdown("...and have it tagged + summarized")
         with gr.Row():
@@ -2112,6 +2114,71 @@ def create_import_obsidian_vault_tab():
         outputs=[import_status],
         show_progress=True
     )
+
+
+# Using pypandoc to convert EPUB to Markdown
+def create_import_book_tab():
+    with gr.TabItem("Import .epub/ebook Files"):
+        gr.Markdown("# Import an .epub file into the database using pypandoc")
+        gr.Markdown("...and have it tagged + summarized")
+        gr.Markdown(
+            "Check out https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/ for info on removing DRM from your ebooks")
+        with gr.Row():
+            import_file = gr.File(label="Upload file for import", file_types=[".epub"])
+        with gr.Row():
+            title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+            author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+        with gr.Row():
+            keywords_input = gr.Textbox(label="Keywords(like genre or publish year)",
+                                        placeholder="Enter keywords, comma-separated")
+            custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                             placeholder="Enter a custom prompt for summarization (optional)")
+        with gr.Row():
+            summary_input = gr.Textbox(label="Summary",
+                                       placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
+        with gr.Row():
+            auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
+            api_name_input = gr.Dropdown(
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                label="API for Auto-summarization"
+            )
+            api_key_input = gr.Textbox(label="API Key", type="password")
+        with gr.Row():
+            import_button = gr.Button("Import Data")
+        with gr.Row():
+            import_output = gr.Textbox(label="Import Status")
+
+        def import_epub(epub_file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
+            try:
+                # Create a temporary directory to store the converted file
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    epub_path = epub_file.name
+                    md_path = os.path.join(temp_dir, "converted.md")
+
+                    # Use pypandoc to convert EPUB to Markdown
+                    output = pypandoc.convert_file(epub_path, 'md', outputfile=md_path)
+
+                    if output != "":
+                        return f"Error converting EPUB: {output}"
+
+                    # Read the converted markdown content
+                    with open(md_path, "r", encoding="utf-8") as md_file:
+                        content = md_file.read()
+
+                    # Now process the content as you would with a text file
+                    return import_data(content, title, author, keywords, custom_prompt,
+                                       summary, auto_summarize, api_name, api_key)
+            except Exception as e:
+                return f"Error processing EPUB: {str(e)}"
+
+        import_button.click(
+            fn=import_epub,
+            inputs=[import_file, title_input, author_input, keywords_input, custom_prompt_input,
+                    summary_input, auto_summarize_checkbox, api_name_input, api_key_input],
+            outputs=import_output
+        )
+
 
 #
 # End of Import Items Tab Functions
