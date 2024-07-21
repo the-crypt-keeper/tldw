@@ -559,7 +559,7 @@ def create_video_transcription_tab():
                                                    label="Chunking Method")
                         max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
                         chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
-                        use_adaptive_chunking = gr.Checkbox(label="Use Adaptive Chunking")
+                        use_adaptive_chunking = gr.Checkbox(label="Use Adaptive Chunking (Adjust chunking based on text complexity)")
                         use_multi_level_chunking = gr.Checkbox(label="Use Multi-level Chunking")
                         chunk_language = gr.Dropdown(choices=['english', 'french', 'german', 'spanish'],
                                                      label="Chunking Language")
@@ -1238,7 +1238,7 @@ def create_resummary_tab():
 
         chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)
         with gr.Row(visible=False) as chunking_options_box:
-            chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens'],
+            chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens', 'chapters'],
                                        label="Chunking Method", value='words')
             max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
             chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
