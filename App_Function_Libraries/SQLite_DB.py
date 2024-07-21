@@ -51,12 +51,15 @@ import os
 import re
 import sqlite3
 import time
+import traceback
 from contextlib import contextmanager
 from datetime import datetime
 from typing import List, Tuple
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
+import yaml
+
 # Import Local Libraries
 #
 #######################################################################################################################
@@ -979,3 +982,71 @@ def convert_to_markdown(item):
     markdown += "## Content\n\n"
     markdown += f"{item['content']}\n\n"
     return markdown
+
+
+
+
+
+#######################################################################################################################
+#
+# Obsidian-related Functions
+
+def import_obsidian_note_to_db(note_data):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT id FROM Media WHERE title = ? AND type = 'obsidian_note'", (note_data['title'],))
+            existing_note = cursor.fetchone()
+
+            if existing_note:
+                media_id = existing_note[0]
+                cursor.execute("""
+                    UPDATE Media
+                    SET content = ?, author = ?, ingestion_date = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (note_data['content'], note_data['frontmatter'].get('author', 'Unknown'), media_id))
+
+                cursor.execute("DELETE FROM MediaKeywords WHERE media_id = ?", (media_id,))
+            else:
+                cursor.execute("""
+                    INSERT INTO Media (title, content, type, author, ingestion_date, url)
+                    VALUES (?, ?, 'obsidian_note', ?, CURRENT_TIMESTAMP, ?)
+                """, (note_data['title'], note_data['content'], note_data['frontmatter'].get('author', 'Unknown'),
+                      note_data['file_path']))
+
+                media_id = cursor.lastrowid
+
+            for tag in note_data['tags']:
+                cursor.execute("INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)", (tag,))
+                cursor.execute("SELECT id FROM Keywords WHERE keyword = ?", (tag,))
+                keyword_id = cursor.fetchone()[0]
+                cursor.execute("INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)",
+                               (media_id, keyword_id))
+
+            frontmatter_str = yaml.dump(note_data['frontmatter'])
+            cursor.execute("""
+                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+                VALUES (?, 'Obsidian Frontmatter', ?, CURRENT_TIMESTAMP)
+            """, (media_id, frontmatter_str))
+
+            # Update full-text search index
+            cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
+                           (media_id, note_data['title'], note_data['content']))
+
+        action = "Updated" if existing_note else "Imported"
+        logger.info(f"{action} Obsidian note: {note_data['title']}")
+        return True, None
+    except sqlite3.Error as e:
+        error_msg = f"Database error {'updating' if existing_note else 'importing'} note {note_data['title']}: {str(e)}"
+        logger.error(error_msg)
+        return False, error_msg
+    except Exception as e:
+        error_msg = f"Unexpected error {'updating' if existing_note else 'importing'} note {note_data['title']}: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        return False, error_msg
+
+
+#
+# End of Obsidian-related Functions
+#######################################################################################################################
