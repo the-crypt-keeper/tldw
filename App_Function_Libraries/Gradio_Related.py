@@ -499,6 +499,7 @@ def create_video_transcription_tab():
                 url_input = gr.Textbox(label="URL(s) (Mandatory)",
                                        placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, and playlists.",
                                        lines=5)
+                video_file_input = gr.File(label="Upload Video File (Optional)", file_types=["video/*"])
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
                 custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
@@ -580,7 +581,7 @@ def create_video_transcription_tab():
                 download_summary = gr.File(label="Download All Summaries as Text")
 
             @error_handler
-            def process_videos_with_error_handling(urls, start_time, end_time, diarize, whisper_model,
+            def process_videos_with_error_handling(inputs, start_time, end_time, diarize, whisper_model,
                                                    custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                                                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                                    use_multi_level_chunking, chunk_language, api_name,
@@ -589,12 +590,12 @@ def create_video_transcription_tab():
                                                    progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
                     logging.info("Entering process_videos_with_error_handling")
-                    logging.info(f"Received URLs: {urls}")
+                    logging.info(f"Received inputs: {inputs}")
 
-                    if not urls:
-                        raise ValueError("No URLs provided")
+                    if not inputs:
+                        raise ValueError("No inputs provided")
 
-                    logging.debug("Input URL(s) is(are) valid")
+                    logging.debug("Input(s) is(are) valid")
 
                     # Ensure batch_size is an integer
                     try:
@@ -602,30 +603,60 @@ def create_video_transcription_tab():
                     except (ValueError, TypeError):
                         batch_size = 1  # Default to processing one video at a time if invalid
 
-                    expanded_urls = parse_and_expand_urls(urls)
-                    logging.info(f"Expanded URLs: {expanded_urls}")
+                    # Separate URLs and local files
+                    urls = [input for input in inputs if
+                            isinstance(input, str) and input.startswith(('http://', 'https://'))]
+                    local_files = [input for input in inputs if
+                                   isinstance(input, str) and not input.startswith(('http://', 'https://'))]
 
-                    total_videos = len(expanded_urls)
-                    logging.info(f"Total videos to process: {total_videos}")
+                    expanded_urls = parse_and_expand_urls(urls) if urls else []
+
+                    valid_local_files = []
+                    invalid_local_files = []
+
+                    for file_path in local_files:
+                        if os.path.exists(file_path):
+                            valid_local_files.append(file_path)
+                        else:
+                            invalid_local_files.append(file_path)
+                            error_message = f"Local file not found: {file_path}"
+                            logging.error(error_message)
+
+                    if invalid_local_files:
+                        logging.warning(f"Found {len(invalid_local_files)} invalid local file paths")
+                        # FIXME - Add more complete error handling for invalid local files
+
+                    all_inputs = expanded_urls + valid_local_files
+                    logging.info(f"Total valid inputs to process: {len(all_inputs)} "
+                                 f"({len(expanded_urls)} URLs, {len(valid_local_files)} local files)")
+
+                    all_inputs = expanded_urls + local_files
+                    logging.info(f"Total inputs to process: {len(all_inputs)}")
                     results = []
                     errors = []
                     results_html = ""
                     all_transcriptions = {}
                     all_summaries = ""
 
-                    for i in range(0, total_videos, batch_size):
-                        batch = expanded_urls[i:i + batch_size]
+                    for i in range(0, len(all_inputs), batch_size):
+                        batch = all_inputs[i:i + batch_size]
                         batch_results = []
 
-                        for url in batch:
+                        for input_item in batch:
                             try:
                                 start_seconds = convert_to_seconds(start_time)
                                 end_seconds = convert_to_seconds(end_time) if end_time else None
 
-                                logging.info(f"Attempting to extract metadata for {url}")
-                                video_metadata = extract_metadata(url, use_cookies, cookies)
-                                if not video_metadata:
-                                    raise ValueError(f"Failed to extract metadata for {url}")
+                                logging.info(f"Attempting to extract metadata for {input_item}")
+
+                                if input_item.startswith(('http://', 'https://')):
+                                    logging.info(f"Attempting to extract metadata for URL: {input_item}")
+                                    video_metadata = extract_metadata(input_item, use_cookies, cookies)
+                                    if not video_metadata:
+                                        raise ValueError(f"Failed to extract metadata for {input_item}")
+                                else:
+                                    logging.info(f"Processing local file: {input_item}")
+                                    video_metadata = {"title": os.path.basename(input_item), "url": input_item}
 
                                 chunk_options = {
                                     'method': chunk_method,
@@ -638,7 +669,7 @@ def create_video_transcription_tab():
 
                                 logging.debug("Gradio_Related.py: process_url_with_metadata being called")
                                 result = process_url_with_metadata(
-                                    url, 2, whisper_model,
+                                    input_item, 2, whisper_model,
                                     custom_prompt if custom_prompt_checkbox else None,
                                     start_seconds, api_name, api_key,
                                     False, False, False, False, 0.01, None, keywords, None, diarize,
@@ -650,31 +681,35 @@ def create_video_transcription_tab():
                                     keep_original_video=keep_original_video
                                 )
 
-                                if result[0] is None:  # Check if the first return value is None
+                                if result[0] is None:
                                     error_message = "Processing failed without specific error"
-                                    batch_results.append((url, error_message, "Error", video_metadata, None, None))
-                                    errors.append(f"Error processing {url}: {error_message}")
+                                    batch_results.append(
+                                        (input_item, error_message, "Error", video_metadata, None, None))
+                                    errors.append(f"Error processing {input_item}: {error_message}")
                                 else:
                                     url, transcription, summary, json_file, summary_file, result_metadata = result
                                     if transcription is None:
-                                        error_message = f"Processing failed for {url}: Transcription is None"
-                                        batch_results.append((url, error_message, "Error", result_metadata, None, None))
+                                        error_message = f"Processing failed for {input_item}: Transcription is None"
+                                        batch_results.append(
+                                            (input_item, error_message, "Error", result_metadata, None, None))
                                         errors.append(error_message)
                                     else:
                                         batch_results.append(
-                                            (url, transcription, "Success", result_metadata, json_file, summary_file))
+                                            (input_item, transcription, "Success", result_metadata, json_file,
+                                             summary_file))
+
 
                             except Exception as e:
-                                error_message = f"Error processing {url}: {str(e)}"
+                                error_message = f"Error processing {input_item}: {str(e)}"
                                 logging.error(error_message, exc_info=True)
-                                batch_results.append((url, error_message, "Error", {}, None, None))
+                                batch_results.append((input_item, error_message, "Error", {}, None, None))
                                 errors.append(error_message)
 
                         results.extend(batch_results)
                         logging.debug(f"Processed {len(batch_results)} videos in batch")
                         if isinstance(progress, gr.Progress):
-                            progress((i + len(batch)) / total_videos,
-                                     f"Processed {i + len(batch)}/{total_videos} videos")
+                            progress((i + len(batch)) / len(all_inputs),
+                                     f"Processed {i + len(batch)}/{len(all_inputs)} videos")
 
                     # Generate HTML for results
                     logging.debug(f"Generating HTML for {len(results)} results")
@@ -733,8 +768,9 @@ def create_video_transcription_tab():
 
                     error_summary = "\n".join(errors) if errors else "No errors occurred."
 
+                    total_inputs = len(all_inputs)
                     return (
-                        f"Processed {total_videos} videos. {len(errors)} errors occurred.",
+                        f"Processed {total_inputs} videos. {len(errors)} errors occurred.",
                         error_summary,
                         results_html,
                         'all_transcriptions.json',
@@ -750,7 +786,7 @@ def create_video_transcription_tab():
                         None
                     )
 
-            def process_videos_wrapper(urls, start_time, end_time, diarize, whisper_model,
+            def process_videos_wrapper(url_input, video_file, start_time, end_time, diarize, whisper_model,
                                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                        use_multi_level_chunking, chunk_language, summarize_recursively, api_name,
@@ -758,8 +794,19 @@ def create_video_transcription_tab():
                                        timestamp_option, keep_original_video):
                 try:
                     logging.info("process_videos_wrapper called")
+
+                    # Handle both URL input and file upload
+                    inputs = []
+                    if url_input:
+                        inputs.extend([url.strip() for url in url_input.split('\n') if url.strip()])
+                    if video_file is not None:
+                        inputs.append(video_file.name)  # Assuming video_file is a file object with a 'name' attribute
+
+                    if not inputs:
+                        raise ValueError("No input provided. Please enter URLs or upload a video file.")
+
                     result = process_videos_with_error_handling(
-                        urls, start_time, end_time, diarize, whisper_model,
+                        inputs, start_time, end_time, diarize, whisper_model,
                         custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                         chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                         use_multi_level_chunking, chunk_language, api_name,
@@ -787,14 +834,14 @@ def create_video_transcription_tab():
 
             # FIXME - remove dead args for process_url_with_metadata
             @error_handler
-            def process_url_with_metadata(url, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key,
+            def process_url_with_metadata(input_item, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key,
                                           vad_filter, download_video_flag, download_audio, rolling_summarization,
                                           detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
                                           include_timestamps=True, metadata=None, use_chunking=False,
                                           chunk_options=None, keep_original_video=False):
 
                 try:
-                    logging.info(f"Starting process_url_metadata for URL: {url}")
+                    logging.info(f"Starting process_url_metadata for URL: {input_item}")
                     # Create download path
                     download_path = create_download_directory("Video_Downloads")
                     logging.info(f"Download path created at: {download_path}")
@@ -803,12 +850,12 @@ def create_video_transcription_tab():
                     info_dict = {}
 
                     # Handle URL or local file
-                    if local_file_path:
-                        video_file_path = local_file_path
+                    if os.path.isfile(input_item):
+                        video_file_path = input_item
                         # Extract basic info from local file
                         info_dict = {
-                            'webpage_url': local_file_path,
-                            'title': os.path.basename(local_file_path),
+                            'webpage_url': input_item,
+                            'title': os.path.basename(input_item),
                             'description': "Local file",
                             'channel_url': None,
                             'duration': None,
@@ -820,7 +867,7 @@ def create_video_transcription_tab():
                         # Extract video information
                         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                             try:
-                                full_info = ydl.extract_info(url, download=False)
+                                full_info = ydl.extract_info(input_item, download=False)
 
                                 # Create a safe subset of info to log
                                 safe_info = {
@@ -831,7 +878,7 @@ def create_video_transcription_tab():
                                     'view_count': full_info.get('view_count', 'Unknown view count')
                                 }
 
-                                logging.debug(f"Full info extracted for {url}: {safe_info}")
+                                logging.debug(f"Full info extracted for {input_item}: {safe_info}")
                             except Exception as e:
                                 logging.error(f"Error extracting video info: {str(e)}")
                                 return None, None, None, None, None, None
@@ -839,7 +886,7 @@ def create_video_transcription_tab():
                         # Filter the required metadata
                         if full_info:
                             info_dict = {
-                                'webpage_url': full_info.get('webpage_url', url),
+                                'webpage_url': full_info.get('webpage_url', input_item),
                                 'title': full_info.get('title'),
                                 'description': full_info.get('description'),
                                 'channel_url': full_info.get('channel_url'),
@@ -855,9 +902,9 @@ def create_video_transcription_tab():
 
                         # Download video/audio
                         logging.info("Downloading video/audio...")
-                        video_file_path = download_video(url, download_path, full_info, download_video_flag)
+                        video_file_path = download_video(input_item, download_path, full_info, download_video_flag)
                         if not video_file_path:
-                            logging.error(f"Failed to download video/audio from {url}")
+                            logging.error(f"Failed to download video/audio from {input_item}")
                             return None, None, None, None, None, None
 
                     logging.info(f"Processing file: {video_file_path}")
@@ -865,7 +912,7 @@ def create_video_transcription_tab():
                     # Perform transcription
                     logging.info("Starting transcription...")
                     audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
-                                                                      vad_filter)
+                                                                      vad_filter, diarize)
 
                     if audio_file_path is None or segments is None:
                         logging.error("Transcription failed or segments not available.")
@@ -973,7 +1020,7 @@ def create_video_transcription_tab():
             process_button.click(
                 fn=process_videos_wrapper,
                 inputs=[
-                    url_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
+                    url_input, video_file_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
                     custom_prompt_checkbox, custom_prompt_input, chunking_options_checkbox,
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                     use_multi_level_chunking, chunk_language, summarize_recursively, api_name_input, api_key_input,
