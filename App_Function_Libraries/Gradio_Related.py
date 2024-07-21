@@ -2542,6 +2542,7 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Import/Export"):
                 create_import_item_tab()
+                create_import_obsidian_vault_tab()
                 create_export_tab()
 
             with gr.TabItem("Utilities"):
