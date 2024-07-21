@@ -60,18 +60,22 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 For offline LLM usage, I recommend the following models(in no particular order past the first):
   1. Samantha-Mistral-instruct-7B-Bulleted-Notes - https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
      * Reason being is that its 'good enough', otherwise would recommend Command-R+, either self-hosted, or through a personal API key (it's free for 1k requests a month...)
-  2. Inkbot-13B-8k-0.2
-     * https://huggingface.co/Tostino/Inkbot-13B-8k-0.2
-  3. Microsfot Phi-3-mini-4k-Instruct
+  2. glm-4-9b-chat-1m
+     * https://huggingface.co/THUDM/glm-4-9b-chat-1m/blob/main/README_en.md / GGUF: 
+  3. Microsoft Phi-3-mini-4k-Instruct
      * https://huggingface.co/microsoft/Phi-3-mini-4k-instruct / GGUF: https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
-     * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-mini-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3.1-mini-128k-instruct-GGUF
+     * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-mini-128k-instruct / Abliterated GGUF: https://huggingface.co/failspy/Phi-3-mini-128k-instruct-abliterated-v3-GGUF
   4. Cohere Command-R+
-     * https://huggingface.co/cohere-ai/Command-R-plus / GGUF: https://huggingface.co/dranger003/c4ai-command-r-plus-iMat.GGUF
-  5. Phi-3-Medium-4k-Instruct
-     * https://huggingface.co/microsoft/Phi-3-medium-4k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-4k-instruct-GGUF
-     * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-medium-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-128k-instruct-GGUF
+     * https://huggingface.co/cohere-ai/Command-R-plus / GGUF: https://huggingface.co/XelotX/c4ai-command-r-plus-XelotX-XelotX-iQuants
+  5. Cohere Command-R (non-plus version)
+     * https://huggingface.co/CohereForAI/c4ai-command-r-v01 / GGUF: https://huggingface.co/dranger003/c4ai-command-r-v01-iMat.GGUF
+  6. Phi-3-Medium-4k-Instruct
+     * https://huggingface.co/microsoft/Phi-3-medium-4k-instruct / Abliterated GGUF:https://huggingface.co/failspy/Phi-3-medium-4k-instruct-abliterated-v3
+       * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-medium-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-128k-instruct-GGUF
   6. Hermes-2-Theta-Llama-3-8B
      * https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B / GGUF: https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B-GGUF
+  7. Yi-1.5-34B-Chat-16k
+     * https://huggingface.co/01-ai/Yi-1.5-34B-Chat-16K / GGUF: https://huggingface.co/mradermacher/Yi-1.5-34B-Chat-16K-GGUF
 
 ----------
 
@@ -150,11 +154,11 @@ For offline LLM usage, I recommend the following models(in no particular order p
     - As such, I would say you want at least 8GB of free space on your system to devote to the app.
     - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
 - **Linux**
-    1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg / dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
+    1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg` or `dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
     2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`
-    5. Create a virtual env: `python -m venv ./`
+    5. Create a virtual env: `sudo python3 -m venv ./`
     6. Launch/activate your virtual environment: `source ./bin/activate`
     7. Setup the necessary python packages:
        * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
@@ -169,7 +173,7 @@ For offline LLM usage, I recommend the following models(in no particular order p
     2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`
-    5. Create a virtual env: `python -m venv ./`
+    5. Create a virtual env: `python3 -m venv ./`
     6. Launch/activate your virtual env: PowerShell: `. .\scripts\activate.ps1` or for CMD: `.\scripts\activate.bat`
     7. Setup the necessary python packages:
        - Cuda
@@ -182,26 +186,16 @@ For offline LLM usage, I recommend the following models(in no particular order p
     8. See `Linux && Windows`
 - **Linux && Windows**
     1. `pip install -r requirements.txt` - may take a bit of time...
-    2. **Script Usage:**
-       - Put your API keys and settings in the `config.txt` file.
-         - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
-       - (make sure your in the python venv - Run `./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
-       - Run `python ./summarize.py <video_url>` - The video URL does _not_ have to be a youtube URL. It can be any site that ytdl supports.
-       - You'll then be asked if you'd like to run the transcription through GPU(1) or CPU(2).
-         - Next, the video will be downloaded to the local directory by ytdl.
-         - Then the video will be transcribed by faster_whisper. (You can see this in the console output)
-           * The resulting transcription output will be stored as both a json file with timestamps, as well as a txt file with no timestamps.
-       - Finally, you can have the transcription summarized through feeding it into an LLM of your choice.
-    3. **GUI Usage:**
-       - Put your API keys and settings in the `config.txt` file.
-         - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
-       - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
-       - Run `python ./summarize.py -gui` - This will launch a webapp that will allow you to interact with the script in a more user-friendly manner.
-         * You can pass in the API keys for the LLMs you want to use in the `config.txt` file, or pass them in when you use the GUI.
-         * You can also download the generated transcript and summary as text files from the UI.
-         * You can also download the video/audio as files from the UI. (WIP - doesn't currently work)
-         * You can also access the SQLite DB that backs the app, with search, tagging, and export functionality.
-    4. **Local LLM with the Script Usage:**
+    2. **GUI Usage:**
+         - Put your API keys and settings in the `config.txt` file.
+           - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
+         - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+         - Run `python ./summarize.py -gui` - This will launch a webapp that will allow you to interact with the script in a more user-friendly manner.
+           * You can pass in the API keys for the LLMs you want to use in the `config.txt` file, or pass them in when you use the GUI.
+           * You can also download the generated transcript and summary as text files from the UI.
+           * You can also download the video/audio as files from the UI. (WIP - doesn't currently work)
+           * You can also access the SQLite DB that backs the app, with search, tagging, and export functionality.
+    3. **Local LLM with the Script Usage:**
        - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
        - I recognize some people may like the functionality and idea of it all, but don't necessarily know/want to know about LLMs/getting them working, so you can also have the script download and run a local model, using system RAM and llamafile/llama.cpp.
        - Simply pass `--local_llm` to the script (`python summarize.py --local-llm`), and it'll ask you if you want to download a model, and which one you'd like to download.
@@ -364,20 +358,21 @@ By default, videos, transcriptions and summaries are stored in a folder with the
   1. Lost in the Middle: How Language Models Use Long Contexts
     - https://arxiv.org/abs/2307.03172
     - `We analyze the performance of language models on two tasks that require identifying relevant information in their input contexts: multi-document question answering and key-value retrieval. We find that performance can degrade significantly when changing the position of relevant information, indicating that current language models do not robustly make use of information in long input contexts. In particular, we observe that performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts, even for explicitly long-context models`
-  2. RULER: What's the Real Context Size of Your Long-Context Language Models?
-    - https://arxiv.org/abs/2404.06654
+  2. [RULER: What's the Real Context Size of Your Long-Context Language Models?](https://arxiv.org/abs/2404.06654)
     - `The needle-in-a-haystack (NIAH) test, which examines the ability to retrieve a piece of information (the "needle") from long distractor texts (the "haystack"), has been widely adopted to evaluate long-context language models (LMs). However, this simple retrieval-based test is indicative of only a superficial form of long-context understanding. To provide a more comprehensive evaluation of long-context LMs, we create a new synthetic benchmark RULER with flexible configurations for customized sequence length and task complexity. RULER expands upon the vanilla NIAH test to encompass variations with diverse types and quantities of needles. Moreover, RULER introduces new task categories multi-hop tracing and aggregation to test behaviors beyond searching from context. We evaluate ten long-context LMs with 13 representative tasks in RULER. Despite achieving nearly perfect accuracy in the vanilla NIAH test, all models exhibit large performance drops as the context length increases. While these models all claim context sizes of 32K tokens or greater, only four models (GPT-4, Command-R, Yi-34B, and Mixtral) can maintain satisfactory performance at the length of 32K. Our analysis of Yi-34B, which supports context length of 200K, reveals large room for improvement as we increase input length and task complexity.`
-  3. Same Task, More Tokens: the Impact of Input Length on the Reasoning Performance of Large Language Models
-     - https://arxiv.org/abs/2402.14848
+  3. [Same Task, More Tokens: the Impact of Input Length on the Reasoning Performance of Large Language Models](https://arxiv.org/abs/2402.14848)
      - `Our findings show a notable degradation in LLMs' reasoning performance at much shorter input lengths than their technical maximum. We show that the degradation trend appears in every version of our dataset, although at different intensities. Additionally, our study reveals that the traditional metric of next word prediction correlates negatively with performance of LLMs' on our reasoning dataset. We analyse our results and identify failure modes that can serve as useful guides for future research, potentially informing strategies to address the limitations observed in LLMs.`
   4. Abliteration (Uncensoring LLMs)
      - [Uncensor any LLM with abliteration - Maxime Labonne(2024)](https://huggingface.co/blog/mlabonne/abliteration)
   5. Retrieval-Augmented-Generation
         - [Retrieval-Augmented Generation for Large Language Models: A Survey](https://arxiv.org/abs/2312.10997)
-        - https://arxiv.org/abs/2312.10997
-        - `Retrieval-Augmented Generation (RAG) has emerged as a promising solution by incorporating knowledge from external databases. This enhances the accuracy and credibility of the generation, particularly for knowledge-intensive tasks, and allows for continuous knowledge updates and integration of domain-specific information. RAG synergistically merges LLMs' intrinsic knowledge with the vast, dynamic repositories of external databases. This comprehensive review paper offers a detailed examination of the progression of RAG paradigms, encompassing the Naive RAG, the Advanced RAG, and the Modular RAG. It meticulously scrutinizes the tripartite foundation of RAG frameworks, which includes the retrieval, the generation and the augmentation techniques. The paper highlights the state-of-the-art technologies embedded in each of these critical components, providing a profound understanding of the advancements in RAG systems. Furthermore, this paper introduces up-to-date evaluation framework and benchmark. At the end, this article delineates the challenges currently faced and points out prospective avenues for research and development. `
+          - https://arxiv.org/abs/2312.10997
+          - `Retrieval-Augmented Generation (RAG) has emerged as a promising solution by incorporating knowledge from external databases. This enhances the accuracy and credibility of the generation, particularly for knowledge-intensive tasks, and allows for continuous knowledge updates and integration of domain-specific information. RAG synergistically merges LLMs' intrinsic knowledge with the vast, dynamic repositories of external databases. This comprehensive review paper offers a detailed examination of the progression of RAG paradigms, encompassing the Naive RAG, the Advanced RAG, and the Modular RAG. It meticulously scrutinizes the tripartite foundation of RAG frameworks, which includes the retrieval, the generation and the augmentation techniques. The paper highlights the state-of-the-art technologies embedded in each of these critical components, providing a profound understanding of the advancements in RAG systems. Furthermore, this paper introduces up-to-date evaluation framework and benchmark. At the end, this article delineates the challenges currently faced and points out prospective avenues for research and development. `
   6. Prompt Engineering
      - Prompt Engineering Guide: https://www.promptingguide.ai/ & https://github.com/dair-ai/Prompt-Engineering-Guide
+  7. Bias and Fairness in LLMs
+     - [ChatGPT Doesn't Trust Chargers Fans: Guardrail Sensitivity in Context](https://arxiv.org/abs/2407.06866)
+       - `While the biases of language models in production are extensively documented, the biases of their guardrails have been neglected. This paper studies how contextual information about the user influences the likelihood of an LLM to refuse to execute a request. By generating user biographies that offer ideological and demographic information, we find a number of biases in guardrail sensitivity on GPT-3.5. Younger, female, and Asian-American personas are more likely to trigger a refusal guardrail when requesting censored or illegal information. Guardrails are also sycophantic, refusing to comply with requests for a political position the user is likely to disagree with. We find that certain identity groups and seemingly innocuous information, e.g., sports fandom, can elicit changes in guardrail sensitivity similar to direct statements of political ideology. For each demographic category and even for American football team fandom, we find that ChatGPT appears to infer a likely political ideology and modify guardrail behavior accordingly.`
 - **Tools & Libraries**
   1. `llama.cpp` - A C++ inference engine. Highly recommend. 
      * https://github.com/ggerganov/llama.cpp

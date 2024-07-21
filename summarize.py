@@ -746,8 +746,7 @@ Sample commands:
                         help="Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)")
     parser.add_argument('--server_mode', action='store_true',
                         help='Run in server mode (This exposes the GUI/Server to the network)')
-    parser.add_argument('--share_public', type=int, default=7860,
-                        help="This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)")
+    parser.add_argument('-share', '--share_public', action='store_true', help="This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet."),
     parser.add_argument('--port', type=int, default=7860, help='Port to run the server on')
     parser.add_argument('--ingest_text_file', action='store_true',
                         help='Ingest .txt files as content instead of treating them as URL lists')
@@ -769,12 +768,7 @@ Sample commands:
     set_chunk_txt_by_tokens = False
     set_max_txt_chunk_tokens = 0
 
-    if args.share_public:
-        share_public = args.share_public
-    else:
-        share_public = None
     if args.server_mode:
-
         server_mode = args.server_mode
     else:
         server_mode = None
@@ -847,7 +841,14 @@ Sample commands:
             local_llm_function()
             time.sleep(2)
             webbrowser.open_new_tab('http://127.0.0.1:7860')
-        launch_ui(demo_mode=False)
+        launch_ui(share_public=False)
+    elif share_public is not None:
+        if local_llm:
+            local_llm_function()
+            time.sleep(2)
+            webbrowser.open_new_tab('http://127.0.0.1:7860')
+        else:
+            launch_ui(share_public=True)
     elif not args.input_path:
         parser.print_help()
         sys.exit(1)
