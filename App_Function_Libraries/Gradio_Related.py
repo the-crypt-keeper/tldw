@@ -15,6 +15,7 @@
 #########################################
 #
 # Built-In Imports
+import math
 import shutil
 import tempfile
 from datetime import datetime
@@ -23,7 +24,7 @@ import logging
 import os.path
 from pathlib import Path
 import sqlite3
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import traceback
 from functools import wraps
 #
@@ -34,7 +35,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast
-from App_Function_Libraries.Chunk_Lib import improved_chunking_process, get_chat_completion
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 from App_Function_Libraries.PDF_Ingestion_Lib import process_and_cleanup_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
@@ -45,7 +46,7 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     perform_transcription, summarize_chunk
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
-    export_keywords_to_csv, export_to_file, add_media_to_database, insert_prompt_to_db
+    export_keywords_to_csv, add_media_to_database, insert_prompt_to_db
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -631,6 +632,7 @@ def create_video_transcription_tab():
                                     'language': chunk_language
                                 } if chunking_options_checkbox else None
 
+                                logging.debug("Gradio_Related.py: process_url_with_metadata being called")
                                 result = process_url_with_metadata(
                                     url, 2, whisper_model,
                                     custom_prompt if custom_prompt_checkbox else None,
@@ -665,11 +667,13 @@ def create_video_transcription_tab():
                                 errors.append(error_message)
 
                         results.extend(batch_results)
+                        logging.debug(f"Processed {len(batch_results)} videos in batch")
                         if isinstance(progress, gr.Progress):
                             progress((i + len(batch)) / total_videos,
                                      f"Processed {i + len(batch)}/{total_videos} videos")
 
                     # Generate HTML for results
+                    logging.debug(f"Generating HTML for {len(results)} results")
                     for url, transcription, status, metadata, json_file, summary_file in results:
                         if status == "Success":
                             title = metadata.get('title', 'Unknown Title')
@@ -716,6 +720,7 @@ def create_video_transcription_tab():
                             """
 
                     # Save all transcriptions and summaries to files
+                    logging.debug("Saving all transcriptions and summaries to files")
                     with open('all_transcriptions.json', 'w') as f:
                         json.dump(all_transcriptions, f, indent=2)
 
@@ -1999,7 +2004,7 @@ def create_import_item_tab():
 # Export Items Tab Functions
 logger = logging.getLogger(__name__)
 
-def export_item_as_markdown(media_id: int) -> str:
+def export_item_as_markdown(media_id: int) -> Tuple[Optional[str], str]:
     try:
         content, prompt, summary = fetch_item_details(media_id)
         title = f"Item {media_id}"  # You might want to fetch the actual title
@@ -2010,10 +2015,11 @@ def export_item_as_markdown(media_id: int) -> str:
             f.write(markdown_content)
 
         logger.info(f"Successfully exported item {media_id} to {filename}")
-        return filename
+        return filename, f"Successfully exported item {media_id} to {filename}"
     except Exception as e:
-        logger.error(f"Error exporting item {media_id}: {str(e)}")
-        return None
+        error_message = f"Error exporting item {media_id}: {str(e)}"
+        logger.error(error_message)
+        return None, error_message
 
 
 def export_items_by_keyword(keyword: str) -> str:
@@ -2054,48 +2060,83 @@ def export_items_by_keyword(keyword: str) -> str:
         return None
 
 
-def export_selected_items(selected_items: List[Dict]) -> str:
+def export_selected_items(selected_items: List[Dict]) -> Tuple[Optional[str], str]:
     try:
+        logger.debug(f"Received selected_items: {selected_items}")
         if not selected_items:
             logger.warning("No items selected for export")
-            return None
+            return None, "No items selected for export"
 
         markdown_content = "# Selected Items\n\n"
         for item in selected_items:
-            content, prompt, summary = fetch_item_details(item['id'])
-            markdown_content += f"## {item['title']}\n\n### Prompt\n{prompt}\n\n### Summary\n{summary}\n\n### Content\n{content}\n\n---\n\n"
+            logger.debug(f"Processing item: {item}")
+            try:
+                # Check if 'value' is a string (JSON) or already a dictionary
+                if isinstance(item, str):
+                    item_data = json.loads(item)
+                elif isinstance(item, dict) and 'value' in item:
+                    item_data = item['value'] if isinstance(item['value'], dict) else json.loads(item['value'])
+                else:
+                    item_data = item
+
+                logger.debug(f"Item data after processing: {item_data}")
+
+                if 'id' not in item_data:
+                    logger.error(f"'id' not found in item data: {item_data}")
+                    continue
+
+                content, prompt, summary = fetch_item_details(item_data['id'])
+                markdown_content += f"## {item_data.get('title', f'Item {item_data['id']}')}\n\n### Prompt\n{prompt}\n\n### Summary\n{summary}\n\n### Content\n{content}\n\n---\n\n"
+            except Exception as e:
+                logger.error(f"Error processing item {item}: {str(e)}")
+                markdown_content += f"## Error\n\nUnable to process this item.\n\n---\n\n"
 
         filename = "export_selected_items.md"
         with open(filename, "w", encoding='utf-8') as f:
             f.write(markdown_content)
 
         logger.info(f"Successfully exported {len(selected_items)} selected items to {filename}")
-        return filename
+        return filename, f"Successfully exported {len(selected_items)} items to {filename}"
     except Exception as e:
-        logger.error(f"Error exporting selected items: {str(e)}")
-        return None
+        error_message = f"Error exporting selected items: {str(e)}"
+        logger.error(error_message)
+        return None, error_message
 
 
-def display_search_results_export_tab(search_query: str, search_type: str):
-    logger.info(f"Searching with query: '{search_query}', type: '{search_type}'")
+def display_search_results_export_tab(search_query: str, search_type: str, page: int = 1, items_per_page: int = 10):
+    logger.info(f"Searching with query: '{search_query}', type: '{search_type}', page: {page}")
     try:
         results = browse_items(search_query, search_type)
         logger.info(f"browse_items returned {len(results)} results")
 
         if not results:
-            return [], f"No results found for query: '{search_query}'"
+            return [], f"No results found for query: '{search_query}'", 1, 1
 
-        checkbox_data = [{"name": f"{item['title']} ({item['url']})", "value": item} for item in results]
-        logger.info(f"Returning {len(checkbox_data)} items for checkbox")
-        return checkbox_data, f"Found {len(checkbox_data)} results"
+        total_pages = math.ceil(len(results) / items_per_page)
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+        paginated_results = results[start_index:end_index]
+
+        checkbox_data = [
+            {
+                "name": f"Name: {item[1]}\nURL: {item[2]}",
+                "value": {"id": item[0], "title": item[1], "url": item[2]}
+            }
+            for item in paginated_results
+        ]
+
+        logger.info(f"Returning {len(checkbox_data)} items for checkbox (page {page} of {total_pages})")
+        return checkbox_data, f"Found {len(results)} results (showing page {page} of {total_pages})", page, total_pages
+
     except DatabaseError as e:
         error_message = f"Error in display_search_results_export_tab: {str(e)}"
         logger.error(error_message)
-        return [], error_message
+        return [], error_message, 1, 1
     except Exception as e:
         error_message = f"Unexpected error in display_search_results_export_tab: {str(e)}"
         logger.error(error_message)
-        return [], error_message
+        return [], error_message, 1, 1
+
 
 def create_export_tab():
     with gr.Tab("Search and Export"):
@@ -2103,43 +2144,109 @@ def create_export_tab():
         search_type = gr.Radio(["Title", "URL", "Keyword", "Content"], label="Search By")
         search_button = gr.Button("Search")
 
-        search_results = gr.CheckboxGroup(label="Search Results")
+        with gr.Row():
+            prev_button = gr.Button("Previous Page")
+            next_button = gr.Button("Next Page")
+
+        current_page = gr.State(1)
+        total_pages = gr.State(1)
+
+        search_results = gr.CheckboxGroup(label="Search Results", choices=[])
         export_selected_button = gr.Button("Export Selected Items")
 
         keyword_input = gr.Textbox(label="Enter keyword for export")
         export_by_keyword_button = gr.Button("Export items by keyword")
 
         export_output = gr.File(label="Download Exported File")
-
         error_output = gr.Textbox(label="Status/Error Messages", interactive=False)
 
+    def search_and_update(query, search_type, page):
+        results, message, current, total = display_search_results_export_tab(query, search_type, page)
+        logger.debug(f"search_and_update results: {results}")
+        return results, message, current, total, gr.update(choices=results)
+
     search_button.click(
-        fn=display_search_results_export_tab,
-        inputs=[search_query, search_type],
-        outputs=[search_results, error_output]
+        fn=search_and_update,
+        inputs=[search_query, search_type, current_page],
+        outputs=[search_results, error_output, current_page, total_pages, search_results],
+        show_progress=True
     )
 
+
+    def update_page(current, total, direction):
+        new_page = max(1, min(total, current + direction))
+        return new_page
+
+    prev_button.click(
+        fn=update_page,
+        inputs=[current_page, total_pages, gr.State(-1)],
+        outputs=[current_page]
+    ).then(
+        fn=search_and_update,
+        inputs=[search_query, search_type, current_page],
+        outputs=[search_results, error_output, current_page, total_pages],
+        show_progress=True
+    )
+
+    next_button.click(
+        fn=update_page,
+        inputs=[current_page, total_pages, gr.State(1)],
+        outputs=[current_page]
+    ).then(
+        fn=search_and_update,
+        inputs=[search_query, search_type, current_page],
+        outputs=[search_results, error_output, current_page, total_pages],
+        show_progress=True
+    )
+
+    def handle_export_selected(selected_items):
+        logger.debug(f"Exporting selected items: {selected_items}")
+        return export_selected_items(selected_items)
+
     export_selected_button.click(
-        fn=lambda selected: (export_selected_items(selected), "Exported selected items") if selected else (
-            None, "No items selected"),
+        fn=handle_export_selected,
         inputs=[search_results],
-        outputs=[export_output, error_output]
+        outputs=[export_output, error_output],
+        show_progress=True
     )
 
     export_by_keyword_button.click(
-        fn=lambda keyword: (
-            export_items_by_keyword(keyword), f"Exported items for keyword: {keyword}") if keyword else (
-            None, "No keyword provided"),
+        fn=export_items_by_keyword,
         inputs=[keyword_input],
-        outputs=[export_output, error_output]
+        outputs=[export_output, error_output],
+        show_progress=True
     )
 
-    # Add functionality to export individual items
+    def handle_item_selection(selected_items):
+        logger.debug(f"Selected items: {selected_items}")
+        if not selected_items:
+            return None, "No item selected"
+
+        try:
+            # Assuming selected_items is a list of dictionaries
+            selected_item = selected_items[0]
+            logger.debug(f"First selected item: {selected_item}")
+
+            # Check if 'value' is a string (JSON) or already a dictionary
+            if isinstance(selected_item['value'], str):
+                item_data = json.loads(selected_item['value'])
+            else:
+                item_data = selected_item['value']
+
+            logger.debug(f"Item data: {item_data}")
+
+            item_id = item_data['id']
+            return export_item_as_markdown(item_id)
+        except Exception as e:
+            error_message = f"Error processing selected item: {str(e)}"
+            logger.error(error_message)
+            return None, error_message
+
     search_results.select(
-        fn=lambda item: (export_item_as_markdown(item['id']), f"Exported item: {item['title']}") if item else (
-            None, "No item selected"),
-        inputs=[gr.State(lambda: search_results.value)],
-        outputs=[export_output, error_output]
+        fn=handle_item_selection,
+        inputs=[search_results],
+        outputs=[export_output, error_output],
+        show_progress=True
     )
 
 
