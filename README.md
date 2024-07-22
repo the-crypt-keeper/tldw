@@ -506,7 +506,6 @@ By default, videos, transcriptions and summaries are stored in a folder with the
     - More API support - I want to add support for more APIs, and I want to make it easier to select between private/Public endpoints in the UI
     - Completely new UI - I want to make the UI more user-friendly and more intuitive. 
       - Gradio is great as PoC, but I think I've shown that this has value and is worth the continued effort.
-    - Allow for drag and drop of video files into the UI for processing.
     - Add support for 'streaming' answers, so it feels more 'real-time'
     - Add TTS/STT support for the UI so you can ask questions directly to the model or have it speak out the results to you.
       - Having something like this would be pretty fucking cool I think: https://github.com/smellslikeml/dolla_llama/tree/main (Need to look more into nemesis by specterops)
@@ -530,4 +529,3 @@ By default, videos, transcriptions and summaries are stored in a folder with the
   - Add support for more APIs
   - Add functionality to select a custom prompt from the prompts database
   - Add more prompts to the prompts database
-  - Poetry for package management and stop the package headaches
