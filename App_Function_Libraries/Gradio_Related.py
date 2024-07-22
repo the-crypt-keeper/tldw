@@ -609,6 +609,7 @@ def create_video_transcription_tab():
                     local_files = [input for input in inputs if
                                    isinstance(input, str) and not input.startswith(('http://', 'https://'))]
 
+                    # Parse and expand URLs if there are any
                     expanded_urls = parse_and_expand_urls(urls) if urls else []
 
                     valid_local_files = []
@@ -793,7 +794,7 @@ def create_video_transcription_tab():
                                        api_key, keywords, use_cookies, cookies, batch_size,
                                        timestamp_option, keep_original_video):
                 try:
-                    logging.info("process_videos_wrapper called")
+                    logging.info("process_videos_wrapper(): process_videos_wrapper called")
 
                     # Handle both URL input and file upload
                     inputs = []
@@ -804,28 +805,31 @@ def create_video_transcription_tab():
 
                     if not inputs:
                         raise ValueError("No input provided. Please enter URLs or upload a video file.")
+                    try:
+                        result = process_videos_with_error_handling(
+                            inputs, start_time, end_time, diarize, whisper_model,
+                            custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
+                            chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
+                            use_multi_level_chunking, chunk_language, api_name,
+                            api_key, keywords, use_cookies, cookies, batch_size,
+                            timestamp_option, keep_original_video, summarize_recursively
+                        )
+                    except Exception as e:
+                        logging.error(f"process_videos_wrapper(): Error in process_videos_with_error_handling: {str(e)}", exc_info=True)
 
-                    result = process_videos_with_error_handling(
-                        inputs, start_time, end_time, diarize, whisper_model,
-                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
-                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                        use_multi_level_chunking, chunk_language, api_name,
-                        api_key, keywords, use_cookies, cookies, batch_size,
-                        timestamp_option, keep_original_video, summarize_recursively
-                    )
-                    logging.info("process_videos_with_error_handling completed")
+                    logging.info("process_videos_wrapper(): process_videos_with_error_handling completed")
 
                     # Ensure that result is a tuple with 5 elements
                     if not isinstance(result, tuple) or len(result) != 5:
                         raise ValueError(
-                            f"Expected 5 outputs, but got {len(result) if isinstance(result, tuple) else 1}")
+                            f"process_videos_wrapper(): Expected 5 outputs, but got {len(result) if isinstance(result, tuple) else 1}")
 
                     return result
                 except Exception as e:
-                    logging.error(f"Error in process_videos_wrapper: {str(e)}", exc_info=True)
+                    logging.error(f"process_videos_wrapper(): Error in process_videos_wrapper: {str(e)}", exc_info=True)
                     # Return a tuple with 5 elements in case of any error
                     return (
-                        f"An error occurred: {str(e)}",  # progress_output
+                        f"process_videos_wrapper(): An error occurred: {str(e)}",  # progress_output
                         str(e),  # error_output
                         f"<div class='error'>Error: {str(e)}</div>",  # results_output
                         None,  # download_transcription
@@ -992,8 +996,8 @@ def create_video_transcription_tab():
                     json_file_path, summary_file_path = save_transcription_and_summary(full_text_with_metadata,
                                                                                        summary_text,
                                                                                        download_path, info_dict)
-                    logging.info(
-                        f"Transcription and summary saved. JSON file: {json_file_path}, Summary file: {summary_file_path}")
+                    logging.info(f"Transcription saved to: {json_file_path}")
+                    logging.info(f"Summary saved to: {summary_file_path}")
 
                     # Prepare keywords for database
                     if isinstance(keywords, str):
@@ -1832,7 +1836,7 @@ def create_chat_interface():
                     selected_parts.append("summary")
                 if use_prompt and "prompt" in content:
                     selected_parts.append("prompt")
-                print(f"Debug - Update Chat Content - Content: {content}")
+                print(f"Debug - Update Chat Content - Content(first 500 char): {content[:500]}")
                 print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
                 return content, selected_parts
             else:
@@ -2765,5 +2769,7 @@ def launch_ui(share_public=None, server_mode=False):
     elif server_mode and not share_public:
         iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
     else:
-        iface.launch(share=False)
-
+        try:
+            iface.launch(share=False)
+        except Exception as e:
+            logging.error(f"Error launching interface: {str(e)}")
