@@ -925,6 +925,3 @@ Sample commands:
             logging.error('An error occurred during the transcription process.')
             logging.error(str(e))
             sys.exit(1)
-
-        finally:
-            cleanup_process()
