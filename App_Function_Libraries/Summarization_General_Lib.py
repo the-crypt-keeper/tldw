@@ -300,10 +300,11 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
         if api_key is None or api_key.strip() == "":
             logging.info("Cohere: API key not provided as parameter")
             logging.info("Cohere: Attempting to use API key from config file")
-            cohere_api_key = loaded_config_data['api_keys']['cohere']
+            api_key = loaded_config_data['api_keys']['cohere']
 
         if api_key is None or api_key.strip() == "":
             logging.error("Cohere: API key not found or is empty")
+            logging.debug(f"Loaded config data: {loaded_config_data}")
             return "Cohere: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"Cohere: Using API Key: {api_key[:5]}...{api_key[-5:]}")
@@ -335,6 +336,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
 
         cohere_model = loaded_config_data['models']['cohere']
 
+        cohere_api_key = api_key
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
@@ -342,21 +345,18 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
         }
 
         cohere_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
-        logging.debug("cohere: Prompt being sent is {cohere_prompt}")
-
-        model = loaded_config_data['models']['anthropic']
+        logging.debug(f"cohere: Prompt being sent is {cohere_prompt}")
 
         data = {
             "chat_history": [
                 {"role": "USER", "message": cohere_prompt}
             ],
             "message": "Please provide a summary.",
-            "model": model,
+            "model": cohere_model,
             "connectors": [{"id": "web-search"}]
         }
 
         logging.debug("cohere: Submitting request to API endpoint")
-        print("cohere: Submitting request to API endpoint")
         response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
         response_data = response.json()
         logging.debug("API Response Data: %s", response_data)
@@ -775,6 +775,7 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
 
     for index, url in enumerate(url_list):
         try:
+            logging.info(f"Starting to process video {index + 1}/{len(url_list)}: {url}")
             transcription, summary, json_file_path, summary_file_path, _, _ = process_url(
                 url=url,
                 num_speakers=num_speakers,
@@ -804,9 +805,17 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
                 recursive_summarization=recursive_summarization
             )
             # Update progress and transcription properly
+
             current_progress, current_status = update_progress(index, url, "Video processed and ingested into the database.")
+            logging.info(f"Successfully processed video {index + 1}/{len(url_list)}: {url}")
+
+            time.sleep(1)
         except Exception as e:
+            logging.error(f"Error processing video {index + 1}/{len(url_list)}: {url}")
+            logging.error(f"Error details: {str(e)}")
             current_progress, current_status = update_progress(index, url, f"Error: {str(e)}")
+
+        yield current_progress, current_status, None, None, None, None
 
     success_message = "All videos have been transcribed, summarized, and ingested into the database successfully."
     return current_progress, success_message, None, None, None, None
@@ -974,10 +983,6 @@ def extract_metadata_and_content(input_data):
 
     return metadata, content
 
-def extract_text_from_segments(segments):
-    if isinstance(segments, list):
-        return ' '.join([seg.get('Text', '') for seg in segments if 'Text' in seg])
-    return str(segments)
 
 def format_input_with_metadata(metadata, content):
     formatted_input = f"Title: {metadata.get('title', 'No title available')}\n"
@@ -987,7 +992,7 @@ def format_input_with_metadata(metadata, content):
 
 def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False):
     loaded_config_data = load_and_log_configs()
-
+    logging.info("Starting summarization process...")
     if custom_prompt_input is None:
         custom_prompt_input = """
         You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
@@ -1045,6 +1050,8 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
                     file.write(summary)
         else:
             logging.warning(f"Failed to generate summary using {api_name} API")
+
+        logging.info("Summarization completed successfully.")
 
         return summary
 
