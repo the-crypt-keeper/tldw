@@ -199,10 +199,8 @@ def get_youtube_playlist_urls(playlist_id):
         return [entry['url'] for entry in result['entries'] if entry.get('url')]
 
 
-def parse_and_expand_urls(url_input):
-    logging.info(f"Starting parse_and_expand_urls with input: {url_input}")
-    urls = [url.strip() for url in url_input.split('\n') if url.strip()]
-    logging.info(f"Parsed URLs: {urls}")
+def parse_and_expand_urls(urls):
+    logging.info(f"Starting parse_and_expand_urls with input: {urls}")
     expanded_urls = []
 
     for url in urls:

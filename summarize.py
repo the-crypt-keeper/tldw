@@ -654,6 +654,8 @@ def main(input_path, api_name=None, api_key=None,
             logging.error(f"Error processing {path}: {str(e)}")
             continue
 
+    logging.debug("Total time taken: %s seconds", time.monotonic() - start_time)
+    logging.info("MAIN: returing transcription_text.")
     return transcription_text
 
 
@@ -925,6 +927,7 @@ Sample commands:
             logging.error('An error occurred during the transcription process.')
             logging.error(str(e))
             sys.exit(1)
+    def cleanup():
+        logging.info("Cleanup function called. Script is exiting.")
 
-        finally:
-            cleanup_process()
+    atexit.register(cleanup)
