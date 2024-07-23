@@ -22,6 +22,9 @@ import sys
 import subprocess
 import time
 
+# DEBUG Imports
+from memory_profiler import profile
+
 # Import Local
 #
 #######################################################################################################################
@@ -32,6 +35,20 @@ import time
 #   ffmpeg -i "example.mp4" -ar 16000 -ac 1 -c:a pcm_s16le "output.wav"
 #       https://www.gyan.dev/ffmpeg/builds/
 #
+
+
+global whisper_model_instance
+
+def get_whisper_model(model_name, device):
+    global whisper_model_instance
+    if whisper_model_instance is None:
+        from faster_whisper import WhisperModel
+        # Retrieve processing choice from the configuration file
+        config = configparser.ConfigParser()
+        config.read('config.txt')
+        processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
+        whisper_model_instance = WhisperModel(model_name, device=f"{processing_choice}")
+    return whisper_model_instance
 
 
 # os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
@@ -95,12 +112,7 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 # Transcribe .wav into .segments.json
 def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, diarize=False):
     logging.info('speech-to-text: Loading faster_whisper model: %s', whisper_model)
-    from faster_whisper import WhisperModel
-    # Retrieve processing choice from the configuration file
-    config = configparser.ConfigParser()
-    config.read('config.txt')
-    processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
-    model = WhisperModel(whisper_model, device=f"{processing_choice}")
+
     time_start = time.time()
     if audio_file_path is None:
         raise ValueError("speech-to-text: No audio file provided")
@@ -120,7 +132,7 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         logging.info('speech-to-text: Starting transcription...')
         options = dict(language=selected_source_lang, beam_size=5, best_of=5, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
-        segments_raw, info = model.transcribe(audio_file_path, **transcribe_options)
+        segments_raw, info = whisper_model_instance.transcribe(audio_file_path, **transcribe_options)
 
         segments = []
         for segment_chunk in segments_raw:
