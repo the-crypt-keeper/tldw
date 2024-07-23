@@ -2717,7 +2717,7 @@ def launch_ui(share_public=None, server_mode=False):
     }
     """
 
-    with gr.Blocks(css=css) as iface:
+    with gr.Blocks(theme='bethecloud/storj_theme',css=css) as iface:
         gr.Markdown("# TL/DW: Too Long, Didn't Watch - Your Personal Research Multi-Tool")
         with gr.Tabs():
             with gr.TabItem("Transcription / Summarization / Ingestion"):
