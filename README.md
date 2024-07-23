@@ -476,6 +476,7 @@ By default, videos, transcriptions and summaries are stored in a folder with the
 - Commercial offerings:
   * Bit.ai 
   * typeset.io/
+  * https://www.getcoralai.com/
 ------------
 
 ### <a name="credits"></a>Credits
