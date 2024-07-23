@@ -15,12 +15,16 @@ import configparser
 ####################
 #
 # Import necessary libraries to run solo for testing
+import gc
 import json
 import logging
 import os
 import sys
 import subprocess
 import time
+
+# DEBUG Imports
+from memory_profiler import profile
 
 # Import Local
 #
@@ -34,7 +38,25 @@ import time
 #
 
 
+whisper_model_instance = None
+# Retrieve processing choice from the configuration file
+config = configparser.ConfigParser()
+config.read('config.txt')
+processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
+
+
+def get_whisper_model(model_name, device):
+    global whisper_model_instance
+    if whisper_model_instance is None or whisper_model_instance.model_size != model_name:
+        from faster_whisper import WhisperModel
+        logging.info(f"Initializing new WhisperModel with size {model_name} on device {device}")
+        whisper_model_instance = WhisperModel(model_name, device=device)
+    return whisper_model_instance
+
+
 # os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
+#DEBUG
+@profile
 def convert_to_wav(video_file_path, offset=0, overwrite=False):
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
 
@@ -89,18 +111,17 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
     except Exception as e:
         logging.error("speech-to-text: Error transcribing audio: %s", str(e))
         return {"error": str(e)}
+    gc.collect()
     return out_path
 
 
 # Transcribe .wav into .segments.json
+#DEBUG
+@profile
 def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, diarize=False):
+    global whisper_model_instance, processing_choice
     logging.info('speech-to-text: Loading faster_whisper model: %s', whisper_model)
-    from faster_whisper import WhisperModel
-    # Retrieve processing choice from the configuration file
-    config = configparser.ConfigParser()
-    config.read('config.txt')
-    processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
-    model = WhisperModel(whisper_model, device=f"{processing_choice}")
+
     time_start = time.time()
     if audio_file_path is None:
         raise ValueError("speech-to-text: No audio file provided")
@@ -120,7 +141,9 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         logging.info('speech-to-text: Starting transcription...')
         options = dict(language=selected_source_lang, beam_size=5, best_of=5, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
-        segments_raw, info = model.transcribe(audio_file_path, **transcribe_options)
+        # use function and config at top of file
+        whisper_model_instance = get_whisper_model(whisper_model, processing_choice)
+        segments_raw, info = whisper_model_instance.transcribe(audio_file_path, **transcribe_options)
 
         segments = []
         for segment_chunk in segments_raw:
@@ -131,27 +154,36 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
             }
             logging.debug("Segment: %s", chunk)
             segments.append(chunk)
+
+        if segments:
+            segments[0]["Text"] = f"This text was transcribed using whisper model: {whisper_model}\n\n" + segments[0]["Text"]
+
         if not segments:
             raise RuntimeError("No transcription produced. The audio file may be invalid or empty.")
         logging.info("speech-to-text: Transcription completed in %.2f seconds", time.time() - time_start)
 
-        # Create a dictionary with the 'segments' key
-        output_data = {'segments': segments}
+        # Save the segments to a JSON file - prettified and non-prettified
+        # FIXME so this is an optional flag to save either the prettified json file or the normal one
+        save_json = True
+        if save_json:
+            logging.info("speech-to-text: Saving segments to JSON file")
+            output_data = {'segments': segments}
 
-        # Save prettified JSON
-        logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
-        with open(prettified_out_file, 'w') as f:
-            json.dump(output_data, f, indent=2)
+            logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
+            with open(prettified_out_file, 'w') as f:
+                json.dump(output_data, f, indent=2)
 
-        # Save non-prettified JSON
-        logging.info("speech-to-text: Saving JSON to %s", out_file)
-        with open(out_file, 'w') as f:
-            json.dump(output_data, f)
+            logging.info("speech-to-text: Saving JSON to %s", out_file)
+            with open(out_file, 'w') as f:
+                json.dump(output_data, f)
+
+        logging.debug(f"speech-to-text: returning {segments[:500]}")
+        gc.collect()
+        return segments
 
     except Exception as e:
         logging.error("speech-to-text: Error transcribing audio: %s", str(e))
         raise RuntimeError("speech-to-text: Error transcribing audio")
-    return segments
 
 #
 #
