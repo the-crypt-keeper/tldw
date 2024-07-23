@@ -198,7 +198,8 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries
             logging.debug("AnthropicAI: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"AnthropicAI: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"AnthropicAI: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"AnthropicAI: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -317,7 +318,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
             logging.debug("Cohere: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"Cohere: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"Cohere: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"Cohere: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -405,7 +407,8 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
             logging.debug("Groq: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"Groq: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"Groq: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"Groq: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -505,7 +508,8 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
         logging.debug("openrouter: Using provided string data for summarization")
         data = input_data
 
-    logging.debug(f"openrouter: Loaded data: {data}")
+    # DEBUG - Debug logging to identify sent data
+    logging.debug(f"openrouter: Loaded data: {data[:500]}...(snipped to first 500 chars)")
     logging.debug(f"openrouter: Type of data: {type(data)}")
 
     if isinstance(data, dict) and 'summary' in data:
@@ -595,7 +599,8 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
             logging.debug("HuggingFace: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"HuggingFace: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"HuggingFace: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"HuggingFace: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -671,7 +676,8 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
             logging.debug("DeepSeek: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"DeepSeek: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"DeepSeek: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"DeepSeek: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
