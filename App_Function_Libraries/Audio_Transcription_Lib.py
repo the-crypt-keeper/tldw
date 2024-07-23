@@ -123,16 +123,18 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         segments_raw, info = model.transcribe(audio_file_path, **transcribe_options)
 
         segments = []
-        for i, segment_chunk in segments_raw:
+        for segment_chunk in segments_raw:
             chunk = {
                 "Time_Start": segment_chunk.start,
                 "Time_End": segment_chunk.end,
                 "Text": segment_chunk.text
             }
-            if i == 0:
-                chunk["Text"] = f"This text was transcribed using whisper model: {whisper_model}\n\n" + chunk["Text"]
             logging.debug("Segment: %s", chunk)
             segments.append(chunk)
+
+        if segments:
+            segments[0]["Text"] = f"This text was transcribed using whisper model: {whisper_model}\n\n" + segments[0]["Text"]
+
         if not segments:
             raise RuntimeError("No transcription produced. The audio file may be invalid or empty.")
         logging.info("speech-to-text: Transcription completed in %.2f seconds", time.time() - time_start)
@@ -140,25 +142,19 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         # Save the segments to a JSON file - prettified and non-prettified
         # FIXME so this is an optional flag to save either the prettified json file or the normal one
         save_json = True
-        try:
-            if save_json:
-                logging.info("speech-to-text: Saving segments to JSON file")
-                # Create a dictionary with the 'segments' key
-                output_data = {'segments': segments}
+        if save_json:
+            logging.info("speech-to-text: Saving segments to JSON file")
+            output_data = {'segments': segments}
 
-                # Save prettified JSON
-                logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
-                with open(prettified_out_file, 'w') as f:
-                    json.dump(output_data, f, indent=2)
+            logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
+            with open(prettified_out_file, 'w') as f:
+                json.dump(output_data, f, indent=2)
 
-                # Save non-prettified JSON
-                logging.info("speech-to-text: Saving JSON to %s", out_file)
-                with open(out_file, 'w') as f:
-                    json.dump(output_data, f)
-        except Exception as e:
-            logging.error("speech-to-text: Error saving JSON file: %s", str(e))
-            raise RuntimeError("speech-to-text: Error saving JSON file")
+            logging.info("speech-to-text: Saving JSON to %s", out_file)
+            with open(out_file, 'w') as f:
+                json.dump(output_data, f)
 
+        logging.debug(f"speech-to-text: returning {segments[:500]}")
         return segments
 
     except Exception as e:
