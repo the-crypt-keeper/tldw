@@ -21,32 +21,27 @@
 #
 ####################
 # Import necessary libraries
-from asyncio import subprocess
-import atexit
+#import atexit
 import re
+import subprocess
 import sys
 import time
+
+from App_Function_Libraries.Utils import download_file
 # Import 3rd-pary Libraries
 #
 # Import Local
 from Article_Summarization_Lib import *
-from App_Function_Libraries.Utils import download_file
+
 #
 #
 #######################################################################################################################
 # Function Definitions
 #
 
-# Download latest llamafile from Github
-    # Example usage
-    #repo = "Mozilla-Ocho/llamafile"
-    #asset_name_prefix = "llamafile-"
-    #output_filename = "llamafile"
-    #download_latest_llamafile(repo, asset_name_prefix, output_filename)
 
-# THIS SHOULD ONLY BE CALLED IF THE USER IS USING THE GUI TO SETUP LLAMAFILE
-# Function is used to download only llamafile
-def download_latest_llamafile_no_model(output_filename):
+# Function to download the latest llamafile from the Mozilla-Ocho/llamafile repo
+def download_latest_llamafile(output_filename):
     # Check if the file already exists
     print("Checking for and downloading Llamafile it it doesn't already exist...")
     if os.path.exists(output_filename):
@@ -55,8 +50,8 @@ def download_latest_llamafile_no_model(output_filename):
         llamafile_exists = True
     else:
         llamafile_exists = False
-
-    if llamafile_exists == True:
+    # Double check if the file exists
+    if llamafile_exists:
         pass
     else:
         # Establish variables for Llamafile download
@@ -107,288 +102,102 @@ def download_latest_llamafile_no_model(output_filename):
     return output_filename
 
 
-# FIXME - Add option in GUI for selecting the other models for download
-# Should only be called from 'local_llm_gui_function' - if its called from anywhere else, shits broken.
-# Function is used to download llamafile + A model from Huggingface
-def download_latest_llamafile_through_gui(repo, asset_name_prefix, output_filename):
-    # Check if the file already exists
-    print("Checking for and downloading Llamafile it it doesn't already exist...")
-    if os.path.exists(output_filename):
-        print("Llamafile already exists. Skipping download.")
-        logging.debug(f"{output_filename} already exists. Skipping download.")
-        llamafile_exists = True
-    else:
-        llamafile_exists = False
+def download_llm_model(model_name, model_url, model_filename, model_hash):
+    print("Checking available LLM models:")
+    available_models = []
+    missing_models = []
 
-    if llamafile_exists == True:
-        pass
-    else:
-        # Get the latest release information
-        latest_release_url = f"https://api.github.com/repos/{repo}/releases/latest"
-        response = requests.get(latest_release_url)
-        if response.status_code != 200:
-            raise Exception(f"Failed to fetch latest release info: {response.status_code}")
-
-        latest_release_data = response.json()
-        tag_name = latest_release_data['tag_name']
-
-        # Get the release details using the tag name
-        release_details_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag_name}"
-        response = requests.get(release_details_url)
-        if response.status_code != 200:
-            raise Exception(f"Failed to fetch release details for tag {tag_name}: {response.status_code}")
-
-        release_data = response.json()
-        assets = release_data.get('assets', [])
-
-        # Find the asset with the specified prefix
-        asset_url = None
-        for asset in assets:
-            if re.match(f"{asset_name_prefix}.*", asset['name']):
-                asset_url = asset['browser_download_url']
-                break
-
-        if not asset_url:
-            raise Exception(f"No asset found with prefix {asset_name_prefix}")
-
-        # Download the asset
-        response = requests.get(asset_url)
-        if response.status_code != 200:
-            raise Exception(f"Failed to download asset: {response.status_code}")
-
-        print("Llamafile downloaded successfully.")
-        logging.debug("Main: Llamafile downloaded successfully.")
-
-        # Save the file
-        with open(output_filename, 'wb') as file:
-            file.write(response.content)
-
-        logging.debug(f"Downloaded {output_filename} from {asset_url}")
-        print(f"Downloaded {output_filename} from {asset_url}")
-
-    # Check to see if the LLM already exists, and if not, download the LLM
-    print("Checking for and downloading LLM from Huggingface if needed...")
-    logging.debug("Main: Checking and downloading LLM from Huggingface if needed...")
-    mistral_7b_instruct_v0_2_q8_0_llamafile = "mistral-7b-instruct-v0.2.Q8_0.llamafile"
-    Samantha_Mistral_Instruct_7B_Bulleted_Notes_Q8 = "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf"
-    Phi_3_mini_128k_instruct_Q8_0_gguf = "Phi-3-mini-128k-instruct-Q8_0.gguf"
-    if os.path.exists(mistral_7b_instruct_v0_2_q8_0_llamafile):
-        llamafile_llm_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
-        print("Model is already downloaded. Skipping download.")
-        pass
-    elif os.path.exists(Samantha_Mistral_Instruct_7B_Bulleted_Notes_Q8):
-        llamafile_llm_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
-        print("Model is already downloaded. Skipping download.")
-        pass
-    elif os.path.exists(mistral_7b_instruct_v0_2_q8_0_llamafile):
-        llamafile_llm_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
-        print("Model is already downloaded. Skipping download.")
-        pass
-    else:
-        logging.debug("Main: Checking and downloading LLM from Huggingface if needed...")
-        print("Downloading LLM from Huggingface...")
-        time.sleep(1)
-        print("Gonna be a bit...")
-        time.sleep(1)
-        print("Like seriously, an 8GB file...")
-        time.sleep(2)
-        # Not needed for GUI
-        # dl_check = input("Final chance to back out, hit 'N'/'n' to cancel, or 'Y'/'y' to continue: ")
-        #if dl_check == "N" or dl_check == "n":
-        #     exit()
-        x = 2
-        if x != 1:
-            print("Uhhhh how'd you get here...?")
-            exit()
+    for key, model in llm_models.items():
+        if os.path.exists(model['filename']):
+            print(f"{key}. {model['name']} (Available)")
+            available_models.append(key)
         else:
-            print("Downloading LLM from Huggingface...")
-            # Establish hash values for LLM models
-            mistral_7b_instruct_v0_2_q8_gguf_sha256 = "f326f5f4f137f3ad30f8c9cc21d4d39e54476583e8306ee2931d5a022cb85b06"
-            samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
-            mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
-            global llm_choice
+            print(f"{key}. {model['name']} (Not downloaded)")
+            missing_models.append(key)
 
-            # FIXME - llm_choice
-            llm_choice = 2
-            llm_choice = input("Which LLM model would you like to download? 1. Mistral-7B-Instruct-v0.2-GGUF or 2. Samantha-Mistral-Instruct-7B-Bulleted-Notes) (plain or 'custom') or MS Flavor: Phi-3-mini-128k-instruct-Q8_0.gguf  \n\n\tPress '1' or '2' or '3' to specify: ")
-            while llm_choice != "1" and llm_choice != "2" and llm_choice != "3":
-                print("Invalid choice. Please try again.")
-            if llm_choice == "1":
-                llm_download_model = "Mistral-7B-Instruct-v0.2-Q8.llamafile"
-                mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
-                llm_download_model_hash = mistral_7b_instruct_v0_2_q8_0_llamafile_sha256
-                llamafile_llm_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
-                llamafile_llm_output_filename = "mistral-7b-instruct-v0.2.Q8_0.llamafile"
-                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
-            elif llm_choice == "2":
-                llm_download_model = "Samantha-Mistral-Instruct-7B-Bulleted-Notes-Q8.gguf"
-                samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
-                llm_download_model_hash = samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256
-                llamafile_llm_output_filename = "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf"
-                llamafile_llm_url = "https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b-bulleted-notes-GGUF/resolve/main/samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf?download=true"
-                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
-            elif llm_choice == "3":
-                llm_download_model = "Phi-3-mini-128k-instruct-Q8_0.gguf"
-                Phi_3_mini_128k_instruct_Q8_0_gguf_sha256 = "6817b66d1c3c59ab06822e9732f0e594eea44e64cae2110906eac9d17f75d193"
-                llm_download_model_hash = Phi_3_mini_128k_instruct_Q8_0_gguf_sha256
-                llamafile_llm_output_filename = "Phi-3-mini-128k-instruct-Q8_0.gguf"
-                llamafile_llm_url = "https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF/resolve/main/Phi-3-mini-128k-instruct-Q8_0.gguf?download=true"
-                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
-            elif llm_choice == "4": # FIXME - and meta_Llama_3_8B_Instruct_Q8_0_llamafile_exists == False:
-                meta_Llama_3_8B_Instruct_Q8_0_llamafile_sha256 = "406868a97f02f57183716c7e4441d427f223fdbc7fa42964ef10c4d60dd8ed37"
-                llm_download_model_hash = meta_Llama_3_8B_Instruct_Q8_0_llamafile_sha256
-                llamafile_llm_output_filename = " Meta-Llama-3-8B-Instruct.Q8_0.llamafile"
-                llamafile_llm_url = "https://huggingface.co/Mozilla/Meta-Llama-3-8B-Instruct-llamafile/resolve/main/Meta-Llama-3-8B-Instruct.Q8_0.llamafile?download=true"
+    if not available_models:
+        print("No models are currently downloaded.")
+    else:
+        print(f"\n{len(available_models)} model(s) are available for use.")
+
+    action = input("Do you want to (u)se an available model, (d)ownload a new model, or (q)uit? ").lower()
+
+    if action == 'u':
+        if not available_models:
+            print("No models are available. Please download a model first.")
+            return None
+        while True:
+            choice = input(f"Enter the number of the model you want to use ({', '.join(available_models)}): ")
+            if choice in available_models:
+                print(f"Selected model: {llm_models[choice]['name']}")
+                return llm_models[choice]['filename']
             else:
                 print("Invalid choice. Please try again.")
-    return output_filename
 
-
-# Maybe replace/ dead code? FIXME
-# Function is used to download llamafile + A model from Huggingface
-def download_latest_llamafile(repo, asset_name_prefix, output_filename):
-    # Check if the file already exists
-    print("Checking for and downloading Llamafile it it doesn't already exist...")
-    if os.path.exists(output_filename):
-        print("Llamafile already exists. Skipping download.")
-        logging.debug(f"{output_filename} already exists. Skipping download.")
-        llamafile_exists = True
-    else:
-        llamafile_exists = False
-
-    if llamafile_exists == True:
-        pass
-    else:
-        # Get the latest release information
-        latest_release_url = f"https://api.github.com/repos/{repo}/releases/latest"
-        response = requests.get(latest_release_url)
-        if response.status_code != 200:
-            raise Exception(f"Failed to fetch latest release info: {response.status_code}")
-
-        latest_release_data = response.json()
-        tag_name = latest_release_data['tag_name']
-
-        # Get the release details using the tag name
-        release_details_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag_name}"
-        response = requests.get(release_details_url)
-        if response.status_code != 200:
-            raise Exception(f"Failed to fetch release details for tag {tag_name}: {response.status_code}")
-
-        release_data = response.json()
-        assets = release_data.get('assets', [])
-
-        # Find the asset with the specified prefix
-        asset_url = None
-        for asset in assets:
-            if re.match(f"{asset_name_prefix}.*", asset['name']):
-                asset_url = asset['browser_download_url']
-                break
-
-        if not asset_url:
-            raise Exception(f"No asset found with prefix {asset_name_prefix}")
-
-        # Download the asset
-        response = requests.get(asset_url)
-        if response.status_code != 200:
-            raise Exception(f"Failed to download asset: {response.status_code}")
-
-        print("Llamafile downloaded successfully.")
-        logging.debug("Main: Llamafile downloaded successfully.")
-
-        # Save the file
-        with open(output_filename, 'wb') as file:
-            file.write(response.content)
-
-        logging.debug(f"Downloaded {output_filename} from {asset_url}")
-        print(f"Downloaded {output_filename} from {asset_url}")
-
-    # Check to see if the LLM already exists, and if not, download the LLM
-    print("Checking for and downloading LLM from Huggingface if needed...")
-    logging.debug("Main: Checking and downloading LLM from Huggingface if needed...")
-    mistral_7b_instruct_v0_2_q8_0_llamafile = "mistral-7b-instruct-v0.2.Q8_0.llamafile"
-    Samantha_Mistral_Instruct_7B_Bulleted_Notes_Q8 = "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf"
-    Phi_3_mini_128k_instruct_Q8_0_gguf = "Phi-3-mini-128k-instruct-Q8_0.gguf"
-    if os.path.exists(mistral_7b_instruct_v0_2_q8_0_llamafile):
-        llamafile_llm_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
-        print("Model is already downloaded. Skipping download.")
-        pass
-    elif os.path.exists(Samantha_Mistral_Instruct_7B_Bulleted_Notes_Q8):
-        llamafile_llm_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
-        print("Model is already downloaded. Skipping download.")
-        pass
-    elif os.path.exists(mistral_7b_instruct_v0_2_q8_0_llamafile):
-        llamafile_llm_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
-        print("Model is already downloaded. Skipping download.")
-        pass
-    else:
-        logging.debug("Main: Checking and downloading LLM from Huggingface if needed...")
-        print("Downloading LLM from Huggingface...")
-        time.sleep(1)
-        print("Gonna be a bit...")
-        time.sleep(1)
-        print("Like seriously, an 8GB file...")
-        time.sleep(2)
-        dl_check = input("Final chance to back out, hit 'N'/'n' to cancel, or 'Y'/'y' to continue: ")
-        if dl_check == "N" or dl_check == "n":
-            exit()
-        else:
-            print("Downloading LLM from Huggingface...")
-            # Establish hash values for LLM models
-            mistral_7b_instruct_v0_2_q8_gguf_sha256 = "f326f5f4f137f3ad30f8c9cc21d4d39e54476583e8306ee2931d5a022cb85b06"
-            samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
-            mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
-
-            # FIXME - llm_choice
-            llm_choice = 2
-            llm_choice = input("Which LLM model would you like to download? 1. Mistral-7B-Instruct-v0.2-GGUF or 2. Samantha-Mistral-Instruct-7B-Bulleted-Notes) (plain or 'custom') or MS Flavor: Phi-3-mini-128k-instruct-Q8_0.gguf  \n\n\tPress '1' or '2' or '3' to specify: ")
-            while llm_choice != "1" and llm_choice != "2" and llm_choice != "3":
-                print("Invalid choice. Please try again.")
-            if llm_choice == "1":
-                llm_download_model = "Mistral-7B-Instruct-v0.2-Q8.llamafile"
-                mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
-                llm_download_model_hash = mistral_7b_instruct_v0_2_q8_0_llamafile_sha256
-                llamafile_llm_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
-                llamafile_llm_output_filename = "mistral-7b-instruct-v0.2.Q8_0.llamafile"
-                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
-            elif llm_choice == "2":
-                llm_download_model = "Samantha-Mistral-Instruct-7B-Bulleted-Notes-Q8.gguf"
-                samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
-                llm_download_model_hash = samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256
-                llamafile_llm_output_filename = "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf"
-                llamafile_llm_url = "https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF/resolve/main/samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf?download=true"
-                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
-            elif llm_choice == "3":
-                llm_download_model = "Phi-3-mini-128k-instruct-Q8_0.gguf"
-                Phi_3_mini_128k_instruct_Q8_0_gguf_sha256 = "6817b66d1c3c59ab06822e9732f0e594eea44e64cae2110906eac9d17f75d193"
-                llm_download_model_hash = Phi_3_mini_128k_instruct_Q8_0_gguf_sha256
-                llamafile_llm_output_filename = "Phi-3-mini-128k-instruct-Q8_0.gguf"
-                llamafile_llm_url = "https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF/resolve/main/Phi-3-mini-128k-instruct-Q8_0.gguf?download=true"
-                download_file(llamafile_llm_url, llamafile_llm_output_filename, llm_download_model_hash)
-            elif llm_choice == "4": # FIXME - and meta_Llama_3_8B_Instruct_Q8_0_llamafile_exists == False:
-                meta_Llama_3_8B_Instruct_Q8_0_llamafile_sha256 = "406868a97f02f57183716c7e4441d427f223fdbc7fa42964ef10c4d60dd8ed37"
-                llm_download_model_hash = meta_Llama_3_8B_Instruct_Q8_0_llamafile_sha256
-                llamafile_llm_output_filename = " Meta-Llama-3-8B-Instruct.Q8_0.llamafile"
-                llamafile_llm_url = "https://huggingface.co/Mozilla/Meta-Llama-3-8B-Instruct-llamafile/resolve/main/Meta-Llama-3-8B-Instruct.Q8_0.llamafile?download=true"
+    elif action == 'd':
+        if not missing_models:
+            print("All models are already downloaded. You can use an available model.")
+            return None
+        print("\nThe following models can be downloaded:")
+        for key in missing_models:
+            print(f"{key}. {llm_models[key]['name']}")
+        while True:
+            choice = input(f"Enter the number of the model you want to download ({', '.join(missing_models)}): ")
+            if choice in missing_models:
+                model = llm_models[choice]
+                print(f"Downloading {model['name']}...")
+                download_file(model['url'], model['filename'], expected_checksum=model['hash'])
+                print(f"{model['filename']} has been downloaded successfully.")
+                return model['filename']
             else:
                 print("Invalid choice. Please try again.")
-    return output_filename
+
+    elif action == 'q':
+        print("Exiting model selection.")
+        return None
+
+    else:
+        print("Invalid action. Exiting model selection.")
+        return None
 
 
 
 
-# FIXME / IMPLEMENT FULLY
-# File download verification
-#mistral_7b_llamafile_instruct_v02_q8_url = "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true"
-#global mistral_7b_instruct_v0_2_q8_0_llamafile_sha256
-#mistral_7b_instruct_v0_2_q8_0_llamafile_sha256 = "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
 
-#mistral_7b_v02_instruct_model_q8_gguf_url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q8_0.gguf?download=true"
-#global mistral_7b_instruct_v0_2_q8_gguf_sha256
-#mistral_7b_instruct_v0_2_q8_gguf_sha256 = "f326f5f4f137f3ad30f8c9cc21d4d39e54476583e8306ee2931d5a022cb85b06"
 
-#samantha_instruct_model_q8_gguf_url = "https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF/resolve/main/samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf?download=true"
-#global samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256
-#samantha_mistral_instruct_7b_bulleted_notes_q8_0_gguf_sha256 = "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
+#
+#
+########################################
+#
+# LLM models information
+
+
+llm_models = {
+    "1": {
+        "name": "Mistral-7B-Instruct-v0.2-Q8.llamafile",
+        "url": "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true",
+        "filename": "mistral-7b-instruct-v0.2.Q8_0.llamafile",
+        "hash": "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
+    },
+    "2": {
+        "name": "Samantha-Mistral-Instruct-7B-Bulleted-Notes-Q8.gguf",
+        "url": "https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b-bulleted-notes-GGUF/resolve/main/samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf?download=true",
+        "filename": "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf",
+        "hash": "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
+    },
+    "3": {
+        "name": "Phi-3-mini-128k-instruct-Q8_0.gguf",
+        "url": "https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF/resolve/main/Phi-3-mini-128k-instruct-Q8_0.gguf?download=true",
+        "filename": "Phi-3-mini-128k-instruct-Q8_0.gguf",
+        "hash": "6817b66d1c3c59ab06822e9732f0e594eea44e64cae2110906eac9d17f75d193"
+    },
+    "4": {
+        "name": "Meta-Llama-3-8B-Instruct.Q8_0.llamafile",
+        "url": "https://huggingface.co/Mozilla/Meta-Llama-3-8B-Instruct-llamafile/resolve/main/Meta-Llama-3-8B-Instruct.Q8_0.llamafile?download=true",
+        "filename": "Meta-Llama-3-8B-Instruct.Q8_0.llamafile",
+        "hash": "406868a97f02f57183716c7e4441d427f223fdbc7fa42964ef10c4d60dd8ed37"
+    }
+}
 
 
 process = None
@@ -396,7 +205,8 @@ process = None
 def cleanup_process():
     global process
     if process is not None:
-        process.kill()
+        # FIXME - process.kill()
+        #process.kill()
         logging.debug("Main: Terminated the external process")
 
 
@@ -409,8 +219,6 @@ def signal_handler(sig, frame):
 # FIXME - Add callout to gradio UI
 def local_llm_function():
     global process
-    repo = "Mozilla-Ocho/llamafile"
-    asset_name_prefix = "llamafile-"
     useros = os.name
     if useros == "nt":
         output_filename = "llamafile.exe"
@@ -422,12 +230,20 @@ def local_llm_function():
     print("WARNING - Hope you're comfy. Or it's already downloaded.")
     time.sleep(6)
     logging.debug("Main: Checking and downloading Llamafile from Github if needed...")
-    llamafile_path = download_latest_llamafile(repo, asset_name_prefix, output_filename)
+    llamafile_path = download_latest_llamafile(output_filename)
     logging.debug("Main: Llamafile downloaded successfully.")
 
     # FIXME - llm_choice
-    global llm_choice
-    llm_choice = 1
+    input("What model do you want to use? (Press Enter to continue)")
+    print("1. Mistral-7B-Instruct-v0.2-Q8.llamafile")
+    print("2. Samantha-Mistral-Instruct-7B-Bulleted-Notes-Q8.gguf")
+    print("3. Phi-3-mini-128k-instruct-Q8_0.gguf")
+    print("4. Meta-Llama-3-8B-Instruct.Q8_0.llamafile")
+    llm_choice = int(input("Enter the number of the model you want to use: "))
+    if llm_choice not in [1, 2, 3, 4]:
+        print("Invalid choice. Exiting.")
+        return
+    arguments = []
     # Launch the llamafile in an external process with the specified argument
     if llm_choice == 1:
         arguments = ["--ctx-size", "8192 ", " -m", "mistral-7b-instruct-v0.2.Q8_0.llamafile"]
@@ -436,10 +252,10 @@ def local_llm_function():
     elif llm_choice == 3:
         arguments = ["--ctx-size", "8192 ", " -m", "Phi-3-mini-128k-instruct-Q8_0.gguf"]
     elif llm_choice == 4:
-        arguments = ["--ctx-size", "8192 ", " -m", "llama-3"] # FIXME
+        arguments = ["--ctx-size", "8192 ", " -m", "Meta-Llama-3-8B-Instruct.Q8_0.llamafile"] # FIXME
 
     try:
-        logging.info("Main: Launching the LLM (llamafile) in an external terminal window...")
+        logging.info("local_llm_function: Launching the LLM (llamafile) in an external terminal window...")
         if useros == "nt":
             launch_in_new_terminal_windows(llamafile_path, arguments)
         elif useros == "posix":
@@ -448,7 +264,8 @@ def local_llm_function():
             launch_in_new_terminal_mac(llamafile_path, arguments)
         # FIXME - pid doesn't exist in this context
         #logging.info(f"Main: Launched the {llamafile_path} with PID {process.pid}")
-        atexit.register(cleanup_process, process)
+        # Ha like this shit works
+        #atexit.register(cleanup_process, process)
     except Exception as e:
         logging.error(f"Failed to launch the process: {e}")
         print(f"Failed to launch the process: {e}")
@@ -471,7 +288,7 @@ def local_llm_gui_function(am_noob, verbose_checked, threads_checked, threads_va
     built_up_args = []
 
     # Identify if the user wants us to do everything for them
-    if am_noob == True:
+    if am_noob:
         print("You're a noob. (lol j/k; they're good settings)")
 
         # Setup variables for Model download from HF
@@ -485,7 +302,7 @@ def local_llm_gui_function(am_noob, verbose_checked, threads_checked, threads_va
         logging.debug("Main: Checking for Llamafile and downloading  from Github if needed...\n\tAlso checking for a "
                       "local LLM model...\n\tDownloading if needed...\n\tThis could take a while...\n\tWill be the "
                       "'samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf' model...")
-        llamafile_path = download_latest_llamafile_through_gui(repo, asset_name_prefix, output_filename)
+        llamafile_path = download_latest_llamafile(output_filename)
         logging.debug("Main: Llamafile downloaded successfully.")
 
         arguments = []
@@ -500,7 +317,7 @@ def local_llm_gui_function(am_noob, verbose_checked, threads_checked, threads_va
         elif llm_choice == 3:
             arguments = ["--ctx-size", "8192 ", " -m", "Phi-3-mini-128k-instruct-Q8_0.gguf"]
         elif llm_choice == 4:
-            arguments = ["--ctx-size", "8192 ", " -m", "llama-3"]
+            arguments = ["--ctx-size", "8192 ", " -m", "Meta-Llama-3-8B-Instruct.Q8_0.llamafile"]
 
         try:
             logging.info("Main(Local-LLM-GUI-noob): Launching the LLM (llamafile) in an external terminal window...")
@@ -515,15 +332,16 @@ def local_llm_gui_function(am_noob, verbose_checked, threads_checked, threads_va
                 command = "llamafile.exe --ctx-size 8192 -m samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf"
                 subprocess.Popen(command, shell=True)
             # FIXME - pid doesn't exist in this context
-            # logging.info(f"Main: Launched the {llamafile_path} with PID {process.pid}")
-            atexit.register(cleanup_process, process)
+            #logging.info(f"Main: Launched the {llamafile_path} with PID {process.pid}")
+            # FIXME - Shit just don't work
+            # atexit.register(cleanup_process, process)
         except Exception as e:
             logging.error(f"Failed to launch the process: {e}")
             print(f"Failed to launch the process: {e}")
 
     else:
         print("You're not a noob.")
-        llamafile_path = download_latest_llamafile_no_model(output_filename)
+        llamafile_path = download_latest_llamafile(output_filename)
         if verbose_checked == True:
             print("Verbose mode enabled.")
             built_up_args.append("--verbose")
@@ -566,7 +384,8 @@ def local_llm_gui_function(am_noob, verbose_checked, threads_checked, threads_va
                 launch_in_new_terminal_mac(llamafile_path, built_up_args)
             # FIXME - pid doesn't exist in this context
             #logging.info(f"Main: Launched the {llamafile_path} with PID {process.pid}")
-            atexit.register(cleanup_process, process)
+            # FIXME
+            #atexit.register(cleanup_process, process)
         except Exception as e:
             logging.error(f"Failed to launch the process: {e}")
             print(f"Failed to launch the process: {e}")
