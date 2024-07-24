@@ -57,26 +57,6 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   directional income
 ```
 
-For offline LLM usage, I recommend the following models(in no particular order past the first):
-  1. Samantha-Mistral-instruct-7B-Bulleted-Notes - https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
-     * Reason being is that its 'good enough', otherwise would recommend Command-R+, either self-hosted, or through a personal API key (it's free for 1k requests a month...)
-  2. glm-4-9b-chat-1m
-     * https://huggingface.co/THUDM/glm-4-9b-chat-1m/blob/main/README_en.md / GGUF: 
-  3. Microsoft Phi-3-mini-4k-Instruct
-     * https://huggingface.co/microsoft/Phi-3-mini-4k-instruct / GGUF: https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
-     * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-mini-128k-instruct / Abliterated GGUF: https://huggingface.co/failspy/Phi-3-mini-128k-instruct-abliterated-v3-GGUF
-  4. Cohere Command-R+
-     * https://huggingface.co/cohere-ai/Command-R-plus / GGUF: https://huggingface.co/XelotX/c4ai-command-r-plus-XelotX-XelotX-iQuants
-  5. Cohere Command-R (non-plus version)
-     * https://huggingface.co/CohereForAI/c4ai-command-r-v01 / GGUF: https://huggingface.co/dranger003/c4ai-command-r-v01-iMat.GGUF
-  6. Phi-3-Medium-4k-Instruct
-     * https://huggingface.co/microsoft/Phi-3-medium-4k-instruct / Abliterated GGUF:https://huggingface.co/failspy/Phi-3-medium-4k-instruct-abliterated-v3
-       * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-medium-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-128k-instruct-GGUF
-  6. Hermes-2-Theta-Llama-3-8B
-     * https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B / GGUF: https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B-GGUF
-  7. Yi-1.5-34B-Chat-16k
-     * https://huggingface.co/01-ai/Yi-1.5-34B-Chat-16K / GGUF: https://huggingface.co/mradermacher/Yi-1.5-34B-Chat-16K-GGUF
-
 ----------
 
 ### <a name="quickstart">Quickstart</a>
@@ -229,6 +209,27 @@ For offline LLM usage, I recommend the following models(in no particular order p
 - **Ingest Converted text files en-masse**
     - `python summarize.py <path_to_text_file> --ingest_text_file --text_title "Title" --text_author "Author Name" -k additional,keywords`
 
+- **LLMs for Offline/Private Use**
+    - For offline LLM usage, I recommend the following models in no particular order past the first (All these models minus Command-R/+ can be ran on a single 12GB VRAM GPU, or 12GB of system RAM at a much slower speed):
+    1. Samantha-Mistral-instruct-7B-Bulleted-Notes - https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
+       * Reason being is that its 'good enough', otherwise would recommend Mistral-Nemo-Instruct2407. Very likely Nemo will prove to be better. Time will tell.
+    2. Mistral-Nemo-Instruct-2407
+       *  https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407 / GGUF: https://huggingface.co/bartowski/Mistral-Nemo-Instruct-2407-GGUF
+    3. Microsoft Phi-3-mini-4k-Instruct
+       * https://huggingface.co/microsoft/Phi-3-mini-4k-instruct / GGUF: https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
+       * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-mini-128k-instruct / Abliterated GGUF: https://huggingface.co/failspy/Phi-3-mini-128k-instruct-abliterated-v3-GGUF
+    4. Cohere Command-R+
+       * https://huggingface.co/cohere-ai/Command-R-plus / GGUF: https://huggingface.co/XelotX/c4ai-command-r-plus-XelotX-XelotX-iQuants
+    5. Cohere Command-R (non-plus version)
+       * https://huggingface.co/CohereForAI/c4ai-command-r-v01 / GGUF: https://huggingface.co/dranger003/c4ai-command-r-v01-iMat.GGUF
+    6. Phi-3-Medium-4k-Instruct
+       * https://huggingface.co/microsoft/Phi-3-medium-4k-instruct / Abliterated GGUF:https://huggingface.co/failspy/Phi-3-medium-4k-instruct-abliterated-v3
+         * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-medium-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-128k-instruct-GGUF
+    6. Hermes-2-Theta-Llama-3-8B
+       * https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B / GGUF: https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B-GGUF
+    7. Yi-1.5-34B-Chat-16k
+       * https://huggingface.co/01-ai/Yi-1.5-34B-Chat-16K / GGUF: https://huggingface.co/mradermacher/Yi-1.5-34B-Chat-16K-GGUF
+
 
 
 ----------
@@ -373,6 +374,7 @@ By default, videos, transcriptions and summaries are stored in a folder with the
           - `Retrieval-Augmented Generation (RAG) has emerged as a promising solution by incorporating knowledge from external databases. This enhances the accuracy and credibility of the generation, particularly for knowledge-intensive tasks, and allows for continuous knowledge updates and integration of domain-specific information. RAG synergistically merges LLMs' intrinsic knowledge with the vast, dynamic repositories of external databases. This comprehensive review paper offers a detailed examination of the progression of RAG paradigms, encompassing the Naive RAG, the Advanced RAG, and the Modular RAG. It meticulously scrutinizes the tripartite foundation of RAG frameworks, which includes the retrieval, the generation and the augmentation techniques. The paper highlights the state-of-the-art technologies embedded in each of these critical components, providing a profound understanding of the advancements in RAG systems. Furthermore, this paper introduces up-to-date evaluation framework and benchmark. At the end, this article delineates the challenges currently faced and points out prospective avenues for research and development. `
   6. Prompt Engineering
      - Prompt Engineering Guide: https://www.promptingguide.ai/ & https://github.com/dair-ai/Prompt-Engineering-Guide
+     - 'The Prompt Report' - https://arxiv.org/abs/2406.06608
   7. Bias and Fairness in LLMs
      - [ChatGPT Doesn't Trust Chargers Fans: Guardrail Sensitivity in Context](https://arxiv.org/abs/2407.06866)
        - `While the biases of language models in production are extensively documented, the biases of their guardrails have been neglected. This paper studies how contextual information about the user influences the likelihood of an LLM to refuse to execute a request. By generating user biographies that offer ideological and demographic information, we find a number of biases in guardrail sensitivity on GPT-3.5. Younger, female, and Asian-American personas are more likely to trigger a refusal guardrail when requesting censored or illegal information. Guardrails are also sycophantic, refusing to comply with requests for a political position the user is likely to disagree with. We find that certain identity groups and seemingly innocuous information, e.g., sports fandom, can elicit changes in guardrail sensitivity similar to direct statements of political ideology. For each demographic category and even for American football team fandom, we find that ChatGPT appears to infer a likely political ideology and modify guardrail behavior accordingly.`
