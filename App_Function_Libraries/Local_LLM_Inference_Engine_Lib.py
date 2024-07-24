@@ -255,7 +255,7 @@ def local_llm_function():
         arguments = ["--ctx-size", "8192 ", " -m", "Meta-Llama-3-8B-Instruct.Q8_0.llamafile"] # FIXME
 
     try:
-        logging.info("Main: Launching the LLM (llamafile) in an external terminal window...")
+        logging.info("local_llm_function: Launching the LLM (llamafile) in an external terminal window...")
         if useros == "nt":
             launch_in_new_terminal_windows(llamafile_path, arguments)
         elif useros == "posix":
