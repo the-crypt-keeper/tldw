@@ -2725,6 +2725,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_video_transcription_tab()
                     create_audio_processing_tab()
                     create_podcast_tab()
+                    create_import_book_tab()
                     create_website_scraping_tab()
                     create_pdf_ingestion_tab()
                     create_resummary_tab()
