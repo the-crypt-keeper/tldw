@@ -373,9 +373,8 @@ def load_media_content(media_id: int) -> dict:
         print(f"Debug - Load Media Content - Error: {str(e)}")
         return {"content": "", "prompt": "", "summary": ""}
 
-def load_preset_prompts():
-    return list_prompts()
 
+# FIXME - not adding content from selected item to query
 def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt):
     try:
         print(f"Debug - Chat Function - Message: {message}")
@@ -1516,7 +1515,6 @@ def create_search_tab():
                 items_output = gr.Dropdown(label="Select Item", choices=[])
                 item_mapping = gr.State({})
                 prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
-                content_output = gr.Markdown(label="Content", visible=True)
 
                 search_button.click(
                     fn=update_dropdown,
@@ -1524,6 +1522,7 @@ def create_search_tab():
                     outputs=[items_output, item_mapping]
                 )
             with gr.Column():
+                content_output = gr.Markdown(label="Content", visible=True)
                 items_output.change(
                     fn=update_detailed_view,
                     inputs=[items_output, item_mapping],
@@ -2598,12 +2597,21 @@ def create_document_editing_tab():
                     outputs=output_text
                 )
 
+        # FIXME - Add actual function for this
         with gr.Tab("Tone Analyzer & Editor"):
             with gr.Row():
                 with gr.Column():
                     input_text = gr.Textbox(label="Input Text", lines=10)
                     concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
                     casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
+                    api_name_input = gr.Dropdown(
+                        choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                        value=None,
+                        label="API for Grammar Check"
+                    )
+                    api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                                                   type="password")
                     adjust_btn = gr.Button("Adjust Tone")
 
                 with gr.Column():
