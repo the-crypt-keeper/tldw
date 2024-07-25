@@ -2170,35 +2170,32 @@ def create_import_obsidian_vault_tab():
 # Using pypandoc to convert EPUB to Markdown
 def create_import_book_tab():
     with gr.TabItem("Import .epub/ebook Files"):
-        gr.Markdown("# Import an .epub file into the database using pypandoc")
-        gr.Markdown("...and have it tagged + summarized")
-        gr.Markdown(
-            "Check out https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/ for info on removing DRM from your ebooks")
         with gr.Row():
-            import_file = gr.File(label="Upload file for import", file_types=[".epub"])
-        with gr.Row():
-            title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
-            author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
-        with gr.Row():
-            keywords_input = gr.Textbox(label="Keywords(like genre or publish year)",
-                                        placeholder="Enter keywords, comma-separated")
-            custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                             placeholder="Enter a custom prompt for summarization (optional)")
-        with gr.Row():
-            summary_input = gr.Textbox(label="Summary",
-                                       placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
-        with gr.Row():
-            auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
-            api_name_input = gr.Dropdown(
-                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                label="API for Auto-summarization"
-            )
-            api_key_input = gr.Textbox(label="API Key", type="password")
-        with gr.Row():
-            import_button = gr.Button("Import Data")
-        with gr.Row():
-            import_output = gr.Textbox(label="Import Status")
+            with gr.Column():
+                gr.Markdown("# Ingest an .epub file using pypandoc")
+                gr.Markdown("...and have it tagged + summarized")
+                gr.Markdown(
+                "How to remove DRM from your ebooks: https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/")
+                import_file = gr.File(label="Upload file for import", file_types=[".epub"])
+                title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+                keywords_input = gr.Textbox(label="Keywords(like genre or publish year)",
+                                            placeholder="Enter keywords, comma-separated")
+                custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter a custom prompt for summarization (optional)")
+                summary_input = gr.Textbox(label="Summary",
+                                           placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
+                auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
+                api_name_input = gr.Dropdown(
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                    label="API for Auto-summarization"
+                )
+                api_key_input = gr.Textbox(label="API Key", type="password")
+                import_button = gr.Button("Import Data")
+            with gr.Column():
+                with gr.Row():
+                    import_output = gr.Textbox(label="Import Status")
 
         def import_epub(epub_file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
             try:
