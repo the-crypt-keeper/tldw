@@ -1804,7 +1804,29 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
 def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
     logging.info(f"Attempting to save chat history. Media content: {media_content}")
     try:
-        new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_content)
+        # Extract the media_id from the media_content
+        media_id = None
+        if isinstance(media_content, dict):
+            # Try to parse the 'content' field as JSON
+            try:
+                content_json = json.loads(media_content.get('content', '{}'))
+                # Look for 'id' in the parsed JSON
+                media_id = content_json.get('id')
+            except json.JSONDecodeError:
+                pass
+
+        # If we couldn't find an 'id', let's use the 'webpage_url' as a fallback
+        if media_id is None and isinstance(media_content, dict):
+            try:
+                content_json = json.loads(media_content.get('content', '{}'))
+                media_id = content_json.get('webpage_url')
+            except json.JSONDecodeError:
+                pass
+
+        if media_id is None:
+            raise ValueError("Unable to extract media_id from media_content")
+
+        new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_id)
         return new_conversation_id, "Chat history saved successfully!"
     except Exception as e:
         error_message = f"Failed to save chat history: {str(e)}"
@@ -1916,7 +1938,7 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
             if conversation_id is None:
                 # Create a new conversation
                 media_id = media_content.get('id', None)
-                conversation_name = f"Chat about {media_content.get('title', 'Unknown Media')}"
+                conversation_name = f"Chat about {media_content.get('title', 'Unknown Media')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 conversation_id = create_chat_conversation(media_id, conversation_name)
 
             # Add user message to the database
@@ -1945,6 +1967,54 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
         return "", history, conversation_id
 
 
+def search_conversations(query):
+    try:
+        conversations = search_chat_conversations(query)
+        if not conversations:
+            print(f"Debug - Search Conversations - No results found for query: {query}")
+            return gr.update(choices=[])
+
+        conversation_options = [
+            (f"{c['conversation_name']} (Media: {c['media_title']}, ID: {c['id']})", c['id'])
+            for c in conversations
+        ]
+        print(f"Debug - Search Conversations - Options: {conversation_options}")
+        return gr.update(choices=conversation_options)
+    except Exception as e:
+        print(f"Debug - Search Conversations - Error: {str(e)}")
+        return gr.update(choices=[])
+
+
+def load_conversation(conversation_id):
+    if not conversation_id:
+        return [], None
+
+    messages = get_chat_messages(conversation_id)
+    history = [
+        (msg['message'], None) if msg['sender'] == 'user' else (None, msg['message'])
+        for msg in messages
+    ]
+    return history, conversation_id
+
+
+def clear_chat():
+    return gr.update(value=[]), None
+
+
+def update_message_in_chat(message_id, new_text, history):
+    update_chat_message(message_id, new_text)
+    updated_history = [(msg1, msg2) if msg1[1] != message_id and msg2[1] != message_id
+                       else ((new_text, msg1[1]) if msg1[1] == message_id else (new_text, msg2[1]))
+                       for msg1, msg2 in history]
+    return updated_history
+
+
+def delete_message_from_chat(message_id, history):
+    delete_chat_message(message_id)
+    updated_history = [(msg1, msg2) for msg1, msg2 in history if msg1[1] != message_id and msg2[1] != message_id]
+    return updated_history
+
+
 def create_chat_interface():
     custom_css = """
     .chatbot-container .message-wrap .message {
@@ -1970,8 +2040,14 @@ def create_chat_interface():
                     use_summary = gr.Checkbox(label="Use Summary")
                     use_prompt = gr.Checkbox(label="Use Prompt")
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
-                previous_conversations = gr.Dropdown(label="Previous Conversations", choices=[])
-                load_conversations_btn = gr.Button("Load Previous Conversations")
+                with gr.Row():
+                    conversation_search = gr.Textbox(label="Search Conversations")
+                with gr.Row():
+                    search_conversations_btn = gr.Button("Search Conversations")
+                with gr.Row():
+                    previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
+                with gr.Row():
+                    load_conversations_btn = gr.Button("Load Selected Conversation")
 
                 api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
@@ -1994,29 +2070,6 @@ def create_chat_interface():
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
                 download_file = gr.File(label="Download Chat History")
 
-        def load_previous_conversations(media_id):
-            conversations = search_chat_conversations("")  # Empty string to get all conversations
-            conversation_choices = [(c['conversation_name'], c['id']) for c in conversations if
-                                    c['media_id'] == media_id]
-            return gr.update(choices=conversation_choices)
-
-        def load_conversation(conversation_id):
-            messages = get_chat_messages(conversation_id)
-            history = [((msg['message'], msg['id']) if msg['sender'] == 'user' else (msg['message'], msg['id'])) for msg in messages]
-            return history
-
-        def update_message_in_chat(message_id, new_text, history):
-            update_chat_message(message_id, new_text)
-            updated_history = [(msg1, msg2) if msg1[1] != message_id and msg2[1] != message_id
-                               else ((new_text, msg1[1]) if msg1[1] == message_id else (new_text, msg2[1]))
-                               for msg1, msg2 in history]
-            return updated_history
-
-        def delete_message_from_chat(message_id, history):
-            delete_chat_message(message_id)
-            updated_history = [(msg1, msg2) for msg1, msg2 in history if msg1[1] != message_id and msg2[1] != message_id]
-            return updated_history
-
         # Restore original functionality
         search_button.click(
             fn=update_dropdown,
@@ -2025,14 +2078,6 @@ def create_chat_interface():
         )
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
-
-
-        def process_chat_response(response, history, conversation_id):
-            if isinstance(response, tuple) and len(response) == 3:
-                _, updated_history, updated_conversation_id = response
-                return "", updated_history, updated_conversation_id
-            else:
-                return response, history, conversation_id
 
         submit.click(
             chat_wrapper,
@@ -2061,11 +2106,19 @@ def create_chat_interface():
                           outputs=[selected_parts])
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
 
-        # Add new functionality
-        load_conversations_btn.click(
-            load_previous_conversations,
-            inputs=[media_content],
+        search_conversations_btn.click(
+            search_conversations,
+            inputs=[conversation_search],
             outputs=[previous_conversations]
+        )
+
+        load_conversations_btn.click(
+            clear_chat,
+            outputs=[chatbot, chat_history]
+        ).then(
+            load_conversation,
+            inputs=[previous_conversations],
+            outputs=[chatbot, conversation_id]
         )
 
         previous_conversations.change(
@@ -2186,32 +2239,6 @@ def create_chat_management_tab():
 
         delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
         delete_message_button = gr.Button("Delete Message", visible=False)
-
-        def search_conversations(query):
-            try:
-                conversations = search_chat_conversations(query)
-                if not conversations:
-                    print(f"Debug - Search Conversations - No results found for query: {query}")
-                    return gr.update(choices=[]), {}
-
-                conversation_options = [f"{c['conversation_name']} (ID: {c['id']})" for c in conversations]
-                conversation_mapping = {f"{c['conversation_name']} (ID: {c['id']})": c['id'] for c in conversations}
-                print(f"Debug - Search Conversations - Mapping: {conversation_mapping}")
-                return gr.update(choices=conversation_options), conversation_mapping
-            except Exception as e:
-                print(f"Debug - Search Conversations - Error: {str(e)}")
-                return gr.update(choices=[]), {}
-
-        def load_conversation(selected_conversation):
-            conversation_id = conversation_mapping.value.get(selected_conversation)
-            if conversation_id:
-                messages = get_chat_messages(conversation_id)
-                html = "<div class='chat-messages'>"
-                for msg in messages:
-                    html += f"<p><strong>{msg['sender']}:</strong> {msg['message']}</p>"
-                html += "</div>"
-                return html
-            return "Please select a valid conversation."
 
         def send_message(selected_conversation, message):
             conversation_id = conversation_mapping.value.get(selected_conversation)

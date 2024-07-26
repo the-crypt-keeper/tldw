@@ -54,7 +54,8 @@ import time
 import traceback
 from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any
+
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
@@ -1062,13 +1063,13 @@ def import_obsidian_note_to_db(note_data):
 
 
 
-def create_chat_conversation(media_id: int, conversation_name: str) -> int:
+def create_chat_conversation(media_id, conversation_name):
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO ChatConversations (media_id, conversation_name)
-                VALUES (?, ?)
+                INSERT INTO ChatConversations (media_id, conversation_name, created_at, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ''', (media_id, conversation_name))
             conn.commit()
             return cursor.lastrowid
@@ -1122,7 +1123,7 @@ def search_chat_conversations(search_query: str) -> List[Dict[str, Any]]:
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT cc.id, cc.media_id, cc.conversation_name, cc.created_at, m.title
+                SELECT cc.id, cc.media_id, cc.conversation_name, cc.created_at, m.title as media_title
                 FROM ChatConversations cc
                 LEFT JOIN Media m ON cc.media_id = m.id
                 WHERE cc.conversation_name LIKE ? OR m.title LIKE ?
@@ -1135,7 +1136,7 @@ def search_chat_conversations(search_query: str) -> List[Dict[str, Any]]:
                     'media_id': conv[1],
                     'conversation_name': conv[2],
                     'created_at': conv[3],
-                    'media_title': conv[4]
+                    'media_title': conv[4] or "Unknown Media"
                 }
                 for conv in conversations
             ]
@@ -1170,29 +1171,43 @@ def delete_chat_message(message_id: int) -> None:
         raise DatabaseError(f"Error deleting chat message: {e}")
 
 
-def save_chat_history_to_database(chatbot, conversation_id, media_content):
-    logging.info(f"Received media_content: {media_content}")
+def save_chat_history_to_database(chatbot, conversation_id, media_id):
     try:
-        if not isinstance(media_content, dict) or 'id' not in media_content:
-            raise ValueError(f"Invalid media_content. Expected a dictionary with 'id' key. Received: {media_content}")
-        media_id = media_content['id']
-        if not isinstance(media_id, int):
-            raise ValueError(f"Invalid media_id: {media_id}. Expected an integer.")
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
 
-        if conversation_id is None:
-            # Create a new conversation
-            conversation_name = f"Chat about {media_content.get('title', 'Unknown Media')}"
-            conversation_id = create_chat_conversation(media_id, conversation_name)
+            # If conversation_id is None, create a new conversation
+            if conversation_id is None:
+                cursor.execute('''
+                    INSERT INTO ChatConversations (media_id, conversation_name, created_at, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (media_id, f"Conversation about media {media_id}"))
+                conversation_id = cursor.lastrowid
 
-        # Save all messages in the chatbot history
-        for user_message, assistant_message in chatbot:
-            add_chat_message(conversation_id, "user", user_message)
-            add_chat_message(conversation_id, "assistant", assistant_message)
+            # Save each message in the chatbot history
+            for i, (user_msg, ai_msg) in enumerate(chatbot):
+                cursor.execute('''
+                    INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (conversation_id, 'user', user_msg))
+
+                cursor.execute('''
+                    INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (conversation_id, 'ai', ai_msg))
+
+            # Update the conversation's updated_at timestamp
+            cursor.execute('''
+                UPDATE ChatConversations
+                SET updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (conversation_id,))
+
+            conn.commit()
 
         return conversation_id
     except Exception as e:
         logging.error(f"Error saving chat history to database: {str(e)}")
-        # Re-raise the exception to be handled by the caller
         raise
 
 
