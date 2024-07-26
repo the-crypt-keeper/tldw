@@ -51,7 +51,8 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     perform_transcription, summarize_chunk
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
-    export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt
+    export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
+    delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -2035,6 +2036,100 @@ def create_chat_interface_top_bottom():
                           outputs=[selected_parts])
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
 
+
+def create_chat_management_tab():
+    with gr.TabItem("Chat Management"):
+        gr.Markdown("# Chat Management")
+
+        with gr.Row():
+            search_query = gr.Textbox(label="Search Conversations")
+            search_button = gr.Button("Search")
+
+        conversation_list = gr.Dropdown(label="Select Conversation", choices=[])
+        conversation_mapping = gr.State({})
+
+        with gr.Row():
+            message_input = gr.Textbox(label="New Message")
+            send_button = gr.Button("Send")
+
+        chat_display = gr.HTML(label="Chat Messages")
+
+        edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
+        edit_message_text = gr.Textbox(label="Edit Message", visible=False)
+        update_message_button = gr.Button("Update Message", visible=False)
+
+        delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
+        delete_message_button = gr.Button("Delete Message", visible=False)
+
+        def search_conversations(query):
+            try:
+                conversations = search_chat_conversations(query)
+                if not conversations:
+                    print(f"Debug - Search Conversations - No results found for query: {query}")
+                    return gr.update(choices=[]), {}
+
+                conversation_options = [f"{c['conversation_name']} (ID: {c['id']})" for c in conversations]
+                conversation_mapping = {f"{c['conversation_name']} (ID: {c['id']})": c['id'] for c in conversations}
+                print(f"Debug - Search Conversations - Mapping: {conversation_mapping}")
+                return gr.update(choices=conversation_options), conversation_mapping
+            except Exception as e:
+                print(f"Debug - Search Conversations - Error: {str(e)}")
+                return gr.update(choices=[]), {}
+
+        def load_conversation(selected_conversation):
+            conversation_id = conversation_mapping.value.get(selected_conversation)
+            if conversation_id:
+                messages = get_chat_messages(conversation_id)
+                html = "<div class='chat-messages'>"
+                for msg in messages:
+                    html += f"<p><strong>{msg['sender']}:</strong> {msg['message']}</p>"
+                html += "</div>"
+                return html
+            return "Please select a valid conversation."
+
+        def send_message(selected_conversation, message):
+            conversation_id = conversation_mapping.value.get(selected_conversation)
+            if conversation_id:
+                add_chat_message(conversation_id, "user", message)
+                return load_conversation(selected_conversation), ""
+            return "Please select a conversation first.", message
+
+        def update_message(message_id, new_text, selected_conversation):
+            update_chat_message(message_id, new_text)
+            return load_conversation(selected_conversation), gr.update(value="", visible=False), gr.update(value="", visible=False), gr.update(visible=False)
+
+        def delete_message(message_id, selected_conversation):
+            delete_chat_message(message_id)
+            return load_conversation(selected_conversation), gr.update(value="", visible=False), gr.update(visible=False)
+
+        search_button.click(
+            search_conversations,
+            inputs=[search_query],
+            outputs=[conversation_list, conversation_mapping]
+        )
+
+        conversation_list.change(
+            load_conversation,
+            inputs=[conversation_list],
+            outputs=[chat_display]
+        )
+        send_button.click(
+            send_message,
+            inputs=[conversation_list, message_input],
+            outputs=[chat_display, message_input]
+        )
+        update_message_button.click(
+            update_message,
+            inputs=[edit_message_id, edit_message_text, conversation_list],
+            outputs=[chat_display, edit_message_id, edit_message_text, update_message_button]
+        )
+        delete_message_button.click(
+            delete_message,
+            inputs=[delete_message_id, conversation_list],
+            outputs=[chat_display, delete_message_id, delete_message_button]
+        )
+
+
 #
 # End of Chat Interface Tab Functions
 ################################################################################################################################################################################################################################
@@ -2299,7 +2394,7 @@ def create_prompt_clone_tab():
 
 
 #
-#
+# End of Media Edit Tab Functions
 ################################################################################################################
 #
 # Import Items Tab Functions
@@ -3101,6 +3196,7 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Remote LLM Chat"):
                 create_chat_interface()
                 create_chat_interface_top_bottom()
+                create_chat_management_tab()
 
             with gr.TabItem("Edit Existing Items"):
                 create_media_edit_tab()
