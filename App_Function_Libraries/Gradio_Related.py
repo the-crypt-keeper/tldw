@@ -1727,9 +1727,98 @@ def create_llamafile_advanced_inputs():
 # Chat Interface Tab Functions
 
 
+def update_chat_content(selected_item, use_content, use_summary, use_prompt, item_mapping):
+    print(f"Debug - Update Chat Content - Selected Item: {selected_item}")
+    print(f"Debug - Update Chat Content - Use Content: {use_content}")
+    print(f"Debug - Update Chat Content - Use Summary: {use_summary}")
+    print(f"Debug - Update Chat Content - Use Prompt: {use_prompt}")
+    print(f"Debug - Update Chat Content - Item Mapping: {item_mapping}")
+
+    if selected_item and selected_item in item_mapping:
+        media_id = item_mapping[selected_item]
+        content = load_media_content(media_id)
+        selected_parts = []
+        if use_content and "content" in content:
+            selected_parts.append("content")
+        if use_summary and "summary" in content:
+            selected_parts.append("summary")
+        if use_prompt and "prompt" in content:
+            selected_parts.append("prompt")
+
+        # Modified debug print
+        if isinstance(content, dict):
+            print(f"Debug - Update Chat Content - Content keys: {list(content.keys())}")
+            for key, value in content.items():
+                print(f"Debug - Update Chat Content - {key} (first 500 char): {str(value)[:500]}")
+        else:
+            print(f"Debug - Update Chat Content - Content(first 500 char): {str(content)[:500]}")
+
+        print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
+        return content, selected_parts
+    else:
+        print(f"Debug - Update Chat Content - No item selected or item not in mapping")
+        return {}, []
+
+
+def debug_output(media_content, selected_parts):
+    print(f"Debug - Media Content: {media_content}")
+    print(f"Debug - Selected Parts: {selected_parts}")
+    return ""
+
+
+def update_selected_parts(use_content, use_summary, use_prompt):
+    selected_parts = []
+    if use_content:
+        selected_parts.append("content")
+    if use_summary:
+        selected_parts.append("summary")
+    if use_prompt:
+        selected_parts.append("prompt")
+    print(f"Debug - Update Selected Parts: {selected_parts}")
+    return selected_parts
+
+
+def update_user_prompt(preset_name):
+    details = fetch_prompt_details(preset_name)
+    if details:
+        # 0 is title, 1 is details, 2 is system prompt, 3 is user prompt
+        return details[2]  # Return the system prompt
+    return ""
+
+
+def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
+    print(f"Debug - Chat Wrapper - Message: {message}")
+    print(f"Debug - Chat Wrapper - Media Content: {media_content}")
+    print(f"Debug - Chat Wrapper - Selected Parts: {selected_parts}")
+    print(f"Debug - Chat Wrapper - API Endpoint: {api_endpoint}")
+    print(f"Debug - Chat Wrapper - User Prompt: {user_prompt}")
+
+    selected_content = "\n\n".join(
+        [f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if
+         part in media_content])
+    print(f"Debug - Chat Wrapper - Selected Content: {selected_content[:500]}...")  # Print first 500 chars
+
+    context = f"Selected content:\n{selected_content}\n\nUser message: {message}"
+    print(f"Debug - Chat Wrapper - Context: {context[:500]}...")  # Print first 500 chars
+
+    # Use a default API endpoint if none is selected
+    if not api_endpoint:
+        api_endpoint = "OpenAI"  # You can change this to any default endpoint you prefer
+        print(f"Debug - Chat Wrapper - Using default API Endpoint: {api_endpoint}")
+
+    bot_message = chat(context, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
+    print(f"Debug - Chat Wrapper - Bot Message: {bot_message[:500]}...")  # Print first 500 chars
+
+    history.append((message, bot_message))
+    return "", history
+
+
 def create_chat_interface():
     with gr.TabItem("Remote LLM Chat"):
         gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
+        chat_history = gr.State([])
+        media_content = gr.State({})
+        selected_parts = gr.State([])
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -1751,56 +1840,17 @@ def create_chat_interface():
         preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
         user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
                                        "be used as the next message instead)", lines=3)
-
         chatbot = gr.Chatbot(height=500)
         msg = gr.Textbox(label="Enter your message")
         submit = gr.Button("Submit")
-
-        chat_history = gr.State([])
-        media_content = gr.State({})
-        selected_parts = gr.State([])
-
         save_button = gr.Button("Save Chat History")
         download_file = gr.File(label="Download Chat History")
-
-        def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
-            print(f"Debug - Chat Wrapper - Message: {message}")
-            print(f"Debug - Chat Wrapper - Media Content: {media_content}")
-            print(f"Debug - Chat Wrapper - Selected Parts: {selected_parts}")
-            print(f"Debug - Chat Wrapper - API Endpoint: {api_endpoint}")
-            print(f"Debug - Chat Wrapper - User Prompt: {user_prompt}")
-
-            selected_content = "\n\n".join(
-                [f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if
-                 part in media_content])
-            print(f"Debug - Chat Wrapper - Selected Content: {selected_content[:500]}...")  # Print first 500 chars
-
-            context = f"Selected content:\n{selected_content}\n\nUser message: {message}"
-            print(f"Debug - Chat Wrapper - Context: {context[:500]}...")  # Print first 500 chars
-
-            # Use a default API endpoint if none is selected
-            if not api_endpoint:
-                api_endpoint = "OpenAI"  # You can change this to any default endpoint you prefer
-                print(f"Debug - Chat Wrapper - Using default API Endpoint: {api_endpoint}")
-
-            bot_message = chat(context, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
-            print(f"Debug - Chat Wrapper - Bot Message: {bot_message[:500]}...")  # Print first 500 chars
-
-            history.append((message, bot_message))
-            return "", history
 
         submit.click(
             chat_wrapper,
             inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
             outputs=[msg, chatbot]
         )
-
-        def save_chat_history(history):
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"chat_history_{timestamp}.json"
-            with open(filename, "w") as f:
-                json.dump(history, f)
-            return filename
 
         save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
 
@@ -1810,86 +1860,25 @@ def create_chat_interface():
             outputs=[items_output, item_mapping]
         )
 
-        def update_user_prompt(preset_name):
-            details = fetch_prompt_details(preset_name)
-            if details:
-                return details[1]  # Return the system prompt
-            return ""
-
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
-
-        def update_chat_content(selected_item, use_content, use_summary, use_prompt, item_mapping):
-            print(f"Debug - Update Chat Content - Selected Item: {selected_item}")
-            print(f"Debug - Update Chat Content - Use Content: {use_content}")
-            print(f"Debug - Update Chat Content - Use Summary: {use_summary}")
-            print(f"Debug - Update Chat Content - Use Prompt: {use_prompt}")
-            print(f"Debug - Update Chat Content - Item Mapping: {item_mapping}")
-
-            if selected_item and selected_item in item_mapping:
-                media_id = item_mapping[selected_item]
-                content = load_media_content(media_id)
-                selected_parts = []
-                if use_content and "content" in content:
-                    selected_parts.append("content")
-                if use_summary and "summary" in content:
-                    selected_parts.append("summary")
-                if use_prompt and "prompt" in content:
-                    selected_parts.append("prompt")
-                print(f"Debug - Update Chat Content - Content(first 500 char): {content[:500]}")
-                print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
-                return content, selected_parts
-            else:
-                print(f"Debug - Update Chat Content - No item selected or item not in mapping")
-                return {}, []
 
         items_output.change(
             update_chat_content,
             inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
             outputs=[media_content, selected_parts]
         )
-
-        def update_selected_parts(use_content, use_summary, use_prompt):
-            selected_parts = []
-            if use_content:
-                selected_parts.append("content")
-            if use_summary:
-                selected_parts.append("summary")
-            if use_prompt:
-                selected_parts.append("prompt")
-            print(f"Debug - Update Selected Parts: {selected_parts}")
-            return selected_parts
-
         use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                            outputs=[selected_parts])
         use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                            outputs=[selected_parts])
         use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                           outputs=[selected_parts])
-
-        def update_selected_parts(use_content, use_summary, use_prompt):
-            selected_parts = []
-            if use_content:
-                selected_parts.append("content")
-            if use_summary:
-                selected_parts.append("summary")
-            if use_prompt:
-                selected_parts.append("prompt")
-            print(f"Debug - Update Selected Parts: {selected_parts}")
-            return selected_parts
-
         use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                            outputs=[selected_parts])
         use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                            outputs=[selected_parts])
         use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                           outputs=[selected_parts])
-
-        # Add debug output
-        def debug_output(media_content, selected_parts):
-            print(f"Debug - Media Content: {media_content}")
-            print(f"Debug - Selected Parts: {selected_parts}")
-            return ""
-
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
 
 #
