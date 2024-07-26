@@ -52,7 +52,8 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
-    delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations
+    delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
+    create_chat_conversation, save_chat_history_to_database
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -358,12 +359,12 @@ def load_media_content(media_id: int) -> dict:
     try:
         print(f"Debug - Load Media Content - Media ID: {media_id}")
         item_details = fetch_item_details(media_id)
-        print(f"Debug - Load Media Content - Item Details: {item_details}")
+        print(f"Debug - Load Media Content - Item Details: \n\n{item_details}\n\n\n\n")
 
         if isinstance(item_details, tuple) and len(item_details) == 3:
             content, prompt, summary = item_details
         else:
-            print(f"Debug - Load Media Content - Unexpected item_details format: {item_details}")
+            print(f"Debug - Load Media Content - Unexpected item_details format: \n\n{item_details}\n\n\n\n")
             content, prompt, summary = "", "", ""
 
         return {
@@ -374,91 +375,6 @@ def load_media_content(media_id: int) -> dict:
     except Exception as e:
         print(f"Debug - Load Media Content - Error: {str(e)}")
         return {"content": "", "prompt": "", "summary": ""}
-
-
-# FIXME - not adding content from selected item to query
-def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt):
-    try:
-        print(f"Debug - Chat Function - Message: {message}")
-        print(f"Debug - Chat Function - Media Content: {media_content}")
-        print(f"Debug - Chat Function - Selected Parts: {selected_parts}")
-        print(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
-        print(f"Debug - Chat Function - Prompt: {prompt}")
-
-        # Ensure selected_parts is a list
-        if not isinstance(selected_parts, (list, tuple)):
-            selected_parts = [selected_parts] if selected_parts else []
-
-        print(f"Debug - Chat Function - Selected Parts (after check): {selected_parts}")
-
-        # Combine the selected parts of the media content
-        combined_content = "\n\n".join([f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if part in media_content])
-        print(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")  # Print first 500 chars
-
-        # Prepare the input for the API
-        input_data = f"{combined_content}\n\nUser: {message}\nAI:"
-        print(f"Debug - Chat Function - Input Data: {input_data[:500]}...")  # Print first 500 chars
-
-        # Use the existing API request code based on the selected endpoint
-        if api_endpoint.lower() == 'openai':
-            response = summarize_with_openai(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "anthropic":
-            response = summarize_with_anthropic(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "cohere":
-            response = summarize_with_cohere(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "groq":
-            response = summarize_with_groq(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "openrouter":
-            response = summarize_with_openrouter(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "deepseek":
-            response = summarize_with_deepseek(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "llama.cpp":
-            response = summarize_with_llama(input_data, prompt)
-        elif api_endpoint.lower() == "kobold":
-            response = summarize_with_kobold(input_data, api_key, prompt)
-        elif api_endpoint.lower() == "ooba":
-            response = summarize_with_oobabooga(input_data, api_key, prompt)
-        elif api_endpoint.lower() == "tabbyapi":
-            response = summarize_with_tabbyapi(input_data, prompt)
-        elif api_endpoint.lower() == "vllm":
-            response = summarize_with_vllm(input_data, prompt)
-        elif api_endpoint.lower() == "local-llm":
-            response = summarize_with_local_llm(input_data, prompt)
-        elif api_endpoint.lower() == "huggingface":
-            response = summarize_with_huggingface(api_key, input_data, prompt)
-        else:
-            raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
-
-        return response
-
-    except Exception as e:
-        logging.error(f"Error in chat function: {str(e)}")
-        return f"An error occurred: {str(e)}"
-
-
-def save_chat_history(history: List[List[str]], media_content: Dict[str, str], selected_parts: List[str],
-                      api_endpoint: str, prompt: str):
-    """
-    Save the chat history along with context information to a JSON file.
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"chat_history_{timestamp}.json"
-
-    chat_data = {
-        "timestamp": timestamp,
-        "history": history,
-        "context": {
-            "selected_media": {
-                part: media_content.get(part, "") for part in selected_parts
-            },
-            "api_endpoint": api_endpoint,
-            "prompt": prompt
-        }
-    }
-
-    json_data = json.dumps(chat_data, indent=2)
-
-    return filename, json_data
 
 
 def error_handler(func):
@@ -1818,12 +1734,129 @@ def create_llamafile_advanced_inputs():
 # Chat Interface Tab Functions
 
 
+
+
+# FIXME - not adding content from selected item to query
+def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt):
+    try:
+        logging.info(f"Debug - Chat Function - Message: {message}")
+        logging.info(f"Debug - Chat Function - Media Content: {media_content}")
+        logging.info(f"Debug - Chat Function - Selected Parts: {selected_parts}")
+        logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
+        logging.info(f"Debug - Chat Function - Prompt: {prompt}")
+
+        # Ensure selected_parts is a list
+        if not isinstance(selected_parts, (list, tuple)):
+            selected_parts = [selected_parts] if selected_parts else []
+
+        logging.debug(f"Debug - Chat Function - Selected Parts (after check): {selected_parts}")
+
+        # Combine the selected parts of the media content
+        combined_content = "\n\n".join([f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if part in media_content])
+        logging.debug(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")  # Print first 500 chars
+
+        # Prepare the input for the API
+        if not history:
+            input_data = f"{combined_content}\n\nUser: {message}\nAI:"
+        else:
+            input_data = f"User: {message}\nAI:"
+        # Print first 500 chars
+        logging.info(f"Debug - Chat Function - Input Data: {input_data[:500]}...")
+
+        # Use the existing API request code based on the selected endpoint
+        logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
+        if api_endpoint.lower() == 'openai':
+            response = summarize_with_openai(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "anthropic":
+            response = summarize_with_anthropic(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "cohere":
+            response = summarize_with_cohere(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "groq":
+            response = summarize_with_groq(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "openrouter":
+            response = summarize_with_openrouter(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "deepseek":
+            response = summarize_with_deepseek(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "llama.cpp":
+            response = summarize_with_llama(input_data, prompt)
+        elif api_endpoint.lower() == "kobold":
+            response = summarize_with_kobold(input_data, api_key, prompt)
+        elif api_endpoint.lower() == "ooba":
+            response = summarize_with_oobabooga(input_data, api_key, prompt)
+        elif api_endpoint.lower() == "tabbyapi":
+            response = summarize_with_tabbyapi(input_data, prompt)
+        elif api_endpoint.lower() == "vllm":
+            response = summarize_with_vllm(input_data, prompt)
+        elif api_endpoint.lower() == "local-llm":
+            response = summarize_with_local_llm(input_data, prompt)
+        elif api_endpoint.lower() == "huggingface":
+            response = summarize_with_huggingface(api_key, input_data, prompt)
+        else:
+            raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
+
+        return response
+
+    except Exception as e:
+        logging.error(f"Error in chat function: {str(e)}")
+        return f"An error occurred: {str(e)}"
+
+
+def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
+    logging.info(f"Attempting to save chat history. Media content: {media_content}")
+    try:
+        new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_content)
+        return new_conversation_id, "Chat history saved successfully!"
+    except Exception as e:
+        error_message = f"Failed to save chat history: {str(e)}"
+        logging.error(error_message)
+        return conversation_id, error_message
+
+
+def save_chat_history(history, conversation_id):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"chat_history_{conversation_id}_{timestamp}.json"
+
+    chat_data = {
+        "conversation_id": conversation_id,
+        "timestamp": timestamp,
+        "history": [
+            {
+                "role": "user" if i % 2 == 0 else "bot",
+                "content": msg[0] if isinstance(msg, tuple) else msg
+            }
+            for i, msg in enumerate(history)
+        ]
+    }
+
+    json_data = json.dumps(chat_data, indent=2)
+
+    # Create a temporary file
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
+        temp_file.write(json_data)
+        temp_file_path = temp_file.name
+
+    return temp_file_path
+
+    json_data = json.dumps(chat_data, indent=2)
+    return filename, json_data
+
+def show_edit_message(selected):
+    if selected:
+        return gr.update(value=selected[0], visible=True), gr.update(value=selected[1], visible=True), gr.update(visible=True)
+    return gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+
+def show_delete_message(selected):
+    if selected:
+        return gr.update(value=selected[1], visible=True), gr.update(visible=True)
+    return gr.update(visible=False), gr.update(visible=False)
+
+
 def update_chat_content(selected_item, use_content, use_summary, use_prompt, item_mapping):
-    print(f"Debug - Update Chat Content - Selected Item: {selected_item}")
-    print(f"Debug - Update Chat Content - Use Content: {use_content}")
-    print(f"Debug - Update Chat Content - Use Summary: {use_summary}")
-    print(f"Debug - Update Chat Content - Use Prompt: {use_prompt}")
-    print(f"Debug - Update Chat Content - Item Mapping: {item_mapping}")
+    logging.debug(f"Debug - Update Chat Content - Selected Item: {selected_item}\n")
+    logging.debug(f"Debug - Update Chat Content - Use Content: {use_content}\n\n\n\n")
+    logging.debug(f"Debug - Update Chat Content - Use Summary: {use_summary}\n\n")
+    logging.debug(f"Debug - Update Chat Content - Use Prompt: {use_prompt}\n\n")
+    logging.debug(f"Debug - Update Chat Content - Item Mapping: {item_mapping}\n\n")
 
     if selected_item and selected_item in item_mapping:
         media_id = item_mapping[selected_item]
@@ -1840,9 +1873,9 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
         if isinstance(content, dict):
             print(f"Debug - Update Chat Content - Content keys: {list(content.keys())}")
             for key, value in content.items():
-                print(f"Debug - Update Chat Content - {key} (first 500 char): {str(value)[:500]}")
+                print(f"Debug - Update Chat Content - {key} (first 500 char): {str(value)[:500]}\n\n\n\n")
         else:
-            print(f"Debug - Update Chat Content - Content(first 500 char): {str(content)[:500]}")
+            print(f"Debug - Update Chat Content - Content(first 500 char): {str(content)[:500]}\n\n\n\n")
 
         print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
         return content, selected_parts
@@ -1877,39 +1910,53 @@ def update_user_prompt(preset_name):
     return ""
 
 
-def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
-    print(f"Debug - Chat Wrapper - Message: {message}")
-    print(f"Debug - Chat Wrapper - Media Content: {media_content}")
-    print(f"Debug - Chat Wrapper - Selected Parts: {selected_parts}")
-    print(f"Debug - Chat Wrapper - API Endpoint: {api_endpoint}")
-    print(f"Debug - Chat Wrapper - User Prompt: {user_prompt}")
+def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id, save_conversation):
+    try:
+        if save_conversation:
+            if conversation_id is None:
+                # Create a new conversation
+                media_id = media_content.get('id', None)
+                conversation_name = f"Chat about {media_content.get('title', 'Unknown Media')}"
+                conversation_id = create_chat_conversation(media_id, conversation_name)
 
-    selected_content = "\n\n".join(
-        [f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if
-         part in media_content])
-    print(f"Debug - Chat Wrapper - Selected Content: {selected_content[:500]}...")  # Print first 500 chars
+            # Add user message to the database
+            user_message_id = add_chat_message(conversation_id, "user", message)
 
-    context = f"Selected content:\n{selected_content}\n\nUser message: {message}"
-    print(f"Debug - Chat Wrapper - Context: {context[:500]}...")  # Print first 500 chars
+        # Include the selected parts and user_prompt only for the first message
+        if not history:
+            content_to_analyze = "\n".join(selected_parts)
+            full_message = f"{user_prompt}\n\n{message}\n\nContent to analyze:\n{content_to_analyze}"
+        else:
+            full_message = message
 
-    # Use a default API endpoint if none is selected
-    if not api_endpoint:
-        api_endpoint = "OpenAI"  # You can change this to any default endpoint you prefer
-        print(f"Debug - Chat Wrapper - Using default API Endpoint: {api_endpoint}")
+        # Generate bot response
+        bot_message = chat(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
 
-    bot_message = chat(context, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
-    print(f"Debug - Chat Wrapper - Bot Message: {bot_message[:500]}...")  # Print first 500 chars
+        if save_conversation:
+            # Add assistant message to the database
+            add_chat_message(conversation_id, "assistant", bot_message)
 
-    history.append((message, bot_message))
-    return "", history
+        # Update history
+        history.append((message, bot_message))
+
+        return "", history, conversation_id
+    except Exception as e:
+        logging.error(f"Error in chat wrapper: {str(e)}")
+        return "", history, conversation_id
 
 
 def create_chat_interface():
+    custom_css = """
+    .chatbot-container .message-wrap .message {
+        font-size: 14px !important;
+    }
+    """
     with gr.TabItem("Remote LLM Chat (Horizontal)"):
         gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
         chat_history = gr.State([])
         media_content = gr.State({})
         selected_parts = gr.State([])
+        conversation_id = gr.State(None)
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -1918,9 +1965,13 @@ def create_chat_interface():
                 search_button = gr.Button("Search")
                 items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
                 item_mapping = gr.State({})
-                use_content = gr.Checkbox(label="Use Content")
-                use_summary = gr.Checkbox(label="Use Summary")
-                use_prompt = gr.Checkbox(label="Use Prompt")
+                with gr.Row():
+                    use_content = gr.Checkbox(label="Use Content")
+                    use_summary = gr.Checkbox(label="Use Summary")
+                    use_prompt = gr.Checkbox(label="Use Prompt")
+                    save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
+                previous_conversations = gr.Dropdown(label="Previous Conversations", choices=[])
+                load_conversations_btn = gr.Button("Load Previous Conversations")
 
                 api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
@@ -1928,20 +1979,45 @@ def create_chat_interface():
                 user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
                                        "be used as the next message instead)", lines=3)
             with gr.Column():
-                chatbot = gr.Chatbot(height=500)
+                chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
-                save_button = gr.Button("Save Chat History")
+
+                edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
+                edit_message_text = gr.Textbox(label="Edit Message", visible=False)
+                update_message_button = gr.Button("Update Message", visible=False)
+
+                delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
+                delete_message_button = gr.Button("Delete Message", visible=False)
+
+                save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
+                save_chat_history_as_file = gr.Button("Save Chat History as File")
                 download_file = gr.File(label="Download Chat History")
 
-        submit.click(
-            chat_wrapper,
-            inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
-            outputs=[msg, chatbot]
-        )
+        def load_previous_conversations(media_id):
+            conversations = search_chat_conversations("")  # Empty string to get all conversations
+            conversation_choices = [(c['conversation_name'], c['id']) for c in conversations if
+                                    c['media_id'] == media_id]
+            return gr.update(choices=conversation_choices)
 
-        save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
+        def load_conversation(conversation_id):
+            messages = get_chat_messages(conversation_id)
+            history = [((msg['message'], msg['id']) if msg['sender'] == 'user' else (msg['message'], msg['id'])) for msg in messages]
+            return history
 
+        def update_message_in_chat(message_id, new_text, history):
+            update_chat_message(message_id, new_text)
+            updated_history = [(msg1, msg2) if msg1[1] != message_id and msg2[1] != message_id
+                               else ((new_text, msg1[1]) if msg1[1] == message_id else (new_text, msg2[1]))
+                               for msg1, msg2 in history]
+            return updated_history
+
+        def delete_message_from_chat(message_id, history):
+            delete_chat_message(message_id)
+            updated_history = [(msg1, msg2) for msg1, msg2 in history if msg1[1] != message_id and msg2[1] != message_id]
+            return updated_history
+
+        # Restore original functionality
         search_button.click(
             fn=update_dropdown,
             inputs=[search_query_input, search_type_input],
@@ -1949,6 +2025,28 @@ def create_chat_interface():
         )
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+
+
+        def process_chat_response(response, history, conversation_id):
+            if isinstance(response, tuple) and len(response) == 3:
+                _, updated_history, updated_conversation_id = response
+                return "", updated_history, updated_conversation_id
+            else:
+                return response, history, conversation_id
+
+        submit.click(
+            chat_wrapper,
+            inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
+                    conversation_id, save_conversation],
+            outputs=[msg, chatbot, conversation_id]
+        ).then(# Clear the message box after submission
+            lambda x: gr.update(value=""),
+            inputs=[chatbot],
+            outputs=[msg]
+        ).then(# Clear the user prompt after the first message
+            lambda: gr.update(value=""),
+            outputs=[user_prompt]
+        )
 
         items_output.change(
             update_chat_content,
@@ -1961,13 +2059,47 @@ def create_chat_interface():
                            outputs=[selected_parts])
         use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                           outputs=[selected_parts])
-        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                           outputs=[selected_parts])
-        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                           outputs=[selected_parts])
-        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                          outputs=[selected_parts])
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
+
+        # Add new functionality
+        load_conversations_btn.click(
+            load_previous_conversations,
+            inputs=[media_content],
+            outputs=[previous_conversations]
+        )
+
+        previous_conversations.change(
+            load_conversation,
+            inputs=[previous_conversations],
+            outputs=[chat_history]
+        )
+
+        update_message_button.click(
+            update_message_in_chat,
+            inputs=[edit_message_id, edit_message_text, chat_history],
+            outputs=[chatbot]
+        )
+
+        delete_message_button.click(
+            delete_message_from_chat,
+            inputs=[delete_message_id, chat_history],
+            outputs=[chatbot]
+        )
+
+        save_chat_history_as_file.click(
+            save_chat_history,
+            inputs=[chatbot, conversation_id],
+            outputs=[download_file]
+        )
+
+        save_chat_history_to_db.click(
+            save_chat_history_to_db_wrapper,
+            inputs=[chatbot, conversation_id, media_content],
+            outputs=[conversation_id, gr.Textbox(label="Save Status")]
+        )
+
+        chatbot.select(show_edit_message, None, [edit_message_text, edit_message_id, update_message_button])
+        chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
 
 def create_chat_interface_top_bottom():
@@ -2000,12 +2132,6 @@ def create_chat_interface_top_bottom():
                 submit = gr.Button("Submit")
                 save_button = gr.Button("Save Chat History")
                 download_file = gr.File(label="Download Chat History")
-
-        submit.click(
-            chat_wrapper,
-            inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
-            outputs=[msg, chatbot]
-        )
 
         save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
 
@@ -3190,19 +3316,20 @@ def launch_ui(share_public=None, server_mode=False):
                 create_search_tab()
                 create_prompt_view_tab()
 
-            with gr.TabItem("Local LLM with Llamafile"):
-                create_llamafile_settings_tab()
-
-            with gr.TabItem("Remote LLM Chat"):
+            with gr.TabItem("Chat with an LLM"):
                 create_chat_interface()
                 create_chat_interface_top_bottom()
                 create_chat_management_tab()
+                create_llamafile_settings_tab()
 
             with gr.TabItem("Edit Existing Items"):
                 create_media_edit_tab()
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
+
+            with gr.TabItem("Writing Tools"):
+                create_document_editing_tab()
 
             with gr.TabItem("Keywords"):
                 with gr.Tabs():
@@ -3215,9 +3342,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_import_item_tab()
                 create_import_obsidian_vault_tab()
                 create_export_tab()
-
-            with gr.TabItem("Document Editing"):
-                create_document_editing_tab()
 
             with gr.TabItem("Utilities"):
                 create_utilities_tab()

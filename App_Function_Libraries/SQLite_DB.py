@@ -54,7 +54,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
@@ -500,7 +500,8 @@ def fetch_item_details(media_id: int):
 #
 #
 #######################################################################################################################
-
+#
+# Media-related Functions
 
 
 
@@ -772,15 +773,10 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 
 
 #
+# End of ....
+#######################################################################################################################
 #
-#######################################################################################################################
-
-
-
-
-#######################################################################################################################
 # Functions to manage prompts DB
-#
 
 def create_prompts_db():
     conn = sqlite3.connect('prompts.db')
@@ -844,12 +840,11 @@ def insert_prompt_to_db(title, description, system_prompt, user_prompt):
     return result
 
 
-
-
 #
 #
 #######################################################################################################################
-
+#
+# Function to fetch/update media content
 
 def update_media_content(selected_item, item_mapping, content_input, prompt_input, summary_input):
     try:
@@ -914,20 +909,6 @@ def load_media_content(media_id: int) -> dict:
             return {"content": "", "prompt": "", "summary": ""}
     except sqlite3.Error as e:
         raise Exception(f"Error loading media content: {e}")
-
-def insert_prompt_to_db(title, description, system_prompt, user_prompt):
-    try:
-        conn = sqlite3.connect('prompts.db')
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO Prompts (name, details, system, user) VALUES (?, ?, ?, ?)",
-            (title, description, system_prompt, user_prompt)
-        )
-        conn.commit()
-        conn.close()
-        return "Prompt added successfully!"
-    except sqlite3.Error as e:
-        return f"Error adding prompt: {e}"
 
 
 def fetch_items_by_title_or_url(search_query: str, search_type: str):
@@ -1011,9 +992,8 @@ def convert_to_markdown(item):
     return markdown
 
 
-
-
-
+#
+# End of Functions to manage prompts DB / Fetch and update media content
 #######################################################################################################################
 #
 # Obsidian-related Functions
@@ -1079,6 +1059,7 @@ def import_obsidian_note_to_db(note_data):
 #######################################################################################################################
 #
 # Chat-related Functions
+
 
 
 def create_chat_conversation(media_id: int, conversation_name: str) -> int:
@@ -1187,6 +1168,32 @@ def delete_chat_message(message_id: int) -> None:
     except sqlite3.Error as e:
         logging.error(f"Error deleting chat message: {e}")
         raise DatabaseError(f"Error deleting chat message: {e}")
+
+
+def save_chat_history_to_database(chatbot, conversation_id, media_content):
+    logging.info(f"Received media_content: {media_content}")
+    try:
+        if not isinstance(media_content, dict) or 'id' not in media_content:
+            raise ValueError(f"Invalid media_content. Expected a dictionary with 'id' key. Received: {media_content}")
+        media_id = media_content['id']
+        if not isinstance(media_id, int):
+            raise ValueError(f"Invalid media_id: {media_id}. Expected an integer.")
+
+        if conversation_id is None:
+            # Create a new conversation
+            conversation_name = f"Chat about {media_content.get('title', 'Unknown Media')}"
+            conversation_id = create_chat_conversation(media_id, conversation_name)
+
+        # Save all messages in the chatbot history
+        for user_message, assistant_message in chatbot:
+            add_chat_message(conversation_id, "user", user_message)
+            add_chat_message(conversation_id, "assistant", assistant_message)
+
+        return conversation_id
+    except Exception as e:
+        logging.error(f"Error saving chat history to database: {str(e)}")
+        # Re-raise the exception to be handled by the caller
+        raise
 
 
 #
