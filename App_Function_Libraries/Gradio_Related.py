@@ -373,9 +373,8 @@ def load_media_content(media_id: int) -> dict:
         print(f"Debug - Load Media Content - Error: {str(e)}")
         return {"content": "", "prompt": "", "summary": ""}
 
-def load_preset_prompts():
-    return list_prompts()
 
+# FIXME - not adding content from selected item to query
 def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt):
     try:
         print(f"Debug - Chat Function - Message: {message}")
@@ -1516,7 +1515,6 @@ def create_search_tab():
                 items_output = gr.Dropdown(label="Select Item", choices=[])
                 item_mapping = gr.State({})
                 prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
-                content_output = gr.Markdown(label="Content", visible=True)
 
                 search_button.click(
                     fn=update_dropdown,
@@ -1524,6 +1522,7 @@ def create_search_tab():
                     outputs=[items_output, item_mapping]
                 )
             with gr.Column():
+                content_output = gr.Markdown(label="Content", visible=True)
                 items_output.change(
                     fn=update_detailed_view,
                     inputs=[items_output, item_mapping],
@@ -1728,80 +1727,127 @@ def create_llamafile_advanced_inputs():
 # Chat Interface Tab Functions
 
 
+def update_chat_content(selected_item, use_content, use_summary, use_prompt, item_mapping):
+    print(f"Debug - Update Chat Content - Selected Item: {selected_item}")
+    print(f"Debug - Update Chat Content - Use Content: {use_content}")
+    print(f"Debug - Update Chat Content - Use Summary: {use_summary}")
+    print(f"Debug - Update Chat Content - Use Prompt: {use_prompt}")
+    print(f"Debug - Update Chat Content - Item Mapping: {item_mapping}")
+
+    if selected_item and selected_item in item_mapping:
+        media_id = item_mapping[selected_item]
+        content = load_media_content(media_id)
+        selected_parts = []
+        if use_content and "content" in content:
+            selected_parts.append("content")
+        if use_summary and "summary" in content:
+            selected_parts.append("summary")
+        if use_prompt and "prompt" in content:
+            selected_parts.append("prompt")
+
+        # Modified debug print
+        if isinstance(content, dict):
+            print(f"Debug - Update Chat Content - Content keys: {list(content.keys())}")
+            for key, value in content.items():
+                print(f"Debug - Update Chat Content - {key} (first 500 char): {str(value)[:500]}")
+        else:
+            print(f"Debug - Update Chat Content - Content(first 500 char): {str(content)[:500]}")
+
+        print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
+        return content, selected_parts
+    else:
+        print(f"Debug - Update Chat Content - No item selected or item not in mapping")
+        return {}, []
+
+
+def debug_output(media_content, selected_parts):
+    print(f"Debug - Media Content: {media_content}")
+    print(f"Debug - Selected Parts: {selected_parts}")
+    return ""
+
+
+def update_selected_parts(use_content, use_summary, use_prompt):
+    selected_parts = []
+    if use_content:
+        selected_parts.append("content")
+    if use_summary:
+        selected_parts.append("summary")
+    if use_prompt:
+        selected_parts.append("prompt")
+    print(f"Debug - Update Selected Parts: {selected_parts}")
+    return selected_parts
+
+
+def update_user_prompt(preset_name):
+    details = fetch_prompt_details(preset_name)
+    if details:
+        # 0 is title, 1 is details, 2 is system prompt, 3 is user prompt
+        return details[2]  # Return the system prompt
+    return ""
+
+
+def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
+    print(f"Debug - Chat Wrapper - Message: {message}")
+    print(f"Debug - Chat Wrapper - Media Content: {media_content}")
+    print(f"Debug - Chat Wrapper - Selected Parts: {selected_parts}")
+    print(f"Debug - Chat Wrapper - API Endpoint: {api_endpoint}")
+    print(f"Debug - Chat Wrapper - User Prompt: {user_prompt}")
+
+    selected_content = "\n\n".join(
+        [f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if
+         part in media_content])
+    print(f"Debug - Chat Wrapper - Selected Content: {selected_content[:500]}...")  # Print first 500 chars
+
+    context = f"Selected content:\n{selected_content}\n\nUser message: {message}"
+    print(f"Debug - Chat Wrapper - Context: {context[:500]}...")  # Print first 500 chars
+
+    # Use a default API endpoint if none is selected
+    if not api_endpoint:
+        api_endpoint = "OpenAI"  # You can change this to any default endpoint you prefer
+        print(f"Debug - Chat Wrapper - Using default API Endpoint: {api_endpoint}")
+
+    bot_message = chat(context, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
+    print(f"Debug - Chat Wrapper - Bot Message: {bot_message[:500]}...")  # Print first 500 chars
+
+    history.append((message, bot_message))
+    return "", history
+
+
 def create_chat_interface():
-    with gr.TabItem("Remote LLM Chat"):
+    with gr.TabItem("Remote LLM Chat (Horizontal)"):
         gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
+        chat_history = gr.State([])
+        media_content = gr.State({})
+        selected_parts = gr.State([])
 
         with gr.Row():
             with gr.Column(scale=1):
                 search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
                 search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
                 search_button = gr.Button("Search")
-
-            with gr.Column(scale=2):
                 items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
                 item_mapping = gr.State({})
+                use_content = gr.Checkbox(label="Use Content")
+                use_summary = gr.Checkbox(label="Use Summary")
+                use_prompt = gr.Checkbox(label="Use Prompt")
 
-        with gr.Row():
-            use_content = gr.Checkbox(label="Use Content")
-            use_summary = gr.Checkbox(label="Use Summary")
-            use_prompt = gr.Checkbox(label="Use Prompt")
-
-        api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
-        api_key = gr.Textbox(label="API Key (if required)", type="password")
-        preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
-        user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
+                api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
+                api_key = gr.Textbox(label="API Key (if required)", type="password")
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
+                user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
                                        "be used as the next message instead)", lines=3)
-
-        chatbot = gr.Chatbot(height=500)
-        msg = gr.Textbox(label="Enter your message")
-        submit = gr.Button("Submit")
-
-        chat_history = gr.State([])
-        media_content = gr.State({})
-        selected_parts = gr.State([])
-
-        save_button = gr.Button("Save Chat History")
-        download_file = gr.File(label="Download Chat History")
-
-        def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
-            print(f"Debug - Chat Wrapper - Message: {message}")
-            print(f"Debug - Chat Wrapper - Media Content: {media_content}")
-            print(f"Debug - Chat Wrapper - Selected Parts: {selected_parts}")
-            print(f"Debug - Chat Wrapper - API Endpoint: {api_endpoint}")
-            print(f"Debug - Chat Wrapper - User Prompt: {user_prompt}")
-
-            selected_content = "\n\n".join(
-                [f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if
-                 part in media_content])
-            print(f"Debug - Chat Wrapper - Selected Content: {selected_content[:500]}...")  # Print first 500 chars
-
-            context = f"Selected content:\n{selected_content}\n\nUser message: {message}"
-            print(f"Debug - Chat Wrapper - Context: {context[:500]}...")  # Print first 500 chars
-
-            # Use a default API endpoint if none is selected
-            if not api_endpoint:
-                api_endpoint = "OpenAI"  # You can change this to any default endpoint you prefer
-                print(f"Debug - Chat Wrapper - Using default API Endpoint: {api_endpoint}")
-
-            bot_message = chat(context, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
-            print(f"Debug - Chat Wrapper - Bot Message: {bot_message[:500]}...")  # Print first 500 chars
-
-            history.append((message, bot_message))
-            return "", history
+            with gr.Column():
+                chatbot = gr.Chatbot(height=500)
+                msg = gr.Textbox(label="Enter your message")
+                submit = gr.Button("Submit")
+                save_button = gr.Button("Save Chat History")
+                download_file = gr.File(label="Download Chat History")
 
         submit.click(
             chat_wrapper,
             inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
             outputs=[msg, chatbot]
         )
-
-        def save_chat_history(history):
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"chat_history_{timestamp}.json"
-            with open(filename, "w") as f:
-                json.dump(history, f)
-            return filename
 
         save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
 
@@ -1811,86 +1857,92 @@ def create_chat_interface():
             outputs=[items_output, item_mapping]
         )
 
-        def update_user_prompt(preset_name):
-            details = fetch_prompt_details(preset_name)
-            if details:
-                return details[1]  # Return the system prompt
-            return ""
-
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
-
-        def update_chat_content(selected_item, use_content, use_summary, use_prompt, item_mapping):
-            print(f"Debug - Update Chat Content - Selected Item: {selected_item}")
-            print(f"Debug - Update Chat Content - Use Content: {use_content}")
-            print(f"Debug - Update Chat Content - Use Summary: {use_summary}")
-            print(f"Debug - Update Chat Content - Use Prompt: {use_prompt}")
-            print(f"Debug - Update Chat Content - Item Mapping: {item_mapping}")
-
-            if selected_item and selected_item in item_mapping:
-                media_id = item_mapping[selected_item]
-                content = load_media_content(media_id)
-                selected_parts = []
-                if use_content and "content" in content:
-                    selected_parts.append("content")
-                if use_summary and "summary" in content:
-                    selected_parts.append("summary")
-                if use_prompt and "prompt" in content:
-                    selected_parts.append("prompt")
-                print(f"Debug - Update Chat Content - Content(first 500 char): {content[:500]}")
-                print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
-                return content, selected_parts
-            else:
-                print(f"Debug - Update Chat Content - No item selected or item not in mapping")
-                return {}, []
 
         items_output.change(
             update_chat_content,
             inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
             outputs=[media_content, selected_parts]
         )
-
-        def update_selected_parts(use_content, use_summary, use_prompt):
-            selected_parts = []
-            if use_content:
-                selected_parts.append("content")
-            if use_summary:
-                selected_parts.append("summary")
-            if use_prompt:
-                selected_parts.append("prompt")
-            print(f"Debug - Update Selected Parts: {selected_parts}")
-            return selected_parts
-
         use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                            outputs=[selected_parts])
         use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                            outputs=[selected_parts])
         use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                           outputs=[selected_parts])
-
-        def update_selected_parts(use_content, use_summary, use_prompt):
-            selected_parts = []
-            if use_content:
-                selected_parts.append("content")
-            if use_summary:
-                selected_parts.append("summary")
-            if use_prompt:
-                selected_parts.append("prompt")
-            print(f"Debug - Update Selected Parts: {selected_parts}")
-            return selected_parts
-
         use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                            outputs=[selected_parts])
         use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                            outputs=[selected_parts])
         use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                           outputs=[selected_parts])
+        items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
 
-        # Add debug output
-        def debug_output(media_content, selected_parts):
-            print(f"Debug - Media Content: {media_content}")
-            print(f"Debug - Selected Parts: {selected_parts}")
-            return ""
 
+def create_chat_interface_top_bottom():
+    with gr.TabItem("Remote LLM Chat (Vertical)"):
+        gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
+        chat_history = gr.State([])
+        media_content = gr.State({})
+        selected_parts = gr.State([])
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+                search_button = gr.Button("Search")
+                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                item_mapping = gr.State({})
+                use_content = gr.Checkbox(label="Use Content")
+                use_summary = gr.Checkbox(label="Use Summary")
+                use_prompt = gr.Checkbox(label="Use Prompt")
+
+                api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
+                api_key = gr.Textbox(label="API Key (if required)", type="password")
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
+                user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
+                                       "be used as the next message instead)", lines=3)
+        with gr.Row():
+            with gr.Column():
+                chatbot = gr.Chatbot(height=500)
+                msg = gr.Textbox(label="Enter your message")
+                submit = gr.Button("Submit")
+                save_button = gr.Button("Save Chat History")
+                download_file = gr.File(label="Download Chat History")
+
+        submit.click(
+            chat_wrapper,
+            inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
+            outputs=[msg, chatbot]
+        )
+
+        save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
+
+        search_button.click(
+            fn=update_dropdown,
+            inputs=[search_query_input, search_type_input],
+            outputs=[items_output, item_mapping]
+        )
+
+        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+
+        items_output.change(
+            update_chat_content,
+            inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
+            outputs=[media_content, selected_parts]
+        )
+        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                          outputs=[selected_parts])
+        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                          outputs=[selected_parts])
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
 
 #
@@ -2170,35 +2222,32 @@ def create_import_obsidian_vault_tab():
 # Using pypandoc to convert EPUB to Markdown
 def create_import_book_tab():
     with gr.TabItem("Import .epub/ebook Files"):
-        gr.Markdown("# Import an .epub file into the database using pypandoc")
-        gr.Markdown("...and have it tagged + summarized")
-        gr.Markdown(
-            "Check out https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/ for info on removing DRM from your ebooks")
         with gr.Row():
-            import_file = gr.File(label="Upload file for import", file_types=[".epub"])
-        with gr.Row():
-            title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
-            author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
-        with gr.Row():
-            keywords_input = gr.Textbox(label="Keywords(like genre or publish year)",
-                                        placeholder="Enter keywords, comma-separated")
-            custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                             placeholder="Enter a custom prompt for summarization (optional)")
-        with gr.Row():
-            summary_input = gr.Textbox(label="Summary",
-                                       placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
-        with gr.Row():
-            auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
-            api_name_input = gr.Dropdown(
-                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                label="API for Auto-summarization"
-            )
-            api_key_input = gr.Textbox(label="API Key", type="password")
-        with gr.Row():
-            import_button = gr.Button("Import Data")
-        with gr.Row():
-            import_output = gr.Textbox(label="Import Status")
+            with gr.Column():
+                gr.Markdown("# Ingest an .epub file using pypandoc")
+                gr.Markdown("...and have it tagged + summarized")
+                gr.Markdown(
+                "How to remove DRM from your ebooks: https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/")
+                import_file = gr.File(label="Upload file for import", file_types=[".epub"])
+                title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+                keywords_input = gr.Textbox(label="Keywords(like genre or publish year)",
+                                            placeholder="Enter keywords, comma-separated")
+                custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter a custom prompt for summarization (optional)")
+                summary_input = gr.Textbox(label="Summary",
+                                           placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
+                auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
+                api_name_input = gr.Dropdown(
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                    label="API for Auto-summarization"
+                )
+                api_key_input = gr.Textbox(label="API Key", type="password")
+                import_button = gr.Button("Import Data")
+            with gr.Column():
+                with gr.Row():
+                    import_output = gr.Textbox(label="Import Status")
 
         def import_epub(epub_file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
             try:
@@ -2601,12 +2650,21 @@ def create_document_editing_tab():
                     outputs=output_text
                 )
 
+        # FIXME - Add actual function for this
         with gr.Tab("Tone Analyzer & Editor"):
             with gr.Row():
                 with gr.Column():
                     input_text = gr.Textbox(label="Input Text", lines=10)
                     concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
                     casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
+                    api_name_input = gr.Dropdown(
+                        choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                        value=None,
+                        label="API for Grammar Check"
+                    )
+                    api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                                                   type="password")
                     adjust_btn = gr.Button("Adjust Tone")
 
                 with gr.Column():
@@ -2725,6 +2783,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_video_transcription_tab()
                     create_audio_processing_tab()
                     create_podcast_tab()
+                    create_import_book_tab()
                     create_website_scraping_tab()
                     create_pdf_ingestion_tab()
                     create_resummary_tab()
@@ -2739,6 +2798,7 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Remote LLM Chat"):
                 create_chat_interface()
+                create_chat_interface_top_bottom()
 
             with gr.TabItem("Edit Existing Items"):
                 create_media_edit_tab()
