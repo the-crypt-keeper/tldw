@@ -367,12 +367,12 @@ Sample commands:
   - **GGUF Files** - GGUF is a binary format that is designed for fast loading and saving of models, and for ease of reading. Models are traditionally developed using PyTorch or another framework, and then converted to GGUF for use in GGML. https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
   - **Inference Engine** - A software system that is designed to execute a model that has been trained by a machine learning algorithm. Llama.cpp and Kobold.cpp are examples of inference engines.
 - **Papers & Concepts**
-  1. Lost in the Middle: How Language Models Use Long Contexts
-    - https://arxiv.org/abs/2307.03172
+  1. Lost in the Middle: How Language Models Use Long Contexts(2023)
+    - https://arxiv.org/abs/2307.03172 
     - `We analyze the performance of language models on two tasks that require identifying relevant information in their input contexts: multi-document question answering and key-value retrieval. We find that performance can degrade significantly when changing the position of relevant information, indicating that current language models do not robustly make use of information in long input contexts. In particular, we observe that performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts, even for explicitly long-context models`
-  2. [RULER: What's the Real Context Size of Your Long-Context Language Models?](https://arxiv.org/abs/2404.06654)
+  2. [RULER: What's the Real Context Size of Your Long-Context Language Models?(2024)](https://arxiv.org/abs/2404.06654)
     - `The needle-in-a-haystack (NIAH) test, which examines the ability to retrieve a piece of information (the "needle") from long distractor texts (the "haystack"), has been widely adopted to evaluate long-context language models (LMs). However, this simple retrieval-based test is indicative of only a superficial form of long-context understanding. To provide a more comprehensive evaluation of long-context LMs, we create a new synthetic benchmark RULER with flexible configurations for customized sequence length and task complexity. RULER expands upon the vanilla NIAH test to encompass variations with diverse types and quantities of needles. Moreover, RULER introduces new task categories multi-hop tracing and aggregation to test behaviors beyond searching from context. We evaluate ten long-context LMs with 13 representative tasks in RULER. Despite achieving nearly perfect accuracy in the vanilla NIAH test, all models exhibit large performance drops as the context length increases. While these models all claim context sizes of 32K tokens or greater, only four models (GPT-4, Command-R, Yi-34B, and Mixtral) can maintain satisfactory performance at the length of 32K. Our analysis of Yi-34B, which supports context length of 200K, reveals large room for improvement as we increase input length and task complexity.`
-  3. [Same Task, More Tokens: the Impact of Input Length on the Reasoning Performance of Large Language Models](https://arxiv.org/abs/2402.14848)
+  3. [Same Task, More Tokens: the Impact of Input Length on the Reasoning Performance of Large Language Models(2024)](https://arxiv.org/abs/2402.14848)
      - `Our findings show a notable degradation in LLMs' reasoning performance at much shorter input lengths than their technical maximum. We show that the degradation trend appears in every version of our dataset, although at different intensities. Additionally, our study reveals that the traditional metric of next word prediction correlates negatively with performance of LLMs' on our reasoning dataset. We analyse our results and identify failure modes that can serve as useful guides for future research, potentially informing strategies to address the limitations observed in LLMs.`
   4. Abliteration (Uncensoring LLMs)
      - [Uncensor any LLM with abliteration - Maxime Labonne(2024)](https://huggingface.co/blog/mlabonne/abliteration)
@@ -413,7 +413,8 @@ Sample commands:
     - **Linux & Mac**
       1. `git clone https://github.com/ggerganov/llama.cpp`
       2. `make` in the `llama.cpp` folder 
-      3. `./server -m ../path/to/model -c <context_size>`
+      3. `./server -m ../path/to/model -c <context_size> -ngl <layers-to-offload-to-gpu>`
+        * Example: `./server -m ../path/to/model -c 8192 -ngl 999` - This will run the model with a context size of 8192 tokens and offload all layers to the GPU.
     - **Windows**
       1. `git clone https://github.com/ggerganov/llama.cpp`
       2. Download + Run: https://github.com/skeeto/w64devkit/releases
@@ -457,10 +458,15 @@ Sample commands:
   6. `media_summary.db` - SQLite DB that stores all the data ingested, transcribed, and summarized.
   7. `prompts.db` - SQLite DB that stores all the prompts.
   8. `App_Function_Libraries` Folder - Folder containing the applications function libraries
-  9. `Tests` Folder - Folder containing tests for the application (ha.)
-  10. `Helper_Scripts` - Folder containing helper scripts for the application
-  11. `models` - Folder containing the models for the speaker diarization LLMs
-  12. `tldw-original-scripts` - Original scripts from the original repo
+  9. `Docs` - Folder containing documentation for the application
+  10. `Tests` Folder - Folder containing tests for the application (ha.)
+  11. `Helper_Scripts` - Folder containing helper scripts for the application
+        * `DB-Related` folder
+        * `Installer_Scripts` folder
+        * `Parsing_Files` folder
+        * `Prompts` folder
+  12. `models` - Folder containing the models for the speaker diarization LLMs
+  13. `tldw-original-scripts` - Original scripts from the original repo
 - **What's in the original repo?**
   - `summarize.py` - download, transcribe and summarize audio
     1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
@@ -483,6 +489,7 @@ Sample commands:
 - https://github.com/bugbakery/transcribee
 - https://github.com/fedirz/faster-whisper-server
 - https://github.com/transcriptionstream/transcriptionstream
+- https://github.com/lifan0127/ai-research-assistant
 - Commercial offerings:
   * Bit.ai 
   * typeset.io/
@@ -535,8 +542,10 @@ Sample commands:
       - Should work if you give it an HF api key in the code though...
     - PyInstaller for Windows/MacOS/Linux
       - At some point. I'd like this to be installable/usable by non-technical individuals and it's current setup kind of prevents that.
+      - I think I may give up on this and just use the batch scripts, but I definitely would prefer a pyinstaller version.
 - **Next items of focus**
   - Bugfixes for stability and file handling(Making sure files are removed when they should be)
   - Add support for more APIs
-  - Add functionality to select a custom prompt from the prompts database
-  - Add more prompts to the prompts database
+  - Live audio recording + transcription
+  - Documentation for each of the functions exposed.
+    - They all are pretty straightforward, but I'd like to make it easier to understand what's going on.
