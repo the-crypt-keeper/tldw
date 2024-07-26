@@ -19,6 +19,7 @@ import math
 import re
 import shutil
 import tempfile
+import uuid
 import zipfile
 from datetime import datetime, time
 import json
@@ -50,7 +51,7 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     perform_transcription, summarize_chunk
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
-    export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db
+    export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -489,7 +490,7 @@ def create_chunking_inputs():
 
 
 def create_video_transcription_tab():
-    with gr.TabItem("Video Transcription + Summarization"):
+    with (gr.TabItem("Video Transcription + Summarization")):
         gr.Markdown("# Transcribe & Summarize Videos from URLs")
         with gr.Row():
             gr.Markdown("""Follow this project at [tldw - GitHub](https://github.com/rmusser01/tldw)""")
@@ -501,13 +502,33 @@ def create_video_transcription_tab():
                 video_file_input = gr.File(label="Upload Video File (Optional)", file_types=["video/*"])
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
-                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3, visible=False)
+
+                with gr.Row():
+                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                     value=False,
+                                                     visible=True)
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                     value=False,
+                                                     visible=True)
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                            choices=load_preset_prompts(),
+                                            visible=False)
+                custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter custom prompt here",
+                                                 lines=3,
+                                                 visible=False)
                 custom_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[custom_prompt_checkbox],
                     outputs=[custom_prompt_input]
                 )
+                preset_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[preset_prompt_checkbox],
+                    outputs=[preset_prompt]
+                )
+                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
+
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
@@ -1058,13 +1079,33 @@ def create_audio_processing_tab():
 
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
-                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3, visible=False)
+
+                with gr.Row():
+                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                     value=False,
+                                                     visible=True)
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                     value=False,
+                                                     visible=True)
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                            choices=load_preset_prompts(),
+                                            visible=False)
+                custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter custom prompt here",
+                                                 lines=3,
+                                                 visible=False)
                 custom_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[custom_prompt_checkbox],
                     outputs=[custom_prompt_input]
                 )
+                preset_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[preset_prompt_checkbox],
+                    outputs=[preset_prompt]
+                )
+                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
+
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
@@ -1127,18 +1168,31 @@ def create_podcast_tab():
                     elem_id="podcast-keywords-input"
                 )
 
-                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
-                podcast_custom_prompt_input = gr.Textbox(
-                    label="Custom Prompt",
-                    placeholder="Enter custom prompt for summarization (optional)",
-                    lines=3,
-                    visible=False
-                )
-                custom_prompt_checkbox.change(
+                with gr.Row():
+                    podcast_custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                     value=False,
+                                                     visible=True)
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                     value=False,
+                                                     visible=True)
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                            choices=load_preset_prompts(),
+                                            visible=False)
+                podcast_custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter custom prompt here",
+                                                 lines=3,
+                                                 visible=False)
+                podcast_custom_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
-                    inputs=[custom_prompt_checkbox],
+                    inputs=[podcast_custom_prompt_checkbox],
                     outputs=[podcast_custom_prompt_input]
                 )
+                preset_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[preset_prompt_checkbox],
+                    outputs=[preset_prompt]
+                )
+                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
 
                 podcast_api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp",
@@ -1216,8 +1270,32 @@ def create_website_scraping_tab():
                 custom_article_title_input = gr.Textbox(label="Custom Article Titles (Optional, one per line)",
                                                         placeholder="Enter custom titles for the articles, one per line",
                                                         lines=5)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt (Optional)",
-                                                 placeholder="Provide a custom prompt for summarization", lines=3)
+                with gr.Row():
+                    website_custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                     value=False,
+                                                     visible=True)
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                     value=False,
+                                                     visible=True)
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                            choices=load_preset_prompts(),
+                                            visible=False)
+                website_custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter custom prompt here",
+                                                 lines=3,
+                                                 visible=False)
+                website_custom_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[website_custom_prompt_checkbox],
+                    outputs=[website_custom_prompt_input]
+                )
+                preset_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[preset_prompt_checkbox],
+                    outputs=[preset_prompt]
+                )
+                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=website_custom_prompt_input)
+
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"], value=None, label="API Name (Mandatory for Summarization)")
@@ -1232,7 +1310,7 @@ def create_website_scraping_tab():
 
                 scrape_button.click(
                     fn=scrape_and_summarize_multiple,
-                    inputs=[url_input, custom_prompt_input, api_name_input, api_key_input, keywords_input,
+                    inputs=[url_input, website_custom_prompt_input, api_name_input, api_key_input, keywords_input,
                             custom_article_title_input],
                     outputs=result_output
                 )
@@ -1249,6 +1327,32 @@ def create_pdf_ingestion_tab():
                 pdf_title_input = gr.Textbox(label="Title (Optional)")
                 pdf_author_input = gr.Textbox(label="Author (Optional)")
                 pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
+                with gr.Row():
+                    pdf_custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                     value=False,
+                                                     visible=True)
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                     value=False,
+                                                     visible=True)
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                            choices=load_preset_prompts(),
+                                            visible=False)
+                pdf_custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter custom prompt here",
+                                                 lines=3,
+                                                 visible=False)
+                pdf_custom_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[pdf_custom_prompt_checkbox],
+                    outputs=[pdf_custom_prompt_input]
+                )
+                preset_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[preset_prompt_checkbox],
+                    outputs=[preset_prompt]
+                )
+                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=pdf_custom_prompt_input)
+
                 pdf_ingest_button = gr.Button("Ingest PDF")
 
                 pdf_upload_button.upload(fn=lambda file: file, inputs=pdf_upload_button, outputs=pdf_file_input)
@@ -1272,37 +1376,62 @@ def create_resummary_tab():
     with gr.TabItem("Re-Summarize"):
         gr.Markdown("# Re-Summarize Existing Content")
         with gr.Row():
-            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
-            search_button = gr.Button("Search")
+            with gr.Column():
+                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+                search_button = gr.Button("Search")
 
-        items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
-        item_mapping = gr.State({})
+                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                item_mapping = gr.State({})
 
-        with gr.Row():
-            api_name_input = gr.Dropdown(
-                choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                value="Local-LLM", label="API Name")
-            api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here")
+                with gr.Row():
+                    api_name_input = gr.Dropdown(
+                        choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                        value="Local-LLM", label="API Name")
+                    api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here")
 
-        chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)
-        with gr.Row(visible=False) as chunking_options_box:
-            chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens', 'chapters'],
-                                       label="Chunking Method", value='words')
-            max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
-            chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
+                chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)
+                with gr.Row(visible=False) as chunking_options_box:
+                    chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens', 'chapters'],
+                                               label="Chunking Method", value='words')
+                    max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
+                    chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
 
-        custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False)
-        custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Enter custom prompt here", lines=3, visible=False)
+                with gr.Row():
+                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                         value=False,
+                                                         visible=True)
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                         value=False,
+                                                         visible=True)
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                            choices=load_preset_prompts(),
+                                            visible=False)
+                custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter custom prompt here",
+                                                 lines=3,
+                                                 visible=False)
+                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
 
-        resummary_button = gr.Button("Re-Summarize")
+                resummarize_button = gr.Button("Re-Summarize")
+            with gr.Column():
+                result_output = gr.Textbox(label="Result")
 
-        result_output = gr.Textbox(label="Result")
+        custom_prompt_checkbox.change(
+            fn=lambda x: gr.update(visible=x),
+            inputs=[custom_prompt_checkbox],
+            outputs=[custom_prompt_input]
+        )
+        preset_prompt_checkbox.change(
+            fn=lambda x: gr.update(visible=x),
+            inputs=[preset_prompt_checkbox],
+            outputs=[preset_prompt]
+        )
 
     # Connect the UI elements
     search_button.click(
-        fn=update_resummary_dropdown,
+        fn=update_resummarize_dropdown,
         inputs=[search_query_input, search_type_input],
         outputs=[items_output, item_mapping]
     )
@@ -1319,17 +1448,17 @@ def create_resummary_tab():
         outputs=[custom_prompt_input]
     )
 
-    resummary_button.click(
-        fn=resummary_content_wrapper,
+    resummarize_button.click(
+        fn=resummarize_content_wrapper,
         inputs=[items_output, item_mapping, api_name_input, api_key_input, chunking_options_checkbox, chunk_method,
                 max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt_input],
         outputs=result_output
     )
 
-    return search_query_input, search_type_input, search_button, items_output, item_mapping, api_name_input, api_key_input, chunking_options_checkbox, chunking_options_box, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt_input, resummary_button, result_output
+    return search_query_input, search_type_input, search_button, items_output, item_mapping, api_name_input, api_key_input, chunking_options_checkbox, chunking_options_box, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt_input, resummarize_button, result_output
 
 
-def update_resummary_dropdown(search_query, search_type):
+def update_resummarize_dropdown(search_query, search_type):
     if search_type in ['Title', 'URL']:
         results = fetch_items_by_title_or_url(search_query, search_type)
     elif search_type == 'Keyword':
@@ -1342,8 +1471,8 @@ def update_resummary_dropdown(search_query, search_type):
     return gr.update(choices=item_options), item_mapping
 
 
-def resummary_content_wrapper(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method,
-                              max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
+def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method,
+                                max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
     if not selected_item or not api_name or not api_key:
         return "Please select an item and provide API details."
 
@@ -1370,12 +1499,12 @@ def resummary_content_wrapper(selected_item, item_mapping, api_name, api_key, ch
     summarization_prompt = custom_prompt if custom_prompt_checkbox and custom_prompt else None
 
     # Call the resummary_content function
-    result = resummary_content(media_id, content, api_name, api_key, chunk_options, summarization_prompt)
+    result = resummarize_content(media_id, content, api_name, api_key, chunk_options, summarization_prompt)
 
     return result
 
 
-def resummary_content(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
+def resummarize_content(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
     if not selected_item or not api_name or not api_key:
         return "Please select an item and provide API details."
 
@@ -1577,45 +1706,6 @@ def create_prompt_view_tab():
             fn=display_search_results,
             inputs=[search_query_input],
             outputs=[search_results_output]
-        )
-
-
-def create_prompt_edit_tab():
-    with gr.TabItem("Edit Prompts"):
-        with gr.Row():
-            with gr.Column():
-                prompt_dropdown = gr.Dropdown(
-                    label="Select Prompt",
-                    choices=[],
-                    interactive=True
-                )
-                prompt_list_button = gr.Button("List Prompts")
-
-            with gr.Column():
-                title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
-                description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
-                system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
-                user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
-                add_prompt_button = gr.Button("Add/Update Prompt")
-                add_prompt_output = gr.HTML()
-
-        # Event handlers
-        prompt_list_button.click(
-            fn=update_prompt_dropdown,
-            outputs=prompt_dropdown
-        )
-
-        add_prompt_button.click(
-            fn=add_or_update_prompt,
-            inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
-            outputs=add_prompt_output
-        )
-
-        # Load prompt details when selected
-        prompt_dropdown.change(
-            fn=load_prompt_details,
-            inputs=[prompt_dropdown],
-            outputs=[title_input, description_input, system_prompt_input, user_prompt_input]
         )
 
 
@@ -1833,7 +1923,7 @@ def create_chat_interface():
 
                 api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
                 user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
                                        "be used as the next message instead)", lines=3)
             with gr.Column():
@@ -1899,7 +1989,7 @@ def create_chat_interface_top_bottom():
 
                 api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts())
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
                 user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
                                        "be used as the next message instead)", lines=3)
         with gr.Row():
@@ -1995,6 +2085,219 @@ def create_media_edit_tab():
             inputs=[items_output, item_mapping, content_input, prompt_input, summary_input],
             outputs=status_message
         )
+
+
+def create_media_edit_and_clone_tab():
+    with gr.TabItem("Clone and Edit Existing Items"):
+        gr.Markdown("# Search, Edit, and Clone Existing Items")
+
+        with gr.Row():
+            with gr.Column():
+                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                         label="Search By")
+            with gr.Column():
+                search_button = gr.Button("Search")
+                clone_button = gr.Button("Clone Item")
+            save_clone_button = gr.Button("Save Cloned Item", visible=False)
+        with gr.Row():
+            items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+            item_mapping = gr.State({})
+
+        content_input = gr.Textbox(label="Edit Content", lines=10)
+        prompt_input = gr.Textbox(label="Edit Prompt", lines=3)
+        summary_input = gr.Textbox(label="Edit Summary", lines=5)
+        new_title_input = gr.Textbox(label="New Title (for cloning)", visible=False)
+        status_message = gr.Textbox(label="Status", interactive=False)
+
+        search_button.click(
+            fn=update_dropdown,
+            inputs=[search_query_input, search_type_input],
+            outputs=[items_output, item_mapping]
+        )
+
+        def load_selected_media_content(selected_item, item_mapping):
+            if selected_item and item_mapping and selected_item in item_mapping:
+                media_id = item_mapping[selected_item]
+                content, prompt, summary = fetch_item_details(media_id)
+                return content, prompt, summary, gr.update(visible=True), gr.update(visible=False)
+            return "No item selected or invalid selection", "", "", gr.update(visible=False), gr.update(visible=False)
+
+        items_output.change(
+            fn=load_selected_media_content,
+            inputs=[items_output, item_mapping],
+            outputs=[content_input, prompt_input, summary_input, clone_button, save_clone_button]
+        )
+
+        def prepare_for_cloning(selected_item):
+            return gr.update(value=f"Copy of {selected_item}", visible=True), gr.update(visible=True)
+
+        clone_button.click(
+            fn=prepare_for_cloning,
+            inputs=[items_output],
+            outputs=[new_title_input, save_clone_button]
+        )
+
+        def save_cloned_item(selected_item, item_mapping, content, prompt, summary, new_title):
+            if selected_item and item_mapping and selected_item in item_mapping:
+                original_media_id = item_mapping[selected_item]
+                try:
+                    with db.get_connection() as conn:
+                        cursor = conn.cursor()
+
+                        # Fetch the original item's details
+                        cursor.execute("SELECT type, url FROM Media WHERE id = ?", (original_media_id,))
+                        original_type, original_url = cursor.fetchone()
+
+                        # Generate a new unique URL
+                        new_url = f"{original_url}_clone_{uuid.uuid4().hex[:8]}"
+
+                        # Insert new item into Media table
+                        cursor.execute("""
+                            INSERT INTO Media (title, content, url, type)
+                            VALUES (?, ?, ?, ?)
+                        """, (new_title, content, new_url, original_type))
+
+                        new_media_id = cursor.lastrowid
+
+                        # Insert new item into MediaModifications table
+                        cursor.execute("""
+                            INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+                            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        """, (new_media_id, prompt, summary))
+
+                        # Copy keywords from the original item
+                        cursor.execute("""
+                            INSERT INTO MediaKeywords (media_id, keyword_id)
+                            SELECT ?, keyword_id
+                            FROM MediaKeywords
+                            WHERE media_id = ?
+                        """, (new_media_id, original_media_id))
+
+                        # Update full-text search index
+                        cursor.execute("""
+                            INSERT INTO media_fts (rowid, title, content)
+                            VALUES (?, ?, ?)
+                        """, (new_media_id, new_title, content))
+
+                        conn.commit()
+
+                    return f"Cloned item saved successfully with ID: {new_media_id}", gr.update(
+                        visible=False), gr.update(visible=False)
+                except Exception as e:
+                    logging.error(f"Error saving cloned item: {e}")
+                    return f"Error saving cloned item: {str(e)}", gr.update(visible=True), gr.update(visible=True)
+            else:
+                return "No item selected or invalid selection", gr.update(visible=True), gr.update(visible=True)
+
+        save_clone_button.click(
+            fn=save_cloned_item,
+            inputs=[items_output, item_mapping, content_input, prompt_input, summary_input, new_title_input],
+            outputs=[status_message, new_title_input, save_clone_button]
+        )
+
+
+def create_prompt_edit_tab():
+    with gr.TabItem("Edit Prompts"):
+        with gr.Row():
+            with gr.Column():
+                prompt_dropdown = gr.Dropdown(
+                    label="Select Prompt",
+                    choices=[],
+                    interactive=True
+                )
+                prompt_list_button = gr.Button("List Prompts")
+
+            with gr.Column():
+                title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
+                description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
+                system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
+                user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
+                add_prompt_button = gr.Button("Add/Update Prompt")
+                add_prompt_output = gr.HTML()
+
+        # Event handlers
+        prompt_list_button.click(
+            fn=update_prompt_dropdown,
+            outputs=prompt_dropdown
+        )
+
+        add_prompt_button.click(
+            fn=add_or_update_prompt,
+            inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
+            outputs=add_prompt_output
+        )
+
+        # Load prompt details when selected
+        prompt_dropdown.change(
+            fn=load_prompt_details,
+            inputs=[prompt_dropdown],
+            outputs=[title_input, description_input, system_prompt_input, user_prompt_input]
+        )
+
+
+def create_prompt_clone_tab():
+    with gr.TabItem("Clone and Edit Prompts"):
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("# Clone and Edit Prompts")
+                prompt_dropdown = gr.Dropdown(
+                    label="Select Prompt",
+                    choices=[],
+                    interactive=True
+                )
+                prompt_list_button = gr.Button("List Prompts")
+
+            with gr.Column():
+                title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
+                description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
+                system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
+                user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
+                clone_prompt_button = gr.Button("Clone Selected Prompt")
+                save_cloned_prompt_button = gr.Button("Save Cloned Prompt", visible=False)
+                add_prompt_output = gr.HTML()
+
+        # Event handlers
+        prompt_list_button.click(
+            fn=update_prompt_dropdown,
+            outputs=prompt_dropdown
+        )
+
+        # Load prompt details when selected
+        prompt_dropdown.change(
+            fn=load_prompt_details,
+            inputs=[prompt_dropdown],
+            outputs=[title_input, description_input, system_prompt_input, user_prompt_input]
+        )
+
+        def prepare_for_cloning(selected_prompt):
+            if selected_prompt:
+                return gr.update(value=f"Copy of {selected_prompt}"), gr.update(visible=True)
+            return gr.update(), gr.update(visible=False)
+
+        clone_prompt_button.click(
+            fn=prepare_for_cloning,
+            inputs=[prompt_dropdown],
+            outputs=[title_input, save_cloned_prompt_button]
+        )
+
+        def save_cloned_prompt(title, description, system_prompt, user_prompt):
+            try:
+                result = add_prompt(title, description, system_prompt, user_prompt)
+                if result == "Prompt added successfully.":
+                    return result, gr.update(choices=update_prompt_dropdown())
+                else:
+                    return result, gr.update()
+            except Exception as e:
+                return f"Error saving cloned prompt: {str(e)}", gr.update()
+
+        save_cloned_prompt_button.click(
+            fn=save_cloned_prompt,
+            inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
+            outputs=[add_prompt_output, prompt_dropdown]
+        )
+
+
 #
 #
 ################################################################################################################
@@ -2791,7 +3094,6 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
                 create_prompt_view_tab()
-                create_prompt_edit_tab()
 
             with gr.TabItem("Local LLM with Llamafile"):
                 create_llamafile_settings_tab()
@@ -2802,6 +3104,9 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Edit Existing Items"):
                 create_media_edit_tab()
+                create_media_edit_and_clone_tab()
+                create_prompt_edit_tab()
+                create_prompt_clone_tab()
 
             with gr.TabItem("Keywords"):
                 with gr.Tabs():
