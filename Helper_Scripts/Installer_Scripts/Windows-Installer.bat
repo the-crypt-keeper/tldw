@@ -1,7 +1,12 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: TLDW Windows Installer Script (using curl)
+:: TLDW Windows Installer and Launcher Script
+
+:: Check if TLDW is already installed
+if exist "tldw\venv\Scripts\activate.bat" (
+    goto :launch_tldw
+)
 
 :: Check for Python installation
 python --version >nul 2>&1
@@ -83,7 +88,14 @@ del ffmpeg.zip
 del ..\tldw.zip
 
 echo Installation completed successfully!
-echo To activate the virtual environment in the future and run tldw, use the following commands:
-echo .\venv\Scripts\activate.bat
-echo python3 summarize.py -gui
-pause
+echo Creating desktop shortcut...
+powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%userprofile%\Desktop\TLDW.lnk'); $Shortcut.TargetPath = '%~f0'; $Shortcut.Save()"
+
+timeout /T 5
+
+:launch_tldw
+echo Launching TLDW...
+cd /d "%~dp0tldw"
+call .\venv\Scripts\activate.bat
+python summarize.py -gui -log INFO
+exit /b 0
