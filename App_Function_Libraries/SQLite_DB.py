@@ -468,7 +468,8 @@ def fetch_item_details(media_id: int):
             return content, prompt, summary
     except sqlite3.Error as e:
         logging.error(f"Error fetching item details: {e}")
-        return "", "", ""  # Return empty strings if there's an error
+        # Return empty strings if there's an error
+        return "", "", ""
 
 #
 #
