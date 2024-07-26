@@ -1806,28 +1806,25 @@ def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
     try:
         # Extract the media_id from the media_content
         media_id = None
-        if isinstance(media_content, dict):
-            # Try to parse the 'content' field as JSON
+        if isinstance(media_content, dict) and 'content' in media_content:
             try:
-                content_json = json.loads(media_content.get('content', '{}'))
-                # Look for 'id' in the parsed JSON
-                media_id = content_json.get('id')
-            except json.JSONDecodeError:
-                pass
-
-        # If we couldn't find an 'id', let's use the 'webpage_url' as a fallback
-        if media_id is None and isinstance(media_content, dict):
-            try:
-                content_json = json.loads(media_content.get('content', '{}'))
+                content_json = json.loads(media_content['content'])
+                # Use the webpage_url as the media_id
                 media_id = content_json.get('webpage_url')
             except json.JSONDecodeError:
                 pass
 
         if media_id is None:
-            raise ValueError("Unable to extract media_id from media_content")
+            # If we couldn't find a media_id, we'll use a placeholder
+            media_id = "unknown_media"
+            logging.warning(f"Unable to extract media_id from media_content. Using placeholder: {media_id}")
 
-        new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_id)
-        return new_conversation_id, "Chat history saved successfully!"
+        # Generate a unique conversation name using media_id and current timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        conversation_name = f"Chat_{media_id}_{timestamp}"
+
+        new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_id, conversation_name)
+        return new_conversation_id, f"Chat history saved successfully as {conversation_name}!"
     except Exception as e:
         error_message = f"Failed to save chat history: {str(e)}"
         logging.error(error_message)

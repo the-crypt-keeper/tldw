@@ -1171,7 +1171,7 @@ def delete_chat_message(message_id: int) -> None:
         raise DatabaseError(f"Error deleting chat message: {e}")
 
 
-def save_chat_history_to_database(chatbot, conversation_id, media_id):
+def save_chat_history_to_database(chatbot, conversation_id, media_id, conversation_name):
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -1181,7 +1181,7 @@ def save_chat_history_to_database(chatbot, conversation_id, media_id):
                 cursor.execute('''
                     INSERT INTO ChatConversations (media_id, conversation_name, created_at, updated_at)
                     VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (media_id, f"Conversation about media {media_id}"))
+                ''', (media_id, conversation_name))
                 conversation_id = cursor.lastrowid
 
             # Save each message in the chatbot history
