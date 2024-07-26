@@ -54,7 +54,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
@@ -217,6 +217,32 @@ def create_tables() -> None:
         ''',
         '''
         CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id);
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS ChatConversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER,
+            conversation_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS ChatMessages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER,
+            sender TEXT,
+            message TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES ChatConversations(id)
+        )
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_chatconversations_media_id ON ChatConversations(media_id);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
         '''
     ]
     for query in table_queries:
@@ -1050,4 +1076,119 @@ def import_obsidian_note_to_db(note_data):
 
 #
 # End of Obsidian-related Functions
+#######################################################################################################################
+#
+# Chat-related Functions
+
+
+def create_chat_conversation(media_id: int, conversation_name: str) -> int:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO ChatConversations (media_id, conversation_name)
+                VALUES (?, ?)
+            ''', (media_id, conversation_name))
+            conn.commit()
+            return cursor.lastrowid
+    except sqlite3.Error as e:
+        logging.error(f"Error creating chat conversation: {e}")
+        raise DatabaseError(f"Error creating chat conversation: {e}")
+
+
+def add_chat_message(conversation_id: int, sender: str, message: str) -> int:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO ChatMessages (conversation_id, sender, message)
+                VALUES (?, ?, ?)
+            ''', (conversation_id, sender, message))
+            conn.commit()
+            return cursor.lastrowid
+    except sqlite3.Error as e:
+        logging.error(f"Error adding chat message: {e}")
+        raise DatabaseError(f"Error adding chat message: {e}")
+
+
+def get_chat_messages(conversation_id: int) -> List[Dict[str, Any]]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, sender, message, timestamp
+                FROM ChatMessages
+                WHERE conversation_id = ?
+                ORDER BY timestamp ASC
+            ''', (conversation_id,))
+            messages = cursor.fetchall()
+            return [
+                {
+                    'id': msg[0],
+                    'sender': msg[1],
+                    'message': msg[2],
+                    'timestamp': msg[3]
+                }
+                for msg in messages
+            ]
+    except sqlite3.Error as e:
+        logging.error(f"Error retrieving chat messages: {e}")
+        raise DatabaseError(f"Error retrieving chat messages: {e}")
+
+
+def search_chat_conversations(search_query: str) -> List[Dict[str, Any]]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT cc.id, cc.media_id, cc.conversation_name, cc.created_at, m.title
+                FROM ChatConversations cc
+                LEFT JOIN Media m ON cc.media_id = m.id
+                WHERE cc.conversation_name LIKE ? OR m.title LIKE ?
+                ORDER BY cc.updated_at DESC
+            ''', (f'%{search_query}%', f'%{search_query}%'))
+            conversations = cursor.fetchall()
+            return [
+                {
+                    'id': conv[0],
+                    'media_id': conv[1],
+                    'conversation_name': conv[2],
+                    'created_at': conv[3],
+                    'media_title': conv[4]
+                }
+                for conv in conversations
+            ]
+    except sqlite3.Error as e:
+        logging.error(f"Error searching chat conversations: {e}")
+        return []
+
+
+def update_chat_message(message_id: int, new_message: str) -> None:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE ChatMessages
+                SET message = ?, timestamp = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (new_message, message_id))
+            conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"Error updating chat message: {e}")
+        raise DatabaseError(f"Error updating chat message: {e}")
+
+
+def delete_chat_message(message_id: int) -> None:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM ChatMessages WHERE id = ?', (message_id,))
+            conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"Error deleting chat message: {e}")
+        raise DatabaseError(f"Error deleting chat message: {e}")
+
+
+#
+# End of Chat-related Functions
 #######################################################################################################################
