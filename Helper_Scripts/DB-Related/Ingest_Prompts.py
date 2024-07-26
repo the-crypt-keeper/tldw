@@ -7,7 +7,7 @@ import os
 import sqlite3
 import argparse
 
-DATABASE_PATH = 'prompts.db'
+DATABASE_PATH = '../prompts.db'
 
 
 def ingest_prompts_from_folder(parent_folder):
