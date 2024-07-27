@@ -2767,6 +2767,161 @@ def create_import_obsidian_vault_tab():
     )
 
 
+def parse_prompt_file(file_content):
+    sections = {
+        'title': '',
+        'author': '',
+        'system': '',
+        'user': ''
+    }
+
+    # Define regex patterns for the sections
+    patterns = {
+        'title': r'### TITLE ###\s*(.*?)\s*###',
+        'author': r'### AUTHOR ###\s*(.*?)\s*###',
+        'system': r'### SYSTEM ###\s*(.*?)\s*###',
+        'user': r'### USER ###\s*(.*?)\s*###'
+    }
+
+    for key, pattern in patterns.items():
+        match = re.search(pattern, file_content, re.DOTALL)
+        if match:
+            sections[key] = match.group(1).strip()
+
+    return sections
+
+
+# FIXME - file uploads... In fact make sure to check _all_ file uploads... will make it easier when centralizing everything for API
+def import_prompt_from_file(file):
+    if file is None:
+        return "No file uploaded. Please upload a file."
+
+    try:
+        if hasattr(file, 'name'):
+            file_name = file.name
+        else:
+            file_name = 'unknown_file'
+
+        if isinstance(file, str):
+            # If file is a string, it's likely a file path
+            file_path = file
+            with open(file_path, 'r', encoding='utf-8') as f:
+                file_content = f.read()
+        elif hasattr(file, 'read'):
+            # If file has a 'read' method, it's likely a file-like object
+            file_content = file.read()
+            if isinstance(file_content, bytes):
+                file_content = file_content.decode('utf-8')
+        else:
+            # If it's neither a string nor a file-like object, try converting it to a string
+            file_content = str(file)
+
+        sections = parse_prompt_file(file_content)
+
+        return sections['title'], sections['author'], sections['system'], sections['user']
+    except Exception as e:
+        return f"Error parsing file: {str(e)}"
+
+
+def import_prompt_data(name, details, system, user):
+    if not name or not system:
+        return "Name and System fields are required."
+
+    try:
+        conn = sqlite3.connect('prompts.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO Prompts (name, details, system, user)
+            VALUES (?, ?, ?, ?)
+        ''', (name, details, system, user))
+        conn.commit()
+        conn.close()
+        return f"Prompt '{name}' successfully imported."
+    except sqlite3.IntegrityError:
+        return "Prompt with this name already exists."
+    except sqlite3.Error as e:
+        return f"Database error: {e}"
+
+
+def create_import_single_prompt_tab():
+    with gr.TabItem("Import Prompt"):
+        gr.Markdown("# Import a prompt into the database")
+        gr.Markdown("...and have it tagged with keywords!(WIP...)")
+
+        with gr.Row():
+            with gr.Column():
+                import_file = gr.File(label="Upload file for import", file_types=["txt", "md"])
+                title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+                system_input = gr.Textbox(label="System", placeholder="Enter the system message for the prompt", lines=3)
+                user_input = gr.Textbox(label="User", placeholder="Enter the user message for the prompt", lines=3)
+                import_button = gr.Button("Import Prompt")
+
+            with gr.Column():
+                import_output = gr.Textbox(label="Import Status")
+                save_button = gr.Button("Save to Database")
+                save_output = gr.Textbox(label="Save Status")
+
+        def handle_import(file):
+            result = import_prompt_from_file(file)
+            if isinstance(result, tuple):
+                title, author, system, user = result
+                return gr.update(value="File successfully imported. You can now edit the content before saving."), gr.update(value=title), gr.update(value=author), gr.update(value=system), gr.update(value=user)
+            else:
+                return gr.update(value=result), gr.update(), gr.update(), gr.update(), gr.update()
+
+        import_button.click(
+            fn=handle_import,
+            inputs=[import_file],
+            outputs=[import_output, title_input, author_input, system_input, user_input]
+        )
+
+        def save_prompt_to_db(title, author, system, user):
+            return add_prompt(title, author, system, user)
+
+        save_button.click(
+            fn=save_prompt_to_db,
+            inputs=[title_input, author_input, system_input, user_input],
+            outputs=save_output
+        )
+
+
+def create_import_multiple_prompts_tab():
+    with gr.TabItem("Import Multiple Prompts from a Zip File"):
+        gr.Markdown("# Import a collection of prompts contained within a zip file")
+        with gr.Row():
+            import_file = gr.File(label="Upload file for import", file_types=["txt", "md"])
+        with gr.Row():
+            title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+            author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+        with gr.Row():
+            keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords, comma-separated")
+            custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                             placeholder="Enter a custom prompt for summarization (optional)")
+        with gr.Row():
+            summary_input = gr.Textbox(label="Summary",
+                                       placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
+        with gr.Row():
+            auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
+            api_name_input = gr.Dropdown(
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                label="API for Auto-summarization"
+            )
+            api_key_input = gr.Textbox(label="API Key", type="password")
+        with gr.Row():
+            import_button = gr.Button("Import Data")
+        with gr.Row():
+            import_output = gr.Textbox(label="Import Status")
+
+        import_button.click(
+            fn=import_data,
+            inputs=[import_file, title_input, author_input, keywords_input, custom_prompt_input,
+                    summary_input, auto_summarize_checkbox, api_name_input, api_key_input],
+            outputs=import_output
+        )
+
+
 # Using pypandoc to convert EPUB to Markdown
 def create_import_book_tab():
     with gr.TabItem("Import .epub/ebook Files"):
@@ -3365,6 +3520,8 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Import/Export"):
                 create_import_item_tab()
                 create_import_obsidian_vault_tab()
+                create_import_single_prompt_tab()
+                create_import_multiple_prompts_tab()
                 create_export_tab()
 
             with gr.TabItem("Utilities"):
