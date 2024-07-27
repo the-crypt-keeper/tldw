@@ -64,9 +64,40 @@
 - The function is responsible for creating the tab and handling the user input.
 - The function first creates the tab using the `gr.Tabitem()` -> `gr.Markdown()` -> `gr.Row():` functions.
 - The function then creates the input fields for the user to input the video URL and the desired summary length.
-  - `custom_prompt_checkbox`, `preset_prompt_checkbox`, `preset_prompt`, `use_time_input`, and `use_cookies_input` are used to dynamically show their corresponding items depending on the user selection.
+  - `custom_prompt_checkbox`, `preset_prompt_checkbox`, `preset_prompt`, `use_time_input`, `chunking_options_checkbox`, and `use_cookies_input` are used to dynamically show their corresponding items depending on the user selection.
 - The function then creates the output fields for the user to view the summary and the transcription.
-
+- Finally, the button `Process Videos` is created to handle the user input with the variable `process_button`
+- The function then defines the `def process_videos_with_error_handling(<args>):` function to handle the user input.
+    - `def process_videos_with_error_handling(<args>):`:
+      - The function first checks to see if there's any input in the URL field.
+      - The function then checks/sets the batch size
+      - Then separates URLs and local files
+      - Validates existence of local files
+      - Sets `all_inputs` variable as result of validation
+      - Starts a `for` loop iterating through every item in the current batch
+      - If the item is a URL, metadata extraction is attempted (using `yt-dlp`)
+      - Chunking options are then set using the variables fed into the function
+      - Line 765: `result = process_url_with_metadata<args>` - Stuff
+        - Args: `input_item, 2, whisper_model, custom_prompt if custom_prompt_checkbox else None, start_seconds, api_name, api_key, False, False, False, False, 0.01, None, keywords, None, diarize, end_time=end_seconds, include_timestamps=(timestamp_option == "Include Timestamps"), metadata=video_metadata, use_chunking=chunking_options_checkbox, chunk_options=chunk_options, keep_original_video=keep_original_video`
+      - If/else decision based on returned result, success or failure
+        - If success, secondary sanity check, then: `transcription, summary = result`
+            * (`batch_results` is an array)
+            * `batch_results.append((input_item, transcription, "Success", result_metadata, json_file, summary_file))`
+        - If failure, `batch_results.append((input_item, error_message, "Error", result_metadata, None, None))errors.append(error_message)`
+      - Next, the length of the results is checked and printed to the screen
+      - Then Lines 809-853 create the HTML to display the results nicely
+      - Lines 857-858, 860-861 save the transcriptions + summaries to JSON
+      - Finally Line 866 holds the following line which returns the final results to the user:
+        - `return ( f"Processed {total_inputs} videos. {len(errors)} errors occurred.", error_summary, results_html, 'all_transcriptions.json', 'all_summaries.txt')`
+- **Let's now dig a bit deeper into Line 765: `process_url_with_metadata<args>`**
+  - `process_url_with_metadata<args>`:
+    - FIXME ALL BUNK
+    - The function is defined in `Ingestion_Related.py` on line 101.
+    - The function is responsible for processing the video URL and returning the transcription and summary.
+    - The function first checks to see if the URL is a valid YouTube URL.
+    - The function then extracts the metadata from the video using `yt-dlp`.
+    - The function then extracts the audio from the video using `ffmpeg`.
+    - The
 
 
 
