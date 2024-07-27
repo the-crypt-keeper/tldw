@@ -53,7 +53,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
-    create_chat_conversation, save_chat_history_to_database
+    create_chat_conversation, save_chat_history_to_database, view_database
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -1623,6 +1623,56 @@ def create_prompt_view_tab():
             fn=display_search_results,
             inputs=[search_query_input],
             outputs=[search_results_output]
+        )
+
+
+def create_viewing_tab():
+    with gr.TabItem("View Database"):
+        gr.Markdown("# View Database Entries")
+        with gr.Row():
+            with gr.Column():
+                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
+                page_number = gr.Number(value=1, label="Page Number", precision=0)
+                view_button = gr.Button("View Page")
+                next_page_button = gr.Button("Next Page (True)")
+                previous_page_button = gr.Button("Previous Page (False)")
+            with gr.Column():
+                results_display = gr.HTML()
+                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
+
+        def update_page(page, entries_per_page):
+            results, pagination, total_pages = view_database(page, entries_per_page)
+            # Enable/disable buttons based on page number
+            next_disabled = page >= total_pages
+            prev_disabled = page <= 1
+            next_label = f"Next Page ({not next_disabled})"
+            prev_label = f"Previous Page ({not prev_disabled})"
+            return results, pagination, page, next_label, prev_label
+
+        def go_to_next_page(current_page, entries_per_page, total_pages):
+            next_page = current_page + 1
+            return update_page(next_page, entries_per_page)
+
+        def go_to_previous_page(current_page, entries_per_page, total_pages):
+            previous_page = current_page - 1
+            return update_page(previous_page, entries_per_page)
+
+        view_button.click(
+            fn=update_page,
+            inputs=[page_number, entries_per_page],
+            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        next_page_button.click(
+            fn=go_to_next_page,
+            inputs=[page_number, entries_per_page, gr.State(1)],
+            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        previous_page_button.click(
+            fn=go_to_previous_page,
+            inputs=[page_number, entries_per_page, gr.State(1)],
+            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
         )
 
 
@@ -3543,6 +3593,7 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
+                create_viewing_tab()
                 create_prompt_view_tab()
 
             with gr.TabItem("Chat with an LLM"):

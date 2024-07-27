@@ -992,6 +992,37 @@ def convert_to_markdown(item):
     markdown += f"{item['content']}\n\n"
     return markdown
 
+# Gradio function to handle user input and display results with pagination for displaying entries in the DB
+def fetch_paginated_data(page: int, results_per_page: int) -> Tuple[List[Tuple], int]:
+    try:
+        offset = (page - 1) * results_per_page
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM Media")
+            total_entries = cursor.fetchone()[0]
+
+            cursor.execute("SELECT id, title, url FROM Media LIMIT ? OFFSET ?", (results_per_page, offset))
+            results = cursor.fetchall()
+
+        return results, total_entries
+    except sqlite3.Error as e:
+        raise Exception(f"Error fetching paginated data: {e}")
+
+def format_results_as_html(results: List[Tuple]) -> str:
+    html = "<table class='table table-striped'>"
+    html += "<tr><th>ID</th><th>Title</th><th>URL</th></tr>"
+    for row in results:
+        html += f"<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td></tr>"
+    html += "</table>"
+    return html
+
+def view_database(page: int, results_per_page: int) -> Tuple[str, str, int]:
+    results, total_entries = fetch_paginated_data(page, results_per_page)
+    formatted_results = format_results_as_html(results)
+    # Calculate total pages
+    total_pages = (total_entries + results_per_page - 1) // results_per_page
+    return formatted_results, f"Page {page} of {total_pages}", total_pages
+
 
 #
 # End of Functions to manage prompts DB / Fetch and update media content
