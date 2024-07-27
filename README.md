@@ -72,6 +72,7 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 1. **Download the Installer Script for your OS:**
    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Install.sh`
    - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows-Installer.bat`
+     - This will install tldw to the directory from where the script is ran. It will also create shortcut on your desktop to the script to make it easy to launch.
    - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS-Install_Updater.sh`
 2. **Run the Installer Script:**
    - **Linux:** `bash Linux-Install.sh`

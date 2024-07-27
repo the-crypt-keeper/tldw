@@ -47,6 +47,10 @@ call :log "Installation/Update process completed"
 echo Installation/Update completed successfully!
 echo To activate the virtual environment in the future, run: %install_dir%\venv\Scripts\activate.bat
 echo To start using TLDW, please refer to the project documentation.
+
+:: Launch TLDW
+call :launch_tldw
+
 pause
 exit /b 0
 
@@ -162,6 +166,14 @@ goto :eof
 call :log "Performing cleanup"
 :: Deactivate virtual environment
 call .\venv\Scripts\deactivate.bat
+goto :eof
+
+:launch_tldw
+call :log "Launching TLDW"
+echo Launching TLDW...
+cd "%install_dir%"
+call .\venv\Scripts\activate.bat
+start cmd /k "python tldw.py"
 goto :eof
 
 :log
