@@ -490,6 +490,8 @@ def create_introduction_tab():
             - So let's try and fix that.
             
             #### Introduction to LLMs:
+            - Non-Technical introduction to Generative AI and LLMs: https://paruir.medium.com/understanding-generative-ai-and-llms-a-non-technical-overview-part-1-788c0eb0dd64
+            - Google's Intro to LLMs: https://developers.google.com/machine-learning/resources/intro-llms#llm_considerations
             - LLMs 101(coming from a tech background): https://vinija.ai/models/LLM/
             - LLM Fundamentals / LLM Scientist / LLM Engineer courses(Free): https://github.com/mlabonne/llm-course
 
@@ -505,6 +507,7 @@ def create_introduction_tab():
             - **Quantization** - The process of converting a continuous range of values into a finite range of discrete values.
             - **GGUF Files** - GGUF is a binary format that is designed for fast loading and saving of models, and for ease of reading. Models are traditionally developed using PyTorch or another framework, and then converted to GGUF for use in GGML. https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
             - **Inference Engine** - A software system that is designed to execute a model that has been trained by a machine learning algorithm. Llama.cpp and Kobold.cpp are examples of inference engines.
+            - **Abliteration** - https://huggingface.co/blog/mlabonne/abliteration
             """)
         with gr.Row():
             gr.Markdown("""### Ok cool, but how do I get started? I don't have an API key or a local server running...
@@ -521,16 +524,28 @@ def create_introduction_tab():
                         * https://console.groq.com/keys
                         * Offer an account with free credits to try out their service. No idea how much you get.
                     - **DeepSeek:**
-                        * https://platform.deepseek.com/ (chinese)
+                        * https://platform.deepseek.com/ (Chinese-hosted/is in english)
                     - **OpenRouter:**
                         https://openrouter.ai/
+                - **Choosing a Model to download**
+                    - You'll first need to select a model you want to use with the server.
+                        - Keep in mind that the model you select will determine the quality of the output you get, and that models run fastest when offloaded fully to your GPU.
+                        * So this means that you can run a large model (Command-R) on CPU+System RAM, but you're gonna see a massive performance hit. Not saying its unusable, but it's not ideal.
+                        * With that in mind, I would recommend an abliterated version of Meta's Llama3.1 model for most tasks. (Abliterated since it won't refuse requests)
+                        * I say this because of the general quality of the model + it's context size.
+                        * You can find the model here: https://huggingface.co/mlabonne/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF
+                        * And the Q8 quant(total size 8.6GB): https://huggingface.co/mlabonne/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF/resolve/main/meta-llama-3.1-8b-instruct-abliterated.Q8_0.gguf?download=true
                 - **Local Inference Server:**
                     - **Llamafile-Server (wrapper for llama.cpp):**
                         * Run this script with the `--local_llm` argument next time, and you'll be walked through setting up a local instance of llamafile-server.
                     - **Llama.cpp Inference Engine:**
                         * Download the latest release for your platform here: https://github.com/ggerganov/llama.cpp/releases
                         * Windows: `llama-<release_number>-bin-win-cuda-cu<11.7.1 or 12.2.0 - version depends on installed cuda>-x64.zip`
+                            * Run it: `llama-server.exe --model <path_to_model> -ctx 8192 -ngl 999` 
+                                - `-ctx 8192` sets the context size to 8192 tokens, `-ngl 999` sets the number of layers to offload to the GPU to 999. (essentially ensuring we only use our GPU and not CPU for processing)
                         * Macos: `llama-<release_number>-bin-macos-arm64.zip - for Apple Silicon / `llama-<release_number>-bin-macos-x64.zip` - for Intel Macs
+                            * Run it: `llama-server --model <path_to_model> -ctx 8192 -ngl 999` 
+                                - `-ctx 8192` sets the context size to 8192 tokens, `-ngl 999` sets the number of layers to offload to the GPU to 999. (essentially ensuring we only use our GPU and not CPU for processing)
                         * Linux: You can probably figure it out.
                     - **Kobold.cpp Server:**
                         1. Download from here: https://github.com/LostRuins/koboldcpp/releases/latest
