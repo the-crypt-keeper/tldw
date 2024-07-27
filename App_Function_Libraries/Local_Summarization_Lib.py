@@ -188,13 +188,14 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
-        if api_key is None:
-            logging.info("Kobold.cpp: API key not provided as parameter")
-            logging.info("Kobold.cpp: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['kobold']
-
-        if api_key is None or api_key.strip() == "":
-            logging.info("Kobold.cpp: API key not found or is empty")
+        # FIXME - doesn't work/breaks
+        # if api_key is None:
+        #     logging.info("Kobold.cpp: API key not provided as parameter")
+        #     logging.info("Kobold.cpp: Attempting to use API key from config file")
+        #     api_key = loaded_config_data['api_keys']['kobold']
+        #
+        # if api_key is None or api_key.strip() == "":
+        #     logging.info("Kobold.cpp: API key not found or is empty")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Kobold.cpp: Loading json data for summarization")
@@ -226,7 +227,7 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
             'content-type': 'application/json',
         }
 
-        kobold_prompt = f"{text} \n\n\n\n{custom_prompt_input}"
+        kobold_prompt = f"{custom_prompt_input}\n\n\n\n{text}"
         logging.debug("kobold: Prompt being sent is {kobold_prompt}")
 
         # FIXME
@@ -234,28 +235,36 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
         data = {
             "max_context_length": 8096,
             "max_length": 4096,
-            "prompt": f"{text}\n\n\n\n{custom_prompt_input}"
+            "prompt": f"{kobold_prompt}"
         }
 
         logging.debug("kobold: Submitting request to API endpoint")
         print("kobold: Submitting request to API endpoint")
-        response = requests.post(kobold_api_IP, headers=headers, json=data)
-        response_data = response.json()
-        logging.debug("kobold: API Response Data: %s", response_data)
+        try:
+            response = requests.post(kobold_api_IP, headers=headers, json=data)
+            logging.debug("kobold: API Response Status Code: %d", response.status_code)
 
-        if response.status_code == 200:
-            if 'results' in response_data and len(response_data['results']) > 0:
-                summary = response_data['results'][0]['text'].strip()
-                logging.debug("kobold: Summarization successful")
-                print("Summarization successful.")
-                return summary
+            if response.status_code == 200:
+                try:
+                    response_data = response.json()
+                    logging.debug("kobold: API Response Data: %s", response_data)
+
+                    if response_data and 'results' in response_data and len(response_data['results']) > 0:
+                        summary = response_data['results'][0]['text'].strip()
+                        logging.debug("kobold: Summarization successful")
+                        return summary
+                    else:
+                        logging.error("Expected data not found in API response.")
+                        return "Expected data not found in API response."
+                except ValueError as e:
+                    logging.error("kobold: Error parsing JSON response: %s", str(e))
+                    return f"Error parsing JSON response: {str(e)}"
             else:
-                logging.error("Expected data not found in API response.")
-                return "Expected data not found in API response."
-        else:
-            logging.error(f"kobold: API request failed with status code {response.status_code}: {response.text}")
-            return f"kobold: API request failed: {response.text}"
-
+                logging.error(f"kobold: API request failed with status code {response.status_code}: {response.text}")
+                return f"kobold: API request failed: {response.text}"
+        except Exception as e:
+            logging.error("kobold: Error in processing: %s", str(e))
+            return f"kobold: Error occurred while processing summary with kobold: {str(e)}"
     except Exception as e:
         logging.error("kobold: Error in processing: %s", str(e))
         return f"kobold: Error occurred while processing summary with kobold: {str(e)}"

@@ -198,7 +198,8 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries
             logging.debug("AnthropicAI: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"AnthropicAI: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"AnthropicAI: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"AnthropicAI: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -300,10 +301,11 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
         if api_key is None or api_key.strip() == "":
             logging.info("Cohere: API key not provided as parameter")
             logging.info("Cohere: Attempting to use API key from config file")
-            cohere_api_key = loaded_config_data['api_keys']['cohere']
+            api_key = loaded_config_data['api_keys']['cohere']
 
         if api_key is None or api_key.strip() == "":
             logging.error("Cohere: API key not found or is empty")
+            logging.debug(f"Loaded config data: {loaded_config_data}")
             return "Cohere: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"Cohere: Using API Key: {api_key[:5]}...{api_key[-5:]}")
@@ -316,7 +318,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
             logging.debug("Cohere: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"Cohere: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"Cohere: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"Cohere: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -335,6 +338,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
 
         cohere_model = loaded_config_data['models']['cohere']
 
+        cohere_api_key = api_key
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
@@ -342,21 +347,18 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
         }
 
         cohere_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
-        logging.debug("cohere: Prompt being sent is {cohere_prompt}")
-
-        model = loaded_config_data['models']['anthropic']
+        logging.debug(f"cohere: Prompt being sent is {cohere_prompt}")
 
         data = {
             "chat_history": [
                 {"role": "USER", "message": cohere_prompt}
             ],
             "message": "Please provide a summary.",
-            "model": model,
+            "model": cohere_model,
             "connectors": [{"id": "web-search"}]
         }
 
         logging.debug("cohere: Submitting request to API endpoint")
-        print("cohere: Submitting request to API endpoint")
         response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
         response_data = response.json()
         logging.debug("API Response Data: %s", response_data)
@@ -405,7 +407,8 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
             logging.debug("Groq: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"Groq: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"Groq: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"Groq: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -505,7 +508,8 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
         logging.debug("openrouter: Using provided string data for summarization")
         data = input_data
 
-    logging.debug(f"openrouter: Loaded data: {data}")
+    # DEBUG - Debug logging to identify sent data
+    logging.debug(f"openrouter: Loaded data: {data[:500]}...(snipped to first 500 chars)")
     logging.debug(f"openrouter: Type of data: {type(data)}")
 
     if isinstance(data, dict) and 'summary' in data:
@@ -595,7 +599,8 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
             logging.debug("HuggingFace: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"HuggingFace: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"HuggingFace: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"HuggingFace: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -671,7 +676,8 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
             logging.debug("DeepSeek: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"DeepSeek: Loaded data: {data}")
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"DeepSeek: Loaded data: {data[:500]}...(snipped to first 500 chars)")
         logging.debug(f"DeepSeek: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -775,6 +781,7 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
 
     for index, url in enumerate(url_list):
         try:
+            logging.info(f"Starting to process video {index + 1}/{len(url_list)}: {url}")
             transcription, summary, json_file_path, summary_file_path, _, _ = process_url(
                 url=url,
                 num_speakers=num_speakers,
@@ -804,9 +811,17 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
                 recursive_summarization=recursive_summarization
             )
             # Update progress and transcription properly
+
             current_progress, current_status = update_progress(index, url, "Video processed and ingested into the database.")
+            logging.info(f"Successfully processed video {index + 1}/{len(url_list)}: {url}")
+
+            time.sleep(1)
         except Exception as e:
+            logging.error(f"Error processing video {index + 1}/{len(url_list)}: {url}")
+            logging.error(f"Error details: {str(e)}")
             current_progress, current_status = update_progress(index, url, f"Error: {str(e)}")
+
+        yield current_progress, current_status, None, None, None, None
 
     success_message = "All videos have been transcribed, summarized, and ingested into the database successfully."
     return current_progress, success_message, None, None, None, None
@@ -974,10 +989,6 @@ def extract_metadata_and_content(input_data):
 
     return metadata, content
 
-def extract_text_from_segments(segments):
-    if isinstance(segments, list):
-        return ' '.join([seg.get('Text', '') for seg in segments if 'Text' in seg])
-    return str(segments)
 
 def format_input_with_metadata(metadata, content):
     formatted_input = f"Title: {metadata.get('title', 'No title available')}\n"
@@ -987,7 +998,7 @@ def format_input_with_metadata(metadata, content):
 
 def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False):
     loaded_config_data = load_and_log_configs()
-
+    logging.info("Starting summarization process...")
     if custom_prompt_input is None:
         custom_prompt_input = """
         You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
@@ -1045,6 +1056,8 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
                     file.write(summary)
         else:
             logging.warning(f"Failed to generate summary using {api_name} API")
+
+        logging.info("Summarization completed successfully.")
 
         return summary
 
@@ -1184,70 +1197,6 @@ def process_url(
 
     video_file_path = None
     global info_dict
-
-    # FIXME - need to handle local audio file processing
-    # If Local audio file is provided
-    if local_file_path:
-        try:
-            pass
-            # # insert code to process local audio file
-            # # Need to be able to add a title/author/etc for ingestion into the database
-            # # Also want to be able to optionally _just_ ingest it, and not ingest.
-            # # FIXME
-            # #download_path = create_download_directory(title)
-            # #audio_path = download_video(url, download_path, info_dict, download_video_flag)
-            #
-            # audio_file_path = local_file_path
-            # global segments
-            # audio_file_path, segments = perform_transcription(audio_file_path, offset, whisper_model, vad_filter)
-            #
-            # if audio_file_path is None or segments is None:
-            #     logging.error("Process_URL: Transcription failed or segments not available.")
-            #     return "Process_URL: Transcription failed.", "Transcription failed.", None, None, None, None
-            #
-            # logging.debug(f"Process_URL: Transcription audio_file: {audio_file_path}")
-            # logging.debug(f"Process_URL: Transcription segments: {segments}")
-            #
-            # transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
-            # logging.debug(f"Process_URL: Transcription text: {transcription_text}")
-
-            # Rolling Summarization Processing
-            # if rolling_summarization:
-            #     text = extract_text_from_segments(segments)
-            #     summary_text = rolling_summarize_function(
-            #         transcription_text,
-            #         detail=detail_level,
-            #         api_name=api_name,
-            #         api_key=api_key,
-            #         custom_prompt=custom_prompt,
-            #         chunk_by_words=chunk_text_by_words,
-            #         max_words=max_words,
-            #         chunk_by_sentences=chunk_text_by_sentences,
-            #         max_sentences=max_sentences,
-            #         chunk_by_paragraphs=chunk_text_by_paragraphs,
-            #         max_paragraphs=max_paragraphs,
-            #         chunk_by_tokens=chunk_text_by_tokens,
-            #         max_tokens=max_tokens
-            #     )
-            # if api_name:
-            #     summary_text = perform_summarization(api_name, segments_json_path, custom_prompt, api_key, config)
-            #     if summary_text is None:
-            #         logging.error("Summary text is None. Check summarization function.")
-            #         summary_file_path = None  # Set summary_file_path to None if summary is not generated
-            # else:
-            #     summary_text = 'Summary not available'
-            #     summary_file_path = None  # Set summary_file_path to None if summary is not generated
-            #
-            # json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path)
-            #
-            # add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt, whisper_model)
-            #
-            # return transcription_text, summary_text, json_file_path, summary_file_path, None, None
-
-        except Exception as e:
-            logging.error(f": {e}")
-            return str(e), 'process_url: Error processing the request.', None, None, None, None
-
 
     # If URL/Local video file is provided
     try:

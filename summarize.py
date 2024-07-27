@@ -16,20 +16,18 @@ from App_Function_Libraries.Book_Ingestion_Lib import ingest_folder, ingest_text
 from App_Function_Libraries.Chunk_Lib import  semantic_chunk_long_file#, rolling_summarize_function,
 from App_Function_Libraries.Gradio_Related import launch_ui
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import cleanup_process, local_llm_function
-from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
-    summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
+from App_Function_Libraries.Local_Summarization_Lib import summarize_with_local_llm
 from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, \
-    summarize_with_cohere, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
-    summarize_with_huggingface, perform_transcription, perform_summarization
-from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav, speech_to_text
+    summarize_with_cohere, summarize_with_groq, perform_transcription, perform_summarization
+from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Local_File_Processing_Lib import read_paths_from_file, process_local_file
-from App_Function_Libraries.SQLite_DB import add_media_to_database, is_valid_url
+from App_Function_Libraries.SQLite_DB import add_media_to_database
 from App_Function_Libraries.System_Checks_Lib import cuda_check, platform_check, check_ffmpeg
-from App_Function_Libraries.Utils import load_and_log_configs, sanitize_filename, create_download_directory, extract_text_from_segments
+from App_Function_Libraries.Utils import load_and_log_configs, create_download_directory, extract_text_from_segments
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 #
 # 3rd-Party Module Imports
-import requests
+#
 # OpenAI Tokenizer support
 #
 # Other Tokenizers
@@ -154,8 +152,7 @@ abc_xyz = """
 # Dirty hack - sue me. - FIXME - fix this...
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
-                  "distil-large-v2", "distil-medium.en", "distil-small.en"]
+
 source_languages = {
     "en": "English",
     "zh": "Chinese",
@@ -654,6 +651,8 @@ def main(input_path, api_name=None, api_key=None,
             logging.error(f"Error processing {path}: {str(e)}")
             continue
 
+    logging.debug("Total time taken: %s seconds", time.monotonic() - start_time)
+    logging.info("MAIN: returing transcription_text.")
     return transcription_text
 
 
@@ -746,8 +745,7 @@ Sample commands:
                         help="Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)")
     parser.add_argument('--server_mode', action='store_true',
                         help='Run in server mode (This exposes the GUI/Server to the network)')
-    parser.add_argument('--share_public', type=int, default=7860,
-                        help="This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)")
+    parser.add_argument('-share', '--share_public', action='store_true', help="This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet."),
     parser.add_argument('--port', type=int, default=7860, help='Port to run the server on')
     parser.add_argument('--ingest_text_file', action='store_true',
                         help='Ingest .txt files as content instead of treating them as URL lists')
@@ -769,12 +767,7 @@ Sample commands:
     set_chunk_txt_by_tokens = False
     set_max_txt_chunk_tokens = 0
 
-    if args.share_public:
-        share_public = args.share_public
-    else:
-        share_public = None
     if args.server_mode:
-
         server_mode = args.server_mode
     else:
         server_mode = None
@@ -847,7 +840,19 @@ Sample commands:
             local_llm_function()
             time.sleep(2)
             webbrowser.open_new_tab('http://127.0.0.1:7860')
-        launch_ui(demo_mode=False)
+        launch_ui(share_public=False)
+    elif local_llm:
+        local_llm_function()
+        time.sleep(2)
+        webbrowser.open_new_tab('http://127.0.0.1:7860')
+        launch_ui(share_public=False)
+    elif share_public is not None:
+        if local_llm:
+            local_llm_function()
+            time.sleep(2)
+            webbrowser.open_new_tab('http://127.0.0.1:7860')
+        else:
+            launch_ui(share_public=True)
     elif not args.input_path:
         parser.print_help()
         sys.exit(1)
@@ -924,6 +929,7 @@ Sample commands:
             logging.error('An error occurred during the transcription process.')
             logging.error(str(e))
             sys.exit(1)
+    def cleanup():
+        logging.info("Cleanup function called. Script is exiting.")
 
-        finally:
-            cleanup_process()
+    atexit.register(cleanup)

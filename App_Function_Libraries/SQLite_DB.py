@@ -51,12 +51,16 @@ import os
 import re
 import sqlite3
 import time
+import traceback
 from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
+
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
+import yaml
+
 # Import Local Libraries
 #
 #######################################################################################################################
@@ -214,6 +218,32 @@ def create_tables() -> None:
         ''',
         '''
         CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id);
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS ChatConversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER,
+            conversation_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS ChatMessages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER,
+            sender TEXT,
+            message TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES ChatConversations(id)
+        )
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_chatconversations_media_id ON ChatConversations(media_id);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
         '''
     ]
     for query in table_queries:
@@ -288,8 +318,8 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     if not is_valid_url(url):
         url = 'localhost'
 
-    if media_type not in ['article', 'audio', 'document', 'podcast', 'text', 'video', 'unknown']:
-        raise InputError("Invalid media type. Allowed types: article, audio file, document, podcast, text, video, unknown.")
+    if media_type not in ['article', 'audio', 'document', 'obsidian_note', 'podcast', 'text', 'video', 'unknown']:
+        raise InputError("Invalid media type. Allowed types: article, audio file, document, obsidian_note podcast, text, video, unknown.")
 
     if ingestion_date and not is_valid_date(ingestion_date):
         raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")
@@ -428,10 +458,18 @@ def browse_items(search_query, search_type):
                 cursor.execute("SELECT id, title, url FROM Media WHERE title LIKE ?", (f'%{search_query}%',))
             elif search_type == 'URL':
                 cursor.execute("SELECT id, title, url FROM Media WHERE url LIKE ?", (f'%{search_query}%',))
+            elif search_type == 'Keyword':
+                return fetch_items_by_keyword(search_query)
+            elif search_type == 'Content':
+                cursor.execute("SELECT id, title, url FROM Media WHERE content LIKE ?", (f'%{search_query}%',))
+            else:
+                raise ValueError(f"Invalid search type: {search_type}")
+
             results = cursor.fetchall()
             return results
     except sqlite3.Error as e:
-        raise Exception(f"Error fetching items by {search_type}: {e}")
+        logger.error(f"Error fetching items by {search_type}: {e}")
+        raise DatabaseError(f"Error fetching items by {search_type}: {e}")
 
 
 # Function to fetch item details
@@ -457,12 +495,14 @@ def fetch_item_details(media_id: int):
             return content, prompt, summary
     except sqlite3.Error as e:
         logging.error(f"Error fetching item details: {e}")
-        return "", "", ""  # Return empty strings if there's an error
+        # Return empty strings if there's an error
+        return "", "", ""
 
 #
 #
 #######################################################################################################################
-
+#
+# Media-related Functions
 
 
 
@@ -734,15 +774,10 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 
 
 #
+# End of ....
+#######################################################################################################################
 #
-#######################################################################################################################
-
-
-
-
-#######################################################################################################################
 # Functions to manage prompts DB
-#
 
 def create_prompts_db():
     conn = sqlite3.connect('prompts.db')
@@ -806,12 +841,11 @@ def insert_prompt_to_db(title, description, system_prompt, user_prompt):
     return result
 
 
-
-
 #
 #
 #######################################################################################################################
-
+#
+# Function to fetch/update media content
 
 def update_media_content(selected_item, item_mapping, content_input, prompt_input, summary_input):
     try:
@@ -876,20 +910,6 @@ def load_media_content(media_id: int) -> dict:
             return {"content": "", "prompt": "", "summary": ""}
     except sqlite3.Error as e:
         raise Exception(f"Error loading media content: {e}")
-
-def insert_prompt_to_db(title, description, system_prompt, user_prompt):
-    try:
-        conn = sqlite3.connect('prompts.db')
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO Prompts (name, details, system, user) VALUES (?, ?, ?, ?)",
-            (title, description, system_prompt, user_prompt)
-        )
-        conn.commit()
-        conn.close()
-        return "Prompt added successfully!"
-    except sqlite3.Error as e:
-        return f"Error adding prompt: {e}"
 
 
 def fetch_items_by_title_or_url(search_query: str, search_type: str):
@@ -971,3 +991,257 @@ def convert_to_markdown(item):
     markdown += "## Content\n\n"
     markdown += f"{item['content']}\n\n"
     return markdown
+
+# Gradio function to handle user input and display results with pagination for displaying entries in the DB
+def fetch_paginated_data(page: int, results_per_page: int) -> Tuple[List[Tuple], int]:
+    try:
+        offset = (page - 1) * results_per_page
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM Media")
+            total_entries = cursor.fetchone()[0]
+
+            cursor.execute("SELECT id, title, url FROM Media LIMIT ? OFFSET ?", (results_per_page, offset))
+            results = cursor.fetchall()
+
+        return results, total_entries
+    except sqlite3.Error as e:
+        raise Exception(f"Error fetching paginated data: {e}")
+
+def format_results_as_html(results: List[Tuple]) -> str:
+    html = "<table class='table table-striped'>"
+    html += "<tr><th>ID</th><th>Title</th><th>URL</th></tr>"
+    for row in results:
+        html += f"<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td></tr>"
+    html += "</table>"
+    return html
+
+def view_database(page: int, results_per_page: int) -> Tuple[str, str, int]:
+    results, total_entries = fetch_paginated_data(page, results_per_page)
+    formatted_results = format_results_as_html(results)
+    # Calculate total pages
+    total_pages = (total_entries + results_per_page - 1) // results_per_page
+    return formatted_results, f"Page {page} of {total_pages}", total_pages
+
+
+#
+# End of Functions to manage prompts DB / Fetch and update media content
+#######################################################################################################################
+#
+# Obsidian-related Functions
+
+def import_obsidian_note_to_db(note_data):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT id FROM Media WHERE title = ? AND type = 'obsidian_note'", (note_data['title'],))
+            existing_note = cursor.fetchone()
+
+            if existing_note:
+                media_id = existing_note[0]
+                cursor.execute("""
+                    UPDATE Media
+                    SET content = ?, author = ?, ingestion_date = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (note_data['content'], note_data['frontmatter'].get('author', 'Unknown'), media_id))
+
+                cursor.execute("DELETE FROM MediaKeywords WHERE media_id = ?", (media_id,))
+            else:
+                cursor.execute("""
+                    INSERT INTO Media (title, content, type, author, ingestion_date, url)
+                    VALUES (?, ?, 'obsidian_note', ?, CURRENT_TIMESTAMP, ?)
+                """, (note_data['title'], note_data['content'], note_data['frontmatter'].get('author', 'Unknown'),
+                      note_data['file_path']))
+
+                media_id = cursor.lastrowid
+
+            for tag in note_data['tags']:
+                cursor.execute("INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)", (tag,))
+                cursor.execute("SELECT id FROM Keywords WHERE keyword = ?", (tag,))
+                keyword_id = cursor.fetchone()[0]
+                cursor.execute("INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)",
+                               (media_id, keyword_id))
+
+            frontmatter_str = yaml.dump(note_data['frontmatter'])
+            cursor.execute("""
+                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+                VALUES (?, 'Obsidian Frontmatter', ?, CURRENT_TIMESTAMP)
+            """, (media_id, frontmatter_str))
+
+            # Update full-text search index
+            cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
+                           (media_id, note_data['title'], note_data['content']))
+
+        action = "Updated" if existing_note else "Imported"
+        logger.info(f"{action} Obsidian note: {note_data['title']}")
+        return True, None
+    except sqlite3.Error as e:
+        error_msg = f"Database error {'updating' if existing_note else 'importing'} note {note_data['title']}: {str(e)}"
+        logger.error(error_msg)
+        return False, error_msg
+    except Exception as e:
+        error_msg = f"Unexpected error {'updating' if existing_note else 'importing'} note {note_data['title']}: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        return False, error_msg
+
+
+#
+# End of Obsidian-related Functions
+#######################################################################################################################
+#
+# Chat-related Functions
+
+
+
+def create_chat_conversation(media_id, conversation_name):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO ChatConversations (media_id, conversation_name, created_at, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ''', (media_id, conversation_name))
+            conn.commit()
+            return cursor.lastrowid
+    except sqlite3.Error as e:
+        logging.error(f"Error creating chat conversation: {e}")
+        raise DatabaseError(f"Error creating chat conversation: {e}")
+
+
+def add_chat_message(conversation_id: int, sender: str, message: str) -> int:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO ChatMessages (conversation_id, sender, message)
+                VALUES (?, ?, ?)
+            ''', (conversation_id, sender, message))
+            conn.commit()
+            return cursor.lastrowid
+    except sqlite3.Error as e:
+        logging.error(f"Error adding chat message: {e}")
+        raise DatabaseError(f"Error adding chat message: {e}")
+
+
+def get_chat_messages(conversation_id: int) -> List[Dict[str, Any]]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, sender, message, timestamp
+                FROM ChatMessages
+                WHERE conversation_id = ?
+                ORDER BY timestamp ASC
+            ''', (conversation_id,))
+            messages = cursor.fetchall()
+            return [
+                {
+                    'id': msg[0],
+                    'sender': msg[1],
+                    'message': msg[2],
+                    'timestamp': msg[3]
+                }
+                for msg in messages
+            ]
+    except sqlite3.Error as e:
+        logging.error(f"Error retrieving chat messages: {e}")
+        raise DatabaseError(f"Error retrieving chat messages: {e}")
+
+
+def search_chat_conversations(search_query: str) -> List[Dict[str, Any]]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT cc.id, cc.media_id, cc.conversation_name, cc.created_at, m.title as media_title
+                FROM ChatConversations cc
+                LEFT JOIN Media m ON cc.media_id = m.id
+                WHERE cc.conversation_name LIKE ? OR m.title LIKE ?
+                ORDER BY cc.updated_at DESC
+            ''', (f'%{search_query}%', f'%{search_query}%'))
+            conversations = cursor.fetchall()
+            return [
+                {
+                    'id': conv[0],
+                    'media_id': conv[1],
+                    'conversation_name': conv[2],
+                    'created_at': conv[3],
+                    'media_title': conv[4] or "Unknown Media"
+                }
+                for conv in conversations
+            ]
+    except sqlite3.Error as e:
+        logging.error(f"Error searching chat conversations: {e}")
+        return []
+
+
+def update_chat_message(message_id: int, new_message: str) -> None:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE ChatMessages
+                SET message = ?, timestamp = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (new_message, message_id))
+            conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"Error updating chat message: {e}")
+        raise DatabaseError(f"Error updating chat message: {e}")
+
+
+def delete_chat_message(message_id: int) -> None:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM ChatMessages WHERE id = ?', (message_id,))
+            conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"Error deleting chat message: {e}")
+        raise DatabaseError(f"Error deleting chat message: {e}")
+
+
+def save_chat_history_to_database(chatbot, conversation_id, media_id, conversation_name):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # If conversation_id is None, create a new conversation
+            if conversation_id is None:
+                cursor.execute('''
+                    INSERT INTO ChatConversations (media_id, conversation_name, created_at, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (media_id, conversation_name))
+                conversation_id = cursor.lastrowid
+
+            # Save each message in the chatbot history
+            for i, (user_msg, ai_msg) in enumerate(chatbot):
+                cursor.execute('''
+                    INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (conversation_id, 'user', user_msg))
+
+                cursor.execute('''
+                    INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (conversation_id, 'ai', ai_msg))
+
+            # Update the conversation's updated_at timestamp
+            cursor.execute('''
+                UPDATE ChatConversations
+                SET updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (conversation_id,))
+
+            conn.commit()
+
+        return conversation_id
+    except Exception as e:
+        logging.error(f"Error saving chat history to database: {str(e)}")
+        raise
+
+
+#
+# End of Chat-related Functions
+#######################################################################################################################
