@@ -596,7 +596,11 @@ def create_video_transcription_tab():
                     inputs=[preset_prompt_checkbox],
                     outputs=[preset_prompt]
                 )
-                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
+                preset_prompt.change(
+                    update_user_prompt,
+                    inputs=preset_prompt,
+                    outputs=custom_prompt_input
+                )
 
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
