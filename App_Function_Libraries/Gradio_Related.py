@@ -2886,39 +2886,89 @@ def create_import_single_prompt_tab():
         )
 
 
+def import_prompts_from_zip(zip_file):
+    if zip_file is None:
+        return "No file uploaded. Please upload a file."
+
+    prompts = []
+    temp_dir = tempfile.mkdtemp()
+    try:
+        zip_path = os.path.join(temp_dir, zip_file.name)
+        with open(zip_path, 'wb') as f:
+            f.write(zip_file.read())
+
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            for filename in z.namelist():
+                if filename.endswith('.txt') or filename.endswith('.md'):
+                    with z.open(filename) as f:
+                        file_content = f.read().decode('utf-8')
+                        sections = parse_prompt_file(file_content)
+                        prompts.append(sections)
+        shutil.rmtree(temp_dir)
+        return prompts
+    except Exception as e:
+        shutil.rmtree(temp_dir)
+        return f"Error parsing zip file: {str(e)}"
+
+
 def create_import_multiple_prompts_tab():
-    with gr.TabItem("Import Multiple Prompts from a Zip File"):
-        gr.Markdown("# Import a collection of prompts contained within a zip file")
+    with gr.TabItem("Import Multiple Prompts"):
+        gr.Markdown("# Import multiple prompts into the database")
+        gr.Markdown("Upload a zip file containing multiple prompt files (txt or md)")
+
         with gr.Row():
-            import_file = gr.File(label="Upload file for import", file_types=["txt", "md"])
-        with gr.Row():
-            title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
-            author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
-        with gr.Row():
-            keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords, comma-separated")
-            custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                             placeholder="Enter a custom prompt for summarization (optional)")
-        with gr.Row():
-            summary_input = gr.Textbox(label="Summary",
-                                       placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
-        with gr.Row():
-            auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
-            api_name_input = gr.Dropdown(
-                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                label="API for Auto-summarization"
-            )
-            api_key_input = gr.Textbox(label="API Key", type="password")
-        with gr.Row():
-            import_button = gr.Button("Import Data")
-        with gr.Row():
-            import_output = gr.Textbox(label="Import Status")
+            with gr.Column():
+                zip_file = gr.File(label="Upload zip file for import", file_types=["zip"])
+                import_button = gr.Button("Import Prompts")
+                prompts_dropdown = gr.Dropdown(label="Select Prompt to Edit", choices=[])
+                title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+                system_input = gr.Textbox(label="System", placeholder="Enter the system message for the prompt", lines=3)
+                user_input = gr.Textbox(label="User", placeholder="Enter the user message for the prompt", lines=3)
+
+
+            with gr.Column():
+                import_output = gr.Textbox(label="Import Status")
+                save_button = gr.Button("Save to Database")
+                save_output = gr.Textbox(label="Save Status")
+                prompts_display = gr.Textbox(label="Identified Prompts")
+
+        def handle_zip_import(zip_file):
+            result = import_prompts_from_zip(zip_file)
+            if isinstance(result, list):
+                prompt_titles = [prompt['title'] for prompt in result]
+                return gr.update(value="Zip file successfully imported. Select a prompt to edit from the dropdown."), prompt_titles, gr.update(value="\n".join(prompt_titles)), result
+            else:
+                return gr.update(value=result), [], gr.update(value=""), []
+
+        def handle_prompt_selection(selected_title, prompts):
+            selected_prompt = next((prompt for prompt in prompts if prompt['title'] == selected_title), None)
+            if selected_prompt:
+                return selected_prompt['title'], selected_prompt['author'], selected_prompt['system'], selected_prompt['user']
+            else:
+                return "", "", "", ""
+
+        zip_import_state = gr.State([])
 
         import_button.click(
-            fn=import_data,
-            inputs=[import_file, title_input, author_input, keywords_input, custom_prompt_input,
-                    summary_input, auto_summarize_checkbox, api_name_input, api_key_input],
-            outputs=import_output
+            fn=handle_zip_import,
+            inputs=[zip_file],
+            outputs=[import_output, prompts_dropdown, prompts_display, zip_import_state]
+        )
+
+        prompts_dropdown.change(
+            fn=handle_prompt_selection,
+            inputs=[prompts_dropdown, zip_import_state],
+            outputs=[title_input, author_input, system_input, user_input]
+        )
+
+        def save_prompt_to_db(title, author, system, user):
+            return add_prompt(title, author, system, user)
+
+        save_button.click(
+            fn=save_prompt_to_db,
+            inputs=[title_input, author_input, system_input, user_input],
+            outputs=save_output
         )
 
 
