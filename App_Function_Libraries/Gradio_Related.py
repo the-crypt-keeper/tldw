@@ -51,7 +51,9 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     perform_transcription, summarize_chunk
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
-    export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt
+    export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
+    delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
+    create_chat_conversation, save_chat_history_to_database
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -357,12 +359,12 @@ def load_media_content(media_id: int) -> dict:
     try:
         print(f"Debug - Load Media Content - Media ID: {media_id}")
         item_details = fetch_item_details(media_id)
-        print(f"Debug - Load Media Content - Item Details: {item_details}")
+        print(f"Debug - Load Media Content - Item Details: \n\n{item_details}\n\n\n\n")
 
         if isinstance(item_details, tuple) and len(item_details) == 3:
             content, prompt, summary = item_details
         else:
-            print(f"Debug - Load Media Content - Unexpected item_details format: {item_details}")
+            print(f"Debug - Load Media Content - Unexpected item_details format: \n\n{item_details}\n\n\n\n")
             content, prompt, summary = "", "", ""
 
         return {
@@ -373,91 +375,6 @@ def load_media_content(media_id: int) -> dict:
     except Exception as e:
         print(f"Debug - Load Media Content - Error: {str(e)}")
         return {"content": "", "prompt": "", "summary": ""}
-
-
-# FIXME - not adding content from selected item to query
-def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt):
-    try:
-        print(f"Debug - Chat Function - Message: {message}")
-        print(f"Debug - Chat Function - Media Content: {media_content}")
-        print(f"Debug - Chat Function - Selected Parts: {selected_parts}")
-        print(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
-        print(f"Debug - Chat Function - Prompt: {prompt}")
-
-        # Ensure selected_parts is a list
-        if not isinstance(selected_parts, (list, tuple)):
-            selected_parts = [selected_parts] if selected_parts else []
-
-        print(f"Debug - Chat Function - Selected Parts (after check): {selected_parts}")
-
-        # Combine the selected parts of the media content
-        combined_content = "\n\n".join([f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if part in media_content])
-        print(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")  # Print first 500 chars
-
-        # Prepare the input for the API
-        input_data = f"{combined_content}\n\nUser: {message}\nAI:"
-        print(f"Debug - Chat Function - Input Data: {input_data[:500]}...")  # Print first 500 chars
-
-        # Use the existing API request code based on the selected endpoint
-        if api_endpoint.lower() == 'openai':
-            response = summarize_with_openai(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "anthropic":
-            response = summarize_with_anthropic(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "cohere":
-            response = summarize_with_cohere(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "groq":
-            response = summarize_with_groq(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "openrouter":
-            response = summarize_with_openrouter(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "deepseek":
-            response = summarize_with_deepseek(api_key, input_data, prompt)
-        elif api_endpoint.lower() == "llama.cpp":
-            response = summarize_with_llama(input_data, prompt)
-        elif api_endpoint.lower() == "kobold":
-            response = summarize_with_kobold(input_data, api_key, prompt)
-        elif api_endpoint.lower() == "ooba":
-            response = summarize_with_oobabooga(input_data, api_key, prompt)
-        elif api_endpoint.lower() == "tabbyapi":
-            response = summarize_with_tabbyapi(input_data, prompt)
-        elif api_endpoint.lower() == "vllm":
-            response = summarize_with_vllm(input_data, prompt)
-        elif api_endpoint.lower() == "local-llm":
-            response = summarize_with_local_llm(input_data, prompt)
-        elif api_endpoint.lower() == "huggingface":
-            response = summarize_with_huggingface(api_key, input_data, prompt)
-        else:
-            raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
-
-        return response
-
-    except Exception as e:
-        logging.error(f"Error in chat function: {str(e)}")
-        return f"An error occurred: {str(e)}"
-
-
-def save_chat_history(history: List[List[str]], media_content: Dict[str, str], selected_parts: List[str],
-                      api_endpoint: str, prompt: str):
-    """
-    Save the chat history along with context information to a JSON file.
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"chat_history_{timestamp}.json"
-
-    chat_data = {
-        "timestamp": timestamp,
-        "history": history,
-        "context": {
-            "selected_media": {
-                part: media_content.get(part, "") for part in selected_parts
-            },
-            "api_endpoint": api_endpoint,
-            "prompt": prompt
-        }
-    }
-
-    json_data = json.dumps(chat_data, indent=2)
-
-    return filename, json_data
 
 
 def error_handler(func):
@@ -1817,12 +1734,148 @@ def create_llamafile_advanced_inputs():
 # Chat Interface Tab Functions
 
 
+
+
+# FIXME - not adding content from selected item to query
+def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt):
+    try:
+        logging.info(f"Debug - Chat Function - Message: {message}")
+        logging.info(f"Debug - Chat Function - Media Content: {media_content}")
+        logging.info(f"Debug - Chat Function - Selected Parts: {selected_parts}")
+        logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
+        logging.info(f"Debug - Chat Function - Prompt: {prompt}")
+
+        # Ensure selected_parts is a list
+        if not isinstance(selected_parts, (list, tuple)):
+            selected_parts = [selected_parts] if selected_parts else []
+
+        logging.debug(f"Debug - Chat Function - Selected Parts (after check): {selected_parts}")
+
+        # Combine the selected parts of the media content
+        combined_content = "\n\n".join([f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if part in media_content])
+        logging.debug(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")  # Print first 500 chars
+
+        # Prepare the input for the API
+        if not history:
+            input_data = f"{combined_content}\n\nUser: {message}\nAI:"
+        else:
+            input_data = f"User: {message}\nAI:"
+        # Print first 500 chars
+        logging.info(f"Debug - Chat Function - Input Data: {input_data[:500]}...")
+
+        # Use the existing API request code based on the selected endpoint
+        logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
+        if api_endpoint.lower() == 'openai':
+            response = summarize_with_openai(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "anthropic":
+            response = summarize_with_anthropic(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "cohere":
+            response = summarize_with_cohere(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "groq":
+            response = summarize_with_groq(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "openrouter":
+            response = summarize_with_openrouter(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "deepseek":
+            response = summarize_with_deepseek(api_key, input_data, prompt)
+        elif api_endpoint.lower() == "llama.cpp":
+            response = summarize_with_llama(input_data, prompt)
+        elif api_endpoint.lower() == "kobold":
+            response = summarize_with_kobold(input_data, api_key, prompt)
+        elif api_endpoint.lower() == "ooba":
+            response = summarize_with_oobabooga(input_data, api_key, prompt)
+        elif api_endpoint.lower() == "tabbyapi":
+            response = summarize_with_tabbyapi(input_data, prompt)
+        elif api_endpoint.lower() == "vllm":
+            response = summarize_with_vllm(input_data, prompt)
+        elif api_endpoint.lower() == "local-llm":
+            response = summarize_with_local_llm(input_data, prompt)
+        elif api_endpoint.lower() == "huggingface":
+            response = summarize_with_huggingface(api_key, input_data, prompt)
+        else:
+            raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
+
+        return response
+
+    except Exception as e:
+        logging.error(f"Error in chat function: {str(e)}")
+        return f"An error occurred: {str(e)}"
+
+
+def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
+    logging.info(f"Attempting to save chat history. Media content: {media_content}")
+    try:
+        # Extract the media_id from the media_content
+        media_id = None
+        if isinstance(media_content, dict) and 'content' in media_content:
+            try:
+                content_json = json.loads(media_content['content'])
+                # Use the webpage_url as the media_id
+                media_id = content_json.get('webpage_url')
+            except json.JSONDecodeError:
+                pass
+
+        if media_id is None:
+            # If we couldn't find a media_id, we'll use a placeholder
+            media_id = "unknown_media"
+            logging.warning(f"Unable to extract media_id from media_content. Using placeholder: {media_id}")
+
+        # Generate a unique conversation name using media_id and current timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        conversation_name = f"Chat_{media_id}_{timestamp}"
+
+        new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_id, conversation_name)
+        return new_conversation_id, f"Chat history saved successfully as {conversation_name}!"
+    except Exception as e:
+        error_message = f"Failed to save chat history: {str(e)}"
+        logging.error(error_message)
+        return conversation_id, error_message
+
+
+def save_chat_history(history, conversation_id):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"chat_history_{conversation_id}_{timestamp}.json"
+
+    chat_data = {
+        "conversation_id": conversation_id,
+        "timestamp": timestamp,
+        "history": [
+            {
+                "role": "user" if i % 2 == 0 else "bot",
+                "content": msg[0] if isinstance(msg, tuple) else msg
+            }
+            for i, msg in enumerate(history)
+        ]
+    }
+
+    json_data = json.dumps(chat_data, indent=2)
+
+    # Create a temporary file
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
+        temp_file.write(json_data)
+        temp_file_path = temp_file.name
+
+    return temp_file_path
+
+    json_data = json.dumps(chat_data, indent=2)
+    return filename, json_data
+
+def show_edit_message(selected):
+    if selected:
+        return gr.update(value=selected[0], visible=True), gr.update(value=selected[1], visible=True), gr.update(visible=True)
+    return gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+
+def show_delete_message(selected):
+    if selected:
+        return gr.update(value=selected[1], visible=True), gr.update(visible=True)
+    return gr.update(visible=False), gr.update(visible=False)
+
+
 def update_chat_content(selected_item, use_content, use_summary, use_prompt, item_mapping):
-    print(f"Debug - Update Chat Content - Selected Item: {selected_item}")
-    print(f"Debug - Update Chat Content - Use Content: {use_content}")
-    print(f"Debug - Update Chat Content - Use Summary: {use_summary}")
-    print(f"Debug - Update Chat Content - Use Prompt: {use_prompt}")
-    print(f"Debug - Update Chat Content - Item Mapping: {item_mapping}")
+    logging.debug(f"Debug - Update Chat Content - Selected Item: {selected_item}\n")
+    logging.debug(f"Debug - Update Chat Content - Use Content: {use_content}\n\n\n\n")
+    logging.debug(f"Debug - Update Chat Content - Use Summary: {use_summary}\n\n")
+    logging.debug(f"Debug - Update Chat Content - Use Prompt: {use_prompt}\n\n")
+    logging.debug(f"Debug - Update Chat Content - Item Mapping: {item_mapping}\n\n")
 
     if selected_item and selected_item in item_mapping:
         media_id = item_mapping[selected_item]
@@ -1839,9 +1892,9 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
         if isinstance(content, dict):
             print(f"Debug - Update Chat Content - Content keys: {list(content.keys())}")
             for key, value in content.items():
-                print(f"Debug - Update Chat Content - {key} (first 500 char): {str(value)[:500]}")
+                print(f"Debug - Update Chat Content - {key} (first 500 char): {str(value)[:500]}\n\n\n\n")
         else:
-            print(f"Debug - Update Chat Content - Content(first 500 char): {str(content)[:500]}")
+            print(f"Debug - Update Chat Content - Content(first 500 char): {str(content)[:500]}\n\n\n\n")
 
         print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
         return content, selected_parts
@@ -1876,39 +1929,101 @@ def update_user_prompt(preset_name):
     return ""
 
 
-def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt):
-    print(f"Debug - Chat Wrapper - Message: {message}")
-    print(f"Debug - Chat Wrapper - Media Content: {media_content}")
-    print(f"Debug - Chat Wrapper - Selected Parts: {selected_parts}")
-    print(f"Debug - Chat Wrapper - API Endpoint: {api_endpoint}")
-    print(f"Debug - Chat Wrapper - User Prompt: {user_prompt}")
+def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id, save_conversation):
+    try:
+        if save_conversation:
+            if conversation_id is None:
+                # Create a new conversation
+                media_id = media_content.get('id', None)
+                conversation_name = f"Chat about {media_content.get('title', 'Unknown Media')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                conversation_id = create_chat_conversation(media_id, conversation_name)
 
-    selected_content = "\n\n".join(
-        [f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if
-         part in media_content])
-    print(f"Debug - Chat Wrapper - Selected Content: {selected_content[:500]}...")  # Print first 500 chars
+            # Add user message to the database
+            user_message_id = add_chat_message(conversation_id, "user", message)
 
-    context = f"Selected content:\n{selected_content}\n\nUser message: {message}"
-    print(f"Debug - Chat Wrapper - Context: {context[:500]}...")  # Print first 500 chars
+        # Include the selected parts and user_prompt only for the first message
+        if not history:
+            content_to_analyze = "\n".join(selected_parts)
+            full_message = f"{user_prompt}\n\n{message}\n\nContent to analyze:\n{content_to_analyze}"
+        else:
+            full_message = message
 
-    # Use a default API endpoint if none is selected
-    if not api_endpoint:
-        api_endpoint = "OpenAI"  # You can change this to any default endpoint you prefer
-        print(f"Debug - Chat Wrapper - Using default API Endpoint: {api_endpoint}")
+        # Generate bot response
+        bot_message = chat(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
 
-    bot_message = chat(context, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
-    print(f"Debug - Chat Wrapper - Bot Message: {bot_message[:500]}...")  # Print first 500 chars
+        if save_conversation:
+            # Add assistant message to the database
+            add_chat_message(conversation_id, "assistant", bot_message)
 
-    history.append((message, bot_message))
-    return "", history
+        # Update history
+        history.append((message, bot_message))
+
+        return "", history, conversation_id
+    except Exception as e:
+        logging.error(f"Error in chat wrapper: {str(e)}")
+        return "", history, conversation_id
+
+
+def search_conversations(query):
+    try:
+        conversations = search_chat_conversations(query)
+        if not conversations:
+            print(f"Debug - Search Conversations - No results found for query: {query}")
+            return gr.update(choices=[])
+
+        conversation_options = [
+            (f"{c['conversation_name']} (Media: {c['media_title']}, ID: {c['id']})", c['id'])
+            for c in conversations
+        ]
+        print(f"Debug - Search Conversations - Options: {conversation_options}")
+        return gr.update(choices=conversation_options)
+    except Exception as e:
+        print(f"Debug - Search Conversations - Error: {str(e)}")
+        return gr.update(choices=[])
+
+
+def load_conversation(conversation_id):
+    if not conversation_id:
+        return [], None
+
+    messages = get_chat_messages(conversation_id)
+    history = [
+        (msg['message'], None) if msg['sender'] == 'user' else (None, msg['message'])
+        for msg in messages
+    ]
+    return history, conversation_id
+
+
+def clear_chat():
+    return gr.update(value=[]), None
+
+
+def update_message_in_chat(message_id, new_text, history):
+    update_chat_message(message_id, new_text)
+    updated_history = [(msg1, msg2) if msg1[1] != message_id and msg2[1] != message_id
+                       else ((new_text, msg1[1]) if msg1[1] == message_id else (new_text, msg2[1]))
+                       for msg1, msg2 in history]
+    return updated_history
+
+
+def delete_message_from_chat(message_id, history):
+    delete_chat_message(message_id)
+    updated_history = [(msg1, msg2) for msg1, msg2 in history if msg1[1] != message_id and msg2[1] != message_id]
+    return updated_history
 
 
 def create_chat_interface():
+    custom_css = """
+    .chatbot-container .message-wrap .message {
+        font-size: 14px !important;
+    }
+    """
     with gr.TabItem("Remote LLM Chat (Horizontal)"):
         gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
         chat_history = gr.State([])
         media_content = gr.State({})
         selected_parts = gr.State([])
+        conversation_id = gr.State(None)
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -1917,9 +2032,19 @@ def create_chat_interface():
                 search_button = gr.Button("Search")
                 items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
                 item_mapping = gr.State({})
-                use_content = gr.Checkbox(label="Use Content")
-                use_summary = gr.Checkbox(label="Use Summary")
-                use_prompt = gr.Checkbox(label="Use Prompt")
+                with gr.Row():
+                    use_content = gr.Checkbox(label="Use Content")
+                    use_summary = gr.Checkbox(label="Use Summary")
+                    use_prompt = gr.Checkbox(label="Use Prompt")
+                    save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
+                with gr.Row():
+                    conversation_search = gr.Textbox(label="Search Conversations")
+                with gr.Row():
+                    search_conversations_btn = gr.Button("Search Conversations")
+                with gr.Row():
+                    previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
+                with gr.Row():
+                    load_conversations_btn = gr.Button("Load Selected Conversation")
 
                 api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
@@ -1927,20 +2052,22 @@ def create_chat_interface():
                 user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
                                        "be used as the next message instead)", lines=3)
             with gr.Column():
-                chatbot = gr.Chatbot(height=500)
+                chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
-                save_button = gr.Button("Save Chat History")
+
+                edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
+                edit_message_text = gr.Textbox(label="Edit Message", visible=False)
+                update_message_button = gr.Button("Update Message", visible=False)
+
+                delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
+                delete_message_button = gr.Button("Delete Message", visible=False)
+
+                save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
+                save_chat_history_as_file = gr.Button("Save Chat History as File")
                 download_file = gr.File(label="Download Chat History")
 
-        submit.click(
-            chat_wrapper,
-            inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
-            outputs=[msg, chatbot]
-        )
-
-        save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
-
+        # Restore original functionality
         search_button.click(
             fn=update_dropdown,
             inputs=[search_query_input, search_type_input],
@@ -1948,6 +2075,20 @@ def create_chat_interface():
         )
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+
+        submit.click(
+            chat_wrapper,
+            inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
+                    conversation_id, save_conversation],
+            outputs=[msg, chatbot, conversation_id]
+        ).then(# Clear the message box after submission
+            lambda x: gr.update(value=""),
+            inputs=[chatbot],
+            outputs=[msg]
+        ).then(# Clear the user prompt after the first message
+            lambda: gr.update(value=""),
+            outputs=[user_prompt]
+        )
 
         items_output.change(
             update_chat_content,
@@ -1960,13 +2101,55 @@ def create_chat_interface():
                            outputs=[selected_parts])
         use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                           outputs=[selected_parts])
-        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                           outputs=[selected_parts])
-        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                           outputs=[selected_parts])
-        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                          outputs=[selected_parts])
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
+
+        search_conversations_btn.click(
+            search_conversations,
+            inputs=[conversation_search],
+            outputs=[previous_conversations]
+        )
+
+        load_conversations_btn.click(
+            clear_chat,
+            outputs=[chatbot, chat_history]
+        ).then(
+            load_conversation,
+            inputs=[previous_conversations],
+            outputs=[chatbot, conversation_id]
+        )
+
+        previous_conversations.change(
+            load_conversation,
+            inputs=[previous_conversations],
+            outputs=[chat_history]
+        )
+
+        update_message_button.click(
+            update_message_in_chat,
+            inputs=[edit_message_id, edit_message_text, chat_history],
+            outputs=[chatbot]
+        )
+
+        delete_message_button.click(
+            delete_message_from_chat,
+            inputs=[delete_message_id, chat_history],
+            outputs=[chatbot]
+        )
+
+        save_chat_history_as_file.click(
+            save_chat_history,
+            inputs=[chatbot, conversation_id],
+            outputs=[download_file]
+        )
+
+        save_chat_history_to_db.click(
+            save_chat_history_to_db_wrapper,
+            inputs=[chatbot, conversation_id, media_content],
+            outputs=[conversation_id, gr.Textbox(label="Save Status")]
+        )
+
+        chatbot.select(show_edit_message, None, [edit_message_text, edit_message_id, update_message_button])
+        chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
 
 def create_chat_interface_top_bottom():
@@ -2000,12 +2183,6 @@ def create_chat_interface_top_bottom():
                 save_button = gr.Button("Save Chat History")
                 download_file = gr.File(label="Download Chat History")
 
-        submit.click(
-            chat_wrapper,
-            inputs=[msg, chat_history, media_content, selected_parts, api_endpoint, api_key, user_prompt],
-            outputs=[msg, chatbot]
-        )
-
         save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
 
         search_button.click(
@@ -2034,6 +2211,74 @@ def create_chat_interface_top_bottom():
         use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                           outputs=[selected_parts])
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
+
+
+def create_chat_management_tab():
+    with gr.TabItem("Chat Management"):
+        gr.Markdown("# Chat Management")
+
+        with gr.Row():
+            search_query = gr.Textbox(label="Search Conversations")
+            search_button = gr.Button("Search")
+
+        conversation_list = gr.Dropdown(label="Select Conversation", choices=[])
+        conversation_mapping = gr.State({})
+
+        with gr.Row():
+            message_input = gr.Textbox(label="New Message")
+            send_button = gr.Button("Send")
+
+        chat_display = gr.HTML(label="Chat Messages")
+
+        edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
+        edit_message_text = gr.Textbox(label="Edit Message", visible=False)
+        update_message_button = gr.Button("Update Message", visible=False)
+
+        delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
+        delete_message_button = gr.Button("Delete Message", visible=False)
+
+        def send_message(selected_conversation, message):
+            conversation_id = conversation_mapping.value.get(selected_conversation)
+            if conversation_id:
+                add_chat_message(conversation_id, "user", message)
+                return load_conversation(selected_conversation), ""
+            return "Please select a conversation first.", message
+
+        def update_message(message_id, new_text, selected_conversation):
+            update_chat_message(message_id, new_text)
+            return load_conversation(selected_conversation), gr.update(value="", visible=False), gr.update(value="", visible=False), gr.update(visible=False)
+
+        def delete_message(message_id, selected_conversation):
+            delete_chat_message(message_id)
+            return load_conversation(selected_conversation), gr.update(value="", visible=False), gr.update(visible=False)
+
+        search_button.click(
+            search_conversations,
+            inputs=[search_query],
+            outputs=[conversation_list, conversation_mapping]
+        )
+
+        conversation_list.change(
+            load_conversation,
+            inputs=[conversation_list],
+            outputs=[chat_display]
+        )
+        send_button.click(
+            send_message,
+            inputs=[conversation_list, message_input],
+            outputs=[chat_display, message_input]
+        )
+        update_message_button.click(
+            update_message,
+            inputs=[edit_message_id, edit_message_text, conversation_list],
+            outputs=[chat_display, edit_message_id, edit_message_text, update_message_button]
+        )
+        delete_message_button.click(
+            delete_message,
+            inputs=[delete_message_id, conversation_list],
+            outputs=[chat_display, delete_message_id, delete_message_button]
+        )
+
 
 #
 # End of Chat Interface Tab Functions
@@ -2299,7 +2544,7 @@ def create_prompt_clone_tab():
 
 
 #
-#
+# End of Media Edit Tab Functions
 ################################################################################################################
 #
 # Import Items Tab Functions
@@ -2520,6 +2765,211 @@ def create_import_obsidian_vault_tab():
         outputs=[import_status],
         show_progress=True
     )
+
+
+def parse_prompt_file(file_content):
+    sections = {
+        'title': '',
+        'author': '',
+        'system': '',
+        'user': ''
+    }
+
+    # Define regex patterns for the sections
+    patterns = {
+        'title': r'### TITLE ###\s*(.*?)\s*###',
+        'author': r'### AUTHOR ###\s*(.*?)\s*###',
+        'system': r'### SYSTEM ###\s*(.*?)\s*###',
+        'user': r'### USER ###\s*(.*?)\s*###'
+    }
+
+    for key, pattern in patterns.items():
+        match = re.search(pattern, file_content, re.DOTALL)
+        if match:
+            sections[key] = match.group(1).strip()
+
+    return sections
+
+
+# FIXME - file uploads... In fact make sure to check _all_ file uploads... will make it easier when centralizing everything for API
+def import_prompt_from_file(file):
+    if file is None:
+        return "No file uploaded. Please upload a file."
+
+    try:
+        if hasattr(file, 'name'):
+            file_name = file.name
+        else:
+            file_name = 'unknown_file'
+
+        if isinstance(file, str):
+            # If file is a string, it's likely a file path
+            file_path = file
+            with open(file_path, 'r', encoding='utf-8') as f:
+                file_content = f.read()
+        elif hasattr(file, 'read'):
+            # If file has a 'read' method, it's likely a file-like object
+            file_content = file.read()
+            if isinstance(file_content, bytes):
+                file_content = file_content.decode('utf-8')
+        else:
+            # If it's neither a string nor a file-like object, try converting it to a string
+            file_content = str(file)
+
+        sections = parse_prompt_file(file_content)
+
+        return sections['title'], sections['author'], sections['system'], sections['user']
+    except Exception as e:
+        return f"Error parsing file: {str(e)}"
+
+
+def import_prompt_data(name, details, system, user):
+    if not name or not system:
+        return "Name and System fields are required."
+
+    try:
+        conn = sqlite3.connect('prompts.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO Prompts (name, details, system, user)
+            VALUES (?, ?, ?, ?)
+        ''', (name, details, system, user))
+        conn.commit()
+        conn.close()
+        return f"Prompt '{name}' successfully imported."
+    except sqlite3.IntegrityError:
+        return "Prompt with this name already exists."
+    except sqlite3.Error as e:
+        return f"Database error: {e}"
+
+
+def create_import_single_prompt_tab():
+    with gr.TabItem("Import Prompt"):
+        gr.Markdown("# Import a prompt into the database")
+        gr.Markdown("...and have it tagged with keywords!(WIP...)")
+
+        with gr.Row():
+            with gr.Column():
+                import_file = gr.File(label="Upload file for import", file_types=["txt", "md"])
+                title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+                system_input = gr.Textbox(label="System", placeholder="Enter the system message for the prompt", lines=3)
+                user_input = gr.Textbox(label="User", placeholder="Enter the user message for the prompt", lines=3)
+                import_button = gr.Button("Import Prompt")
+
+            with gr.Column():
+                import_output = gr.Textbox(label="Import Status")
+                save_button = gr.Button("Save to Database")
+                save_output = gr.Textbox(label="Save Status")
+
+        def handle_import(file):
+            result = import_prompt_from_file(file)
+            if isinstance(result, tuple):
+                title, author, system, user = result
+                return gr.update(value="File successfully imported. You can now edit the content before saving."), gr.update(value=title), gr.update(value=author), gr.update(value=system), gr.update(value=user)
+            else:
+                return gr.update(value=result), gr.update(), gr.update(), gr.update(), gr.update()
+
+        import_button.click(
+            fn=handle_import,
+            inputs=[import_file],
+            outputs=[import_output, title_input, author_input, system_input, user_input]
+        )
+
+        def save_prompt_to_db(title, author, system, user):
+            return add_prompt(title, author, system, user)
+
+        save_button.click(
+            fn=save_prompt_to_db,
+            inputs=[title_input, author_input, system_input, user_input],
+            outputs=save_output
+        )
+
+
+def import_prompts_from_zip(zip_file):
+    if zip_file is None:
+        return "No file uploaded. Please upload a file."
+
+    prompts = []
+    temp_dir = tempfile.mkdtemp()
+    try:
+        zip_path = os.path.join(temp_dir, zip_file.name)
+        with open(zip_path, 'wb') as f:
+            f.write(zip_file.read())
+
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            for filename in z.namelist():
+                if filename.endswith('.txt') or filename.endswith('.md'):
+                    with z.open(filename) as f:
+                        file_content = f.read().decode('utf-8')
+                        sections = parse_prompt_file(file_content)
+                        prompts.append(sections)
+        shutil.rmtree(temp_dir)
+        return prompts
+    except Exception as e:
+        shutil.rmtree(temp_dir)
+        return f"Error parsing zip file: {str(e)}"
+
+
+def create_import_multiple_prompts_tab():
+    with gr.TabItem("Import Multiple Prompts"):
+        gr.Markdown("# Import multiple prompts into the database")
+        gr.Markdown("Upload a zip file containing multiple prompt files (txt or md)")
+
+        with gr.Row():
+            with gr.Column():
+                zip_file = gr.File(label="Upload zip file for import", file_types=["zip"])
+                import_button = gr.Button("Import Prompts")
+                prompts_dropdown = gr.Dropdown(label="Select Prompt to Edit", choices=[])
+                title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+                system_input = gr.Textbox(label="System", placeholder="Enter the system message for the prompt", lines=3)
+                user_input = gr.Textbox(label="User", placeholder="Enter the user message for the prompt", lines=3)
+
+
+            with gr.Column():
+                import_output = gr.Textbox(label="Import Status")
+                save_button = gr.Button("Save to Database")
+                save_output = gr.Textbox(label="Save Status")
+                prompts_display = gr.Textbox(label="Identified Prompts")
+
+        def handle_zip_import(zip_file):
+            result = import_prompts_from_zip(zip_file)
+            if isinstance(result, list):
+                prompt_titles = [prompt['title'] for prompt in result]
+                return gr.update(value="Zip file successfully imported. Select a prompt to edit from the dropdown."), prompt_titles, gr.update(value="\n".join(prompt_titles)), result
+            else:
+                return gr.update(value=result), [], gr.update(value=""), []
+
+        def handle_prompt_selection(selected_title, prompts):
+            selected_prompt = next((prompt for prompt in prompts if prompt['title'] == selected_title), None)
+            if selected_prompt:
+                return selected_prompt['title'], selected_prompt['author'], selected_prompt['system'], selected_prompt['user']
+            else:
+                return "", "", "", ""
+
+        zip_import_state = gr.State([])
+
+        import_button.click(
+            fn=handle_zip_import,
+            inputs=[zip_file],
+            outputs=[import_output, prompts_dropdown, prompts_display, zip_import_state]
+        )
+
+        prompts_dropdown.change(
+            fn=handle_prompt_selection,
+            inputs=[prompts_dropdown, zip_import_state],
+            outputs=[title_input, author_input, system_input, user_input]
+        )
+
+        def save_prompt_to_db(title, author, system, user):
+            return add_prompt(title, author, system, user)
+
+        save_button.click(
+            fn=save_prompt_to_db,
+            inputs=[title_input, author_input, system_input, user_input],
+            outputs=save_output
+        )
 
 
 # Using pypandoc to convert EPUB to Markdown
@@ -3095,18 +3545,20 @@ def launch_ui(share_public=None, server_mode=False):
                 create_search_tab()
                 create_prompt_view_tab()
 
-            with gr.TabItem("Local LLM with Llamafile"):
-                create_llamafile_settings_tab()
-
-            with gr.TabItem("Remote LLM Chat"):
+            with gr.TabItem("Chat with an LLM"):
                 create_chat_interface()
                 create_chat_interface_top_bottom()
+                create_chat_management_tab()
+                create_llamafile_settings_tab()
 
             with gr.TabItem("Edit Existing Items"):
                 create_media_edit_tab()
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
+
+            with gr.TabItem("Writing Tools"):
+                create_document_editing_tab()
 
             with gr.TabItem("Keywords"):
                 with gr.Tabs():
@@ -3118,10 +3570,9 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Import/Export"):
                 create_import_item_tab()
                 create_import_obsidian_vault_tab()
+                create_import_single_prompt_tab()
+                create_import_multiple_prompts_tab()
                 create_export_tab()
-
-            with gr.TabItem("Document Editing"):
-                create_document_editing_tab()
 
             with gr.TabItem("Utilities"):
                 create_utilities_tab()
