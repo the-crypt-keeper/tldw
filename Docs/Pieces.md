@@ -176,16 +176,66 @@
   - If it's the first chunk, it summarizes it using the `summarize_func()` function
   - If it's not the first chunk, it combines the current summary with the chunk and summarizes the combined text
   - Next it appends the current summary to the `summarized_chunks` list
-  - Finally it returns the summarized chunks list:
+  - Finally, it returns the summarized chunks list:
     - `return summarized_chunks`
 - **Let's now dig deeper into `summarize_chunk()`:**
-  - 
+  - This function is defined on line 922 of `Summarization_General.py`:
+    - `def summarize_chunk(api_name, text, custom_prompt_input, api_key):`
+  - This function is simply one long if/else statement matching the `api_name` with the appropriate summarization function to call.
+    - i.e. `if api_name == "openai":` -> `return summarize_with_openai(api_key, text, custom_prompt_input)`
+    - Each of these functions are defined in the `Summarization_Lib.py` file.
+    - The first one can be found at Line 66 of that file: `def summarize_with_openai(api_key, input_data, custom_prompt_arg):`
+      - It continues downward from there.
+  - If no api_name is matched, and none was passed, it simply returns `None`
+  - If no api_name is matched and an argument for it was passed, it returns an error message.
 - **Let's now dig deeper into Line 1086-1089 `save_transcription_and_summary()`**
-  - 
+  - The function is defined in `Summarization_General.py` on Line 900:
+    - `def save_transcription_and_summary(transcription_text, summary_text, download_path, info_dict):`
+  - The function first sanitizes the video title
+    - `video_title = sanitize_filename(info_dict.get('title', 'Untitled'))`
+    - `sanitize_filename()` is defined on Line 138 in `Utils.py`.
+  - Then, Lines 904-907 it saves the transcription to a `.txt` file
+    - `transcription_file_path = os.path.join(download_path, f"{video_title}_transcription.txt")`
+  - Then, Lines 909-914 it saves the summary to a `.txt` file if it exists
+    - `summary_file_path = os.path.join(download_path, f"{video_title}_summary.txt")`
+  - Finally, it returns the paths to the transcription and summary files:
+    - `return transcription_file_path, summary_file_path`
 - **Let's now dig deeper into Line 1104-1108 `add_media_to_database()`**
-  - 
+  - Function is defined in `SQLite_DB.py` on Line 721:
+    - `def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):`
+  - The function first extracts the media contents from the `segments` list
+  - It then sets the custom prompt if not set
+    - ```
+          result = add_media_with_keywords(
+                    url=url,
+                    title=info_dict.get('title', 'Untitled'),
+                    media_type=media_type,
+                    content=content,
+                    keywords=','.join(keywords) if isinstance(keywords, list) else keywords,
+                    prompt=custom_prompt_input or 'No prompt provided',
+                    summary=summary or 'No summary provided',
+                    transcription_model=whisper_model,
+                    author=info_dict.get('uploader', 'Unknown'),
+                    ingestion_date=datetime.now().strftime('%Y-%m-%d')
+         )
+      ```
+  - Finally, it returns `result`
+    - `return result`
+- **Let's now dig deeper into `add_media_with_keywords()`**
+  - It is defined on Lines 303-304 of `SQLite_DB.py`:
+    - `def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author, ingestion_date):`
+  - The function first sets default values for all the variables
+  - Next it ensures the URL is valid and if it isn't, it sets it to `localhost`
+  - It then performs a check of the media type, seeing if it matches one of the following, raising an error if it doesn't:
+    - `if media_type not in ['article', 'audio', 'document', 'obsidian_note', 'podcast', 'text', 'video', 'unknown']:`
+  - Next it checks to ensure the ingestion date/time is correct, raising an error if it isn't:
+    - `if ingestion_date and not is_valid_date(ingestion_date):`
+  - Next it ensure proper formatting of the keywords
+  - Next, Lines 344-399 it attempts to connect to the DB and insert the generated items into the database.
+  - Finally, it returns the following string on success (throwing appropriate errors if it fails at any part of the process):
+    - `return f"Media '{title}' added/updated successfully with keywords: {', '.join(keyword_list)}"`
 
-
+------------------------------------------------------------------------------------------------------------------
 
 
 
