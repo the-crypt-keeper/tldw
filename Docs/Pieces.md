@@ -158,7 +158,7 @@
     - `def improved_chunking_process(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:`
     - First sets the various chunking options:
     - `chunk_method`, `max_chunk_size`, `overlap`, `language`, `adaptive`, `multi_level`
-  - It then proceeds to perform chunking on the input text based on the selected chunking method:
+  - It then proceeds to perform chunking on the input text based on the selected chunking method: (All these functions are defined in the `Chunking_Lib.py` file)
     - `adaptive` - `adpativ_chunk_size()`
     - `multi_level` - `multi_level_chunking()`
     - `chunk_method == words` - `chunk_text_by_words()`
@@ -167,15 +167,29 @@
     - `chunk_method == tokens` - `chunk_text_by_tokens()`
     - `chunks = [text]` - If no chunking method is selected / No chunking is performed.
   - Finally, it returns the chunks:
-    - return [{'text': chunk, 'metadata': get_chunk_metadata(chunk, text)} for chunk in chunks]`
+    - `return [{'text': chunk, 'metadata': get_chunk_metadata(chunk, text)} for chunk in chunks]`
 - **Let's now dig deeper into `recursive_summarize_chunks()`:**
-  - 
+  - Defined on Line 215 of `Chunking_Lib.py`:
+    - `def recursive_summarize_chunks(chunks, summarize_func, custom_prompt):`
+  - First initializes the variables: `summarized_chunks = []`, `current_summary = ""`
+  - Then iterates through each chunk in the chunks list
+  - If it's the first chunk, it summarizes it using the `summarize_func()` function
+  - If it's not the first chunk, it combines the current summary with the chunk and summarizes the combined text
+  - Next it appends the current summary to the `summarized_chunks` list
+  - Finally it returns the summarized chunks list:
+    - `return summarized_chunks`
 - **Let's now dig deeper into `summarize_chunk()`:**
   - 
 - **Let's now dig deeper into Line 1086-1089 `save_transcription_and_summary()`**
   - 
 - **Let's now dig deeper into Line 1104-1108 `add_media_to_database()`**
   - 
+
+
+
+
+
+
 
 #### Audio File Transcription + Summarization
 
