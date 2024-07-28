@@ -53,7 +53,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
-    create_chat_conversation, save_chat_history_to_database, view_database
+    create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -110,15 +110,28 @@ def gradio_download_youtube_video(url):
     return str(output_file_path)
 
 
-
-
 def format_transcription(content):
-    # Add extra space after periods for better readability
-    content = content.replace('.', '. ').replace('.  ', '. ')
-    # Split the content into lines for multiline display
-    lines = content.split('. ')
-    # Join lines with HTML line break for better presentation in Markdown
-    formatted_content = "<br>".join(lines)
+    # Replace '\n' with actual line breaks
+    content = content.replace('\\n', '\n')
+    # Split the content by newlines first
+    lines = content.split('\n')
+    formatted_lines = []
+    for line in lines:
+        # Add extra space after periods for better readability
+        line = line.replace('.', '. ').replace('.  ', '. ')
+
+        # Split into sentences using a more comprehensive regex
+        sentences = re.split('(?<=[.!?]) +', line)
+
+        # Trim whitespace from each sentence and add a line break
+        formatted_sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+
+        # Join the formatted sentences
+        formatted_lines.append(' '.join(formatted_sentences))
+
+    # Join the lines with HTML line breaks
+    formatted_content = '<br>'.join(formatted_lines)
+
     return formatted_content
 
 
@@ -169,17 +182,23 @@ all_prompts = prompts_category_1 + prompts_category_2
 def handle_prompt_selection(prompt):
     return f"You selected: {prompt}"
 
-def display_details(media_id):
-    # Gradio Search Function-related stuff
-    if media_id:
-        details = display_item_details(media_id)
-        details_html = ""
-        for detail in details:
-            details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
-            details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
-            details_html += f"<h4>Transcription:</h4><pre>{detail[2]}</pre><hr>"
-        return details_html
-    return "No details available."
+# FIXME - Dead code?
+# def display_details(media_id):
+#     if media_id:
+#         details = display_item_details(media_id)
+#         details_html = ""
+#         for detail in details:
+#             details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
+#             details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
+#
+#             # Format the transcription
+#             formatted_transcription = format_transcription(detail[2])
+#
+#             # Use <pre> tag with style for better formatting
+#             details_html += f"<h4>Transcription:</h4><pre style='white-space: pre-wrap; word-wrap: break-word;'>{formatted_transcription}</pre><hr>"
+#
+#         return details_html
+#     return "No details available."
 
 
 def fetch_items_by_title_or_url(search_query: str, search_type: str):
@@ -283,17 +302,6 @@ def browse_items(search_query, search_type):
     return results
 
 
-def display_item_details(media_id):
-    # Function to display item details
-    prompt_summary_results, content = fetch_item_details(media_id)
-    content_section = f"<h4>Transcription:</h4><pre>{content}</pre><hr>"
-    prompt_summary_section = ""
-    for prompt, summary in prompt_summary_results:
-        prompt_summary_section += f"<h4>Prompt:</h4><p>{prompt}</p>"
-        prompt_summary_section += f"<h4>Summary:</h4><p>{summary}</p><hr>"
-    return prompt_summary_section, content_section
-
-
 def update_dropdown(search_query, search_type):
     results = browse_items(search_query, search_type)
     item_options = [f"{item[1]} ({item[2]})" for item in results]
@@ -316,11 +324,15 @@ def update_detailed_view(item, item_mapping):
             if content or prompt or summary:
                 details_html = "<h4>Details:</h4>"
                 if prompt:
-                    details_html += f"<h4>Prompt:</h4>{prompt}</p>"
+                    formatted_prompt = format_transcription(prompt)
+                    details_html += f"<h4>Prompt:</h4>{formatted_prompt}</p>"
                 if summary:
-                    details_html += f"<h4>Summary:</h4>{summary}</p>"
+                    formatted_summary = format_transcription(summary)
+                    details_html += f"<h4>Summary:</h4>{formatted_summary}</p>"
                 # Format the transcription content for better readability
-                content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{format_transcription(content)}</div>"
+                formatted_content = format_transcription(content)
+                #content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{content}</div>"
+                content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{formatted_content}</div>"
                 return details_html, content_html
             else:
                 return "No details available.", "No details available."
@@ -826,6 +838,12 @@ def create_video_transcription_tab():
 
                             summary = open(summary_file, 'r').read() if summary_file else "No summary available"
 
+                            # FIXME - Add to other functions that generate HTML
+                            # Format the transcription
+                            formatted_transcription = format_transcription(transcription_text)
+                            # Format the summary
+                            formatted_summary = format_transcription(summary)
+
                             results_html += f"""
                             <div class="result-box">
                                 <gradio-accordion>
@@ -834,9 +852,11 @@ def create_video_transcription_tab():
                                         <h4>Metadata:</h4>
                                         <pre>{metadata_text}</pre>
                                         <h4>Transcription:</h4>
-                                        <div class="transcription">{transcription_text}</div>
+                                        <div class="transcription" style="white-space: pre-wrap; word-wrap: break-word;">
+                                            {formatted_transcription}
+                                        </div>
                                         <h4>Summary:</h4>
-                                        <div class="summary">{summary}</div>
+                                        <div class="summary">{formatted_summary}</div>
                                     </gradio-accordion-item>
                                 </gradio-accordion>
                             </div>
@@ -922,11 +942,16 @@ def create_video_transcription_tab():
                     logging.error(f"process_videos_wrapper(): Error in process_videos_wrapper: {str(e)}", exc_info=True)
                     # Return a tuple with 5 elements in case of any error
                     return (
-                        f"process_videos_wrapper(): An error occurred: {str(e)}",  # progress_output
-                        str(e),  # error_output
-                        f"<div class='error'>Error: {str(e)}</div>",  # results_output
-                        None,  # download_transcription
-                        None  # download_summary
+                        # progress_output
+                        f"process_videos_wrapper(): An error occurred: {str(e)}",
+                        # error_output
+                        str(e),
+                        # results_output
+                        f"<div class='error'>Error: {str(e)}</div>",
+                        # download_transcription
+                        None,
+                        # download_summary
+                        None
                     )
 
             # FIXME - remove dead args for process_url_with_metadata
@@ -2492,6 +2517,86 @@ def create_chat_management_tab():
 #
 # Media Edit Tab Functions
 
+# FIXME - under construction
+def get_transcript_options(media_id):
+    transcripts = get_transcripts(media_id)
+    return [f"{t[0]}: {t[1]} ({t[3]})" for t in transcripts]
+
+
+def update_transcript_options(media_id):
+    options = get_transcript_options(media_id)
+    return gr.update(choices=options), gr.update(choices=options)
+
+def compare_transcripts(media_id, transcript1_id, transcript2_id):
+    try:
+        transcripts = get_transcripts(media_id)
+        transcript1 = next((t for t in transcripts if t[0] == int(transcript1_id)), None)
+        transcript2 = next((t for t in transcripts if t[0] == int(transcript2_id)), None)
+
+        if not transcript1 or not transcript2:
+            return "One or both selected transcripts not found."
+
+        comparison = f"Transcript 1 (Model: {transcript1[1]}, Created: {transcript1[3]}):\n\n"
+        comparison += format_transcription(transcript1[2])
+        comparison += f"\n\nTranscript 2 (Model: {transcript2[1]}, Created: {transcript2[3]}):\n\n"
+        comparison += format_transcription(transcript2[2])
+
+        return comparison
+    except Exception as e:
+        logging.error(f"Error in compare_transcripts: {str(e)}")
+        return f"Error comparing transcripts: {str(e)}"
+
+
+def create_compare_transcripts_tab():
+    with gr.TabItem("Compare Transcripts"):
+        gr.Markdown("# Compare Transcripts")
+
+        with gr.Row():
+            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+            search_button = gr.Button("Search")
+
+        with gr.Row():
+            media_id_output = gr.Dropdown(label="Select Media Item", choices=[], interactive=True)
+            media_mapping = gr.State({})
+
+        media_id_input = gr.Number(label="Media ID", visible=False)
+        transcript1_dropdown = gr.Dropdown(label="Transcript 1")
+        transcript2_dropdown = gr.Dropdown(label="Transcript 2")
+        compare_button = gr.Button("Compare Transcripts")
+        comparison_output = gr.Textbox(label="Comparison Result", lines=20)
+
+        def update_media_dropdown(search_query, search_type):
+            results = browse_items(search_query, search_type)
+            item_options = [f"{item[1]} ({item[2]})" for item in results]
+            new_item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}
+            return gr.update(choices=item_options), new_item_mapping
+
+        search_button.click(
+            fn=update_media_dropdown,
+            inputs=[search_query_input, search_type_input],
+            outputs=[media_id_output, media_mapping]
+        )
+
+        def load_selected_media_id(selected_media, media_mapping):
+            if selected_media and media_mapping and selected_media in media_mapping:
+                media_id = media_mapping[selected_media]
+                return media_id
+            return None
+
+        media_id_output.change(
+            fn=load_selected_media_id,
+            inputs=[media_id_output, media_mapping],
+            outputs=[media_id_input]
+        )
+
+        media_id_input.change(update_transcript_options, inputs=[media_id_input],
+                              outputs=[transcript1_dropdown, transcript2_dropdown])
+        compare_button.click(compare_transcripts, inputs=[media_id_input, transcript1_dropdown, transcript2_dropdown],
+                             outputs=[comparison_output])
+
+### End of under construction section
+
 def create_media_edit_tab():
     with gr.TabItem("Edit Existing Items"):
         gr.Markdown("# Search and Edit Media Items")
@@ -3760,6 +3865,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_llamafile_settings_tab()
 
             with gr.TabItem("Edit Existing Items"):
+                create_compare_transcripts_tab()
                 create_media_edit_tab()
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
