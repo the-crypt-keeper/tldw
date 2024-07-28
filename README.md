@@ -422,6 +422,7 @@ Sample commands:
       2. Download + Run: https://github.com/skeeto/w64devkit/releases
       3. cd to `llama.cpp` folder make` in the `llama.cpp` folder
       4. `server.exe -m ..\path\to\model -c <context_size>`
+        * Example: `./server -m ../path/to/model -c 8192 -ngl 999` - This will run the model with a context size of 8192 tokens and offload all layers to the GPU.
   - **Kobold.cpp** - c/p'd from: https://github.com/LostRuins/koboldcpp/wiki
     - **Windows**
       1. Download from here: https://github.com/LostRuins/koboldcpp/releases/latest
