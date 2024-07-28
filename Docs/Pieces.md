@@ -5,7 +5,7 @@
 - [Introduction](#introduction)
 - [How Does it All Start?](#how-does-it-start)
 - [Transcription / Summarization / Ingestion Tab](#transcription--summarization--ingestion-tab)
-- [](#)
+- [Audio File Transcription / Summarization](#audio_file_transcription)
 - [](#)
 
 
@@ -59,15 +59,18 @@
 ------------------------------------------------------------------------------------------------------------------
 ### <a name="transcription--summarization--ingestion-tab"></a> Transcription / Summarization / Ingestion Tab
 #### Video Transcription + Summarization
-- The tab for video transcription is the `create_video_transcription_tab()`
-- The function is defined in `Gradio_Related.py` on line 561.
-- The function is responsible for creating the tab and handling the user input.
-- The function first creates the tab using the `gr.Tabitem()` -> `gr.Markdown()` -> `gr.Row():` functions.
-- The function then creates the input fields for the user to input the video URL and the desired summary length.
-  - `custom_prompt_checkbox`, `preset_prompt_checkbox`, `preset_prompt`, `use_time_input`, `chunking_options_checkbox`, and `use_cookies_input` are used to dynamically show their corresponding items depending on the user selection.
-- The function then creates the output fields for the user to view the summary and the transcription.
-- Finally, the button `Process Videos` is created to handle the user input with the variable `process_button`
-- The function then defines the `def process_videos_with_error_handling(<args>):` function to handle the user input.
+1. The tab for video transcription is the `create_video_transcription_tab()`
+2. The function is defined in `Gradio_Related.py` on line 561.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Markdown()` -> `gr.Row():` functions.
+5. The function then creates the input fields for the user to input the video URL and the desired summary length.
+   - `custom_prompt_checkbox`, `preset_prompt_checkbox`, `preset_prompt`, `use_time_input`, `chunking_options_checkbox`, and `use_cookies_input` are used to dynamically show their corresponding items depending on the user selection.
+6. The function then creates the output fields for the user to view the summary and the transcription.
+7. Finally, the button `Process Videos` is created to handle the user input with the variable `process_button`
+8. `process_button` when clicked, calls the `process_videos_wrapper()` function.
+9. `process_videos_wrapper()` is defined on line 903 of `Gradio_Related.py`
+    - The function first validates the filenames passed in, and then proceeds to call `process_videos_with_error_handling()`
+10. The function then defines the `def process_videos_with_error_handling(<args>):` function to handle the user input.
     - `def process_videos_with_error_handling(<args>):`:
       - The function first checks to see if there's any input in the URL field.
       - The function then checks/sets the batch size
@@ -237,28 +240,227 @@
 
 ------------------------------------------------------------------------------------------------------------------
 
+#### <a name="audio_file_transcription"></a>Audio File Transcription + Summarization
+1. The tab for audio file transcription is the `create_audio_processing_tab()`
+2. The function is defined in `Gradio_Related.py` on line 1157.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `process_audio_files()` funcion when the `Process Audio Files` button is clicked.
+7. `process_audio_files()` is defined on line 249 of `Audio_Files.py`
+    - `def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key, use_cookies, cookies, keep_original, custom_keywords, custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize)`
+    - The function first validates the filenames passed in, and then proceeds to call `process_audio_files_with_error_handling()`
+    - Setups some arrays for usage
+    - Then defines the `update_progress()` function to update the progress bar
+    - Then defines the `cleanup_files()` function to cleanup the files after processing
+    - Then defines the `reencode_mp3(mp3_file_path)` function to re-encode the mp3 files - ran into an issue where the mp3 files were not being processed correctly, this seemed to fix it...
+    - Then defines the `convert_mp3_to_wav(mp3_file_path)` function, which does as it says.
+    - Next it checks to see if ffmpeg is in the system path, if not it raises an error
+    - Defines the chunking options
+    - Handles multiple urls and splits them, proceeds to process one-by-one
+    - URL Processing:
+      - First the audio file is downloaded from the URL (if it's a URL) - `download_audio_file(url, use_cookies, cookies)`
+      - UI is updated to show the progress
+      - The audio file is then re-encoded as mp3
+      - The audio file is then converted to wav
+      - The audio file is then transcribed - diarization is handled here
+      - Validation of segments
+      - Chunking is then performed, `improved_chunking_process(transcription, chunk_options)` 
+      - After chunking, the chunks are summarized: `perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)`
+      - Finally, the results are stored in the db with `add_media_with_keywords(url=url, title=os.path.basename(wav_file_path), media_type='audio', content=transcription, keywords=custom_keywords, prompt=custom_prompt_input, summary=summary, transcription_model=whisper_model, author="Unknown", ingestion_date=datetime.now().strftime('%Y-%m-%d'))`
+    - Local File Processing:
+      - Max file size is checked
+      - Audio file is re-encoded as mp3
+      - Audio file is converted to wav
+      - The audio file is then transcribed - diarization is handled here
+      - Validation of segments
+      - Chunking is then performed, `improved_chunking_process(transcription, chunk_options)` 
+      - After chunking, the chunks are summarized: `perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)`
+      - Finally, the results are stored in the db with `add_media_with_keywords(url=url, title=os.path.basename(wav_file_path), media_type='audio', content=transcription, keywords=custom_keywords, prompt=custom_prompt_input, summary=summary, transcription_model=whisper_model, author="Unknown", ingestion_date=datetime.now().strftime('%Y-%m-%d'))`
+8. The results are then displayed to the user in the Gradio UI.
+- **Let's now dig deeper into `download_audio_file(url, use_cookies, cookies)`**
+    - Defined on line 48 of `Audio_Files.py`
+      - `def download_audio_file(url, use_cookies=False, cookies=None):`
+    - First sets up `header` dict
+    - Then sets cookies if they were passed
+    - Makes the request
+    - Checks the file size
+    - Generates a unique filename
+    - Ensures the download path exists
+    - Then downloads the file
+    - Finally, returns the file path
+      - `return save_path`
 
-
-
-
-#### Audio File Transcription + Summarization
-
-
+------------------------------------------------------------------------------------------------------------------
 
 #### Podcast Transcription + Summarization
+1. The tab for podcast transcription is the `create_podcast_tab()`
+2. The function is defined in `Gradio_Related.py` on line 1254.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `process_podcast()` function when the `Process Podcast` button is clicked.
+7. `process_podcast()` is defined on lin 501 of `Audio_Files.py`
+    - `def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model, keep_original=False, enable_diarization=False, use_cookies=False, cookies=None, chunk_method=None, max_chunk_size=300, chunk_overlap=0, use_adaptive_chunking=False, use_multi_level_chunking=False, chunk_language='english')`
+    - Sets up some variables, and defines `update_progress()` and `cleanup_files()` functions (Same as above)
+    - Then attempts to download the podcast file - `download_audio_file(url, use_cookies, cookies)`
+    - Progress is updated, metadata is extracted and formatted
+    - Keywords setup
+    - Podcast is transcribed - `segments = speech_to_text(audio_file, whisper_model=whisper_model, diarize=True)`
+    - Chunking is performed - `chunked_text = improved_chunking_process(transcription, chunk_options)`
+    - Metadata and content is combined
+    - The content is then summarized - `summary = perform_summarization(api_name, chunked_text, custom_prompt, api_key)`
+    - Results are then stored in the db - `add_media_with_keywords( url=url, title=title, media_type='podcast', content=full_content, keywords=keywords, prompt=custom_prompt, summary=summary or "No summary available", transcription_model=whisper_model, author=author, ingestion_date=datetime.now().strftime('%Y-%m-%d'))`
+8. Finally, the results are returned from `process_podcast()`
+    - `return (update_progress("Processing complete."), full_content, summary or "No summary generated.", title, author, keywords, error_message)`
 
-
-
-#### Import .epub/ebook Files
-
-
+------------------------------------------------------------------------------------------------------------------
 
 #### Website Scraping
+1. The tab for podcast transcription is the `create_website_scraping_tab()`
+2. The function is defined in `Gradio_Related.py` on line 1254.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `scrape_and_summarize_multiple()` function when the `Scrape and Summarize` button is clicked.
+7. `scrape_and_summarize_multiple()` is defined on line 110 of `Article_Summarization_Lib.py`
+    - `def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles):`
+    - First strips the URLs and sets the title for each
+    - Sets up the `results` and `errors` arrays
+    - Sets up a progress bar
+    - Iterates through each URL, scraping the content and summarizing it
+      - `scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_title)`
+    - Updates the progress/GUI as it cycles through
+    - Finally, returns the results:
+      - `return combined_output`
+8. Results are then displayed to the user in the Gradio UI.
+- **Let's now dig deeper into `scrape_and_summarize()`**
+    - Defined on line 141 of `Article_Summarization_Lib.py`
+        - `def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_article_title):`
+    1. First scrapes the article content
+        * `article_data = scrape_article(url)`
+    2. Sets up the metadata
+    3. Then sets up the custom prompt
+    4. Then performs summarization of the content:
+        * First sanitizes the filename - `sanitized_title = sanitize_filename(title)`
+        * Runs down if/else statement to determine the API to use for summarization
+    5. It then stores the results in the DB with the following statement:
+        * `ingestion_result = ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date, article_custom_prompt)`
+    6. Finally, it returns the results:
+        * `return f"Title: {title}\nAuthor: {author}\nIngestion Result: {ingestion_result}\n\nSummary: {summary}\n\nArticle Contents: {content}"`
+- **Let's now dig deeper into `scrape_article()`**
+    - Defined on line 49 of `Article_Extractor_Lib.py`
+    1. First defines the `fetch_html(url)` function
+        * Function uses a headless chrome instance to fetch the HTML of the page
+        * Returns the HTML - `return content`
+    2. Then defines the `extract_article_data(html):` function
+        * Function uses `trafilatura` to extract the article content from the HTML
+        * returns metadata+article content
+    3. Then defines the `convert_html_to_markdown()` function
+        * `def convert_html_to_markdown(html):`
+        * Uses beautifulsoup to convert the HTML to markdown
+        * `return text`
+    4. Then defines the `fetch_and_extract_article(url):` function
+        * This function performs: `article_data = extract_article_data(html)`
+        * Then `article_data['content'] = convert_html_to_markdown(article_data['content'])`
+    5. Finally, it returns `article_data`
+        * `return article_data`
+
+------------------------------------------------------------------------------------------------------------------
+
+#### Import .epub/ebook Files
+1. The tab for epub/ebook ingestion is the `def create_import_book_tab():` functioned defined on line 3238 of the `Gradio_Related.py` file. 
+2. The function is defined in `Gradio_Related.py` on line 1254.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `import_epub()` function when the `Import eBook` button is clicked.
+7. The function `import_epub()` is defined on line 3317 of `Gradio_Related.py`
+    * `def import_epub(epub_file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):`
+    * First creates a temp directory to store the epub file
+    * Then uses pypandoc to convert the epub file to markdown
+    * returns the following:
+      * `return import_data(content, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key)`
+8. The function `import_data()` is defined on line 2948 of `Gradio_Related.py`
+    * First checks to verify a file was uploaded/passed
+    * Performs various checks of the file
+    * Creates the `info_dict` dict
+    * Creates segments list
+    * Sets up keywords list
+    * Performs summarization: `perform_summarization(api_name, file_content, custom_prompt, api_key)`
+    * Adds the media to the DB:
+      * `add_media_to_database(url=file_name, info_dict=info_dict, segments=segments, summary=summary, keywords=keyword_list, custom_prompt_input=custom_prompt, whisper_model="Imported",  # Indicating this was an imported file, media_type = "document")`
+    * Finally, returns the following:
+      * `return f"File '{file_name}' successfully imported with title '{title}' and author '{author}'."`
 
 
+------------------------------------------------------------------------------------------------------------------
 
 #### PDF Ingestion
+1. The tab for PDF ingestion is the `def create_pdf_ingestion_tab()` function.
+2. The function is defined in `Gradio_Related.py` on line 1418.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `process_and_cleanup_pdf()` function when the `Ingest PDF` button is clicked.
+7. The `process_and_cleanup_pdf()` function is defined on line 136 in the `PDF_Ingestion_Lib.py` file
+    * `def process_and_cleanup_pdf(file, title, author, keywords):`
+    * First validates that a pdf has been uploaded.
+    * Temp directory setup to store the pdf
+    * PDF stored in the temp directory
+    * PDF is then processed using the `ingest_pdf_file()` function.
+8. The `ingest_pdf_file()` function is defined on line 94:
+    * `def ingest_pdf_file(file_path, title=None, author=None, keywords=None):`
+    * The function first attempts to convert the PDF to markdown - `markdown_content = convert_pdf_to_markdown(file_path)`
+    * Filename and author are set
+    * Keywords are set
+    * Media is added to the DB:
+      * `add_media_with_keywords(url=file_path, title=title, media_type='document', content=markdown_content, keywords=keywords, prompt='No prompt for PDF files', summary='No summary for PDF files', transcription_model='None', author=author, ingestion_date=datetime.now().strftime('%Y-%m-%d'))`
+    * Finally, it returns the following string: 
+      * `return f"PDF file '{title}' converted to Markdown and ingested successfully.", file_path`
+10. The `convert_pdf_to_markdown(file_path)` function is defined on line 40 of `PDF_Ingestion_Lib.py`
+    * `def convert_pdf_to_markdown(pdf_path)`
+    * This function's whole purpose is to act as a shim callout to the Marker pipeline to convert the PDF to markdown. (`PDF_Converter.py` script)
+    * Marker unfortunately has conflicting dependencies with the rest of the project, so it's been separated out into its own pipeline.
+    * The function simply calls the Marker pipeline and returns the markdown content.
+    * `return result.stdout`
+11. The `PDF_Converter.py` script does the following:
+    * Takes the passed in PDF file, and does the following: `markdown_content = marker_pdf.convert(pdf_file)`
+    * It then returns the markdown content.
+    * That's it.
+12. This is then returned all the way back to step 8, where it's stored in the DB and the user is notified of the success.
 
+
+
+------------------------------------------------------------------------------------------------------------------
 
 #### Re-Summarize
-
+1. The tab for Re-Summarization is the `def create_resummary_tab()` function.
+2. The function is defined in `Gradio_Related.py` on line 1474.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. The function itself then calls `resummarize_content_wrapper` when the `Re-Summarize` button is clicked.
+7. The `resummarize_content_wrapper()` function is defined on line 1573 in `Gradio_Related.py`
+    * `def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt)`
+    * The function first validates all necessary selections have been made
+    * Then verifies the media selection is valid
+    * Fetches the old content: `content, old_prompt, old_summary = fetch_item_details(media_id)`
+    * Sets up the chunking options
+    * Sets up the custom prompt: `summarization_prompt = custom_prompt if custom_prompt_checkbox and custom_prompt else None`
+    * Then calls `resummarize_content()` with the appropriate arguments - `result = resummarize_content(media_id, content, api_name, api_key, chunk_options, summarization_prompt)`
+    * Finally, it returns the results of the re-summarization.
+      * `return result`
+8. The `resummarize_content()` function is defined on line 1606 in `Summarization_General.py`
+    * `def resummarize_content(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):`
+    * Verifies passed args are valid/media exists
+    * Sets up chunking options -> Performs chunking using `summarize_chunk(api_name, chunk_text, summarization_prompt, api_key)`
+    * Joins the resulting chunks (if chunking performed)
+    * Then calls `update_media_content()`
+      * `update_result = update_media_content(selected_item, item_mapping, content, summarization_prompt, new_summary)`
+    * Finally, it returns the results of the re-summarization to the Gradio UI.
+      * `return f"Re-summarization complete. New summary: {new_summary[:500]}..."`
+- **Let's take a deeper look at `update_media_content()`**
+    * Defined on line 852 of `SQLite_DB.py`
+      * `def update_media_content(selected_item, item_mapping, content_input, prompt_input, summary_input):`
+    * Performs various checks and updates the DB with the new records.

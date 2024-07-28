@@ -169,6 +169,7 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
             with open(json_file_path, 'w') as json_file:
                 json.dump([{'text': content}], json_file, indent=2)
 
+            # FIXME - Swap out this if/else to use the dedicated function....
             try:
                 if api_name.lower() == 'openai':
                     # def summarize_with_openai(api_key, input_data, custom_prompt_arg)
