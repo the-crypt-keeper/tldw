@@ -244,7 +244,7 @@
 1. The tab for audio file transcription is the `create_audio_processing_tab()`
 2. The function is defined in `Gradio_Related.py` on line 1157.
 3. The function is responsible for creating the tab and handling the user input.
-4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Markdown()` -> `gr.Row():` functions.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
 5. Then sets up inputs for the various variables the user can input
 6. It then calls the `process_audio_files()` funcion when the `Process Audio Files` button is clicked.
 7. `process_audio_files()` is defined on line 249 of `Audio_Files.py`
@@ -297,7 +297,7 @@
 1. The tab for podcast transcription is the `create_podcast_tab()`
 2. The function is defined in `Gradio_Related.py` on line 1254.
 3. The function is responsible for creating the tab and handling the user input.
-4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Markdown()` -> `gr.Row():` functions.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
 5. Then sets up inputs for the various variables the user can input
 6. It then calls the `process_podcast()` function when the `Process Podcast` button is clicked.
 7. `process_podcast()` is defined on lin 501 of `Audio_Files.py`
@@ -316,17 +316,65 @@
 
 ------------------------------------------------------------------------------------------------------------------
 
+#### Website Scraping
+1. The tab for podcast transcription is the `create_website_scraping_tab()`
+2. The function is defined in `Gradio_Related.py` on line 1254.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `scrape_and_summarize_multiple()` function when the `Scrape and Summarize` button is clicked.
+7. `scrape_and_summarize_multiple()` is defined on line 110 of `Article_Summarization_Lib.py`
+    - `def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles):`
+    - First strips the URLs and sets the title for each
+    - Sets up the `results` and `errors` arrays
+    - Sets up a progress bar
+    - Iterates through each URL, scraping the content and summarizing it
+      - `scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_title)`
+    - Updates the progress/GUI as it cycles through
+    - Finally, returns the results:
+      - `return combined_output`
+8. Results are then displayed to the user in the Gradio UI.
+- **Let's now dig deeper into `scrape_and_summarize()`**
+    - Defined on line 141 of `Article_Summarization_Lib.py`
+        - `def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_article_title):`
+    1. First scrapes the article content
+        * `article_data = scrape_article(url)`
+    2. Sets up the metadata
+    3. Then sets up the custom prompt
+    4. Then performs summarization of the content:
+        * First sanitizes the filename - `sanitized_title = sanitize_filename(title)`
+        * Runs down if/else statement to determine the API to use for summarization
+    5. It then stores the results in the DB with the following statement:
+        * `ingestion_result = ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date, article_custom_prompt)`
+    6. Finally, it returns the results:
+        * `return f"Title: {title}\nAuthor: {author}\nIngestion Result: {ingestion_result}\n\nSummary: {summary}\n\nArticle Contents: {content}"`
+- **Let's now dig deeper into `scrape_article()`**
+    - Defined on line 49 of `Article_Extractor_Lib.py`
+    1. First defines the `fetch_html(url)` function
+        * Function uses a headless chrome instance to fetch the HTML of the page
+        * Returns the HTML - `return content`
+    2. Then defines the `extract_article_data(html):` function
+        * Function uses `trafilatura` to extract the article content from the HTML
+        * returns metadata+article content
+    3. Then defines the `convert_html_to_markdown()` function
+        * `def convert_html_to_markdown(html):`
+        * Uses beautifulsoup to convert the HTML to markdown
+        * `return text`
+    4. Then defines the `fetch_and_extract_article(url):` function
+        * This function performs: `article_data = extract_article_data(html)`
+        * Then `article_data['content'] = convert_html_to_markdown(article_data['content'])`
+    5. Finally, it returns `article_data`
+        * `return article_data`
+
+------------------------------------------------------------------------------------------------------------------
 
 #### Import .epub/ebook Files
 
-
-
-#### Website Scraping
-
-
+------------------------------------------------------------------------------------------------------------------
 
 #### PDF Ingestion
 
+------------------------------------------------------------------------------------------------------------------
 
 #### Re-Summarize
 
