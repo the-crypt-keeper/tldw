@@ -116,11 +116,66 @@
     - Finally, we return the transcription and summary on lines 1110-1111:
       - `return info_dict['webpage_url'], full_text_with_metadata, summary_text, json_file_path, summary_file_path, info_dict`
 - **Let's now dig deeper into Line 1002: `download_video()`**
+  - This function is imported from `Video_DL_Ingestion_Lib.py` and is defined on Line 97 of that file: 
+    - `def download_video(video_url, download_path, info_dict, download_video_flag):` 
+  - It first checks to see if the video has a valid name set in the info_dict{} dict
+  - Does path handling for calling ffmpeg
+  - Uses yt-dlp to download the audio of the video, or the full video if the user wants
 - **Let's now dig deeper into Line 1011: `perform_transcription()`**
+  - This function is imported from `Summarization_General.py` and is defined on Line 831 of that file:
+    - `def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False):`
+  - It itself calls `audio_file_path = convert_to_wav(video_path, offset)`
+  - Then checks for diarization and performs it if set
+  - Then checks for a segments JSON file and loads it if it exists
+  - Returns:
+    - `return audio_file_path, diarized_segments`
+- **Let's now dig deper into `convert_to_wav()` from the `Audio_Transcription_Lib.py` Library**
+  - Sets the out-path for the file as the same path as the input file, but with a .wav extension
+    - If the file already exists it will skip the conversion process
+    - If the file doesn't exist, it will call ffmpeg to convert the file to a .wav file
+  - Returns:
+    - `return out_path`
 - **Let's now dig deeper into Line 1076: `perform_summarization()`**
-- **Let's now dig deeper into Line 1086-1089 `save_transcription_and_summary()`**
-- **Let's now dig deeper into Line 1104-1108 `add_media_to_database()`**
+  - This function is defined in `Summarization_General.py` on Line 999:
+    * `def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False):`
+  - First evaluates if a custom prompt was passed, if not it uses the default prompt
+  - Then extracts the metadata + content from the input_data
+    - `extract_metadata_and_content(input_data)`
+  - Input is structured for summarization:
+    - `structured_input = format_input_with_metadata(metadata, content)`
+  - Then its checked if `recursive_summarization` was set (Line 1035), 
+    - if so, it first performs chunking, calling `improved_chunking_process()`
+      - `chunks = improved_chunking_process(structured_input, chunk_options)`
+    - Finally, it performs recursive summarization using `recursive_summarize_chunks()`
+      - `summary = recursive_summarize_chunks([chunk['text'] for chunk in chunks], lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key), custom_prompt_input)`      
+  - If `recursive_summarization` was not set, then `summarize_chunk()` is called directly
+    - `summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key)`
+  - Lines 1051-1081: It then evaluates if a summary was generated, and if so, saves it as a `.txt` file.
+  - Once complete, it returns the summary
+    - `return summary`
+- **Let's now dig deeper into `improved_chunking_process()`:**
+  - This function is defined in `Chunking_Lib.py` on Line 52:
+    - `def improved_chunking_process(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:`
+    - First sets the various chunking options:
+    - `chunk_method`, `max_chunk_size`, `overlap`, `language`, `adaptive`, `multi_level`
+  - It then proceeds to perform chunking on the input text based on the selected chunking method:
+    - `adaptive` - `adpativ_chunk_size()`
+    - `multi_level` - `multi_level_chunking()`
+    - `chunk_method == words` - `chunk_text_by_words()`
+    - `chunk_method == sentences` - `chunk_text_by_sentences()`
+    - `chunk_method == paragraps` - `chunk_text_by_paragraphs()`
+    - `chunk_method == tokens` - `chunk_text_by_tokens()`
 
+
+
+- **Let's now dig deeper into `recursive_summarize_chunks()`:**
+  - 
+- **Let's now dig deeper into `summarize_chunk()`:**
+  - 
+- **Let's now dig deeper into Line 1086-1089 `save_transcription_and_summary()`**
+  - 
+- **Let's now dig deeper into Line 1104-1108 `add_media_to_database()`**
+  - 
 
 #### Audio File Transcription + Summarization
 
