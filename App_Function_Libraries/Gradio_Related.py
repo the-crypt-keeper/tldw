@@ -53,7 +53,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
-    create_chat_conversation, save_chat_history_to_database, view_database
+    create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -2774,6 +2774,49 @@ def create_prompt_clone_tab():
         )
 
 
+# FIXME - under construction
+def get_transcript_options(media_id):
+    transcripts = get_transcripts(media_id)
+    return [f"{t[0]}: {t[1]} ({t[3]})" for t in transcripts]
+
+def update_transcript_options(media_id):
+    options = get_transcript_options(media_id)
+    return gr.Dropdown.update(choices=options), gr.Dropdown.update(choices=options)
+
+# Compare Transcripts Tab functions
+def compare_transcripts(media_id, transcript1_id, transcript2_id):
+    try:
+        transcripts = get_transcripts(media_id)
+        transcript1 = next((t for t in transcripts if t[0] == int(transcript1_id)), None)
+        transcript2 = next((t for t in transcripts if t[0] == int(transcript2_id)), None)
+
+        if not transcript1 or not transcript2:
+            return "One or both selected transcripts not found."
+
+        comparison = f"Transcript 1 (Model: {transcript1[1]}, Created: {transcript1[3]}):\n\n"
+        comparison += format_transcription(transcript1[2])
+        comparison += f"\n\nTranscript 2 (Model: {transcript2[1]}, Created: {transcript2[3]}):\n\n"
+        comparison += format_transcription(transcript2[2])
+
+        return comparison
+    except Exception as e:
+        logging.error(f"Error in compare_transcripts: {str(e)}")
+        return f"Error comparing transcripts: {str(e)}"
+
+def create_compare_transcripts_tab():
+    with gr.TabItem("Compare Transcripts"):
+        media_id_input = gr.Number(label="Media ID")
+        transcript1_dropdown = gr.Dropdown(label="Transcript 1")
+        transcript2_dropdown = gr.Dropdown(label="Transcript 2")
+        compare_button = gr.Button("Compare Transcripts")
+        comparison_output = gr.Textbox(label="Comparison Result", lines=20)
+
+        media_id_input.change(update_transcript_options, inputs=[media_id_input],
+                              outputs=[transcript1_dropdown, transcript2_dropdown])
+        compare_button.click(compare_transcripts, inputs=[media_id_input, transcript1_dropdown, transcript2_dropdown],
+                             outputs=[comparison_output])
+
+
 #
 # End of Media Edit Tab Functions
 ################################################################################################################
@@ -3785,6 +3828,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_llamafile_settings_tab()
 
             with gr.TabItem("Edit Existing Items"):
+                create_compare_transcripts_tab()
                 create_media_edit_tab()
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
