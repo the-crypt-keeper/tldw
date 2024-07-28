@@ -165,9 +165,9 @@
     - `chunk_method == sentences` - `chunk_text_by_sentences()`
     - `chunk_method == paragraps` - `chunk_text_by_paragraphs()`
     - `chunk_method == tokens` - `chunk_text_by_tokens()`
-
-
-
+    - `chunks = [text]` - If no chunking method is selected / No chunking is performed.
+  - Finally, it returns the chunks:
+    - return [{'text': chunk, 'metadata': get_chunk_metadata(chunk, text)} for chunk in chunks]`
 - **Let's now dig deeper into `recursive_summarize_chunks()`:**
   - 
 - **Let's now dig deeper into `summarize_chunk()`:**
