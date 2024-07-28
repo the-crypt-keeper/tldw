@@ -5,7 +5,7 @@
 - [Introduction](#introduction)
 - [How Does it All Start?](#how-does-it-start)
 - [Transcription / Summarization / Ingestion Tab](#transcription--summarization--ingestion-tab)
-- [](#)
+- [Audio File Transcription / Summarization](#audio_file_transcription)
 - [](#)
 
 
@@ -59,15 +59,18 @@
 ------------------------------------------------------------------------------------------------------------------
 ### <a name="transcription--summarization--ingestion-tab"></a> Transcription / Summarization / Ingestion Tab
 #### Video Transcription + Summarization
-- The tab for video transcription is the `create_video_transcription_tab()`
-- The function is defined in `Gradio_Related.py` on line 561.
-- The function is responsible for creating the tab and handling the user input.
-- The function first creates the tab using the `gr.Tabitem()` -> `gr.Markdown()` -> `gr.Row():` functions.
-- The function then creates the input fields for the user to input the video URL and the desired summary length.
-  - `custom_prompt_checkbox`, `preset_prompt_checkbox`, `preset_prompt`, `use_time_input`, `chunking_options_checkbox`, and `use_cookies_input` are used to dynamically show their corresponding items depending on the user selection.
-- The function then creates the output fields for the user to view the summary and the transcription.
-- Finally, the button `Process Videos` is created to handle the user input with the variable `process_button`
-- The function then defines the `def process_videos_with_error_handling(<args>):` function to handle the user input.
+1. The tab for video transcription is the `create_video_transcription_tab()`
+2. The function is defined in `Gradio_Related.py` on line 561.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Markdown()` -> `gr.Row():` functions.
+5. The function then creates the input fields for the user to input the video URL and the desired summary length.
+   - `custom_prompt_checkbox`, `preset_prompt_checkbox`, `preset_prompt`, `use_time_input`, `chunking_options_checkbox`, and `use_cookies_input` are used to dynamically show their corresponding items depending on the user selection.
+6. The function then creates the output fields for the user to view the summary and the transcription.
+7. Finally, the button `Process Videos` is created to handle the user input with the variable `process_button`
+8. `process_button` when clicked, calls the `process_videos_wrapper()` function.
+9. `process_videos_wrapper()` is defined on line 903 of `Gradio_Related.py`
+    - The function first validates the filenames passed in, and then proceeds to call `process_videos_with_error_handling()`
+10. The function then defines the `def process_videos_with_error_handling(<args>):` function to handle the user input.
     - `def process_videos_with_error_handling(<args>):`:
       - The function first checks to see if there's any input in the URL field.
       - The function then checks/sets the batch size
@@ -237,16 +240,81 @@
 
 ------------------------------------------------------------------------------------------------------------------
 
+#### <a name="audio_file_transcription"></a>Audio File Transcription + Summarization
+1. The tab for audio file transcription is the `create_audio_processing_tab()`
+2. The function is defined in `Gradio_Related.py` on line 1157.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Markdown()` -> `gr.Row():` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `process_audio_files()` funcion when the `Process Audio Files` button is clicked.
+7. `process_audio_files()` is defined on line 249 of `Audio_Files.py`
+    - `def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key, use_cookies, cookies, keep_original, custom_keywords, custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize)`
+    - The function first validates the filenames passed in, and then proceeds to call `process_audio_files_with_error_handling()`
+    - Setups some arrays for usage
+    - Then defines the `update_progress()` function to update the progress bar
+    - Then defines the `cleanup_files()` function to cleanup the files after processing
+    - Then defines the `reencode_mp3(mp3_file_path)` function to re-encode the mp3 files - ran into an issue where the mp3 files were not being processed correctly, this seemed to fix it...
+    - Then defines the `convert_mp3_to_wav(mp3_file_path)` function, which does as it says.
+    - Next it checks to see if ffmpeg is in the system path, if not it raises an error
+    - Defines the chunking options
+    - Handles multiple urls and splits them, proceeds to process one-by-one
+    - URL Processing:
+      - First the audio file is downloaded from the URL (if it's a URL) - `download_audio_file(url, use_cookies, cookies)`
+      - UI is updated to show the progress
+      - The audio file is then re-encoded as mp3
+      - The audio file is then converted to wav
+      - The audio file is then transcribed - diarization is handled here
+      - Validation of segments
+      - Chunking is then performed, `improved_chunking_process(transcription, chunk_options)` 
+      - After chunking, the chunks are summarized: `perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)`
+      - Finally, the results are stored in the db with `add_media_with_keywords(url=url, title=os.path.basename(wav_file_path), media_type='audio', content=transcription, keywords=custom_keywords, prompt=custom_prompt_input, summary=summary, transcription_model=whisper_model, author="Unknown", ingestion_date=datetime.now().strftime('%Y-%m-%d'))`
+    - Local File Processing:
+      - Max file size is checked
+      - Audio file is re-encoded as mp3
+      - Audio file is converted to wav
+      - The audio file is then transcribed - diarization is handled here
+      - Validation of segments
+      - Chunking is then performed, `improved_chunking_process(transcription, chunk_options)` 
+      - After chunking, the chunks are summarized: `perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)`
+      - Finally, the results are stored in the db with `add_media_with_keywords(url=url, title=os.path.basename(wav_file_path), media_type='audio', content=transcription, keywords=custom_keywords, prompt=custom_prompt_input, summary=summary, transcription_model=whisper_model, author="Unknown", ingestion_date=datetime.now().strftime('%Y-%m-%d'))`
+8. The results are then displayed to the user in the Gradio UI.
+- **Let's now dig deeper into `download_audio_file(url, use_cookies, cookies)`**
+    - Defined on line 48 of `Audio_Files.py`
+      - `def download_audio_file(url, use_cookies=False, cookies=None):`
+    - First sets up `header` dict
+    - Then sets cookies if they were passed
+    - Makes the request
+    - Checks the file size
+    - Generates a unique filename
+    - Ensures the download path exists
+    - Then downloads the file
+    - Finally, returns the file path
+      - `return save_path`
 
-
-
-
-#### Audio File Transcription + Summarization
-
-
+------------------------------------------------------------------------------------------------------------------
 
 #### Podcast Transcription + Summarization
+1. The tab for podcast transcription is the `create_podcast_tab()`
+2. The function is defined in `Gradio_Related.py` on line 1254.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Markdown()` -> `gr.Row():` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `process_podcast()` function when the `Process Podcast` button is clicked.
+7. `process_podcast()` is defined on lin 501 of `Audio_Files.py`
+    - `def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model, keep_original=False, enable_diarization=False, use_cookies=False, cookies=None, chunk_method=None, max_chunk_size=300, chunk_overlap=0, use_adaptive_chunking=False, use_multi_level_chunking=False, chunk_language='english')`
+    - Sets up some variables, and defines `update_progress()` and `cleanup_files()` functions (Same as above)
+    - Then attempts to download the podcast file - `download_audio_file(url, use_cookies, cookies)`
+    - Progress is updated, metadata is extracted and formatted
+    - Keywords setup
+    - Podcast is transcribed - `segments = speech_to_text(audio_file, whisper_model=whisper_model, diarize=True)`
+    - Chunking is performed - `chunked_text = improved_chunking_process(transcription, chunk_options)`
+    - Metadata and content is combined
+    - The content is then summarized - `summary = perform_summarization(api_name, chunked_text, custom_prompt, api_key)`
+    - Results are then stored in the db - `add_media_with_keywords( url=url, title=title, media_type='podcast', content=full_content, keywords=keywords, prompt=custom_prompt, summary=summary or "No summary available", transcription_model=whisper_model, author=author, ingestion_date=datetime.now().strftime('%Y-%m-%d'))`
+8. Finally, the results are returned from `process_podcast()`
+    - `return (update_progress("Processing complete."), full_content, summary or "No summary generated.", title, author, keywords, error_message)`
 
+------------------------------------------------------------------------------------------------------------------
 
 
 #### Import .epub/ebook Files
