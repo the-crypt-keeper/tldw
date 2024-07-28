@@ -2981,6 +2981,7 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
             'uploader': author or 'Unknown',
         }
 
+        # FIXME - Add chunking support... I added chapter chunking specifically for this...
         # Create segments (assuming one segment for the entire content)
         segments = [{'Text': file_content}]
 
@@ -3309,7 +3310,7 @@ def create_import_book_tab():
                     label="API for Auto-summarization"
                 )
                 api_key_input = gr.Textbox(label="API Key", type="password")
-                import_button = gr.Button("Import Data")
+                import_button = gr.Button("Import eBook")
             with gr.Column():
                 with gr.Row():
                     import_output = gr.Textbox(label="Import Status")

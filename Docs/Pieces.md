@@ -369,12 +369,98 @@
 ------------------------------------------------------------------------------------------------------------------
 
 #### Import .epub/ebook Files
+1. The tab for epub/ebook ingestion is the `def create_import_book_tab():` functioned defined on line 3238 of the `Gradio_Related.py` file. 
+2. The function is defined in `Gradio_Related.py` on line 1254.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `import_epub()` function when the `Import eBook` button is clicked.
+7. The function `import_epub()` is defined on line 3317 of `Gradio_Related.py`
+    * `def import_epub(epub_file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):`
+    * First creates a temp directory to store the epub file
+    * Then uses pypandoc to convert the epub file to markdown
+    * returns the following:
+      * `return import_data(content, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key)`
+8. The function `import_data()` is defined on line 2948 of `Gradio_Related.py`
+    * First checks to verify a file was uploaded/passed
+    * Performs various checks of the file
+    * Creates the `info_dict` dict
+    * Creates segments list
+    * Sets up keywords list
+    * Performs summarization: `perform_summarization(api_name, file_content, custom_prompt, api_key)`
+    * Adds the media to the DB:
+      * `add_media_to_database(url=file_name, info_dict=info_dict, segments=segments, summary=summary, keywords=keyword_list, custom_prompt_input=custom_prompt, whisper_model="Imported",  # Indicating this was an imported file, media_type = "document")`
+    * Finally, returns the following:
+      * `return f"File '{file_name}' successfully imported with title '{title}' and author '{author}'."`
+
 
 ------------------------------------------------------------------------------------------------------------------
 
 #### PDF Ingestion
+1. The tab for PDF ingestion is the `def create_pdf_ingestion_tab()` function.
+2. The function is defined in `Gradio_Related.py` on line 1418.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. It then calls the `process_and_cleanup_pdf()` function when the `Ingest PDF` button is clicked.
+7. The `process_and_cleanup_pdf()` function is defined on line 136 in the `PDF_Ingestion_Lib.py` file
+    * `def process_and_cleanup_pdf(file, title, author, keywords):`
+    * First validates that a pdf has been uploaded.
+    * Temp directory setup to store the pdf
+    * PDF stored in the temp directory
+    * PDF is then processed using the `ingest_pdf_file()` function.
+8. The `ingest_pdf_file()` function is defined on line 94:
+    * `def ingest_pdf_file(file_path, title=None, author=None, keywords=None):`
+    * The function first attempts to convert the PDF to markdown - `markdown_content = convert_pdf_to_markdown(file_path)`
+    * Filename and author are set
+    * Keywords are set
+    * Media is added to the DB:
+      * `add_media_with_keywords(url=file_path, title=title, media_type='document', content=markdown_content, keywords=keywords, prompt='No prompt for PDF files', summary='No summary for PDF files', transcription_model='None', author=author, ingestion_date=datetime.now().strftime('%Y-%m-%d'))`
+    * Finally, it returns the following string: 
+      * `return f"PDF file '{title}' converted to Markdown and ingested successfully.", file_path`
+10. The `convert_pdf_to_markdown(file_path)` function is defined on line 40 of `PDF_Ingestion_Lib.py`
+    * `def convert_pdf_to_markdown(pdf_path)`
+    * This function's whole purpose is to act as a shim callout to the Marker pipeline to convert the PDF to markdown. (`PDF_Converter.py` script)
+    * Marker unfortunately has conflicting dependencies with the rest of the project, so it's been separated out into its own pipeline.
+    * The function simply calls the Marker pipeline and returns the markdown content.
+    * `return result.stdout`
+11. The `PDF_Converter.py` script does the following:
+    * Takes the passed in PDF file, and does the following: `markdown_content = marker_pdf.convert(pdf_file)`
+    * It then returns the markdown content.
+    * That's it.
+12. This is then returned all the way back to step 8, where it's stored in the DB and the user is notified of the success.
+
+
 
 ------------------------------------------------------------------------------------------------------------------
 
 #### Re-Summarize
-
+1. The tab for Re-Summarization is the `def create_resummary_tab()` function.
+2. The function is defined in `Gradio_Related.py` on line 1474.
+3. The function is responsible for creating the tab and handling the user input.
+4. The function first creates the tab using the `gr.Tabitem()` -> `gr.Row():` -> `gr.Column()` functions.
+5. Then sets up inputs for the various variables the user can input
+6. The function itself then calls `resummarize_content_wrapper` when the `Re-Summarize` button is clicked.
+7. The `resummarize_content_wrapper()` function is defined on line 1573 in `Gradio_Related.py`
+    * `def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt)`
+    * The function first validates all necessary selections have been made
+    * Then verifies the media selection is valid
+    * Fetches the old content: `content, old_prompt, old_summary = fetch_item_details(media_id)`
+    * Sets up the chunking options
+    * Sets up the custom prompt: `summarization_prompt = custom_prompt if custom_prompt_checkbox and custom_prompt else None`
+    * Then calls `resummarize_content()` with the appropriate arguments - `result = resummarize_content(media_id, content, api_name, api_key, chunk_options, summarization_prompt)`
+    * Finally, it returns the results of the re-summarization.
+      * `return result`
+8. The `resummarize_content()` function is defined on line 1606 in `Summarization_General.py`
+    * `def resummarize_content(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):`
+    * Verifies passed args are valid/media exists
+    * Sets up chunking options -> Performs chunking using `summarize_chunk(api_name, chunk_text, summarization_prompt, api_key)`
+    * Joins the resulting chunks (if chunking performed)
+    * Then calls `update_media_content()`
+      * `update_result = update_media_content(selected_item, item_mapping, content, summarization_prompt, new_summary)`
+    * Finally, it returns the results of the re-summarization to the Gradio UI.
+      * `return f"Re-summarization complete. New summary: {new_summary[:500]}..."`
+- **Let's take a deeper look at `update_media_content()`**
+    * Defined on line 852 of `SQLite_DB.py`
+      * `def update_media_content(selected_item, item_mapping, content_input, prompt_input, summary_input):`
+    * Performs various checks and updates the DB with the new records.
