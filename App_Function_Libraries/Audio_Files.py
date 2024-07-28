@@ -58,7 +58,8 @@ def download_audio_file(url, use_cookies=False, cookies=None):
 
         # Make the request
         response = requests.get(url, headers=headers, stream=True)
-        response.raise_for_status()  # Raise an exception for bad status codes
+        # Raise an exception for bad status codes
+        response.raise_for_status()
 
         # Get the file size
         file_size = int(response.headers.get('content-length', 0))

@@ -188,8 +188,6 @@ def import_data(file):
     pass
 
 
-
-
 #######################
 # Config loading
 #
