@@ -1053,6 +1053,7 @@ def create_video_transcription_tab():
                     with open(segments_json_path, 'w') as f:
                         json.dump(segments_with_metadata, f, indent=2)
 
+                    # FIXME - why isnt this working?
                     # Delete the .wav file after successful transcription
                     files_to_delete = [audio_file_path]
                     for file_path in files_to_delete:
