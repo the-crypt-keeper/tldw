@@ -53,7 +53,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
-    create_chat_conversation, save_chat_history_to_database, view_database
+    create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -110,15 +110,28 @@ def gradio_download_youtube_video(url):
     return str(output_file_path)
 
 
-
-
 def format_transcription(content):
-    # Add extra space after periods for better readability
-    content = content.replace('.', '. ').replace('.  ', '. ')
-    # Split the content into lines for multiline display
-    lines = content.split('. ')
-    # Join lines with HTML line break for better presentation in Markdown
-    formatted_content = "<br>".join(lines)
+    # Replace '\n' with actual line breaks
+    content = content.replace('\\n', '\n')
+    # Split the content by newlines first
+    lines = content.split('\n')
+    formatted_lines = []
+    for line in lines:
+        # Add extra space after periods for better readability
+        line = line.replace('.', '. ').replace('.  ', '. ')
+
+        # Split into sentences using a more comprehensive regex
+        sentences = re.split('(?<=[.!?]) +', line)
+
+        # Trim whitespace from each sentence and add a line break
+        formatted_sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+
+        # Join the formatted sentences
+        formatted_lines.append(' '.join(formatted_sentences))
+
+    # Join the lines with HTML line breaks
+    formatted_content = '<br>'.join(formatted_lines)
+
     return formatted_content
 
 
@@ -169,17 +182,23 @@ all_prompts = prompts_category_1 + prompts_category_2
 def handle_prompt_selection(prompt):
     return f"You selected: {prompt}"
 
-def display_details(media_id):
-    # Gradio Search Function-related stuff
-    if media_id:
-        details = display_item_details(media_id)
-        details_html = ""
-        for detail in details:
-            details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
-            details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
-            details_html += f"<h4>Transcription:</h4><pre>{detail[2]}</pre><hr>"
-        return details_html
-    return "No details available."
+# FIXME - Dead code?
+# def display_details(media_id):
+#     if media_id:
+#         details = display_item_details(media_id)
+#         details_html = ""
+#         for detail in details:
+#             details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
+#             details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
+#
+#             # Format the transcription
+#             formatted_transcription = format_transcription(detail[2])
+#
+#             # Use <pre> tag with style for better formatting
+#             details_html += f"<h4>Transcription:</h4><pre style='white-space: pre-wrap; word-wrap: break-word;'>{formatted_transcription}</pre><hr>"
+#
+#         return details_html
+#     return "No details available."
 
 
 def fetch_items_by_title_or_url(search_query: str, search_type: str):
@@ -283,17 +302,6 @@ def browse_items(search_query, search_type):
     return results
 
 
-def display_item_details(media_id):
-    # Function to display item details
-    prompt_summary_results, content = fetch_item_details(media_id)
-    content_section = f"<h4>Transcription:</h4><pre>{content}</pre><hr>"
-    prompt_summary_section = ""
-    for prompt, summary in prompt_summary_results:
-        prompt_summary_section += f"<h4>Prompt:</h4><p>{prompt}</p>"
-        prompt_summary_section += f"<h4>Summary:</h4><p>{summary}</p><hr>"
-    return prompt_summary_section, content_section
-
-
 def update_dropdown(search_query, search_type):
     results = browse_items(search_query, search_type)
     item_options = [f"{item[1]} ({item[2]})" for item in results]
@@ -316,11 +324,15 @@ def update_detailed_view(item, item_mapping):
             if content or prompt or summary:
                 details_html = "<h4>Details:</h4>"
                 if prompt:
-                    details_html += f"<h4>Prompt:</h4>{prompt}</p>"
+                    formatted_prompt = format_transcription(prompt)
+                    details_html += f"<h4>Prompt:</h4>{formatted_prompt}</p>"
                 if summary:
-                    details_html += f"<h4>Summary:</h4>{summary}</p>"
+                    formatted_summary = format_transcription(summary)
+                    details_html += f"<h4>Summary:</h4>{formatted_summary}</p>"
                 # Format the transcription content for better readability
-                content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{format_transcription(content)}</div>"
+                formatted_content = format_transcription(content)
+                #content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{content}</div>"
+                content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{formatted_content}</div>"
                 return details_html, content_html
             else:
                 return "No details available.", "No details available."
@@ -406,6 +418,158 @@ def create_chunking_inputs():
 
 
 
+
+
+
+
+
+#
+# End of miscellaneous unsorted functions
+#######################################################################################################################
+#
+# Start of Video/Audio Transcription and Summarization Functions
+
+def create_introduction_tab():
+    with (gr.TabItem("Introduction")):
+        gr.Markdown("# tldw: Your LLM-powered Research Multi-tool")
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("""### What can it do?
+                - Transcribe and summarize videos from URLs/Local files
+                - Transcribe and Summarize Audio files/Podcasts (URL/local file)
+                - Summarize articles from URLs/Local notes
+                - Ingest and summarize books(epub/PDF)
+                - Ingest and summarize research papers (PDFs - WIP)
+                - Search and display ingested content + summaries
+                - Create and manage custom prompts
+                - Chat with an LLM of your choice to generate content using the selected item + Prompts
+                - Keyword support for content search and display
+                - Export keywords/items to markdown/CSV(csv is wip)
+                - Import existing notes from Obsidian to the database (Markdown/txt files or a zip containing a collection of files)
+                - View and manage chat history
+                - Writing Tools: Grammar & Style check, Tone Analyzer & Editor, more planned...
+                - RAG (Retrieval-Augmented Generation) support for content generation(think about asking questions about your entire library of items)
+                - More features planned...
+                - All powered by your choice of LLM. 
+                    - Currently supports: Local-LLM(llamafile-server), OpenAI, Anthropic, Cohere, Groq, DeepSeek, OpenRouter, Llama.cpp, Kobold, Ooba, Tabbyapi, VLLM and more to come...
+                - All data is stored locally in a SQLite database for easy access and management.
+                - No trackers (Gradio has some analytics but it's disabled here...)
+                - No ads, no tracking, no BS. Just you and your content.
+                - Open-source and free to use. Contributions welcome!
+                - If you have any thoughts or feedback, please let me know on github or via email.
+                """)
+                gr.Markdown("""Follow this project at [tl/dw: Too Long, Didn't Watch - Your Personal Research Multi-Tool - GitHub](https://github.com/rmusser01/tldw)""")
+            with gr.Column():
+                gr.Markdown("""### How to use:
+                ##### Quick Start: Just click on the appropriate tab for what you're trying to do and fill in the required fields. Click "Process <video/audio/article/etc>" and wait for the results.
+                #### Simple Instructions
+                - Basic Usage:
+                    - If you don't have an API key/don't know what an LLM is/don't know what an API key is, please look further down the page for information on getting started.
+                    - If you want summaries/chat with an LLM, you'll need:
+                        1. An API key for the LLM API service you want to use, or,
+                        2. A local inference server running an LLM (like llamafile-server/llama.cpp - for instructions on how to do so see the projects README or below), or,
+                        3. A "local" inference server you have access to running an LLM.
+                    - If you just want transcriptions you can ignore the above.
+                    - Select the tab for the task you want to perform
+                    - Fill in the required fields
+                    - Click the "Process" button
+                    - Wait for the results to appear
+                    - Download the results if needed
+                    - Repeat as needed
+                    - As of writing this, the UI is still a work in progress.
+                    - That being said, I plan to replace it all eventually. In the meantime, please have patience.
+                    - The UI is divided into tabs for different tasks.
+                    - Each tab has a set of fields that you can fill in to perform the task.
+                    - Some fields are mandatory, some are optional.
+                    - The fields are mostly self-explanatory, but I will try to add more detailed instructions as I go.
+                #### Detailed Usage:
+                - There are 8 Top-level tabs in the UI. Each tab has a specific set of tasks that you can perform by selecting one of the 'sub-tabs' made available by clicking on the top tab.
+                - The tabs are as follows:
+                    1. Transcription / Summarization / Ingestion - This tab is for processing videos, audio files, articles, books, and PDFs/office docs.
+                    2. Search / Detailed View - This tab is for searching and displaying content from the database. You can also view detailed information about the selected item.
+                    3. Chat with an LLM - This tab is for chatting with an LLM to generate content based on the selected item and prompts.
+                    4. Edit Existing Items - This tab is for editing existing items in the database (Prompts + ingested items).
+                    5. Writing Tools - This tab is for using various writing tools like Grammar & Style check, Tone Analyzer & Editor, etc.
+                    6. Keywords - This tab is for managing keywords for content search and display.
+                    7. Import/Export - This tab is for importing notes from Obsidian and exporting keywords/items to markdown/CSV.
+                    8. Utilities - This tab contains some random utilities that I thought might be useful.
+                - Each sub-tab is responsible for that set of functionality. This is reflected in the codebase as well, where I have split the functionality into separate files for each tab/larger goal.
+                """)
+        with gr.Row():
+            gr.Markdown("""### HELP! I don't know what any of this this shit is!
+            ### DON'T PANIC
+            #### Its ok, you're not alone, most people have no clue what any of this stuff is. 
+            - So let's try and fix that.
+            
+            #### Introduction to LLMs:
+            - Non-Technical introduction to Generative AI and LLMs: https://paruir.medium.com/understanding-generative-ai-and-llms-a-non-technical-overview-part-1-788c0eb0dd64
+            - Google's Intro to LLMs: https://developers.google.com/machine-learning/resources/intro-llms#llm_considerations
+            - LLMs 101(coming from a tech background): https://vinija.ai/models/LLM/
+            - LLM Fundamentals / LLM Scientist / LLM Engineer courses(Free): https://github.com/mlabonne/llm-course
+
+            #### Various Phrases & Terms to know
+            - **LLM** - Large Language Model - A type of neural network that can generate human-like text.
+            - **API** - Application Programming Interface - A set of rules and protocols that allows one software application to communicate with another. 
+                * Think of it like a post address for a piece of software. You can send messages to and from it.
+            - **API Key** - A unique identifier that is used to authenticate a user, developer, or calling program to an API.
+                * Like the key to a post office box. You need it to access the contents.
+            - **GUI** - Graphical User Interface - the thing facilitating your interact with this application.
+            - **DB** - Database
+            - **Prompt Engineering** - The process of designing prompts that are used to guide the output of a language model. Is a meme but also very much not.
+            - **Quantization** - The process of converting a continuous range of values into a finite range of discrete values.
+            - **GGUF Files** - GGUF is a binary format that is designed for fast loading and saving of models, and for ease of reading. Models are traditionally developed using PyTorch or another framework, and then converted to GGUF for use in GGML. https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
+            - **Inference Engine** - A software system that is designed to execute a model that has been trained by a machine learning algorithm. Llama.cpp and Kobold.cpp are examples of inference engines.
+            - **Abliteration** - https://huggingface.co/blog/mlabonne/abliteration
+            """)
+        with gr.Row():
+            gr.Markdown("""### Ok cool, but how do I get started? I don't have an API key or a local server running...
+                #### Great, glad you asked! Getting Started:
+                - **Getting an API key for a commercial services provider:
+                    - **OpenAI:**
+                        * https://platform.openai.com/docs/quickstart
+                    - **Anthropic:**
+                        * https://docs.anthropic.com/en/api/getting-started
+                    - **Cohere:**
+                        * https://docs.cohere.com/
+                        * They offer 1k free requests a month(up to 1million tokens total I think?), so you can try it out without paying.
+                    - **Groq:**
+                        * https://console.groq.com/keys
+                        * Offer an account with free credits to try out their service. No idea how much you get.
+                    - **DeepSeek:**
+                        * https://platform.deepseek.com/ (Chinese-hosted/is in english)
+                    - **OpenRouter:**
+                        https://openrouter.ai/
+                - **Choosing a Model to download**
+                    - You'll first need to select a model you want to use with the server.
+                        - Keep in mind that the model you select will determine the quality of the output you get, and that models run fastest when offloaded fully to your GPU.
+                        * So this means that you can run a large model (Command-R) on CPU+System RAM, but you're gonna see a massive performance hit. Not saying its unusable, but it's not ideal.
+                        * With that in mind, I would recommend an abliterated version of Meta's Llama3.1 model for most tasks. (Abliterated since it won't refuse requests)
+                        * I say this because of the general quality of the model + it's context size.
+                        * You can find the model here: https://huggingface.co/mlabonne/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF
+                        * And the Q8 quant(total size 8.6GB): https://huggingface.co/mlabonne/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF/resolve/main/meta-llama-3.1-8b-instruct-abliterated.Q8_0.gguf?download=true
+                - **Local Inference Server:**
+                    - **Llamafile-Server (wrapper for llama.cpp):**
+                        * Run this script with the `--local_llm` argument next time, and you'll be walked through setting up a local instance of llamafile-server.
+                    - **Llama.cpp Inference Engine:**
+                        * Download the latest release for your platform here: https://github.com/ggerganov/llama.cpp/releases
+                        * Windows: `llama-<release_number>-bin-win-cuda-cu<11.7.1 or 12.2.0 - version depends on installed cuda>-x64.zip`
+                            * Run it: `llama-server.exe --model <path_to_model> -ctx 8192 -ngl 999` 
+                                - `-ctx 8192` sets the context size to 8192 tokens, `-ngl 999` sets the number of layers to offload to the GPU to 999. (essentially ensuring we only use our GPU and not CPU for processing)
+                        * Macos: `llama-<release_number>-bin-macos-arm64.zip - for Apple Silicon / `llama-<release_number>-bin-macos-x64.zip` - for Intel Macs
+                            * Run it: `llama-server --model <path_to_model> -ctx 8192 -ngl 999` 
+                                - `-ctx 8192` sets the context size to 8192 tokens, `-ngl 999` sets the number of layers to offload to the GPU to 999. (essentially ensuring we only use our GPU and not CPU for processing)
+                        * Linux: You can probably figure it out.
+                    - **Kobold.cpp Server:**
+                        1. Download from here: https://github.com/LostRuins/koboldcpp/releases/latest
+                        2. `Double click KoboldCPP.exe and select model OR run "KoboldCPP.exe --help" in CMD prompt to get command line arguments for more control.`
+                        3. `Generally you don't have to change much besides the Presets and GPU Layers. Run with CuBLAS or CLBlast for GPU acceleration.`
+                        4. `Select your GGUF or GGML model you downloaded earlier, and connect to the displayed URL once it finishes loading.`
+                    - **Linux**
+                        1. `On Linux, we provide a koboldcpp-linux-x64 PyInstaller prebuilt binary on the releases page for modern systems. Simply download and run the binary.`
+                            * Alternatively, you can also install koboldcpp to the current directory by running the following terminal command: `curl -fLo koboldcpp https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-linux-x64 && chmod +x koboldcpp`
+                        2. When you can't use the precompiled binary directly, we provide an automated build script which uses conda to obtain all dependencies, and generates (from source) a ready-to-use a pyinstaller binary for linux users. Simply execute the build script with `./koboldcpp.sh dist` and run the generated binary.
+            """)
+
 def create_video_transcription_tab():
     with (gr.TabItem("Video Transcription + Summarization")):
         gr.Markdown("# Transcribe & Summarize Videos from URLs")
@@ -444,7 +608,11 @@ def create_video_transcription_tab():
                     inputs=[preset_prompt_checkbox],
                     outputs=[preset_prompt]
                 )
-                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
+                preset_prompt.change(
+                    update_user_prompt,
+                    inputs=preset_prompt,
+                    outputs=custom_prompt_input
+                )
 
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
@@ -670,6 +838,12 @@ def create_video_transcription_tab():
 
                             summary = open(summary_file, 'r').read() if summary_file else "No summary available"
 
+                            # FIXME - Add to other functions that generate HTML
+                            # Format the transcription
+                            formatted_transcription = format_transcription(transcription_text)
+                            # Format the summary
+                            formatted_summary = format_transcription(summary)
+
                             results_html += f"""
                             <div class="result-box">
                                 <gradio-accordion>
@@ -678,9 +852,11 @@ def create_video_transcription_tab():
                                         <h4>Metadata:</h4>
                                         <pre>{metadata_text}</pre>
                                         <h4>Transcription:</h4>
-                                        <div class="transcription">{transcription_text}</div>
+                                        <div class="transcription" style="white-space: pre-wrap; word-wrap: break-word;">
+                                            {formatted_transcription}
+                                        </div>
                                         <h4>Summary:</h4>
-                                        <div class="summary">{summary}</div>
+                                        <div class="summary">{formatted_summary}</div>
                                     </gradio-accordion-item>
                                 </gradio-accordion>
                             </div>
@@ -766,11 +942,16 @@ def create_video_transcription_tab():
                     logging.error(f"process_videos_wrapper(): Error in process_videos_wrapper: {str(e)}", exc_info=True)
                     # Return a tuple with 5 elements in case of any error
                     return (
-                        f"process_videos_wrapper(): An error occurred: {str(e)}",  # progress_output
-                        str(e),  # error_output
-                        f"<div class='error'>Error: {str(e)}</div>",  # results_output
-                        None,  # download_transcription
-                        None  # download_summary
+                        # progress_output
+                        f"process_videos_wrapper(): An error occurred: {str(e)}",
+                        # error_output
+                        str(e),
+                        # results_output
+                        f"<div class='error'>Error: {str(e)}</div>",
+                        # download_transcription
+                        None,
+                        # download_summary
+                        None
                     )
 
             # FIXME - remove dead args for process_url_with_metadata
@@ -872,6 +1053,7 @@ def create_video_transcription_tab():
                     with open(segments_json_path, 'w') as f:
                         json.dump(segments_with_metadata, f, indent=2)
 
+                    # FIXME - why isnt this working?
                     # Delete the .wav file after successful transcription
                     files_to_delete = [audio_file_path]
                     for file_path in files_to_delete:
@@ -2336,6 +2518,86 @@ def create_chat_management_tab():
 #
 # Media Edit Tab Functions
 
+# FIXME - under construction
+def get_transcript_options(media_id):
+    transcripts = get_transcripts(media_id)
+    return [f"{t[0]}: {t[1]} ({t[3]})" for t in transcripts]
+
+
+def update_transcript_options(media_id):
+    options = get_transcript_options(media_id)
+    return gr.update(choices=options), gr.update(choices=options)
+
+def compare_transcripts(media_id, transcript1_id, transcript2_id):
+    try:
+        transcripts = get_transcripts(media_id)
+        transcript1 = next((t for t in transcripts if t[0] == int(transcript1_id)), None)
+        transcript2 = next((t for t in transcripts if t[0] == int(transcript2_id)), None)
+
+        if not transcript1 or not transcript2:
+            return "One or both selected transcripts not found."
+
+        comparison = f"Transcript 1 (Model: {transcript1[1]}, Created: {transcript1[3]}):\n\n"
+        comparison += format_transcription(transcript1[2])
+        comparison += f"\n\nTranscript 2 (Model: {transcript2[1]}, Created: {transcript2[3]}):\n\n"
+        comparison += format_transcription(transcript2[2])
+
+        return comparison
+    except Exception as e:
+        logging.error(f"Error in compare_transcripts: {str(e)}")
+        return f"Error comparing transcripts: {str(e)}"
+
+
+def create_compare_transcripts_tab():
+    with gr.TabItem("Compare Transcripts"):
+        gr.Markdown("# Compare Transcripts")
+
+        with gr.Row():
+            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+            search_button = gr.Button("Search")
+
+        with gr.Row():
+            media_id_output = gr.Dropdown(label="Select Media Item", choices=[], interactive=True)
+            media_mapping = gr.State({})
+
+        media_id_input = gr.Number(label="Media ID", visible=False)
+        transcript1_dropdown = gr.Dropdown(label="Transcript 1")
+        transcript2_dropdown = gr.Dropdown(label="Transcript 2")
+        compare_button = gr.Button("Compare Transcripts")
+        comparison_output = gr.Textbox(label="Comparison Result", lines=20)
+
+        def update_media_dropdown(search_query, search_type):
+            results = browse_items(search_query, search_type)
+            item_options = [f"{item[1]} ({item[2]})" for item in results]
+            new_item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}
+            return gr.update(choices=item_options), new_item_mapping
+
+        search_button.click(
+            fn=update_media_dropdown,
+            inputs=[search_query_input, search_type_input],
+            outputs=[media_id_output, media_mapping]
+        )
+
+        def load_selected_media_id(selected_media, media_mapping):
+            if selected_media and media_mapping and selected_media in media_mapping:
+                media_id = media_mapping[selected_media]
+                return media_id
+            return None
+
+        media_id_output.change(
+            fn=load_selected_media_id,
+            inputs=[media_id_output, media_mapping],
+            outputs=[media_id_input]
+        )
+
+        media_id_input.change(update_transcript_options, inputs=[media_id_input],
+                              outputs=[transcript1_dropdown, transcript2_dropdown])
+        compare_button.click(compare_transcripts, inputs=[media_id_input, transcript1_dropdown, transcript2_dropdown],
+                             outputs=[comparison_output])
+
+### End of under construction section
+
 def create_media_edit_tab():
     with gr.TabItem("Edit Existing Items"):
         gr.Markdown("# Search and Edit Media Items")
@@ -2719,6 +2981,7 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
             'uploader': author or 'Unknown',
         }
 
+        # FIXME - Add chunking support... I added chapter chunking specifically for this...
         # Create segments (assuming one segment for the entire content)
         segments = [{'Text': file_content}]
 
@@ -3047,7 +3310,7 @@ def create_import_book_tab():
                     label="API for Auto-summarization"
                 )
                 api_key_input = gr.Textbox(label="API Key", type="password")
-                import_button = gr.Button("Import Data")
+                import_button = gr.Button("Import eBook")
             with gr.Column():
                 with gr.Row():
                     import_output = gr.Textbox(label="Import Status")
@@ -3583,6 +3846,7 @@ def launch_ui(share_public=None, server_mode=False):
         with gr.Tabs():
             with gr.TabItem("Transcription / Summarization / Ingestion"):
                 with gr.Tabs():
+                    create_introduction_tab()
                     create_video_transcription_tab()
                     create_audio_processing_tab()
                     create_podcast_tab()
@@ -3603,6 +3867,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_llamafile_settings_tab()
 
             with gr.TabItem("Edit Existing Items"):
+                create_compare_transcripts_tab()
                 create_media_edit_tab()
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
