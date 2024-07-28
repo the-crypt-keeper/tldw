@@ -110,24 +110,27 @@ def gradio_download_youtube_video(url):
     return str(output_file_path)
 
 
-# Old format_transcription function
-# def format_transcription(transcription):
-#     # Split into sentences
-#     sentences = re.split('(?<=[.!?]) +', transcription)
-#     # Join sentences with newlines
-#     return '\n'.join(sentences)
 def format_transcription(content):
-    # Add extra space after periods for better readability
-    content = content.replace('.', '. ').replace('.  ', '. ')
+    # Replace '\n' with actual line breaks
+    content = content.replace('\\n', '\n')
+    # Split the content by newlines first
+    lines = content.split('\n')
+    formatted_lines = []
+    for line in lines:
+        # Add extra space after periods for better readability
+        line = line.replace('.', '. ').replace('.  ', '. ')
 
-    # Split into sentences using a more comprehensive regex
-    sentences = re.split('(?<=[.!?]) +', content)
+        # Split into sentences using a more comprehensive regex
+        sentences = re.split('(?<=[.!?]) +', line)
 
-    # Trim whitespace from each sentence and add a line break
-    formatted_sentences = [sentence.strip() + '<br>' for sentence in sentences if sentence.strip()]
+        # Trim whitespace from each sentence and add a line break
+        formatted_sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
 
-    # Join the formatted sentences
-    formatted_content = ''.join(formatted_sentences)
+        # Join the formatted sentences
+        formatted_lines.append(' '.join(formatted_sentences))
+
+    # Join the lines with HTML line breaks
+    formatted_content = '<br>'.join(formatted_lines)
 
     return formatted_content
 
@@ -179,26 +182,23 @@ all_prompts = prompts_category_1 + prompts_category_2
 def handle_prompt_selection(prompt):
     return f"You selected: {prompt}"
 
-
-
-
-
-def display_details(media_id):
-    if media_id:
-        details = display_item_details(media_id)
-        details_html = ""
-        for detail in details:
-            details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
-            details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
-
-            # Format the transcription
-            formatted_transcription = format_transcription(detail[2])
-
-            # Use <pre> tag with style for better formatting
-            details_html += f"<h4>Transcription:</h4><pre style='white-space: pre-wrap; word-wrap: break-word;'>{formatted_transcription}</pre><hr>"
-
-        return details_html
-    return "No details available."
+# FIXME - Dead code?
+# def display_details(media_id):
+#     if media_id:
+#         details = display_item_details(media_id)
+#         details_html = ""
+#         for detail in details:
+#             details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
+#             details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
+#
+#             # Format the transcription
+#             formatted_transcription = format_transcription(detail[2])
+#
+#             # Use <pre> tag with style for better formatting
+#             details_html += f"<h4>Transcription:</h4><pre style='white-space: pre-wrap; word-wrap: break-word;'>{formatted_transcription}</pre><hr>"
+#
+#         return details_html
+#     return "No details available."
 
 
 def fetch_items_by_title_or_url(search_query: str, search_type: str):
@@ -302,17 +302,6 @@ def browse_items(search_query, search_type):
     return results
 
 
-def display_item_details(media_id):
-    # Function to display item details
-    prompt_summary_results, content = fetch_item_details(media_id)
-    content_section = f"<h4>Transcription:</h4><pre>{content}</pre><hr>"
-    prompt_summary_section = ""
-    for prompt, summary in prompt_summary_results:
-        prompt_summary_section += f"<h4>Prompt:</h4><p>{prompt}</p>"
-        prompt_summary_section += f"<h4>Summary:</h4><p>{summary}</p><hr>"
-    return prompt_summary_section, content_section
-
-
 def update_dropdown(search_query, search_type):
     results = browse_items(search_query, search_type)
     item_options = [f"{item[1]} ({item[2]})" for item in results]
@@ -335,12 +324,14 @@ def update_detailed_view(item, item_mapping):
             if content or prompt or summary:
                 details_html = "<h4>Details:</h4>"
                 if prompt:
-                    details_html += f"<h4>Prompt:</h4>{prompt}</p>"
+                    formatted_prompt = format_transcription(prompt)
+                    details_html += f"<h4>Prompt:</h4>{formatted_prompt}</p>"
                 if summary:
                     formatted_summary = format_transcription(summary)
                     details_html += f"<h4>Summary:</h4>{formatted_summary}</p>"
                 # Format the transcription content for better readability
                 formatted_content = format_transcription(content)
+                #content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{content}</div>"
                 content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{formatted_content}</div>"
                 return details_html, content_html
             else:
