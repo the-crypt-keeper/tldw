@@ -134,6 +134,7 @@ def ingest_pdf_file(file_path, title=None, author=None, keywords=None):
 
 
 def process_and_cleanup_pdf(file, title, author, keywords):
+    # FIXME - Update to validate file upload/filetype is pdf....
     if file is None:
         return "No file uploaded. Please upload a PDF file."
 

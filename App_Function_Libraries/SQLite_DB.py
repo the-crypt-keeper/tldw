@@ -130,6 +130,7 @@ db = Database()
 # Function to create tables with the new media schema
 def create_tables() -> None:
     table_queries = [
+        # CREATE TABLE statements
         '''
         CREATE TABLE IF NOT EXISTS Media (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,11 +182,37 @@ def create_tables() -> None:
         )
         ''',
         '''
-        CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(title, content);
+        CREATE TABLE IF NOT EXISTS ChatConversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER,
+            conversation_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
         ''',
         '''
-        CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword);
+        CREATE TABLE IF NOT EXISTS ChatMessages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER,
+            sender TEXT,
+            message TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES ChatConversations(id)
+        )
         ''',
+        '''
+        CREATE TABLE IF NOT EXISTS Transcripts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER,
+            whisper_model TEXT,
+            transcription TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
+        ''',
+
+        # CREATE INDEX statements
         '''
         CREATE INDEX IF NOT EXISTS idx_media_title ON Media(title);
         ''',
@@ -214,38 +241,29 @@ def create_tables() -> None:
         CREATE INDEX IF NOT EXISTS idx_mediamodifications_media_id ON MediaModifications(media_id);
         ''',
         '''
+        CREATE INDEX IF NOT EXISTS idx_chatconversations_media_id ON ChatConversations(media_id);
+        ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
+        ''',
+
+        # CREATE UNIQUE INDEX statements
+        '''
         CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url);
         ''',
         '''
         CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id);
         ''',
+
+        # CREATE VIRTUAL TABLE statements
         '''
-        CREATE TABLE IF NOT EXISTS ChatConversations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            media_id INTEGER,
-            conversation_name TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (media_id) REFERENCES Media(id)
-        )
+        CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(title, content);
         ''',
         '''
-        CREATE TABLE IF NOT EXISTS ChatMessages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            conversation_id INTEGER,
-            sender TEXT,
-            message TEXT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (conversation_id) REFERENCES ChatConversations(id)
-        )
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_chatconversations_media_id ON ChatConversations(media_id);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
+        CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword);
         '''
     ]
+
     for query in table_queries:
         db.execute_query(query)
 
@@ -732,23 +750,7 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 
         # Set default custom prompt if not provided
         if custom_prompt_input is None:
-            custom_prompt_input = """
-            You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
-            **Bulleted Note Creation Guidelines**
-
-            **Headings**:
-            - Based on referenced topics, not categories like quotes or terms
-            - Surrounded by **bold** formatting 
-            - Not listed as bullet points
-            - No space between headings and list items underneath
-
-            **Emphasis**:
-            - **Important terms** set in bold font
-            - **Text ending in a colon**: also bolded
-
-            **Review**:
-            - Ensure adherence to specified format
-            - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
+            custom_prompt_input = """No Custom Prompt Provided or Was Used."""
 
         logging.info(f"Adding media to database: URL={url}, Title={info_dict.get('title', 'Untitled')}, Type={media_type}")
 
@@ -1245,3 +1247,23 @@ def save_chat_history_to_database(chatbot, conversation_id, media_id, conversati
 #
 # End of Chat-related Functions
 #######################################################################################################################
+#
+# Functions to Compare Transcripts
+
+# Fetch Transcripts
+def get_transcripts(media_id):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, whisper_model, transcription, created_at
+            FROM Transcripts
+            WHERE media_id = ?
+            ORDER BY created_at DESC
+            ''', (media_id,))
+            return cursor.fetchall()
+    except Exception as e:
+        logging.error(f"Error in get_transcripts: {str(e)}")
+        return []
+
+

@@ -3,6 +3,7 @@
 #### More: Full-Text-Search across everything ingested (RAG is wip), Local LLM inference as part of it(llamafile) for those who don't want to mess with setting up an LLM, and a WebApp(gradio as PoC) to interact with the script in a more user-friendly manner (GUI is now the main/intended method of interaction).
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
+#### Hugggingface Space isn't the most stable, is currently broken due to the cudnn file missing error... I'm working on it.
 
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
@@ -421,6 +422,7 @@ Sample commands:
       2. Download + Run: https://github.com/skeeto/w64devkit/releases
       3. cd to `llama.cpp` folder make` in the `llama.cpp` folder
       4. `server.exe -m ..\path\to\model -c <context_size>`
+        * Example: `./server -m ../path/to/model -c 8192 -ngl 999` - This will run the model with a context size of 8192 tokens and offload all layers to the GPU.
   - **Kobold.cpp** - c/p'd from: https://github.com/LostRuins/koboldcpp/wiki
     - **Windows**
       1. Download from here: https://github.com/LostRuins/koboldcpp/releases/latest
