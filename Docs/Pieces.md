@@ -115,10 +115,11 @@
       - `add_media_to_database(info_dict['webpage_url'], info_dict, full_text_with_metadata, summary_text, keywords_list, custom_prompt, whisper_model)`
     - Finally, we return the transcription and summary on lines 1110-1111:
       - `return info_dict['webpage_url'], full_text_with_metadata, summary_text, json_file_path, summary_file_path, info_dict`
-
-- **Let's now dig deeper into Line 10012: `download_video()`
-- **Let's now dig deeper into Line 1011: `perform_transcription()`
-
+- **Let's now dig deeper into Line 1002: `download_video()`**
+- **Let's now dig deeper into Line 1011: `perform_transcription()`**
+- **Let's now dig deeper into Line 1076: `perform_summarization()`**
+- **Let's now dig deeper into Line 1086-1089 `save_transcription_and_summary()`**
+- **Let's now dig deeper into Line 1104-1108 `add_media_to_database()`**
 
 
 #### Audio File Transcription + Summarization
