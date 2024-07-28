@@ -45,9 +45,11 @@ config.read('config.txt')
 processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
 
+# FIXME: This is a temporary solution.
+# This doesn't clear older models, which means potentially a lot of memory is being used...
 def get_whisper_model(model_name, device):
     global whisper_model_instance
-    if whisper_model_instance is None or whisper_model_instance.model_size != model_name:
+    if whisper_model_instance is None:
         from faster_whisper import WhisperModel
         logging.info(f"Initializing new WhisperModel with size {model_name} on device {device}")
         whisper_model_instance = WhisperModel(model_name, device=device)
