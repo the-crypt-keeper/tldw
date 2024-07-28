@@ -244,6 +244,16 @@ def create_tables() -> None:
         ''',
         '''
         CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS Transcripts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER,
+            whisper_model TEXT,
+            transcription TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
         '''
     ]
     for query in table_queries:
@@ -1229,3 +1239,23 @@ def save_chat_history_to_database(chatbot, conversation_id, media_id, conversati
 #
 # End of Chat-related Functions
 #######################################################################################################################
+#
+# Functions to Compare Transcripts
+
+# Fetch Transcripts
+def get_transcripts(media_id):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, whisper_model, transcription, created_at
+            FROM Transcripts
+            WHERE media_id = ?
+            ORDER BY created_at DESC
+            ''', (media_id,))
+            return cursor.fetchall()
+    except Exception as e:
+        logging.error(f"Error in get_transcripts: {str(e)}")
+        return []
+
+
