@@ -356,7 +356,6 @@ def print_hello():
 # Summarization with Detail
 #
 
-# FIXME - see 'Old_Chunking_Lib.py'
 
 #
 #
