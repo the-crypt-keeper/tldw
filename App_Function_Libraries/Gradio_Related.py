@@ -110,15 +110,25 @@ def gradio_download_youtube_video(url):
     return str(output_file_path)
 
 
-
-
+# Old format_transcription function
+# def format_transcription(transcription):
+#     # Split into sentences
+#     sentences = re.split('(?<=[.!?]) +', transcription)
+#     # Join sentences with newlines
+#     return '\n'.join(sentences)
 def format_transcription(content):
     # Add extra space after periods for better readability
     content = content.replace('.', '. ').replace('.  ', '. ')
-    # Split the content into lines for multiline display
-    lines = content.split('. ')
-    # Join lines with HTML line break for better presentation in Markdown
-    formatted_content = "<br>".join(lines)
+
+    # Split into sentences using a more comprehensive regex
+    sentences = re.split('(?<=[.!?]) +', content)
+
+    # Trim whitespace from each sentence and add a line break
+    formatted_sentences = [sentence.strip() + '<br>' for sentence in sentences if sentence.strip()]
+
+    # Join the formatted sentences
+    formatted_content = ''.join(formatted_sentences)
+
     return formatted_content
 
 
@@ -169,15 +179,24 @@ all_prompts = prompts_category_1 + prompts_category_2
 def handle_prompt_selection(prompt):
     return f"You selected: {prompt}"
 
+
+
+
+
 def display_details(media_id):
-    # Gradio Search Function-related stuff
     if media_id:
         details = display_item_details(media_id)
         details_html = ""
         for detail in details:
             details_html += f"<h4>Prompt:</h4><p>{detail[0]}</p>"
             details_html += f"<h4>Summary:</h4><p>{detail[1]}</p>"
-            details_html += f"<h4>Transcription:</h4><pre>{detail[2]}</pre><hr>"
+
+            # Format the transcription
+            formatted_transcription = format_transcription(detail[2])
+
+            # Use <pre> tag with style for better formatting
+            details_html += f"<h4>Transcription:</h4><pre style='white-space: pre-wrap; word-wrap: break-word;'>{formatted_transcription}</pre><hr>"
+
         return details_html
     return "No details available."
 
@@ -318,9 +337,11 @@ def update_detailed_view(item, item_mapping):
                 if prompt:
                     details_html += f"<h4>Prompt:</h4>{prompt}</p>"
                 if summary:
-                    details_html += f"<h4>Summary:</h4>{summary}</p>"
+                    formatted_summary = format_transcription(summary)
+                    details_html += f"<h4>Summary:</h4>{formatted_summary}</p>"
                 # Format the transcription content for better readability
-                content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{format_transcription(content)}</div>"
+                formatted_content = format_transcription(content)
+                content_html = f"<h4>Transcription:</h4><div style='white-space: pre-wrap;'>{formatted_content}</div>"
                 return details_html, content_html
             else:
                 return "No details available.", "No details available."
@@ -826,6 +847,12 @@ def create_video_transcription_tab():
 
                             summary = open(summary_file, 'r').read() if summary_file else "No summary available"
 
+                            # FIXME - Add to other functions that generate HTML
+                            # Format the transcription
+                            formatted_transcription = format_transcription(transcription_text)
+                            # Format the summary
+                            formatted_summary = format_transcription(summary)
+
                             results_html += f"""
                             <div class="result-box">
                                 <gradio-accordion>
@@ -834,9 +861,11 @@ def create_video_transcription_tab():
                                         <h4>Metadata:</h4>
                                         <pre>{metadata_text}</pre>
                                         <h4>Transcription:</h4>
-                                        <div class="transcription">{transcription_text}</div>
+                                        <div class="transcription" style="white-space: pre-wrap; word-wrap: break-word;">
+                                            {formatted_transcription}
+                                        </div>
                                         <h4>Summary:</h4>
-                                        <div class="summary">{summary}</div>
+                                        <div class="summary">{formatted_summary}</div>
                                     </gradio-accordion-item>
                                 </gradio-accordion>
                             </div>
