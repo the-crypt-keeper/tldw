@@ -151,8 +151,6 @@ def normalize_title(title):
     return title
 
 
-
-
 def clean_youtube_url(url):
     parsed_url = urlparse(url)
     query_params = parse_qs(parsed_url.query)
@@ -168,24 +166,25 @@ def extract_video_info(url):
     title = info_dict.get('title', 'Untitled')
     return info_dict, title
 
-
-def clean_youtube_url(url):
-    parsed_url = urlparse(url)
-    query_params = parse_qs(parsed_url.query)
-    if 'list' in query_params:
-        query_params.pop('list')
-    cleaned_query = urlencode(query_params, doseq=True)
-    cleaned_url = urlunparse(parsed_url._replace(query=cleaned_query))
-    return cleaned_url
-
-def extract_video_info(url):
-    info_dict = get_youtube(url)
-    title = info_dict.get('title', 'Untitled')
-    return info_dict, title
 
 def import_data(file):
     # Implement this function to import data from a file
     pass
+
+
+def safe_read_file(file_path):
+    encodings = ['utf-8', 'utf-16', 'ascii', 'latin-1', 'iso-8859-1', 'cp1252']
+    for encoding in encodings:
+        try:
+            with open(file_path, 'r', encoding=encoding) as file:
+                return file.read()
+        except UnicodeDecodeError:
+            continue
+        except FileNotFoundError:
+            return f"File not found: {file_path}"
+        except Exception as e:
+            return f"An error occurred: {e}"
+    return f"Unable to decode the file {file_path} with any of the attempted encodings: {encodings}"
 
 
 #######################
@@ -326,14 +325,8 @@ def load_and_log_configs():
         return None
 
 
-
 # Log file
 # logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
-
-
-
-
-
 
 
 def format_metadata_as_text(metadata):
@@ -376,7 +369,6 @@ def format_metadata_as_text(metadata):
 # }
 #
 # print(format_metadata_as_text(example_metadata))
-
 
 
 def convert_to_seconds(time_str):

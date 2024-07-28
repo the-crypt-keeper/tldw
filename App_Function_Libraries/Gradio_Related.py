@@ -55,7 +55,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
-    convert_to_seconds, load_comprehensive_config
+    convert_to_seconds, load_comprehensive_config, safe_read_file
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
     generate_timestamped_url, extract_metadata, download_video
 
@@ -836,7 +836,7 @@ def create_video_transcription_tab():
                                 metadata_text = "Metadata format error"
                                 transcription_text = "Transcription format error"
 
-                            summary = open(summary_file, 'r').read() if summary_file else "No summary available"
+                            summary = safe_read_file(summary_file) if summary_file else "No summary available"
 
                             # FIXME - Add to other functions that generate HTML
                             # Format the transcription
