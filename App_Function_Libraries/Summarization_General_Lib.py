@@ -827,7 +827,7 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
     return current_progress, success_message, None, None, None, None
 
 
-# stuff
+
 def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False):
     global segments_json_path
     audio_file_path = convert_to_wav(video_path, offset)
