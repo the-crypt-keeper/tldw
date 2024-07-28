@@ -550,5 +550,4 @@ Sample commands:
   - Bugfixes for stability and file handling(Making sure files are removed when they should be)
   - Add support for more APIs
   - Live audio recording + transcription
-  - Documentation for each of the functions exposed.
-    - They all are pretty straightforward, but I'd like to make it easier to understand what's going on.
+  - RAG support
