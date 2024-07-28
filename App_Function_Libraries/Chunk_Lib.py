@@ -74,7 +74,8 @@ def improved_chunking_process(text: str, chunk_options: Dict[str, Any]) -> List[
         elif chunk_method == 'chapters':
             return chunk_ebook_by_chapters(text, chunk_options)
         else:
-            chunks = [text]  # No chunking applied
+            # No chunking applied
+            chunks = [text]
 
     return [{'text': chunk, 'metadata': get_chunk_metadata(chunk, text)} for chunk in chunks]
 
