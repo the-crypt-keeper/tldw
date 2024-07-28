@@ -130,6 +130,7 @@ db = Database()
 # Function to create tables with the new media schema
 def create_tables() -> None:
     table_queries = [
+        # CREATE TABLE statements
         '''
         CREATE TABLE IF NOT EXISTS Media (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,11 +182,37 @@ def create_tables() -> None:
         )
         ''',
         '''
-        CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(title, content);
+        CREATE TABLE IF NOT EXISTS ChatConversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER,
+            conversation_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
         ''',
         '''
-        CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword);
+        CREATE TABLE IF NOT EXISTS ChatMessages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER,
+            sender TEXT,
+            message TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES ChatConversations(id)
+        )
         ''',
+        '''
+        CREATE TABLE IF NOT EXISTS Transcripts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER,
+            whisper_model TEXT,
+            transcription TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
+        ''',
+
+        # CREATE INDEX statements
         '''
         CREATE INDEX IF NOT EXISTS idx_media_title ON Media(title);
         ''',
@@ -214,48 +241,29 @@ def create_tables() -> None:
         CREATE INDEX IF NOT EXISTS idx_mediamodifications_media_id ON MediaModifications(media_id);
         ''',
         '''
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url);
-        ''',
-        '''
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id);
-        ''',
-        '''
-        CREATE TABLE IF NOT EXISTS ChatConversations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            media_id INTEGER,
-            conversation_name TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (media_id) REFERENCES Media(id)
-        )
-        ''',
-        '''
-        CREATE TABLE IF NOT EXISTS ChatMessages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            conversation_id INTEGER,
-            sender TEXT,
-            message TEXT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (conversation_id) REFERENCES ChatConversations(id)
-        )
-        ''',
-        '''
         CREATE INDEX IF NOT EXISTS idx_chatconversations_media_id ON ChatConversations(media_id);
         ''',
         '''
         CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
         ''',
+
+        # CREATE UNIQUE INDEX statements
         '''
-        CREATE TABLE IF NOT EXISTS Transcripts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            media_id INTEGER,
-            whisper_model TEXT,
-            transcription TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (media_id) REFERENCES Media(id)
-        )
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url);
+        ''',
+        '''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id);
+        ''',
+
+        # CREATE VIRTUAL TABLE statements
+        '''
+        CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(title, content);
+        ''',
+        '''
+        CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword);
         '''
     ]
+
     for query in table_queries:
         db.execute_query(query)
 
