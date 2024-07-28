@@ -91,13 +91,33 @@
         - `return ( f"Processed {total_inputs} videos. {len(errors)} errors occurred.", error_summary, results_html, 'all_transcriptions.json', 'all_summaries.txt')`
 - **Let's now dig a bit deeper into Line 765: `process_url_with_metadata<args>`**
   - `process_url_with_metadata<args>`:
-    - FIXME ALL BUNK
-    - The function is defined in `Ingestion_Related.py` on line 101.
-    - The function is responsible for processing the video URL and returning the transcription and summary.
-    - The function first checks to see if the URL is a valid YouTube URL.
-    - The function then extracts the metadata from the video using `yt-dlp`.
-    - The function then extracts the audio from the video using `ffmpeg`.
-    - The
+    - Defined on line 934: `def process_url_with_metadata(input_item, num_speakers, whisper_model, custom_prompt, offset, api_name, api_key, vad_filter, download_video_flag, download_audio, rolling_summarization, detail_level, question_box, keywords, local_file_path, diarize, end_time=None, include_timestamps=True, metadata=None, use_chunking=False, chunk_options=None, keep_original_video=False):```
+    - First creates the folder `Video_Downloads` if it doesn't already exist in the current folder.
+    - We then create the `infodict` dict
+    - We then check if the input item is a URL or a local file
+      - If it's a file we simply set the `video_metadata` to `None` with the `video_description` set to `Local file`
+      - If it's a URL, we extract the metadata using `yt-dlp`
+    - Next metadata is set,
+    - Video is downloaded 1002: 
+      - `Line video_file_path = download_video(input_item, download_path, full_info, download_video_flag)`
+    - Video is transcribed Line 1011:
+      - `audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model, vad_filter, diarize)`
+    - Line 1027 We save the transcription to a JSON file
+    - Lines 1032-1039 We delete the wav file 
+    - Lines 1043-1054 we delete the video file if the user doesn't want to keep it
+    - Line 1063 we create the `transcription_text` variable from compiling all the transcription segments
+    - Lines 1076-1084 we summarize the transcription
+      - `perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key)`
+    - Lines 1086-1089 we save the summary to a text file
+      - `save_transcription_and_summary(full_text_with_metadata, summary_text, download_path, info_dict)`
+    - Lines 1095-1102 We prep the keywords
+    - Lines 1104-1108 We save the media to the DB:
+      - `add_media_to_database(info_dict['webpage_url'], info_dict, full_text_with_metadata, summary_text, keywords_list, custom_prompt, whisper_model)`
+    - Finally, we return the transcription and summary on lines 1110-1111:
+      - `return info_dict['webpage_url'], full_text_with_metadata, summary_text, json_file_path, summary_file_path, info_dict`
+
+- **Let's now dig deeper into Line 10012: `download_video()`
+- **Let's now dig deeper into Line 1011: `perform_transcription()`
 
 
 
