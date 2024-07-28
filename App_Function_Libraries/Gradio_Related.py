@@ -922,11 +922,16 @@ def create_video_transcription_tab():
                     logging.error(f"process_videos_wrapper(): Error in process_videos_wrapper: {str(e)}", exc_info=True)
                     # Return a tuple with 5 elements in case of any error
                     return (
-                        f"process_videos_wrapper(): An error occurred: {str(e)}",  # progress_output
-                        str(e),  # error_output
-                        f"<div class='error'>Error: {str(e)}</div>",  # results_output
-                        None,  # download_transcription
-                        None  # download_summary
+                        # progress_output
+                        f"process_videos_wrapper(): An error occurred: {str(e)}",
+                        # error_output
+                        str(e),
+                        # results_output
+                        f"<div class='error'>Error: {str(e)}</div>",
+                        # download_transcription
+                        None,
+                        # download_summary
+                        None
                     )
 
             # FIXME - remove dead args for process_url_with_metadata
