@@ -3435,7 +3435,8 @@ def export_selected_items(selected_items: List[Dict]) -> Tuple[Optional[str], st
                     continue
 
                 content, prompt, summary = fetch_item_details(item_data['id'])
-                markdown_content += f"## {item_data.get('title', f'Item {item_data['id']}')}\n\n### Prompt\n{prompt}\n\n### Summary\n{summary}\n\n### Content\n{content}\n\n---\n\n"
+                item_title = item_data.get('title', f'Item {item_data["id"]}')
+                markdown_content += f"## {item_title}\n\n### Prompt\n{prompt}\n\n### Summary\n{summary}\n\n### Content\n{content}\n\n---\n\n"
             except Exception as e:
                 logger.error(f"Error processing item {item}: {str(e)}")
                 markdown_content += f"## Error\n\nUnable to process this item.\n\n---\n\n"
