@@ -110,3 +110,7 @@ torch
 torchaudio
 openai
 tiktoken
+scikit-learn
+pyannote.audio
+memory_profiler
+pypandoc
