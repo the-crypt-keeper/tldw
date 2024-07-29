@@ -53,7 +53,7 @@ import sqlite3
 import time
 import traceback
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any
 
 # Third-Party Libraries
@@ -142,7 +142,9 @@ def create_tables() -> None:
             ingestion_date TEXT,
             prompt TEXT,
             summary TEXT,
-            transcription_model TEXT
+            transcription_model TEXT,
+            is_trash BOOLEAN DEFAULT 0,
+            trash_date DATETIME
         )
         ''',
         '''
@@ -246,6 +248,9 @@ def create_tables() -> None:
         '''
         CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
         ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_media_is_trash ON Media(is_trash);
+        ''',
 
         # CREATE UNIQUE INDEX statements
         '''
@@ -266,6 +271,22 @@ def create_tables() -> None:
 
     for query in table_queries:
         db.execute_query(query)
+
+    for query in table_queries:
+        db.execute_query(query)
+
+    # Add new columns to the Media table if they don't exist
+    alter_queries = [
+        "ALTER TABLE Media ADD COLUMN is_trash BOOLEAN DEFAULT 0;",
+        "ALTER TABLE Media ADD COLUMN trash_date DATETIME;"
+    ]
+
+    for query in alter_queries:
+        try:
+            db.execute_query(query)
+        except Exception as e:
+            # If the column already exists, SQLite will throw an error. We can safely ignore it.
+            logging.debug(f"Note: {str(e)}")
 
     logging.info("All tables and indexes created successfully.")
 
@@ -1267,3 +1288,97 @@ def get_transcripts(media_id):
         return []
 
 
+#
+# End of Functions to Compare Transcripts
+#######################################################################################################################
+#
+# Functions to handle deletion of media items
+
+
+def mark_as_trash(media_id: int) -> None:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE Media 
+            SET is_trash = 1, trash_date = ?
+            WHERE id = ?
+        """, (datetime.now(), media_id))
+        conn.commit()
+
+
+def restore_from_trash(media_id: int) -> None:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE Media 
+            SET is_trash = 0, trash_date = NULL
+            WHERE id = ?
+        """, (media_id,))
+        conn.commit()
+
+
+def get_trashed_items() -> List[Dict]:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, title, trash_date 
+            FROM Media 
+            WHERE is_trash = 1
+            ORDER BY trash_date DESC
+        """)
+        return [{'id': row[0], 'title': row[1], 'trash_date': row[2]} for row in cursor.fetchall()]
+
+
+def permanently_delete_item(media_id: int) -> None:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM Media WHERE id = ?", (media_id,))
+        cursor.execute("DELETE FROM MediaKeywords WHERE media_id = ?", (media_id,))
+        cursor.execute("DELETE FROM MediaVersion WHERE media_id = ?", (media_id,))
+        cursor.execute("DELETE FROM MediaModifications WHERE media_id = ?", (media_id,))
+        cursor.execute("DELETE FROM media_fts WHERE rowid = ?", (media_id,))
+        conn.commit()
+
+
+def empty_trash(days_threshold: int) -> Tuple[int, int]:
+    threshold_date = datetime.now() - timedelta(days=days_threshold)
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id FROM Media 
+            WHERE is_trash = 1 AND trash_date <= ?
+        """, (threshold_date,))
+        old_items = cursor.fetchall()
+
+        for item in old_items:
+            permanently_delete_item(item[0])
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM Media 
+            WHERE is_trash = 1 AND trash_date > ?
+        """, (threshold_date,))
+        remaining_items = cursor.fetchone()[0]
+
+    return len(old_items), remaining_items
+
+
+def user_delete_item(media_id: int, force: bool = False) -> str:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_trash, trash_date FROM Media WHERE id = ?", (media_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            return "Item not found."
+
+        is_trash, trash_date = result
+
+        if not is_trash:
+            mark_as_trash(media_id)
+            return "Item moved to trash."
+
+        if force or (trash_date and (datetime.now() - trash_date).days >= 30):
+            permanently_delete_item(media_id)
+            return "Item permanently deleted."
+        else:
+            return "Item is already in trash. Use force=True to delete permanently before 30 days."

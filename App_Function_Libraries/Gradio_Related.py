@@ -53,7 +53,8 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
-    create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts
+    create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
+    user_delete_item, empty_trash
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config, safe_read_file
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -2855,6 +2856,40 @@ def create_prompt_clone_tab():
         )
 
 
+##### Trash Tab
+def delete_item(media_id, force):
+    return user_delete_item(media_id, force)
+
+def list_trash():
+    items = get_trashed_items()
+    return "\n".join(
+        [f"ID: {item['id']}, Title: {item['title']}, Trashed on: {item['trash_date']}" for item in items])
+
+def empty_trash_ui(days):
+    deleted, remaining = empty_trash(days)
+    return f"Deleted {deleted} items. {remaining} items remain in trash."
+
+def create_view_trash_tab():
+    with gr.TabItem("View Trash"):
+        view_button = gr.Button("View Trash")
+        trash_list = gr.Textbox(label="Trashed Items")
+        view_button.click(list_trash, inputs=[], outputs=trash_list)
+def create_delete_trash_tab():
+    with gr.TabItem("Delete Item"):
+        media_id_input = gr.Number(label="Media ID")
+        force_checkbox = gr.Checkbox(label="Force Delete")
+        delete_button = gr.Button("Delete")
+        delete_output = gr.Textbox(label="Result")
+        delete_button.click(delete_item, inputs=[media_id_input, force_checkbox], outputs=delete_output)
+
+def create_empty_trash_tab():
+    with gr.TabItem("Empty Trash"):
+        days_input = gr.Slider(minimum=15, maximum=90, step=5, label="Delete items older than (days)")
+        empty_button = gr.Button("Empty Trash")
+        empty_output = gr.Textbox(label="Result")
+        empty_button.click(empty_trash_ui, inputs=[days_input], outputs=empty_output)
+
+
 #
 # End of Media Edit Tab Functions
 ################################################################################################################
@@ -3872,6 +3907,9 @@ def launch_ui(share_public=None, server_mode=False):
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
+                create_view_trash_tab()
+                create_delete_trash_tab()
+                create_empty_trash_tab()
 
             with gr.TabItem("Writing Tools"):
                 create_document_editing_tab()
