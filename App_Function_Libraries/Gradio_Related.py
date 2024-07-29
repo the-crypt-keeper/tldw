@@ -53,7 +53,8 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
-    create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts
+    create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
+    user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config, safe_read_file
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -874,10 +875,10 @@ def create_video_transcription_tab():
 
                     # Save all transcriptions and summaries to files
                     logging.debug("Saving all transcriptions and summaries to files")
-                    with open('all_transcriptions.json', 'w') as f:
-                        json.dump(all_transcriptions, f, indent=2)
+                    with open('all_transcriptions.json', 'w', encoding='utf-8') as f:
+                        json.dump(all_transcriptions, f, indent=2, ensure_ascii=False)
 
-                    with open('all_summaries.txt', 'w') as f:
+                    with open('all_summaries.txt', 'w', encoding='utf-8') as f:
                         f.write(all_summaries)
 
                     error_summary = "\n".join(errors) if errors else "No errors occurred."
@@ -2855,6 +2856,40 @@ def create_prompt_clone_tab():
         )
 
 
+##### Trash Tab
+def delete_item(media_id, force):
+    return user_delete_item(media_id, force)
+
+def list_trash():
+    items = get_trashed_items()
+    return "\n".join(
+        [f"ID: {item['id']}, Title: {item['title']}, Trashed on: {item['trash_date']}" for item in items])
+
+def empty_trash_ui(days):
+    deleted, remaining = empty_trash(days)
+    return f"Deleted {deleted} items. {remaining} items remain in trash."
+
+def create_view_trash_tab():
+    with gr.TabItem("View Trash"):
+        view_button = gr.Button("View Trash")
+        trash_list = gr.Textbox(label="Trashed Items")
+        view_button.click(list_trash, inputs=[], outputs=trash_list)
+def create_delete_trash_tab():
+    with gr.TabItem("Delete Item"):
+        media_id_input = gr.Number(label="Media ID")
+        force_checkbox = gr.Checkbox(label="Force Delete")
+        delete_button = gr.Button("Delete")
+        delete_output = gr.Textbox(label="Result")
+        delete_button.click(delete_item, inputs=[media_id_input, force_checkbox], outputs=delete_output)
+
+def create_empty_trash_tab():
+    with gr.TabItem("Empty Trash"):
+        days_input = gr.Slider(minimum=15, maximum=90, step=5, label="Delete items older than (days)")
+        empty_button = gr.Button("Empty Trash")
+        empty_output = gr.Textbox(label="Result")
+        empty_button.click(empty_trash_ui, inputs=[days_input], outputs=empty_output)
+
+
 #
 # End of Media Edit Tab Functions
 ################################################################################################################
@@ -3599,6 +3634,47 @@ def create_export_tab():
     )
 
 
+
+def create_backup():
+    backup_file = create_automated_backup(db_path, backup_dir)
+    return f"Backup created: {backup_file}"
+
+def list_backups():
+    backups = [f for f in os.listdir(backup_dir) if f.endswith('.db')]
+    return "\n".join(backups)
+
+def restore_backup(backup_name):
+    backup_path = os.path.join(backup_dir, backup_name)
+    if os.path.exists(backup_path):
+        shutil.copy2(backup_path, db_path)
+        return f"Database restored from {backup_name}"
+    else:
+        return "Backup file not found"
+
+
+def create_backup_tab():
+    with gr.Tab("Create Backup"):
+        gr.Markdown("# Create a backup of the database")
+        create_button = gr.Button("Create Backup")
+        create_output = gr.Textbox(label="Result")
+        create_button.click(create_backup, inputs=[], outputs=create_output)
+
+def create_view_backups_tab():
+    with gr.TabItem("View Backups"):
+        gr.Markdown("# Browse available backups")
+        view_button = gr.Button("View Backups")
+        backup_list = gr.Textbox(label="Available Backups")
+        view_button.click(list_backups, inputs=[], outputs=backup_list)
+
+def create_restore_backup_tab():
+    with gr.TabItem("Restore Backup"):
+        gr.Markdown("# Restore a backup of the database")
+        backup_input = gr.Textbox(label="Backup Filename")
+        restore_button = gr.Button("Restore")
+        restore_output = gr.Textbox(label="Result")
+        restore_button.click(restore_backup, inputs=[backup_input], outputs=restore_output)
+
+
 #
 # End of Export Items Tab Functions
 ################################################################################################################
@@ -3872,6 +3948,9 @@ def launch_ui(share_public=None, server_mode=False):
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
+                create_view_trash_tab()
+                create_delete_trash_tab()
+                create_empty_trash_tab()
 
             with gr.TabItem("Writing Tools"):
                 create_document_editing_tab()
@@ -3889,6 +3968,11 @@ def launch_ui(share_public=None, server_mode=False):
                 create_import_single_prompt_tab()
                 create_import_multiple_prompts_tab()
                 create_export_tab()
+
+            with gr.TabItem("Backup Management"):
+                create_backup_tab()
+                create_view_backups_tab()
+                create_restore_backup_tab()
 
             with gr.TabItem("Utilities"):
                 create_utilities_tab()

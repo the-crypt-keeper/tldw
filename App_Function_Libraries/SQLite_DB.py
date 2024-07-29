@@ -49,17 +49,19 @@ import csv
 import logging
 import os
 import re
+import shutil
 import sqlite3
 import time
 import traceback
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any
 
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
 import yaml
+
 
 # Import Local Libraries
 #
@@ -72,6 +74,112 @@ import yaml
 #logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
+#
+# Backup-related functions
+
+def create_incremental_backup(db_path, backup_dir):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Get the page count of the database
+    cursor.execute("PRAGMA page_count")
+    page_count = cursor.fetchone()[0]
+
+    # Create a new backup file
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = os.path.join(backup_dir, f"incremental_backup_{timestamp}.sqlib")
+
+    # Perform the incremental backup
+    conn.execute(f"VACUUM INTO '{backup_file}'")
+
+    conn.close()
+    print(f"Incremental backup created: {backup_file}")
+    return backup_file
+
+
+def create_automated_backup(db_path, backup_dir):
+    # Ensure backup directory exists
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # Create a timestamped backup file name
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = os.path.join(backup_dir, f"backup_{timestamp}.db")
+
+    # Copy the database file
+    shutil.copy2(db_path, backup_file)
+
+    print(f"Backup created: {backup_file}")
+    return backup_file
+
+# FIXME - boto3 aint getting installed by default....
+# def upload_to_s3(file_path, bucket_name, s3_key):
+#     import boto3
+#     s3 = boto3.client('s3')
+#     try:
+#         s3.upload_file(file_path, bucket_name, s3_key)
+#         print(f"File uploaded to S3: {s3_key}")
+#     except Exception as e:
+#         print(f"Error uploading to S3: {str(e)}")
+
+
+def rotate_backups(backup_dir, max_backups=10):
+    backups = sorted(
+        [f for f in os.listdir(backup_dir) if f.endswith('.db')],
+        key=lambda x: os.path.getmtime(os.path.join(backup_dir, x)),
+        reverse=True
+    )
+
+    while len(backups) > max_backups:
+        old_backup = backups.pop()
+        os.remove(os.path.join(backup_dir, old_backup))
+        print(f"Removed old backup: {old_backup}")
+
+
+# FIXME - Setup properly and test/add documentation for its existence...
+db_path = "path/to/your/database.db"
+backup_dir = "path/to/backup/directory"
+#create_automated_backup(db_path, backup_dir)
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#backup_file = create_automated_backup(db_path, backup_dir)
+#upload_to_s3(backup_file, 'your-s3-bucket-name', f"database_backups/{os.path.basename(backup_file)}")
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#create_incremental_backup(db_path, backup_dir)
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#rotate_backups(backup_dir)
+
+#
+#
+#######################################################################################################################
+#
+# DB-Integrity Check Functions
+
+def check_database_integrity(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA integrity_check")
+    result = cursor.fetchone()
+
+    conn.close()
+
+    if result[0] == "ok":
+        print("Database integrity check passed.")
+        return True
+    else:
+        print("Database integrity check failed:", result[0])
+        return False
+
+#check_database_integrity(db_path)
+
+#
+# End of DB-Integrity Check functions
+#######################################################################################################################
+#
+# Media-related Functions
 
 # Custom exceptions
 class DatabaseError(Exception):
@@ -142,7 +250,9 @@ def create_tables() -> None:
             ingestion_date TEXT,
             prompt TEXT,
             summary TEXT,
-            transcription_model TEXT
+            transcription_model TEXT,
+            is_trash BOOLEAN DEFAULT 0,
+            trash_date DATETIME
         )
         ''',
         '''
@@ -246,6 +356,9 @@ def create_tables() -> None:
         '''
         CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
         ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_media_is_trash ON Media(is_trash);
+        ''',
 
         # CREATE UNIQUE INDEX statements
         '''
@@ -266,6 +379,22 @@ def create_tables() -> None:
 
     for query in table_queries:
         db.execute_query(query)
+
+    for query in table_queries:
+        db.execute_query(query)
+
+    # Add new columns to the Media table if they don't exist
+    alter_queries = [
+        "ALTER TABLE Media ADD COLUMN is_trash BOOLEAN DEFAULT 0;",
+        "ALTER TABLE Media ADD COLUMN trash_date DATETIME;"
+    ]
+
+    for query in alter_queries:
+        try:
+            db.execute_query(query)
+        except Exception as e:
+            # If the column already exists, SQLite will throw an error. We can safely ignore it.
+            logging.debug(f"Note: {str(e)}")
 
     logging.info("All tables and indexes created successfully.")
 
@@ -1267,3 +1396,102 @@ def get_transcripts(media_id):
         return []
 
 
+#
+# End of Functions to Compare Transcripts
+#######################################################################################################################
+#
+# Functions to handle deletion of media items
+
+
+def mark_as_trash(media_id: int) -> None:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE Media 
+            SET is_trash = 1, trash_date = ?
+            WHERE id = ?
+        """, (datetime.now(), media_id))
+        conn.commit()
+
+
+def restore_from_trash(media_id: int) -> None:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE Media 
+            SET is_trash = 0, trash_date = NULL
+            WHERE id = ?
+        """, (media_id,))
+        conn.commit()
+
+
+def get_trashed_items() -> List[Dict]:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, title, trash_date 
+            FROM Media 
+            WHERE is_trash = 1
+            ORDER BY trash_date DESC
+        """)
+        return [{'id': row[0], 'title': row[1], 'trash_date': row[2]} for row in cursor.fetchall()]
+
+
+def permanently_delete_item(media_id: int) -> None:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM Media WHERE id = ?", (media_id,))
+        cursor.execute("DELETE FROM MediaKeywords WHERE media_id = ?", (media_id,))
+        cursor.execute("DELETE FROM MediaVersion WHERE media_id = ?", (media_id,))
+        cursor.execute("DELETE FROM MediaModifications WHERE media_id = ?", (media_id,))
+        cursor.execute("DELETE FROM media_fts WHERE rowid = ?", (media_id,))
+        conn.commit()
+
+
+def empty_trash(days_threshold: int) -> Tuple[int, int]:
+    threshold_date = datetime.now() - timedelta(days=days_threshold)
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id FROM Media 
+            WHERE is_trash = 1 AND trash_date <= ?
+        """, (threshold_date,))
+        old_items = cursor.fetchall()
+
+        for item in old_items:
+            permanently_delete_item(item[0])
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM Media 
+            WHERE is_trash = 1 AND trash_date > ?
+        """, (threshold_date,))
+        remaining_items = cursor.fetchone()[0]
+
+    return len(old_items), remaining_items
+
+
+def user_delete_item(media_id: int, force: bool = False) -> str:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_trash, trash_date FROM Media WHERE id = ?", (media_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            return "Item not found."
+
+        is_trash, trash_date = result
+
+        if not is_trash:
+            mark_as_trash(media_id)
+            return "Item moved to trash."
+
+        if force or (trash_date and (datetime.now() - trash_date).days >= 30):
+            permanently_delete_item(media_id)
+            return "Item permanently deleted."
+        else:
+            return "Item is already in trash. Use force=True to delete permanently before 30 days."
+
+
+#
+# End of Functions to handle deletion of media items
+#######################################################################################################################
