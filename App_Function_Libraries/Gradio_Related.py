@@ -874,10 +874,10 @@ def create_video_transcription_tab():
 
                     # Save all transcriptions and summaries to files
                     logging.debug("Saving all transcriptions and summaries to files")
-                    with open('all_transcriptions.json', 'w') as f:
-                        json.dump(all_transcriptions, f, indent=2)
+                    with open('all_transcriptions.json', 'w', encoding='utf-8') as f:
+                        json.dump(all_transcriptions, f, indent=2, ensure_ascii=False)
 
-                    with open('all_summaries.txt', 'w') as f:
+                    with open('all_summaries.txt', 'w', encoding='utf-8') as f:
                         f.write(all_summaries)
 
                     error_summary = "\n".join(errors) if errors else "No errors occurred."
