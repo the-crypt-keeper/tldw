@@ -23,15 +23,15 @@ import configparser
 import hashlib
 import json
 import logging
+import os
+import re
+import time
 from datetime import timedelta
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 import requests
-import time
-from tqdm import tqdm
-import os
-import re
 import unicodedata
+from tqdm import tqdm
 
 from App_Function_Libraries.Video_DL_Ingestion_Lib import get_youtube
 
@@ -423,7 +423,15 @@ def save_segments_to_json(segments, file_name="transcription_segments.json"):
 
     return json_file_path
 
+#
+#
+#######################################################################################################################
+#
+# Backup code
 
+#
+# End of backup code
+#######################################################################################################################
 
 
 

@@ -54,7 +54,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
-    user_delete_item, empty_trash
+    user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config, safe_read_file
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -3634,6 +3634,47 @@ def create_export_tab():
     )
 
 
+
+def create_backup():
+    backup_file = create_automated_backup(db_path, backup_dir)
+    return f"Backup created: {backup_file}"
+
+def list_backups():
+    backups = [f for f in os.listdir(backup_dir) if f.endswith('.db')]
+    return "\n".join(backups)
+
+def restore_backup(backup_name):
+    backup_path = os.path.join(backup_dir, backup_name)
+    if os.path.exists(backup_path):
+        shutil.copy2(backup_path, db_path)
+        return f"Database restored from {backup_name}"
+    else:
+        return "Backup file not found"
+
+
+def create_backup_tab():
+    with gr.Tab("Create Backup"):
+        gr.Markdown("# Create a backup of the database")
+        create_button = gr.Button("Create Backup")
+        create_output = gr.Textbox(label="Result")
+        create_button.click(create_backup, inputs=[], outputs=create_output)
+
+def create_view_backups_tab():
+    with gr.TabItem("View Backups"):
+        gr.Markdown("# Browse available backups")
+        view_button = gr.Button("View Backups")
+        backup_list = gr.Textbox(label="Available Backups")
+        view_button.click(list_backups, inputs=[], outputs=backup_list)
+
+def create_restore_backup_tab():
+    with gr.TabItem("Restore Backup"):
+        gr.Markdown("# Restore a backup of the database")
+        backup_input = gr.Textbox(label="Backup Filename")
+        restore_button = gr.Button("Restore")
+        restore_output = gr.Textbox(label="Result")
+        restore_button.click(restore_backup, inputs=[backup_input], outputs=restore_output)
+
+
 #
 # End of Export Items Tab Functions
 ################################################################################################################
@@ -3927,6 +3968,11 @@ def launch_ui(share_public=None, server_mode=False):
                 create_import_single_prompt_tab()
                 create_import_multiple_prompts_tab()
                 create_export_tab()
+
+            with gr.TabItem("Backup Management"):
+                create_backup_tab()
+                create_view_backups_tab()
+                create_restore_backup_tab()
 
             with gr.TabItem("Utilities"):
                 create_utilities_tab()
