@@ -177,6 +177,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
 def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries=3, retry_delay=5):
     try:
         loaded_config_data = load_and_log_configs()
+        anthropic_api_key = api_key
         # API key validation
         if api_key is None or api_key.strip() == "":
             logging.info("Anthropic: API key not provided as parameter")
@@ -188,7 +189,8 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries
             logging.error("Anthropic: API key not found or is empty")
             return "Anthropic: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"Anthropic: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        logging.debug(f"Anthropic: Using API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("AnthropicAI: Loading json data for summarization")
@@ -428,8 +430,10 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
         # Set the model to be used
         groq_model = loaded_config_data['models']['groq']
 
+        groq_api_key = api_key
+
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'Authorization': f'Bearer {groq_api_key}',
             'Content-Type': 'application/json'
         }
 
@@ -476,6 +480,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
     import requests
     import json
     global openrouter_model, openrouter_api_key
+    openrouter_api_key = api_key
     # API key validation
     if api_key is None or api_key.strip() == "":
         logging.info("OpenRouter: API key not provided as parameter")
@@ -573,6 +578,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
     except Exception as e:
         logging.error("openrouter: Error in processing: %s", str(e))
         return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
+
 
 def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
     loaded_config_data = load_and_log_configs()
