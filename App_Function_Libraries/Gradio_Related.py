@@ -1676,6 +1676,95 @@ def resummarize_content(selected_item, item_mapping, api_name, api_key, chunking
 #
 ############################################################################################################################################################################################################################
 #
+# Transcript Comparison Tab
+
+# FIXME - under construction
+def get_transcript_options(media_id):
+    transcripts = get_transcripts(media_id)
+    return [f"{t[0]}: {t[1]} ({t[3]})" for t in transcripts]
+
+
+def update_transcript_options(media_id):
+    options = get_transcript_options(media_id)
+    return gr.update(choices=options), gr.update(choices=options)
+
+def compare_transcripts(media_id, transcript1_id, transcript2_id):
+    try:
+        transcripts = get_transcripts(media_id)
+        transcript1 = next((t for t in transcripts if t[0] == int(transcript1_id)), None)
+        transcript2 = next((t for t in transcripts if t[0] == int(transcript2_id)), None)
+
+        if not transcript1 or not transcript2:
+            return "One or both selected transcripts not found."
+
+        comparison = f"Transcript 1 (Model: {transcript1[1]}, Created: {transcript1[3]}):\n\n"
+        comparison += format_transcription(transcript1[2])
+        comparison += f"\n\nTranscript 2 (Model: {transcript2[1]}, Created: {transcript2[3]}):\n\n"
+        comparison += format_transcription(transcript2[2])
+
+        return comparison
+    except Exception as e:
+        logging.error(f"Error in compare_transcripts: {str(e)}")
+        return f"Error comparing transcripts: {str(e)}"
+
+
+def create_compare_transcripts_tab():
+    with gr.TabItem("Compare Transcripts"):
+        gr.Markdown("# Compare Transcripts")
+
+        with gr.Row():
+            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+            search_button = gr.Button("Search")
+
+        with gr.Row():
+            media_id_output = gr.Dropdown(label="Select Media Item", choices=[], interactive=True)
+            media_mapping = gr.State({})
+
+        media_id_input = gr.Number(label="Media ID", visible=False)
+        transcript1_dropdown = gr.Dropdown(label="Transcript 1")
+        transcript2_dropdown = gr.Dropdown(label="Transcript 2")
+        compare_button = gr.Button("Compare Transcripts")
+        comparison_output = gr.Textbox(label="Comparison Result", lines=20)
+
+        def update_media_dropdown(search_query, search_type):
+            results = browse_items(search_query, search_type)
+            item_options = [f"{item[1]} ({item[2]})" for item in results]
+            new_item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}
+            return gr.update(choices=item_options), new_item_mapping
+
+        search_button.click(
+            fn=update_media_dropdown,
+            inputs=[search_query_input, search_type_input],
+            outputs=[media_id_output, media_mapping]
+        )
+
+        def load_selected_media_id(selected_media, media_mapping):
+            if selected_media and media_mapping and selected_media in media_mapping:
+                media_id = media_mapping[selected_media]
+                return media_id
+            return None
+
+        media_id_output.change(
+            fn=load_selected_media_id,
+            inputs=[media_id_output, media_mapping],
+            outputs=[media_id_input]
+        )
+
+        media_id_input.change(update_transcript_options, inputs=[media_id_input],
+                              outputs=[transcript1_dropdown, transcript2_dropdown])
+        compare_button.click(compare_transcripts, inputs=[media_id_input, transcript1_dropdown, transcript2_dropdown],
+                             outputs=[comparison_output])
+
+### End of under construction section
+
+
+
+
+#
+#
+###########################################################################################################################################################################################################################
+#
 # Search Tab
 
 def add_or_update_prompt(title, description, system_prompt, user_prompt):
@@ -1970,7 +2059,7 @@ def create_llamafile_advanced_inputs():
 
 
 # FIXME - not adding content from selected item to query
-def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt):
+def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt, temperature):
     try:
         logging.info(f"Debug - Chat Function - Message: {message}")
         logging.info(f"Debug - Chat Function - Media Content: {media_content}")
@@ -1996,34 +2085,37 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         # Print first 500 chars
         logging.info(f"Debug - Chat Function - Input Data: {input_data[:500]}...")
 
+        temperature = float(temperature) if temperature else 0.7
+        temp = temperature
+
         # Use the existing API request code based on the selected endpoint
         logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
         if api_endpoint.lower() == 'openai':
-            response = summarize_with_openai(api_key, input_data, prompt)
+            response = summarize_with_openai(api_key, input_data, prompt, temp)
         elif api_endpoint.lower() == "anthropic":
-            response = summarize_with_anthropic(api_key, input_data, prompt)
+            response = summarize_with_anthropic(api_key, input_data, prompt, temp)
         elif api_endpoint.lower() == "cohere":
-            response = summarize_with_cohere(api_key, input_data, prompt)
+            response = summarize_with_cohere(api_key, input_data, prompt, temp)
         elif api_endpoint.lower() == "groq":
-            response = summarize_with_groq(api_key, input_data, prompt)
+            response = summarize_with_groq(api_key, input_data, prompt, temp)
         elif api_endpoint.lower() == "openrouter":
-            response = summarize_with_openrouter(api_key, input_data, prompt)
+            response = summarize_with_openrouter(api_key, input_data, prompt, temp)
         elif api_endpoint.lower() == "deepseek":
-            response = summarize_with_deepseek(api_key, input_data, prompt)
+            response = summarize_with_deepseek(api_key, input_data, prompt, temp)
         elif api_endpoint.lower() == "llama.cpp":
-            response = summarize_with_llama(input_data, prompt)
+            response = summarize_with_llama(input_data, prompt, temp)
         elif api_endpoint.lower() == "kobold":
-            response = summarize_with_kobold(input_data, api_key, prompt)
+            response = summarize_with_kobold(input_data, api_key, prompt, temp)
         elif api_endpoint.lower() == "ooba":
-            response = summarize_with_oobabooga(input_data, api_key, prompt)
+            response = summarize_with_oobabooga(input_data, api_key, prompt, temp)
         elif api_endpoint.lower() == "tabbyapi":
-            response = summarize_with_tabbyapi(input_data, prompt)
+            response = summarize_with_tabbyapi(input_data, prompt, temp)
         elif api_endpoint.lower() == "vllm":
-            response = summarize_with_vllm(input_data, prompt)
+            response = summarize_with_vllm(input_data, prompt, temp)
         elif api_endpoint.lower() == "local-llm":
-            response = summarize_with_local_llm(input_data, prompt)
+            response = summarize_with_local_llm(input_data, prompt, temp)
         elif api_endpoint.lower() == "huggingface":
-            response = summarize_with_huggingface(api_key, input_data, prompt)
+            response = summarize_with_huggingface(api_key, input_data, prompt, temp)
         else:
             raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
 
@@ -2162,7 +2254,8 @@ def update_user_prompt(preset_name):
     return ""
 
 
-def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id, save_conversation):
+# FIXME - add additional features....
+def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id, save_conversation, temperature, max_tokens=None, top_p=None, frequency_penalty=None, presence_penalty=None, stop_sequence=None):
     try:
         if save_conversation:
             if conversation_id is None:
@@ -2182,7 +2275,7 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
             full_message = message
 
         # Generate bot response
-        bot_message = chat(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt)
+        bot_message = chat(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt, temperature)
 
         if save_conversation:
             # Add assistant message to the database
@@ -2271,6 +2364,8 @@ def create_chat_interface():
                     use_prompt = gr.Checkbox(label="Use Prompt")
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
                 with gr.Row():
+                    temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
+                with gr.Row():
                     conversation_search = gr.Textbox(label="Search Conversations")
                 with gr.Row():
                     search_conversations_btn = gr.Button("Search Conversations")
@@ -2312,7 +2407,7 @@ def create_chat_interface():
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
-                    conversation_id, save_conversation],
+                    conversation_id, save_conversation, temperature],
             outputs=[msg, chatbot, conversation_id]
         ).then(# Clear the message box after submission
             lambda x: gr.update(value=""),
@@ -2385,12 +2480,286 @@ def create_chat_interface():
         chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
 
-def create_chat_interface_top_bottom():
-    with gr.TabItem("Remote LLM Chat (Vertical)"):
+def create_chat_interface_stacked():
+    custom_css = """
+    .chatbot-container .message-wrap .message {
+        font-size: 14px !important;
+    }
+    """
+    with gr.TabItem("Remote LLM Chat - Stacked"):
+        gr.Markdown("# Stacked Chat")
+        chat_history = gr.State([])
+        media_content = gr.State({})
+        selected_parts = gr.State([])
+        conversation_id = gr.State(None)
+
+        with gr.Row():
+            with gr.Column():
+                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+                search_button = gr.Button("Search")
+                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                item_mapping = gr.State({})
+                with gr.Row():
+                    use_content = gr.Checkbox(label="Use Content")
+                    use_summary = gr.Checkbox(label="Use Summary")
+                    use_prompt = gr.Checkbox(label="Use Prompt")
+                    save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
+                    temp = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
+                with gr.Row():
+                    conversation_search = gr.Textbox(label="Search Conversations")
+                with gr.Row():
+                    previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
+                with gr.Row():
+                    search_conversations_btn = gr.Button("Search Conversations")
+                    load_conversations_btn = gr.Button("Load Selected Conversation")
+            with gr.Column():
+                api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
+                api_key = gr.Textbox(label="API Key (if required)", type="password")
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
+                user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
+                                       "be used as the next message instead)", lines=3)
+        with gr.Row():
+            with gr.Column(scale=1):
+                chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
+                msg = gr.Textbox(label="Enter your message")
+                submit = gr.Button("Submit")
+
+                edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
+                edit_message_text = gr.Textbox(label="Edit Message", visible=False)
+                update_message_button = gr.Button("Update Message", visible=False)
+
+                delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
+                delete_message_button = gr.Button("Delete Message", visible=False)
+
+                save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
+                save_chat_history_as_file = gr.Button("Save Chat History as File")
+                download_file = gr.File(label="Download Chat History")
+
+        # Restore original functionality
+        search_button.click(
+            fn=update_dropdown,
+            inputs=[search_query_input, search_type_input],
+            outputs=[items_output, item_mapping]
+        )
+
+        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+
+        submit.click(
+            chat_wrapper,
+            inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
+                    conversation_id, save_conversation, temp],
+            outputs=[msg, chatbot, conversation_id]
+        ).then(# Clear the message box after submission
+            lambda x: gr.update(value=""),
+            inputs=[chatbot],
+            outputs=[msg]
+        ).then(# Clear the user prompt after the first message
+            lambda: gr.update(value=""),
+            outputs=[user_prompt]
+        )
+
+        items_output.change(
+            update_chat_content,
+            inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
+            outputs=[media_content, selected_parts]
+        )
+        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                          outputs=[selected_parts])
+        items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
+
+        search_conversations_btn.click(
+            search_conversations,
+            inputs=[conversation_search],
+            outputs=[previous_conversations]
+        )
+
+        load_conversations_btn.click(
+            clear_chat,
+            outputs=[chatbot, chat_history]
+        ).then(
+            load_conversation,
+            inputs=[previous_conversations],
+            outputs=[chatbot, conversation_id]
+        )
+
+        previous_conversations.change(
+            load_conversation,
+            inputs=[previous_conversations],
+            outputs=[chat_history]
+        )
+
+        update_message_button.click(
+            update_message_in_chat,
+            inputs=[edit_message_id, edit_message_text, chat_history],
+            outputs=[chatbot]
+        )
+
+        delete_message_button.click(
+            delete_message_from_chat,
+            inputs=[delete_message_id, chat_history],
+            outputs=[chatbot]
+        )
+
+        save_chat_history_as_file.click(
+            save_chat_history,
+            inputs=[chatbot, conversation_id],
+            outputs=[download_file]
+        )
+
+        save_chat_history_to_db.click(
+            save_chat_history_to_db_wrapper,
+            inputs=[chatbot, conversation_id, media_content],
+            outputs=[conversation_id, gr.Textbox(label="Save Status")]
+        )
+
+        chatbot.select(show_edit_message, None, [edit_message_text, edit_message_id, update_message_button])
+        chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
+
+
+def create_chat_interface_three():
+    custom_css = """
+    .chatbot-container .message-wrap .message {
+        font-size: 14px !important;
+    }
+    .chat-window {
+        height: 400px;
+        overflow-y: auto;
+    }
+    """
+    # CSS issue
+    with gr.TabItem("Multi-API Chat Interface"):
+        gr.Markdown("# Multi-API Chat Interface")
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                             label="Search By")
+                search_button = gr.Button("Search")
+                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                item_mapping = gr.State({})
+                use_content = gr.Checkbox(label="Use Content")
+                use_summary = gr.Checkbox(label="Use Summary")
+                use_prompt = gr.Checkbox(label="Use Prompt")
+                save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
+            with gr.Column():
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
+                user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
+
+        with gr.Row():
+            for i in range(3):
+                with gr.Column():
+                    gr.Markdown(f"### Chat Window {i + 1}")
+                    api_endpoint = gr.Dropdown(label=f"API Endpoint {i + 1}",
+                                               choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
+                                                        "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba",
+                                                        "Tabbyapi", "VLLM", "HuggingFace"])
+                    api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
+                    temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
+                    chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
+
+        with gr.Row():
+            msg = gr.Textbox(label="Enter your message", scale=4)
+            submit = gr.Button("Submit", scale=1)
+
+        # State variables
+        chat_history = [gr.State([]) for _ in range(3)]
+        media_content = gr.State({})
+        selected_parts = gr.State([])
+        conversation_id = gr.State(None)
+
+        # Event handlers
+        search_button.click(
+            fn=update_dropdown,
+            inputs=[search_query_input, search_type_input],
+            outputs=[items_output, item_mapping]
+        )
+
+        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+
+        def chat_wrapper_multi(message, *args):
+            chat_histories = args[:3]
+            chatbots = args[3:6]
+            api_endpoints = args[6:9]
+            api_keys = args[9:12]
+            temperatures = args[12:15]
+            media_content = args[15]
+            selected_parts = args[16]
+            conversation_id = args[17]
+            save_conversation = args[18]
+
+            new_chat_histories = []
+            new_chatbots = []
+
+            for i in range(3):
+                new_msg, new_history, new_conv_id = chat_wrapper(
+                    message, chat_histories[i], media_content, selected_parts,
+                    api_endpoints[i], api_keys[i], user_prompt, conversation_id,
+                    save_conversation, temperature=temperatures[i]
+                )
+                new_chat_histories.append(new_history)
+                new_chatbots.append(new_msg)
+
+            return [message] + new_chatbots + new_chat_histories + [new_conv_id]
+
+        submit.click(
+            chat_wrapper_multi,
+            inputs=[msg] + chat_history + [chatbot for _ in range(3)] +
+                   [api_endpoint for _ in range(3)] + [api_key for _ in range(3)] +
+                   [temperature for _ in range(3)] + [media_content, selected_parts, conversation_id,
+                                                      save_conversation],
+            outputs=[msg] + [chatbot for _ in range(3)] + chat_history + [conversation_id]
+        ).then(
+            lambda x: gr.update(value=""),
+            inputs=[chatbot],
+            outputs=[msg]
+        ).then(
+            lambda: gr.update(value=""),
+            outputs=[user_prompt]
+        )
+
+        items_output.change(
+            update_chat_content,
+            inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
+            outputs=[media_content, selected_parts]
+        )
+
+        for checkbox in [use_content, use_summary, use_prompt]:
+            checkbox.change(
+                update_selected_parts,
+                inputs=[use_content, use_summary, use_prompt],
+                outputs=[selected_parts]
+            )
+
+
+def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, temperature, media_content,
+                       selected_parts, conversation_id, save_conversation, user_prompt):
+    new_msg, new_history, new_conv_id = chat_wrapper(
+        message, chat_history, media_content, selected_parts,
+        api_endpoint, api_key, user_prompt, conversation_id,
+        save_conversation, temperature
+    )
+
+    if new_msg:
+        updated_chatbot = chatbot + [(message, new_msg)]
+    else:
+        updated_chatbot = chatbot
+
+    return new_msg, updated_chatbot, new_history, new_conv_id
+
+
+def create_chat_interface_vertical():
+    with gr.TabItem("Remote LLM Chat (No Saving)"):
         gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
         chat_history = gr.State([])
         media_content = gr.State({})
         selected_parts = gr.State([])
+        conversation_id = gr.State(None)
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -2402,21 +2771,22 @@ def create_chat_interface_top_bottom():
                 use_content = gr.Checkbox(label="Use Content")
                 use_summary = gr.Checkbox(label="Use Summary")
                 use_prompt = gr.Checkbox(label="Use Prompt")
+                save_conversation = gr.Checkbox(label="Save Conversation", value=False)
 
                 api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
+                temperature = gr.Slider(label="Temperature", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
-                                       "be used as the next message instead)", lines=3)
-        with gr.Row():
+                user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
             with gr.Column():
+                gr.Markdown("#### Chat Window")
                 chatbot = gr.Chatbot(height=500)
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
                 save_button = gr.Button("Save Chat History")
                 download_file = gr.File(label="Download Chat History")
 
-        save_button.click(save_chat_history, inputs=[chat_history], outputs=[download_file])
+        save_button.click(save_chat_history, inputs=[chatbot], outputs=[download_file])
 
         search_button.click(
             fn=update_dropdown,
@@ -2431,19 +2801,28 @@ def create_chat_interface_top_bottom():
             inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
             outputs=[media_content, selected_parts]
         )
-        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                           outputs=[selected_parts])
-        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                           outputs=[selected_parts])
-        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                          outputs=[selected_parts])
-        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                           outputs=[selected_parts])
-        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                           outputs=[selected_parts])
-        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
-                          outputs=[selected_parts])
+
+        for checkbox in [use_content, use_summary, use_prompt]:
+            checkbox.change(
+                update_selected_parts,
+                inputs=[use_content, use_summary, use_prompt],
+                outputs=[selected_parts]
+            )
+
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
+
+        submit.click(
+            chat_wrapper_single,
+            inputs=[msg, chat_history, chatbot, api_endpoint, api_key, temperature, media_content, selected_parts, conversation_id, save_conversation, user_prompt],
+            outputs=[msg, chatbot, chat_history, conversation_id]
+        ).then(
+            lambda x: gr.update(value=""),
+            inputs=[chatbot],
+            outputs=[msg]
+        ).then(
+            lambda: gr.update(value=""),
+            outputs=[user_prompt]
+        )
 
 
 def create_chat_management_tab():
@@ -2519,85 +2898,7 @@ def create_chat_management_tab():
 #
 # Media Edit Tab Functions
 
-# FIXME - under construction
-def get_transcript_options(media_id):
-    transcripts = get_transcripts(media_id)
-    return [f"{t[0]}: {t[1]} ({t[3]})" for t in transcripts]
 
-
-def update_transcript_options(media_id):
-    options = get_transcript_options(media_id)
-    return gr.update(choices=options), gr.update(choices=options)
-
-def compare_transcripts(media_id, transcript1_id, transcript2_id):
-    try:
-        transcripts = get_transcripts(media_id)
-        transcript1 = next((t for t in transcripts if t[0] == int(transcript1_id)), None)
-        transcript2 = next((t for t in transcripts if t[0] == int(transcript2_id)), None)
-
-        if not transcript1 or not transcript2:
-            return "One or both selected transcripts not found."
-
-        comparison = f"Transcript 1 (Model: {transcript1[1]}, Created: {transcript1[3]}):\n\n"
-        comparison += format_transcription(transcript1[2])
-        comparison += f"\n\nTranscript 2 (Model: {transcript2[1]}, Created: {transcript2[3]}):\n\n"
-        comparison += format_transcription(transcript2[2])
-
-        return comparison
-    except Exception as e:
-        logging.error(f"Error in compare_transcripts: {str(e)}")
-        return f"Error comparing transcripts: {str(e)}"
-
-
-def create_compare_transcripts_tab():
-    with gr.TabItem("Compare Transcripts"):
-        gr.Markdown("# Compare Transcripts")
-
-        with gr.Row():
-            search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-            search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
-            search_button = gr.Button("Search")
-
-        with gr.Row():
-            media_id_output = gr.Dropdown(label="Select Media Item", choices=[], interactive=True)
-            media_mapping = gr.State({})
-
-        media_id_input = gr.Number(label="Media ID", visible=False)
-        transcript1_dropdown = gr.Dropdown(label="Transcript 1")
-        transcript2_dropdown = gr.Dropdown(label="Transcript 2")
-        compare_button = gr.Button("Compare Transcripts")
-        comparison_output = gr.Textbox(label="Comparison Result", lines=20)
-
-        def update_media_dropdown(search_query, search_type):
-            results = browse_items(search_query, search_type)
-            item_options = [f"{item[1]} ({item[2]})" for item in results]
-            new_item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}
-            return gr.update(choices=item_options), new_item_mapping
-
-        search_button.click(
-            fn=update_media_dropdown,
-            inputs=[search_query_input, search_type_input],
-            outputs=[media_id_output, media_mapping]
-        )
-
-        def load_selected_media_id(selected_media, media_mapping):
-            if selected_media and media_mapping and selected_media in media_mapping:
-                media_id = media_mapping[selected_media]
-                return media_id
-            return None
-
-        media_id_output.change(
-            fn=load_selected_media_id,
-            inputs=[media_id_output, media_mapping],
-            outputs=[media_id_input]
-        )
-
-        media_id_input.change(update_transcript_options, inputs=[media_id_input],
-                              outputs=[transcript1_dropdown, transcript2_dropdown])
-        compare_button.click(compare_transcripts, inputs=[media_id_input, transcript1_dropdown, transcript2_dropdown],
-                             outputs=[comparison_output])
-
-### End of under construction section
 
 def create_media_edit_tab():
     with gr.TabItem("Edit Existing Items"):
@@ -3937,8 +4238,10 @@ def launch_ui(share_public=None, server_mode=False):
                 create_prompt_view_tab()
 
             with gr.TabItem("Chat with an LLM"):
+                create_chat_interface_vertical()
                 create_chat_interface()
-                create_chat_interface_top_bottom()
+                create_chat_interface_stacked()
+                create_chat_interface_three()
                 create_chat_management_tab()
                 create_llamafile_settings_tab()
 
