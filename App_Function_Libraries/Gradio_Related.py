@@ -2772,7 +2772,7 @@ def create_chat_interface_multi_api():
             )
 
 
-def create_chat_interface_three():
+def create_chat_interface_four():
     custom_css = """
     .chatbot-container .message-wrap .message {
         font-size: 14px !important;
@@ -2782,38 +2782,41 @@ def create_chat_interface_three():
         overflow-y: auto;
     }
     """
-    with gr.TabItem("Three Independent API Chats"):
-        gr.Markdown("# Three Independent API Chat Interfaces")
+    with gr.TabItem("Four Independent API Chats"):
+        gr.Markdown("# Four Independent API Chat Interfaces")
 
         with gr.Row():
             with gr.Column():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
                 user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
-
+            with gr.Column():
+                gr.Markdown("Scroll down for the chat windows...")
         chat_interfaces = []
-        for i in range(3):
+        for row in range(2):
             with gr.Row():
-                with gr.Column():
-                    gr.Markdown(f"### Chat Window {i + 1}")
-                    api_endpoint = gr.Dropdown(label=f"API Endpoint {i + 1}",
-                                               choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
-                                                        "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba",
-                                                        "Tabbyapi", "VLLM", "HuggingFace"])
-                    api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
-                    temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
-                    chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
-                    msg = gr.Textbox(label=f"Enter your message for Chat {i + 1}")
-                    submit = gr.Button(f"Submit to Chat {i + 1}")
+                for col in range(2):
+                    i = row * 2 + col
+                    with gr.Column():
+                        gr.Markdown(f"### Chat Window {i + 1}")
+                        api_endpoint = gr.Dropdown(label=f"API Endpoint {i + 1}",
+                                                   choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
+                                                            "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba",
+                                                            "Tabbyapi", "VLLM", "HuggingFace"])
+                        api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
+                        temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
+                        chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
+                        msg = gr.Textbox(label=f"Enter your message for Chat {i + 1}")
+                        submit = gr.Button(f"Submit to Chat {i + 1}")
 
-                    chat_interfaces.append({
-                        'api_endpoint': api_endpoint,
-                        'api_key': api_key,
-                        'temperature': temperature,
-                        'chatbot': chatbot,
-                        'msg': msg,
-                        'submit': submit,
-                        'chat_history': gr.State([])
-                    })
+                        chat_interfaces.append({
+                            'api_endpoint': api_endpoint,
+                            'api_key': api_key,
+                            'temperature': temperature,
+                            'chatbot': chatbot,
+                            'msg': msg,
+                            'submit': submit,
+                            'chat_history': gr.State([])
+                        })
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
 
@@ -4379,7 +4382,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_chat_interface()
                 create_chat_interface_stacked()
                 create_chat_interface_multi_api()
-                create_chat_interface_three()
+                create_chat_interface_four()
                 create_chat_management_tab()
                 create_llamafile_settings_tab()
 
