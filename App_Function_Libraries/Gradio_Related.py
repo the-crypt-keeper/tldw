@@ -910,6 +910,19 @@ def create_video_transcription_tab():
                 try:
                     logging.info("process_videos_wrapper(): process_videos_wrapper called")
 
+                    # Define file paths
+                    transcriptions_file = os.path.join('all_transcriptions.json')
+                    summaries_file = os.path.join('all_summaries.txt')
+
+                    # Delete existing files if they exist
+                    for file_path in [transcriptions_file, summaries_file]:
+                        try:
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+                                logging.info(f"Deleted existing file: {file_path}")
+                        except Exception as e:
+                            logging.warning(f"Failed to delete file {file_path}: {str(e)}")
+
                     # Handle both URL input and file upload
                     inputs = []
                     if url_input:
