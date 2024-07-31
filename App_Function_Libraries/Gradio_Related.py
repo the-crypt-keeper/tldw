@@ -4046,16 +4046,15 @@ def create_restore_backup_tab():
 # Keyword Management Tab Functions
 
 def create_export_keywords_tab():
-    with gr.Group():
-        with gr.Tab("Export Keywords"):
-            export_keywords_button = gr.Button("Export Keywords")
-            export_keywords_output = gr.File(label="Download Exported Keywords")
-            export_keywords_status = gr.Textbox(label="Export Status")
+    with gr.Tab("Export Keywords"):
+        export_keywords_button = gr.Button("Export Keywords")
+        export_keywords_output = gr.File(label="Download Exported Keywords")
+        export_keywords_status = gr.Textbox(label="Export Status")
 
-            export_keywords_button.click(
-                fn=export_keywords_to_csv,
-                outputs=[export_keywords_status, export_keywords_output]
-            )
+        export_keywords_button.click(
+            fn=export_keywords_to_csv,
+            outputs=[export_keywords_status, export_keywords_output]
+        )
 
 def create_view_keywords_tab():
     with gr.TabItem("View Keywords"):
