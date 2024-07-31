@@ -69,8 +69,9 @@
 7. Finally, the button `Process Videos` is created to handle the user input with the variable `process_button`
 8. `process_button` when clicked, calls the `process_videos_wrapper()` function.
 9. `process_videos_wrapper()` is defined on line 903 of `Gradio_Related.py`
-    - The function first validates the filenames passed in, and then proceeds to call `process_videos_with_error_handling()`
-10. The function then defines the `def process_videos_with_error_handling(<args>):` function to handle the user input.
+    - The function first sets up file paths for `all_summaries.json` and `all_transcripts.json` and then proceeds to delete them, making sure each session starts clean.
+    - Then validates the filenames passed in, and then proceeds to call `process_videos_with_error_handling()`
+10. The parent function then defines the `def process_videos_with_error_handling(<args>):` function to handle the user input.
     - `def process_videos_with_error_handling(<args>):`:
       - The function first checks to see if there's any input in the URL field.
       - The function then checks/sets the batch size
