@@ -51,7 +51,7 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     perform_transcription, summarize_chunk
 from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
-    export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
+    export_keywords_to_csv, add_media_to_database, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
@@ -2656,7 +2656,7 @@ def create_chat_interface_stacked():
 
 
 # FIXME - broken temp sliders
-def create_chat_interface_three():
+def create_chat_interface_multi_api():
     custom_css = """
     .chatbot-container .message-wrap .message {
         font-size: 14px !important;
@@ -2667,8 +2667,8 @@ def create_chat_interface_three():
     }
     """
     # CSS issue
-    with gr.TabItem("Multi-API Chat Interface"):
-        gr.Markdown("# Multi-API Chat Interface")
+    with gr.TabItem("One Prompt - Multiple APIs"):
+        gr.Markdown("# One Prompt but Multiple API Chat Interface")
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -2771,6 +2771,79 @@ def create_chat_interface_three():
                 outputs=[selected_parts]
             )
 
+
+def create_chat_interface_three():
+    custom_css = """
+    .chatbot-container .message-wrap .message {
+        font-size: 14px !important;
+    }
+    .chat-window {
+        height: 400px;
+        overflow-y: auto;
+    }
+    """
+    with gr.TabItem("Three Independent API Chats"):
+        gr.Markdown("# Three Independent API Chat Interfaces")
+
+        with gr.Row():
+            with gr.Column():
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
+                user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
+
+        chat_interfaces = []
+        for i in range(3):
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown(f"### Chat Window {i + 1}")
+                    api_endpoint = gr.Dropdown(label=f"API Endpoint {i + 1}",
+                                               choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
+                                                        "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba",
+                                                        "Tabbyapi", "VLLM", "HuggingFace"])
+                    api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
+                    temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
+                    chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
+                    msg = gr.Textbox(label=f"Enter your message for Chat {i + 1}")
+                    submit = gr.Button(f"Submit to Chat {i + 1}")
+
+                    chat_interfaces.append({
+                        'api_endpoint': api_endpoint,
+                        'api_key': api_key,
+                        'temperature': temperature,
+                        'chatbot': chatbot,
+                        'msg': msg,
+                        'submit': submit,
+                        'chat_history': gr.State([])
+                    })
+
+        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+
+        def chat_wrapper_single(message, chat_history, api_endpoint, api_key, temperature, user_prompt):
+            new_msg, new_history, _ = chat_wrapper(
+                message, chat_history, {}, [],  # Empty media_content and selected_parts
+                api_endpoint, api_key, user_prompt, None,  # No conversation_id
+                False,  # Not saving conversation
+                temperature=temperature
+            )
+            chat_history.append((message, new_msg))
+            return "", chat_history, chat_history
+
+        for interface in chat_interfaces:
+            interface['submit'].click(
+                chat_wrapper_single,
+                inputs=[
+                    interface['msg'],
+                    interface['chat_history'],
+                    interface['api_endpoint'],
+                    interface['api_key'],
+                    interface['temperature'],
+                    user_prompt
+                ],
+                outputs=[
+                    interface['msg'],
+                    interface['chatbot'],
+                    interface['chat_history']
+                ]
+            )
 
 def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, temperature, media_content,
                        selected_parts, conversation_id, save_conversation, user_prompt):
@@ -4305,6 +4378,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_chat_interface_vertical()
                 create_chat_interface()
                 create_chat_interface_stacked()
+                create_chat_interface_multi_api()
                 create_chat_interface_three()
                 create_chat_management_tab()
                 create_llamafile_settings_tab()
