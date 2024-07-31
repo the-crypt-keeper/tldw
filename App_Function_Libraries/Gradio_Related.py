@@ -536,7 +536,9 @@ def create_introduction_tab():
                     - **DeepSeek:**
                         * https://platform.deepseek.com/ (Chinese-hosted/is in english)
                     - **OpenRouter:**
-                        https://openrouter.ai/
+                        * https://openrouter.ai/
+                    - **Mistral:**
+                        * https://console.mistral.ai/
                 - **Choosing a Model to download**
                     - You'll first need to select a model you want to use with the server.
                         - Keep in mind that the model you select will determine the quality of the output you get, and that models run fastest when offloaded fully to your GPU.
@@ -614,7 +616,7 @@ def create_video_transcription_tab():
 
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace", "Mistral"],
                     value=None, label="API Name (Mandatory)")
                 api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
@@ -1206,7 +1208,7 @@ def create_audio_processing_tab():
 
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace", "Mistral"],
                     value=None,
                     label="API for Summarization (Optional)"
                 )
@@ -1294,7 +1296,7 @@ def create_podcast_tab():
 
                 podcast_api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp",
-                             "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                             "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace", "Mistral"],
                     value=None,
                     label="API Name for Summarization (Optional)"
                 )
@@ -1396,7 +1398,7 @@ def create_website_scraping_tab():
 
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"], value=None, label="API Name (Mandatory for Summarization)")
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace", "Mistral"], value=None, label="API Name (Mandatory for Summarization)")
                 api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
                                            placeholder="Enter your API key here; Ignore if using Local API or Built-in API")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
@@ -1485,7 +1487,7 @@ def create_resummary_tab():
                 with gr.Row():
                     api_name_input = gr.Dropdown(
                         choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
-                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace", "Mistral"],
                         value="Local-LLM", label="API Name")
                     api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here")
 
@@ -2408,7 +2410,8 @@ def create_chat_interface():
                 with gr.Row():
                     load_conversations_btn = gr.Button("Load Selected Conversation")
 
-                api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
+                api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace", "Mistral"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
                 user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
@@ -2577,9 +2580,8 @@ def create_chat_interface_editable():
                     load_conversations_btn = gr.Button("Load Selected Conversation")
 
                 api_endpoint = gr.Dropdown(label="Select API Endpoint",
-                                           choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek",
-                                                    "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM",
-                                                    "HuggingFace"])
+                                           choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace", "Mistral"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
                 user_prompt = gr.Textbox(
