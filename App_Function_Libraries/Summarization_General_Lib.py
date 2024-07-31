@@ -372,8 +372,6 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None):
 
         cohere_model = loaded_config_data['models']['cohere']
 
-        cohere_api_key = api_key
-
         if temp is None:
             temp = 0.3
         temp = float(temp)
