@@ -21,6 +21,8 @@
 import json
 import logging
 import os
+from typing import Union
+
 import requests
 # Import 3rd-party Libraries
 from openai import OpenAI
@@ -185,17 +187,34 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
 def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_IP="http://127.0.0.1:5001/api/v1/generate"):
-    loaded_config_data = load_and_log_configs()
+    logging.debug("Kobold: Summarization process starting...")
     try:
-        # API key validation
-        # FIXME - doesn't work/breaks
-        # if api_key is None:
-        #     logging.info("Kobold.cpp: API key not provided as parameter")
-        #     logging.info("Kobold.cpp: Attempting to use API key from config file")
-        #     api_key = loaded_config_data['api_keys']['kobold']
-        #
-        # if api_key is None or api_key.strip() == "":
-        #     logging.info("Kobold.cpp: API key not found or is empty")
+        logging.debug("Kobold: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            anthropic_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                anthropic_api_key = api_key
+                logging.info("Kobold: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                kobold_api_key = loaded_config_data['api_keys'].get('kobold')
+                if kobold_api_key:
+                    logging.info("Kobold: Using API key from config file")
+                else:
+                    logging.warning("Anthropic: No API key found in config file")
+
+        # Final check to ensure we have a valid API key
+        if not kobold_api_key or not kobold_api_key.strip():
+            logging.error("Kobold: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid Anthropic API key available")
+
+
+        logging.debug(f"Kobold: Using API Key: {kobold_api_key[:5]}...{kobold_api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Kobold.cpp: Loading json data for summarization")
@@ -272,16 +291,34 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
 def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions"):
-    loaded_config_data = load_and_log_configs()
+    logging.debug("Oobabooga: Summarization process starting...")
     try:
-        # API key validation
-        if api_key is None:
-            logging.info("ooba: API key not provided as parameter")
-            logging.info("ooba: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['ooba']
+        logging.debug("Oobabooga: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            ooba_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                ooba_api_key = api_key
+                logging.info("Oobabooga: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                ooba_api_key = loaded_config_data['api_keys'].get('ooba')
+                if ooba_api_key:
+                    logging.info("Anthropic: Using API key from config file")
+                else:
+                    logging.warning("Anthropic: No API key found in config file")
 
-        if api_key is None or api_key.strip() == "":
-            logging.info("ooba: API key not found or is empty")
+        # Final check to ensure we have a valid API key
+        if not ooba_api_key or not ooba_api_key.strip():
+            logging.error("Anthropic: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid Anthropic API key available")
+
+
+        logging.debug(f"Oobabooga: Using API Key: {ooba_api_key[:5]}...{ooba_api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Oobabooga: Loading json data for summarization")
@@ -347,52 +384,69 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http:/
 
 # FIXME - Install is more trouble than care to deal with right now.
 def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:5000/v1/chat/completions"):
-    loaded_config_data = load_and_log_configs()
-    model = loaded_config_data['models']['tabby']
-    # API key validation
-    if api_key is None:
-        logging.info("tabby: API key not provided as parameter")
-        logging.info("tabby: Attempting to use API key from config file")
-        api_key = loaded_config_data['api_keys']['tabby']
-
-    if api_key is None or api_key.strip() == "":
-        logging.info("tabby: API key not found or is empty")
-
-    if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("tabby: Loading json data for summarization")
-        with open(input_data, 'r') as file:
-            data = json.load(file)
-    else:
-        logging.debug("tabby: Using provided string data for summarization")
-        data = input_data
-
-    logging.debug(f"tabby: Loaded data: {data}")
-    logging.debug(f"tabby: Type of data: {type(data)}")
-
-    if isinstance(data, dict) and 'summary' in data:
-        # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("tabby: Summary already exists in the loaded data")
-        return data['summary']
-
-    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-    if isinstance(data, list):
-        segments = data
-        text = extract_text_from_segments(segments)
-    elif isinstance(data, str):
-        text = data
-    else:
-        raise ValueError("Invalid input data format")
-
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json'
-    }
-    data2 = {
-        'text': text,
-        'model': 'tabby'  # Specify the model if needed
-    }
-    tabby_api_ip = loaded_config_data['local_apis']['tabby']['ip']
+    logging.debug("TabbyAPI: Summarization process starting...")
     try:
+        logging.debug("TabbyAPI: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            tabby_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                tabby_api_key = api_key
+                logging.info("TabbyAPI: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                tabby_api_key = loaded_config_data['api_keys'].get('tabby')
+                if tabby_api_key:
+                    logging.info("TabbyAPI: Using API key from config file")
+                else:
+                    logging.warning("TabbyAPI: No API key found in config file")
+
+        # Final check to ensure we have a valid API key
+        if not tabby_api_key or not tabby_api_key.strip():
+            logging.error("TabbyAPI: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid Anthropic API key available")
+
+
+        logging.debug(f"TabbyAPI: Using API Key: {tabby_api_key[:5]}...{tabby_api_key[-5:]}")
+
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("tabby: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("tabby: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"tabby: Loaded data: {data}")
+        logging.debug(f"tabby: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("tabby: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Invalid input data format")
+
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        data2 = {
+            'text': text,
+            'model': 'tabby'  # Specify the model if needed
+        }
+        tabby_api_ip = loaded_config_data['local_apis']['tabby']['ip']
         response = requests.post(tabby_api_ip, headers=headers, json=data2)
         response.raise_for_status()
         summary = response.json().get('summary', '')
@@ -401,61 +455,106 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_I
         logger.error(f"Error summarizing with TabbyAPI: {e}")
         return "Error summarizing with TabbyAPI."
 
+def summarize_with_vllm(
+        input_data: Union[str, dict, list],
+        custom_prompt_input: str,
+        api_key: str = None,
+        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions",
+        model: str = None
+) -> str:
+    logging.debug("vLLM: Summarization process starting...")
+    try:
+        logging.debug("vLLM: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            vllm_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                vllm_api_key = api_key
+                logging.info("vLLM: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                vllm_api_key = loaded_config_data['api_keys'].get('vllm')
+                if vllm_api_key:
+                    logging.info("vLLM: Using API key from config file")
+                else:
+                    logging.warning("vLLM: No API key found in config file")
 
-# FIXME - https://docs.vllm.ai/en/latest/getting_started/quickstart.html .... Great docs.
-def summarize_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions"):
-    loaded_config_data = load_and_log_configs()
-    llm_model = loaded_config_data['models']['vllm']
-    # API key validation
-    if api_key is None:
-        logging.info("vLLM: API key not provided as parameter")
-        logging.info("vLLM: Attempting to use API key from config file")
-        api_key = loaded_config_data['api_keys']['llama']
+        # Final check to ensure we have a valid API key
+        if not vllm_api_key or not vllm_api_key.strip():
+            logging.error("Anthropic: No valid API key available")
+            raise ValueError("No valid vLLM API key available")
 
-    if api_key is None or api_key.strip() == "":
-        logging.info("vLLM: API key not found or is empty")
-    vllm_client = OpenAI(
-        base_url=vllm_api_url,
-        api_key=custom_prompt_input
-    )
+        logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:]}")
+        # Process input data
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("vLLM: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("vLLM: Using provided data for summarization")
+            data = input_data
 
-    if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("vLLM: Loading json data for summarization")
-        with open(input_data, 'r') as file:
-            data = json.load(file)
-    else:
-        logging.debug("vLLM: Using provided string data for summarization")
-        data = input_data
+        logging.debug(f"vLLM: Type of data: {type(data)}")
 
-    logging.debug(f"vLLM: Loaded data: {data}")
-    logging.debug(f"vLLM: Type of data: {type(data)}")
+        # Extract text for summarization
+        if isinstance(data, dict) and 'summary' in data:
+            logging.debug("vLLM: Summary already exists in the loaded data")
+            return data['summary']
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
+        elif isinstance(data, str):
+            text = data
+        elif isinstance(data, dict):
+            text = json.dumps(data)
+        else:
+            raise ValueError("Invalid input data format")
 
-    if isinstance(data, dict) and 'summary' in data:
-        # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("vLLM: Summary already exists in the loaded data")
-        return data['summary']
+        logging.debug(f"vLLM: Extracted text (showing first 500 chars): {text[:500]}...")
 
-    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-    if isinstance(data, list):
-        segments = data
-        text = extract_text_from_segments(segments)
-    elif isinstance(data, str):
-        text = data
-    else:
-        raise ValueError("Invalid input data format")
+        model = model or loaded_config_data['models']['vllm']
 
+        # Prepare the API request
+        headers = {
+            "Content-Type": "application/json"
+        }
 
-    custom_prompt = custom_prompt_input
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are a professional summarizer."},
+                {"role": "user", "content": f"{text}\n\n{custom_prompt_input}"}
+            ]
+        }
 
-    completion = client.chat.completions.create(
-        model=llm_model,
-        messages=[
-            {"role": "system", "content": "You are a professional summarizer."},
-            {"role": "user", "content": f"{text} \n\n\n\n{custom_prompt}"}
-        ]
-    )
-    vllm_summary = completion.choices[0].message.content
-    return vllm_summary
+        # Make the API call
+        logging.debug(f"vLLM: Sending request to {vllm_api_url}")
+        response = requests.post(vllm_api_url, headers=headers, json=payload)
+
+        # Check for successful response
+        response.raise_for_status()
+
+        # Extract and return the summary
+        response_data = response.json()
+        if 'choices' in response_data and len(response_data['choices']) > 0:
+            summary = response_data['choices'][0]['message']['content']
+            logging.debug("vLLM: Summarization successful")
+            logging.debug(f"vLLM: Summary (first 500 chars): {summary[:500]}...")
+            return summary
+        else:
+            raise ValueError("Unexpected response format from vLLM API")
+
+    except requests.RequestException as e:
+        logging.error(f"vLLM: API request failed: {str(e)}")
+        return f"Error: vLLM API request failed - {str(e)}"
+    except json.JSONDecodeError as e:
+        logging.error(f"vLLM: Failed to parse API response: {str(e)}")
+        return f"Error: Failed to parse vLLM API response - {str(e)}"
+    except Exception as e:
+        logging.error(f"vLLM: Unexpected error during summarization: {str(e)}")
+        return f"Error: Unexpected error during vLLM summarization - {str(e)}"
 
 
 def save_summary_to_file(summary, file_path):
