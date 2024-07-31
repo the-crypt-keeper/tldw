@@ -2542,7 +2542,7 @@ def create_chat_interface_editable():
     }
     """
 
-    with gr.TabItem("Remote LLM Chat (Horizontal)"):
+    with gr.TabItem("Remote LLM Chat - Editable"):
         gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
         gr.HTML("<script>" + custom_js + "</script>")
 
@@ -2702,7 +2702,7 @@ def create_chat_interface_editable():
         def show_edit_message(evt: gr.SelectData, chat_history):
             return gr.update(value=chat_history[evt.index][0]), gr.update(value=evt.index)
 
-        chatbot.select(show_edit_message, chat_history, [edit_message_text, gr.update()])
+        #chatbot.select(show_edit_message, chat_history, [edit_message_text, gr.update()])
 
     return chatbot, chat_history, conversation_id
 
