@@ -63,7 +63,7 @@ def extract_text_from_segments(segments):
     return text.strip()
 
 
-def summarize_with_openai(api_key, input_data, custom_prompt_arg):
+def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -136,6 +136,9 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
             f"OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
         logging.debug("openai: Preparing data + prompt for submittal")
         openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        if temp is None:
+            temp = 0.7
+        temp = float(temp)
         data = {
             "model": openai_model,
             "messages": [
@@ -143,7 +146,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
                 {"role": "user", "content": openai_prompt}
             ],
             "max_tokens": 4096,
-            "temperature": 0.1
+            "temperature": temp
         }
 
         logging.debug("OpenAI: Posting request")
@@ -174,7 +177,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries=3, retry_delay=5):
+def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp, max_retries=3, retry_delay=5):
     try:
         loaded_config_data = load_and_log_configs()
         anthropic_api_key = api_key
@@ -220,6 +223,10 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries
 
         anthropic_model = loaded_config_data['models']['anthropic']
 
+        if temp is None:
+            temp = 0.1
+        temp = float(temp)
+
         headers = {
             'x-api-key': anthropic_api_key,
             'anthropic-version': '2023-06-01',
@@ -240,7 +247,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries
             "max_tokens": 4096,  # max _possible_ tokens to return
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
-            "temperature": 0.1,
+            "temperature": temp,
             "top_k": 0,
             "top_p": 1.0,
             "metadata": {
@@ -296,7 +303,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries
 
 
 # Summarize with Cohere
-def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
+def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -342,6 +349,10 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
 
         cohere_api_key = api_key
 
+        if temp is None:
+            temp = 0.3
+        temp = float(temp)
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
@@ -357,7 +368,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
             ],
             "message": "Please provide a summary.",
             "model": cohere_model,
-            "connectors": [{"id": "web-search"}]
+            "connectors": [{"id": "web-search"}],
+            "temperature": temp
         }
 
         logging.debug("cohere: Submitting request to API endpoint")
@@ -385,7 +397,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, input_data, custom_prompt_arg):
+def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -432,6 +444,11 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
 
         groq_api_key = api_key
 
+        if temp is None:
+            temp = 0.2
+        temp = float(temp)
+
+
         headers = {
             'Authorization': f'Bearer {groq_api_key}',
             'Content-Type': 'application/json'
@@ -444,7 +461,8 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
             "messages": [
                 {
                     "role": "user",
-                    "content": groq_prompt
+                    "content": groq_prompt,
+                    "temperature": temp
                 }
             ],
             "model": groq_model
@@ -475,7 +493,7 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
 
 
-def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
+def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp):
     loaded_config_data = load_and_log_configs()
     import requests
     import json
@@ -544,6 +562,10 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
 
     openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
 
+    if temp is None:
+        temp = 0.1
+    temp = float(temp)
+
     try:
         logging.debug("openrouter: Submitting request to API endpoint")
         print("openrouter: Submitting request to API endpoint")
@@ -556,7 +578,8 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
                 "model": f"{openrouter_model}",
                 "messages": [
                     {"role": "user", "content": openrouter_prompt}
-                ]
+                ],
+                "temperature": temp
             })
         )
 
@@ -580,7 +603,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
         return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
 
 
-def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
+def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp):
     loaded_config_data = load_and_log_configs()
     global huggingface_api_key
     logging.debug(f"huggingface: Summarization process starting...")
@@ -631,6 +654,10 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
         huggingface_model = loaded_config_data['models']['huggingface']
         API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}"
 
+        if temp is None:
+            temp = 0.1
+        temp = float(temp)
+
         huggingface_prompt = f"{text}\n\n\n\n{custom_prompt_arg}"
         logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
         data = {
@@ -658,7 +685,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
         return None
 
 
-def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
+def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -702,6 +729,10 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
 
         deepseek_model = loaded_config_data['models']['deepseek'] or "deepseek-chat"
 
+        if temp is None:
+            temp = 0.1
+        temp = float(temp)
+
         headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json'
@@ -718,7 +749,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
                 {"role": "user", "content": deepseek_prompt}
             ],
             "stream": False,
-            "temperature": 0.8
+            "temperature": temp
         }
 
         logging.debug("DeepSeek: Posting request")
