@@ -2513,6 +2513,200 @@ def create_chat_interface():
         chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
 
+def create_chat_interface_editable():
+    custom_css = """
+    .chatbot-container .message-wrap .message {
+        font-size: 14px !important;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .chatbot-container .message-wrap .message:hover {
+        background-color: #f0f0f0;
+    }
+    .chatbot-container .message-wrap .message.selected-message {
+        background-color: #e0e0e0;
+    }
+    """
+
+    custom_js = """
+    function selectMessage(el) {
+        el.classList.toggle('selected-message');
+        updateSelectedMessages();
+    }
+
+    function updateSelectedMessages() {
+        const selectedMessages = document.querySelectorAll('.selected-message');
+        const messageIds = Array.from(selectedMessages).map(el => el.dataset.messageId);
+        document.getElementById('selected_messages').value = JSON.stringify(messageIds);
+        document.dispatchEvent(new CustomEvent('input', { target: document.getElementById('selected_messages') }));
+    }
+    """
+
+    with gr.TabItem("Remote LLM Chat (Horizontal)"):
+        gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
+        gr.HTML("<script>" + custom_js + "</script>")
+
+        chat_history = gr.State([])
+        media_content = gr.State({})
+        selected_parts = gr.State([])
+        conversation_id = gr.State(None)
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                             label="Search By")
+                search_button = gr.Button("Search")
+                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                item_mapping = gr.State({})
+                with gr.Row():
+                    use_content = gr.Checkbox(label="Use Content")
+                    use_summary = gr.Checkbox(label="Use Summary")
+                    use_prompt = gr.Checkbox(label="Use Prompt")
+                    save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
+                with gr.Row():
+                    temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
+                with gr.Row():
+                    conversation_search = gr.Textbox(label="Search Conversations")
+                with gr.Row():
+                    search_conversations_btn = gr.Button("Search Conversations")
+                with gr.Row():
+                    previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
+                with gr.Row():
+                    load_conversations_btn = gr.Button("Load Selected Conversation")
+
+                api_endpoint = gr.Dropdown(label="Select API Endpoint",
+                                           choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek",
+                                                    "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM",
+                                                    "HuggingFace"])
+                api_key = gr.Textbox(label="API Key (if required)", type="password")
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
+                user_prompt = gr.Textbox(
+                    label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
+                          "be used as the next message instead)", lines=3)
+            with gr.Column():
+                chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
+                selected_messages = gr.JSON(elem_id="selected_messages", visible=False)
+                msg = gr.Textbox(label="Enter your message")
+                submit = gr.Button("Submit")
+
+                edit_message_text = gr.Textbox(label="Edit Selected Message", visible=True)
+                update_message_button = gr.Button("Update Selected Message", visible=True)
+
+                delete_message_button = gr.Button("Delete Selected Messages", visible=True)
+
+                save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
+                save_chat_history_as_file = gr.Button("Save Chat History as File")
+                download_file = gr.File(label="Download Chat History")
+
+        # Event handlers
+        search_button.click(
+            fn=update_dropdown,
+            inputs=[search_query_input, search_type_input],
+            outputs=[items_output, item_mapping]
+        )
+
+        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+
+        submit.click(
+            chat_wrapper,
+            inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
+                    conversation_id, save_conversation, temperature],
+            outputs=[msg, chatbot, conversation_id]
+        ).then(
+            lambda x: gr.update(value=""),
+            inputs=[chatbot],
+            outputs=[msg]
+        ).then(
+            lambda: gr.update(value=""),
+            outputs=[user_prompt]
+        )
+
+        items_output.change(
+            update_chat_content,
+            inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
+            outputs=[media_content, selected_parts]
+        )
+        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                           outputs=[selected_parts])
+        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                          outputs=[selected_parts])
+        items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
+
+        search_conversations_btn.click(
+            search_conversations,
+            inputs=[conversation_search],
+            outputs=[previous_conversations]
+        )
+
+        load_conversations_btn.click(
+            clear_chat,
+            outputs=[chatbot, chat_history]
+        ).then(
+            load_conversation,
+            inputs=[previous_conversations],
+            outputs=[chatbot, conversation_id]
+        )
+
+        previous_conversations.change(
+            load_conversation,
+            inputs=[previous_conversations],
+            outputs=[chat_history]
+        )
+
+        def edit_selected_message(selected, edit_text, history):
+            selected_ids = json.loads(selected)
+            if len(selected_ids) != 1:
+                return history
+
+            message_id = int(selected_ids[0])
+            if 0 <= message_id < len(history):
+                history[message_id] = (edit_text, history[message_id][1])
+            return history
+
+        def delete_selected_messages(selected, history):
+            selected_ids = json.loads(selected)
+            selected_ids = [int(id) for id in selected_ids]
+            selected_ids.sort(reverse=True)
+            for message_id in selected_ids:
+                if 0 <= message_id < len(history):
+                    del history[message_id]
+            return history, ""  # Clear selected_messages
+
+        update_message_button.click(
+            edit_selected_message,
+            inputs=[selected_messages, edit_message_text, chat_history],
+            outputs=[chatbot]
+        )
+
+        delete_message_button.click(
+            delete_selected_messages,
+            inputs=[selected_messages, chat_history],
+            outputs=[chatbot, selected_messages]
+        )
+
+        save_chat_history_as_file.click(
+            save_chat_history,
+            inputs=[chatbot, conversation_id],
+            outputs=[download_file]
+        )
+
+        save_chat_history_to_db.click(
+            save_chat_history_to_db_wrapper,
+            inputs=[chatbot, conversation_id, media_content],
+            outputs=[conversation_id, gr.Textbox(label="Save Status")]
+        )
+
+        def show_edit_message(evt: gr.SelectData, chat_history):
+            return gr.update(value=chat_history[evt.index][0]), gr.update(value=evt.index)
+
+        chatbot.select(show_edit_message, chat_history, [edit_message_text, gr.update()])
+
+    return chatbot, chat_history, conversation_id
+
+
 def create_chat_interface_stacked():
     custom_css = """
     .chatbot-container .message-wrap .message {
@@ -4379,6 +4573,7 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Chat with an LLM"):
                 create_chat_interface_vertical()
+                create_chat_interface_editable()
                 create_chat_interface()
                 create_chat_interface_stacked()
                 create_chat_interface_multi_api()
