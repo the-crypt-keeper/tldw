@@ -1837,7 +1837,88 @@ def display_search_results(query):
     return "No results found."
 
 
+import gradio as gr
+import sqlite3
+
 def create_prompt_view_tab():
+    with gr.TabItem("View Prompt Database"):
+        gr.Markdown("# View Prompt Database Entries")
+        with gr.Row():
+            with gr.Column():
+                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
+                page_number = gr.Number(value=1, label="Page Number", precision=0)
+                view_button = gr.Button("View Page")
+                next_page_button = gr.Button("Next Page")
+                previous_page_button = gr.Button("Previous Page")
+            with gr.Column():
+                results_display = gr.HTML()
+                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
+
+        def view_database(page, entries_per_page):
+            offset = (page - 1) * entries_per_page
+            try:
+                with sqlite3.connect('prompts.db') as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+                        FROM Prompts p
+                        LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
+                        LEFT JOIN Keywords k ON pk.keyword_id = k.id
+                        GROUP BY p.id
+                        ORDER BY p.name
+                        LIMIT ? OFFSET ?
+                    ''', (entries_per_page, offset))
+                    prompts = cursor.fetchall()
+
+                    cursor.execute('SELECT COUNT(*) FROM Prompts')
+                    total_prompts = cursor.fetchone()[0]
+
+                results = "<table><tr><th>Title</th><th>Details</th><th>System Prompt</th><th>User Prompt</th><th>Keywords</th></tr>"
+                for prompt in prompts:
+                    results += f"<tr><td>{prompt[0]}</td><td>{prompt[1] or ''}</td><td>{prompt[2] or ''}</td><td>{prompt[3] or ''}</td><td>{prompt[4] or ''}</td></tr>"
+                results += "</table>"
+
+                total_pages = (total_prompts + entries_per_page - 1) // entries_per_page
+                pagination = f"Page {page} of {total_pages} (Total prompts: {total_prompts})"
+
+                return results, pagination, total_pages
+            except sqlite3.Error as e:
+                return f"<p>Error fetching prompts: {e}</p>", "Error", 0
+
+        def update_page(page, entries_per_page):
+            results, pagination, total_pages = view_database(page, entries_per_page)
+            next_disabled = page >= total_pages
+            prev_disabled = page <= 1
+            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(interactive=not prev_disabled)
+
+        def go_to_next_page(current_page, entries_per_page):
+            next_page = current_page + 1
+            return update_page(next_page, entries_per_page)
+
+        def go_to_previous_page(current_page, entries_per_page):
+            previous_page = max(1, current_page - 1)
+            return update_page(previous_page, entries_per_page)
+
+        view_button.click(
+            fn=update_page,
+            inputs=[page_number, entries_per_page],
+            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        next_page_button.click(
+            fn=go_to_next_page,
+            inputs=[page_number, entries_per_page],
+            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        previous_page_button.click(
+            fn=go_to_previous_page,
+            inputs=[page_number, entries_per_page],
+            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+
+def create_prompt_search_tab():
     with gr.TabItem("Search Prompts"):
         with gr.Row():
             with gr.Column():
@@ -4222,6 +4303,7 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
                 create_viewing_tab()
+                create_prompt_search_tab()
                 create_prompt_view_tab()
 
             with gr.TabItem("Chat with an LLM"):
@@ -4238,9 +4320,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
-                create_view_trash_tab()
-                create_delete_trash_tab()
-                create_empty_trash_tab()
 
             with gr.TabItem("Writing Tools"):
                 create_document_editing_tab()
@@ -4267,6 +4346,10 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Utilities"):
                 create_utilities_tab()
 
+            with gr.TabItem("Trashcan"):
+                create_view_trash_tab()
+                create_delete_trash_tab()
+                create_empty_trash_tab()
 
     # Launch the interface
     server_port_variable = 7860
