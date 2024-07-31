@@ -401,6 +401,84 @@ def create_tables() -> None:
 create_tables()
 
 
+def check_media_exists(title, url):
+    """Check if media with the given title or URL exists in the database."""
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM Media WHERE title = ? OR url = ?", (title, url))
+        result = cursor.fetchone()
+        return result is not None
+
+
+def check_media_and_whisper_model(title=None, url=None, current_whisper_model=None):
+    """
+    Check if media exists in the database and compare the whisper model used.
+
+    :param title: Title of the media (optional)
+    :param url: URL of the media (optional)
+    :param current_whisper_model: The whisper model currently selected for use
+    :return: Tuple (bool, str) - (should_download, reason)
+    """
+    if not title and not url:
+        return True, "No title or URL provided"
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+
+        # First, find the media_id
+        query = "SELECT id FROM Media WHERE "
+        params = []
+
+        if title:
+            query += "title = ?"
+            params.append(title)
+
+        if url:
+            if params:
+                query += " OR "
+            query += "url = ?"
+            params.append(url)
+
+        cursor.execute(query, tuple(params))
+        result = cursor.fetchone()
+
+        if not result:
+            return True, "Media not found in database"
+
+        media_id = result[0]
+
+        # Now, get the latest transcript for this media
+        cursor.execute("""
+            SELECT transcription 
+            FROM Transcripts 
+            WHERE media_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        """, (media_id,))
+
+        transcript_result = cursor.fetchone()
+
+        if not transcript_result:
+            return True, f"No transcript found for media (ID: {media_id})"
+
+        transcription = transcript_result[0]
+
+        # Extract the whisper model from the transcription
+        match = re.search(r"This text was transcribed using whisper model: (.+)$", transcription, re.MULTILINE)
+        if not match:
+            return True, f"Whisper model information not found in transcript (Media ID: {media_id})"
+
+        db_whisper_model = match.group(1).strip()
+
+        if not current_whisper_model:
+            return False, f"Media found in database (ID: {media_id})"
+
+        if db_whisper_model != current_whisper_model:
+            return True, f"Different whisper model (DB: {db_whisper_model}, Current: {current_whisper_model})"
+
+        return False, f"Media found with same whisper model (ID: {media_id})"
+
+
 #######################################################################################################################
 # Keyword-related Functions
 #

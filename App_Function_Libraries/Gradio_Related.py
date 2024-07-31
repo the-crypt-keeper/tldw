@@ -782,7 +782,8 @@ def create_video_transcription_tab():
                                     metadata=video_metadata,
                                     use_chunking=chunking_options_checkbox,
                                     chunk_options=chunk_options,
-                                    keep_original_video=keep_original_video
+                                    keep_original_video=keep_original_video,
+                                    current_whisper_model=whisper_model,
                                 )
 
                                 if result[0] is None:
@@ -958,7 +959,7 @@ def create_video_transcription_tab():
                                           vad_filter, download_video_flag, download_audio, rolling_summarization,
                                           detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
                                           include_timestamps=True, metadata=None, use_chunking=False,
-                                          chunk_options=None, keep_original_video=False):
+                                          chunk_options=None, keep_original_video=False, current_whisper_model="Blank"):
 
                 try:
                     logging.info(f"Starting process_url_metadata for URL: {input_item}")
@@ -1022,7 +1023,7 @@ def create_video_transcription_tab():
 
                         # Download video/audio
                         logging.info("Downloading video/audio...")
-                        video_file_path = download_video(input_item, download_path, full_info, download_video_flag)
+                        video_file_path = download_video(input_item, download_path, full_info, download_video_flag, current_whisper_model="Blank")
                         if not video_file_path:
                             logging.error(f"Failed to download video/audio from {input_item}")
                             return None, None, None, None, None, None

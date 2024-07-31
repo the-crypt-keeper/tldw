@@ -207,6 +207,7 @@ def load_comprehensive_config():
     return config
 
 
+# FIXME - update to include prompt path in return statement
 def load_and_log_configs():
     try:
         config = load_comprehensive_config()
@@ -272,6 +273,7 @@ def load_and_log_configs():
 
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
+        vllm_model = config.get('Local-API', 'vllm_model', fallback=None)
 
         logging.debug(f"Loaded Kobold API IP: {kobold_api_IP}")
         logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
@@ -298,7 +300,12 @@ def load_and_log_configs():
                 'openai': openai_api_key,
                 'huggingface': huggingface_api_key,
                 'openrouter': openrouter_api_key,
-                'deepseek': deepseek_api_key
+                'deepseek': deepseek_api_key,
+                'kobold': kobold_api_key,
+                'llama': llama_api_key,
+                'ooba': ooba_api_key,
+                'tabby': tabby_api_key,
+                'vllm': vllm_api_key
             },
             'models': {
                 'anthropic': anthropic_model,
@@ -307,14 +314,16 @@ def load_and_log_configs():
                 'openai': openai_model,
                 'huggingface': huggingface_model,
                 'openrouter': openrouter_model,
-                'deepseek': deepseek_model
+                'deepseek': deepseek_model,
+                'vllm': vllm_model
+
             },
-            'local_apis': {
-                'kobold': {'ip': kobold_api_IP, 'key': kobold_api_key},
-                'llama': {'ip': llama_api_IP, 'key': llama_api_key},
-                'ooba': {'ip': ooba_api_IP, 'key': ooba_api_key},
-                'tabby': {'ip': tabby_api_IP, 'key': tabby_api_key},
-                'vllm': {'ip': vllm_api_url, 'key': vllm_api_key}
+            'local_api_ip': {
+                'kobold': kobold_api_IP,
+                'llama': llama_api_IP,
+                'ooba': ooba_api_IP,
+                'tabby': tabby_api_IP,
+                'vllm': vllm_api_url,
             },
             'output_path': output_path,
             'processing_choice': processing_choice
