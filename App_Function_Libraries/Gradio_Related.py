@@ -3385,7 +3385,8 @@ def parse_prompt_file(file_content):
         'title': '',
         'author': '',
         'system': '',
-        'user': ''
+        'user': '',
+        'keywords': []
     }
 
     # Define regex patterns for the sections
@@ -3393,45 +3394,56 @@ def parse_prompt_file(file_content):
         'title': r'### TITLE ###\s*(.*?)\s*###',
         'author': r'### AUTHOR ###\s*(.*?)\s*###',
         'system': r'### SYSTEM ###\s*(.*?)\s*###',
-        'user': r'### USER ###\s*(.*?)\s*###'
+        'user': r'### USER ###\s*(.*?)\s*###',
+        'keywords': r'### KEYWORDS ###\s*(.*?)\s*###'
     }
 
     for key, pattern in patterns.items():
         match = re.search(pattern, file_content, re.DOTALL)
         if match:
-            sections[key] = match.group(1).strip()
+            if key == 'keywords':
+                # Split keywords by commas and strip whitespace
+                sections[key] = [k.strip() for k in match.group(1).split(',') if k.strip()]
+            else:
+                sections[key] = match.group(1).strip()
 
     return sections
 
 
-# FIXME - file uploads... In fact make sure to check _all_ file uploads... will make it easier when centralizing everything for API
+# FIXME - file uploads...fixed here, but rest of project... In fact make sure to check _all_ file uploads... will make it easier when centralizing everything for API
 def import_prompt_from_file(file):
     if file is None:
         return "No file uploaded. Please upload a file."
 
     try:
-        if hasattr(file, 'name'):
-            file_name = file.name
-        else:
-            file_name = 'unknown_file'
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Get the original file name
+            original_filename = file.name if hasattr(file, 'name') else 'unknown_file'
 
-        if isinstance(file, str):
-            # If file is a string, it's likely a file path
-            file_path = file
-            with open(file_path, 'r', encoding='utf-8') as f:
-                file_content = f.read()
-        elif hasattr(file, 'read'):
-            # If file has a 'read' method, it's likely a file-like object
-            file_content = file.read()
-            if isinstance(file_content, bytes):
-                file_content = file_content.decode('utf-8')
-        else:
-            # If it's neither a string nor a file-like object, try converting it to a string
-            file_content = str(file)
+            # Create a path for the temporary file
+            temp_file_path = os.path.join(temp_dir, original_filename)
 
-        sections = parse_prompt_file(file_content)
+            # Write the contents to the temporary file
+            if isinstance(file, str):
+                # If file is a string, it's likely a file path
+                shutil.copy(file, temp_file_path)
+            elif hasattr(file, 'read'):
+                # If file has a 'read' method, it's likely a file-like object
+                with open(temp_file_path, 'wb') as temp_file:
+                    shutil.copyfileobj(file, temp_file)
+            else:
+                # If it's neither a string nor a file-like object, try converting it to a string
+                with open(temp_file_path, 'w', encoding='utf-8') as temp_file:
+                    temp_file.write(str(file))
 
-        return sections['title'], sections['author'], sections['system'], sections['user']
+            # Read and parse the content from the temporary file
+            with open(temp_file_path, 'r', encoding='utf-8') as temp_file:
+                file_content = temp_file.read()
+
+            sections = parse_prompt_file(file_content)
+
+        return sections['title'], sections['author'], sections['system'], sections['user'], sections['keywords']
     except Exception as e:
         return f"Error parsing file: {str(e)}"
 
@@ -3457,9 +3469,8 @@ def import_prompt_data(name, details, system, user):
 
 
 def create_import_single_prompt_tab():
-    with gr.TabItem("Import Prompt"):
+    with gr.TabItem("Import a Prompt"):
         gr.Markdown("# Import a prompt into the database")
-        gr.Markdown("...and have it tagged with keywords!(WIP...)")
 
         with gr.Row():
             with gr.Column():
@@ -3468,6 +3479,7 @@ def create_import_single_prompt_tab():
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
                 system_input = gr.Textbox(label="System", placeholder="Enter the system message for the prompt", lines=3)
                 user_input = gr.Textbox(label="User", placeholder="Enter the user message for the prompt", lines=3)
+                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords separated by commas")
                 import_button = gr.Button("Import Prompt")
 
             with gr.Column():
@@ -3477,27 +3489,38 @@ def create_import_single_prompt_tab():
 
         def handle_import(file):
             result = import_prompt_from_file(file)
-            if isinstance(result, tuple):
-                title, author, system, user = result
-                return gr.update(value="File successfully imported. You can now edit the content before saving."), gr.update(value=title), gr.update(value=author), gr.update(value=system), gr.update(value=user)
+            if isinstance(result, tuple) and len(result) == 5:
+                title, author, system, user, keywords = result
+                return gr.update(value="File successfully imported. You can now edit the content before saving."), \
+                       gr.update(value=title), gr.update(value=author), gr.update(value=system), \
+                       gr.update(value=user), gr.update(value=", ".join(keywords))
             else:
-                return gr.update(value=result), gr.update(), gr.update(), gr.update(), gr.update()
+                return gr.update(value=result), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
         import_button.click(
             fn=handle_import,
             inputs=[import_file],
-            outputs=[import_output, title_input, author_input, system_input, user_input]
+            outputs=[import_output, title_input, author_input, system_input, user_input, keywords_input]
         )
 
-        def save_prompt_to_db(title, author, system, user):
-            return add_prompt(title, author, system, user)
+        def save_prompt_to_db(title, author, system, user, keywords):
+            keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+            return add_prompt(title, author, system, user, keyword_list)
 
         save_button.click(
             fn=save_prompt_to_db,
-            inputs=[title_input, author_input, system_input, user_input],
+            inputs=[title_input, author_input, system_input, user_input, keywords_input],
             outputs=save_output
         )
 
+        def update_prompt_dropdown():
+            return gr.update(choices=load_preset_prompts())
+
+        save_button.click(
+            fn=update_prompt_dropdown,
+            inputs=[],
+            outputs=[gr.Dropdown(label="Select Preset Prompt")]
+        )
 
 def import_prompts_from_zip(zip_file):
     if zip_file is None:
