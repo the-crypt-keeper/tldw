@@ -1837,8 +1837,53 @@ def display_search_results(query):
     return "No results found."
 
 
-import gradio as gr
-import sqlite3
+def create_viewing_tab():
+    with gr.TabItem("View Database"):
+        gr.Markdown("# View Database Entries")
+        with gr.Row():
+            with gr.Column():
+                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
+                page_number = gr.Number(value=1, label="Page Number", precision=0)
+                view_button = gr.Button("View Page")
+                next_page_button = gr.Button("Next Page")
+                previous_page_button = gr.Button("Previous Page")
+            with gr.Column():
+                results_display = gr.HTML()
+                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
+
+        def update_page(page, entries_per_page):
+            results, pagination, total_pages = view_database(page, entries_per_page)
+            next_disabled = page >= total_pages
+            prev_disabled = page <= 1
+            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(interactive=not prev_disabled)
+
+        def go_to_next_page(current_page, entries_per_page):
+            next_page = current_page + 1
+            return update_page(next_page, entries_per_page)
+
+        def go_to_previous_page(current_page, entries_per_page):
+            previous_page = max(1, current_page - 1)
+            return update_page(previous_page, entries_per_page)
+
+        view_button.click(
+            fn=update_page,
+            inputs=[page_number, entries_per_page],
+            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        next_page_button.click(
+            fn=go_to_next_page,
+            inputs=[page_number, entries_per_page],
+            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        previous_page_button.click(
+            fn=go_to_previous_page,
+            inputs=[page_number, entries_per_page],
+            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+
 
 def create_prompt_view_tab():
     with gr.TabItem("View Prompt Database"):
@@ -1933,56 +1978,6 @@ def create_prompt_search_tab():
             fn=display_search_results,
             inputs=[search_query_input],
             outputs=[search_results_output]
-        )
-
-
-def create_viewing_tab():
-    with gr.TabItem("View Database"):
-        gr.Markdown("# View Database Entries")
-        with gr.Row():
-            with gr.Column():
-                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
-                page_number = gr.Number(value=1, label="Page Number", precision=0)
-                view_button = gr.Button("View Page")
-                next_page_button = gr.Button("Next Page (True)")
-                previous_page_button = gr.Button("Previous Page (False)")
-            with gr.Column():
-                results_display = gr.HTML()
-                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
-
-        def update_page(page, entries_per_page):
-            results, pagination, total_pages = view_database(page, entries_per_page)
-            # Enable/disable buttons based on page number
-            next_disabled = page >= total_pages
-            prev_disabled = page <= 1
-            next_label = f"Next Page ({not next_disabled})"
-            prev_label = f"Previous Page ({not prev_disabled})"
-            return results, pagination, page, next_label, prev_label
-
-        def go_to_next_page(current_page, entries_per_page, total_pages):
-            next_page = current_page + 1
-            return update_page(next_page, entries_per_page)
-
-        def go_to_previous_page(current_page, entries_per_page, total_pages):
-            previous_page = current_page - 1
-            return update_page(previous_page, entries_per_page)
-
-        view_button.click(
-            fn=update_page,
-            inputs=[page_number, entries_per_page],
-            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
-        )
-
-        next_page_button.click(
-            fn=go_to_next_page,
-            inputs=[page_number, entries_per_page, gr.State(1)],
-            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
-        )
-
-        previous_page_button.click(
-            fn=go_to_previous_page,
-            inputs=[page_number, entries_per_page, gr.State(1)],
-            outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
         )
 
 
@@ -4325,11 +4320,10 @@ def launch_ui(share_public=None, server_mode=False):
                 create_document_editing_tab()
 
             with gr.TabItem("Keywords"):
-                with gr.Tabs():
-                    create_view_keywords_tab()
-                    create_add_keyword_tab()
-                    create_delete_keyword_tab()
-                    create_export_keywords_tab()
+                create_view_keywords_tab()
+                create_add_keyword_tab()
+                create_delete_keyword_tab()
+                create_export_keywords_tab()
 
             with gr.TabItem("Import/Export"):
                 create_import_item_tab()
