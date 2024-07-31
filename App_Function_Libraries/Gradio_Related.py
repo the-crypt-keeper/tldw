@@ -2655,6 +2655,7 @@ def create_chat_interface_stacked():
         chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
 
+# FIXME - broken temp sliders
 def create_chat_interface_three():
     custom_css = """
     .chatbot-container .message-wrap .message {
