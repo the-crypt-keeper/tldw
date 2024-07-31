@@ -54,7 +54,8 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     export_keywords_to_csv, add_media_to_database, insert_prompt_to_db, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
-    user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path
+    user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
+    load_prompt_details
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config, safe_read_file
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -70,10 +71,6 @@ whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large",
 custom_prompt_input = None
 server_mode = False
 share_public = False
-
-
-def load_preset_prompts():
-    return list_prompts()
 
 
 def gradio_download_youtube_video(url):
@@ -1767,46 +1764,6 @@ def create_compare_transcripts_tab():
 #
 # Search Tab
 
-def add_or_update_prompt(title, description, system_prompt, user_prompt):
-    if not title:
-        return "Error: Title is required."
-
-    existing_prompt = fetch_prompt_details(title)
-    if existing_prompt:
-        # Update existing prompt
-        result = update_prompt_in_db(title, description, system_prompt, user_prompt)
-    else:
-        # Insert new prompt
-        result = insert_prompt_to_db(title, description, system_prompt, user_prompt)
-
-    # Refresh the prompt dropdown
-    update_prompt_dropdown()
-    return result
-
-
-def load_prompt_details(selected_prompt):
-    if selected_prompt:
-        details = fetch_prompt_details(selected_prompt)
-        if details:
-            return details[0], details[1], details[2], details[3]
-    return "", "", "", ""
-
-
-def update_prompt_in_db(title, description, system_prompt, user_prompt):
-    try:
-        conn = sqlite3.connect('prompts.db')
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE Prompts SET details = ?, system = ?, user = ? WHERE name = ?",
-            (description, system_prompt, user_prompt, title)
-        )
-        conn.commit()
-        conn.close()
-        return "Prompt updated successfully!"
-    except sqlite3.Error as e:
-        return f"Error updating prompt: {e}"
-
-
 def search_prompts(query):
     try:
         conn = sqlite3.connect('prompts.db')
@@ -2519,6 +2476,7 @@ def create_chat_interface_stacked():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
                 user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
                                        "be used as the next message instead)", lines=3)
+                gr.Markdown("Scroll down for the chat window...")
         with gr.Row():
             with gr.Column(scale=1):
                 chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
@@ -2768,16 +2726,22 @@ def create_chat_interface_vertical():
                 search_button = gr.Button("Search")
                 items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
                 item_mapping = gr.State({})
-                use_content = gr.Checkbox(label="Use Content")
-                use_summary = gr.Checkbox(label="Use Summary")
-                use_prompt = gr.Checkbox(label="Use Prompt")
-                save_conversation = gr.Checkbox(label="Save Conversation", value=False)
+                with gr.Row():
+                    use_content = gr.Checkbox(label="Use Content")
+                    use_summary = gr.Checkbox(label="Use Summary")
+                    use_prompt = gr.Checkbox(label="Use Prompt")
+                    save_conversation = gr.Checkbox(label="Save Conversation", value=False)
+                with gr.Row():
+                    api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
+                with gr.Row():
+                    api_key = gr.Textbox(label="API Key (if required)", type="password")
+                with gr.Row():
+                    temperature = gr.Slider(label="Temperature", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
+                with gr.Row():
+                    user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
 
-                api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
-                api_key = gr.Textbox(label="API Key (if required)", type="password")
-                temperature = gr.Slider(label="Temperature", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
             with gr.Column():
                 gr.Markdown("#### Chat Window")
                 chatbot = gr.Chatbot(height=500)

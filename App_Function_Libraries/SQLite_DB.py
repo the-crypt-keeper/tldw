@@ -911,66 +911,217 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 # Functions to manage prompts DB
 
 def create_prompts_db():
-    conn = sqlite3.connect('prompts.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Prompts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            details TEXT,
-            system TEXT,
-            user TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-create_prompts_db()
-
-
-def add_prompt(name, details, system, user=None):
-    try:
-        conn = sqlite3.connect('prompts.db')
+    with sqlite3.connect('prompts.db') as conn:
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO Prompts (name, details, system, user)
-            VALUES (?, ?, ?, ?)
-        ''', (name, details, system, user))
-        conn.commit()
-        conn.close()
+        cursor.executescript('''
+            CREATE TABLE IF NOT EXISTS Prompts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                details TEXT,
+                system TEXT,
+                user TEXT
+            );
+            CREATE TABLE IF NOT EXISTS Keywords (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                keyword TEXT NOT NULL UNIQUE COLLATE NOCASE
+            );
+            CREATE TABLE IF NOT EXISTS PromptKeywords (
+                prompt_id INTEGER,
+                keyword_id INTEGER,
+                FOREIGN KEY (prompt_id) REFERENCES Prompts (id),
+                FOREIGN KEY (keyword_id) REFERENCES Keywords (id),
+                PRIMARY KEY (prompt_id, keyword_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON Keywords(keyword);
+            CREATE INDEX IF NOT EXISTS idx_promptkeywords_prompt_id ON PromptKeywords(prompt_id);
+            CREATE INDEX IF NOT EXISTS idx_promptkeywords_keyword_id ON PromptKeywords(keyword_id);
+        ''')
+
+
+def normalize_keyword(keyword):
+    return re.sub(r'\s+', ' ', keyword.strip().lower())
+
+
+def add_prompt(name, details, system, user=None, keywords=None):
+    if not name or not system:
+        return "Name and system prompt are required."
+
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO Prompts (name, details, system, user)
+                VALUES (?, ?, ?, ?)
+            ''', (name, details, system, user))
+            prompt_id = cursor.lastrowid
+
+            if keywords:
+                normalized_keywords = [normalize_keyword(k) for k in keywords if k.strip()]
+                for keyword in set(normalized_keywords):  # Use set to remove duplicates
+                    cursor.execute('''
+                        INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)
+                    ''', (keyword,))
+                    cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                    keyword_id = cursor.fetchone()[0]
+                    cursor.execute('''
+                        INSERT OR IGNORE INTO PromptKeywords (prompt_id, keyword_id) VALUES (?, ?)
+                    ''', (prompt_id, keyword_id))
         return "Prompt added successfully."
     except sqlite3.IntegrityError:
         return "Prompt with this name already exists."
     except sqlite3.Error as e:
         return f"Database error: {e}"
 
+
 def fetch_prompt_details(name):
-    conn = sqlite3.connect('prompts.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT name, details, system, user
-        FROM Prompts
-        WHERE name = ?
-    ''', (name,))
-    result = cursor.fetchone()
-    conn.close()
+    with sqlite3.connect('prompts.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+            FROM Prompts p
+            LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
+            LEFT JOIN Keywords k ON pk.keyword_id = k.id
+            WHERE p.name = ?
+            GROUP BY p.id
+        ''', (name,))
+        return cursor.fetchone()
+
+
+def list_prompts(page=1, per_page=10):
+    offset = (page - 1) * per_page
+    with sqlite3.connect('prompts.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT name FROM Prompts LIMIT ? OFFSET ?', (per_page, offset))
+        prompts = [row[0] for row in cursor.fetchall()]
+
+        # Get total count of prompts
+        cursor.execute('SELECT COUNT(*) FROM Prompts')
+        total_count = cursor.fetchone()[0]
+
+    total_pages = (total_count + per_page - 1) // per_page
+    return prompts, total_pages, page
+
+# This will not scale. For a large number of prompts, use a more efficient method.
+# FIXME - see above statement.
+def load_preset_prompts():
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT name FROM Prompts ORDER BY name ASC')
+            prompts = [row[0] for row in cursor.fetchall()]
+        return prompts
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return []
+
+
+def insert_prompt_to_db(title, description, system_prompt, user_prompt, keywords=None):
+    return add_prompt(title, description, system_prompt, user_prompt, keywords)
+
+
+def search_prompts_by_keyword(keyword, page=1, per_page=10):
+    normalized_keyword = normalize_keyword(keyword)
+    offset = (page - 1) * per_page
+    with sqlite3.connect('prompts.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT DISTINCT p.name
+            FROM Prompts p
+            JOIN PromptKeywords pk ON p.id = pk.prompt_id
+            JOIN Keywords k ON pk.keyword_id = k.id
+            WHERE k.keyword LIKE ?
+            LIMIT ? OFFSET ?
+        ''', ('%' + normalized_keyword + '%', per_page, offset))
+        prompts = [row[0] for row in cursor.fetchall()]
+
+        # Get total count of matching prompts
+        cursor.execute('''
+            SELECT COUNT(DISTINCT p.id)
+            FROM Prompts p
+            JOIN PromptKeywords pk ON p.id = pk.prompt_id
+            JOIN Keywords k ON pk.keyword_id = k.id
+            WHERE k.keyword LIKE ?
+        ''', ('%' + normalized_keyword + '%',))
+        total_count = cursor.fetchone()[0]
+
+    total_pages = (total_count + per_page - 1) // per_page
+    return prompts, total_pages, page
+
+
+def update_prompt_keywords(prompt_name, new_keywords):
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('SELECT id FROM Prompts WHERE name = ?', (prompt_name,))
+            prompt_id = cursor.fetchone()
+            if not prompt_id:
+                return "Prompt not found."
+            prompt_id = prompt_id[0]
+
+            cursor.execute('DELETE FROM PromptKeywords WHERE prompt_id = ?', (prompt_id,))
+
+            normalized_keywords = [normalize_keyword(k) for k in new_keywords if k.strip()]
+            for keyword in set(normalized_keywords):  # Use set to remove duplicates
+                cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+                cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                keyword_id = cursor.fetchone()[0]
+                cursor.execute('INSERT INTO PromptKeywords (prompt_id, keyword_id) VALUES (?, ?)',
+                               (prompt_id, keyword_id))
+
+            # Remove unused keywords
+            cursor.execute('''
+                DELETE FROM Keywords
+                WHERE id NOT IN (SELECT DISTINCT keyword_id FROM PromptKeywords)
+            ''')
+        return "Keywords updated successfully."
+    except sqlite3.Error as e:
+        return f"Database error: {e}"
+
+
+def add_or_update_prompt(title, description, system_prompt, user_prompt, keywords=None):
+    if not title:
+        return "Error: Title is required."
+
+    existing_prompt = fetch_prompt_details(title)
+    if existing_prompt:
+        # Update existing prompt
+        result = update_prompt_in_db(title, description, system_prompt, user_prompt)
+        if "successfully" in result:
+            # Update keywords if the prompt update was successful
+            keyword_result = update_prompt_keywords(title, keywords or [])
+            result += f" {keyword_result}"
+    else:
+        # Insert new prompt
+        result = insert_prompt_to_db(title, description, system_prompt, user_prompt, keywords)
+
     return result
 
-def list_prompts():
-    conn = sqlite3.connect('prompts.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT name
-        FROM Prompts
-    ''')
-    results = cursor.fetchall()
-    conn.close()
-    return [row[0] for row in results]
 
-def insert_prompt_to_db(title, description, system_prompt, user_prompt):
-    result = add_prompt(title, description, system_prompt, user_prompt)
-    return result
+def load_prompt_details(selected_prompt):
+    if selected_prompt:
+        details = fetch_prompt_details(selected_prompt)
+        if details:
+            return details[0], details[1], details[2], details[3], details[4]  # Include keywords
+    return "", "", "", "", ""
 
+
+def update_prompt_in_db(title, description, system_prompt, user_prompt):
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE Prompts SET details = ?, system = ?, user = ? WHERE name = ?",
+                (description, system_prompt, user_prompt, title)
+            )
+            if cursor.rowcount == 0:
+                return "No prompt found with the given title."
+        return "Prompt updated successfully!"
+    except sqlite3.Error as e:
+        return f"Error updating prompt: {e}"
+
+
+create_prompts_db()
 
 #
 #
