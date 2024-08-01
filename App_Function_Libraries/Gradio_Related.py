@@ -15,6 +15,8 @@
 #########################################
 #
 # Built-In Imports
+import glob
+import html
 import math
 import re
 import shutil
@@ -39,7 +41,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
-from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast
+from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast, download_youtube_audio
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 from App_Function_Libraries.PDF_Ingestion_Lib import process_and_cleanup_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
@@ -55,9 +57,9 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
-    load_prompt_details, load_preset_prompts, insert_prompt_to_db
+    load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
-    convert_to_seconds, load_comprehensive_config, safe_read_file
+    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
     generate_timestamped_url, extract_metadata, download_video
 
@@ -72,40 +74,53 @@ custom_prompt_input = None
 server_mode = False
 share_public = False
 
-
 def gradio_download_youtube_video(url):
-    """Download video using yt-dlp with specified options."""
-    # Determine ffmpeg path based on the operating system.
-    ffmpeg_path = './Bin/ffmpeg.exe' if os.name == 'nt' else 'ffmpeg'
+    try:
+        # Determine ffmpeg path based on the operating system.
+        ffmpeg_path = './Bin/ffmpeg.exe' if os.name == 'nt' else 'ffmpeg'
 
-    # Extract information about the video
-    with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-        info_dict = ydl.extract_info(url, download=False)
-        sanitized_title = sanitize_filename(info_dict['title'])
-        original_ext = info_dict['ext']
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Extract information about the video
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                info_dict = ydl.extract_info(url, download=False)
+                sanitized_title = sanitize_filename(info_dict['title'])
+                original_ext = info_dict['ext']
 
-    # Setup the final directory and filename
-    download_dir = Path(f"results/{sanitized_title}")
-    download_dir.mkdir(parents=True, exist_ok=True)
-    output_file_path = download_dir / f"{sanitized_title}.{original_ext}"
+            # Setup the temporary filename
+            temp_file_path = Path(temp_dir) / f"{sanitized_title}.{original_ext}"
 
-    # Initialize yt-dlp with generic options and the output template
-    ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',
-        'ffmpeg_location': ffmpeg_path,
-        'outtmpl': str(output_file_path),
-        'noplaylist': True, 'quiet': True
-    }
+            # Initialize yt-dlp with generic options and the output template
+            ydl_opts = {
+                'format': 'bestvideo+bestaudio/best',
+                'ffmpeg_location': ffmpeg_path,
+                'outtmpl': str(temp_file_path),
+                'noplaylist': True,
+                'quiet': True
+            }
 
-    # Execute yt-dlp to download the video
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+            # Execute yt-dlp to download the video
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
 
-    # Final check to ensure file exists
-    if not output_file_path.exists():
-        raise FileNotFoundError(f"Expected file was not found: {output_file_path}")
+            # Final check to ensure file exists
+            if not temp_file_path.exists():
+                raise FileNotFoundError(f"Expected file was not found: {temp_file_path}")
 
-    return str(output_file_path)
+            # Create a persistent directory for the download if it doesn't exist
+            persistent_dir = Path("downloads")
+            persistent_dir.mkdir(exist_ok=True)
+
+            # Move the file from the temporary directory to the persistent directory
+            persistent_file_path = persistent_dir / f"{sanitized_title}.{original_ext}"
+            shutil.move(str(temp_file_path), str(persistent_file_path))
+
+            # Add the file to the list of downloaded files
+            downloaded_files.append(str(persistent_file_path))
+
+            return str(persistent_file_path), f"Video downloaded successfully: {sanitized_title}.{original_ext}"
+    except Exception as e:
+        return None, f"Error downloading video: {str(e)}"
 
 
 def format_transcription(content):
@@ -576,9 +591,11 @@ def create_video_transcription_tab():
         with gr.Row():
             gr.Markdown("""Follow this project at [tldw - GitHub](https://github.com/rmusser01/tldw)""")
         with gr.Row():
+            gr.Markdown("""If you're wondering what all this is, please see the 'Introduction/Help' tab up above for more detailed information and how to obtain an API Key.""")
+        with gr.Row():
             with gr.Column():
                 url_input = gr.Textbox(label="URL(s) (Mandatory)",
-                                       placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, and playlists.",
+                                       placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, other video sites and Youtube playlists.",
                                        lines=5)
                 video_file_input = gr.File(label="Upload Video File (Optional)", file_types=["video/*"])
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
@@ -618,7 +635,7 @@ def create_video_transcription_tab():
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
                     value=None, label="API Name (Mandatory)")
-                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here")
+                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here", type="password")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set")
                 batch_size_input = gr.Slider(minimum=1, maximum=10, value=1, step=1,
@@ -1413,7 +1430,7 @@ def create_website_scraping_tab():
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"], value=None, label="API Name (Mandatory for Summarization)")
                 api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
-                                           placeholder="Enter your API key here; Ignore if using Local API or Built-in API")
+                                           placeholder="Enter your API key here; Ignore if using Local API or Built-in API", type="password")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set", visible=True)
 
@@ -1502,7 +1519,7 @@ def create_resummary_tab():
                         choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
                         value="Local-LLM", label="API Name")
-                    api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here")
+                    api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here", type="password")
 
                 chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)
                 with gr.Row(visible=False) as chunking_options_box:
@@ -1900,7 +1917,6 @@ def create_viewing_tab():
         )
 
 
-
 def create_prompt_view_tab():
     with gr.TabItem("View Prompt Database"):
         gr.Markdown("# View Prompt Database Entries")
@@ -1912,8 +1928,8 @@ def create_prompt_view_tab():
                 next_page_button = gr.Button("Next Page")
                 previous_page_button = gr.Button("Previous Page")
             with gr.Column():
-                results_display = gr.HTML()
                 pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
+        results_display = gr.HTML()
 
         def view_database(page, entries_per_page):
             offset = (page - 1) * entries_per_page
@@ -1934,10 +1950,34 @@ def create_prompt_view_tab():
                     cursor.execute('SELECT COUNT(*) FROM Prompts')
                     total_prompts = cursor.fetchone()[0]
 
-                results = "<table><tr><th>Title</th><th>Details</th><th>System Prompt</th><th>User Prompt</th><th>Keywords</th></tr>"
+                results = ""
                 for prompt in prompts:
-                    results += f"<tr><td>{prompt[0]}</td><td>{prompt[1] or ''}</td><td>{prompt[2] or ''}</td><td>{prompt[3] or ''}</td><td>{prompt[4] or ''}</td></tr>"
-                results += "</table>"
+                    # Escape HTML special characters and replace newlines with <br> tags
+                    title = html.escape(prompt[0]).replace('\n', '<br>')
+                    details = html.escape(prompt[1] or '').replace('\n', '<br>')
+                    system_prompt = html.escape(prompt[2] or '')
+                    user_prompt = html.escape(prompt[3] or '')
+                    keywords = html.escape(prompt[4] or '').replace('\n', '<br>')
+
+                    results += f"""
+                    <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><strong>Title:</strong> {title}</div>
+                            <div><strong>Details:</strong> {details}</div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>User Prompt:</strong>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{user_prompt}</pre>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>System Prompt:</strong>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{system_prompt}</pre>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>Keywords:</strong> {keywords}
+                        </div>
+                    </div>
+                    """
 
                 total_pages = (total_prompts + entries_per_page - 1) // entries_per_page
                 pagination = f"Page {page} of {total_pages} (Total prompts: {total_prompts})"
@@ -1950,7 +1990,8 @@ def create_prompt_view_tab():
             results, pagination, total_pages = view_database(page, entries_per_page)
             next_disabled = page >= total_pages
             prev_disabled = page <= 1
-            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(interactive=not prev_disabled)
+            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(
+                interactive=not prev_disabled)
 
         def go_to_next_page(current_page, entries_per_page):
             next_page = current_page + 1
@@ -1979,21 +2020,114 @@ def create_prompt_view_tab():
         )
 
 
+
 def create_prompt_search_tab():
     with gr.TabItem("Search Prompts"):
+        gr.Markdown("# Search and View Prompt Details")
+        gr.Markdown("Currently has all of the https://github.com/danielmiessler/fabric prompts already available")
         with gr.Row():
             with gr.Column():
-                gr.Markdown("# Search and View Prompt Details")
-                gr.Markdown("Currently has all of the https://github.com/danielmiessler/fabric prompts already available")
                 search_query_input = gr.Textbox(label="Search Prompts", placeholder="Enter your search query...")
-                search_button = gr.Button("Search Prompts")
+                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
+                page_number = gr.Number(value=1, label="Page Number", precision=0)
             with gr.Column():
-                search_results_output = gr.Markdown()
-                prompt_details_output = gr.HTML()
+                search_button = gr.Button("Search Prompts")
+                next_page_button = gr.Button("Next Page")
+                previous_page_button = gr.Button("Previous Page")
+                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
+        search_results_output = gr.HTML()
+
+        def search_and_display_prompts(query, page, entries_per_page):
+            offset = (page - 1) * entries_per_page
+            try:
+                with sqlite3.connect('prompts.db') as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+                        FROM Prompts p
+                        LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
+                        LEFT JOIN Keywords k ON pk.keyword_id = k.id
+                        WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
+                        GROUP BY p.id
+                        ORDER BY p.name
+                        LIMIT ? OFFSET ?
+                    ''', (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', entries_per_page, offset))
+                    prompts = cursor.fetchall()
+
+                    cursor.execute('''
+                        SELECT COUNT(DISTINCT p.id)
+                        FROM Prompts p
+                        LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
+                        LEFT JOIN Keywords k ON pk.keyword_id = k.id
+                        WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
+                    ''', (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'))
+                    total_prompts = cursor.fetchone()[0]
+
+                results = ""
+                for prompt in prompts:
+                    title = html.escape(prompt[0]).replace('\n', '<br>')
+                    details = html.escape(prompt[1] or '').replace('\n', '<br>')
+                    system_prompt = html.escape(prompt[2] or '')
+                    user_prompt = html.escape(prompt[3] or '')
+                    keywords = html.escape(prompt[4] or '').replace('\n', '<br>')
+
+                    results += f"""
+                    <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><strong>Title:</strong> {title}</div>
+                            <div><strong>Details:</strong> {details}</div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>User Prompt:</strong>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{user_prompt}</pre>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>System Prompt:</strong>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{system_prompt}</pre>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>Keywords:</strong> {keywords}
+                        </div>
+                    </div>
+                    """
+
+                total_pages = (total_prompts + entries_per_page - 1) // entries_per_page
+                pagination = f"Page {page} of {total_pages} (Total prompts: {total_prompts})"
+
+                return results, pagination, total_pages
+            except sqlite3.Error as e:
+                return f"<p>Error searching prompts: {e}</p>", "Error", 0
+
+        def update_search_page(query, page, entries_per_page):
+            results, pagination, total_pages = search_and_display_prompts(query, page, entries_per_page)
+            next_disabled = page >= total_pages
+            prev_disabled = page <= 1
+            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(interactive=not prev_disabled)
+
+        def go_to_next_search_page(query, current_page, entries_per_page):
+            next_page = current_page + 1
+            return update_search_page(query, next_page, entries_per_page)
+
+        def go_to_previous_search_page(query, current_page, entries_per_page):
+            previous_page = max(1, current_page - 1)
+            return update_search_page(query, previous_page, entries_per_page)
+
         search_button.click(
-            fn=display_search_results,
-            inputs=[search_query_input],
-            outputs=[search_results_output]
+            fn=update_search_page,
+            inputs=[search_query_input, page_number, entries_per_page],
+            outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        next_page_button.click(
+            fn=go_to_next_search_page,
+            inputs=[search_query_input, page_number, entries_per_page],
+            outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        previous_page_button.click(
+            fn=go_to_previous_search_page,
+            inputs=[search_query_input, page_number, entries_per_page],
+            outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
         )
 
 
@@ -2053,21 +2187,77 @@ def stop_llamafile():
     return "Llamafile stopped"
 
 
+
+
 def create_llamafile_settings_tab():
+    def get_model_files(directory):
+        pattern = os.path.join(directory, "*.{gguf,llamafile}")
+        return [os.path.basename(f) for f in glob.glob(pattern)]
+
+    def update_dropdowns():
+        current_dir_models = get_model_files(".")
+        parent_dir_models = get_model_files("..")
+        return (
+            {"choices": current_dir_models, "value": None},
+            {"choices": parent_dir_models, "value": None}
+        )
+
     with gr.TabItem("Local LLM with Llamafile"):
         gr.Markdown("# Settings for Llamafile")
         am_noob = gr.Checkbox(label="Check this to enable sane defaults", value=False, visible=True)
         advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Enable to show all settings", value=False)
 
         model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
-        model_value = gr.Textbox(label="Select Local Model File", value="", visible=True)
+
+        with gr.Row():
+            current_dir_dropdown = gr.Dropdown(
+                label="Select Model from Current Directory (.)",
+                choices=[],  # Start with an empty list
+                visible=True
+            )
+            parent_dir_dropdown = gr.Dropdown(
+                label="Select Model from Parent Directory (..)",
+                choices=[],  # Start with an empty list
+                visible=True
+            )
+
+        refresh_button = gr.Button("Refresh Model Lists")
+
+        print(os.getcwd())
+        model_value = gr.Textbox(label="Selected Model File", value="", visible=True)
+
+        def update_model_value(current_dir_model, parent_dir_model):
+            if current_dir_model:
+                return current_dir_model
+            elif parent_dir_model:
+                return os.path.join("..", parent_dir_model)
+            else:
+                return ""
+
+        current_dir_dropdown.change(
+            fn=update_model_value,
+            inputs=[current_dir_dropdown, parent_dir_dropdown],
+            outputs=model_value
+        )
+        parent_dir_dropdown.change(
+            fn=update_model_value,
+            inputs=[current_dir_dropdown, parent_dir_dropdown],
+            outputs=model_value
+        )
+
+        refresh_button.click(
+            fn=update_dropdowns,
+            inputs=[],
+            outputs=[current_dir_dropdown, parent_dir_dropdown]
+        )
+
         ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
         ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
 
         advanced_inputs = create_llamafile_advanced_inputs()
 
         start_button = gr.Button("Start Llamafile")
-        stop_button = gr.Button("Stop Llamafile")
+        stop_button = gr.Button("Stop Llamafile (doesn't work)")
         output_display = gr.Markdown()
 
         start_button.click(
@@ -3534,13 +3724,101 @@ def create_view_trash_tab():
         view_button = gr.Button("View Trash")
         trash_list = gr.Textbox(label="Trashed Items")
         view_button.click(list_trash, inputs=[], outputs=trash_list)
+
+
+def search_prompts_for_deletion(query):
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, name, details
+                FROM Prompts
+                WHERE name LIKE ? OR details LIKE ?
+                LIMIT 10
+            ''', (f'%{query}%', f'%{query}%'))
+            results = cursor.fetchall()
+
+            if not results:
+                return "No matching prompts found."
+
+            output = "<h3>Matching Prompts:</h3>"
+            for row in results:
+                output += f"<p><strong>ID:</strong> {row[0]} | <strong>Name:</strong> {html.escape(row[1])} | <strong>Details:</strong> {html.escape(row[2][:100])}...</p>"
+            return output
+    except sqlite3.Error as e:
+        return f"An error occurred while searching prompts: {e}"
+
+
+def search_media_for_deletion(query):
+    try:
+        with sqlite3.connect('media.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, title, description
+                FROM media
+                WHERE title LIKE ? OR description LIKE ?
+                LIMIT 10
+            ''', (f'%{query}%', f'%{query}%'))
+            results = cursor.fetchall()
+
+            if not results:
+                return "No matching media found."
+
+            output = "<h3>Matching Media:</h3>"
+            for row in results:
+                output += f"<p><strong>ID:</strong> {row[0]} | <strong>Title:</strong> {html.escape(row[1])} | <strong>Description:</strong> {html.escape(row[2][:100])}...</p>"
+            return output
+    except sqlite3.Error as e:
+        return f"An error occurred while searching media: {e}"
+
+
 def create_delete_trash_tab():
-    with gr.TabItem("Delete Item"):
-        media_id_input = gr.Number(label="Media ID")
-        force_checkbox = gr.Checkbox(label="Force Delete")
-        delete_button = gr.Button("Delete")
-        delete_output = gr.Textbox(label="Result")
-        delete_button.click(delete_item, inputs=[media_id_input, force_checkbox], outputs=delete_output)
+    with gr.TabItem("Delete DB Item"):
+        gr.Markdown("# Search and Delete Items from Databases")
+
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("## Search and Delete Prompts")
+                prompt_search_input = gr.Textbox(label="Search Prompts")
+                prompt_search_button = gr.Button("Search Prompts")
+                prompt_search_results = gr.HTML()
+                prompt_id_input = gr.Number(label="Prompt ID")
+                prompt_delete_button = gr.Button("Delete Prompt")
+                prompt_delete_output = gr.Textbox(label="Delete Result")
+
+            with gr.Column():
+                gr.Markdown("## Search and Delete Media")
+                media_search_input = gr.Textbox(label="Search Media")
+                media_search_button = gr.Button("Search Media")
+                media_search_results = gr.HTML()
+                media_id_input = gr.Number(label="Media ID")
+                media_force_checkbox = gr.Checkbox(label="Force Delete")
+                media_delete_button = gr.Button("Delete Media")
+                media_delete_output = gr.Textbox(label="Delete Result")
+
+        prompt_search_button.click(
+            search_prompts_for_deletion,
+            inputs=[prompt_search_input],
+            outputs=prompt_search_results
+        )
+
+        prompt_delete_button.click(
+            delete_prompt,
+            inputs=[prompt_id_input],
+            outputs=prompt_delete_output
+        )
+
+        media_search_button.click(
+            search_media_for_deletion,
+            inputs=[media_search_input],
+            outputs=media_search_results
+        )
+
+        media_delete_button.click(
+            delete_item,
+            inputs=[media_id_input, media_force_checkbox],
+            outputs=media_delete_output
+        )
 
 def create_empty_trash_tab():
     with gr.TabItem("Empty Trash"):
@@ -4540,47 +4818,61 @@ def create_document_editing_tab():
 #
 # Utilities Tab Functions
 
+def create_utilities_yt_video_tab():
+    with gr.Tab("YouTube Video Downloader"):
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown(
+                    "<h3>Youtube Video Downloader</h3><p>This Input takes a Youtube URL as input and creates a webm file for you to download. </br><em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
+                youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
+                download_button = gr.Button("Download Video")
+            with gr.Column():
+                output_file = gr.File(label="Download Video")
+                output_message = gr.Textbox(label="Status")
 
-def create_utilities_tab():
-    with gr.Group():
-        with gr.Tab("YouTube Video Downloader"):
-            gr.Markdown(
-                "<h3>Youtube Video Downloader</h3><p>This Input takes a Youtube URL as input and creates a webm file for you to download. </br><em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
-            youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
-            download_button = gr.Button("Download Video")
-            output_file = gr.File(label="Download Video")
+        download_button.click(
+            fn=gradio_download_youtube_video,
+            inputs=youtube_url_input,
+            outputs=[output_file, output_message]
+        )
 
-            download_button.click(
-                fn=gradio_download_youtube_video,
-                inputs=youtube_url_input,
-                outputs=output_file
-            )
+def create_utilities_yt_audio_tab():
+    with gr.Tab("YouTube Audio Downloader"):
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown(
+                    "<h3>Youtube Audio Downloader</h3><p>This Input takes a Youtube URL as input and creates an audio file for you to download.</p>"
+                    +"\n<em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em>\n or \n<strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
+                youtube_url_input_audio = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
+                download_button_audio = gr.Button("Download Audio")
+            with gr.Column():
+                output_file_audio = gr.File(label="Download Audio")
+                output_message_audio = gr.Textbox(label="Status")
 
-        with gr.Tab("YouTube Audio Downloader"):
-            gr.Markdown(
-                "<h3>Youtube Audio Downloader</h3><p>This Input takes a Youtube URL as input and creates an audio file for you to download. </br><em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
-            youtube_url_input_audio = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
-            download_button_audio = gr.Button("Download Audio")
-            output_file_audio = gr.File(label="Download Audio")
+        download_button_audio.click(
+            fn=download_youtube_audio,
+            inputs=youtube_url_input_audio,
+            outputs=[output_file_audio, output_message_audio]
+        )
 
-            # Implement the audio download functionality here
-
-        with gr.Tab("YouTube Timestamp URL Generator"):
-            gr.Markdown("## Generate YouTube URL with Timestamp")
-            with gr.Row():
+def create_utilities_yt_timestamp_tab():
+    with gr.Tab("YouTube Timestamp URL Generator"):
+        gr.Markdown("## Generate YouTube URL with Timestamp")
+        with gr.Row():
+            with gr.Column():
                 url_input = gr.Textbox(label="YouTube URL")
                 hours_input = gr.Number(label="Hours", value=0, minimum=0, precision=0)
                 minutes_input = gr.Number(label="Minutes", value=0, minimum=0, maximum=59, precision=0)
                 seconds_input = gr.Number(label="Seconds", value=0, minimum=0, maximum=59, precision=0)
+                generate_button = gr.Button("Generate URL")
+            with gr.Column():
+                output_url = gr.Textbox(label="Timestamped URL")
 
-            generate_button = gr.Button("Generate URL")
-            output_url = gr.Textbox(label="Timestamped URL")
-
-            generate_button.click(
-                fn=generate_timestamped_url,
-                inputs=[url_input, hours_input, minutes_input, seconds_input],
-                outputs=output_url
-            )
+        generate_button.click(
+            fn=generate_timestamped_url,
+            inputs=[url_input, hours_input, minutes_input, seconds_input],
+            outputs=output_url
+        )
 
 #
 # End of Utilities Tab Functions
@@ -4630,7 +4922,6 @@ def launch_ui(share_public=None, server_mode=False):
         with gr.Tabs():
             with gr.TabItem("Transcription / Summarization / Ingestion"):
                 with gr.Tabs():
-                    create_introduction_tab()
                     create_video_transcription_tab()
                     create_audio_processing_tab()
                     create_podcast_tab()
@@ -4684,12 +4975,17 @@ def launch_ui(share_public=None, server_mode=False):
                 create_restore_backup_tab()
 
             with gr.TabItem("Utilities"):
-                create_utilities_tab()
+                create_utilities_yt_video_tab()
+                create_utilities_yt_audio_tab()
+                create_utilities_yt_timestamp_tab()
 
             with gr.TabItem("Trashcan"):
                 create_view_trash_tab()
                 create_delete_trash_tab()
                 create_empty_trash_tab()
+            
+            with gr.TabItem("Introduction/Help"):
+                create_introduction_tab()
 
     # Launch the interface
     server_port_variable = 7860
