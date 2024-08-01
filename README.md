@@ -14,7 +14,7 @@
 
 ----------
 **GUI Screenshot**
-![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
+![tldw-summarization-gui-demo](Docs/GUI-Front_Page.PNG)
 
 
 ### <a name="what"></a> What is this (TL/DW)?

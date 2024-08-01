@@ -1201,6 +1201,25 @@ def update_prompt_in_db(title, description, system_prompt, user_prompt):
 
 create_prompts_db()
 
+def delete_prompt(prompt_id):
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+
+            # Delete associated keywords
+            cursor.execute("DELETE FROM PromptKeywords WHERE prompt_id = ?", (prompt_id,))
+
+            # Delete the prompt
+            cursor.execute("DELETE FROM Prompts WHERE id = ?", (prompt_id,))
+
+            if cursor.rowcount == 0:
+                return f"No prompt found with ID {prompt_id}"
+            else:
+                conn.commit()
+                return f"Prompt with ID {prompt_id} has been successfully deleted"
+    except sqlite3.Error as e:
+        return f"An error occurred: {e}"
+
 #
 #
 #######################################################################################################################
