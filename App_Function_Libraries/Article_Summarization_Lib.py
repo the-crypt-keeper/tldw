@@ -29,7 +29,9 @@ from App_Function_Libraries.Utils import sanitize_filename
 from Article_Extractor_Lib import scrape_article
 from Local_Summarization_Lib import summarize_with_llama, summarize_with_oobabooga, summarize_with_tabbyapi, \
     summarize_with_vllm, summarize_with_kobold, save_summary_to_file, summarize_with_local_llm
-from Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, summarize_with_cohere, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, summarize_with_huggingface
+from Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, summarize_with_cohere, \
+    summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, summarize_with_huggingface, \
+    summarize_with_mistral
 from SQLite_DB import Database, create_tables, add_media_with_keywords
 #
 #######################################################################################################################
@@ -196,6 +198,9 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
                     logging.debug(f"MAIN: Trying to summarize with DeepSeek")
                     # def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
                     summary = summarize_with_deepseek(api_key, json_file_path, article_custom_prompt)
+
+                elif api_name.lower() == "mistral":
+                    summary = summarize_with_mistral(api_key, json_file_path, article_custom_prompt)
 
                 elif api_name.lower() == "llama.cpp":
                     logging.debug(f"MAIN: Trying to summarize with Llama.cpp")

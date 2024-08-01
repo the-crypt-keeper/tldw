@@ -40,7 +40,7 @@ logger = logging.getLogger()
 openai_api_key = "Fake_key"
 client = OpenAI(api_key=openai_api_key)
 
-def summarize_with_local_llm(input_data, custom_prompt_arg):
+def summarize_with_local_llm(input_data, custom_prompt_arg, temp):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Local LLM: Loading json data for summarization")
@@ -108,19 +108,25 @@ def summarize_with_local_llm(input_data, custom_prompt_arg):
         print("Error occurred while processing summary with Local LLM:", str(e))
         return "Local LLM: Error occurred while processing summary"
 
-def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/completion", api_key=None):
-    loaded_config_data = load_and_log_configs()
+def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/completion", api_key=None, temp=None, system_message=None):
     try:
-        # API key validation
-        if api_key is None:
-            logging.info("llama.cpp: API key not provided as parameter")
-            logging.info("llama.cpp: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['llama']
-
-        if api_key is None or api_key.strip() == "":
-            logging.info("llama.cpp: API key not found or is empty")
-
-        logging.debug(f"llama.cpp: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        logging.debug("Llama.cpp: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            llama_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                llama_api_key = api_key
+                logging.info("Llama.cpp: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                llama_api_key = loaded_config_data['api_keys'].get('llama')
+                if llama_api_key:
+                    logging.info("Llama.cpp: Using API key from config file")
+                else:
+                    logging.warning("Llama.cpp: No API key found in config file")
 
         # Load transcript
         logging.debug("llama.cpp: Loading JSON data")
@@ -156,11 +162,17 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
         if len(api_key) > 5:
             headers['Authorization'] = f'Bearer {api_key}'
 
-        llama_prompt = f"{text} \n\n\n\n{custom_prompt}"
+        llama_prompt = f"{custom_prompt} \n\n\n\n{text}"
+        system_message = "You are a professional summarizer."
         logging.debug("llama: Prompt being sent is {llama_prompt}")
 
         data = {
-            "prompt": llama_prompt
+            "messages": [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": llama_prompt}
+            ],
+            "max_tokens": 4096,
+            "temperature": temp
         }
 
         logging.debug("llama: Submitting request to API endpoint")
@@ -186,18 +198,18 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_IP="http://127.0.0.1:5001/api/v1/generate"):
+def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None):
     logging.debug("Kobold: Summarization process starting...")
     try:
         logging.debug("Kobold: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
         if loaded_config_data is None:
             logging.error("Failed to load configuration data")
-            anthropic_api_key = None
+            kobold_api_key = None
         else:
             # Prioritize the API key passed as a parameter
             if api_key and api_key.strip():
-                anthropic_api_key = api_key
+                kobold_api_key = api_key
                 logging.info("Kobold: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
@@ -205,14 +217,7 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
                 if kobold_api_key:
                     logging.info("Kobold: Using API key from config file")
                 else:
-                    logging.warning("Anthropic: No API key found in config file")
-
-        # Final check to ensure we have a valid API key
-        if not kobold_api_key or not kobold_api_key.strip():
-            logging.error("Kobold: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # For example: raise ValueError("No valid Anthropic API key available")
-
+                    logging.warning("Kobold: No API key found in config file")
 
         logging.debug(f"Kobold: Using API Key: {kobold_api_key[:5]}...{kobold_api_key[-5:]}")
 
@@ -254,13 +259,18 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
         data = {
             "max_context_length": 8096,
             "max_length": 4096,
-            "prompt": f"{kobold_prompt}"
+            "prompt": kobold_prompt,
+            "temperature": 0.7,
+            #"top_p": 0.9,
+            #"top_k": 100
+            #"rep_penalty": 1.0,
         }
 
         logging.debug("kobold: Submitting request to API endpoint")
         print("kobold: Submitting request to API endpoint")
+        kobold_api_ip = loaded_config_data['local_api_ip']['kobold']
         try:
-            response = requests.post(kobold_api_IP, headers=headers, json=data)
+            response = requests.post(kobold_api_ip, headers=headers, json=data)
             logging.debug("kobold: API Response Status Code: %d", response.status_code)
 
             if response.status_code == 200:
@@ -290,7 +300,7 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions"):
+def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions", temp=None, system_message=None):
     logging.debug("Oobabooga: Summarization process starting...")
     try:
         logging.debug("Oobabooga: Loading and validating configurations")
@@ -310,13 +320,6 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http:/
                     logging.info("Anthropic: Using API key from config file")
                 else:
                     logging.warning("Anthropic: No API key found in config file")
-
-        # Final check to ensure we have a valid API key
-        if not ooba_api_key or not ooba_api_key.strip():
-            logging.error("Anthropic: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # For example: raise ValueError("No valid Anthropic API key available")
-
 
         logging.debug(f"Oobabooga: Using API Key: {ooba_api_key[:5]}...{ooba_api_key[-5:]}")
 
@@ -404,13 +407,6 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_I
                 else:
                     logging.warning("TabbyAPI: No API key found in config file")
 
-        # Final check to ensure we have a valid API key
-        if not tabby_api_key or not tabby_api_key.strip():
-            logging.error("TabbyAPI: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # For example: raise ValueError("No valid Anthropic API key available")
-
-
         logging.debug(f"TabbyAPI: Using API Key: {tabby_api_key[:5]}...{tabby_api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -481,11 +477,6 @@ def summarize_with_vllm(
                     logging.info("vLLM: Using API key from config file")
                 else:
                     logging.warning("vLLM: No API key found in config file")
-
-        # Final check to ensure we have a valid API key
-        if not vllm_api_key or not vllm_api_key.strip():
-            logging.error("Anthropic: No valid API key available")
-            raise ValueError("No valid vLLM API key available")
 
         logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:]}")
         # Process input data

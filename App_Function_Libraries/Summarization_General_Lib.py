@@ -4,7 +4,6 @@
 # This library is used to perform summarization.
 #
 ####
-import configparser
 ####################
 # Function List
 #
@@ -17,11 +16,12 @@ import configparser
 #
 ####################
 # Import necessary libraries
-import os
-import logging
-import time
-import requests
 import json
+import logging
+import os
+import time
+
+import requests
 from requests import RequestException
 
 from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav, speech_to_text
@@ -391,7 +391,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None):
             ],
             "message": "Please provide a summary.",
             "model": cohere_model,
-            "connectors": [{"id": "web-search"}],
+#            "connectors": [{"id": "web-search"}],
             "temperature": temp
         }
 
@@ -529,66 +529,61 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None):
 
 
 def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None):
-    loaded_config_data = load_and_log_configs()
     import requests
     import json
     global openrouter_model, openrouter_api_key
-    logging.debug("Anthropic: Loading and validating configurations")
-    loaded_config_data = load_and_log_configs()
-    if loaded_config_data is None:
-        logging.error("Failed to load configuration data")
-        openrouter_api_key = None
-    else:
-        # Prioritize the API key passed as a parameter
-        if api_key and api_key.strip():
-            openrouter_api_key = api_key
-            logging.info("Anthropic: Using API key provided as parameter")
+    try:
+        logging.debug("OpenRouter: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            openrouter_api_key = None
         else:
-            # If no parameter is provided, use the key from the config
-            openrouter_api_key = loaded_config_data['api_keys'].get('anthropic')
-            if openrouter_api_key:
-                logging.info("Anthropic: Using API key from config file")
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                openrouter_api_key = api_key
+                logging.info("OpenRouter: Using API key provided as parameter")
             else:
-                logging.warning("Anthropic: No API key found in config file")
+                # If no parameter is provided, use the key from the config
+                openrouter_api_key = loaded_config_data['api_keys'].get('openrouter')
+                if openrouter_api_key:
+                    logging.info("OpenRouter: Using API key from config file")
+                else:
+                    logging.warning("OpenRouter: No API key found in config file")
 
-    # Final check to ensure we have a valid API key
-    if not openrouter_api_key or not openrouter_api_key.strip():
-        logging.error("Anthropic: No valid API key available")
-        # You might want to raise an exception here or handle this case as appropriate for your application
-        # For example: raise ValueError("No valid Anthropic API key available")
+        # Model Selection validation
+        logging.debug("OpenRouter: Validating model selection")
+        loaded_config_data = load_and_log_configs()
+        openrouter_model = loaded_config_data['models']['openrouter']
+        logging.debug(f"OpenRouter: Using model from config file: {openrouter_model}")
 
+        # Final check to ensure we have a valid API key
+        if not openrouter_api_key or not openrouter_api_key.strip():
+            logging.error("OpenRouter: No valid API key available")
+            raise ValueError("No valid Anthropic API key available")
+    except Exception as e:
+        logging.error("OpenRouter: Error in processing: %s", str(e))
+        return f"OpenRouter: Error occurred while processing config file with OpenRouter: {str(e)}"
 
     logging.debug(f"OpenRouter: Using API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:]}")
 
-    # Model Selection validation
-    if openrouter_model is None or openrouter_model.strip() == "":
-        logging.info("OpenRouter: model not provided as parameter")
-        logging.info("OpenRouter: Attempting to use model from config file")
-        openrouter_model = loaded_config_data['api_keys']['openrouter_model']
-
-    if api_key is None or api_key.strip() == "":
-        logging.error("OpenAI: API key not found or is empty")
-        return "OpenAI: API Key Not Provided/Found in Config file or is empty"
-
-    logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
-
-    logging.debug(f"openai: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+    logging.debug(f"OpenRouter: Using Model: {openrouter_model}")
 
     if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("openrouter: Loading json data for summarization")
+        logging.debug("OpenRouter: Loading json data for summarization")
         with open(input_data, 'r') as file:
             data = json.load(file)
     else:
-        logging.debug("openrouter: Using provided string data for summarization")
+        logging.debug("OpenRouter: Using provided string data for summarization")
         data = input_data
 
     # DEBUG - Debug logging to identify sent data
-    logging.debug(f"openrouter: Loaded data: {data[:500]}...(snipped to first 500 chars)")
-    logging.debug(f"openrouter: Type of data: {type(data)}")
+    logging.debug(f"OpenRouter: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+    logging.debug(f"OpenRouter: Type of data: {type(data)}")
 
     if isinstance(data, dict) and 'summary' in data:
         # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("openrouter: Summary already exists in the loaded data")
+        logging.debug("OpenRouter: Summary already exists in the loaded data")
         return data['summary']
 
     # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
@@ -598,18 +593,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None)
     elif isinstance(data, str):
         text = data
     else:
-        raise ValueError("Invalid input data format")
-
-    config = configparser.ConfigParser()
-    file_path = 'config.txt'
-
-    # Check if the file exists in the specified path
-    if os.path.exists(file_path):
-        config.read(file_path)
-    elif os.path.exists('config.txt'):  # Check in the current directory
-        config.read('../config.txt')
-    else:
-        print("config.txt not found in the specified path or current directory.")
+        raise ValueError("OpenRouter: Invalid input data format")
 
     openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
 
@@ -618,15 +602,15 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None)
     temp = float(temp)
 
     try:
-        logging.debug("openrouter: Submitting request to API endpoint")
-        print("openrouter: Submitting request to API endpoint")
+        logging.debug("OpenRouter: Submitting request to API endpoint")
+        print("OpenRouter: Submitting request to API endpoint")
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {openrouter_api_key}",
             },
             data=json.dumps({
-                "model": f"{openrouter_model}",
+                "model": openrouter_model,
                 "messages": [
                     {"role": "user", "content": openrouter_prompt}
                 ],
@@ -1136,35 +1120,37 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
         return None, None
 
 
-def summarize_chunk(api_name, text, custom_prompt_input, api_key):
+def summarize_chunk(api_name, text, custom_prompt_input, api_key, temp=None):
     logging.debug("Entered 'summarize_chunk' function")
     try:
         if api_name.lower() == 'openai':
-            return summarize_with_openai(api_key, text, custom_prompt_input)
+            return summarize_with_openai(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "anthropic":
-            return summarize_with_anthropic(api_key, text, custom_prompt_input)
+            return summarize_with_anthropic(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "cohere":
-            return summarize_with_cohere(api_key, text, custom_prompt_input)
+            return summarize_with_cohere(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "groq":
-            return summarize_with_groq(api_key, text, custom_prompt_input)
+            return summarize_with_groq(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "openrouter":
-            return summarize_with_openrouter(api_key, text, custom_prompt_input)
+            return summarize_with_openrouter(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "deepseek":
-            return summarize_with_deepseek(api_key, text, custom_prompt_input)
+            return summarize_with_deepseek(api_key, text, custom_prompt_input, temp)
+        elif api_name.lower() == "mistral":
+            return summarize_with_mistral(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "llama.cpp":
-            return summarize_with_llama(text, custom_prompt_input)
+            return summarize_with_llama(text, custom_prompt_input, temp)
         elif api_name.lower() == "kobold":
-            return summarize_with_kobold(text, api_key, custom_prompt_input)
+            return summarize_with_kobold(text, api_key, custom_prompt_input, temp)
         elif api_name.lower() == "ooba":
-            return summarize_with_oobabooga(text, api_key, custom_prompt_input)
+            return summarize_with_oobabooga(text, api_key, custom_prompt_input, temp)
         elif api_name.lower() == "tabbyapi":
-            return summarize_with_tabbyapi(text, custom_prompt_input)
+            return summarize_with_tabbyapi(text, custom_prompt_input, temp)
         elif api_name.lower() == "vllm":
-            return summarize_with_vllm(text, custom_prompt_input)
+            return summarize_with_vllm(text, custom_prompt_input, temp)
         elif api_name.lower() == "local-llm":
-            return summarize_with_local_llm(text, custom_prompt_input)
+            return summarize_with_local_llm(text, custom_prompt_input, temp)
         elif api_name.lower() == "huggingface":
-            return summarize_with_huggingface(api_key, text, custom_prompt_input)
+            return summarize_with_huggingface(api_key, text, custom_prompt_input, temp)
         else:
             logging.warning(f"Unsupported API: {api_name}")
             return None
@@ -1214,7 +1200,7 @@ def format_input_with_metadata(metadata, content):
     formatted_input += content
     return formatted_input
 
-def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False):
+def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False, temp=None):
     loaded_config_data = load_and_log_configs()
     logging.info("Starting summarization process...")
     if custom_prompt_input is None:
@@ -1265,10 +1251,10 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
             logging.debug("summary = recursive_summarize_chunks")
             summary = recursive_summarize_chunks([chunk['text'] for chunk in chunks],
                                                  lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key),
-                                                 custom_prompt_input)
+                                                 custom_prompt_input, temp)
         else:
             logging.debug("summary = summarize_chunk")
-            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key)
+            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key, temp)
 
         # add some actual validation logic
         if summary is not None:
@@ -1535,7 +1521,7 @@ def process_url(
             )
         elif api_name:
             summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key,
-                                                 recursive_summarization)
+                                                 recursive_summarization, temp=None)
         else:
             summary_text = 'Summary not available'
 
