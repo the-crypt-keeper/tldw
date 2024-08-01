@@ -41,7 +41,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
-from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast
+from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast, download_youtube_audio
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 from App_Function_Libraries.PDF_Ingestion_Lib import process_and_cleanup_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
@@ -4839,8 +4839,13 @@ def create_utilities_tab():
             youtube_url_input_audio = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
             download_button_audio = gr.Button("Download Audio")
             output_file_audio = gr.File(label="Download Audio")
+            output_message_audio = gr.Textbox(label="Status")
 
-            # Implement the audio download functionality here
+            download_button_audio.click(
+                fn=download_youtube_audio,
+                inputs=youtube_url_input_audio,
+                outputs=[output_file_audio, output_message_audio]
+            )
 
         with gr.Tab("YouTube Timestamp URL Generator"):
             gr.Markdown("## Generate YouTube URL with Timestamp")
