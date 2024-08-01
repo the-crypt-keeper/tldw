@@ -198,7 +198,7 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_IP="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None):
+def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None):
     logging.debug("Kobold: Summarization process starting...")
     try:
         logging.debug("Kobold: Loading and validating configurations")
@@ -264,8 +264,9 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
 
         logging.debug("kobold: Submitting request to API endpoint")
         print("kobold: Submitting request to API endpoint")
+        kobold_api_ip = loaded_config_data['local_api_ip']['kobold']
         try:
-            response = requests.post(kobold_api_IP, headers=headers, json=data)
+            response = requests.post(kobold_api_ip, headers=headers, json=data)
             logging.debug("kobold: API Response Status Code: %d", response.status_code)
 
             if response.status_code == 200:
