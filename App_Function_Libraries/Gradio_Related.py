@@ -1911,9 +1911,10 @@ def create_prompt_view_tab():
                 view_button = gr.Button("View Page")
                 next_page_button = gr.Button("Next Page")
                 previous_page_button = gr.Button("Previous Page")
-            with gr.Column():
-                results_display = gr.HTML()
                 pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
+        with gr.Row():
+            results_display = gr.HTML()
+
 
         def view_database(page, entries_per_page):
             offset = (page - 1) * entries_per_page
