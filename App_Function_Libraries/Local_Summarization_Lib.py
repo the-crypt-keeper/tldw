@@ -128,11 +128,6 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
                 else:
                     logging.warning("Llama.cpp: No API key found in config file")
 
-        # Final check to ensure we have a valid API key
-        if not llama_api_key or not llama_api_key.strip():
-            logging.error("Llama.cpp: No valid API key available")
-            raise ValueError("Llama.cpp: No valid Anthropic API key available")
-
         # Load transcript
         logging.debug("llama.cpp: Loading JSON data")
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -223,12 +218,6 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_I
                     logging.info("Kobold: Using API key from config file")
                 else:
                     logging.warning("Kobold: No API key found in config file")
-
-        # Final check to ensure we have a valid API key
-        if not kobold_api_key or not kobold_api_key.strip():
-            logging.error("Kobold: No valid API key available")
-            raise ValueError("No valid Anthropic API key available")
-
 
         logging.debug(f"Kobold: Using API Key: {kobold_api_key[:5]}...{kobold_api_key[-5:]}")
 
@@ -327,13 +316,6 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http:/
                 else:
                     logging.warning("Anthropic: No API key found in config file")
 
-        # Final check to ensure we have a valid API key
-        if not ooba_api_key or not ooba_api_key.strip():
-            logging.error("Anthropic: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # For example: raise ValueError("No valid Anthropic API key available")
-
-
         logging.debug(f"Oobabooga: Using API Key: {ooba_api_key[:5]}...{ooba_api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -420,13 +402,6 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_I
                 else:
                     logging.warning("TabbyAPI: No API key found in config file")
 
-        # Final check to ensure we have a valid API key
-        if not tabby_api_key or not tabby_api_key.strip():
-            logging.error("TabbyAPI: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # For example: raise ValueError("No valid Anthropic API key available")
-
-
         logging.debug(f"TabbyAPI: Using API Key: {tabby_api_key[:5]}...{tabby_api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -497,11 +472,6 @@ def summarize_with_vllm(
                     logging.info("vLLM: Using API key from config file")
                 else:
                     logging.warning("vLLM: No API key found in config file")
-
-        # Final check to ensure we have a valid API key
-        if not vllm_api_key or not vllm_api_key.strip():
-            logging.error("Anthropic: No valid API key available")
-            raise ValueError("No valid vLLM API key available")
 
         logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:]}")
         # Process input data
