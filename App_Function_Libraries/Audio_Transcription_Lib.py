@@ -24,7 +24,7 @@ import subprocess
 import time
 
 # DEBUG Imports
-from memory_profiler import profile
+#from memory_profiler import profile
 
 # Import Local
 #
@@ -58,7 +58,7 @@ def get_whisper_model(model_name, device):
 
 # os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
 #DEBUG
-@profile
+#@profile
 def convert_to_wav(video_file_path, offset=0, overwrite=False):
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
 
@@ -119,7 +119,7 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 
 # Transcribe .wav into .segments.json
 #DEBUG
-@profile
+#@profile
 def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, diarize=False):
     global whisper_model_instance, processing_choice
     logging.info('speech-to-text: Loading faster_whisper model: %s', whisper_model)
