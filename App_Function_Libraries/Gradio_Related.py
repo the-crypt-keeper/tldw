@@ -591,6 +591,8 @@ def create_video_transcription_tab():
         with gr.Row():
             gr.Markdown("""Follow this project at [tldw - GitHub](https://github.com/rmusser01/tldw)""")
         with gr.Row():
+            gr.Markdown("""If you're wondering what all this is, please see the 'Introduction/Help' tab up above for more detailed information and how to obtain an API Key.""")
+        with gr.Row():
             with gr.Column():
                 url_input = gr.Textbox(label="URL(s) (Mandatory)",
                                        placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, other video sites and Youtube playlists.",
