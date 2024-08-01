@@ -1900,21 +1900,18 @@ def create_viewing_tab():
         )
 
 
-
 def create_prompt_view_tab():
     with gr.TabItem("View Prompt Database"):
         gr.Markdown("# View Prompt Database Entries")
         with gr.Row():
-            with gr.Column():
-                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
-                page_number = gr.Number(value=1, label="Page Number", precision=0)
-                view_button = gr.Button("View Page")
-                next_page_button = gr.Button("Next Page")
-                previous_page_button = gr.Button("Previous Page")
-                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
-        with gr.Row():
-            results_display = gr.HTML()
+            entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
+            page_number = gr.Number(value=1, label="Page Number", precision=0)
+            view_button = gr.Button("View Page")
+            next_page_button = gr.Button("Next Page")
+            previous_page_button = gr.Button("Previous Page")
+            pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
 
+        results_display = gr.HTML()
 
         def view_database(page, entries_per_page):
             offset = (page - 1) * entries_per_page
@@ -1935,10 +1932,25 @@ def create_prompt_view_tab():
                     cursor.execute('SELECT COUNT(*) FROM Prompts')
                     total_prompts = cursor.fetchone()[0]
 
-                results = "<table><tr><th>Title</th><th>Details</th><th>System Prompt</th><th>User Prompt</th><th>Keywords</th></tr>"
+                results = ""
                 for prompt in prompts:
-                    results += f"<tr><td>{prompt[0]}</td><td>{prompt[1] or ''}</td><td>{prompt[2] or ''}</td><td>{prompt[3] or ''}</td><td>{prompt[4] or ''}</td></tr>"
-                results += "</table>"
+                    results += f"""
+                    <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><strong>Title:</strong> {prompt[0]}</div>
+                            <div><strong>Details:</strong> {prompt[1] or ''}</div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>System Prompt:</strong> {prompt[2] or ''}
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>User Prompt:</strong> {prompt[3] or ''}
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>Keywords:</strong> {prompt[4] or ''}
+                        </div>
+                    </div>
+                    """
 
                 total_pages = (total_prompts + entries_per_page - 1) // entries_per_page
                 pagination = f"Page {page} of {total_pages} (Total prompts: {total_prompts})"
@@ -1951,7 +1963,8 @@ def create_prompt_view_tab():
             results, pagination, total_pages = view_database(page, entries_per_page)
             next_disabled = page >= total_pages
             prev_disabled = page <= 1
-            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(interactive=not prev_disabled)
+            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(
+                interactive=not prev_disabled)
 
         def go_to_next_page(current_page, entries_per_page):
             next_page = current_page + 1
