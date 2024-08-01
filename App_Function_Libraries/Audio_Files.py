@@ -16,25 +16,23 @@
 # Imports
 import json
 import logging
+import os
 import subprocess
-import sys
-import tempfile
 import uuid
 from datetime import datetime
 
 import requests
-import os
-from gradio import gradio
 import yt_dlp
 
 from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 # Local Imports
-from App_Function_Libraries.SQLite_DB import add_media_to_database, add_media_with_keywords
-from App_Function_Libraries.Utils import create_download_directory, save_segments_to_json
+from App_Function_Libraries.SQLite_DB import add_media_to_database, add_media_with_keywords, \
+    check_media_and_whisper_model
 from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
+from App_Function_Libraries.Utils import create_download_directory, save_segments_to_json
 from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
 
 #
@@ -45,8 +43,20 @@ from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
 MAX_FILE_SIZE = 500 * 1024 * 1024
 
 
-def download_audio_file(url, use_cookies=False, cookies=None):
+def download_audio_file(url, current_whisper_model="", use_cookies=False, cookies=None):
     try:
+        # Check if media already exists in the database and compare whisper models
+        should_download, reason = check_media_and_whisper_model(
+            url=url,
+            current_whisper_model=current_whisper_model
+        )
+
+        if not should_download:
+            logging.info(f"Skipping audio download: {reason}")
+            return None
+
+        logging.info(f"Proceeding with audio download: {reason}")
+
         # Set up the request headers
         headers = {}
         if use_cookies and cookies:
@@ -72,6 +82,7 @@ def download_audio_file(url, use_cookies=False, cookies=None):
 
         # Ensure the downloads directory exists
         os.makedirs('downloads', exist_ok=True)
+
 
         # Download the file
         with open(save_path, 'wb') as f:

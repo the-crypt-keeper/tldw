@@ -32,6 +32,10 @@ from urllib.parse import urlparse, parse_qs
 import unicodedata
 # 3rd-Party Imports
 import yt_dlp
+
+from App_Function_Libraries.SQLite_DB import check_media_and_whisper_model
+
+
 # Import Local
 #
 #######################################################################################################################
@@ -94,7 +98,7 @@ def get_playlist_videos(playlist_url):
             return [], None
 
 
-def download_video(video_url, download_path, info_dict, download_video_flag):
+def download_video(video_url, download_path, info_dict, download_video_flag, current_whisper_model):
     global video_file_path, ffmpeg_path
     global audio_file_path
 
@@ -105,6 +109,20 @@ def download_video(video_url, download_path, info_dict, download_video_flag):
         return None
 
     normalized_video_title = normalize_title(info_dict['title'])
+
+    # Check if media already exists in the database and compare whisper models
+    should_download, reason = check_media_and_whisper_model(
+        title=normalized_video_title,
+        url=video_url,
+        current_whisper_model=current_whisper_model
+    )
+
+    if not should_download:
+        logging.info(f"Skipping download: {reason}")
+        return None
+
+    logging.info(f"Proceeding with download: {reason}")
+
     video_file_path = os.path.join(download_path, f"{normalized_video_title}.{info_dict['ext']}")
 
     # Check for existence of video file
@@ -292,7 +310,7 @@ def extract_metadata(url, use_cookies=False, cookies=None):
 
 def generate_timestamped_url(url, hours, minutes, seconds):
     # Extract video ID from the URL
-    video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
+    video_id_match = re.search(r'(?:v=|)([0-9A-Za-z_-]{11}).*', url)
     if not video_id_match:
         return "Invalid YouTube URL"
 
