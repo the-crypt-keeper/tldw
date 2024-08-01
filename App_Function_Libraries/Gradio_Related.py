@@ -2546,17 +2546,18 @@ def create_chat_interface_editable():
     """
 
     custom_js = """
-    function selectMessage(el) {
-        el.classList.toggle('selected-message');
-        updateSelectedMessages();
-    }
-
-    function updateSelectedMessages() {
-        const selectedMessages = document.querySelectorAll('.selected-message');
-        const messageIds = Array.from(selectedMessages).map(el => el.dataset.messageId);
-        document.getElementById('selected_messages').value = JSON.stringify(messageIds);
-        document.dispatchEvent(new CustomEvent('input', { target: document.getElementById('selected_messages') }));
-    }
+        function selectMessage(el) {
+            el.classList.toggle('selected-message');
+            updateSelectedMessages();
+        }
+        
+        function updateSelectedMessages() {
+            const selectedMessages = document.querySelectorAll('.selected-message');
+            const messageIds = Array.from(selectedMessages).map(el => el.dataset.messageId);
+            const selectedMessagesInput = document.getElementById('selected_messages');
+            selectedMessagesInput.value = JSON.stringify(messageIds);
+            selectedMessagesInput.dispatchEvent(new Event('change'));
+        }
     """
 
     with gr.TabItem("Remote LLM Chat - Editable"):
@@ -2672,14 +2673,32 @@ def create_chat_interface_editable():
             outputs=[chat_history]
         )
 
+        def show_edit_message(evt: gr.SelectData, chat_history):
+            selected_id = json.dumps([evt.index])
+            return gr.update(value=chat_history[evt.index][0]), gr.update(value=selected_id)
+
+        chatbot.select(
+            show_edit_message,
+            inputs=[chat_history],
+            outputs=[edit_message_text, selected_messages]
+        )
+
         def edit_selected_message(selected, edit_text, history):
-            selected_ids = json.loads(selected)
+            try:
+                selected_ids = json.loads(selected) if selected else []
+            except json.JSONDecodeError:
+                print("Invalid JSON in selected messages")
+                return history
+
             if len(selected_ids) != 1:
+                print(f"Expected 1 selected message, got {len(selected_ids)}")
                 return history
 
             message_id = int(selected_ids[0])
             if 0 <= message_id < len(history):
                 history[message_id] = (edit_text, history[message_id][1])
+            else:
+                print(f"Invalid message ID: {message_id}")
             return history
 
         def delete_selected_messages(selected, history):
@@ -2714,9 +2733,6 @@ def create_chat_interface_editable():
             inputs=[chatbot, conversation_id, media_content],
             outputs=[conversation_id, gr.Textbox(label="Save Status")]
         )
-
-        def show_edit_message(evt: gr.SelectData, chat_history):
-            return gr.update(value=chat_history[evt.index][0]), gr.update(value=evt.index)
 
         #chatbot.select(show_edit_message, chat_history, [edit_message_text, gr.update()])
 
@@ -3038,6 +3054,7 @@ def create_chat_interface_four():
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
 
         def chat_wrapper_single(message, chat_history, api_endpoint, api_key, temperature, user_prompt):
+            logging.debug(f"Chat Wrapper Single - Message: {message}, Chat History: {chat_history}")
             new_msg, new_history, _ = chat_wrapper(
                 message, chat_history, {}, [],  # Empty media_content and selected_parts
                 api_endpoint, api_key, user_prompt, None,  # No conversation_id
@@ -3048,6 +3065,7 @@ def create_chat_interface_four():
             return "", chat_history, chat_history
 
         for interface in chat_interfaces:
+            logging.debug(f"Chat Interface - Clicked Submit for Chat {interface['chatbot']}"),
             interface['submit'].click(
                 chat_wrapper_single,
                 inputs=[
