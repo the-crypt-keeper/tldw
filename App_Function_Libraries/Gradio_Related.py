@@ -57,7 +57,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
-    load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt
+    load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt, search_and_display_items
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -1917,6 +1917,64 @@ def create_viewing_tab():
         )
 
 
+def create_search_summaries_tab():
+    with gr.TabItem("Search/View Title+Summary "):
+        gr.Markdown("# Search across all ingested items in the Database and review their summaries")
+        gr.Markdown("Search by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
+        with gr.Row():
+            with gr.Column():
+                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                             label="Search By")
+                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
+                page_number = gr.Number(value=1, label="Page Number", precision=0)
+                char_count_input = gr.Number(value=5000, label="Amount of characters to display from the main content",
+                                             precision=0)
+            with gr.Column():
+                search_button = gr.Button("Search")
+                next_page_button = gr.Button("Next Page")
+                previous_page_button = gr.Button("Previous Page")
+                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
+        search_results_output = gr.HTML()
+
+
+        def update_search_page(query, search_type, page, entries_per_page, char_count):
+            # Ensure char_count is a positive integer
+            char_count = max(1, int(char_count)) if char_count else 5000
+            results, pagination, total_pages = search_and_display_items(query, search_type, page, entries_per_page, char_count)
+            next_disabled = page >= total_pages
+            prev_disabled = page <= 1
+            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(
+                interactive=not prev_disabled)
+
+        def go_to_next_search_page(query, search_type, current_page, entries_per_page, char_count):
+            next_page = current_page + 1
+            return update_search_page(query, search_type, next_page, entries_per_page, char_count)
+
+        def go_to_previous_search_page(query, search_type, current_page, entries_per_page, char_count):
+            previous_page = max(1, current_page - 1)
+            return update_search_page(query, search_type, previous_page, entries_per_page, char_count)
+
+        search_button.click(
+            fn=update_search_page,
+            inputs=[search_query_input, search_type_input, page_number, entries_per_page, char_count_input],
+            outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        next_page_button.click(
+            fn=go_to_next_search_page,
+            inputs=[search_query_input, search_type_input, page_number, entries_per_page, char_count_input],
+            outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        previous_page_button.click(
+            fn=go_to_previous_search_page,
+            inputs=[search_query_input, search_type_input, page_number, entries_per_page, char_count_input],
+            outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+
+
 def create_prompt_view_tab():
     with gr.TabItem("View Prompt Database"):
         gr.Markdown("# View Prompt Database Entries")
@@ -2314,7 +2372,8 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
 
         # Combine the selected parts of the media content
         combined_content = "\n\n".join([f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if part in media_content])
-        logging.debug(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")  # Print first 500 chars
+        # Print first 500 chars
+        logging.debug(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")
 
         # Prepare the input for the API
         if not history:
@@ -4933,6 +4992,7 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
                 create_viewing_tab()
+                create_search_summaries_tab()
                 create_prompt_search_tab()
                 create_prompt_view_tab()
 
