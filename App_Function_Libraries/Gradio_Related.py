@@ -56,7 +56,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
-    load_prompt_details, load_preset_prompts, insert_prompt_to_db
+    load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config, safe_read_file
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -3652,13 +3652,101 @@ def create_view_trash_tab():
         view_button = gr.Button("View Trash")
         trash_list = gr.Textbox(label="Trashed Items")
         view_button.click(list_trash, inputs=[], outputs=trash_list)
+
+
+def search_prompts_for_deletion(query):
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, name, details
+                FROM Prompts
+                WHERE name LIKE ? OR details LIKE ?
+                LIMIT 10
+            ''', (f'%{query}%', f'%{query}%'))
+            results = cursor.fetchall()
+
+            if not results:
+                return "No matching prompts found."
+
+            output = "<h3>Matching Prompts:</h3>"
+            for row in results:
+                output += f"<p><strong>ID:</strong> {row[0]} | <strong>Name:</strong> {html.escape(row[1])} | <strong>Details:</strong> {html.escape(row[2][:100])}...</p>"
+            return output
+    except sqlite3.Error as e:
+        return f"An error occurred while searching prompts: {e}"
+
+
+def search_media_for_deletion(query):
+    try:
+        with sqlite3.connect('media.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, title, description
+                FROM media
+                WHERE title LIKE ? OR description LIKE ?
+                LIMIT 10
+            ''', (f'%{query}%', f'%{query}%'))
+            results = cursor.fetchall()
+
+            if not results:
+                return "No matching media found."
+
+            output = "<h3>Matching Media:</h3>"
+            for row in results:
+                output += f"<p><strong>ID:</strong> {row[0]} | <strong>Title:</strong> {html.escape(row[1])} | <strong>Description:</strong> {html.escape(row[2][:100])}...</p>"
+            return output
+    except sqlite3.Error as e:
+        return f"An error occurred while searching media: {e}"
+
+
 def create_delete_trash_tab():
-    with gr.TabItem("Delete Item"):
-        media_id_input = gr.Number(label="Media ID")
-        force_checkbox = gr.Checkbox(label="Force Delete")
-        delete_button = gr.Button("Delete")
-        delete_output = gr.Textbox(label="Result")
-        delete_button.click(delete_item, inputs=[media_id_input, force_checkbox], outputs=delete_output)
+    with gr.TabItem("Delete DB Item"):
+        gr.Markdown("# Search and Delete Items from Databases")
+
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("## Search and Delete Prompts")
+                prompt_search_input = gr.Textbox(label="Search Prompts")
+                prompt_search_button = gr.Button("Search Prompts")
+                prompt_search_results = gr.HTML()
+                prompt_id_input = gr.Number(label="Prompt ID")
+                prompt_delete_button = gr.Button("Delete Prompt")
+                prompt_delete_output = gr.Textbox(label="Delete Result")
+
+            with gr.Column():
+                gr.Markdown("## Search and Delete Media")
+                media_search_input = gr.Textbox(label="Search Media")
+                media_search_button = gr.Button("Search Media")
+                media_search_results = gr.HTML()
+                media_id_input = gr.Number(label="Media ID")
+                media_force_checkbox = gr.Checkbox(label="Force Delete")
+                media_delete_button = gr.Button("Delete Media")
+                media_delete_output = gr.Textbox(label="Delete Result")
+
+        prompt_search_button.click(
+            search_prompts_for_deletion,
+            inputs=[prompt_search_input],
+            outputs=prompt_search_results
+        )
+
+        prompt_delete_button.click(
+            delete_prompt,
+            inputs=[prompt_id_input],
+            outputs=prompt_delete_output
+        )
+
+        media_search_button.click(
+            search_media_for_deletion,
+            inputs=[media_search_input],
+            outputs=media_search_results
+        )
+
+        media_delete_button.click(
+            delete_item,
+            inputs=[media_id_input, media_force_checkbox],
+            outputs=media_delete_output
+        )
 
 def create_empty_trash_tab():
     with gr.TabItem("Empty Trash"):
