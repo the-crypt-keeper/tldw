@@ -58,12 +58,14 @@ pillow
 playwright
 protobuf
 psutil
+pyannote.audio
 pycryptodomex
 pydantic
 pydantic_core
 pydub
 pyee
 Pygments
+pypandoc
 pyparsing
 pyreadline3
 python-dateutil
@@ -79,6 +81,7 @@ rich
 rpds-py
 ruff
 safetensors
+scikit-learn
 semantic-version
 sentencepiece
 setuptools
@@ -89,6 +92,7 @@ starlette
 sympy
 termcolor
 timm
+tiktoken
 tokenizers
 tomlkit
 toolz
@@ -108,5 +112,5 @@ yt-dlp
 nltk
 torch
 torchaudio
-openai
-tiktoken
+
+
