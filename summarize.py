@@ -23,7 +23,8 @@ from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Local_File_Processing_Lib import read_paths_from_file, process_local_file
 from App_Function_Libraries.SQLite_DB import add_media_to_database
 from App_Function_Libraries.System_Checks_Lib import cuda_check, platform_check, check_ffmpeg
-from App_Function_Libraries.Utils import load_and_log_configs, create_download_directory, extract_text_from_segments
+from App_Function_Libraries.Utils import load_and_log_configs, create_download_directory, extract_text_from_segments, \
+    cleanup_downloads
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 #
 # 3rd-Party Module Imports
@@ -796,23 +797,6 @@ Sample commands:
         logger.addHandler(file_handler)
         logger.info(f"Log file created at: {args.log_file}")
 
-    ########## Custom Prompt setup
-    custom_prompt_input = args.custom_prompt
-
-    if not args.custom_prompt:
-        logging.debug("No custom prompt defined, will use default")
-        args.custom_prompt_input = (
-            "\n\nabove is the transcript of a video. "
-            "Please read through the transcript carefully. Identify the main topics that are "
-            "discussed over the course of the transcript. Then, summarize the key points about each "
-            "main topic in a concise bullet point. The bullet points should cover the key "
-            "information conveyed about each topic in the video, but should be much shorter than "
-            "the full transcript. Please output your bullet point summary inside <bulletpoints> "
-            "tags."
-        )
-        print("No custom prompt defined, will use default")
-
-        custom_prompt_input = args.custom_prompt
     else:
         logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt_input} \n\nas the prompt")
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
@@ -907,6 +891,24 @@ Sample commands:
         # FIXME - dirty hack
         args.time_based = False
 
+        ########## Custom Prompt setup
+        custom_prompt_input = args.custom_prompt
+
+        if not args.custom_prompt:
+            logging.debug("No custom prompt defined, will use default")
+            args.custom_prompt_input = (
+                "\n\nThis is the transcript of a video. "
+                "Please read through the transcript carefully. Identify the main topics that are "
+                "discussed over the course of the transcript. Then, summarize the key points about each "
+                "main topic in a concise bullet point. The bullet points should cover the key "
+                "information conveyed about each topic in the video, but should be much shorter than "
+                "the full transcript. Please output your bullet point summary inside <bulletpoints> "
+                "tags."
+            )
+            print("No custom prompt defined, will use default")
+
+            custom_prompt_input = args.custom_prompt
+
         try:
             results = main(args.input_path, api_name=args.api_name, api_key=args.api_key,
                            num_speakers=args.num_speakers, whisper_model=args.whisper_model, offset=args.offset,
@@ -932,3 +934,5 @@ Sample commands:
         logging.info("Cleanup function called. Script is exiting.")
 
     atexit.register(cleanup)
+    # Register the cleanup function to run on exit
+    atexit.register(cleanup_downloads)

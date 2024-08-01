@@ -14,13 +14,18 @@
 
 ----------
 **GUI Screenshot**
-![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
+![tldw-summarization-gui-demo](Docs/GUI-Front_Page.PNG)
 
 
 ### <a name="what"></a> What is this (TL/DW)?
 - **101**
-  - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it.
+  - The end goal of this project, is to be a personal research multi-tool/data assistant/young lady's illustrated primer, that is capable of ingesting:
+    * audio, videos, articles, free form text, documents, and books,
+  - as text into a SQLite DB, so that you can then search and chat with it at any time on your own device/locally.
+    - (Plus act as a nice way of creating your personal 'media' database, so you can )
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
+    - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off.
+    - If anything, I'd like to see this project be used in schools, universities, and research institutions, as well as by individuals who are looking to learn and grow. (or at least something like this project; small goals :p)
 - **Don't care, give me code**
   * `git clone https://github.com/rmusser01/tldw` -> `cd tldw/Helper_Scripts/Installer_Scripts` -> `Linux: ./Linux-Install.sh` / `Windows: Windows-installer.bat` / `MacOS: MacOS-Install_Updater.sh`
     * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three`
@@ -45,7 +50,7 @@
   - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
   - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite (for now, would like to build a shim for ElasticSearch/Similar) DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it. (Plus act as a nice way of personally tagging data for possible future training of your personal AI agent :P)
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
-  - Basically a cheap foreign knockoff `Young Lady's Illustrated Primer`(Neal Stephenson's the Diamond Age) that you'd buy from some shady dude in a van at a swap meet.
+  - Basically a [cheap foreign knockoff](https://tvtropes.org/pmwiki/pmwiki.php/Main/ShoddyKnockoffProduct) [`Young Lady's Illustrated Primer`](https://en.wikipedia.org/wiki/The_Diamond_Age) that you'd buy from some [shady dude in a van at a swap meet](https://tvtropes.org/pmwiki/pmwiki.php/Main/TheLittleShopThatWasntThereYesterday).
     * Some food for thought: https://notes.andymatuschak.org/z9R3ho4NmDFScAohj3J8J3Y
     * I say this recognizing the inherent difficulties in replicating such a device and acknowledging the current limitations of technology.
 
@@ -550,5 +555,4 @@ Sample commands:
   - Bugfixes for stability and file handling(Making sure files are removed when they should be)
   - Add support for more APIs
   - Live audio recording + transcription
-  - Documentation for each of the functions exposed.
-    - They all are pretty straightforward, but I'd like to make it easier to understand what's going on.
+  - RAG support

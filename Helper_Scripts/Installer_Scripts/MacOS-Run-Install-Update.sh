@@ -25,11 +25,6 @@ ask_permission() {
     esac
 }
 
-cleanup() {
-    log "Performing cleanup"
-    # Deactivate virtual environment
-    deactivate
-}
 
 # Function to install Homebrew
 install_homebrew() {
@@ -75,24 +70,6 @@ if ! command_exists ffmpeg; then
 fi
 
 install_dir="$(dirname "$0")/tldw"
-
-# Check if this is an update or new installation
-if [ -d "$install_dir" ]; then
-    read -p "TLDW directory found. Do you want to update? (y/n): " update_choice
-    if [[ $update_choice == "y" || $update_choice == "Y" ]]; then
-        update
-    else
-        fresh_install
-    fi
-else
-    fresh_install
-fi
-
-cleanup
-log "Installation/Update process completed"
-echo "Installation/Update completed successfully!"
-echo "To activate the virtual environment in the future, run: source $install_dir/venv/bin/activate"
-echo "To start using TLDW, please refer to the project documentation."
 
 # Functions
 
@@ -165,7 +142,31 @@ setup_environment() {
     # Update config.txt to use CPU
     sed -i '' 's/cuda/cpu/' config.txt
 
-    # Install other requirements
-    pip install -r requirements.txt
+    # Install requirements from the cloned repository
+    if [ -f "requirements.txt" ]; then
+        log "Installing requirements from requirements.txt"
+        pip install -r requirements.txt
+    else
+        log "requirements.txt not found in the installation directory"
+        echo "Warning: requirements.txt not found. Some dependencies may be missing."
+    fi
 }
 
+# Check if this is an update or new installation
+if [ -d "$install_dir" ]; then
+    read -p "TLDW directory found. Do you want to update? (y/n): " update_choice
+    if [[ $update_choice == "y" || $update_choice == "Y" ]]; then
+        update
+    else
+        fresh_install
+    fi
+else
+    fresh_install
+fi
+
+log "Installation/Update process completed"
+echo "Installation/Update completed successfully!"
+echo "To activate the virtual environment in the future, run: source $install_dir/venv/bin/activate"
+echo "To start using TLDW, please refer to the project documentation."
+echo "Otherwise, hang on a sec as tldw launches..."
+python3 summarize.py -gui
