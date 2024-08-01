@@ -22,7 +22,7 @@
   - The end goal of this project, is to be a personal research multi-tool/data assistant/young lady's illustrated primer, that is capable of ingesting:
     * audio, videos, articles, free form text, documents, and books,
   - as text into a SQLite DB, so that you can then search and chat with it at any time on your own device/locally.
-    - (Plus act as a nice way of creating your personal 'media' database, so you can )
+    - (Plus act as a nice way of creating your personal 'media' database, a personal digital library with search!)
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
     - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off.
     - If anything, I'd like to see this project be used in schools, universities, and research institutions, as well as by individuals who are looking to learn and grow. (or at least something like this project; small goals :p)
@@ -38,7 +38,7 @@
   - Ingest content(video/audio/ebook/website/markdown) from a URL or a local file. Can be done in batches with a text file containing a list of URLs or paths to local files(CLI only) as well as from the GUI.
     - GUI can handle local file uploads, but not batched file uploads. Can handle multiple URLs though.
   - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
-    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, Triton and Aphrodite support planned)
+    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, and Triton support planned) - Tabby/vLLM are in, but untested. Aphrodite you can use llama.cpp or kobold.cpp API and it should work...
   - Recursive/'Rolling' summaries (i.e. chunking up input and doing a chain of summaries) are supported. 
     - The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
   - Everything is stored in a SQLite DB, so you can search across all the content you've ingested, and review or modify it.
@@ -548,9 +548,6 @@ Sample commands:
       - Set it up so users can test against their own datasets
     - Offline diarization of speakers - Code is in, but there was some issue that was a headache so I said screw it.
       - Should work if you give it an HF api key in the code though...
-    - PyInstaller for Windows/MacOS/Linux
-      - At some point. I'd like this to be installable/usable by non-technical individuals and it's current setup kind of prevents that.
-      - I think I may give up on this and just use the batch scripts, but I definitely would prefer a pyinstaller version.
 - **Next items of focus**
   - Bugfixes for stability and file handling(Making sure files are removed when they should be)
   - Add support for more APIs
