@@ -63,17 +63,18 @@ def extract_text_from_segments(segments):
     return text.strip()
 
 
-def summarize_with_openai(api_key, input_data, custom_prompt_arg):
+def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None):
     loaded_config_data = load_and_log_configs()
+
     try:
         # API key validation
         if api_key is None or api_key.strip() == "":
-            logging.info("OpenAI: API key not provided as parameter")
+            logging.info("OpenAI: #1 API key not provided as parameter")
             logging.info("OpenAI: Attempting to use API key from config file")
             api_key = loaded_config_data['api_keys']['openai']
 
         if api_key is None or api_key.strip() == "":
-            logging.error("OpenAI: API key not found or is empty")
+            logging.error("OpenAI: #2 API key not found or is empty")
             return "OpenAI: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
@@ -136,6 +137,9 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
             f"OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
         logging.debug("openai: Preparing data + prompt for submittal")
         openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        if temp is None:
+            temp = 0.7
+        temp = float(temp)
         data = {
             "model": openai_model,
             "messages": [
@@ -143,7 +147,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
                 {"role": "user", "content": openai_prompt}
             ],
             "max_tokens": 4096,
-            "temperature": 0.1
+            "temperature": temp
         }
 
         logging.debug("OpenAI: Posting request")
@@ -174,21 +178,35 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg):
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries=3, retry_delay=5):
+def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, max_retries=3, retry_delay=5):
+    logging.debug("Anthropic: Summarization process starting...")
     try:
+        logging.debug("Anthropic: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
-        # API key validation
-        if api_key is None or api_key.strip() == "":
-            logging.info("Anthropic: API key not provided as parameter")
-            logging.info("Anthropic: Attempting to use API key from config file")
-            anthropic_api_key = loaded_config_data['api_keys']['anthropic']
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            anthropic_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                anthropic_api_key = api_key
+                logging.info("Anthropic: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                anthropic_api_key = loaded_config_data['api_keys'].get('anthropic')
+                if anthropic_api_key:
+                    logging.info("Anthropic: Using API key from config file")
+                else:
+                    logging.warning("Anthropic: No API key found in config file")
 
-        # Sanity check to ensure API key is not empty in the config file
-        if api_key is None or api_key.strip() == "":
-            logging.error("Anthropic: API key not found or is empty")
-            return "Anthropic: API Key Not Provided/Found in Config file or is empty"
+        # Final check to ensure we have a valid API key
+        if not anthropic_api_key or not anthropic_api_key.strip():
+            logging.error("Anthropic: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid Anthropic API key available")
 
-        logging.debug(f"Anthropic: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        logging.debug(f"Anthropic: Using API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("AnthropicAI: Loading json data for summarization")
@@ -216,7 +234,9 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries
         else:
             raise ValueError("Anthropic: Invalid input data format")
 
-        anthropic_model = loaded_config_data['models']['anthropic']
+        if temp is None:
+            temp = 0.1
+        temp = float(temp)
 
         headers = {
             'x-api-key': anthropic_api_key,
@@ -238,7 +258,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries
             "max_tokens": 4096,  # max _possible_ tokens to return
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
-            "temperature": 0.1,
+            "temperature": temp,
             "top_k": 0,
             "top_p": 1.0,
             "metadata": {
@@ -294,21 +314,35 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, max_retries
 
 
 # Summarize with Cohere
-def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
-    loaded_config_data = load_and_log_configs()
+def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None):
+    logging.debug("Cohere: Summarization process starting...")
     try:
-        # API key validation
-        if api_key is None or api_key.strip() == "":
-            logging.info("Cohere: API key not provided as parameter")
-            logging.info("Cohere: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['cohere']
+        logging.debug("Cohere: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            cohere_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                cohere_api_key = api_key
+                logging.info("Cohere: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                cohere_api_key = loaded_config_data['api_keys'].get('cohere')
+                if cohere_api_key:
+                    logging.info("Cohere: Using API key from config file")
+                else:
+                    logging.warning("Cohere: No API key found in config file")
 
-        if api_key is None or api_key.strip() == "":
-            logging.error("Cohere: API key not found or is empty")
-            logging.debug(f"Loaded config data: {loaded_config_data}")
-            return "Cohere: API Key Not Provided/Found in Config file or is empty"
+        # Final check to ensure we have a valid API key
+        if not cohere_api_key or not cohere_api_key.strip():
+            logging.error("Cohere: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid Anthropic API key available")
 
-        logging.debug(f"Cohere: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        logging.debug(f"Cohere: Using API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Cohere: Loading json data for summarization")
@@ -338,7 +372,9 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
 
         cohere_model = loaded_config_data['models']['cohere']
 
-        cohere_api_key = api_key
+        if temp is None:
+            temp = 0.3
+        temp = float(temp)
 
         headers = {
             'accept': 'application/json',
@@ -355,7 +391,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
             ],
             "message": "Please provide a summary.",
             "model": cohere_model,
-            "connectors": [{"id": "web-search"}]
+            "connectors": [{"id": "web-search"}],
+            "temperature": temp
         }
 
         logging.debug("cohere: Submitting request to API endpoint")
@@ -383,20 +420,34 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg):
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, input_data, custom_prompt_arg):
-    loaded_config_data = load_and_log_configs()
+def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None):
+    logging.debug("Groq: Summarization process starting...")
     try:
-        # API key validation
-        if api_key is None or api_key.strip() == "":
-            logging.info("Groq: API key not provided as parameter")
-            logging.info("Groq: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['groq']
+        logging.debug("Groq: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            groq_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                groq_api_key = api_key
+                logging.info("Groq: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                groq_api_key = loaded_config_data['api_keys'].get('groq')
+                if groq_api_key:
+                    logging.info("Groq: Using API key from config file")
+                else:
+                    logging.warning("Groq: No API key found in config file")
 
-        if api_key is None or api_key.strip() == "":
-            logging.error("Groq: API key not found or is empty")
-            return "Groq: API Key Not Provided/Found in Config file or is empty"
+        # Final check to ensure we have a valid API key
+        if not groq_api_key or not groq_api_key.strip():
+            logging.error("Anthropic: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid Anthropic API key available")
 
-        logging.debug(f"Groq: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        logging.debug(f"Groq: Using API Key: {groq_api_key[:5]}...{groq_api_key[-5:]}")
 
         # Transcript data handling & Validation
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -428,8 +479,13 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
         # Set the model to be used
         groq_model = loaded_config_data['models']['groq']
 
+        if temp is None:
+            temp = 0.2
+        temp = float(temp)
+
+
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'Authorization': f'Bearer {groq_api_key}',
             'Content-Type': 'application/json'
         }
 
@@ -440,10 +496,11 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
             "messages": [
                 {
                     "role": "user",
-                    "content": groq_prompt
+                    "content": groq_prompt,
                 }
             ],
-            "model": groq_model
+            "model": groq_model,
+            "temperature": temp
         }
 
         logging.debug("groq: Submitting request to API endpoint")
@@ -471,20 +528,37 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg):
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
 
 
-def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
+def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None):
     loaded_config_data = load_and_log_configs()
     import requests
     import json
     global openrouter_model, openrouter_api_key
-    # API key validation
-    if api_key is None or api_key.strip() == "":
-        logging.info("OpenRouter: API key not provided as parameter")
-        logging.info("OpenRouter: Attempting to use API key from config file")
-        openrouter_api_key = loaded_config_data['api_keys']['openrouter']
+    logging.debug("Anthropic: Loading and validating configurations")
+    loaded_config_data = load_and_log_configs()
+    if loaded_config_data is None:
+        logging.error("Failed to load configuration data")
+        openrouter_api_key = None
+    else:
+        # Prioritize the API key passed as a parameter
+        if api_key and api_key.strip():
+            openrouter_api_key = api_key
+            logging.info("Anthropic: Using API key provided as parameter")
+        else:
+            # If no parameter is provided, use the key from the config
+            openrouter_api_key = loaded_config_data['api_keys'].get('anthropic')
+            if openrouter_api_key:
+                logging.info("Anthropic: Using API key from config file")
+            else:
+                logging.warning("Anthropic: No API key found in config file")
 
-    if api_key is None or api_key.strip() == "":
-        logging.error("OpenRouter: API key not found or is empty")
-        return "OpenRouter: API Key Not Provided/Found in Config file or is empty"
+    # Final check to ensure we have a valid API key
+    if not openrouter_api_key or not openrouter_api_key.strip():
+        logging.error("Anthropic: No valid API key available")
+        # You might want to raise an exception here or handle this case as appropriate for your application
+        # For example: raise ValueError("No valid Anthropic API key available")
+
+
+    logging.debug(f"OpenRouter: Using API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:]}")
 
     # Model Selection validation
     if openrouter_model is None or openrouter_model.strip() == "":
@@ -539,6 +613,10 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
 
     openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
 
+    if temp is None:
+        temp = 0.1
+    temp = float(temp)
+
     try:
         logging.debug("openrouter: Submitting request to API endpoint")
         print("openrouter: Submitting request to API endpoint")
@@ -551,7 +629,8 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
                 "model": f"{openrouter_model}",
                 "messages": [
                     {"role": "user", "content": openrouter_prompt}
-                ]
+                ],
+                "temperature": temp
             })
         )
 
@@ -574,22 +653,38 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg):
         logging.error("openrouter: Error in processing: %s", str(e))
         return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
 
-def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
+
+def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None):
     loaded_config_data = load_and_log_configs()
     global huggingface_api_key
-    logging.debug(f"huggingface: Summarization process starting...")
+    logging.debug("HuggingFace: Summarization process starting...")
     try:
-        # API key validation
-        if api_key is None or api_key.strip() == "":
-            logging.info("HuggingFace: API key not provided as parameter")
-            logging.info("HuggingFace: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['huggingface']
+        logging.debug("HuggingFace: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            huggingface_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                huggingface_api_key = api_key
+                logging.info("HuggingFace: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                huggingface_api_key = loaded_config_data['api_keys'].get('huggingface')
+                if huggingface_api_key:
+                    logging.info("HuggingFace: Using API key from config file")
+                else:
+                    logging.warning("HuggingFace: No API key found in config file")
 
-        if api_key is None or api_key.strip() == "":
-            logging.error("HuggingFace: API key not found or is empty")
-            return "HuggingFace: API Key Not Provided/Found in Config file or is empty"
+        # Final check to ensure we have a valid API key
+        if not huggingface_api_key or not huggingface_api_key.strip():
+            logging.error("HuggingFace: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid Anthropic API key available")
 
-        logging.debug(f"HuggingFace: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        logging.debug(f"HuggingFace: Using API Key: {huggingface_api_key[:5]}...{huggingface_api_key[-5:]}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("HuggingFace: Loading json data for summarization")
@@ -617,14 +712,14 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
         else:
             raise ValueError("HuggingFace: Invalid input data format")
 
-        print(f"HuggingFace: lets make sure the HF api key exists...\n\t {api_key}")
         headers = {
-            "Authorization": f"Bearer {api_key}"
+            "Authorization": f"Bearer {huggingface_api_key}"
         }
-
         huggingface_model = loaded_config_data['models']['huggingface']
         API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}"
-
+        if temp is None:
+            temp = 0.1
+        temp = float(temp)
         huggingface_prompt = f"{text}\n\n\n\n{custom_prompt_arg}"
         logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
         data = {
@@ -632,10 +727,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
             "parameters": {"max_length": 512, "min_length": 100}  # You can adjust max_length and min_length as needed
         }
 
-        print(f"huggingface: lets make sure the HF api key is the same..\n\t {huggingface_api_key}")
-
         logging.debug("huggingface: Submitting request...")
-
         response = requests.post(API_URL, headers=headers, json=data)
 
         if response.status_code == 200:
@@ -646,26 +738,42 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
         else:
             logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
             return f"Failed to process summary, status code {response.status_code}: {response.text}"
+
     except Exception as e:
         logging.error("huggingface: Error in processing: %s", str(e))
         print(f"Error occurred while processing summary with huggingface: {str(e)}")
         return None
 
 
-def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
-    loaded_config_data = load_and_log_configs()
+def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None):
+    logging.debug("DeepSeek: Summarization process starting...")
     try:
-        # API key validation
-        if api_key is None or api_key.strip() == "":
-            logging.info("DeepSeek: API key not provided as parameter")
-            logging.info("DeepSeek: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['deepseek']
+        logging.debug("DeepSeek: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            deepseek_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                deepseek_api_key = api_key
+                logging.info("DeepSeek: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                deepseek_api_key = loaded_config_data['api_keys'].get('deepseek')
+                if deepseek_api_key:
+                    logging.info("DeepSeek: Using API key from config file")
+                else:
+                    logging.warning("DeepSeek: No API key found in config file")
 
-        if api_key is None or api_key.strip() == "":
-            logging.error("DeepSeek: API key not found or is empty")
-            return "DeepSeek: API Key Not Provided/Found in Config file or is empty"
+        # Final check to ensure we have a valid API key
+        if not deepseek_api_key or not deepseek_api_key.strip():
+            logging.error("DeepSeek: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid deepseek API key available")
 
-        logging.debug(f"DeepSeek: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        logging.debug(f"DeepSeek: Using API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:]}")
 
         # Input data handling
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -696,6 +804,10 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
 
         deepseek_model = loaded_config_data['models']['deepseek'] or "deepseek-chat"
 
+        if temp is None:
+            temp = 0.1
+        temp = float(temp)
+
         headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json'
@@ -712,7 +824,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
                 {"role": "user", "content": deepseek_prompt}
             ],
             "stream": False,
-            "temperature": 0.8
+            "temperature": temp
         }
 
         logging.debug("DeepSeek: Posting request")
@@ -735,6 +847,111 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg):
         logging.error(f"DeepSeek: Error in processing: {str(e)}", exc_info=True)
         return f"DeepSeek: Error occurred while processing summary: {str(e)}"
 
+
+def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None):
+    logging.debug("Mistral: Summarization process starting...")
+    try:
+        logging.debug("Mistral: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            mistral_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                mistral_api_key = api_key
+                logging.info("Mistral: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                mistral_api_key = loaded_config_data['api_keys'].get('mistral')
+                if mistral_api_key:
+                    logging.info("Mistral: Using API key from config file")
+                else:
+                    logging.warning("Mistral: No API key found in config file")
+
+        # Final check to ensure we have a valid API key
+        if not mistral_api_key or not mistral_api_key.strip():
+            logging.error("Mistral: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid deepseek API key available")
+
+
+        logging.debug(f"Mistral: Using API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:]}")
+
+        # Input data handling
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Mistral: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Mistral: Using provided string data for summarization")
+            data = input_data
+
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"Mistral: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        logging.debug(f"Mistral: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Mistral: Summary already exists in the loaded data")
+            return data['summary']
+
+        # Text extraction
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Mistral: Invalid input data format")
+
+        mistral_model = loaded_config_data['models']['mistral'] or "mistral-large-latest"
+
+        if temp is None:
+            temp = 0.2
+        temp = float(temp)
+
+        headers = {
+            'Authorization': f'Bearer {mistral_api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        logging.debug(
+            f"Deepseek API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
+        logging.debug("Mistral: Preparing data + prompt for submittal")
+        mistral_prompt = f"{custom_prompt_arg}\n\n\n\n{text} "
+        data = {
+            "model": mistral_model,
+            "messages": [
+                {"role": "user",
+                "content": mistral_prompt}
+            ],
+            "temperature": temp,
+            "top_p": 1,
+            "max_tokens": 4096,
+            "stream": "false",
+            "safe_prompt": "false"
+        }
+
+        logging.debug("Mistral: Posting request")
+        response = requests.post('https://api.mistral.ai/v1/chat/completions', headers=headers, json=data)
+
+        if response.status_code == 200:
+            response_data = response.json()
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                summary = response_data['choices'][0]['message']['content'].strip()
+                logging.debug("Mistral: Summarization successful")
+                return summary
+            else:
+                logging.warning("Mistral: Summary not found in the response data")
+                return "Mistral: Summary not available"
+        else:
+            logging.error(f"Mistral: Summarization failed with status code {response.status_code}")
+            logging.error(f"Mistral: Error response: {response.text}")
+            return f"Mistral: Failed to process summary. Status code: {response.status_code}"
+    except Exception as e:
+        logging.error(f"Mistral: Error in processing: {str(e)}", exc_info=True)
+        return f"Mistral: Error occurred while processing summary: {str(e)}"
 
 #
 #
@@ -920,6 +1137,7 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
 
 
 def summarize_chunk(api_name, text, custom_prompt_input, api_key):
+    logging.debug("Entered 'summarize_chunk' function")
     try:
         if api_name.lower() == 'openai':
             return summarize_with_openai(api_key, text, custom_prompt_input)
@@ -1042,13 +1260,18 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
                 'language': 'english'
             }
             chunks = improved_chunking_process(structured_input, chunk_options)
+            logging.debug(f"Chunking process completed. Number of chunks: {len(chunks)}")
+            logging.debug("Now performing recursive summarization on each chunk...")
+            logging.debug("summary = recursive_summarize_chunks")
             summary = recursive_summarize_chunks([chunk['text'] for chunk in chunks],
                                                  lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key),
                                                  custom_prompt_input)
         else:
+            logging.debug("summary = summarize_chunk")
             summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key)
 
-        if summary:
+        # add some actual validation logic
+        if summary is not None:
             logging.info(f"Summary generated using {api_name} API")
             if isinstance(input_data, str) and os.path.exists(input_data):
                 summary_file_path = input_data.replace('.json', '_summary.txt')
