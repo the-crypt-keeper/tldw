@@ -2767,6 +2767,8 @@ def create_chat_interface_stacked():
             with gr.Column(scale=1):
                 chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
+        with gr.Row():
+            with gr.Column():
                 submit = gr.Button("Submit")
 
                 edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
@@ -2775,9 +2777,9 @@ def create_chat_interface_stacked():
 
                 delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
                 delete_message_button = gr.Button("Delete Message", visible=False)
-
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
+            with gr.Column():
                 download_file = gr.File(label="Download Chat History")
 
         # Restore original functionality
@@ -2876,7 +2878,6 @@ def create_chat_interface_multi_api():
         overflow-y: auto;
     }
     """
-    # CSS issue
     with gr.TabItem("One Prompt - Multiple APIs"):
         gr.Markdown("# One Prompt but Multiple API Chat Interface")
 
@@ -2897,6 +2898,10 @@ def create_chat_interface_multi_api():
                 user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
 
         with gr.Row():
+            chatbots = []
+            api_endpoints = []
+            api_keys = []
+            temperatures = []
             for i in range(3):
                 with gr.Column():
                     gr.Markdown(f"### Chat Window {i + 1}")
@@ -2907,6 +2912,10 @@ def create_chat_interface_multi_api():
                     api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
                     temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
                     chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
+                    chatbots.append(chatbot)
+                    api_endpoints.append(api_endpoint)
+                    api_keys.append(api_key)
+                    temperatures.append(temperature)
 
         with gr.Row():
             msg = gr.Textbox(label="Enter your message", scale=4)
@@ -2954,14 +2963,12 @@ def create_chat_interface_multi_api():
 
         submit.click(
             chat_wrapper_multi,
-            inputs=[msg] + chat_history + [chatbot for _ in range(3)] +
-                   [api_endpoint for _ in range(3)] + [api_key for _ in range(3)] +
-                   [temperature for _ in range(3)] + [media_content, selected_parts, conversation_id,
-                                                      save_conversation],
-            outputs=[msg] + [chatbot for _ in range(3)] + chat_history + [conversation_id]
+            inputs=[msg] + chat_history + chatbots + api_endpoints + api_keys + temperatures +
+                   [media_content, selected_parts, conversation_id, save_conversation],
+            outputs=[msg] + chatbots + chat_history + [conversation_id]
         ).then(
             lambda x: gr.update(value=""),
-            inputs=[chatbot],
+            inputs=[chatbots[0]],
             outputs=[msg]
         ).then(
             lambda: gr.update(value=""),
@@ -3621,19 +3628,23 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
         else:
             file_name = 'unknown_file'
 
-        if isinstance(file, str):
-            # If file is a string, it's likely a file path
-            file_path = file
-            with open(file_path, 'r', encoding='utf-8') as f:
-                file_content = f.read()
-        elif hasattr(file, 'read'):
-            # If file has a 'read' method, it's likely a file-like object
-            file_content = file.read()
-            if isinstance(file_content, bytes):
-                file_content = file_content.decode('utf-8')
-        else:
-            # If it's neither a string nor a file-like object, try converting it to a string
-            file_content = str(file)
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt', encoding='utf-8') as temp_file:
+            if isinstance(file, str):
+                # If file is a string, it's likely file content
+                temp_file.write(file)
+            elif hasattr(file, 'read'):
+                # If file has a 'read' method, it's likely a file-like object
+                content = file.read()
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8')
+                temp_file.write(content)
+            else:
+                # If it's neither a string nor a file-like object, try converting it to a string
+                temp_file.write(str(file))
+
+            temp_file.seek(0)
+            file_content = temp_file.read()
 
         logging.debug(f"File name: {file_name}")
         logging.debug(f"File content (first 100 chars): {file_content[:100]}")
@@ -3665,9 +3676,12 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
             summary=summary,
             keywords=keyword_list,
             custom_prompt_input=custom_prompt,
-            whisper_model="Imported",  # Indicating this was an imported file,
-            media_type = "document"
+            whisper_model="Imported",  # Indicating this was an imported file
+            media_type="document"
         )
+
+        # Clean up the temporary file
+        os.unlink(temp_file.name)
 
         return f"File '{file_name}' successfully imported with title '{title}' and author '{author}'."
     except Exception as e:
