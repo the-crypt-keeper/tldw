@@ -55,7 +55,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
-    load_prompt_details, load_preset_prompts
+    load_prompt_details, load_preset_prompts, insert_prompt_to_db
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config, safe_read_file
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
@@ -3900,7 +3900,7 @@ def create_import_single_prompt_tab():
 
         def save_prompt_to_db(title, author, system, user, keywords):
             keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
-            return add_prompt(title, author, system, user, keyword_list)
+            return insert_prompt_to_db(title, author, system, user, keyword_list)
 
         save_button.click(
             fn=save_prompt_to_db,
@@ -3934,6 +3934,8 @@ def import_prompts_from_zip(zip_file):
                     with z.open(filename) as f:
                         file_content = f.read().decode('utf-8')
                         sections = parse_prompt_file(file_content)
+                        if 'keywords' not in sections:
+                            sections['keywords'] = []
                         prompts.append(sections)
         shutil.rmtree(temp_dir)
         return prompts
@@ -3956,7 +3958,7 @@ def create_import_multiple_prompts_tab():
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
                 system_input = gr.Textbox(label="System", placeholder="Enter the system message for the prompt", lines=3)
                 user_input = gr.Textbox(label="User", placeholder="Enter the user message for the prompt", lines=3)
-
+                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords separated by commas")
 
             with gr.Column():
                 import_output = gr.Textbox(label="Import Status")
@@ -3975,9 +3977,15 @@ def create_import_multiple_prompts_tab():
         def handle_prompt_selection(selected_title, prompts):
             selected_prompt = next((prompt for prompt in prompts if prompt['title'] == selected_title), None)
             if selected_prompt:
-                return selected_prompt['title'], selected_prompt['author'], selected_prompt['system'], selected_prompt['user']
+                return (
+                    selected_prompt['title'],
+                    selected_prompt.get('author', ''),
+                    selected_prompt['system'],
+                    selected_prompt.get('user', ''),
+                    ", ".join(selected_prompt.get('keywords', []))
+                )
             else:
-                return "", "", "", ""
+                return "", "", "", "", ""
 
         zip_import_state = gr.State([])
 
@@ -3990,17 +3998,28 @@ def create_import_multiple_prompts_tab():
         prompts_dropdown.change(
             fn=handle_prompt_selection,
             inputs=[prompts_dropdown, zip_import_state],
-            outputs=[title_input, author_input, system_input, user_input]
+            outputs=[title_input, author_input, system_input, user_input, keywords_input]
         )
 
-        def save_prompt_to_db(title, author, system, user):
-            return add_prompt(title, author, system, user)
+        def save_prompt_to_db(title, author, system, user, keywords):
+            keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+            return insert_prompt_to_db(title, author, system, user, keyword_list)
 
         save_button.click(
             fn=save_prompt_to_db,
-            inputs=[title_input, author_input, system_input, user_input],
+            inputs=[title_input, author_input, system_input, user_input, keywords_input],
             outputs=save_output
         )
+
+        def update_prompt_dropdown():
+            return gr.update(choices=load_preset_prompts())
+
+        save_button.click(
+            fn=update_prompt_dropdown,
+            inputs=[],
+            outputs=[gr.Dropdown(label="Select Preset Prompt")]
+        )
+
 
 
 # Using pypandoc to convert EPUB to Markdown
@@ -4620,7 +4639,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_prompt_view_tab()
 
             with gr.TabItem("Chat with an LLM"):
-                create_chat_interface_vertical()
+                #create_chat_interface_vertical()
                 create_chat_interface_editable()
                 create_chat_interface()
                 create_chat_interface_stacked()
