@@ -2304,7 +2304,7 @@ def update_user_prompt(preset_name):
 
 
 # FIXME - add additional features....
-def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id, save_conversation, temperature, max_tokens=None, top_p=None, frequency_penalty=None, presence_penalty=None, stop_sequence=None):
+def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, conversation_id, save_conversation, temperature, max_tokens=None, top_p=None, frequency_penalty=None, presence_penalty=None, stop_sequence=None):
     try:
         if save_conversation:
             if conversation_id is None:
@@ -2316,15 +2316,15 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
             # Add user message to the database
             user_message_id = add_chat_message(conversation_id, "user", message)
 
-        # Include the selected parts and user_prompt only for the first message
+        # Include the selected parts and custom_prompt only for the first message
         if not history:
             content_to_analyze = "\n".join(selected_parts)
-            full_message = f"{user_prompt}\n\n{message}\n\nContent to analyze:\n{content_to_analyze}"
+            full_message = f"{custom_prompt}\n\n{message}\n\nContent to analyze:\n{content_to_analyze}"
         else:
             full_message = message
 
         # Generate bot response
-        bot_message = chat(message, history, media_content, selected_parts, api_endpoint, api_key, user_prompt, temperature)
+        bot_message = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature)
 
         if save_conversation:
             # Add assistant message to the database
@@ -2906,15 +2906,14 @@ def create_chat_interface_multi_api():
                 search_button = gr.Button("Search")
                 items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
                 item_mapping = gr.State({})
-                use_content = gr.Checkbox(label="Use Content")
-                use_summary = gr.Checkbox(label="Use Summary")
-                use_prompt = gr.Checkbox(label="Use Prompt")
-                save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
+                with gr.Row():
+                    use_content = gr.Checkbox(label="Use Content")
+                    use_summary = gr.Checkbox(label="Use Summary")
+                    use_prompt = gr.Checkbox(label="Use Prompt")
             with gr.Column():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
-                gr.Markdown("Scroll down for the chat windows...")
-                gr.Markdown("Also just click the 'x' in the upper right of the chat box to make the error go away. It happens if you don't select an item to chat about but doesn't harm anything or prevent you from chatting.")
+                user_prompt = gr.Textbox(label="Modify Prompt", lines=5)
+
         with gr.Row():
             chatbots = []
             api_endpoints = []
@@ -2954,7 +2953,7 @@ def create_chat_interface_multi_api():
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
 
-        def chat_wrapper_multi(message, *args):
+        def chat_wrapper_multi(message, custom_prompt, *args):
             chat_histories = args[:3]
             chatbots = args[3:6]
             api_endpoints = args[6:9]
@@ -2962,17 +2961,17 @@ def create_chat_interface_multi_api():
             temperatures = args[12:15]
             media_content = args[15]
             selected_parts = args[16]
-            conversation_id = args[17]
-            save_conversation = args[18]
 
             new_chat_histories = []
             new_chatbots = []
 
             for i in range(3):
-                bot_message, new_history, new_conv_id = chat_wrapper(
+                # Call chat_wrapper with dummy values for conversation_id and save_conversation
+                bot_message, new_history, _ = chat_wrapper(
                     message, chat_histories[i], media_content, selected_parts,
-                    api_endpoints[i], api_keys[i], user_prompt, conversation_id,
-                    save_conversation, temperature=temperatures[i]
+                    api_endpoints[i], api_keys[i], custom_prompt, None,  # None for conversation_id
+                    False,  # False for save_conversation
+                    temperature=temperatures[i]
                 )
 
                 new_chatbot = chatbots[i] + [(message, bot_message)]
@@ -2980,15 +2979,16 @@ def create_chat_interface_multi_api():
                 new_chat_histories.append(new_history)
                 new_chatbots.append(new_chatbot)
 
-            return [gr.update(value="")] + new_chatbots + new_chat_histories + [new_conv_id]
+            return [gr.update(value="")] + new_chatbots + new_chat_histories
 
+        # In the create_chat_interface_multi_api function:
         submit.click(
             chat_wrapper_multi,
-            inputs=[msg] + chat_history + chatbots + api_endpoints + api_keys + temperatures +
-                   [media_content, selected_parts, conversation_id, save_conversation],
-            outputs=[msg] + chatbots + chat_history + [conversation_id]
+            inputs=[msg, user_prompt] + chat_history + chatbots + api_endpoints + api_keys + temperatures +
+                   [media_content, selected_parts],
+            outputs=[msg] + chatbots + chat_history
         ).then(
-            lambda: gr.update(value=""),
+            lambda: (gr.update(value=""), gr.update(value="")),
             outputs=[msg, user_prompt]
         )
 
