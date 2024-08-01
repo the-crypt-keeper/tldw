@@ -7,6 +7,10 @@
 
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
+**Install me with the Installer Script! Download and double click (Make sure to read it over first!)**
+- **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Run-Install-Update.sh`
+- **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS-Run-Install-Update.sh`
+- **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/WindowsRun-Install-Update.bat`
 ----------
 
 ### Table of Contents
@@ -19,26 +23,30 @@
 
 ### <a name="what"></a> What is this (TL/DW)?
 - **101**
-  - The end goal of this project, is to be a personal research multi-tool/data assistant/young lady's illustrated primer, that is capable of ingesting:
-    * audio, videos, articles, free form text, documents, and books,
-  - as text into a SQLite DB, so that you can then search and chat with it at any time on your own device/locally.
-    - (Plus act as a nice way of creating your personal 'media' database, so you can )
+  - The end goal of this project, is to be a personal research multi-tool/data assistant/young lady's illustrated primer.
+  - A tool that can ingest: audio, videos, articles, free form text, documents, and books as text into a personal, offline database, so that you can then search and chat with it at any time on your own device/locally.
+    - (+ act as a nice way of creating your personal 'media' database, a personal digital library with search!)
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
-    - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off.
-    - If anything, I'd like to see this project be used in schools, universities, and research institutions, as well as by individuals who are looking to learn and grow. (or at least something like this project; small goals :p)
+    - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off, and I don't see it as more worthwhile than some other endeavors.
+    - If anything, I'd like to see this project be used in schools, universities, and research institutions, or anyone who wants to keep a record of what they've consumed and be able to search and ask questions about it.
+    - I believe that this project can be a great tool for learning and research, and I'd like to see it develop to a point where it could be reasonably used as such.
+    - In the meantime, if you don't care about data ownership or privacy, https://notebooklm.google/ is a good alternative that works, is free, and has a working RAG setup (unlike mine :cry:).
 - **Don't care, give me code**
-  * `git clone https://github.com/rmusser01/tldw` -> `cd tldw/Helper_Scripts/Installer_Scripts` -> `Linux: ./Linux-Install.sh` / `Windows: Windows-installer.bat` / `MacOS: MacOS-Install_Updater.sh`
-    * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three`
-      * Works but is not going to receive functionality updates, so I recommend using the GUI.
-    - GUI usage: `python summarize.py -gui`
-    - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
+  * Install git for your style of OS, then run the following commands in a terminal:
+    * Install git on windows - On your keyboard: press WINDOWS + R to open Run dialog box. Then, run the following command to install git:
+      * `cmd /c winget install -e --id Git.Git`
+    * `git clone https://github.com/rmusser01/tldw` -> `cd tldw/Helper_Scripts/Installer_Scripts` -> `Linux: ./Linux-Install.sh` / `Windows: Windows-installer.bat` / `MacOS: MacOS-Install_Updater.sh`
+      * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three`
+        * Works but is not going to receive functionality updates, so I recommend using the GUI.
+      - GUI usage: `python summarize.py -gui`
+      - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
   - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
     - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
 - **(not so)Short Summary**
   - Ingest content(video/audio/ebook/website/markdown) from a URL or a local file. Can be done in batches with a text file containing a list of URLs or paths to local files(CLI only) as well as from the GUI.
     - GUI can handle local file uploads, but not batched file uploads. Can handle multiple URLs though.
   - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
-    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, Triton and Aphrodite support planned)
+    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, and Triton support planned) - Tabby/vLLM are in, but untested. Aphrodite you can use llama.cpp or kobold.cpp API and it should work...
   - Recursive/'Rolling' summaries (i.e. chunking up input and doing a chain of summaries) are supported. 
     - The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
   - Everything is stored in a SQLite DB, so you can search across all the content you've ingested, and review or modify it.
@@ -548,9 +556,6 @@ Sample commands:
       - Set it up so users can test against their own datasets
     - Offline diarization of speakers - Code is in, but there was some issue that was a headache so I said screw it.
       - Should work if you give it an HF api key in the code though...
-    - PyInstaller for Windows/MacOS/Linux
-      - At some point. I'd like this to be installable/usable by non-technical individuals and it's current setup kind of prevents that.
-      - I think I may give up on this and just use the batch scripts, but I definitely would prefer a pyinstaller version.
 - **Next items of focus**
   - Bugfixes for stability and file handling(Making sure files are removed when they should be)
   - Add support for more APIs

@@ -2262,27 +2262,38 @@ def create_llamafile_settings_tab():
 
     with gr.TabItem("Local LLM with Llamafile"):
         gr.Markdown("# Settings for Llamafile")
-        am_noob = gr.Checkbox(label="Check this to enable sane defaults", value=False, visible=True)
-        advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Enable to show all settings", value=False)
-
-        model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
-
         with gr.Row():
-            current_dir_dropdown = gr.Dropdown(
-                label="Select Model from Current Directory (.)",
-                choices=[],  # Start with an empty list
-                visible=True
-            )
-            parent_dir_dropdown = gr.Dropdown(
-                label="Select Model from Parent Directory (..)",
-                choices=[],  # Start with an empty list
-                visible=True
-            )
+            with gr.Column():
+                am_noob = gr.Checkbox(label="Check this to enable sane defaults", value=False, visible=True)
+                # FIXME - these get deleted at some point?
+                advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Enable to show all settings", value=False)
 
-        refresh_button = gr.Button("Refresh Model Lists")
 
-        print(os.getcwd())
-        model_value = gr.Textbox(label="Selected Model File", value="", visible=True)
+            with gr.Column():
+                # FIXME - make this actually work
+                model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
+                current_dir_dropdown = gr.Dropdown(
+                    label="Select Model from Current Directory (.)",
+                    choices=[],  # Start with an empty list
+                    visible=True
+                )
+                parent_dir_dropdown = gr.Dropdown(
+                    label="Select Model from Parent Directory (..)",
+                    choices=[],  # Start with an empty list
+                    visible=True
+                )
+                refresh_button = gr.Button("Refresh Model Lists")
+                model_value = gr.Textbox(label="Selected Model File", value="", visible=True)
+        with gr.Row():
+            with gr.Column():
+                ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
+                ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
+                advanced_inputs = create_llamafile_advanced_inputs()
+            with gr.Column():
+                start_button = gr.Button("Start Llamafile")
+                stop_button = gr.Button("Stop Llamafile (doesn't work)")
+                output_display = gr.Markdown()
+
 
         def update_model_value(current_dir_model, parent_dir_model):
             if current_dir_model:
@@ -2308,15 +2319,6 @@ def create_llamafile_settings_tab():
             inputs=[],
             outputs=[current_dir_dropdown, parent_dir_dropdown]
         )
-
-        ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
-        ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
-
-        advanced_inputs = create_llamafile_advanced_inputs()
-
-        start_button = gr.Button("Start Llamafile")
-        stop_button = gr.Button("Stop Llamafile (doesn't work)")
-        output_display = gr.Markdown()
 
         start_button.click(
             fn=start_llamafile,
