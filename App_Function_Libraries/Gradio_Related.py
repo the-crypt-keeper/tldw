@@ -2004,21 +2004,114 @@ def create_prompt_view_tab():
         )
 
 
+
 def create_prompt_search_tab():
     with gr.TabItem("Search Prompts"):
+        gr.Markdown("# Search and View Prompt Details")
+        gr.Markdown("Currently has all of the https://github.com/danielmiessler/fabric prompts already available")
         with gr.Row():
             with gr.Column():
-                gr.Markdown("# Search and View Prompt Details")
-                gr.Markdown("Currently has all of the https://github.com/danielmiessler/fabric prompts already available")
                 search_query_input = gr.Textbox(label="Search Prompts", placeholder="Enter your search query...")
-                search_button = gr.Button("Search Prompts")
+                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
+                page_number = gr.Number(value=1, label="Page Number", precision=0)
             with gr.Column():
-                search_results_output = gr.Markdown()
-                prompt_details_output = gr.HTML()
+                search_button = gr.Button("Search Prompts")
+                next_page_button = gr.Button("Next Page")
+                previous_page_button = gr.Button("Previous Page")
+                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
+        search_results_output = gr.HTML()
+
+        def search_and_display_prompts(query, page, entries_per_page):
+            offset = (page - 1) * entries_per_page
+            try:
+                with sqlite3.connect('prompts.db') as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+                        FROM Prompts p
+                        LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
+                        LEFT JOIN Keywords k ON pk.keyword_id = k.id
+                        WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
+                        GROUP BY p.id
+                        ORDER BY p.name
+                        LIMIT ? OFFSET ?
+                    ''', (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', entries_per_page, offset))
+                    prompts = cursor.fetchall()
+
+                    cursor.execute('''
+                        SELECT COUNT(DISTINCT p.id)
+                        FROM Prompts p
+                        LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
+                        LEFT JOIN Keywords k ON pk.keyword_id = k.id
+                        WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
+                    ''', (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'))
+                    total_prompts = cursor.fetchone()[0]
+
+                results = ""
+                for prompt in prompts:
+                    title = html.escape(prompt[0]).replace('\n', '<br>')
+                    details = html.escape(prompt[1] or '').replace('\n', '<br>')
+                    system_prompt = html.escape(prompt[2] or '')
+                    user_prompt = html.escape(prompt[3] or '')
+                    keywords = html.escape(prompt[4] or '').replace('\n', '<br>')
+
+                    results += f"""
+                    <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><strong>Title:</strong> {title}</div>
+                            <div><strong>Details:</strong> {details}</div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>User Prompt:</strong>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{user_prompt}</pre>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>System Prompt:</strong>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{system_prompt}</pre>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>Keywords:</strong> {keywords}
+                        </div>
+                    </div>
+                    """
+
+                total_pages = (total_prompts + entries_per_page - 1) // entries_per_page
+                pagination = f"Page {page} of {total_pages} (Total prompts: {total_prompts})"
+
+                return results, pagination, total_pages
+            except sqlite3.Error as e:
+                return f"<p>Error searching prompts: {e}</p>", "Error", 0
+
+        def update_search_page(query, page, entries_per_page):
+            results, pagination, total_pages = search_and_display_prompts(query, page, entries_per_page)
+            next_disabled = page >= total_pages
+            prev_disabled = page <= 1
+            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(interactive=not prev_disabled)
+
+        def go_to_next_search_page(query, current_page, entries_per_page):
+            next_page = current_page + 1
+            return update_search_page(query, next_page, entries_per_page)
+
+        def go_to_previous_search_page(query, current_page, entries_per_page):
+            previous_page = max(1, current_page - 1)
+            return update_search_page(query, previous_page, entries_per_page)
+
         search_button.click(
-            fn=display_search_results,
-            inputs=[search_query_input],
-            outputs=[search_results_output]
+            fn=update_search_page,
+            inputs=[search_query_input, page_number, entries_per_page],
+            outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        next_page_button.click(
+            fn=go_to_next_search_page,
+            inputs=[search_query_input, page_number, entries_per_page],
+            outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
+        )
+
+        previous_page_button.click(
+            fn=go_to_previous_search_page,
+            inputs=[search_query_input, page_number, entries_per_page],
+            outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
         )
 
 
