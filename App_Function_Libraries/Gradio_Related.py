@@ -2136,6 +2136,10 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
 
         temperature = float(temperature) if temperature else 0.7
         temp = temperature
+        
+        logging.debug("Debug - Chat Function - Temperature: {temperature}")
+        logging.debug(f"Debug - Chat Function - API Key: {api_key[:10]}")
+        logging.debug(f"Debug - Chat Function - Prompt: {prompt}")
 
         # Use the existing API request code based on the selected endpoint
         logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
@@ -2317,9 +2321,11 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
             user_message_id = add_chat_message(conversation_id, "user", message)
 
         # Include the selected parts and custom_prompt only for the first message
-        if not history:
+        if not history and selected_parts:
             content_to_analyze = "\n".join(selected_parts)
             full_message = f"{custom_prompt}\n\n{message}\n\nContent to analyze:\n{content_to_analyze}"
+        elif custom_prompt:
+            full_message = f"{custom_prompt}\n\n{message}"
         else:
             full_message = message
 
@@ -2778,7 +2784,7 @@ def create_chat_interface_stacked():
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
                 user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
-                                       "be used as the next message instead)", lines=3)
+                                       "be used as the next message instead)", lines=3, value=".")
                 gr.Markdown("Scroll down for the chat window...")
         with gr.Row():
             with gr.Column(scale=1):
@@ -2912,7 +2918,7 @@ def create_chat_interface_multi_api():
                     use_prompt = gr.Checkbox(label="Use Prompt")
             with gr.Column():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(label="Modify Prompt", lines=5)
+                user_prompt = gr.Textbox(label="Modify Prompt", lines=5, value=".")
 
         with gr.Row():
             chatbots = []
@@ -3022,7 +3028,7 @@ def create_chat_interface_four():
         with gr.Row():
             with gr.Column():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
+                user_prompt = gr.Textbox(label="Modify Prompt", lines=3, value=".")
             with gr.Column():
                 gr.Markdown("Scroll down for the chat windows...")
         chat_interfaces = []
