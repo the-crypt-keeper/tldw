@@ -1398,13 +1398,16 @@ def import_obsidian_note_to_db(note_data):
             cursor.execute("SELECT id FROM Media WHERE title = ? AND type = 'obsidian_note'", (note_data['title'],))
             existing_note = cursor.fetchone()
 
+            # Generate a relative path or meaningful identifier instead of using the temporary file path
+            relative_path = os.path.relpath(note_data['file_path'], start=os.path.dirname(note_data['file_path']))
+
             if existing_note:
                 media_id = existing_note[0]
                 cursor.execute("""
                     UPDATE Media
-                    SET content = ?, author = ?, ingestion_date = CURRENT_TIMESTAMP
+                    SET content = ?, author = ?, ingestion_date = CURRENT_TIMESTAMP, url = ?
                     WHERE id = ?
-                """, (note_data['content'], note_data['frontmatter'].get('author', 'Unknown'), media_id))
+                """, (note_data['content'], note_data['frontmatter'].get('author', 'Unknown'), relative_path, media_id))
 
                 cursor.execute("DELETE FROM MediaKeywords WHERE media_id = ?", (media_id,))
             else:
@@ -1412,7 +1415,7 @@ def import_obsidian_note_to_db(note_data):
                     INSERT INTO Media (title, content, type, author, ingestion_date, url)
                     VALUES (?, ?, 'obsidian_note', ?, CURRENT_TIMESTAMP, ?)
                 """, (note_data['title'], note_data['content'], note_data['frontmatter'].get('author', 'Unknown'),
-                      note_data['file_path']))
+                      relative_path))
 
                 media_id = cursor.lastrowid
 
