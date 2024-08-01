@@ -259,7 +259,11 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_i
         data = {
             "max_context_length": 8096,
             "max_length": 4096,
-            "prompt": f"{kobold_prompt}"
+            "prompt": kobold_prompt,
+            "temperature": 0.7,
+            #"top_p": 0.9,
+            #"top_k": 100
+            #"rep_penalty": 1.0,
         }
 
         logging.debug("kobold: Submitting request to API endpoint")
