@@ -4836,7 +4836,6 @@ def launch_ui(share_public=None, server_mode=False):
         with gr.Tabs():
             with gr.TabItem("Transcription / Summarization / Ingestion"):
                 with gr.Tabs():
-                    create_introduction_tab()
                     create_video_transcription_tab()
                     create_audio_processing_tab()
                     create_podcast_tab()
@@ -4896,6 +4895,9 @@ def launch_ui(share_public=None, server_mode=False):
                 create_view_trash_tab()
                 create_delete_trash_tab()
                 create_empty_trash_tab()
+            
+            with gr.TabItem("Introduction/Help"):
+                create_introduction_tab()
 
     # Launch the interface
     server_port_variable = 7860
