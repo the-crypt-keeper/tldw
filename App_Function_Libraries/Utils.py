@@ -186,7 +186,26 @@ def safe_read_file(file_path):
             return f"An error occurred: {e}"
     return f"Unable to decode the file {file_path} with any of the attempted encodings: {encodings}"
 
+#
+#
+#######################
+# Temp file cleanup
+#
+# Global list to keep track of downloaded files
+downloaded_files = []
 
+def cleanup_downloads():
+    """Function to clean up downloaded files when the server exits."""
+    for file_path in downloaded_files:
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"Cleaned up file: {file_path}")
+        except Exception as e:
+            print(f"Error cleaning up file {file_path}: {e}")
+
+#
+#
 #######################
 # Config loading
 #

@@ -15,6 +15,7 @@
 #########################################
 #
 # Built-In Imports
+import glob
 import html
 import math
 import re
@@ -58,7 +59,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
     load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
-    convert_to_seconds, load_comprehensive_config, safe_read_file
+    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
     generate_timestamped_url, extract_metadata, download_video
 
@@ -73,40 +74,53 @@ custom_prompt_input = None
 server_mode = False
 share_public = False
 
-
 def gradio_download_youtube_video(url):
-    """Download video using yt-dlp with specified options."""
-    # Determine ffmpeg path based on the operating system.
-    ffmpeg_path = './Bin/ffmpeg.exe' if os.name == 'nt' else 'ffmpeg'
+    try:
+        # Determine ffmpeg path based on the operating system.
+        ffmpeg_path = './Bin/ffmpeg.exe' if os.name == 'nt' else 'ffmpeg'
 
-    # Extract information about the video
-    with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-        info_dict = ydl.extract_info(url, download=False)
-        sanitized_title = sanitize_filename(info_dict['title'])
-        original_ext = info_dict['ext']
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Extract information about the video
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                info_dict = ydl.extract_info(url, download=False)
+                sanitized_title = sanitize_filename(info_dict['title'])
+                original_ext = info_dict['ext']
 
-    # Setup the final directory and filename
-    download_dir = Path(f"results/{sanitized_title}")
-    download_dir.mkdir(parents=True, exist_ok=True)
-    output_file_path = download_dir / f"{sanitized_title}.{original_ext}"
+            # Setup the temporary filename
+            temp_file_path = Path(temp_dir) / f"{sanitized_title}.{original_ext}"
 
-    # Initialize yt-dlp with generic options and the output template
-    ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',
-        'ffmpeg_location': ffmpeg_path,
-        'outtmpl': str(output_file_path),
-        'noplaylist': True, 'quiet': True
-    }
+            # Initialize yt-dlp with generic options and the output template
+            ydl_opts = {
+                'format': 'bestvideo+bestaudio/best',
+                'ffmpeg_location': ffmpeg_path,
+                'outtmpl': str(temp_file_path),
+                'noplaylist': True,
+                'quiet': True
+            }
 
-    # Execute yt-dlp to download the video
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+            # Execute yt-dlp to download the video
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
 
-    # Final check to ensure file exists
-    if not output_file_path.exists():
-        raise FileNotFoundError(f"Expected file was not found: {output_file_path}")
+            # Final check to ensure file exists
+            if not temp_file_path.exists():
+                raise FileNotFoundError(f"Expected file was not found: {temp_file_path}")
 
-    return str(output_file_path)
+            # Create a persistent directory for the download if it doesn't exist
+            persistent_dir = Path("downloads")
+            persistent_dir.mkdir(exist_ok=True)
+
+            # Move the file from the temporary directory to the persistent directory
+            persistent_file_path = persistent_dir / f"{sanitized_title}.{original_ext}"
+            shutil.move(str(temp_file_path), str(persistent_file_path))
+
+            # Add the file to the list of downloaded files
+            downloaded_files.append(str(persistent_file_path))
+
+            return str(persistent_file_path), f"Video downloaded successfully: {sanitized_title}.{original_ext}"
+    except Exception as e:
+        return None, f"Error downloading video: {str(e)}"
 
 
 def format_transcription(content):
@@ -2171,21 +2185,77 @@ def stop_llamafile():
     return "Llamafile stopped"
 
 
+
+
 def create_llamafile_settings_tab():
+    def get_model_files(directory):
+        pattern = os.path.join(directory, "*.{gguf,llamafile}")
+        return [os.path.basename(f) for f in glob.glob(pattern)]
+
+    def update_dropdowns():
+        current_dir_models = get_model_files(".")
+        parent_dir_models = get_model_files("..")
+        return (
+            {"choices": current_dir_models, "value": None},
+            {"choices": parent_dir_models, "value": None}
+        )
+
     with gr.TabItem("Local LLM with Llamafile"):
         gr.Markdown("# Settings for Llamafile")
         am_noob = gr.Checkbox(label="Check this to enable sane defaults", value=False, visible=True)
         advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Enable to show all settings", value=False)
 
         model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
-        model_value = gr.Textbox(label="Select Local Model File", value="", visible=True)
+
+        with gr.Row():
+            current_dir_dropdown = gr.Dropdown(
+                label="Select Model from Current Directory (.)",
+                choices=[],  # Start with an empty list
+                visible=True
+            )
+            parent_dir_dropdown = gr.Dropdown(
+                label="Select Model from Parent Directory (..)",
+                choices=[],  # Start with an empty list
+                visible=True
+            )
+
+        refresh_button = gr.Button("Refresh Model Lists")
+
+        print(os.getcwd())
+        model_value = gr.Textbox(label="Selected Model File", value="", visible=True)
+
+        def update_model_value(current_dir_model, parent_dir_model):
+            if current_dir_model:
+                return current_dir_model
+            elif parent_dir_model:
+                return os.path.join("..", parent_dir_model)
+            else:
+                return ""
+
+        current_dir_dropdown.change(
+            fn=update_model_value,
+            inputs=[current_dir_dropdown, parent_dir_dropdown],
+            outputs=model_value
+        )
+        parent_dir_dropdown.change(
+            fn=update_model_value,
+            inputs=[current_dir_dropdown, parent_dir_dropdown],
+            outputs=model_value
+        )
+
+        refresh_button.click(
+            fn=update_dropdowns,
+            inputs=[],
+            outputs=[current_dir_dropdown, parent_dir_dropdown]
+        )
+
         ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
         ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
 
         advanced_inputs = create_llamafile_advanced_inputs()
 
         start_button = gr.Button("Start Llamafile")
-        stop_button = gr.Button("Stop Llamafile")
+        stop_button = gr.Button("Stop Llamafile (doesn't work)")
         output_display = gr.Markdown()
 
         start_button.click(
@@ -4755,11 +4825,12 @@ def create_utilities_tab():
             youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
             download_button = gr.Button("Download Video")
             output_file = gr.File(label="Download Video")
+            output_message = gr.Textbox(label="Status")
 
             download_button.click(
                 fn=gradio_download_youtube_video,
                 inputs=youtube_url_input,
-                outputs=output_file
+                outputs=[output_file, output_message]
             )
 
         with gr.Tab("YouTube Audio Downloader"):
