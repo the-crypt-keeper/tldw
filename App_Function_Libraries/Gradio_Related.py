@@ -579,7 +579,7 @@ def create_video_transcription_tab():
         with gr.Row():
             with gr.Column():
                 url_input = gr.Textbox(label="URL(s) (Mandatory)",
-                                       placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, and playlists.",
+                                       placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, other video sites and Youtube playlists.",
                                        lines=5)
                 video_file_input = gr.File(label="Upload Video File (Optional)", file_types=["video/*"])
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
@@ -619,7 +619,7 @@ def create_video_transcription_tab():
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
                     value=None, label="API Name (Mandatory)")
-                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here")
+                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here", type="password")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set")
                 batch_size_input = gr.Slider(minimum=1, maximum=10, value=1, step=1,
@@ -1414,7 +1414,7 @@ def create_website_scraping_tab():
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"], value=None, label="API Name (Mandatory for Summarization)")
                 api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
-                                           placeholder="Enter your API key here; Ignore if using Local API or Built-in API")
+                                           placeholder="Enter your API key here; Ignore if using Local API or Built-in API", type="password")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set", visible=True)
 
@@ -1503,7 +1503,7 @@ def create_resummary_tab():
                         choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
                         value="Local-LLM", label="API Name")
-                    api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here")
+                    api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here", type="password")
 
                 chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)
                 with gr.Row(visible=False) as chunking_options_box:
