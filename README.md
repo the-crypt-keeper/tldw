@@ -27,11 +27,14 @@
     - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off.
     - If anything, I'd like to see this project be used in schools, universities, and research institutions, as well as by individuals who are looking to learn and grow. (or at least something like this project; small goals :p)
 - **Don't care, give me code**
-  * `git clone https://github.com/rmusser01/tldw` -> `cd tldw/Helper_Scripts/Installer_Scripts` -> `Linux: ./Linux-Install.sh` / `Windows: Windows-installer.bat` / `MacOS: MacOS-Install_Updater.sh`
-    * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three`
-      * Works but is not going to receive functionality updates, so I recommend using the GUI.
-    - GUI usage: `python summarize.py -gui`
-    - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
+  * Install git for your style of OS, then run the following commands in a terminal:
+    * Install git on windows - On your keyboard: press WINDOWS + R to open Run dialog box. Then, run the following command to install git:
+      * `cmd /c winget install -e --id Git.Git`
+    * `git clone https://github.com/rmusser01/tldw` -> `cd tldw/Helper_Scripts/Installer_Scripts` -> `Linux: ./Linux-Install.sh` / `Windows: Windows-installer.bat` / `MacOS: MacOS-Install_Updater.sh`
+      * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three`
+        * Works but is not going to receive functionality updates, so I recommend using the GUI.
+      - GUI usage: `python summarize.py -gui`
+      - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
   - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
     - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
 - **(not so)Short Summary**
