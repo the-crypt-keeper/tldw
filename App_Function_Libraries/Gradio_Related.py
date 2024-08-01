@@ -4816,57 +4816,61 @@ def create_document_editing_tab():
 #
 # Utilities Tab Functions
 
+def create_utilities_yt_video_tab():
+    with gr.Tab("YouTube Video Downloader"):
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown(
+                    "<h3>Youtube Video Downloader</h3><p>This Input takes a Youtube URL as input and creates a webm file for you to download. </br><em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
+                youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
+                download_button = gr.Button("Download Video")
+            with gr.Column():
+                output_file = gr.File(label="Download Video")
+                output_message = gr.Textbox(label="Status")
 
-def create_utilities_tab():
-    with gr.Group():
-        with gr.Tab("YouTube Video Downloader"):
-            gr.Markdown(
-                "<h3>Youtube Video Downloader</h3><p>This Input takes a Youtube URL as input and creates a webm file for you to download. </br><em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
-            youtube_url_input = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
-            download_button = gr.Button("Download Video")
-            output_file = gr.File(label="Download Video")
-            output_message = gr.Textbox(label="Status")
+        download_button.click(
+            fn=gradio_download_youtube_video,
+            inputs=youtube_url_input,
+            outputs=[output_file, output_message]
+        )
 
-            download_button.click(
-                fn=gradio_download_youtube_video,
-                inputs=youtube_url_input,
-                outputs=[output_file, output_message]
-            )
+def create_utilities_yt_audio_tab():
+    with gr.Tab("YouTube Audio Downloader"):
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown(
+                    "<h3>Youtube Audio Downloader</h3><p>This Input takes a Youtube URL as input and creates an audio file for you to download.</p>"
+                    +"\n<em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em>\n or \n<strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
+                youtube_url_input_audio = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
+                download_button_audio = gr.Button("Download Audio")
+            with gr.Column():
+                output_file_audio = gr.File(label="Download Audio")
+                output_message_audio = gr.Textbox(label="Status")
 
-        with gr.Tab("YouTube Audio Downloader"):
-            with gr.Row():
-                with gr.Column():
-                    gr.Markdown(
-                        "<h3>Youtube Audio Downloader</h3><p>This Input takes a Youtube URL as input and creates an audio file for you to download. </br><em>If you want a full-featured one:</em> <strong><em>https://github.com/StefanLobbenmeier/youtube-dl-gui</strong></em> or <strong><em>https://github.com/yt-dlg/yt-dlg</em></strong></p>")
-                    youtube_url_input_audio = gr.Textbox(label="YouTube URL", placeholder="Enter YouTube video URL here")
-                    download_button_audio = gr.Button("Download Audio")
-                with gr.Column():
-                    output_file_audio = gr.File(label="Download Audio")
-                    output_message_audio = gr.Textbox(label="Status")
+        download_button_audio.click(
+            fn=download_youtube_audio,
+            inputs=youtube_url_input_audio,
+            outputs=[output_file_audio, output_message_audio]
+        )
 
-            download_button_audio.click(
-                fn=download_youtube_audio,
-                inputs=youtube_url_input_audio,
-                outputs=[output_file_audio, output_message_audio]
-            )
+def create_utilities_yt_timestamp_tab():
+    with gr.Tab("YouTube Timestamp URL Generator"):
+        gr.Markdown("## Generate YouTube URL with Timestamp")
+        with gr.Row():
+            with gr.Column():
+                url_input = gr.Textbox(label="YouTube URL")
+                hours_input = gr.Number(label="Hours", value=0, minimum=0, precision=0)
+                minutes_input = gr.Number(label="Minutes", value=0, minimum=0, maximum=59, precision=0)
+                seconds_input = gr.Number(label="Seconds", value=0, minimum=0, maximum=59, precision=0)
+                generate_button = gr.Button("Generate URL")
+            with gr.Column():
+                output_url = gr.Textbox(label="Timestamped URL")
 
-        with gr.Tab("YouTube Timestamp URL Generator"):
-            gr.Markdown("## Generate YouTube URL with Timestamp")
-            with gr.Row():
-                with gr.Column():
-                    url_input = gr.Textbox(label="YouTube URL")
-                    hours_input = gr.Number(label="Hours", value=0, minimum=0, precision=0)
-                    minutes_input = gr.Number(label="Minutes", value=0, minimum=0, maximum=59, precision=0)
-                    seconds_input = gr.Number(label="Seconds", value=0, minimum=0, maximum=59, precision=0)
-                    generate_button = gr.Button("Generate URL")
-                with gr.Column():
-                    output_url = gr.Textbox(label="Timestamped URL")
-
-            generate_button.click(
-                fn=generate_timestamped_url,
-                inputs=[url_input, hours_input, minutes_input, seconds_input],
-                outputs=output_url
-            )
+        generate_button.click(
+            fn=generate_timestamped_url,
+            inputs=[url_input, hours_input, minutes_input, seconds_input],
+            outputs=output_url
+        )
 
 #
 # End of Utilities Tab Functions
@@ -4969,7 +4973,9 @@ def launch_ui(share_public=None, server_mode=False):
                 create_restore_backup_tab()
 
             with gr.TabItem("Utilities"):
-                create_utilities_tab()
+                create_utilities_yt_video_tab()
+                create_utilities_yt_audio_tab()
+                create_utilities_yt_timestamp_tab()
 
             with gr.TabItem("Trashcan"):
                 create_view_trash_tab()
