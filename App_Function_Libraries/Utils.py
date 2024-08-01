@@ -289,6 +289,7 @@ def load_and_log_configs():
 
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
+        tabby_model = config.get('models', 'tabby_model', fallback=None)
 
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
@@ -334,7 +335,8 @@ def load_and_log_configs():
                 'huggingface': huggingface_model,
                 'openrouter': openrouter_model,
                 'deepseek': deepseek_model,
-                'vllm': vllm_model
+                'vllm': vllm_model,
+                'tabby': tabby_model
 
             },
             'local_api_ip': {

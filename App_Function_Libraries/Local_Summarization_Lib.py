@@ -163,7 +163,8 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
             headers['Authorization'] = f'Bearer {api_key}'
 
         llama_prompt = f"{custom_prompt} \n\n\n\n{text}"
-        system_message = "You are a professional summarizer."
+        if system_message == None:
+            system_message = "You are a helpful AI assistant."
         logging.debug("llama: Prompt being sent is {llama_prompt}")
 
         data = {
@@ -385,8 +386,8 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http:/
         return f"ooba: Error occurred while processing summary with oobabooga: {str(e)}"
 
 
-# FIXME - Install is more trouble than care to deal with right now.
-def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:5000/v1/chat/completions"):
+
+def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:5000/v1/chat/completions", temp=None, system_message=None):
     logging.debug("TabbyAPI: Summarization process starting...")
     try:
         logging.debug("TabbyAPI: Loading and validating configurations")
@@ -406,6 +407,12 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_I
                     logging.info("TabbyAPI: Using API key from config file")
                 else:
                     logging.warning("TabbyAPI: No API key found in config file")
+
+        tabby_api_ip = loaded_config_data['local_api_ip']['tabby']
+        tabby_model = loaded_config_data['models']['tabby']
+        if temp == None:
+            temp = 0.7
+
 
         logging.debug(f"TabbyAPI: Using API Key: {tabby_api_key[:5]}...{tabby_api_key[-5:]}")
 
@@ -439,10 +446,19 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_I
             'Content-Type': 'application/json'
         }
         data2 = {
-            'text': text,
-            'model': 'tabby'  # Specify the model if needed
+            'max_tokens': 4096,
+            "min_tokens": 0,
+            'temperature': temp,
+            #'top_p': 1.0,
+            #'top_k': 0,
+            #'frequency_penalty': 0,
+            #'presence_penalty': 0.0,
+            #"repetition_penalty": 1.0,
+            'model': tabby_model,
+            'user': custom_prompt_input,
+            'messages': input_data
         }
-        tabby_api_ip = loaded_config_data['local_apis']['tabby']['ip']
+
         response = requests.post(tabby_api_ip, headers=headers, json=data2)
         response.raise_for_status()
         summary = response.json().get('summary', '')
@@ -456,7 +472,9 @@ def summarize_with_vllm(
         custom_prompt_input: str,
         api_key: str = None,
         vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions",
-        model: str = None
+        model: str = None,
+        system_prompt: str = None,
+        temp: float = 0.7
 ) -> str:
     logging.debug("vLLM: Summarization process starting...")
     try:
@@ -505,6 +523,9 @@ def summarize_with_vllm(
 
         logging.debug(f"vLLM: Extracted text (showing first 500 chars): {text[:500]}...")
 
+        if system_prompt is None:
+            system_prompt = "You are a helpful AI assistant."
+
         model = model or loaded_config_data['models']['vllm']
 
         # Prepare the API request
@@ -515,8 +536,8 @@ def summarize_with_vllm(
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": "You are a professional summarizer."},
-                {"role": "user", "content": f"{text}\n\n{custom_prompt_input}"}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"{custom_prompt_input}\n\n{text}"}
             ]
         }
 
