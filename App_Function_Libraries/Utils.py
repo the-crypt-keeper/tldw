@@ -23,15 +23,15 @@ import configparser
 import hashlib
 import json
 import logging
+import os
+import re
+import time
 from datetime import timedelta
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 import requests
-import time
-from tqdm import tqdm
-import os
-import re
 import unicodedata
+from tqdm import tqdm
 
 from App_Function_Libraries.Video_DL_Ingestion_Lib import get_youtube
 
@@ -151,8 +151,6 @@ def normalize_title(title):
     return title
 
 
-
-
 def clean_youtube_url(url):
     parsed_url = urlparse(url)
     query_params = parse_qs(parsed_url.query)
@@ -168,26 +166,46 @@ def extract_video_info(url):
     title = info_dict.get('title', 'Untitled')
     return info_dict, title
 
-
-def clean_youtube_url(url):
-    parsed_url = urlparse(url)
-    query_params = parse_qs(parsed_url.query)
-    if 'list' in query_params:
-        query_params.pop('list')
-    cleaned_query = urlencode(query_params, doseq=True)
-    cleaned_url = urlunparse(parsed_url._replace(query=cleaned_query))
-    return cleaned_url
-
-def extract_video_info(url):
-    info_dict = get_youtube(url)
-    title = info_dict.get('title', 'Untitled')
-    return info_dict, title
 
 def import_data(file):
     # Implement this function to import data from a file
     pass
 
 
+def safe_read_file(file_path):
+    encodings = ['utf-8', 'utf-16', 'ascii', 'latin-1', 'iso-8859-1', 'cp1252']
+    for encoding in encodings:
+        try:
+            with open(file_path, 'r', encoding=encoding) as file:
+                return file.read()
+        except UnicodeDecodeError:
+            continue
+        except FileNotFoundError:
+            return f"File not found: {file_path}"
+        except Exception as e:
+            return f"An error occurred: {e}"
+    return f"Unable to decode the file {file_path} with any of the attempted encodings: {encodings}"
+
+#
+#
+#######################
+# Temp file cleanup
+#
+# Global list to keep track of downloaded files
+downloaded_files = []
+
+def cleanup_downloads():
+    """Function to clean up downloaded files when the server exits."""
+    for file_path in downloaded_files:
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"Cleaned up file: {file_path}")
+        except Exception as e:
+            print(f"Error cleaning up file {file_path}: {e}")
+
+#
+#
 #######################
 # Config loading
 #
@@ -208,6 +226,7 @@ def load_comprehensive_config():
     return config
 
 
+# FIXME - update to include prompt path in return statement
 def load_and_log_configs():
     try:
         config = load_comprehensive_config()
@@ -259,7 +278,7 @@ def load_and_log_configs():
         logging.debug(f"Loaded OpenRouter Model: {openrouter_model}")
 
         # Local-Models
-        kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+        kobold_api_ip = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
@@ -270,11 +289,13 @@ def load_and_log_configs():
 
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
+        tabby_model = config.get('models', 'tabby_model', fallback=None)
 
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
+        vllm_model = config.get('Local-API', 'vllm_model', fallback=None)
 
-        logging.debug(f"Loaded Kobold API IP: {kobold_api_IP}")
+        logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
         logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
         logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
         logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
@@ -299,7 +320,12 @@ def load_and_log_configs():
                 'openai': openai_api_key,
                 'huggingface': huggingface_api_key,
                 'openrouter': openrouter_api_key,
-                'deepseek': deepseek_api_key
+                'deepseek': deepseek_api_key,
+                'kobold': kobold_api_key,
+                'llama': llama_api_key,
+                'ooba': ooba_api_key,
+                'tabby': tabby_api_key,
+                'vllm': vllm_api_key
             },
             'models': {
                 'anthropic': anthropic_model,
@@ -308,14 +334,17 @@ def load_and_log_configs():
                 'openai': openai_model,
                 'huggingface': huggingface_model,
                 'openrouter': openrouter_model,
-                'deepseek': deepseek_model
+                'deepseek': deepseek_model,
+                'vllm': vllm_model,
+                'tabby': tabby_model
+
             },
-            'local_apis': {
-                'kobold': {'ip': kobold_api_IP, 'key': kobold_api_key},
-                'llama': {'ip': llama_api_IP, 'key': llama_api_key},
-                'ooba': {'ip': ooba_api_IP, 'key': ooba_api_key},
-                'tabby': {'ip': tabby_api_IP, 'key': tabby_api_key},
-                'vllm': {'ip': vllm_api_url, 'key': vllm_api_key}
+            'local_api_ip': {
+                'kobold': kobold_api_ip,
+                'llama': llama_api_IP,
+                'ooba': ooba_api_IP,
+                'tabby': tabby_api_IP,
+                'vllm': vllm_api_url,
             },
             'output_path': output_path,
             'processing_choice': processing_choice
@@ -326,14 +355,8 @@ def load_and_log_configs():
         return None
 
 
-
 # Log file
 # logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
-
-
-
-
-
 
 
 def format_metadata_as_text(metadata):
@@ -376,7 +399,6 @@ def format_metadata_as_text(metadata):
 # }
 #
 # print(format_metadata_as_text(example_metadata))
-
 
 
 def convert_to_seconds(time_str):
@@ -431,7 +453,15 @@ def save_segments_to_json(segments, file_name="transcription_segments.json"):
 
     return json_file_path
 
+#
+#
+#######################################################################################################################
+#
+# Backup code
 
+#
+# End of backup code
+#######################################################################################################################
 
 
 

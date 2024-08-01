@@ -16,25 +16,26 @@
 # Imports
 import json
 import logging
+import os
 import subprocess
-import sys
 import tempfile
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 import requests
-import os
-from gradio import gradio
 import yt_dlp
 
 from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 # Local Imports
-from App_Function_Libraries.SQLite_DB import add_media_to_database, add_media_with_keywords
-from App_Function_Libraries.Utils import create_download_directory, save_segments_to_json
+from App_Function_Libraries.SQLite_DB import add_media_to_database, add_media_with_keywords, \
+    check_media_and_whisper_model
 from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
+from App_Function_Libraries.Utils import create_download_directory, save_segments_to_json, downloaded_files, \
+    sanitize_filename
 from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
 
 #
@@ -45,8 +46,20 @@ from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
 MAX_FILE_SIZE = 500 * 1024 * 1024
 
 
-def download_audio_file(url, use_cookies=False, cookies=None):
+def download_audio_file(url, current_whisper_model="", use_cookies=False, cookies=None):
     try:
+        # Check if media already exists in the database and compare whisper models
+        should_download, reason = check_media_and_whisper_model(
+            url=url,
+            current_whisper_model=current_whisper_model
+        )
+
+        if not should_download:
+            logging.info(f"Skipping audio download: {reason}")
+            return None
+
+        logging.info(f"Proceeding with audio download: {reason}")
+
         # Set up the request headers
         headers = {}
         if use_cookies and cookies:
@@ -72,6 +85,7 @@ def download_audio_file(url, use_cookies=False, cookies=None):
 
         # Ensure the downloads directory exists
         os.makedirs('downloads', exist_ok=True)
+
 
         # Download the file
         with open(save_path, 'wb') as f:
@@ -483,20 +497,68 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
         return update_progress(f"Processing failed: {str(e)}"), "", ""
 
 
-def download_youtube_audio(url: str) -> str:
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'wav',
-            'preferredquality': '192',
-        }],
-        'outtmpl': '%(title)s.%(ext)s'
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info)
-        return filename.rsplit('.', 1)[0] + '.wav'
+def download_youtube_audio(url):
+    try:
+        # Determine ffmpeg path based on the operating system.
+        ffmpeg_path = './Bin/ffmpeg.exe' if os.name == 'nt' else 'ffmpeg'
+
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Extract information about the video
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                info_dict = ydl.extract_info(url, download=False)
+                sanitized_title = sanitize_filename(info_dict['title'])
+
+            # Setup the temporary filenames
+            temp_video_path = Path(temp_dir) / f"{sanitized_title}_temp.mp4"
+            temp_audio_path = Path(temp_dir) / f"{sanitized_title}.mp3"
+
+            # Initialize yt-dlp with options for downloading
+            ydl_opts = {
+                'format': 'bestaudio[ext=m4a]/best[height<=480]',  # Prefer best audio, or video up to 480p
+                'ffmpeg_location': ffmpeg_path,
+                'outtmpl': str(temp_video_path),
+                'noplaylist': True,
+                'quiet': True
+            }
+
+            # Execute yt-dlp to download the video/audio
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+
+            # Check if the file exists
+            if not temp_video_path.exists():
+                raise FileNotFoundError(f"Expected file was not found: {temp_video_path}")
+
+            # Use ffmpeg to extract audio
+            ffmpeg_command = [
+                ffmpeg_path,
+                '-i', str(temp_video_path),
+                '-vn',  # No video
+                '-acodec', 'libmp3lame',
+                '-b:a', '192k',
+                str(temp_audio_path)
+            ]
+            subprocess.run(ffmpeg_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            # Check if the audio file was created
+            if not temp_audio_path.exists():
+                raise FileNotFoundError(f"Expected audio file was not found: {temp_audio_path}")
+
+            # Create a persistent directory for the download if it doesn't exist
+            persistent_dir = Path("downloads")
+            persistent_dir.mkdir(exist_ok=True)
+
+            # Move the file from the temporary directory to the persistent directory
+            persistent_file_path = persistent_dir / f"{sanitized_title}.mp3"
+            os.replace(str(temp_audio_path), str(persistent_file_path))
+
+            # Add the file to the list of downloaded files
+            downloaded_files.append(str(persistent_file_path))
+
+            return str(persistent_file_path), f"Audio downloaded successfully: {sanitized_title}.mp3"
+    except Exception as e:
+        return None, f"Error downloading audio: {str(e)}"
 
 
 def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model,

@@ -46,20 +46,23 @@
 #
 # Import necessary libraries
 import csv
+import html
 import logging
 import os
 import re
+import shutil
 import sqlite3
 import time
 import traceback
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any
 
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
 import yaml
+
 
 # Import Local Libraries
 #
@@ -72,6 +75,112 @@ import yaml
 #logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
+#
+# Backup-related functions
+
+def create_incremental_backup(db_path, backup_dir):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Get the page count of the database
+    cursor.execute("PRAGMA page_count")
+    page_count = cursor.fetchone()[0]
+
+    # Create a new backup file
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = os.path.join(backup_dir, f"incremental_backup_{timestamp}.sqlib")
+
+    # Perform the incremental backup
+    conn.execute(f"VACUUM INTO '{backup_file}'")
+
+    conn.close()
+    print(f"Incremental backup created: {backup_file}")
+    return backup_file
+
+
+def create_automated_backup(db_path, backup_dir):
+    # Ensure backup directory exists
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # Create a timestamped backup file name
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = os.path.join(backup_dir, f"backup_{timestamp}.db")
+
+    # Copy the database file
+    shutil.copy2(db_path, backup_file)
+
+    print(f"Backup created: {backup_file}")
+    return backup_file
+
+# FIXME - boto3 aint getting installed by default....
+# def upload_to_s3(file_path, bucket_name, s3_key):
+#     import boto3
+#     s3 = boto3.client('s3')
+#     try:
+#         s3.upload_file(file_path, bucket_name, s3_key)
+#         print(f"File uploaded to S3: {s3_key}")
+#     except Exception as e:
+#         print(f"Error uploading to S3: {str(e)}")
+
+
+def rotate_backups(backup_dir, max_backups=10):
+    backups = sorted(
+        [f for f in os.listdir(backup_dir) if f.endswith('.db')],
+        key=lambda x: os.path.getmtime(os.path.join(backup_dir, x)),
+        reverse=True
+    )
+
+    while len(backups) > max_backups:
+        old_backup = backups.pop()
+        os.remove(os.path.join(backup_dir, old_backup))
+        print(f"Removed old backup: {old_backup}")
+
+
+# FIXME - Setup properly and test/add documentation for its existence...
+db_path = "path/to/your/database.db"
+backup_dir = "path/to/backup/directory"
+#create_automated_backup(db_path, backup_dir)
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#backup_file = create_automated_backup(db_path, backup_dir)
+#upload_to_s3(backup_file, 'your-s3-bucket-name', f"database_backups/{os.path.basename(backup_file)}")
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#create_incremental_backup(db_path, backup_dir)
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#rotate_backups(backup_dir)
+
+#
+#
+#######################################################################################################################
+#
+# DB-Integrity Check Functions
+
+def check_database_integrity(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA integrity_check")
+    result = cursor.fetchone()
+
+    conn.close()
+
+    if result[0] == "ok":
+        print("Database integrity check passed.")
+        return True
+    else:
+        print("Database integrity check failed:", result[0])
+        return False
+
+#check_database_integrity(db_path)
+
+#
+# End of DB-Integrity Check functions
+#######################################################################################################################
+#
+# Media-related Functions
 
 # Custom exceptions
 class DatabaseError(Exception):
@@ -142,7 +251,9 @@ def create_tables() -> None:
             ingestion_date TEXT,
             prompt TEXT,
             summary TEXT,
-            transcription_model TEXT
+            transcription_model TEXT,
+            is_trash BOOLEAN DEFAULT 0,
+            trash_date DATETIME
         )
         ''',
         '''
@@ -246,6 +357,9 @@ def create_tables() -> None:
         '''
         CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
         ''',
+        '''
+        CREATE INDEX IF NOT EXISTS idx_media_is_trash ON Media(is_trash);
+        ''',
 
         # CREATE UNIQUE INDEX statements
         '''
@@ -267,9 +381,103 @@ def create_tables() -> None:
     for query in table_queries:
         db.execute_query(query)
 
+    for query in table_queries:
+        db.execute_query(query)
+
+    # Add new columns to the Media table if they don't exist
+    alter_queries = [
+        "ALTER TABLE Media ADD COLUMN is_trash BOOLEAN DEFAULT 0;",
+        "ALTER TABLE Media ADD COLUMN trash_date DATETIME;"
+    ]
+
+    for query in alter_queries:
+        try:
+            db.execute_query(query)
+        except Exception as e:
+            # If the column already exists, SQLite will throw an error. We can safely ignore it.
+            logging.debug(f"Note: {str(e)}")
+
     logging.info("All tables and indexes created successfully.")
 
 create_tables()
+
+
+def check_media_exists(title, url):
+    """Check if media with the given title or URL exists in the database."""
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM Media WHERE title = ? OR url = ?", (title, url))
+        result = cursor.fetchone()
+        return result is not None
+
+
+def check_media_and_whisper_model(title=None, url=None, current_whisper_model=None):
+    """
+    Check if media exists in the database and compare the whisper model used.
+
+    :param title: Title of the media (optional)
+    :param url: URL of the media (optional)
+    :param current_whisper_model: The whisper model currently selected for use
+    :return: Tuple (bool, str) - (should_download, reason)
+    """
+    if not title and not url:
+        return True, "No title or URL provided"
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+
+        # First, find the media_id
+        query = "SELECT id FROM Media WHERE "
+        params = []
+
+        if title:
+            query += "title = ?"
+            params.append(title)
+
+        if url:
+            if params:
+                query += " OR "
+            query += "url = ?"
+            params.append(url)
+
+        cursor.execute(query, tuple(params))
+        result = cursor.fetchone()
+
+        if not result:
+            return True, "Media not found in database"
+
+        media_id = result[0]
+
+        # Now, get the latest transcript for this media
+        cursor.execute("""
+            SELECT transcription 
+            FROM Transcripts 
+            WHERE media_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        """, (media_id,))
+
+        transcript_result = cursor.fetchone()
+
+        if not transcript_result:
+            return True, f"No transcript found for media (ID: {media_id})"
+
+        transcription = transcript_result[0]
+
+        # Extract the whisper model from the transcription
+        match = re.search(r"This text was transcribed using whisper model: (.+)$", transcription, re.MULTILINE)
+        if not match:
+            return True, f"Whisper model information not found in transcript (Media ID: {media_id})"
+
+        db_whisper_model = match.group(1).strip()
+
+        if not current_whisper_model:
+            return False, f"Media found in database (ID: {media_id})"
+
+        if db_whisper_model != current_whisper_model:
+            return True, f"Different whisper model (DB: {db_whisper_model}, Current: {current_whisper_model})"
+
+        return False, f"Media found with same whisper model (ID: {media_id})"
 
 
 #######################################################################################################################
@@ -782,66 +990,236 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 # Functions to manage prompts DB
 
 def create_prompts_db():
-    conn = sqlite3.connect('prompts.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Prompts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            details TEXT,
-            system TEXT,
-            user TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-create_prompts_db()
-
-
-def add_prompt(name, details, system, user=None):
-    try:
-        conn = sqlite3.connect('prompts.db')
+    with sqlite3.connect('prompts.db') as conn:
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO Prompts (name, details, system, user)
-            VALUES (?, ?, ?, ?)
-        ''', (name, details, system, user))
-        conn.commit()
-        conn.close()
+        cursor.executescript('''
+            CREATE TABLE IF NOT EXISTS Prompts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                details TEXT,
+                system TEXT,
+                user TEXT
+            );
+            CREATE TABLE IF NOT EXISTS Keywords (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                keyword TEXT NOT NULL UNIQUE COLLATE NOCASE
+            );
+            CREATE TABLE IF NOT EXISTS PromptKeywords (
+                prompt_id INTEGER,
+                keyword_id INTEGER,
+                FOREIGN KEY (prompt_id) REFERENCES Prompts (id),
+                FOREIGN KEY (keyword_id) REFERENCES Keywords (id),
+                PRIMARY KEY (prompt_id, keyword_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON Keywords(keyword);
+            CREATE INDEX IF NOT EXISTS idx_promptkeywords_prompt_id ON PromptKeywords(prompt_id);
+            CREATE INDEX IF NOT EXISTS idx_promptkeywords_keyword_id ON PromptKeywords(keyword_id);
+        ''')
+
+
+def normalize_keyword(keyword):
+    return re.sub(r'\s+', ' ', keyword.strip().lower())
+
+
+def add_prompt(name, details, system, user=None, keywords=None):
+    if not name or not system:
+        return "Name and system prompt are required."
+
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO Prompts (name, details, system, user)
+                VALUES (?, ?, ?, ?)
+            ''', (name, details, system, user))
+            prompt_id = cursor.lastrowid
+
+            if keywords:
+                normalized_keywords = [normalize_keyword(k) for k in keywords if k.strip()]
+                for keyword in set(normalized_keywords):  # Use set to remove duplicates
+                    cursor.execute('''
+                        INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)
+                    ''', (keyword,))
+                    cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                    keyword_id = cursor.fetchone()[0]
+                    cursor.execute('''
+                        INSERT OR IGNORE INTO PromptKeywords (prompt_id, keyword_id) VALUES (?, ?)
+                    ''', (prompt_id, keyword_id))
         return "Prompt added successfully."
     except sqlite3.IntegrityError:
         return "Prompt with this name already exists."
     except sqlite3.Error as e:
         return f"Database error: {e}"
 
+
 def fetch_prompt_details(name):
-    conn = sqlite3.connect('prompts.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT name, details, system, user
-        FROM Prompts
-        WHERE name = ?
-    ''', (name,))
-    result = cursor.fetchone()
-    conn.close()
+    with sqlite3.connect('prompts.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+            FROM Prompts p
+            LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
+            LEFT JOIN Keywords k ON pk.keyword_id = k.id
+            WHERE p.name = ?
+            GROUP BY p.id
+        ''', (name,))
+        return cursor.fetchone()
+
+
+def list_prompts(page=1, per_page=10):
+    offset = (page - 1) * per_page
+    with sqlite3.connect('prompts.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT name FROM Prompts LIMIT ? OFFSET ?', (per_page, offset))
+        prompts = [row[0] for row in cursor.fetchall()]
+
+        # Get total count of prompts
+        cursor.execute('SELECT COUNT(*) FROM Prompts')
+        total_count = cursor.fetchone()[0]
+
+    total_pages = (total_count + per_page - 1) // per_page
+    return prompts, total_pages, page
+
+# This will not scale. For a large number of prompts, use a more efficient method.
+# FIXME - see above statement.
+def load_preset_prompts():
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT name FROM Prompts ORDER BY name ASC')
+            prompts = [row[0] for row in cursor.fetchall()]
+        return prompts
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return []
+
+
+def insert_prompt_to_db(title, description, system_prompt, user_prompt, keywords=None):
+    return add_prompt(title, description, system_prompt, user_prompt, keywords)
+
+
+def search_prompts_by_keyword(keyword, page=1, per_page=10):
+    normalized_keyword = normalize_keyword(keyword)
+    offset = (page - 1) * per_page
+    with sqlite3.connect('prompts.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT DISTINCT p.name
+            FROM Prompts p
+            JOIN PromptKeywords pk ON p.id = pk.prompt_id
+            JOIN Keywords k ON pk.keyword_id = k.id
+            WHERE k.keyword LIKE ?
+            LIMIT ? OFFSET ?
+        ''', ('%' + normalized_keyword + '%', per_page, offset))
+        prompts = [row[0] for row in cursor.fetchall()]
+
+        # Get total count of matching prompts
+        cursor.execute('''
+            SELECT COUNT(DISTINCT p.id)
+            FROM Prompts p
+            JOIN PromptKeywords pk ON p.id = pk.prompt_id
+            JOIN Keywords k ON pk.keyword_id = k.id
+            WHERE k.keyword LIKE ?
+        ''', ('%' + normalized_keyword + '%',))
+        total_count = cursor.fetchone()[0]
+
+    total_pages = (total_count + per_page - 1) // per_page
+    return prompts, total_pages, page
+
+
+def update_prompt_keywords(prompt_name, new_keywords):
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('SELECT id FROM Prompts WHERE name = ?', (prompt_name,))
+            prompt_id = cursor.fetchone()
+            if not prompt_id:
+                return "Prompt not found."
+            prompt_id = prompt_id[0]
+
+            cursor.execute('DELETE FROM PromptKeywords WHERE prompt_id = ?', (prompt_id,))
+
+            normalized_keywords = [normalize_keyword(k) for k in new_keywords if k.strip()]
+            for keyword in set(normalized_keywords):  # Use set to remove duplicates
+                cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+                cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                keyword_id = cursor.fetchone()[0]
+                cursor.execute('INSERT INTO PromptKeywords (prompt_id, keyword_id) VALUES (?, ?)',
+                               (prompt_id, keyword_id))
+
+            # Remove unused keywords
+            cursor.execute('''
+                DELETE FROM Keywords
+                WHERE id NOT IN (SELECT DISTINCT keyword_id FROM PromptKeywords)
+            ''')
+        return "Keywords updated successfully."
+    except sqlite3.Error as e:
+        return f"Database error: {e}"
+
+
+def add_or_update_prompt(title, description, system_prompt, user_prompt, keywords=None):
+    if not title:
+        return "Error: Title is required."
+
+    existing_prompt = fetch_prompt_details(title)
+    if existing_prompt:
+        # Update existing prompt
+        result = update_prompt_in_db(title, description, system_prompt, user_prompt)
+        if "successfully" in result:
+            # Update keywords if the prompt update was successful
+            keyword_result = update_prompt_keywords(title, keywords or [])
+            result += f" {keyword_result}"
+    else:
+        # Insert new prompt
+        result = insert_prompt_to_db(title, description, system_prompt, user_prompt, keywords)
+
     return result
 
-def list_prompts():
-    conn = sqlite3.connect('prompts.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT name
-        FROM Prompts
-    ''')
-    results = cursor.fetchall()
-    conn.close()
-    return [row[0] for row in results]
 
-def insert_prompt_to_db(title, description, system_prompt, user_prompt):
-    result = add_prompt(title, description, system_prompt, user_prompt)
-    return result
+def load_prompt_details(selected_prompt):
+    if selected_prompt:
+        details = fetch_prompt_details(selected_prompt)
+        if details:
+            return details[0], details[1], details[2], details[3], details[4]  # Include keywords
+    return "", "", "", "", ""
 
+
+def update_prompt_in_db(title, description, system_prompt, user_prompt):
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE Prompts SET details = ?, system = ?, user = ? WHERE name = ?",
+                (description, system_prompt, user_prompt, title)
+            )
+            if cursor.rowcount == 0:
+                return "No prompt found with the given title."
+        return "Prompt updated successfully!"
+    except sqlite3.Error as e:
+        return f"Error updating prompt: {e}"
+
+
+create_prompts_db()
+
+def delete_prompt(prompt_id):
+    try:
+        with sqlite3.connect('prompts.db') as conn:
+            cursor = conn.cursor()
+
+            # Delete associated keywords
+            cursor.execute("DELETE FROM PromptKeywords WHERE prompt_id = ?", (prompt_id,))
+
+            # Delete the prompt
+            cursor.execute("DELETE FROM Prompts WHERE id = ?", (prompt_id,))
+
+            if cursor.rowcount == 0:
+                return f"No prompt found with ID {prompt_id}"
+            else:
+                conn.commit()
+                return f"Prompt with ID {prompt_id} has been successfully deleted"
+    except sqlite3.Error as e:
+        return f"An error occurred: {e}"
 
 #
 #
@@ -1026,6 +1404,83 @@ def view_database(page: int, results_per_page: int) -> Tuple[str, str, int]:
     return formatted_results, f"Page {page} of {total_pages}", total_pages
 
 
+def search_and_display_items(query, search_type, page, entries_per_page,char_count):
+    offset = (page - 1) * entries_per_page
+    try:
+        with sqlite3.connect('media_summary.db') as conn:
+            cursor = conn.cursor()
+
+            # Adjust the SQL query based on the search type
+            if search_type == "Title":
+                where_clause = "WHERE m.title LIKE ?"
+            elif search_type == "URL":
+                where_clause = "WHERE m.url LIKE ?"
+            elif search_type == "Keyword":
+                where_clause = "WHERE k.keyword LIKE ?"
+            elif search_type == "Content":
+                where_clause = "WHERE m.content LIKE ?"
+            else:
+                raise ValueError("Invalid search type")
+
+            cursor.execute(f'''
+                SELECT m.id, m.title, m.url, m.content, mm.summary, GROUP_CONCAT(k.keyword, ', ') as keywords
+                FROM Media m
+                LEFT JOIN MediaModifications mm ON m.id = mm.media_id
+                LEFT JOIN MediaKeywords mk ON m.id = mk.media_id
+                LEFT JOIN Keywords k ON mk.keyword_id = k.id
+                {where_clause}
+                GROUP BY m.id
+                ORDER BY m.ingestion_date DESC
+                LIMIT ? OFFSET ?
+            ''', (f'%{query}%', entries_per_page, offset))
+            items = cursor.fetchall()
+
+            cursor.execute(f'''
+                SELECT COUNT(DISTINCT m.id)
+                FROM Media m
+                LEFT JOIN MediaKeywords mk ON m.id = mk.media_id
+                LEFT JOIN Keywords k ON mk.keyword_id = k.id
+                {where_clause}
+            ''', (f'%{query}%',))
+            total_items = cursor.fetchone()[0]
+
+        results = ""
+        for item in items:
+            title = html.escape(item[1]).replace('\n', '<br>')
+            url = html.escape(item[2]).replace('\n', '<br>')
+            # First X amount of characters of the content
+            content = html.escape(item[3] or '')[:char_count] + '...'
+            summary = html.escape(item[4] or '').replace('\n', '<br>')
+            keywords = html.escape(item[5] or '').replace('\n', '<br>')
+
+            results += f"""
+            <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div><strong>Title:</strong> {title}</div>
+                    <div><strong>URL:</strong> {url}</div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>Content (first {char_count} characters):</strong>
+                    <pre style="white-space: pre-wrap; word-wrap: break-word;">{content}</pre>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>Summary:</strong>
+                    <pre style="white-space: pre-wrap; word-wrap: break-word;">{summary}</pre>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>Keywords:</strong> {keywords}
+                </div>
+            </div>
+            """
+
+        total_pages = (total_items + entries_per_page - 1) // entries_per_page
+        pagination = f"Page {page} of {total_pages} (Total items: {total_items})"
+
+        return results, pagination, total_pages
+    except sqlite3.Error as e:
+        return f"<p>Error searching items: {e}</p>", "Error", 0
+
+
 #
 # End of Functions to manage prompts DB / Fetch and update media content
 #######################################################################################################################
@@ -1040,13 +1495,16 @@ def import_obsidian_note_to_db(note_data):
             cursor.execute("SELECT id FROM Media WHERE title = ? AND type = 'obsidian_note'", (note_data['title'],))
             existing_note = cursor.fetchone()
 
+            # Generate a relative path or meaningful identifier instead of using the temporary file path
+            relative_path = os.path.relpath(note_data['file_path'], start=os.path.dirname(note_data['file_path']))
+
             if existing_note:
                 media_id = existing_note[0]
                 cursor.execute("""
                     UPDATE Media
-                    SET content = ?, author = ?, ingestion_date = CURRENT_TIMESTAMP
+                    SET content = ?, author = ?, ingestion_date = CURRENT_TIMESTAMP, url = ?
                     WHERE id = ?
-                """, (note_data['content'], note_data['frontmatter'].get('author', 'Unknown'), media_id))
+                """, (note_data['content'], note_data['frontmatter'].get('author', 'Unknown'), relative_path, media_id))
 
                 cursor.execute("DELETE FROM MediaKeywords WHERE media_id = ?", (media_id,))
             else:
@@ -1054,7 +1512,7 @@ def import_obsidian_note_to_db(note_data):
                     INSERT INTO Media (title, content, type, author, ingestion_date, url)
                     VALUES (?, ?, 'obsidian_note', ?, CURRENT_TIMESTAMP, ?)
                 """, (note_data['title'], note_data['content'], note_data['frontmatter'].get('author', 'Unknown'),
-                      note_data['file_path']))
+                      relative_path))
 
                 media_id = cursor.lastrowid
 
@@ -1267,3 +1725,102 @@ def get_transcripts(media_id):
         return []
 
 
+#
+# End of Functions to Compare Transcripts
+#######################################################################################################################
+#
+# Functions to handle deletion of media items
+
+
+def mark_as_trash(media_id: int) -> None:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE Media 
+            SET is_trash = 1, trash_date = ?
+            WHERE id = ?
+        """, (datetime.now(), media_id))
+        conn.commit()
+
+
+def restore_from_trash(media_id: int) -> None:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE Media 
+            SET is_trash = 0, trash_date = NULL
+            WHERE id = ?
+        """, (media_id,))
+        conn.commit()
+
+
+def get_trashed_items() -> List[Dict]:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, title, trash_date 
+            FROM Media 
+            WHERE is_trash = 1
+            ORDER BY trash_date DESC
+        """)
+        return [{'id': row[0], 'title': row[1], 'trash_date': row[2]} for row in cursor.fetchall()]
+
+
+def permanently_delete_item(media_id: int) -> None:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM Media WHERE id = ?", (media_id,))
+        cursor.execute("DELETE FROM MediaKeywords WHERE media_id = ?", (media_id,))
+        cursor.execute("DELETE FROM MediaVersion WHERE media_id = ?", (media_id,))
+        cursor.execute("DELETE FROM MediaModifications WHERE media_id = ?", (media_id,))
+        cursor.execute("DELETE FROM media_fts WHERE rowid = ?", (media_id,))
+        conn.commit()
+
+
+def empty_trash(days_threshold: int) -> Tuple[int, int]:
+    threshold_date = datetime.now() - timedelta(days=days_threshold)
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id FROM Media 
+            WHERE is_trash = 1 AND trash_date <= ?
+        """, (threshold_date,))
+        old_items = cursor.fetchall()
+
+        for item in old_items:
+            permanently_delete_item(item[0])
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM Media 
+            WHERE is_trash = 1 AND trash_date > ?
+        """, (threshold_date,))
+        remaining_items = cursor.fetchone()[0]
+
+    return len(old_items), remaining_items
+
+
+def user_delete_item(media_id: int, force: bool = False) -> str:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_trash, trash_date FROM Media WHERE id = ?", (media_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            return "Item not found."
+
+        is_trash, trash_date = result
+
+        if not is_trash:
+            mark_as_trash(media_id)
+            return "Item moved to trash."
+
+        if force or (trash_date and (datetime.now() - trash_date).days >= 30):
+            permanently_delete_item(media_id)
+            return "Item permanently deleted."
+        else:
+            return "Item is already in trash. Use force=True to delete permanently before 30 days."
+
+
+#
+# End of Functions to handle deletion of media items
+#######################################################################################################################
