@@ -259,7 +259,7 @@ def load_and_log_configs():
         logging.debug(f"Loaded OpenRouter Model: {openrouter_model}")
 
         # Local-Models
-        kobold_api_IP = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+        kobold_api_ip = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
@@ -275,7 +275,7 @@ def load_and_log_configs():
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
         vllm_model = config.get('Local-API', 'vllm_model', fallback=None)
 
-        logging.debug(f"Loaded Kobold API IP: {kobold_api_IP}")
+        logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
         logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
         logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
         logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
@@ -319,7 +319,7 @@ def load_and_log_configs():
 
             },
             'local_api_ip': {
-                'kobold': kobold_api_IP,
+                'kobold': kobold_api_ip,
                 'llama': llama_api_IP,
                 'ooba': ooba_api_IP,
                 'tabby': tabby_api_IP,
