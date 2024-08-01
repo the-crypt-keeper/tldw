@@ -46,6 +46,7 @@
 #
 # Import necessary libraries
 import csv
+import html
 import logging
 import os
 import re
@@ -1401,6 +1402,83 @@ def view_database(page: int, results_per_page: int) -> Tuple[str, str, int]:
     # Calculate total pages
     total_pages = (total_entries + results_per_page - 1) // results_per_page
     return formatted_results, f"Page {page} of {total_pages}", total_pages
+
+
+def search_and_display_items(query, search_type, page, entries_per_page,char_count):
+    offset = (page - 1) * entries_per_page
+    try:
+        with sqlite3.connect('media_summary.db') as conn:
+            cursor = conn.cursor()
+
+            # Adjust the SQL query based on the search type
+            if search_type == "Title":
+                where_clause = "WHERE m.title LIKE ?"
+            elif search_type == "URL":
+                where_clause = "WHERE m.url LIKE ?"
+            elif search_type == "Keyword":
+                where_clause = "WHERE k.keyword LIKE ?"
+            elif search_type == "Content":
+                where_clause = "WHERE m.content LIKE ?"
+            else:
+                raise ValueError("Invalid search type")
+
+            cursor.execute(f'''
+                SELECT m.id, m.title, m.url, m.content, mm.summary, GROUP_CONCAT(k.keyword, ', ') as keywords
+                FROM Media m
+                LEFT JOIN MediaModifications mm ON m.id = mm.media_id
+                LEFT JOIN MediaKeywords mk ON m.id = mk.media_id
+                LEFT JOIN Keywords k ON mk.keyword_id = k.id
+                {where_clause}
+                GROUP BY m.id
+                ORDER BY m.ingestion_date DESC
+                LIMIT ? OFFSET ?
+            ''', (f'%{query}%', entries_per_page, offset))
+            items = cursor.fetchall()
+
+            cursor.execute(f'''
+                SELECT COUNT(DISTINCT m.id)
+                FROM Media m
+                LEFT JOIN MediaKeywords mk ON m.id = mk.media_id
+                LEFT JOIN Keywords k ON mk.keyword_id = k.id
+                {where_clause}
+            ''', (f'%{query}%',))
+            total_items = cursor.fetchone()[0]
+
+        results = ""
+        for item in items:
+            title = html.escape(item[1]).replace('\n', '<br>')
+            url = html.escape(item[2]).replace('\n', '<br>')
+            # First X amount of characters of the content
+            content = html.escape(item[3] or '')[:char_count] + '...'
+            summary = html.escape(item[4] or '').replace('\n', '<br>')
+            keywords = html.escape(item[5] or '').replace('\n', '<br>')
+
+            results += f"""
+            <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div><strong>Title:</strong> {title}</div>
+                    <div><strong>URL:</strong> {url}</div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>Content (first {char_count} characters):</strong>
+                    <pre style="white-space: pre-wrap; word-wrap: break-word;">{content}</pre>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>Summary:</strong>
+                    <pre style="white-space: pre-wrap; word-wrap: break-word;">{summary}</pre>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>Keywords:</strong> {keywords}
+                </div>
+            </div>
+            """
+
+        total_pages = (total_items + entries_per_page - 1) // entries_per_page
+        pagination = f"Page {page} of {total_pages} (Total items: {total_items})"
+
+        return results, pagination, total_pages
+    except sqlite3.Error as e:
+        return f"<p>Error searching items: {e}</p>", "Error", 0
 
 
 #
