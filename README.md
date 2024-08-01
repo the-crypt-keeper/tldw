@@ -22,13 +22,14 @@
 
 ### <a name="what"></a> What is this (TL/DW)?
 - **101**
-  - The end goal of this project, is to be a personal research multi-tool/data assistant/young lady's illustrated primer, that is capable of ingesting:
-    * audio, videos, articles, free form text, documents, and books,
-  - as text into a SQLite DB, so that you can then search and chat with it at any time on your own device/locally.
-    - (Plus act as a nice way of creating your personal 'media' database, a personal digital library with search!)
+  - The end goal of this project, is to be a personal research multi-tool/data assistant/young lady's illustrated primer.
+  - A tool that can ingest: audio, videos, articles, free form text, documents, and books as text into a personal, offline database, so that you can then search and chat with it at any time on your own device/locally.
+    - (+ act as a nice way of creating your personal 'media' database, a personal digital library with search!)
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
-    - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off.
-    - If anything, I'd like to see this project be used in schools, universities, and research institutions, as well as by individuals who are looking to learn and grow. (or at least something like this project; small goals :p)
+    - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off, and I don't see it as more worthwhile than some other endeavors.
+    - If anything, I'd like to see this project be used in schools, universities, and research institutions, or anyone who wants to keep a record of what they've consumed and be able to search and ask questions about it.
+    - I believe that this project can be a great tool for learning and research, and I'd like to see it develop to a point where it could be reasonably used as such.
+    - In the meantime, if you don't care about data ownership or privacy, https://notebooklm.google/ is a good alternative that works, is free, and has a working RAG setup (unlike mine :cry:).
 - **Don't care, give me code**
   * Install git for your style of OS, then run the following commands in a terminal:
     * Install git on windows - On your keyboard: press WINDOWS + R to open Run dialog box. Then, run the following command to install git:
