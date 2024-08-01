@@ -410,9 +410,8 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_I
 
         tabby_api_ip = loaded_config_data['local_api_ip']['tabby']
         tabby_model = loaded_config_data['models']['tabby']
-        if temp == None:
+        if temp is None:
             temp = 0.7
-
 
         logging.debug(f"TabbyAPI: Using API Key: {tabby_api_key[:5]}...{tabby_api_key[-5:]}")
 
@@ -460,12 +459,35 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_I
         }
 
         response = requests.post(tabby_api_ip, headers=headers, json=data2)
-        response.raise_for_status()
-        summary = response.json().get('summary', '')
-        return summary
+
+        if response.status_code == 200:
+            response_json = response.json()
+
+            # Validate the response structure
+            if all(key in response_json for key in ['id', 'choices', 'created', 'model', 'object', 'usage']):
+                logging.info("TabbyAPI: Received a valid 200 response")
+                summary = response_json['choices'][0].get('message', {}).get('content', '')
+                return summary
+            else:
+                logging.error("TabbyAPI: Received a 200 response, but the structure is invalid")
+                return "Error: Received an invalid response structure from TabbyAPI."
+
+        elif response.status_code == 422:
+            logging.error(f"TabbyAPI: Received a 422 error. Details: {response.json()}")
+            return "Error: Invalid request sent to TabbyAPI."
+
+        else:
+            response.raise_for_status()  # This will raise an exception for other status codes
+
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error summarizing with TabbyAPI: {e}")
-        return "Error summarizing with TabbyAPI."
+        logging.error(f"Error summarizing with TabbyAPI: {e}")
+        return f"Error summarizing with TabbyAPI: {str(e)}"
+    except json.JSONDecodeError:
+        logging.error("TabbyAPI: Received an invalid JSON response")
+        return "Error: Received an invalid JSON response from TabbyAPI."
+    except Exception as e:
+        logging.error(f"Unexpected error in summarize_with_tabbyapi: {e}")
+        return f"Unexpected error in summarization process: {str(e)}"
 
 def summarize_with_vllm(
         input_data: Union[str, dict, list],
