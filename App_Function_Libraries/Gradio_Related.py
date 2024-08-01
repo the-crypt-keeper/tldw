@@ -15,6 +15,7 @@
 #########################################
 #
 # Built-In Imports
+import html
 import math
 import re
 import shutil
@@ -1904,13 +1905,14 @@ def create_prompt_view_tab():
     with gr.TabItem("View Prompt Database"):
         gr.Markdown("# View Prompt Database Entries")
         with gr.Row():
-            entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
-            page_number = gr.Number(value=1, label="Page Number", precision=0)
-            view_button = gr.Button("View Page")
-            next_page_button = gr.Button("Next Page")
-            previous_page_button = gr.Button("Previous Page")
-            pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
-
+            with gr.Column():
+                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
+                page_number = gr.Number(value=1, label="Page Number", precision=0)
+                view_button = gr.Button("View Page")
+                next_page_button = gr.Button("Next Page")
+                previous_page_button = gr.Button("Previous Page")
+            with gr.Column():
+                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
         results_display = gr.HTML()
 
         def view_database(page, entries_per_page):
@@ -1934,20 +1936,29 @@ def create_prompt_view_tab():
 
                 results = ""
                 for prompt in prompts:
+                    # Escape HTML special characters and replace newlines with <br> tags
+                    title = html.escape(prompt[0]).replace('\n', '<br>')
+                    details = html.escape(prompt[1] or '').replace('\n', '<br>')
+                    system_prompt = html.escape(prompt[2] or '')
+                    user_prompt = html.escape(prompt[3] or '')
+                    keywords = html.escape(prompt[4] or '').replace('\n', '<br>')
+
                     results += f"""
                     <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>Title:</strong> {prompt[0]}</div>
-                            <div><strong>Details:</strong> {prompt[1] or ''}</div>
+                            <div><strong>Title:</strong> {title}</div>
+                            <div><strong>Details:</strong> {details}</div>
                         </div>
                         <div style="margin-top: 10px;">
-                            <strong>System Prompt:</strong> {prompt[2] or ''}
+                            <strong>User Prompt:</strong>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{user_prompt}</pre>
                         </div>
                         <div style="margin-top: 10px;">
-                            <strong>User Prompt:</strong> {prompt[3] or ''}
+                            <strong>System Prompt:</strong>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{system_prompt}</pre>
                         </div>
                         <div style="margin-top: 10px;">
-                            <strong>Keywords:</strong> {prompt[4] or ''}
+                            <strong>Keywords:</strong> {keywords}
                         </div>
                     </div>
                     """
