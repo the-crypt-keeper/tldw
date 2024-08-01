@@ -391,7 +391,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None):
             ],
             "message": "Please provide a summary.",
             "model": cohere_model,
-            "connectors": [{"id": "web-search"}],
+#            "connectors": [{"id": "web-search"}],
             "temperature": temp
         }
 
@@ -1136,35 +1136,37 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
         return None, None
 
 
-def summarize_chunk(api_name, text, custom_prompt_input, api_key):
+def summarize_chunk(api_name, text, custom_prompt_input, api_key, temp=None):
     logging.debug("Entered 'summarize_chunk' function")
     try:
         if api_name.lower() == 'openai':
-            return summarize_with_openai(api_key, text, custom_prompt_input)
+            return summarize_with_openai(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "anthropic":
-            return summarize_with_anthropic(api_key, text, custom_prompt_input)
+            return summarize_with_anthropic(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "cohere":
-            return summarize_with_cohere(api_key, text, custom_prompt_input)
+            return summarize_with_cohere(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "groq":
-            return summarize_with_groq(api_key, text, custom_prompt_input)
+            return summarize_with_groq(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "openrouter":
-            return summarize_with_openrouter(api_key, text, custom_prompt_input)
+            return summarize_with_openrouter(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "deepseek":
-            return summarize_with_deepseek(api_key, text, custom_prompt_input)
+            return summarize_with_deepseek(api_key, text, custom_prompt_input, temp)
+        elif api_name.lower() == "mistral":
+            return summarize_with_mistral(api_key, text, custom_prompt_input, temp)
         elif api_name.lower() == "llama.cpp":
-            return summarize_with_llama(text, custom_prompt_input)
+            return summarize_with_llama(text, custom_prompt_input, temp)
         elif api_name.lower() == "kobold":
-            return summarize_with_kobold(text, api_key, custom_prompt_input)
+            return summarize_with_kobold(text, api_key, custom_prompt_input, temp)
         elif api_name.lower() == "ooba":
-            return summarize_with_oobabooga(text, api_key, custom_prompt_input)
+            return summarize_with_oobabooga(text, api_key, custom_prompt_input, temp)
         elif api_name.lower() == "tabbyapi":
-            return summarize_with_tabbyapi(text, custom_prompt_input)
+            return summarize_with_tabbyapi(text, custom_prompt_input, temp)
         elif api_name.lower() == "vllm":
-            return summarize_with_vllm(text, custom_prompt_input)
+            return summarize_with_vllm(text, custom_prompt_input, temp)
         elif api_name.lower() == "local-llm":
-            return summarize_with_local_llm(text, custom_prompt_input)
+            return summarize_with_local_llm(text, custom_prompt_input, temp)
         elif api_name.lower() == "huggingface":
-            return summarize_with_huggingface(api_key, text, custom_prompt_input)
+            return summarize_with_huggingface(api_key, text, custom_prompt_input, temp)
         else:
             logging.warning(f"Unsupported API: {api_name}")
             return None
@@ -1214,7 +1216,7 @@ def format_input_with_metadata(metadata, content):
     formatted_input += content
     return formatted_input
 
-def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False):
+def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False, temp=None):
     loaded_config_data = load_and_log_configs()
     logging.info("Starting summarization process...")
     if custom_prompt_input is None:
@@ -1265,10 +1267,10 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
             logging.debug("summary = recursive_summarize_chunks")
             summary = recursive_summarize_chunks([chunk['text'] for chunk in chunks],
                                                  lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key),
-                                                 custom_prompt_input)
+                                                 custom_prompt_input, temp)
         else:
             logging.debug("summary = summarize_chunk")
-            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key)
+            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key, temp)
 
         # add some actual validation logic
         if summary is not None:
@@ -1535,7 +1537,7 @@ def process_url(
             )
         elif api_name:
             summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key,
-                                                 recursive_summarization)
+                                                 recursive_summarization, temp=None)
         else:
             summary_text = 'Summary not available'
 
