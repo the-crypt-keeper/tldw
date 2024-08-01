@@ -796,23 +796,6 @@ Sample commands:
         logger.addHandler(file_handler)
         logger.info(f"Log file created at: {args.log_file}")
 
-    ########## Custom Prompt setup
-    custom_prompt_input = args.custom_prompt
-
-    if not args.custom_prompt:
-        logging.debug("No custom prompt defined, will use default")
-        args.custom_prompt_input = (
-            "\n\nabove is the transcript of a video. "
-            "Please read through the transcript carefully. Identify the main topics that are "
-            "discussed over the course of the transcript. Then, summarize the key points about each "
-            "main topic in a concise bullet point. The bullet points should cover the key "
-            "information conveyed about each topic in the video, but should be much shorter than "
-            "the full transcript. Please output your bullet point summary inside <bulletpoints> "
-            "tags."
-        )
-        print("No custom prompt defined, will use default")
-
-        custom_prompt_input = args.custom_prompt
     else:
         logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt_input} \n\nas the prompt")
         print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
@@ -906,6 +889,24 @@ Sample commands:
         llm_model = args.llm_model or None
         # FIXME - dirty hack
         args.time_based = False
+
+        ########## Custom Prompt setup
+        custom_prompt_input = args.custom_prompt
+
+        if not args.custom_prompt:
+            logging.debug("No custom prompt defined, will use default")
+            args.custom_prompt_input = (
+                "\n\nThis is the transcript of a video. "
+                "Please read through the transcript carefully. Identify the main topics that are "
+                "discussed over the course of the transcript. Then, summarize the key points about each "
+                "main topic in a concise bullet point. The bullet points should cover the key "
+                "information conveyed about each topic in the video, but should be much shorter than "
+                "the full transcript. Please output your bullet point summary inside <bulletpoints> "
+                "tags."
+            )
+            print("No custom prompt defined, will use default")
+
+            custom_prompt_input = args.custom_prompt
 
         try:
             results = main(args.input_path, api_name=args.api_name, api_key=args.api_key,
