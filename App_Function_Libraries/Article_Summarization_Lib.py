@@ -109,7 +109,7 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
         return str(e)
 
 
-def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles):
+def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles, system_message=None):
     urls = [url.strip() for url in urls.split('\n') if url.strip()]
     custom_titles = custom_article_titles.split('\n') if custom_article_titles else []
 
@@ -122,7 +122,7 @@ def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, ke
     for i, url in tqdm(enumerate(urls), total=len(urls), desc="Processing URLs"):
         custom_title = custom_titles[i] if i < len(custom_titles) else None
         try:
-            result = scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_title)
+            result = scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_title, system_message)
             results.append(f"Results for URL {i + 1}:\n{result}")
         except Exception as e:
             error_message = f"Error processing URL {i + 1} ({url}): {str(e)}"

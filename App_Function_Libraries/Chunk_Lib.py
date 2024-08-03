@@ -211,8 +211,8 @@ def chunk_on_delimiter(input_string: str,
     combined_chunks = [f"{chunk}{delimiter}" for chunk in combined_chunks]
     return combined_chunks
 
-
-def recursive_summarize_chunks(chunks, summarize_func, custom_prompt, temp=None):
+# ????FIXME
+def recursive_summarize_chunks(chunks, summarize_func, custom_prompt, temp=None, system_prompt=None):
     summarized_chunks = []
     current_summary = ""
 
@@ -220,10 +220,10 @@ def recursive_summarize_chunks(chunks, summarize_func, custom_prompt, temp=None)
     logging.debug(f"recursive_summarize_chunks:  temperature is @ {temp}")
     for i, chunk in enumerate(chunks):
         if i == 0:
-            current_summary = summarize_func(chunk, custom_prompt, temp)
+            current_summary = summarize_func(chunk, custom_prompt, temp, system_prompt)
         else:
             combined_text = current_summary + "\n\n" + chunk
-            current_summary = summarize_func(combined_text, custom_prompt, temp)
+            current_summary = summarize_func(combined_text, custom_prompt, temp, system_prompt)
 
         summarized_chunks.append(current_summary)
 
