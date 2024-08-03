@@ -387,11 +387,11 @@ def update_prompt_dropdown():
 
 def display_prompt_details(selected_prompt):
     if selected_prompt:
-        details = fetch_prompt_details(selected_prompt)
-        if details:
-            details_str = f"<h4>Details:</h4><p>{details[0]}</p>"
-            system_str = f"<h4>System:</h4><p>{details[1]}</p>"
-            user_str = f"<h4>User:</h4><p>{details[2]}</p>" if details[2] else ""
+        prompts = update_user_prompt(selected_prompt)
+        if prompts["title"]:  # Check if we have any details
+            details_str = f"<h4>Details:</h4><p>{prompts['details']}</p>"
+            system_str = f"<h4>System:</h4><p>{prompts['system_prompt']}</p>"
+            user_str = f"<h4>User:</h4><p>{prompts['user_prompt']}</p>" if prompts['user_prompt'] else ""
             return details_str + system_str + user_str
     return "No details available."
 
@@ -627,27 +627,43 @@ def create_video_transcription_tab():
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                            choices=load_preset_prompts(),
-                                            visible=False)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter custom prompt here",
-                                                 lines=3,
-                                                 visible=False)
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=load_preset_prompts(),
+                                                visible=False)
+                with gr.Row():
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt here",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Row():
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="You are a professional summarizer. Please summarize this video transcript.",
+                                                     lines=3,
+                                                     visible=False,
+                                                     interactive=True)
                 custom_prompt_checkbox.change(
-                    fn=lambda x: gr.update(visible=x),
+                    fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
                     inputs=[custom_prompt_checkbox],
-                    outputs=[custom_prompt_input]
+                    outputs=[custom_prompt_input, system_prompt_input]
                 )
                 preset_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[preset_prompt_checkbox],
                     outputs=[preset_prompt]
                 )
+
+                def update_prompts(preset_name):
+                    prompts = update_user_prompt(preset_name)
+                    return (
+                        gr.update(value=prompts["user_prompt"], visible=True),
+                        gr.update(value=prompts["system_prompt"], visible=True)
+                    )
+
                 preset_prompt.change(
-                    update_user_prompt,
+                    update_prompts,
                     inputs=preset_prompt,
-                    outputs=custom_prompt_input
+                    outputs=[custom_prompt_input, system_prompt_input]
                 )
 
                 api_name_input = gr.Dropdown(
@@ -1253,32 +1269,49 @@ def create_audio_processing_tab():
 
                 with gr.Row():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-                                                     visible=True,
-                                                     value=False)
+                                                     value=False,
+                                                     visible=True)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                            choices=load_preset_prompts(),
-                                            visible=False)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter custom prompt here",
-                                                 lines=3,
-                                                 visible=False,
-                                                 value=custom_prompt_summarize_bulleted_notes
-                                                 )
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=load_preset_prompts(),
+                                                visible=False)
+                with gr.Row():
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt here",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Row():
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     lines=3,
+                                                     visible=False)
 
                 custom_prompt_checkbox.change(
-                    fn=lambda x: gr.update(visible=x),
+                    fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
                     inputs=[custom_prompt_checkbox],
-                    outputs=[custom_prompt_input]
+                    outputs=[custom_prompt_input, system_prompt_input]
                 )
                 preset_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[preset_prompt_checkbox],
                     outputs=[preset_prompt]
                 )
-                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
+
+                def update_prompts(preset_name):
+                    prompts = update_user_prompt(preset_name)
+                    return (
+                        gr.update(value=prompts["user_prompt"], visible=True),
+                        gr.update(value=prompts["system_prompt"], visible=True)
+                    )
+
+                preset_prompt.change(
+                    update_prompts,
+                    inputs=preset_prompt,
+                    outputs=[custom_prompt_input, system_prompt_input]
+                )
 
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
@@ -1349,25 +1382,44 @@ def create_podcast_tab():
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                            choices=load_preset_prompts(),
-                                            visible=False)
-                podcast_custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter custom prompt here",
-                                                 lines=3,
-                                                 visible=False,
-                                                value=custom_prompt_summarize_bulleted_notes)
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=load_preset_prompts(),
+                                                visible=False)
+                with gr.Row():
+                    podcast_custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt here",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Row():
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     lines=3,
+                                                     visible=False)
+
                 podcast_custom_prompt_checkbox.change(
-                    fn=lambda x: gr.update(visible=x),
+                    fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
                     inputs=[podcast_custom_prompt_checkbox],
-                    outputs=[podcast_custom_prompt_input]
+                    outputs=[podcast_custom_prompt_input, system_prompt_input]
                 )
                 preset_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[preset_prompt_checkbox],
                     outputs=[preset_prompt]
                 )
-                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
+
+                def update_prompts(preset_name):
+                    prompts = update_user_prompt(preset_name)
+                    return (
+                        gr.update(value=prompts["user_prompt"], visible=True),
+                        gr.update(value=prompts["system_prompt"], visible=True)
+                    )
+
+                preset_prompt.change(
+                    update_prompts,
+                    inputs=preset_prompt,
+                    outputs=[podcast_custom_prompt_input, system_prompt_input]
+                )
 
                 podcast_api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp",
@@ -1446,31 +1498,50 @@ def create_website_scraping_tab():
                                                         placeholder="Enter custom titles for the articles, one per line",
                                                         lines=5)
                 with gr.Row():
-                    website_custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
                                                      value=False,
                                                      visible=True)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                            choices=load_preset_prompts(),
-                                            visible=False)
-                website_custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter custom prompt here",
-                                                 lines=3,
-                                                 visible=False,
-                                                 value=custom_prompt_summarize_bulleted_notes)
-                website_custom_prompt_checkbox.change(
-                    fn=lambda x: gr.update(visible=x),
-                    inputs=[website_custom_prompt_checkbox],
-                    outputs=[website_custom_prompt_input]
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=load_preset_prompts(),
+                                                visible=False)
+                with gr.Row():
+                    website_custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt here",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Row():
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     lines=3,
+                                                     visible=False)
+
+                custom_prompt_checkbox.change(
+                    fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+                    inputs=[custom_prompt_checkbox],
+                    outputs=[website_custom_prompt_input, system_prompt_input]
                 )
                 preset_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[preset_prompt_checkbox],
                     outputs=[preset_prompt]
                 )
-                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=website_custom_prompt_input)
+
+                def update_prompts(preset_name):
+                    prompts = update_user_prompt(preset_name)
+                    return (
+                        gr.update(value=prompts["user_prompt"], visible=True),
+                        gr.update(value=prompts["system_prompt"], visible=True)
+                    )
+
+                preset_prompt.change(
+                    update_prompts,
+                    inputs=preset_prompt,
+                    outputs=[website_custom_prompt_input, system_prompt_input]
+                )
 
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
@@ -1487,7 +1558,7 @@ def create_website_scraping_tab():
                 scrape_button.click(
                     fn=scrape_and_summarize_multiple,
                     inputs=[url_input, website_custom_prompt_input, api_name_input, api_key_input, keywords_input,
-                            custom_article_title_input],
+                            custom_article_title_input, system_prompt_input],
                     outputs=result_output
                 )
 
@@ -1504,31 +1575,50 @@ def create_pdf_ingestion_tab():
                 pdf_author_input = gr.Textbox(label="Author (Optional)")
                 pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
                 with gr.Row():
-                    pdf_custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
                                                      value=False,
                                                      visible=True)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                            choices=load_preset_prompts(),
-                                            visible=False)
-                pdf_custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter custom prompt here",
-                                                 lines=3,
-                                                 visible=False,
-                                                 value=custom_prompt_summarize_bulleted_notes)
-                pdf_custom_prompt_checkbox.change(
-                    fn=lambda x: gr.update(visible=x),
-                    inputs=[pdf_custom_prompt_checkbox],
-                    outputs=[pdf_custom_prompt_input]
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=load_preset_prompts(),
+                                                visible=False)
+                with gr.Row():
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt here",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Row():
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     lines=3,
+                                                     visible=False)
+
+                custom_prompt_checkbox.change(
+                    fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+                    inputs=[custom_prompt_checkbox],
+                    outputs=[custom_prompt_input, system_prompt_input]
                 )
                 preset_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[preset_prompt_checkbox],
                     outputs=[preset_prompt]
                 )
-                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=pdf_custom_prompt_input)
+
+                def update_prompts(preset_name):
+                    prompts = update_user_prompt(preset_name)
+                    return (
+                        gr.update(value=prompts["user_prompt"], visible=True),
+                        gr.update(value=prompts["system_prompt"], visible=True)
+                    )
+
+                preset_prompt.change(
+                    update_prompts,
+                    inputs=preset_prompt,
+                    outputs=[custom_prompt_input, system_prompt_input]
+                )
 
                 pdf_ingest_button = gr.Button("Ingest PDF")
 
@@ -1577,29 +1667,47 @@ def create_resummary_tab():
 
                 with gr.Row():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-                                                         value=False,
-                                                         visible=True)
+                                                     value=False,
+                                                     visible=True)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
-                                                         value=False,
-                                                         visible=True)
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                            choices=load_preset_prompts(),
-                                            visible=False)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter custom prompt here",
-                                                 lines=3,
-                                                 visible=False,
-                                                 value=custom_prompt_summarize_bulleted_notes)
-                preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
+                                                     value=False,
+                                                     visible=True)
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=load_preset_prompts(),
+                                                visible=False)
+                with gr.Row():
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt here",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Row():
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     lines=3,
+                                                     visible=False)
+
+                def update_prompts(preset_name):
+                    prompts = update_user_prompt(preset_name)
+                    return (
+                        gr.update(value=prompts["user_prompt"], visible=True),
+                        gr.update(value=prompts["system_prompt"], visible=True)
+                    )
+
+                preset_prompt.change(
+                    update_prompts,
+                    inputs=preset_prompt,
+                    outputs=[custom_prompt_input, system_prompt_input]
+                )
 
                 resummarize_button = gr.Button("Re-Summarize")
             with gr.Column():
                 result_output = gr.Textbox(label="Result")
 
         custom_prompt_checkbox.change(
-            fn=lambda x: gr.update(visible=x),
+            fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
             inputs=[custom_prompt_checkbox],
-            outputs=[custom_prompt_input]
+            outputs=[custom_prompt_input, system_prompt_input]
         )
         preset_prompt_checkbox.change(
             fn=lambda x: gr.update(visible=x),
@@ -1621,9 +1729,9 @@ def create_resummary_tab():
     )
 
     custom_prompt_checkbox.change(
-        fn=lambda x: gr.update(visible=x),
+        fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
         inputs=[custom_prompt_checkbox],
-        outputs=[custom_prompt_input]
+        outputs=[custom_prompt_input, system_prompt_input]
     )
 
     resummarize_button.click(
@@ -2602,16 +2710,28 @@ def update_selected_parts(use_content, use_summary, use_prompt):
     return selected_parts
 
 
+# Old update_user_prompt shim for backwards compatibility
+def get_system_prompt(preset_name):
+    # For backwards compatibility
+    prompts = update_user_prompt(preset_name)
+    return prompts["system_prompt"]
+
+
 def update_user_prompt(preset_name):
     details = fetch_prompt_details(preset_name)
     if details:
-        # 0 is title, 1 is details, 2 is system prompt, 3 is user prompt
-        return details[2]  # Return the system prompt
-    return ""
+        # Return a dictionary with all details
+        return {
+            "title": details[0],
+            "details": details[1],
+            "system_prompt": details[2],
+            "user_prompt": details[3] if len(details) > 3 else ""
+        }
+    return {"title": "", "details": "", "system_prompt": "", "user_prompt": ""}
 
 
 # FIXME - add additional features....
-def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, conversation_id, save_conversation, temperature, max_tokens=None, top_p=None, frequency_penalty=None, presence_penalty=None, stop_sequence=None):
+def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, conversation_id, save_conversation, temperature, system_prompt, max_tokens=None, top_p=None, frequency_penalty=None, presence_penalty=None, stop_sequence=None):
     try:
         if save_conversation:
             if conversation_id is None:
@@ -2633,7 +2753,7 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
             full_message = message
 
         # Generate bot response
-        bot_message = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature)
+        bot_message = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature, system_prompt)
 
         if save_conversation:
             # Add assistant message to the database
@@ -2736,9 +2856,23 @@ def create_chat_interface():
                 api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
-                                       "be used as the next message instead)", lines=3)
+                custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                     value=False,
+                                                     visible=True)
+                preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                     value=False,
+                                                     visible=True)
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                            choices=load_preset_prompts(),
+                                            visible=False)
+                user_prompt = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter custom prompt here",
+                                                 lines=3,
+                                                 visible=False)
+                system_prompt_input = gr.Textbox(label="System Prompt",
+                                                 value="You are a helpful AI assitant",
+                                                 lines=3,
+                                                 visible=False)
             with gr.Column():
                 chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
@@ -2762,12 +2896,33 @@ def create_chat_interface():
             outputs=[items_output, item_mapping]
         )
 
-        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+        def update_prompts(preset_name):
+            prompts = update_user_prompt(preset_name)
+            return (
+                gr.update(value=prompts["user_prompt"], visible=True),
+                gr.update(value=prompts["system_prompt"], visible=True)
+            )
+
+        preset_prompt.change(
+            update_prompts,
+            inputs=preset_prompt,
+            outputs=[user_prompt, system_prompt_input]
+        )
+        custom_prompt_checkbox.change(
+            fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+            inputs=[custom_prompt_checkbox],
+            outputs=[user_prompt, system_prompt_input]
+        )
+        preset_prompt_checkbox.change(
+            fn=lambda x: gr.update(visible=x),
+            inputs=[preset_prompt_checkbox],
+            outputs=[preset_prompt]
+        )
 
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
-                    conversation_id, save_conversation, temperature],
+                    conversation_id, save_conversation, temperature, system_prompt_input],
             outputs=[msg, chatbot, conversation_id]
         ).then(# Clear the message box after submission
             lambda x: gr.update(value=""),
@@ -2775,7 +2930,7 @@ def create_chat_interface():
             outputs=[msg]
         ).then(# Clear the user prompt after the first message
             lambda: gr.update(value=""),
-            outputs=[user_prompt]
+            outputs=[user_prompt, system_prompt_input]
         )
 
         items_output.change(
@@ -2890,7 +3045,9 @@ def create_chat_interface_editable():
                 with gr.Row():
                     use_content = gr.Checkbox(label="Use Content")
                     use_summary = gr.Checkbox(label="Use Summary")
-                    use_prompt = gr.Checkbox(label="Use Prompt")
+                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                         value=False,
+                                                         visible=True)
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
                 with gr.Row():
                     temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
@@ -2907,10 +3064,20 @@ def create_chat_interface_editable():
                                            choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(
-                    label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
-                          "be used as the next message instead)", lines=3)
+                # preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                #                                      value=False,
+                #                                      visible=True)
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                            choices=load_preset_prompts(),
+                                            visible=False)
+                custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                 placeholder="Enter custom prompt here",
+                                                 lines=3,
+                                                 visible=False)
+                system_prompt_input = gr.Textbox(label="System Prompt",
+                                                 value="You are a helpful AI assistant.",
+                                                 lines=3,
+                                                 visible=False)
             with gr.Column():
                 chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 selected_messages = gr.JSON(elem_id="selected_messages", visible=False)
@@ -2933,12 +3100,23 @@ def create_chat_interface_editable():
             outputs=[items_output, item_mapping]
         )
 
-        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+        def update_prompts(preset_name):
+            prompts = update_user_prompt(preset_name)
+            return (
+                gr.update(value=prompts["user_prompt"], visible=True),
+                gr.update(value=prompts["system_prompt"], visible=True)
+            )
+
+        preset_prompt.change(
+            update_prompts,
+            inputs=preset_prompt,
+            outputs=[custom_prompt_input, system_prompt_input]
+        )
 
         submit.click(
             chat_wrapper,
-            inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
-                    conversation_id, save_conversation, temperature],
+            inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, custom_prompt_input,
+                    conversation_id, save_conversation, temperature, system_prompt_input],
             outputs=[msg, chatbot, conversation_id]
         ).then(
             lambda x: gr.update(value=""),
@@ -2946,19 +3124,19 @@ def create_chat_interface_editable():
             outputs=[msg]
         ).then(
             lambda: gr.update(value=""),
-            outputs=[user_prompt]
+            outputs=[custom_prompt_input, system_prompt_input]
         )
 
         items_output.change(
             update_chat_content,
-            inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
+            inputs=[items_output, use_content, use_summary, custom_prompt_input, item_mapping],
             outputs=[media_content, selected_parts]
         )
-        use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+        use_content.change(update_selected_parts, inputs=[use_content, use_summary, custom_prompt_input],
                            outputs=[selected_parts])
-        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, custom_prompt_input],
                            outputs=[selected_parts])
-        use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+        custom_prompt_input.change(update_selected_parts, inputs=[use_content, use_summary, custom_prompt_input],
                           outputs=[selected_parts])
         items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
 
@@ -3085,9 +3263,17 @@ def create_chat_interface_stacked():
             with gr.Column():
                 api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Mistral", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(label="Modify Prompt (Need to delete this after the first message, otherwise it'll "
-                                       "be used as the next message instead)", lines=3, value=".")
+                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                            choices=load_preset_prompts(),
+                                            visible=True)
+                system_prompt = gr.Textbox(label="System Prompt",
+                                           value="You are a helpful AI assistant.",
+                                           lines=3,
+                                           visible=True)
+                user_prompt = gr.Textbox(label="Custom User Prompt",
+                                         placeholder="Enter custom prompt here",
+                                         lines=3,
+                                         visible=True)
                 gr.Markdown("Scroll down for the chat window...")
         with gr.Row():
             with gr.Column(scale=1):
@@ -3115,12 +3301,23 @@ def create_chat_interface_stacked():
             outputs=[items_output, item_mapping]
         )
 
-        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+        def update_prompts(preset_name):
+            prompts = update_user_prompt(preset_name)
+            return (
+                gr.update(value=prompts["user_prompt"], visible=True),
+                gr.update(value=prompts["system_prompt"], visible=True)
+            )
+
+        preset_prompt.change(
+            update_prompts,
+            inputs=preset_prompt,
+            outputs=[user_prompt, system_prompt]
+        )
 
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
-                    conversation_id, save_conversation, temp],
+                    conversation_id, save_conversation, temp, system_prompt],
             outputs=[msg, chatbot, conversation_id]
         ).then(# Clear the message box after submission
             lambda x: gr.update(value=""),
@@ -3128,7 +3325,7 @@ def create_chat_interface_stacked():
             outputs=[msg]
         ).then(# Clear the user prompt after the first message
             lambda: gr.update(value=""),
-            outputs=[user_prompt]
+            outputs=[user_prompt, system_prompt]
         )
 
         items_output.change(
@@ -3193,7 +3390,7 @@ def create_chat_interface_stacked():
         chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
 
-# FIXME - broken chat
+# FIXME - System prompts
 def create_chat_interface_multi_api():
     custom_css = """
     .chatbot-container .message-wrap .message {
@@ -3221,6 +3418,7 @@ def create_chat_interface_multi_api():
                     use_prompt = gr.Checkbox(label="Use Prompt")
             with gr.Column():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
+                system_prompt = gr.Textbox(label="System Prompt", value="You are a helpful AI assistant.", lines=5)
                 user_prompt = gr.Textbox(label="Modify Prompt", lines=5, value=".")
 
         with gr.Row():
@@ -3262,7 +3460,7 @@ def create_chat_interface_multi_api():
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
 
-        def chat_wrapper_multi(message, custom_prompt, *args):
+        def chat_wrapper_multi(message, custom_prompt, system_prompt, *args):
             chat_histories = args[:3]
             chatbots = args[3:6]
             api_endpoints = args[6:9]
@@ -3280,7 +3478,8 @@ def create_chat_interface_multi_api():
                     message, chat_histories[i], media_content, selected_parts,
                     api_endpoints[i], api_keys[i], custom_prompt, None,  # None for conversation_id
                     False,  # False for save_conversation
-                    temperature=temperatures[i]
+                    temperature=temperatures[i],
+                    system_prompt=system_prompt
                 )
 
                 new_chatbot = chatbots[i] + [(message, bot_message)]
@@ -3293,7 +3492,7 @@ def create_chat_interface_multi_api():
         # In the create_chat_interface_multi_api function:
         submit.click(
             chat_wrapper_multi,
-            inputs=[msg, user_prompt] + chat_history + chatbots + api_endpoints + api_keys + temperatures +
+            inputs=[msg, user_prompt, system_prompt] + chat_history + chatbots + api_endpoints + api_keys + temperatures +
                    [media_content, selected_parts],
             outputs=[msg] + chatbots + chat_history
         ).then(
@@ -4434,10 +4633,28 @@ def create_import_book_tab():
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
                 keywords_input = gr.Textbox(label="Keywords(like genre or publish year)",
                                             placeholder="Enter keywords, comma-separated")
-                custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter a custom prompt for summarization (optional)")
-                summary_input = gr.Textbox(label="Summary",
-                                           placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
+                system_prompt_input = gr.Textbox(label="System Prompt",
+                                                 lines=3,
+                                                 value=""""
+                                                    <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                                                    **Bulleted Note Creation Guidelines**
+                                                    
+                                                    **Headings**:
+                                                    - Based on referenced topics, not categories like quotes or terms
+                                                    - Surrounded by **bold** formatting 
+                                                    - Not listed as bullet points
+                                                    - No space between headings and list items underneath
+                                                    
+                                                    **Emphasis**:
+                                                    - **Important terms** set in bold font
+                                                    - **Text ending in a colon**: also bolded
+                                                    
+                                                    **Review**:
+                                                    - Ensure adherence to specified format
+                                                    - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                                                """,)
+                custom_prompt_input = gr.Textbox(label="Custom User Prompt",
+                                                 placeholder="Enter a custom user prompt for summarization (optional)")
                 auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
@@ -4468,15 +4685,15 @@ def create_import_book_tab():
                         content = md_file.read()
 
                     # Now process the content as you would with a text file
-                    return import_data(content, title, author, keywords, custom_prompt,
-                                       summary, auto_summarize, api_name, api_key)
+                    return import_data(content, title, author, keywords, system_prompt_input,
+                                       custom_prompt_input, auto_summarize, api_name, api_key)
             except Exception as e:
                 return f"Error processing EPUB: {str(e)}"
 
         import_button.click(
             fn=import_epub,
-            inputs=[import_file, title_input, author_input, keywords_input, custom_prompt_input,
-                    summary_input, auto_summarize_checkbox, api_name_input, api_key_input],
+            inputs=[import_file, title_input, author_input, keywords_input, system_prompt_input,
+                    custom_prompt_input, auto_summarize_checkbox, api_name_input, api_key_input],
             outputs=import_output
         )
 
@@ -4841,17 +5058,17 @@ def adjust_tone(text, concise, casual, api_name, api_key):
 
     prompt = f"Rewrite the following text to match these tones: {tone_prompt}. Text: {text}"
     # Performing tone adjustment request...
-    adjusted_text = perform_summarization(api_name, text, prompt, api_key)
+    adjusted_text = perform_summarization(api_name, text, prompt, api_key, system_prompt=None)
 
     return adjusted_text
 
 
-def grammar_style_check(input_text, custom_prompt, api_name, api_key):
+def grammar_style_check(input_text, custom_prompt, api_name, api_key, system_prompt):
     default_prompt = "Please analyze the following text for grammar and style. Offer suggestions for improvement and point out any misused words or incorrect spellings:\n\n"
     full_prompt = custom_prompt if custom_prompt else default_prompt
     full_text = full_prompt + input_text
 
-    return perform_summarization(api_name, full_text, custom_prompt, api_key)
+    return perform_summarization(api_name, full_text, custom_prompt, api_key, system_prompt)
 
 
 def create_document_editing_tab():
@@ -4863,11 +5080,15 @@ def create_document_editing_tab():
                     gr.Markdown("This utility checks the grammar and style of the provided text by feeding it to an LLM and returning suggestions for improvement.")
                     input_text = gr.Textbox(label="Input Text", lines=10)
                     custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
-                    custom_prompt_input = gr.Textbox(label="Custom Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=5, visible=False)
+                    system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=5, visible=False)
+                    custom_prompt_input = gr.Textbox(label="user Prompt",
+                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     lines=3,
+                                                     visible=False)
                     custom_prompt_checkbox.change(
-                        fn=lambda x: gr.update(visible=x),
+                        fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
                         inputs=[custom_prompt_checkbox],
-                        outputs=[custom_prompt_input]
+                        outputs=[custom_prompt_input, system_prompt_input]
                     )
                     api_name_input = gr.Dropdown(
                         choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
@@ -4887,7 +5108,7 @@ def create_document_editing_tab():
 
                 check_grammar_button.click(
                     fn=grammar_style_check,
-                    inputs=[input_text, custom_prompt_input, api_name_input, api_key_input],
+                    inputs=[input_text, custom_prompt_input, api_name_input, api_key_input, system_prompt_input],
                     outputs=output_text
                 )
 
