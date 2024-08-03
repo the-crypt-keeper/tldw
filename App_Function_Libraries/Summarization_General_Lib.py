@@ -380,6 +380,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         if temp is None:
             temp = 0.3
         temp = float(temp)
+        if system_message is None:
+            system_message = "You are a professional summarizer."
 
         headers = {
             'accept': 'application/json',
@@ -391,10 +393,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         logging.debug(f"cohere: Prompt being sent is {cohere_prompt}")
 
         data = {
-            "chat_history": [
-                {"role": "USER", "message": cohere_prompt}
-            ],
-            "message": system_message,
+            "preamble": system_message,
+            "message": cohere_prompt,
             "model": cohere_model,
 #            "connectors": [{"id": "web-search"}],
             "temperature": temp
