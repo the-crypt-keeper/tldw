@@ -139,6 +139,8 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
         openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         if temp is None:
             temp = 0.7
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
         temp = float(temp)
         data = {
             "model": openai_model,
@@ -178,7 +180,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, max_retries=3, retry_delay=5):
+def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, max_retries=3, retry_delay=5):
     logging.debug("Anthropic: Summarization process starting...")
     try:
         logging.debug("Anthropic: Loading and validating configurations")
@@ -238,6 +240,9 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
             temp = 0.1
         temp = float(temp)
 
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+
         headers = {
             'x-api-key': anthropic_api_key,
             'anthropic-version': '2023-06-01',
@@ -265,7 +270,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
                 "user_id": "example_user_id",
             },
             "stream": False,
-            "system": "You are a professional summarizer."
+            "system": system_message
         }
 
         for attempt in range(max_retries):
@@ -380,6 +385,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         if temp is None:
             temp = 0.3
         temp = float(temp)
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
 
         headers = {
             'accept': 'application/json',
@@ -391,10 +398,8 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         logging.debug(f"cohere: Prompt being sent is {cohere_prompt}")
 
         data = {
-            "chat_history": [
-                {"role": "USER", "message": cohere_prompt}
-            ],
-            "message": system_message,
+            "preamble": system_message,
+            "message": cohere_prompt,
             "model": cohere_model,
 #            "connectors": [{"id": "web-search"}],
             "temperature": temp
@@ -487,7 +492,8 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, syste
         if temp is None:
             temp = 0.2
         temp = float(temp)
-
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
 
         headers = {
             'Authorization': f'Bearer {groq_api_key}',
@@ -609,6 +615,8 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None,
     if temp is None:
         temp = 0.1
     temp = float(temp)
+    if system_message is None:
+        system_message = "You are a helpful AI assistant who does whatever the user requests."
 
     try:
         logging.debug("OpenRouter: Submitting request to API endpoint")
@@ -801,6 +809,8 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
         if temp is None:
             temp = 0.1
         temp = float(temp)
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
 
         headers = {
             'Authorization': f'Bearer {api_key}',
@@ -842,7 +852,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
         return f"DeepSeek: Error occurred while processing summary: {str(e)}"
 
 
-def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None):
+def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     logging.debug("Mistral: Summarization process starting...")
     try:
         logging.debug("Mistral: Loading and validating configurations")
@@ -904,6 +914,8 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None):
         if temp is None:
             temp = 0.2
         temp = float(temp)
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
 
         headers = {
             'Authorization': f'Bearer {mistral_api_key}',
@@ -917,6 +929,8 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None):
         data = {
             "model": mistral_model,
             "messages": [
+                {"role": "system",
+                 "content": system_message},
                 {"role": "user",
                 "content": mistral_prompt}
             ],
@@ -1208,11 +1222,11 @@ def format_input_with_metadata(metadata, content):
     formatted_input += content
     return formatted_input
 
-def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False, temp=None):
+def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False, temp=None, system_message=None):
     loaded_config_data = load_and_log_configs()
     logging.info("Starting summarization process...")
-    if custom_prompt_input is None:
-        custom_prompt_input = """
+    if system_message is None:
+        system_message = """
         You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
 **Bulleted Note Creation Guidelines**
 
@@ -1259,10 +1273,10 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
             logging.debug("summary = recursive_summarize_chunks")
             summary = recursive_summarize_chunks([chunk['text'] for chunk in chunks],
                                                  lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key),
-                                                 custom_prompt_input, temp)
+                                                 custom_prompt_input, temp, system_message)
         else:
             logging.debug("summary = summarize_chunk")
-            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key, temp)
+            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key, temp, system_message)
 
         # add some actual validation logic
         if summary is not None:
