@@ -42,11 +42,26 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #
 #############
 # Global variables setup
-custom_prompt_input = ("Above is the transcript of a video. Please read through the transcript carefully. Identify the "
-"main topics that are discussed over the course of the transcript. Then, summarize the key points about each main "
-"topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, "
-"but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> "
-"tags.")
+# FIXME
+custom_prompt_summarize_bulleted_notes = ("""
+                    <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                        **Bulleted Note Creation Guidelines**
+
+                        **Headings**:
+                        - Based on referenced topics, not categories like quotes or terms
+                        - Surrounded by **bold** formatting 
+                        - Not listed as bullet points
+                        - No space between headings and list items underneath
+
+                        **Emphasis**:
+                        - **Important terms** set in bold font
+                        - **Text ending in a colon**: also bolded
+
+                        **Review**:
+                        - Ensure adherence to specified format
+                        - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                    """)
+
 #
 # Global variables
 whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
@@ -429,8 +444,8 @@ def main(input_path, api_name=None, api_key=None,
          chunk_overlap=100,
          chunk_unit='tokens',
          summarize_chunks=None,
-         diarize=False
-         ):
+         diarize=False,
+         system_message=None):
     global detail_level_number, summary, audio_file, transcription_text, info_dict
 
     detail_level = detail
@@ -529,15 +544,15 @@ def main(input_path, api_name=None, api_key=None,
                         if summarize_chunks:
                             summary = None
                             if summarize_chunks == 'openai':
-                                summary = summarize_with_openai(api_key, chunk_text, custom_prompt)
+                                summary = summarize_with_openai(api_key, chunk_text, custom_prompt, system_message)
                             elif summarize_chunks == 'anthropic':
-                                summary = summarize_with_anthropic(api_key, chunk_text, custom_prompt)
+                                summary = summarize_with_anthropic(api_key, chunk_text, custom_prompt, system_message)
                             elif summarize_chunks == 'cohere':
-                                summary = summarize_with_cohere(api_key, chunk_text, custom_prompt)
+                                summary = summarize_with_cohere(api_key, chunk_text, custom_prompt, system_message)
                             elif summarize_chunks == 'groq':
-                                summary = summarize_with_groq(api_key, chunk_text, custom_prompt)
+                                summary = summarize_with_groq(api_key, chunk_text, custom_prompt, system_message)
                             elif summarize_chunks == 'local-llm':
-                                summary = summarize_with_local_llm(chunk_text, custom_prompt)
+                                summary = summarize_with_local_llm(chunk_text, custom_prompt, system_message)
                             # FIXME - Add more summarization methods as needed
 
                             if summary:
@@ -766,6 +781,7 @@ Sample commands:
     set_max_txt_chunk_paragraphs = 0
     set_chunk_txt_by_tokens = False
     set_max_txt_chunk_tokens = 0
+    custom_prompt_input = args.custom_prompt
 
     if args.server_mode:
         server_mode = args.server_mode
