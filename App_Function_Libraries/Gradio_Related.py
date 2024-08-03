@@ -3266,14 +3266,14 @@ def create_chat_interface_stacked():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt",
                                             choices=load_preset_prompts(),
                                             visible=True)
-                user_prompt = gr.Textbox(label="Custom Prompt",
-                                         placeholder="Enter custom prompt here",
-                                         lines=3,
-                                         visible=True)
                 system_prompt = gr.Textbox(label="System Prompt",
                                            value="You are a helpful AI assistant.",
                                            lines=3,
                                            visible=True)
+                user_prompt = gr.Textbox(label="Custom User Prompt",
+                                         placeholder="Enter custom prompt here",
+                                         lines=3,
+                                         visible=True)
                 gr.Markdown("Scroll down for the chat window...")
         with gr.Row():
             with gr.Column(scale=1):
