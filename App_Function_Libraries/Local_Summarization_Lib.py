@@ -40,7 +40,7 @@ logger = logging.getLogger()
 openai_api_key = "Fake_key"
 client = OpenAI(api_key=openai_api_key)
 
-def summarize_with_local_llm(input_data, custom_prompt_arg, temp):
+def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Local LLM: Loading json data for summarization")
@@ -67,6 +67,9 @@ def summarize_with_local_llm(input_data, custom_prompt_arg, temp):
         else:
             raise ValueError("Invalid input data format")
 
+        if system_message is None:
+            system_message = "You are a helpful AI assistant."
+
         headers = {
             'Content-Type': 'application/json'
         }
@@ -77,7 +80,7 @@ def summarize_with_local_llm(input_data, custom_prompt_arg, temp):
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a professional summarizer."
+                    "content": system_message
                 },
                 {
                     "role": "user",
@@ -166,6 +169,8 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
         if system_message == None:
             system_message = "You are a helpful AI assistant."
         logging.debug("llama: Prompt being sent is {llama_prompt}")
+        if system_message is None:
+            system_message = "You are a helpful AI assistant."
 
         data = {
             "messages": [
@@ -360,10 +365,14 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http:/
         ooba_prompt = f"{text}" + f"\n\n\n\n{custom_prompt}"
         logging.debug("ooba: Prompt being sent is {ooba_prompt}")
 
+        if system_message is None:
+            system_message = "You are a helpful AI assistant."
+
         data = {
             "mode": "chat",
             "character": "Example",
-            "messages": [{"role": "user", "content": ooba_prompt}]
+            "messages": [{"role": "user", "content": ooba_prompt}],
+            "system_message": system_message,
         }
 
         logging.debug("ooba: Submitting request to API endpoint")
@@ -439,6 +448,8 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_I
             text = data
         else:
             raise ValueError("Invalid input data format")
+        if system_message is None:
+            system_message = "You are a helpful AI assistant."
 
         headers = {
             'Authorization': f'Bearer {api_key}',
@@ -549,6 +560,8 @@ def summarize_with_vllm(
             system_prompt = "You are a helpful AI assistant."
 
         model = model or loaded_config_data['models']['vllm']
+        if system_prompt is None:
+            system_prompt = "You are a helpful AI assistant."
 
         # Prepare the API request
         headers = {
