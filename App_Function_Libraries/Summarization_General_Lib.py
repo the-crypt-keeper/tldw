@@ -63,7 +63,7 @@ def extract_text_from_segments(segments):
     return text.strip()
 
 
-def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None):
+def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     loaded_config_data = load_and_log_configs()
 
     try:
@@ -143,7 +143,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None):
         data = {
             "model": openai_model,
             "messages": [
-                {"role": "system", "content": "You are a professional summarizer."},
+                {"role": "system", "content": system_message},
                 {"role": "user", "content": openai_prompt}
             ],
             "max_tokens": 4096,
@@ -314,7 +314,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
 
 
 # Summarize with Cohere
-def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None):
+def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     logging.debug("Cohere: Summarization process starting...")
     try:
         logging.debug("Cohere: Loading and validating configurations")
@@ -341,6 +341,11 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None):
             # You might want to raise an exception here or handle this case as appropriate for your application
             # For example: raise ValueError("No valid Anthropic API key available")
 
+        if custom_prompt_arg is None:
+            custom_prompt_arg = ""
+
+        if system_message is None:
+            system_message = ""
 
         logging.debug(f"Cohere: Using API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:]}")
 
@@ -389,7 +394,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None):
             "chat_history": [
                 {"role": "USER", "message": cohere_prompt}
             ],
-            "message": "Please provide a summary.",
+            "message": system_message,
             "model": cohere_model,
 #            "connectors": [{"id": "web-search"}],
             "temperature": temp
@@ -420,7 +425,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None):
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None):
+def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     logging.debug("Groq: Summarization process starting...")
     try:
         logging.debug("Groq: Loading and validating configurations")
@@ -495,6 +500,10 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None):
         data = {
             "messages": [
                 {
+                    "role": "system",
+                    "content": system_message,
+                },
+                {
                     "role": "user",
                     "content": groq_prompt,
                 }
@@ -528,7 +537,7 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None):
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
 
 
-def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None):
+def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     import requests
     import json
     global openrouter_model, openrouter_api_key
@@ -612,6 +621,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None)
             data=json.dumps({
                 "model": openrouter_model,
                 "messages": [
+                    {"role": "system", "content": system_message},
                     {"role": "user", "content": openrouter_prompt}
                 ],
                 "temperature": temp
@@ -729,7 +739,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
         return None
 
 
-def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None):
+def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     logging.debug("DeepSeek: Summarization process starting...")
     try:
         logging.debug("DeepSeek: Loading and validating configurations")
@@ -804,7 +814,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None):
         data = {
             "model": deepseek_model,
             "messages": [
-                {"role": "system", "content": "You are a professional summarizer."},
+                {"role": "system", "content": system_message},
                 {"role": "user", "content": deepseek_prompt}
             ],
             "stream": False,
@@ -983,34 +993,32 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
     for index, url in enumerate(url_list):
         try:
             logging.info(f"Starting to process video {index + 1}/{len(url_list)}: {url}")
-            transcription, summary, json_file_path, summary_file_path, _, _ = process_url(
-                url=url,
-                num_speakers=num_speakers,
-                whisper_model=whisper_model,
-                custom_prompt_input=custom_prompt_input,
-                offset=offset,
-                api_name=api_name,
-                api_key=api_key,
-                vad_filter=vad_filter,
-                download_video_flag=download_video_flag,
-                download_audio=download_audio,
-                rolling_summarization=rolling_summarization,
-                detail_level=detail_level,
-                question_box=question_box,
-                keywords=keywords,
-                chunk_text_by_words=chunk_text_by_words,
-                max_words=max_words,
-                chunk_text_by_sentences=chunk_text_by_sentences,
-                max_sentences=max_sentences,
-                chunk_text_by_paragraphs=chunk_text_by_paragraphs,
-                max_paragraphs=max_paragraphs,
-                chunk_text_by_tokens=chunk_text_by_tokens,
-                max_tokens=max_tokens,
-                chunk_by_semantic=chunk_by_semantic,
-                semantic_chunk_size=semantic_chunk_size,
-                semantic_chunk_overlap=semantic_chunk_overlap,
-                recursive_summarization=recursive_summarization
-            )
+            transcription, summary, json_file_path, summary_file_path, _, _ = process_url(url=url,
+                                                                                          num_speakers=num_speakers,
+                                                                                          whisper_model=whisper_model,
+                                                                                          custom_prompt_input=custom_prompt_input,
+                                                                                          offset=offset,
+                                                                                          api_name=api_name,
+                                                                                          api_key=api_key,
+                                                                                          vad_filter=vad_filter,
+                                                                                          download_video_flag=download_video_flag,
+                                                                                          download_audio=download_audio,
+                                                                                          rolling_summarization=rolling_summarization,
+                                                                                          detail_level=detail_level,
+                                                                                          question_box=question_box,
+                                                                                          keywords=keywords,
+                                                                                          chunk_text_by_words=chunk_text_by_words,
+                                                                                          max_words=max_words,
+                                                                                          chunk_text_by_sentences=chunk_text_by_sentences,
+                                                                                          max_sentences=max_sentences,
+                                                                                          chunk_text_by_paragraphs=chunk_text_by_paragraphs,
+                                                                                          max_paragraphs=max_paragraphs,
+                                                                                          chunk_text_by_tokens=chunk_text_by_tokens,
+                                                                                          max_tokens=max_tokens,
+                                                                                          chunk_by_semantic=chunk_by_semantic,
+                                                                                          semantic_chunk_size=semantic_chunk_size,
+                                                                                          semantic_chunk_overlap=semantic_chunk_overlap,
+                                                                                          recursive_summarization=recursive_summarization)
             # Update progress and transcription properly
 
             current_progress, current_status = update_progress(index, url, "Video processed and ingested into the database.")
@@ -1120,37 +1128,37 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
         return None, None
 
 
-def summarize_chunk(api_name, text, custom_prompt_input, api_key, temp=None):
+def summarize_chunk(api_name, text, custom_prompt_input, api_key, temp=None, system_message=None):
     logging.debug("Entered 'summarize_chunk' function")
     try:
         if api_name.lower() == 'openai':
-            return summarize_with_openai(api_key, text, custom_prompt_input, temp)
+            return summarize_with_openai(api_key, text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "anthropic":
-            return summarize_with_anthropic(api_key, text, custom_prompt_input, temp)
+            return summarize_with_anthropic(api_key, text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "cohere":
-            return summarize_with_cohere(api_key, text, custom_prompt_input, temp)
+            return summarize_with_cohere(api_key, text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "groq":
-            return summarize_with_groq(api_key, text, custom_prompt_input, temp)
+            return summarize_with_groq(api_key, text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "openrouter":
-            return summarize_with_openrouter(api_key, text, custom_prompt_input, temp)
+            return summarize_with_openrouter(api_key, text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "deepseek":
-            return summarize_with_deepseek(api_key, text, custom_prompt_input, temp)
+            return summarize_with_deepseek(api_key, text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "mistral":
-            return summarize_with_mistral(api_key, text, custom_prompt_input, temp)
+            return summarize_with_mistral(api_key, text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "llama.cpp":
-            return summarize_with_llama(text, custom_prompt_input, temp)
+            return summarize_with_llama(text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "kobold":
-            return summarize_with_kobold(text, api_key, custom_prompt_input, temp)
+            return summarize_with_kobold(text, api_key, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "ooba":
-            return summarize_with_oobabooga(text, api_key, custom_prompt_input, temp)
+            return summarize_with_oobabooga(text, api_key, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "tabbyapi":
-            return summarize_with_tabbyapi(text, custom_prompt_input, temp)
+            return summarize_with_tabbyapi(text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "vllm":
-            return summarize_with_vllm(text, custom_prompt_input, temp)
+            return summarize_with_vllm(text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "local-llm":
-            return summarize_with_local_llm(text, custom_prompt_input, temp)
+            return summarize_with_local_llm(text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "huggingface":
-            return summarize_with_huggingface(api_key, text, custom_prompt_input, temp)
+            return summarize_with_huggingface(api_key, text, custom_prompt_input, temp, system_message)
         else:
             logging.warning(f"Unsupported API: {api_name}")
             return None
@@ -1341,8 +1349,9 @@ def process_url(
         semantic_chunk_overlap,
         local_file_path=None,
         diarize=False,
-        recursive_summarization=False
-):
+        recursive_summarization=False,
+        temp=None,
+        system_message=None):
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
     set_max_txt_chunk_words = max_words
@@ -1359,30 +1368,10 @@ def process_url(
     progress = []
     success_message = "All videos processed successfully. Transcriptions and summaries have been ingested into the database."
 
-    if custom_prompt_input is None:
-        custom_prompt_input = """
-            You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
-    **Bulleted Note Creation Guidelines**
-
-    **Headings**:
-    - Based on referenced topics, not categories like quotes or terms
-    - Surrounded by **bold** formatting 
-    - Not listed as bullet points
-    - No space between headings and list items underneath
-
-    **Emphasis**:
-    - **Important terms** set in bold font
-    - **Text ending in a colon**: also bolded
-
-    **Review**:
-    - Ensure adherence to specified format
-    - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
-
     # Validate input
     if not url and not local_file_path:
         return "Process_URL: No URL provided.", "No URL provided.", None, None, None, None, None, None
 
-    # FIXME - Chatgpt again?
     if isinstance(url, str):
         urls = url.strip().split('\n')
         if len(urls) > 1:
@@ -1477,25 +1466,25 @@ def process_url(
                 if api_name == "anthropic":
                     summary = summarize_with_anthropic(api_key, chunk, custom_prompt_input)
                 elif api_name == "cohere":
-                    summary = summarize_with_cohere(api_key, chunk, custom_prompt_input)
+                    summary = summarize_with_cohere(api_key, chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "openai":
-                    summary = summarize_with_openai(api_key, chunk, custom_prompt_input)
+                    summary = summarize_with_openai(api_key, chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "Groq":
-                    summary = summarize_with_groq(api_key, chunk, custom_prompt_input)
+                    summary = summarize_with_groq(api_key, chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "DeepSeek":
-                    summary = summarize_with_deepseek(api_key, chunk, custom_prompt_input)
+                    summary = summarize_with_deepseek(api_key, chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "OpenRouter":
-                    summary = summarize_with_openrouter(api_key, chunk, custom_prompt_input)
+                    summary = summarize_with_openrouter(api_key, chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "Llama.cpp":
-                    summary = summarize_with_llama(chunk, custom_prompt_input)
+                    summary = summarize_with_llama(chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "Kobold":
-                    summary = summarize_with_kobold(chunk, custom_prompt_input)
+                    summary = summarize_with_kobold(chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "Ooba":
-                    summary = summarize_with_oobabooga(chunk, custom_prompt_input)
+                    summary = summarize_with_oobabooga(chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "Tabbyapi":
-                    summary = summarize_with_tabbyapi(chunk, custom_prompt_input)
+                    summary = summarize_with_tabbyapi(chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "VLLM":
-                    summary = summarize_with_vllm(chunk, custom_prompt_input)
+                    summary = summarize_with_vllm(chunk, custom_prompt_input, temp, system_message)
                 summarized_chunk_transcriptions.append(summary)
 
         # Combine chunked transcriptions into a single file
