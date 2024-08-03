@@ -2862,16 +2862,13 @@ def create_chat_interface():
                 preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
-            with gr.Row():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt",
                                             choices=load_preset_prompts(),
                                             visible=False)
-            with gr.Row():
                 user_prompt = gr.Textbox(label="Custom Prompt",
                                                  placeholder="Enter custom prompt here",
                                                  lines=3,
                                                  visible=False)
-            with gr.Row():
                 system_prompt_input = gr.Textbox(label="System Prompt",
                                                  value="You are a helpful AI assitant",
                                                  lines=3,
@@ -3067,19 +3064,16 @@ def create_chat_interface_editable():
                                            choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
-                preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                #preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
-            with gr.Row():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt",
                                             choices=load_preset_prompts(),
                                             visible=False)
-            with gr.Row():
                 custom_prompt_input = gr.Textbox(label="Custom Prompt",
                                                  placeholder="Enter custom prompt here",
                                                  lines=3,
                                                  visible=False)
-            with gr.Row():
                 system_prompt_input = gr.Textbox(label="System Prompt",
                                                  value="You are a helpful AI assistant.",
                                                  lines=3,
@@ -4642,10 +4636,28 @@ def create_import_book_tab():
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
                 keywords_input = gr.Textbox(label="Keywords(like genre or publish year)",
                                             placeholder="Enter keywords, comma-separated")
-                custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter a custom prompt for summarization (optional)")
-                summary_input = gr.Textbox(label="Summary",
-                                           placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
+                system_prompt_input = gr.Textbox(label="System Prompt",
+                                                 lines=3,
+                                                 value=""""
+                                                    <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                                                    **Bulleted Note Creation Guidelines**
+                                                    
+                                                    **Headings**:
+                                                    - Based on referenced topics, not categories like quotes or terms
+                                                    - Surrounded by **bold** formatting 
+                                                    - Not listed as bullet points
+                                                    - No space between headings and list items underneath
+                                                    
+                                                    **Emphasis**:
+                                                    - **Important terms** set in bold font
+                                                    - **Text ending in a colon**: also bolded
+                                                    
+                                                    **Review**:
+                                                    - Ensure adherence to specified format
+                                                    - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                                                """,)
+                custom_prompt_input = gr.Textbox(label="Custom User Prompt",
+                                                 placeholder="Enter a custom user prompt for summarization (optional)")
                 auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
@@ -4676,15 +4688,15 @@ def create_import_book_tab():
                         content = md_file.read()
 
                     # Now process the content as you would with a text file
-                    return import_data(content, title, author, keywords, custom_prompt,
-                                       summary, auto_summarize, api_name, api_key)
+                    return import_data(content, title, author, keywords, system_prompt_input,
+                                       custom_prompt_input, auto_summarize, api_name, api_key)
             except Exception as e:
                 return f"Error processing EPUB: {str(e)}"
 
         import_button.click(
             fn=import_epub,
-            inputs=[import_file, title_input, author_input, keywords_input, custom_prompt_input,
-                    summary_input, auto_summarize_checkbox, api_name_input, api_key_input],
+            inputs=[import_file, title_input, author_input, keywords_input, system_prompt_input,
+                    custom_prompt_input, auto_summarize_checkbox, api_name_input, api_key_input],
             outputs=import_output
         )
 
