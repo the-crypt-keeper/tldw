@@ -73,6 +73,25 @@ whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large",
 custom_prompt_input = None
 server_mode = False
 share_public = False
+custom_prompt_summarize_bulleted_notes = ("""
+                    <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                        **Bulleted Note Creation Guidelines**
+
+                        **Headings**:
+                        - Based on referenced topics, not categories like quotes or terms
+                        - Surrounded by **bold** formatting 
+                        - Not listed as bullet points
+                        - No space between headings and list items underneath
+
+                        **Emphasis**:
+                        - **Important terms** set in bold font
+                        - **Text ending in a colon**: also bolded
+
+                        **Review**:
+                        - Ensure adherence to specified format
+                        - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                    """)
+
 
 def gradio_download_youtube_video(url):
     try:
@@ -790,10 +809,32 @@ def create_video_transcription_tab():
                                     'language': chunk_language
                                 } if chunking_options_checkbox else None
 
+                                if custom_prompt_checkbox:
+                                    custom_prompt = custom_prompt
+                                else:
+                                    custom_prompt = ("""
+                                    <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                                        **Bulleted Note Creation Guidelines**
+                                        
+                                        **Headings**:
+                                        - Based on referenced topics, not categories like quotes or terms
+                                        - Surrounded by **bold** formatting 
+                                        - Not listed as bullet points
+                                        - No space between headings and list items underneath
+                                        
+                                        **Emphasis**:
+                                        - **Important terms** set in bold font
+                                        - **Text ending in a colon**: also bolded
+                                        
+                                        **Review**:
+                                        - Ensure adherence to specified format
+                                        - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                                    """)
+
                                 logging.debug("Gradio_Related.py: process_url_with_metadata being called")
                                 result = process_url_with_metadata(
                                     input_item, 2, whisper_model,
-                                    custom_prompt if custom_prompt_checkbox else None,
+                                    custom_prompt,
                                     start_seconds, api_name, api_key,
                                     False, False, False, False, 0.01, None, keywords, None, diarize,
                                     end_time=end_seconds,
@@ -1212,8 +1253,8 @@ def create_audio_processing_tab():
 
                 with gr.Row():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-                                                     value=False,
-                                                     visible=True)
+                                                     visible=True,
+                                                     value=False)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
@@ -1223,7 +1264,10 @@ def create_audio_processing_tab():
                 custom_prompt_input = gr.Textbox(label="Custom Prompt",
                                                  placeholder="Enter custom prompt here",
                                                  lines=3,
-                                                 visible=False)
+                                                 visible=False,
+                                                 value=custom_prompt_summarize_bulleted_notes
+                                                 )
+
                 custom_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[custom_prompt_checkbox],
@@ -1311,7 +1355,8 @@ def create_podcast_tab():
                 podcast_custom_prompt_input = gr.Textbox(label="Custom Prompt",
                                                  placeholder="Enter custom prompt here",
                                                  lines=3,
-                                                 visible=False)
+                                                 visible=False,
+                                                value=custom_prompt_summarize_bulleted_notes)
                 podcast_custom_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[podcast_custom_prompt_checkbox],
@@ -1413,7 +1458,8 @@ def create_website_scraping_tab():
                 website_custom_prompt_input = gr.Textbox(label="Custom Prompt",
                                                  placeholder="Enter custom prompt here",
                                                  lines=3,
-                                                 visible=False)
+                                                 visible=False,
+                                                 value=custom_prompt_summarize_bulleted_notes)
                 website_custom_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[website_custom_prompt_checkbox],
@@ -1470,7 +1516,8 @@ def create_pdf_ingestion_tab():
                 pdf_custom_prompt_input = gr.Textbox(label="Custom Prompt",
                                                  placeholder="Enter custom prompt here",
                                                  lines=3,
-                                                 visible=False)
+                                                 visible=False,
+                                                 value=custom_prompt_summarize_bulleted_notes)
                 pdf_custom_prompt_checkbox.change(
                     fn=lambda x: gr.update(visible=x),
                     inputs=[pdf_custom_prompt_checkbox],
@@ -1541,7 +1588,8 @@ def create_resummary_tab():
                 custom_prompt_input = gr.Textbox(label="Custom Prompt",
                                                  placeholder="Enter custom prompt here",
                                                  lines=3,
-                                                 visible=False)
+                                                 visible=False,
+                                                 value=custom_prompt_summarize_bulleted_notes)
                 preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=custom_prompt_input)
 
                 resummarize_button = gr.Button("Re-Summarize")
@@ -2358,7 +2406,8 @@ def create_llamafile_advanced_inputs():
 
 
 # FIXME - not adding content from selected item to query
-def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt, temperature):
+def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt, temperature,
+         system_message=None):
     try:
         logging.info(f"Debug - Chat Function - Message: {message}")
         logging.info(f"Debug - Chat Function - Media Content: {media_content}")
@@ -2385,6 +2434,9 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         # Print first 500 chars
         logging.info(f"Debug - Chat Function - Input Data: {input_data[:500]}...")
 
+        if system_message:
+            print(f"System message: {system_message}")
+            logging.debug(f"Debug - Chat Function - System Message: {system_message}")
         temperature = float(temperature) if temperature else 0.7
         temp = temperature
         
@@ -2395,31 +2447,31 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         # Use the existing API request code based on the selected endpoint
         logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
         if api_endpoint.lower() == 'openai':
-            response = summarize_with_openai(api_key, input_data, prompt, temp)
+            response = summarize_with_openai(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "anthropic":
-            response = summarize_with_anthropic(api_key, input_data, prompt, temp)
+            response = summarize_with_anthropic(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "cohere":
-            response = summarize_with_cohere(api_key, input_data, prompt, temp)
+            response = summarize_with_cohere(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "groq":
-            response = summarize_with_groq(api_key, input_data, prompt, temp)
+            response = summarize_with_groq(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "openrouter":
-            response = summarize_with_openrouter(api_key, input_data, prompt, temp)
+            response = summarize_with_openrouter(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "deepseek":
-            response = summarize_with_deepseek(api_key, input_data, prompt, temp)
+            response = summarize_with_deepseek(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "llama.cpp":
-            response = summarize_with_llama(input_data, prompt, temp)
+            response = summarize_with_llama(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "kobold":
-            response = summarize_with_kobold(input_data, api_key, prompt, temp)
+            response = summarize_with_kobold(input_data, api_key, prompt, temp, system_message)
         elif api_endpoint.lower() == "ooba":
-            response = summarize_with_oobabooga(input_data, api_key, prompt, temp)
+            response = summarize_with_oobabooga(input_data, api_key, prompt, temp, system_message)
         elif api_endpoint.lower() == "tabbyapi":
-            response = summarize_with_tabbyapi(input_data, prompt, temp)
+            response = summarize_with_tabbyapi(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "vllm":
-            response = summarize_with_vllm(input_data, prompt, temp)
+            response = summarize_with_vllm(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "local-llm":
-            response = summarize_with_local_llm(input_data, prompt, temp)
+            response = summarize_with_local_llm(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "huggingface":
-            response = summarize_with_huggingface(api_key, input_data, prompt, temp)
+            response = summarize_with_huggingface(api_key, input_data, prompt, temp, system_message)
         else:
             raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
 
