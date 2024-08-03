@@ -3064,9 +3064,9 @@ def create_chat_interface_editable():
                                            choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
-                #preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
-                                                     value=False,
-                                                     visible=True)
+                # preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                #                                      value=False,
+                #                                      visible=True)
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt",
                                             choices=load_preset_prompts(),
                                             visible=False)
@@ -3263,20 +3263,17 @@ def create_chat_interface_stacked():
             with gr.Column():
                 api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Mistral", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
-            with gr.Row():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt",
                                             choices=load_preset_prompts(),
-                                            visible=False)
-            with gr.Row():
+                                            visible=True)
                 user_prompt = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter custom prompt here",
-                                                 lines=3,
-                                                 visible=False)
-            with gr.Row():
+                                         placeholder="Enter custom prompt here",
+                                         lines=3,
+                                         visible=True)
                 system_prompt = gr.Textbox(label="System Prompt",
-                                                 value="You are a helpful AI assistant.",
-                                                 lines=3,
-                                                 visible=False)
+                                           value="You are a helpful AI assistant.",
+                                           lines=3,
+                                           visible=True)
                 gr.Markdown("Scroll down for the chat window...")
         with gr.Row():
             with gr.Column(scale=1):
