@@ -559,3 +559,9 @@ Sample commands:
   - Add support for more APIs
   - Live audio recording + transcription
   - RAG support
+
+#### And because Who doesn't love a good quote? (Particularly relevant to this material/LLMs)
+- `I like the lies-to-children motif, because it underlies the way we run our society and resonates nicely with Discworld. Like the reason for Unseen being a storehouse of knowledge - you arrive knowing everything and leave realising that you know practically nothing, therefore all the knowledge you had must be stored in the university. But it's like that in "real Science", too. You arrive with your sparkling A-levels all agleam, and the first job of the tutors is to reveal that what you thought was true is only true for a given value of "truth". Most of us need just "enough" knowledge of the sciences, and it's delivered to us in metaphors and analogies that bite us in the bum if we think they're the same as the truth.`
+    * Terry Pratchett
+- `The first principle is that you must not fool yourself - and you are the easiest person to fool.`
+  *Richard Feynman
