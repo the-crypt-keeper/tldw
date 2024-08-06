@@ -33,9 +33,9 @@ from typing import Dict, List, Tuple, Optional
 import traceback
 from functools import wraps
 
+import pypandoc
 #
 # Import 3rd-Party Libraries
-import pypandoc
 import yt_dlp
 import gradio as gr
 #
@@ -68,6 +68,8 @@ from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls,
 # Function Definitions
 #
 
+# I know this is bad, I don't care, this key is set to expire on Aug 19. Until then, it is what it is.
+MISTRAL_TOKEN = "p3hw1VRckQl86OjeOtvaOckMfAaernxz"
 whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
                   "distil-large-v2", "distil-medium.en", "distil-small.en"]
 custom_prompt_input = None
@@ -669,8 +671,12 @@ def create_video_transcription_tab():
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                    value=None, label="API Name (Mandatory)")
-                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here", type="password")
+                    value="Mistral",
+                    label="API Name (Mandatory)",
+                )
+                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here",
+                                           type="password",
+                                           value=MISTRAL_TOKEN)
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set")
                 batch_size_input = gr.Slider(minimum=1, maximum=10, value=1, step=1,
@@ -1316,10 +1322,12 @@ def create_audio_processing_tab():
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                    value=None,
+                    value="Mistral",
                     label="API for Summarization (Optional)"
                 )
-                api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here", type="password")
+                api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here",
+                                           type="password",
+                                           value=MISTRAL_TOKEN)
                 custom_keywords_input = gr.Textbox(label="Custom Keywords", placeholder="Enter custom keywords, comma-separated")
                 keep_original_input = gr.Checkbox(label="Keep original audio file", value=False)
 
@@ -1424,10 +1432,12 @@ def create_podcast_tab():
                 podcast_api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp",
                              "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                    value=None,
+                    value="Mistral",
                     label="API Name for Summarization (Optional)"
                 )
-                podcast_api_key_input = gr.Textbox(label="API Key (if required)", type="password")
+                podcast_api_key_input = gr.Textbox(label="API Key (if required)",
+                                                   type="password",
+                                                   value=MISTRAL_TOKEN)
                 podcast_whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
 
                 keep_original_input = gr.Checkbox(label="Keep original audio file", value=False)
@@ -1545,9 +1555,14 @@ def create_website_scraping_tab():
 
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"], value=None, label="API Name (Mandatory for Summarization)")
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                    value="Mistral",
+                    label="API Name (Mandatory for Summarization)"
+                )
                 api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
-                                           placeholder="Enter your API key here; Ignore if using Local API or Built-in API", type="password")
+                                           placeholder="Enter your API key here; Ignore if using Local API or Built-in API",
+                                           type="password",
+                                           value=MISTRAL_TOKEN)
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set", visible=True)
 
@@ -1655,8 +1670,13 @@ def create_resummary_tab():
                     api_name_input = gr.Dropdown(
                         choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                        value="Local-LLM", label="API Name")
-                    api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here", type="password")
+                        value="Mistral",
+                        label="API Name"
+                    )
+                    api_key_input = gr.Textbox(label="API Key",
+                                               placeholder="Enter your API key here",
+                                               type="password",
+                                               value=MISTRAL_TOKEN)
 
                 chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)
                 with gr.Row(visible=False) as chunking_options_box:
@@ -2455,7 +2475,7 @@ def create_llamafile_settings_tab():
             if current_dir_model:
                 return current_dir_model
             elif parent_dir_model:
-                return os.path.join("..", parent_dir_model)
+                return os.path.join("../App_Function_Libraries", parent_dir_model)
             else:
                 return ""
 
@@ -2853,9 +2873,13 @@ def create_chat_interface():
                 with gr.Row():
                     load_conversations_btn = gr.Button("Load Selected Conversation")
 
-                api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
-                api_key = gr.Textbox(label="API Key (if required)", type="password")
+                api_endpoint = gr.Dropdown(label="Select API Endpoint",
+                                           choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                                           value="Mistral")
+                api_key = gr.Textbox(label="API Key (if required)",
+                                     type="password",
+                                     value=MISTRAL_TOKEN)
                 custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
                                                      value=False,
                                                      visible=True)
@@ -3062,8 +3086,11 @@ def create_chat_interface_editable():
 
                 api_endpoint = gr.Dropdown(label="Select API Endpoint",
                                            choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
-                api_key = gr.Textbox(label="API Key (if required)", type="password")
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                                           value="Mistral")
+                api_key = gr.Textbox(label="API Key (if required)",
+                                     type="password",
+                                     value=MISTRAL_TOKEN)
                 # preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                 #                                      value=False,
                 #                                      visible=True)
@@ -3261,8 +3288,12 @@ def create_chat_interface_stacked():
                     search_conversations_btn = gr.Button("Search Conversations")
                     load_conversations_btn = gr.Button("Load Selected Conversation")
             with gr.Column():
-                api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Mistral", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
-                api_key = gr.Textbox(label="API Key (if required)", type="password")
+                api_endpoint = gr.Dropdown(label="Select API Endpoint",
+                                           choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "OpenRouter", "Mistral", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                                           value="Mistral")
+                api_key = gr.Textbox(label="API Key (if required)",
+                                     type="password",
+                                     value=MISTRAL_TOKEN)
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt",
                                             choices=load_preset_prompts(),
                                             visible=True)
@@ -3432,8 +3463,11 @@ def create_chat_interface_multi_api():
                     api_endpoint = gr.Dropdown(label=f"API Endpoint {i + 1}",
                                                choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
                                                         "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba",
-                                                        "Tabbyapi", "VLLM", "HuggingFace"])
-                    api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
+                                                        "Tabbyapi", "VLLM", "HuggingFace"],
+                                               value="Mistral")
+                    api_key = gr.Textbox(label=f"API Key {i + 1} (if required)",
+                                         type="password",
+                                         value=MISTRAL_TOKEN)
                     temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
                     chatbot = gr.Chatbot(height=800, elem_classes="chat-window")
                     chatbots.append(chatbot)
@@ -3543,8 +3577,9 @@ def create_chat_interface_four():
                         api_endpoint = gr.Dropdown(label=f"API Endpoint {i + 1}",
                                                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
                                                             "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba",
-                                                            "Tabbyapi", "VLLM", "HuggingFace"])
-                        api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
+                                                            "Tabbyapi", "VLLM", "HuggingFace"],
+                                                   value="Mistral")
+                        api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password", value=MISTRAL_TOKEN)
                         temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
                         chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
                         msg = gr.Textbox(label=f"Enter your message for Chat {i + 1}")
@@ -3629,9 +3664,13 @@ def create_chat_interface_vertical():
                     use_prompt = gr.Checkbox(label="Use Prompt")
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False)
                 with gr.Row():
-                    api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"])
+                    api_endpoint = gr.Dropdown(label="Select API Endpoint",
+                                               choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
+                                               value="Mistral")
                 with gr.Row():
-                    api_key = gr.Textbox(label="API Key (if required)", type="password")
+                    api_key = gr.Textbox(label="API Key (if required)",
+                                         type="password",
+                                         value=MISTRAL_TOKEN)
                 with gr.Row():
                     temperature = gr.Slider(label="Temperature", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
                 with gr.Row():
@@ -4325,9 +4364,12 @@ def create_import_item_tab():
             api_name_input = gr.Dropdown(
                 choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                          "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                label="API for Auto-summarization"
+                label="API for Auto-summarization",
+                value="Mistral"
             )
-            api_key_input = gr.Textbox(label="API Key", type="password")
+            api_key_input = gr.Textbox(label="API Key",
+                                       type="password",
+                                       value=MISTRAL_TOKEN)
         with gr.Row():
             import_button = gr.Button("Import Data")
         with gr.Row():
@@ -4659,9 +4701,12 @@ def create_import_book_tab():
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                    label="API for Auto-summarization"
+                    label="API for Auto-summarization",
+                    value="Mistral"
                 )
-                api_key_input = gr.Textbox(label="API Key", type="password")
+                api_key_input = gr.Textbox(label="API Key",
+                                           type="password",
+                                           value=MISTRAL_TOKEN)
                 import_button = gr.Button("Import eBook")
             with gr.Column():
                 with gr.Row():
@@ -5093,11 +5138,12 @@ def create_document_editing_tab():
                     api_name_input = gr.Dropdown(
                         choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                                  "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                        value=None,
+                        value="Mistral",
                         label="API for Grammar Check"
                     )
                     api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
-                                                   type="password")
+                                                   type="password",
+                                               value=MISTRAL_TOKEN)
                     check_grammar_button = gr.Button("Check Grammar and Style")
 
                 with gr.Column():
@@ -5122,11 +5168,12 @@ def create_document_editing_tab():
                     api_name_input = gr.Dropdown(
                         choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                                  "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "HuggingFace"],
-                        value=None,
+                        value="Mistral",
                         label="API for Grammar Check"
                     )
                     api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
-                                                   type="password")
+                                                   type="password",
+                                               value=MISTRAL_TOKEN)
                     adjust_btn = gr.Button("Adjust Tone")
 
                 with gr.Column():
