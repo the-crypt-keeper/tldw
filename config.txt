@@ -1,18 +1,18 @@
 [API]
-anthropic_api_key = <anthropic_api_key
+anthropic_api_key = <anthropic_api_key>
 anthropic_model = claude-3-sonnet-20240229
-cohere_api_key = <cohere_api_key>
+cohere_api_key = <your_cohere_api_key>
 cohere_model = command-r-plus
 groq_api_key = <your_groq_api_key>
 groq_model = llama3-70b-8192
 openai_api_key = <openai_api_key>
-openai_model = gpt-4o
-huggingface_api_key = <huggingface_api_token>
+openai_model = gpt-4-turbo
+huggingface_api_token = <huggingface_api_token>
 huggingface_model = CohereForAI/c4ai-command-r-plus
 openrouter_api_key = <openrouter_api_key>
 openrouter_model = mistralai/mistral-7b-instruct:free
 deepseek_api_key = <deepseek_api_key>
-deepseek_model = deepseek-coder
+deepseek_model = deepseek-chat
 
 [Local-API]
 kobold_api_key = <kobold api key>
@@ -24,11 +24,14 @@ ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
 tabby_api_IP = http://127.0.0.1:5000/v1/chat/completions
 tabby_api_key = <tabbyapi key>
 vllm_api_IP = http://127.0.0.1:8000/v1/chat/completions
+vllm_model = <vllm model>
+ollama_api_IP = http://127.0.0.1:11434/api/generate
+ollama_api_key = <ollama api key>
+ollama_model = <ollama model>
 
 [Paths]
 output_path = Results
 logging_file = Logs
-
 
 [Processing]
 processing_choice = cuda
@@ -39,3 +42,28 @@ max_tokens = 100
 [Prompts]
 prompt_sample = "What is the meaning of life?"
 video_summarize_prompt = "Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary."
+
+
+
+#[Comments]
+#OpenAI Models:
+#    f
+#Anthropic Models:
+#    f
+#Cohere Models:
+#    f
+#DeepSeek Models:
+#    f
+#Groq Models:
+#    f
+#Mistral Models:
+#    mistral-large-latest
+#    open-mistral-nemo
+#    codestral-latest
+#    mistral-embed
+#    open-mistral-7b
+#    open-mixtral-8x7b
+#    open-mixtral-8x22b
+#    open-codestral-mamba
+
+
