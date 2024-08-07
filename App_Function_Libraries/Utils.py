@@ -295,6 +295,10 @@ def load_and_log_configs():
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
         vllm_model = config.get('Local-API', 'vllm_model', fallback=None)
 
+        ollama_api_url = config.get('Local-API', 'ollama_api_IP', fallback='http://127.0.0.1:11434/api/generate')
+        ollama_api_key = config.get('Local-API', 'ollama_api_key', fallback=None)
+        ollama_model = config.get('Local-API', 'ollama_model', fallback=None)
+
         logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
         logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
         logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
@@ -325,7 +329,8 @@ def load_and_log_configs():
                 'llama': llama_api_key,
                 'ooba': ooba_api_key,
                 'tabby': tabby_api_key,
-                'vllm': vllm_api_key
+                'vllm': vllm_api_key,
+                'ollama': ollama_api_key
             },
             'models': {
                 'anthropic': anthropic_model,
@@ -336,7 +341,8 @@ def load_and_log_configs():
                 'openrouter': openrouter_model,
                 'deepseek': deepseek_model,
                 'vllm': vllm_model,
-                'tabby': tabby_model
+                'tabby': tabby_model,
+                'ollama': ollama_model
 
             },
             'local_api_ip': {
@@ -345,6 +351,7 @@ def load_and_log_configs():
                 'ooba': ooba_api_IP,
                 'tabby': tabby_api_IP,
                 'vllm': vllm_api_url,
+                'ollama': ollama_api_url
             },
             'output_path': output_path,
             'processing_choice': processing_choice
