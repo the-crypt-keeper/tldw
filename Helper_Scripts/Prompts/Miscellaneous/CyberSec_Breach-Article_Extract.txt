@@ -38,4 +38,3 @@ For each article, extract the specified information below, presenting it in an o
     - Lessons Learned: Brief insights gained that could prevent future incidents.
 
 ### USER ###
-I sure do like to bake bread. Here is a list of recipes I've baked

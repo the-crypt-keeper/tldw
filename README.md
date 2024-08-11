@@ -7,6 +7,10 @@
 
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
+**Install me with the Installer Script! Download and double click (Make sure to read it over first!)**
+- **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Run-Install-Update.sh`
+- **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS-Run-Install-Update.sh`
+- **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/WindowsRun-Install-Update.bat`
 ----------
 
 ### Table of Contents
@@ -14,26 +18,35 @@
 
 ----------
 **GUI Screenshot**
-![tldw-summarization-gui-demo](./Tests/GUI-Front_Page.PNG)
+![tldw-summarization-gui-demo](Docs/GUI-Front_Page.PNG)
 
 
 ### <a name="what"></a> What is this (TL/DW)?
 - **101**
-  - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it.
+  - The end goal of this project, is to be a personal research multi-tool/data assistant/young lady's illustrated primer.
+  - A tool that can ingest: audio, videos, articles, free form text, documents, and books as text into a personal, offline database, so that you can then search and chat with it at any time on your own device/locally.
+    - (+ act as a nice way of creating your personal 'media' database, a personal digital library with search!)
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
+    - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off, and I don't see it as more worthwhile than some other endeavors.
+    - If anything, I'd like to see this project be used in schools, universities, and research institutions, or anyone who wants to keep a record of what they've consumed and be able to search and ask questions about it.
+    - I believe that this project can be a great tool for learning and research, and I'd like to see it develop to a point where it could be reasonably used as such.
+    - In the meantime, if you don't care about data ownership or privacy, https://notebooklm.google/ is a good alternative that works, is free, and has a working RAG setup (unlike mine :cry:).
 - **Don't care, give me code**
-  * `git clone https://github.com/rmusser01/tldw` -> `cd tldw/Helper_Scripts/Installer_Scripts` -> `Linux: ./Linux-Install.sh` / `Windows: Windows-installer.bat` / `MacOS: MacOS-Install_Updater.sh`
-    * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three`
-      * Works but is not going to receive functionality updates, so I recommend using the GUI.
-    - GUI usage: `python summarize.py -gui`
-    - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
+  * Install git for your style of OS, then run the following commands in a terminal:
+    * Install git on windows - On your keyboard: press WINDOWS + R to open Run dialog box. Then, run the following command to install git:
+      * `cmd /c winget install -e --id Git.Git`
+    * `git clone https://github.com/rmusser01/tldw` -> `cd tldw/Helper_Scripts/Installer_Scripts` -> `Linux: ./Linux-Install.sh` / `Windows: Windows-installer.bat` / `MacOS: MacOS-Install_Updater.sh`
+      * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three`
+        * Works but is not going to receive functionality updates, so I recommend using the GUI.
+      - GUI usage: `python summarize.py -gui`
+      - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
   - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
     - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
 - **(not so)Short Summary**
   - Ingest content(video/audio/ebook/website/markdown) from a URL or a local file. Can be done in batches with a text file containing a list of URLs or paths to local files(CLI only) as well as from the GUI.
     - GUI can handle local file uploads, but not batched file uploads. Can handle multiple URLs though.
   - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
-    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, Triton and Aphrodite support planned)
+    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, and Triton support planned) - Tabby/vLLM are in, but untested. Aphrodite you can use llama.cpp or kobold.cpp API and it should work...
   - Recursive/'Rolling' summaries (i.e. chunking up input and doing a chain of summaries) are supported. 
     - The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
   - Everything is stored in a SQLite DB, so you can search across all the content you've ingested, and review or modify it.
@@ -43,9 +56,7 @@
   - Act as a Multi-Purpose Research tool. The idea being that there is so much data one comes across, and we can store it all as text. (with tagging!)
   - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your fingertips at a moments notice.
   - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
-  - The end goal of this project, is to be a personal data assistant, that ingests recorded audio, videos, articles, free form text, documents, and books as text into a SQLite (for now, would like to build a shim for ElasticSearch/Similar) DB, so that you can then search across it at any time, and be able to retrieve/extract that information, as well as be able to ask questions about it. (Plus act as a nice way of personally tagging data for possible future training of your personal AI agent :P)
-  - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
-  - Basically a cheap foreign knockoff `Young Lady's Illustrated Primer`(Neal Stephenson's the Diamond Age) that you'd buy from some shady dude in a van at a swap meet.
+  - Basically a [cheap foreign knockoff](https://tvtropes.org/pmwiki/pmwiki.php/Main/ShoddyKnockoffProduct) [`Young Lady's Illustrated Primer`](https://en.wikipedia.org/wiki/The_Diamond_Age) that you'd buy from some [shady dude in a van at a swap meet](https://tvtropes.org/pmwiki/pmwiki.php/Main/TheLittleShopThatWasntThereYesterday).
     * Some food for thought: https://notes.andymatuschak.org/z9R3ho4NmDFScAohj3J8J3Y
     * I say this recognizing the inherent difficulties in replicating such a device and acknowledging the current limitations of technology.
 
@@ -543,12 +554,14 @@ Sample commands:
       - Set it up so users can test against their own datasets
     - Offline diarization of speakers - Code is in, but there was some issue that was a headache so I said screw it.
       - Should work if you give it an HF api key in the code though...
-    - PyInstaller for Windows/MacOS/Linux
-      - At some point. I'd like this to be installable/usable by non-technical individuals and it's current setup kind of prevents that.
-      - I think I may give up on this and just use the batch scripts, but I definitely would prefer a pyinstaller version.
 - **Next items of focus**
   - Bugfixes for stability and file handling(Making sure files are removed when they should be)
   - Add support for more APIs
   - Live audio recording + transcription
-  - Documentation for each of the functions exposed.
-    - They all are pretty straightforward, but I'd like to make it easier to understand what's going on.
+  - RAG support
+
+#### And because Who doesn't love a good quote? (Particularly relevant to this material/LLMs)
+- `I like the lies-to-children motif, because it underlies the way we run our society and resonates nicely with Discworld. Like the reason for Unseen being a storehouse of knowledge - you arrive knowing everything and leave realising that you know practically nothing, therefore all the knowledge you had must be stored in the university. But it's like that in "real Science", too. You arrive with your sparkling A-levels all agleam, and the first job of the tutors is to reveal that what you thought was true is only true for a given value of "truth". Most of us need just "enough" knowledge of the sciences, and it's delivered to us in metaphors and analogies that bite us in the bum if we think they're the same as the truth.`
+    * Terry Pratchett
+- `The first principle is that you must not fool yourself - and you are the easiest person to fool.`
+  *Richard Feynman
