@@ -3028,7 +3028,7 @@ def create_chat_interface_editable():
         }
     """
 
-    with gr.TabItem("Remote LLM Chat - Editable"):
+    with gr.TabItem("Remote LLM Chat"):
         gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
         gr.HTML("<script>" + custom_js + "</script>")
 
