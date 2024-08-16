@@ -3081,16 +3081,21 @@ def create_chat_interface_editable():
                                                  value="You are a helpful AI assistant.",
                                                  lines=3,
                                                  visible=False)
+            custom_prompt_checkbox.change(
+                fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+                inputs=[custom_prompt_checkbox],
+                outputs=[custom_prompt_input, system_prompt_input]
+            )
             with gr.Column():
                 chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 selected_messages = gr.JSON(elem_id="selected_messages", visible=False)
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
 
-                edit_message_text = gr.Textbox(label="Edit Selected Message", visible=True)
-                update_message_button = gr.Button("Update Selected Message", visible=True)
-
-                delete_message_button = gr.Button("Delete Selected Messages", visible=True)
+                # edit_message_text = gr.Textbox(label="Edit Selected Message", visible=True)
+                # update_message_button = gr.Button("Update Selected Message", visible=True)
+                #
+                # delete_message_button = gr.Button("Delete Selected Messages", visible=True)
 
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
@@ -3164,54 +3169,53 @@ def create_chat_interface_editable():
             outputs=[chat_history]
         )
 
-        def show_edit_message(evt: gr.SelectData, chat_history):
-            selected_id = json.dumps([evt.index])
-            return gr.update(value=chat_history[evt.index][0]), gr.update(value=selected_id)
-
-        chatbot.select(
-            show_edit_message,
-            inputs=[chat_history],
-            outputs=[edit_message_text, selected_messages]
-        )
-
-        def edit_selected_message(selected, edit_text, history):
-            try:
-                selected_ids = json.loads(selected) if selected else []
-            except json.JSONDecodeError:
-                print("Invalid JSON in selected messages")
-                return history
-
-            if len(selected_ids) != 1:
-                print(f"Expected 1 selected message, got {len(selected_ids)}")
-                return history
-
-            message_id = int(selected_ids[0])
-            if 0 <= message_id < len(history):
-                history[message_id] = (edit_text, history[message_id][1])
-            else:
-                print(f"Invalid message ID: {message_id}")
-            return history
-
-        def delete_selected_messages(selected, history):
-            selected_ids = json.loads(selected)
-            selected_ids = [int(id) for id in selected_ids]
-            selected_ids.sort(reverse=True)
-            for message_id in selected_ids:
-                if 0 <= message_id < len(history):
-                    del history[message_id]
-            return history, ""  # Clear selected_messages
-
-        update_message_button.click(
-            edit_selected_message,
-            inputs=[selected_messages, edit_message_text, chat_history],
-            outputs=[chatbot]
-        )
-
-        delete_message_button.click(
-            delete_selected_messages,
-            inputs=[selected_messages, chat_history],
-            outputs=[chatbot, selected_messages]
-        )
+        # FIXME
+        # def show_edit_message(evt: gr.SelectData, chat_history):
+        #     selected_id = json.dumps([evt.index])
+        #     return gr.update(value=chat_history[evt.index][0]), gr.update(value=selected_id)
+        # chatbot.select(
+        #     show_edit_message,
+        #     inputs=[chat_history],
+        #     outputs=[edit_message_text, selected_messages]
+        # )
+        # def edit_selected_message(selected, edit_text, history):
+        #     try:
+        #         selected_ids = json.loads(selected) if selected else []
+        #     except json.JSONDecodeError:
+        #         print("Invalid JSON in selected messages")
+        #         return history
+        #
+        #     if len(selected_ids) != 1:
+        #         print(f"Expected 1 selected message, got {len(selected_ids)}")
+        #         return history
+        #
+        #     message_id = int(selected_ids[0])
+        #     if 0 <= message_id < len(history):
+        #         history[message_id] = (edit_text, history[message_id][1])
+        #     else:
+        #         print(f"Invalid message ID: {message_id}")
+        #     return history
+        #
+        # def delete_selected_messages(selected, history):
+        #     selected_ids = json.loads(selected)
+        #     selected_ids = [int(id) for id in selected_ids]
+        #     selected_ids.sort(reverse=True)
+        #     for message_id in selected_ids:
+        #         if 0 <= message_id < len(history):
+        #             del history[message_id]
+        #     return history, ""  # Clear selected_messages
+        #
+        # update_message_button.click(
+        #     edit_selected_message,
+        #     inputs=[selected_messages, edit_message_text, chat_history],
+        #     outputs=[chatbot]
+        # )
+        #
+        # delete_message_button.click(
+        #     delete_selected_messages,
+        #     inputs=[selected_messages, chat_history],
+        #     outputs=[chatbot, selected_messages]
+        # )
 
         save_chat_history_as_file.click(
             save_chat_history,
