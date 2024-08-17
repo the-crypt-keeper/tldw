@@ -1960,7 +1960,7 @@ def resummarize_content(selected_item, item_mapping, content, api_name, api_key=
     try:
         update_result = update_media_content(selected_item, item_mapping, content, summarization_prompt, new_summary)
         if "successfully" in update_result.lower():
-            return f"Re-summarization complete. New summary: {new_summary[:500]}..."
+            return f"Re-summarization complete. New summary: {new_summary}..."
         else:
             return f"Error during database update: {update_result}"
     except Exception as e:
