@@ -460,6 +460,16 @@ def save_segments_to_json(segments, file_name="transcription_segments.json"):
 
     return json_file_path
 
+def generate_unique_filename(base_path, base_filename):
+    """Generate a unique filename by appending a counter if necessary."""
+    filename = base_filename
+    counter = 1
+    while os.path.exists(os.path.join(base_path, filename)):
+        name, ext = os.path.splitext(base_filename)
+        filename = f"{name}_{counter}{ext}"
+        counter += 1
+    return filename
+
 
 def generate_unique_identifier(file_path):
     filename = os.path.basename(file_path)
