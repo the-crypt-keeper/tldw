@@ -639,7 +639,23 @@ def create_video_transcription_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this video transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False,
                                                      interactive=True)
@@ -1288,7 +1304,23 @@ def create_audio_processing_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1396,7 +1428,23 @@ def create_podcast_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1518,7 +1566,23 @@ def create_website_scraping_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1595,7 +1659,23 @@ def create_pdf_ingestion_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1686,7 +1766,23 @@ def create_resummary_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1760,9 +1856,9 @@ def update_resummarize_dropdown(search_query, search_type):
     return gr.update(choices=item_options), item_mapping
 
 
-def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method,
-                                max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
-    if not selected_item or not api_name or not api_key:
+def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key=None, chunking_options_checkbox=None, chunk_method=None,
+                                max_chunk_size=None, chunk_overlap=None, custom_prompt_checkbox=None, custom_prompt=None):
+    if not selected_item or not api_name:
         return "Please select an item and provide API details."
 
     media_id = item_mapping.get(selected_item)
@@ -1787,14 +1883,20 @@ def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key, 
     # Prepare summarization prompt
     summarization_prompt = custom_prompt if custom_prompt_checkbox and custom_prompt else None
 
+    # API Key
+    api_key = api_key if api_key else None
+
     # Call the resummary_content function
     result = resummarize_content(media_id, content, api_name, api_key, chunk_options, summarization_prompt)
 
     return result
 
 
-def resummarize_content(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
-    if not selected_item or not api_name or not api_key:
+# FIXME - should be moved...
+def resummarize_content(selected_item, item_mapping, api_name, api_key=None, chunking_options_checkbox=None, chunk_method=None, max_chunk_size=None, chunk_overlap=None, custom_prompt_checkbox=None, custom_prompt=None):
+    # FIXME - check for config + api key
+    logging.debug("Resummarization: Stuff.")
+    if not selected_item or not api_name:
         return "Please select an item and provide API details."
 
     media_id = item_mapping.get(selected_item)
@@ -4777,7 +4879,23 @@ def create_document_editing_tab():
                     custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
                     system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=5, visible=False)
                     custom_prompt_input = gr.Textbox(label="user Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
                     custom_prompt_checkbox.change(
