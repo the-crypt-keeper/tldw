@@ -1704,38 +1704,6 @@ def save_chat_history_to_database(chatbot, conversation_id, media_id, media_name
         raise
 
 
-def get_conversation_name(conversation_id):
-    if conversation_id is None:
-        return None
-
-    try:
-        with sqlite3.connect('media_summary.db') as conn:  # Replace with your actual database name
-            cursor = conn.cursor()
-
-            query = """
-            SELECT conversation_name, media_name
-            FROM ChatConversations
-            WHERE id = ?
-            """
-
-            cursor.execute(query, (conversation_id,))
-            result = cursor.fetchone()
-
-            if result:
-                conversation_name, media_name = result
-                if conversation_name:
-                    return conversation_name
-                elif media_name:
-                    return f"{media_name}-chat"
-
-            return None  # Return None if no result found
-    except sqlite3.Error as e:
-        logging.error(f"Database error in get_conversation_name: {e}")
-        return None
-    except Exception as e:
-        logging.error(f"Unexpected error in get_conversation_name: {e}")
-        return None
-
 #
 # End of Chat-related Functions
 #######################################################################################################################
