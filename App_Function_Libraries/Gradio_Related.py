@@ -58,11 +58,9 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
-    load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt, search_and_display_items, \
-    get_conversation_name
+    load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt, search_and_display_items
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
-    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files, generate_unique_identifier, \
-    generate_unique_filename
+    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files, generate_unique_identifier
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
     generate_timestamped_url, extract_metadata, download_video
 
@@ -2705,37 +2703,20 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
 
 
 def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
-    logging.info(f"Attempting to save chat history. Media content type: {type(media_content)}")
+    logging.info(f"Attempting to save chat history. Media content: {media_content}")
     try:
         # Extract the media_id and media_name from the media_content
         media_id = None
         media_name = None
-        if isinstance(media_content, dict):
-            logging.debug(f"Media content keys: {media_content.keys()}")
-            if 'content' in media_content:
-                try:
-                    content = media_content['content']
-                    if isinstance(content, str):
-                        content_json = json.loads(content)
-                    elif isinstance(content, dict):
-                        content_json = content
-                    else:
-                        raise ValueError(f"Unexpected content type: {type(content)}")
-
-                    # Use the webpage_url as the media_id
-                    media_id = content_json.get('webpage_url')
-                    # Use the title as the media_name
-                    media_name = content_json.get('title')
-
-                    logging.info(f"Extracted media_id: {media_id}, media_name: {media_name}")
-                except json.JSONDecodeError:
-                    logging.error("Failed to decode JSON from media_content['content']")
-                except Exception as e:
-                    logging.error(f"Error processing media_content: {str(e)}")
-            else:
-                logging.warning("'content' key not found in media_content")
-        else:
-            logging.warning(f"media_content is not a dictionary. Type: {type(media_content)}")
+        if isinstance(media_content, dict) and 'content' in media_content:
+            try:
+                content_json = json.loads(media_content['content'])
+                # Use the webpage_url as the media_id
+                media_id = content_json.get('webpage_url')
+                # Use the title as the media_name
+                media_name = content_json.get('title')
+            except json.JSONDecodeError:
+                pass
 
         if media_id is None:
             # If we couldn't find a media_id, we'll use a placeholder
@@ -2754,52 +2735,19 @@ def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
         return new_conversation_id, f"Chat history saved successfully as {conversation_name}!"
     except Exception as e:
         error_message = f"Failed to save chat history: {str(e)}"
-        logging.error(error_message, exc_info=True)
+        logging.error(error_message)
         return conversation_id, error_message
 
 
-def save_chat_history(history, conversation_id, media_content):
-    try:
-        content, conversation_name = generate_chat_history_content(history, conversation_id, media_content)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_conversation_name = re.sub(r'[^a-zA-Z0-9_-]', '_', conversation_name)
-        base_filename = f"{safe_conversation_name}_{timestamp}.json"
-
-        # Create a temporary file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
-            temp_file.write(content)
-            temp_file_path = temp_file.name
-
-        # Generate a unique filename
-        unique_filename = generate_unique_filename(os.path.dirname(temp_file_path), base_filename)
-        final_path = os.path.join(os.path.dirname(temp_file_path), unique_filename)
-
-        # Rename the temporary file to the unique filename
-        os.rename(temp_file_path, final_path)
-
-        return final_path
-    except Exception as e:
-        logging.error(f"Error saving chat history: {str(e)}")
-        return None
-
-
-def generate_chat_history_content(history, conversation_id, media_content):
+def save_chat_history(history, conversation_id, media_id, media_name):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    conversation_name = get_conversation_name(conversation_id)
-
-    if not conversation_name:
-        media_name = extract_media_name(media_content)
-        if media_name:
-            conversation_name = f"{media_name}-chat"
-        else:
-            conversation_name = f"chat-{timestamp}"  # Fallback name
+    filename = f"chat_history_{conversation_id}_{timestamp}.json"
 
     chat_data = {
         "conversation_id": conversation_id,
-        "conversation_name": conversation_name,
         "timestamp": timestamp,
+        "media_id": media_id,
+        "media_name": media_name,
         "history": [
             {
                 "role": "user" if i % 2 == 0 else "bot",
@@ -2809,25 +2757,14 @@ def generate_chat_history_content(history, conversation_id, media_content):
         ]
     }
 
-    return json.dumps(chat_data, indent=2), conversation_name
+    json_data = json.dumps(chat_data, indent=2)
 
+    # Create a temporary file
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
+        temp_file.write(json_data)
+        temp_file_path = temp_file.name
 
-def extract_media_name(media_content):
-    if isinstance(media_content, dict):
-        content = media_content.get('content', {})
-        if isinstance(content, str):
-            try:
-                content = json.loads(content)
-            except json.JSONDecodeError:
-                logging.warning("Failed to parse media_content JSON string")
-                return None
-
-        # Try to extract title from the content
-        if isinstance(content, dict):
-            return content.get('title') or content.get('name')
-
-    logging.warning(f"Unexpected media_content format: {type(media_content)}")
-    return None
+    return temp_file_path
 
 def show_edit_message(selected):
     if selected:
@@ -2909,11 +2846,6 @@ def update_user_prompt(preset_name):
             "user_prompt": details[3] if len(details) > 3 else ""
         }
     return {"title": "", "details": "", "system_prompt": "", "user_prompt": ""}
-
-
-def clear_chat():
-    # Return empty list for chatbot and None for conversation_id
-    return [], None
 
 
 # FIXME - add additional features....
@@ -3063,7 +2995,6 @@ def create_chat_interface():
                 chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
-                clear_chat_button = gr.Button("Clear Chat")
 
                 edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
                 edit_message_text = gr.Textbox(label="Edit Message", visible=False)
@@ -3075,26 +3006,12 @@ def create_chat_interface():
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
                 download_file = gr.File(label="Download Chat History")
-                save_status = gr.Textbox(label="Save Status", interactive=False)
 
         # Restore original functionality
         search_button.click(
             fn=update_dropdown,
             inputs=[search_query_input, search_type_input],
             outputs=[items_output, item_mapping]
-        )
-
-        def save_chat_wrapper(history, conversation_id, media_content):
-            file_path = save_chat_history(history, conversation_id, media_content)
-            if file_path:
-                return file_path, f"Chat history saved successfully as {os.path.basename(file_path)}!"
-            else:
-                return None, "Error saving chat history. Please check the logs and try again."
-
-        save_chat_history_as_file.click(
-            save_chat_wrapper,
-            inputs=[chatbot, conversation_id, media_content],
-            outputs=[download_file, save_status]
         )
 
         def update_prompts(preset_name):
@@ -3104,13 +3021,6 @@ def create_chat_interface():
                 gr.update(value=prompts["system_prompt"], visible=True)
             )
 
-        def clear_chat():
-            return [], None  # Return empty list for chatbot and None for conversation_id
-
-        clear_chat_button.click(
-            clear_chat,
-            outputs=[chatbot, conversation_id]
-        )
         preset_prompt.change(
             update_prompts,
             inputs=preset_prompt,
@@ -3258,7 +3168,6 @@ def create_chat_interface_stacked():
         with gr.Row():
             with gr.Column():
                 submit = gr.Button("Submit")
-                clear_chat_button = gr.Button("Clear Chat")
 
                 edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
                 edit_message_text = gr.Textbox(label="Edit Message", visible=False)
@@ -3285,10 +3194,6 @@ def create_chat_interface_stacked():
                 gr.update(value=prompts["system_prompt"], visible=True)
             )
 
-        clear_chat_button.click(
-            clear_chat,
-            outputs=[chatbot, conversation_id]
-        )
         preset_prompt.change(
             update_prompts,
             inputs=preset_prompt,
@@ -3425,13 +3330,6 @@ def create_chat_interface_multi_api():
         with gr.Row():
             msg = gr.Textbox(label="Enter your message", scale=4)
             submit = gr.Button("Submit", scale=1)
-            # FIXME - clear chat
-        #     clear_chat_button = gr.Button("Clear Chat")
-        #
-        # clear_chat_button.click(
-        #     clear_chat,
-        #     outputs=[chatbot]
-        # )
 
         # State variables
         chat_history = [gr.State([]) for _ in range(3)]
