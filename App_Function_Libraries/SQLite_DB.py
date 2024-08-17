@@ -297,6 +297,7 @@ def create_tables(db) -> None:
         CREATE TABLE IF NOT EXISTS ChatConversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             media_id INTEGER,
+            media_name TEXT,
             conversation_name TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1656,7 +1657,7 @@ def delete_chat_message(message_id: int) -> None:
         raise DatabaseError(f"Error deleting chat message: {e}")
 
 
-def save_chat_history_to_database(chatbot, conversation_id, media_id, conversation_name):
+def save_chat_history_to_database(chatbot, conversation_id, media_id, media_name, conversation_name):
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -1664,10 +1665,17 @@ def save_chat_history_to_database(chatbot, conversation_id, media_id, conversati
             # If conversation_id is None, create a new conversation
             if conversation_id is None:
                 cursor.execute('''
-                    INSERT INTO ChatConversations (media_id, conversation_name, created_at, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (media_id, conversation_name))
+                    INSERT INTO ChatConversations (media_id, media_name, conversation_name, created_at, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (media_id, media_name, conversation_name))
                 conversation_id = cursor.lastrowid
+            else:
+                # If conversation exists, update the media_name
+                cursor.execute('''
+                    UPDATE ChatConversations
+                    SET media_name = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (media_name, conversation_id))
 
             # Save each message in the chatbot history
             for i, (user_msg, ai_msg) in enumerate(chatbot):
@@ -1695,6 +1703,38 @@ def save_chat_history_to_database(chatbot, conversation_id, media_id, conversati
         logging.error(f"Error saving chat history to database: {str(e)}")
         raise
 
+
+def get_conversation_name(conversation_id):
+    if conversation_id is None:
+        return None
+
+    try:
+        with sqlite3.connect('media_summary.db') as conn:  # Replace with your actual database name
+            cursor = conn.cursor()
+
+            query = """
+            SELECT conversation_name, media_name
+            FROM ChatConversations
+            WHERE id = ?
+            """
+
+            cursor.execute(query, (conversation_id,))
+            result = cursor.fetchone()
+
+            if result:
+                conversation_name, media_name = result
+                if conversation_name:
+                    return conversation_name
+                elif media_name:
+                    return f"{media_name}-chat"
+
+            return None  # Return None if no result found
+    except sqlite3.Error as e:
+        logging.error(f"Database error in get_conversation_name: {e}")
+        return None
+    except Exception as e:
+        logging.error(f"Unexpected error in get_conversation_name: {e}")
+        return None
 
 #
 # End of Chat-related Functions
