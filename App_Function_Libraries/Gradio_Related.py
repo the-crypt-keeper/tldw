@@ -60,7 +60,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
     load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt, search_and_display_items
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
-    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files
+    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files, generate_unique_identifier
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
     generate_timestamped_url, extract_metadata, download_video
 
@@ -639,7 +639,23 @@ def create_video_transcription_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this video transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False,
                                                      interactive=True)
@@ -1003,7 +1019,8 @@ def create_video_transcription_tab():
                     if url_input:
                         inputs.extend([url.strip() for url in url_input.split('\n') if url.strip()])
                     if video_file is not None:
-                        inputs.append(video_file.name)  # Assuming video_file is a file object with a 'name' attribute
+                        # Assuming video_file is a file object with a 'name' attribute
+                        inputs.append(video_file.name)
 
                     if not inputs:
                         raise ValueError("No input provided. Please enter URLs or upload a video file.")
@@ -1063,9 +1080,10 @@ def create_video_transcription_tab():
                     # Handle URL or local file
                     if os.path.isfile(input_item):
                         video_file_path = input_item
+                        unique_id = generate_unique_identifier(input_item)
                         # Extract basic info from local file
                         info_dict = {
-                            'webpage_url': input_item,
+                            'webpage_url': unique_id,
                             'title': os.path.basename(input_item),
                             'description': "Local file",
                             'channel_url': None,
@@ -1286,7 +1304,23 @@ def create_audio_processing_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1394,7 +1428,23 @@ def create_podcast_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1516,7 +1566,23 @@ def create_website_scraping_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1593,7 +1659,23 @@ def create_pdf_ingestion_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1684,7 +1766,23 @@ def create_resummary_tab():
                                                      visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
 
@@ -1755,17 +1853,32 @@ def update_resummarize_dropdown(search_query, search_type):
 
     item_options = [f"{item[1]} ({item[2]})" for item in results]
     item_mapping = {f"{item[1]} ({item[2]})": item[0] for item in results}
+    logging.debug(f"item_options: {item_options}")
+    logging.debug(f"item_mapping: {item_mapping}")
     return gr.update(choices=item_options), item_mapping
 
 
-def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method,
-                                max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
-    if not selected_item or not api_name or not api_key:
+def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key=None, chunking_options_checkbox=None, chunk_method=None,
+                                max_chunk_size=None, chunk_overlap=None, custom_prompt_checkbox=None, custom_prompt=None):
+    logging.debug(f"resummarize_content_wrapper called with item_mapping type: {type(item_mapping)}")
+    logging.debug(f"selected_item: {selected_item}")
+
+    if not selected_item or not api_name:
         return "Please select an item and provide API details."
+
+    # Handle potential string representation of item_mapping
+    if isinstance(item_mapping, str):
+        try:
+            item_mapping = json.loads(item_mapping)
+        except json.JSONDecodeError:
+            return f"Error: item_mapping is a string but not valid JSON. Value: {item_mapping[:100]}..."
+
+    if not isinstance(item_mapping, dict):
+        return f"Error: item_mapping is not a dictionary or valid JSON string. Type: {type(item_mapping)}"
 
     media_id = item_mapping.get(selected_item)
     if not media_id:
-        return "Invalid selection."
+        return f"Invalid selection. Selected item: {selected_item}, Available items: {list(item_mapping.keys())[:5]}..."
 
     content, old_prompt, old_summary = fetch_item_details(media_id)
 
@@ -1775,8 +1888,8 @@ def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key, 
     # Prepare chunking options
     chunk_options = {
         'method': chunk_method,
-        'max_size': int(max_chunk_size),
-        'overlap': int(chunk_overlap),
+        'max_size': int(max_chunk_size) if max_chunk_size is not None else None,
+        'overlap': int(chunk_overlap) if chunk_overlap is not None else None,
         'language': 'english',
         'adaptive': True,
         'multi_level': False,
@@ -1785,49 +1898,43 @@ def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key, 
     # Prepare summarization prompt
     summarization_prompt = custom_prompt if custom_prompt_checkbox and custom_prompt else None
 
-    # Call the resummary_content function
-    result = resummarize_content(media_id, content, api_name, api_key, chunk_options, summarization_prompt)
+    logging.debug(f"Calling resummarize_content with media_id: {media_id}")
+    # Call the resummarize_content function
+    result = resummarize_content(selected_item, item_mapping, content, api_name, api_key, chunk_options, summarization_prompt)
 
     return result
 
 
-def resummarize_content(selected_item, item_mapping, api_name, api_key, chunking_options_checkbox, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt):
-    if not selected_item or not api_name or not api_key:
-        return "Please select an item and provide API details."
-
-    media_id = item_mapping.get(selected_item)
-    if not media_id:
-        return "Invalid selection."
-
-    content, old_prompt, old_summary = fetch_item_details(media_id)
-
-    if not content:
-        return "No content available for re-summarization."
-
+# FIXME - should be moved...
+def resummarize_content(selected_item, item_mapping, content, api_name, api_key=None, chunk_options=None, summarization_prompt=None):
+    logging.debug(f"resummarize_content called with selected_item: {selected_item}")
     # Load configuration
     config = load_comprehensive_config()
 
-    # Prepare chunking options
-    chunk_options = {
-        'method': chunk_method,
-        'max_size': int(max_chunk_size),
-        'overlap': int(chunk_overlap),
-        'language': 'english',
-        'adaptive': True,
-        'multi_level': False,
-    }
-
     # Chunking logic
-    if chunking_options_checkbox:
+    if chunk_options:
         chunks = improved_chunking_process(content, chunk_options)
     else:
         chunks = [{'text': content, 'metadata': {}}]
 
-    # Prepare summarization prompt
-    if custom_prompt_checkbox and custom_prompt:
-        summarization_prompt = custom_prompt
-    else:
-        summarization_prompt = config.get('Prompts', 'default_summary_prompt', fallback="Summarize the following text:")
+    # Use default prompt if not provided
+    if not summarization_prompt:
+        summarization_prompt = config.get('Prompts', 'default_summary_prompt', fallback="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]""")
 
     # Summarization logic
     summaries = []
@@ -1849,15 +1956,17 @@ def resummarize_content(selected_item, item_mapping, api_name, api_key, chunking
     new_summary = " ".join(summaries)
 
     # Update the database with the new summary
+
     try:
         update_result = update_media_content(selected_item, item_mapping, content, summarization_prompt, new_summary)
         if "successfully" in update_result.lower():
-            return f"Re-summarization complete. New summary: {new_summary[:500]}..."
+            return f"Re-summarization complete. New summary: {new_summary}..."
         else:
             return f"Error during database update: {update_result}"
     except Exception as e:
         logging.error(f"Error updating database: {str(e)}")
         return f"Error updating database: {str(e)}"
+
 
 # End of Re-Summarization Functions
 #
@@ -2998,238 +3107,6 @@ def create_chat_interface():
         chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
 
-def create_chat_interface_editable():
-    custom_css = """
-    .chatbot-container .message-wrap .message {
-        font-size: 14px !important;
-        cursor: pointer;
-        transition: background-color 0.3s;
-    }
-    .chatbot-container .message-wrap .message:hover {
-        background-color: #f0f0f0;
-    }
-    .chatbot-container .message-wrap .message.selected-message {
-        background-color: #e0e0e0;
-    }
-    """
-
-    custom_js = """
-        function selectMessage(el) {
-            el.classList.toggle('selected-message');
-            updateSelectedMessages();
-        }
-        
-        function updateSelectedMessages() {
-            const selectedMessages = document.querySelectorAll('.selected-message');
-            const messageIds = Array.from(selectedMessages).map(el => el.dataset.messageId);
-            const selectedMessagesInput = document.getElementById('selected_messages');
-            selectedMessagesInput.value = JSON.stringify(messageIds);
-            selectedMessagesInput.dispatchEvent(new Event('change'));
-        }
-    """
-
-    with gr.TabItem("Remote LLM Chat - Editable"):
-        gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
-        gr.HTML("<script>" + custom_js + "</script>")
-
-        chat_history = gr.State([])
-        media_content = gr.State({})
-        selected_parts = gr.State([])
-        conversation_id = gr.State(None)
-
-        with gr.Row():
-            with gr.Column(scale=1):
-                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
-                                             label="Search By")
-                search_button = gr.Button("Search")
-                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
-                item_mapping = gr.State({})
-                with gr.Row():
-                    use_content = gr.Checkbox(label="Use Content")
-                    use_summary = gr.Checkbox(label="Use Summary")
-                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-                                                         value=False,
-                                                         visible=True)
-                    save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
-                with gr.Row():
-                    temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
-                with gr.Row():
-                    conversation_search = gr.Textbox(label="Search Conversations")
-                with gr.Row():
-                    search_conversations_btn = gr.Button("Search Conversations")
-                with gr.Row():
-                    previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
-                with gr.Row():
-                    load_conversations_btn = gr.Button("Load Selected Conversation")
-
-                api_endpoint = gr.Dropdown(label="Select API Endpoint",
-                                           choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"])
-                api_key = gr.Textbox(label="API Key (if required)", type="password")
-                # preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
-                #                                      value=False,
-                #                                      visible=True)
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                            choices=load_preset_prompts(),
-                                            visible=False)
-                custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                 placeholder="Enter custom prompt here",
-                                                 lines=3,
-                                                 visible=False)
-                system_prompt_input = gr.Textbox(label="System Prompt",
-                                                 value="You are a helpful AI assistant.",
-                                                 lines=3,
-                                                 visible=False)
-            with gr.Column():
-                chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
-                selected_messages = gr.JSON(elem_id="selected_messages", visible=False)
-                msg = gr.Textbox(label="Enter your message")
-                submit = gr.Button("Submit")
-
-                edit_message_text = gr.Textbox(label="Edit Selected Message", visible=True)
-                update_message_button = gr.Button("Update Selected Message", visible=True)
-
-                delete_message_button = gr.Button("Delete Selected Messages", visible=True)
-
-                save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
-                save_chat_history_as_file = gr.Button("Save Chat History as File")
-                download_file = gr.File(label="Download Chat History")
-
-        # Event handlers
-        search_button.click(
-            fn=update_dropdown,
-            inputs=[search_query_input, search_type_input],
-            outputs=[items_output, item_mapping]
-        )
-
-        def update_prompts(preset_name):
-            prompts = update_user_prompt(preset_name)
-            return (
-                gr.update(value=prompts["user_prompt"], visible=True),
-                gr.update(value=prompts["system_prompt"], visible=True)
-            )
-
-        preset_prompt.change(
-            update_prompts,
-            inputs=preset_prompt,
-            outputs=[custom_prompt_input, system_prompt_input]
-        )
-
-        submit.click(
-            chat_wrapper,
-            inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, custom_prompt_input,
-                    conversation_id, save_conversation, temperature, system_prompt_input],
-            outputs=[msg, chatbot, conversation_id]
-        ).then(
-            lambda x: gr.update(value=""),
-            inputs=[chatbot],
-            outputs=[msg]
-        ).then(
-            lambda: gr.update(value=""),
-            outputs=[custom_prompt_input, system_prompt_input]
-        )
-
-        items_output.change(
-            update_chat_content,
-            inputs=[items_output, use_content, use_summary, custom_prompt_input, item_mapping],
-            outputs=[media_content, selected_parts]
-        )
-        use_content.change(update_selected_parts, inputs=[use_content, use_summary, custom_prompt_input],
-                           outputs=[selected_parts])
-        use_summary.change(update_selected_parts, inputs=[use_content, use_summary, custom_prompt_input],
-                           outputs=[selected_parts])
-        custom_prompt_input.change(update_selected_parts, inputs=[use_content, use_summary, custom_prompt_input],
-                          outputs=[selected_parts])
-        items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
-
-        search_conversations_btn.click(
-            search_conversations,
-            inputs=[conversation_search],
-            outputs=[previous_conversations]
-        )
-
-        load_conversations_btn.click(
-            clear_chat,
-            outputs=[chatbot, chat_history]
-        ).then(
-            load_conversation,
-            inputs=[previous_conversations],
-            outputs=[chatbot, conversation_id]
-        )
-
-        previous_conversations.change(
-            load_conversation,
-            inputs=[previous_conversations],
-            outputs=[chat_history]
-        )
-
-        def show_edit_message(evt: gr.SelectData, chat_history):
-            selected_id = json.dumps([evt.index])
-            return gr.update(value=chat_history[evt.index][0]), gr.update(value=selected_id)
-
-        chatbot.select(
-            show_edit_message,
-            inputs=[chat_history],
-            outputs=[edit_message_text, selected_messages]
-        )
-
-        def edit_selected_message(selected, edit_text, history):
-            try:
-                selected_ids = json.loads(selected) if selected else []
-            except json.JSONDecodeError:
-                print("Invalid JSON in selected messages")
-                return history
-
-            if len(selected_ids) != 1:
-                print(f"Expected 1 selected message, got {len(selected_ids)}")
-                return history
-
-            message_id = int(selected_ids[0])
-            if 0 <= message_id < len(history):
-                history[message_id] = (edit_text, history[message_id][1])
-            else:
-                print(f"Invalid message ID: {message_id}")
-            return history
-
-        def delete_selected_messages(selected, history):
-            selected_ids = json.loads(selected)
-            selected_ids = [int(id) for id in selected_ids]
-            selected_ids.sort(reverse=True)
-            for message_id in selected_ids:
-                if 0 <= message_id < len(history):
-                    del history[message_id]
-            return history, ""  # Clear selected_messages
-
-        update_message_button.click(
-            edit_selected_message,
-            inputs=[selected_messages, edit_message_text, chat_history],
-            outputs=[chatbot]
-        )
-
-        delete_message_button.click(
-            delete_selected_messages,
-            inputs=[selected_messages, chat_history],
-            outputs=[chatbot, selected_messages]
-        )
-
-        save_chat_history_as_file.click(
-            save_chat_history,
-            inputs=[chatbot, conversation_id],
-            outputs=[download_file]
-        )
-
-        save_chat_history_to_db.click(
-            save_chat_history_to_db_wrapper,
-            inputs=[chatbot, conversation_id, media_content],
-            outputs=[conversation_id, gr.Textbox(label="Save Status")]
-        )
-
-        #chatbot.select(show_edit_message, chat_history, [edit_message_text, gr.update()])
-
-    return chatbot, chat_history, conversation_id
-
-
 def create_chat_interface_stacked():
     custom_css = """
     .chatbot-container .message-wrap .message {
@@ -3609,84 +3486,6 @@ def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, t
         updated_chatbot = chatbot
 
     return new_msg, updated_chatbot, new_history, new_conv_id
-
-
-def create_chat_interface_vertical():
-    with gr.TabItem("Remote LLM Chat (No Saving)"):
-        gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
-        chat_history = gr.State([])
-        media_content = gr.State({})
-        selected_parts = gr.State([])
-        conversation_id = gr.State(None)
-
-        with gr.Row():
-            with gr.Column(scale=1):
-                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
-                search_button = gr.Button("Search")
-                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
-                item_mapping = gr.State({})
-                with gr.Row():
-                    use_content = gr.Checkbox(label="Use Content")
-                    use_summary = gr.Checkbox(label="Use Summary")
-                    use_prompt = gr.Checkbox(label="Use Prompt")
-                    save_conversation = gr.Checkbox(label="Save Conversation", value=False)
-                with gr.Row():
-                    api_endpoint = gr.Dropdown(label="Select API Endpoint", choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"])
-                with gr.Row():
-                    api_key = gr.Textbox(label="API Key (if required)", type="password")
-                with gr.Row():
-                    temperature = gr.Slider(label="Temperature", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
-                with gr.Row():
-                    preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                with gr.Row():
-                    user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
-
-            with gr.Column():
-                gr.Markdown("#### Chat Window")
-                chatbot = gr.Chatbot(height=500)
-                msg = gr.Textbox(label="Enter your message")
-                submit = gr.Button("Submit")
-                save_button = gr.Button("Save Chat History")
-                download_file = gr.File(label="Download Chat History")
-
-        save_button.click(save_chat_history, inputs=[chatbot], outputs=[download_file])
-
-        search_button.click(
-            fn=update_dropdown,
-            inputs=[search_query_input, search_type_input],
-            outputs=[items_output, item_mapping]
-        )
-
-        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
-
-        items_output.change(
-            update_chat_content,
-            inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
-            outputs=[media_content, selected_parts]
-        )
-
-        for checkbox in [use_content, use_summary, use_prompt]:
-            checkbox.change(
-                update_selected_parts,
-                inputs=[use_content, use_summary, use_prompt],
-                outputs=[selected_parts]
-            )
-
-        items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
-
-        submit.click(
-            chat_wrapper_single,
-            inputs=[msg, chat_history, chatbot, api_endpoint, api_key, temperature, media_content, selected_parts, conversation_id, save_conversation, user_prompt],
-            outputs=[msg, chatbot, chat_history, conversation_id]
-        ).then(
-            lambda x: gr.update(value=""),
-            inputs=[chatbot],
-            outputs=[msg]
-        ).then(
-            lambda: gr.update(value=""),
-            outputs=[user_prompt]
-        )
 
 
 def create_chat_management_tab():
@@ -5085,7 +4884,23 @@ def create_document_editing_tab():
                     custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
                     system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=5, visible=False)
                     custom_prompt_input = gr.Textbox(label="user Prompt",
-                                                     value="You are a professional summarizer. Please summarize this audio transcript.",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
+
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
+
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
                                                      lines=3,
                                                      visible=False)
                     custom_prompt_checkbox.change(
@@ -5275,8 +5090,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_prompt_view_tab()
 
             with gr.TabItem("Chat with an LLM"):
-                #create_chat_interface_vertical()
-                create_chat_interface_editable()
                 create_chat_interface()
                 create_chat_interface_stacked()
                 create_chat_interface_multi_api()
@@ -5285,11 +5098,12 @@ def launch_ui(share_public=None, server_mode=False):
                 create_llamafile_settings_tab()
 
             with gr.TabItem("Edit Existing Items"):
-                create_compare_transcripts_tab()
                 create_media_edit_tab()
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
+                # FIXME
+                #create_compare_transcripts_tab()
 
             with gr.TabItem("Writing Tools"):
                 create_document_editing_tab()
