@@ -297,6 +297,7 @@ def create_tables(db) -> None:
         CREATE TABLE IF NOT EXISTS ChatConversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             media_id INTEGER,
+            media_name TEXT,
             conversation_name TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1656,7 +1657,7 @@ def delete_chat_message(message_id: int) -> None:
         raise DatabaseError(f"Error deleting chat message: {e}")
 
 
-def save_chat_history_to_database(chatbot, conversation_id, media_id, conversation_name):
+def save_chat_history_to_database(chatbot, conversation_id, media_id, media_name, conversation_name):
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -1664,10 +1665,17 @@ def save_chat_history_to_database(chatbot, conversation_id, media_id, conversati
             # If conversation_id is None, create a new conversation
             if conversation_id is None:
                 cursor.execute('''
-                    INSERT INTO ChatConversations (media_id, conversation_name, created_at, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (media_id, conversation_name))
+                    INSERT INTO ChatConversations (media_id, media_name, conversation_name, created_at, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (media_id, media_name, conversation_name))
                 conversation_id = cursor.lastrowid
+            else:
+                # If conversation exists, update the media_name
+                cursor.execute('''
+                    UPDATE ChatConversations
+                    SET media_name = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (media_name, conversation_id))
 
             # Save each message in the chatbot history
             for i, (user_msg, ai_msg) in enumerate(chatbot):
