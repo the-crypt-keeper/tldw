@@ -58,9 +58,11 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
-    load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt, search_and_display_items
+    load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt, search_and_display_items, \
+    get_conversation_name
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
-    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files, generate_unique_identifier
+    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files, generate_unique_identifier, \
+    generate_unique_filename
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
     generate_timestamped_url, extract_metadata, download_video
 
@@ -2646,9 +2648,9 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
 
         # Prepare the input for the API
         if not history:
-            input_data = f"{combined_content}\n\nUser: {message}\nAI:"
+            input_data = f"{combined_content}\n\nUser: {message}\n"
         else:
-            input_data = f"User: {message}\nAI:"
+            input_data = f"User: {message}\n"
         # Print first 500 chars
         logging.info(f"Debug - Chat Function - Input Data: {input_data[:500]}...")
 
@@ -2703,41 +2705,100 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
 
 
 def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
-    logging.info(f"Attempting to save chat history. Media content: {media_content}")
+    logging.info(f"Attempting to save chat history. Media content type: {type(media_content)}")
     try:
-        # Extract the media_id from the media_content
+        # Extract the media_id and media_name from the media_content
         media_id = None
-        if isinstance(media_content, dict) and 'content' in media_content:
-            try:
-                content_json = json.loads(media_content['content'])
-                # Use the webpage_url as the media_id
-                media_id = content_json.get('webpage_url')
-            except json.JSONDecodeError:
-                pass
+        media_name = None
+        if isinstance(media_content, dict):
+            logging.debug(f"Media content keys: {media_content.keys()}")
+            if 'content' in media_content:
+                try:
+                    content = media_content['content']
+                    if isinstance(content, str):
+                        content_json = json.loads(content)
+                    elif isinstance(content, dict):
+                        content_json = content
+                    else:
+                        raise ValueError(f"Unexpected content type: {type(content)}")
+
+                    # Use the webpage_url as the media_id
+                    media_id = content_json.get('webpage_url')
+                    # Use the title as the media_name
+                    media_name = content_json.get('title')
+
+                    logging.info(f"Extracted media_id: {media_id}, media_name: {media_name}")
+                except json.JSONDecodeError:
+                    logging.error("Failed to decode JSON from media_content['content']")
+                except Exception as e:
+                    logging.error(f"Error processing media_content: {str(e)}")
+            else:
+                logging.warning("'content' key not found in media_content")
+        else:
+            logging.warning(f"media_content is not a dictionary. Type: {type(media_content)}")
 
         if media_id is None:
             # If we couldn't find a media_id, we'll use a placeholder
             media_id = "unknown_media"
             logging.warning(f"Unable to extract media_id from media_content. Using placeholder: {media_id}")
 
+        if media_name is None:
+            media_name = "Unnamed Media"
+            logging.warning(f"Unable to extract media_name from media_content. Using placeholder: {media_name}")
+
         # Generate a unique conversation name using media_id and current timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         conversation_name = f"Chat_{media_id}_{timestamp}"
 
-        new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_id, conversation_name)
+        new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_id, media_name, conversation_name)
         return new_conversation_id, f"Chat history saved successfully as {conversation_name}!"
     except Exception as e:
         error_message = f"Failed to save chat history: {str(e)}"
-        logging.error(error_message)
+        logging.error(error_message, exc_info=True)
         return conversation_id, error_message
 
 
-def save_chat_history(history, conversation_id):
+def save_chat_history(history, conversation_id, media_content):
+    try:
+        content, conversation_name = generate_chat_history_content(history, conversation_id, media_content)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_conversation_name = re.sub(r'[^a-zA-Z0-9_-]', '_', conversation_name)
+        base_filename = f"{safe_conversation_name}_{timestamp}.json"
+
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+
+        # Generate a unique filename
+        unique_filename = generate_unique_filename(os.path.dirname(temp_file_path), base_filename)
+        final_path = os.path.join(os.path.dirname(temp_file_path), unique_filename)
+
+        # Rename the temporary file to the unique filename
+        os.rename(temp_file_path, final_path)
+
+        return final_path
+    except Exception as e:
+        logging.error(f"Error saving chat history: {str(e)}")
+        return None
+
+
+def generate_chat_history_content(history, conversation_id, media_content):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"chat_history_{conversation_id}_{timestamp}.json"
+
+    conversation_name = get_conversation_name(conversation_id)
+
+    if not conversation_name:
+        media_name = extract_media_name(media_content)
+        if media_name:
+            conversation_name = f"{media_name}-chat"
+        else:
+            conversation_name = f"chat-{timestamp}"  # Fallback name
 
     chat_data = {
         "conversation_id": conversation_id,
+        "conversation_name": conversation_name,
         "timestamp": timestamp,
         "history": [
             {
@@ -2748,17 +2809,25 @@ def save_chat_history(history, conversation_id):
         ]
     }
 
-    json_data = json.dumps(chat_data, indent=2)
+    return json.dumps(chat_data, indent=2), conversation_name
 
-    # Create a temporary file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
-        temp_file.write(json_data)
-        temp_file_path = temp_file.name
 
-    return temp_file_path
+def extract_media_name(media_content):
+    if isinstance(media_content, dict):
+        content = media_content.get('content', {})
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except json.JSONDecodeError:
+                logging.warning("Failed to parse media_content JSON string")
+                return None
 
-    json_data = json.dumps(chat_data, indent=2)
-    return filename, json_data
+        # Try to extract title from the content
+        if isinstance(content, dict):
+            return content.get('title') or content.get('name')
+
+    logging.warning(f"Unexpected media_content format: {type(media_content)}")
+    return None
 
 def show_edit_message(selected):
     if selected:
@@ -2840,6 +2909,11 @@ def update_user_prompt(preset_name):
             "user_prompt": details[3] if len(details) > 3 else ""
         }
     return {"title": "", "details": "", "system_prompt": "", "user_prompt": ""}
+
+
+def clear_chat():
+    # Return empty list for chatbot and None for conversation_id
+    return [], None
 
 
 # FIXME - add additional features....
@@ -2989,6 +3063,7 @@ def create_chat_interface():
                 chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
+                clear_chat_button = gr.Button("Clear Chat")
 
                 edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
                 edit_message_text = gr.Textbox(label="Edit Message", visible=False)
@@ -3000,12 +3075,26 @@ def create_chat_interface():
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
                 download_file = gr.File(label="Download Chat History")
+                save_status = gr.Textbox(label="Save Status", interactive=False)
 
         # Restore original functionality
         search_button.click(
             fn=update_dropdown,
             inputs=[search_query_input, search_type_input],
             outputs=[items_output, item_mapping]
+        )
+
+        def save_chat_wrapper(history, conversation_id, media_content):
+            file_path = save_chat_history(history, conversation_id, media_content)
+            if file_path:
+                return file_path, f"Chat history saved successfully as {os.path.basename(file_path)}!"
+            else:
+                return None, "Error saving chat history. Please check the logs and try again."
+
+        save_chat_history_as_file.click(
+            save_chat_wrapper,
+            inputs=[chatbot, conversation_id, media_content],
+            outputs=[download_file, save_status]
         )
 
         def update_prompts(preset_name):
@@ -3015,6 +3104,13 @@ def create_chat_interface():
                 gr.update(value=prompts["system_prompt"], visible=True)
             )
 
+        def clear_chat():
+            return [], None  # Return empty list for chatbot and None for conversation_id
+
+        clear_chat_button.click(
+            clear_chat,
+            outputs=[chatbot, conversation_id]
+        )
         preset_prompt.change(
             update_prompts,
             inputs=preset_prompt,
@@ -3041,7 +3137,7 @@ def create_chat_interface():
             inputs=[chatbot],
             outputs=[msg]
         ).then(# Clear the user prompt after the first message
-            lambda: gr.update(value=""),
+            lambda: (gr.update(value=""), gr.update(value="")),
             outputs=[user_prompt, system_prompt_input]
         )
 
@@ -3162,6 +3258,7 @@ def create_chat_interface_stacked():
         with gr.Row():
             with gr.Column():
                 submit = gr.Button("Submit")
+                clear_chat_button = gr.Button("Clear Chat")
 
                 edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
                 edit_message_text = gr.Textbox(label="Edit Message", visible=False)
@@ -3188,6 +3285,10 @@ def create_chat_interface_stacked():
                 gr.update(value=prompts["system_prompt"], visible=True)
             )
 
+        clear_chat_button.click(
+            clear_chat,
+            outputs=[chatbot, conversation_id]
+        )
         preset_prompt.change(
             update_prompts,
             inputs=preset_prompt,
@@ -3324,6 +3425,13 @@ def create_chat_interface_multi_api():
         with gr.Row():
             msg = gr.Textbox(label="Enter your message", scale=4)
             submit = gr.Button("Submit", scale=1)
+            # FIXME - clear chat
+        #     clear_chat_button = gr.Button("Clear Chat")
+        #
+        # clear_chat_button.click(
+        #     clear_chat,
+        #     outputs=[chatbot]
+        # )
 
         # State variables
         chat_history = [gr.State([]) for _ in range(3)]
@@ -3488,6 +3596,7 @@ def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, t
     return new_msg, updated_chatbot, new_history, new_conv_id
 
 
+# FIXME - Finish implementing functions + testing/valdidation
 def create_chat_management_tab():
     with gr.TabItem("Chat Management"):
         gr.Markdown("# Chat Management")
@@ -3499,33 +3608,74 @@ def create_chat_management_tab():
         conversation_list = gr.Dropdown(label="Select Conversation", choices=[])
         conversation_mapping = gr.State({})
 
-        with gr.Row():
-            message_input = gr.Textbox(label="New Message")
-            send_button = gr.Button("Send")
+        chat_content = gr.TextArea(label="Chat Content", lines=20, max_lines=50)
+        save_button = gr.Button("Save Changes")
 
-        chat_display = gr.HTML(label="Chat Messages")
+        result_message = gr.Markdown("")
 
-        edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
-        edit_message_text = gr.Textbox(label="Edit Message", visible=False)
-        update_message_button = gr.Button("Update Message", visible=False)
+        def search_conversations(query):
+            # Implement your search logic here
+            conversations = fetch_conversations(query)  # You'll need to implement this function
+            choices = [f"{conv['id']}: {conv['timestamp']}" for conv in conversations]
+            mapping = {choice: conv['id'] for choice, conv in zip(choices, conversations)}
+            return gr.update(choices=choices), mapping
 
-        delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
-        delete_message_button = gr.Button("Delete Message", visible=False)
-
-        def send_message(selected_conversation, message):
-            conversation_id = conversation_mapping.value.get(selected_conversation)
+        def load_conversation(selected):
+            conversation_id = conversation_mapping.value.get(selected)
             if conversation_id:
-                add_chat_message(conversation_id, "user", message)
-                return load_conversation(selected_conversation), ""
-            return "Please select a conversation first.", message
+                # Fetch the entire conversation content
+                content = fetch_conversation_content(conversation_id)  # You'll need to implement this function
+                if content:
+                    formatted_content = format_conversation(content)
+                    return formatted_content
+            return "Please select a conversation or no conversation found."
 
-        def update_message(message_id, new_text, selected_conversation):
-            update_chat_message(message_id, new_text)
-            return load_conversation(selected_conversation), gr.update(value="", visible=False), gr.update(value="", visible=False), gr.update(visible=False)
+        def save_conversation(selected, content):
+            conversation_id = conversation_mapping.value.get(selected)
+            if conversation_id:
+                try:
+                    # Parse the content back into JSON
+                    parsed_content = parse_formatted_content(content)
+                    # Save the modified content
+                    success = save_conversation_content(conversation_id, parsed_content)  # You'll need to implement this function
+                    return "Changes saved successfully." if success else "Failed to save changes."
+                except json.JSONDecodeError:
+                    return "Error: Invalid JSON format. Please check your edits."
+            return "Please select a conversation before saving."
 
-        def delete_message(message_id, selected_conversation):
-            delete_chat_message(message_id)
-            return load_conversation(selected_conversation), gr.update(value="", visible=False), gr.update(visible=False)
+        def format_conversation(content):
+            try:
+                data = json.loads(content)
+                formatted = f"Conversation ID: {data['conversation_id']}\n"
+                formatted += f"Timestamp: {data['timestamp']}\n\n"
+                for message in data['history']:
+                    formatted += f"Role: {message['role']}\n"
+                    formatted += f"Content: {message['content'][1] if message['content'][1] else message['content'][0]}\n\n"
+                return formatted
+            except json.JSONDecodeError:
+                return "Error: Invalid JSON format"
+
+        def parse_formatted_content(formatted_content):
+            lines = formatted_content.split('\n')
+            conversation_id = int(lines[0].split(': ')[1])
+            timestamp = lines[1].split(': ')[1]
+            history = []
+            current_role = None
+            current_content = None
+            for line in lines[3:]:
+                if line.startswith("Role: "):
+                    if current_role is not None:
+                        history.append({"role": current_role, "content": ["", current_content]})
+                    current_role = line.split(': ')[1]
+                elif line.startswith("Content: "):
+                    current_content = line.split(': ', 1)[1]
+            if current_role is not None:
+                history.append({"role": current_role, "content": ["", current_content]})
+            return json.dumps({
+                "conversation_id": conversation_id,
+                "timestamp": timestamp,
+                "history": history
+            }, indent=2)
 
         search_button.click(
             search_conversations,
@@ -3536,23 +3686,30 @@ def create_chat_management_tab():
         conversation_list.change(
             load_conversation,
             inputs=[conversation_list],
-            outputs=[chat_display]
+            outputs=[chat_content]
         )
-        send_button.click(
-            send_message,
-            inputs=[conversation_list, message_input],
-            outputs=[chat_display, message_input]
+
+        save_button.click(
+            save_conversation,
+            inputs=[conversation_list, chat_content],
+            outputs=[result_message]
         )
-        update_message_button.click(
-            update_message,
-            inputs=[edit_message_id, edit_message_text, conversation_list],
-            outputs=[chat_display, edit_message_id, edit_message_text, update_message_button]
-        )
-        delete_message_button.click(
-            delete_message,
-            inputs=[delete_message_id, conversation_list],
-            outputs=[chat_display, delete_message_id, delete_message_button]
-        )
+
+    return search_query, search_button, conversation_list, conversation_mapping, chat_content, save_button, result_message
+
+# You'll need to implement these functions to interact with your database
+def fetch_conversations(query):
+    # Return a list of conversation objects with 'id' and 'timestamp'
+    pass
+
+def fetch_conversation_content(conversation_id):
+    # Retrieve the JSON content for the given conversation_id
+    pass
+
+def save_conversation_content(conversation_id, content):
+    # Save the JSON content for the given conversation_id
+    # Return True if successful, False otherwise
+    pass
 
 
 #
