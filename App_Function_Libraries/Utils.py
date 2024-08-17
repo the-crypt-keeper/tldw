@@ -460,6 +460,20 @@ def save_segments_to_json(segments, file_name="transcription_segments.json"):
 
     return json_file_path
 
+
+def generate_unique_identifier(file_path):
+    filename = os.path.basename(file_path)
+    timestamp = int(time.time())
+
+    # Generate a hash of the file content
+    hasher = hashlib.md5()
+    with open(file_path, 'rb') as f:
+        buf = f.read()
+        hasher.update(buf)
+    content_hash = hasher.hexdigest()[:8]  # Use first 8 characters of the hash
+
+    return f"local:{timestamp}:{content_hash}:{filename}"
+
 #
 #
 #######################################################################################################################

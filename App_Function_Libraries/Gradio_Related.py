@@ -60,7 +60,7 @@ from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts,
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
     load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt, search_and_display_items
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
-    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files
+    convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files, generate_unique_identifier
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, \
     generate_timestamped_url, extract_metadata, download_video
 
@@ -1003,7 +1003,8 @@ def create_video_transcription_tab():
                     if url_input:
                         inputs.extend([url.strip() for url in url_input.split('\n') if url.strip()])
                     if video_file is not None:
-                        inputs.append(video_file.name)  # Assuming video_file is a file object with a 'name' attribute
+                        # Assuming video_file is a file object with a 'name' attribute
+                        inputs.append(video_file.name)
 
                     if not inputs:
                         raise ValueError("No input provided. Please enter URLs or upload a video file.")
@@ -1063,9 +1064,10 @@ def create_video_transcription_tab():
                     # Handle URL or local file
                     if os.path.isfile(input_item):
                         video_file_path = input_item
+                        unique_id = generate_unique_identifier(input_item)
                         # Extract basic info from local file
                         info_dict = {
-                            'webpage_url': input_item,
+                            'webpage_url': unique_id,
                             'title': os.path.basename(input_item),
                             'description': "Local file",
                             'channel_url': None,
@@ -4973,11 +4975,12 @@ def launch_ui(share_public=None, server_mode=False):
                 create_llamafile_settings_tab()
 
             with gr.TabItem("Edit Existing Items"):
-                create_compare_transcripts_tab()
                 create_media_edit_tab()
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
+                # FIXME
+                #create_compare_transcripts_tab()
 
             with gr.TabItem("Writing Tools"):
                 create_document_editing_tab()
