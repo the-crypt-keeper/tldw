@@ -3721,18 +3721,18 @@ def create_chat_management_tab():
 
         def save_conversation(selected, conversation_mapping, content):
             if not selected or selected not in conversation_mapping:
-                return "Please select a conversation before saving."
+                return "Please select a conversation before saving.", "<p>No changes made</p>"
 
             conversation_id = conversation_mapping[selected]
             is_valid, result = validate_conversation_json(content)
 
             if not is_valid:
-                return f"Error: {result}"
+                return f"Error: {result}", "<p>No changes made due to error</p>"
 
             conversation_data = result
             if conversation_data["conversation_id"] != conversation_id:
-                return "Error: Conversation ID mismatch."
-
+                return "Error: Conversation ID mismatch.", "<p>No changes made due to ID mismatch</p>"
+        
             try:
                 with db.get_connection() as conn:
                     conn.execute("BEGIN TRANSACTION")
@@ -3756,15 +3756,26 @@ def create_chat_management_tab():
                         ''', (conversation_id, message["sender"], message["message"], message.get("timestamp")))
 
                     conn.commit()
-                    return "Conversation updated successfully."
+
+                    # Create updated HTML preview
+                    html_preview = "<div style='max-height: 500px; overflow-y: auto;'>"
+                    for msg in conversation_data["messages"]:
+                        sender_style = "background-color: #e6f3ff;" if msg['sender'] == 'user' else "background-color: #f0f0f0;"
+                        html_preview += f"<div style='margin-bottom: 10px; padding: 10px; border-radius: 5px; {sender_style}'>"
+                        html_preview += f"<strong>{msg['sender']}:</strong> {html.escape(msg['message'])}<br>"
+                        html_preview += f"<small>Timestamp: {msg.get('timestamp', 'N/A')}</small>"
+                        html_preview += "</div>"
+                    html_preview += "</div>"
+
+                    return "Conversation updated successfully.", html_preview
             except sqlite3.Error as e:
                 conn.rollback()
                 logging.error(f"Database error in save_conversation: {e}")
-                return f"Error updating conversation: {str(e)}"
+                return f"Error updating conversation: {str(e)}", "<p>Error occurred while saving</p>"
             except Exception as e:
                 conn.rollback()
                 logging.error(f"Unexpected error in save_conversation: {e}")
-                return f"Unexpected error: {str(e)}"
+                return f"Unexpected error: {str(e)}", "<p>Unexpected error occurred</p>"
 
         def parse_formatted_content(formatted_content):
             lines = formatted_content.split('\n')
@@ -3807,22 +3818,6 @@ def create_chat_management_tab():
         )
 
     return search_query, search_button, conversation_list, conversation_mapping, chat_content, save_button, result_message, chat_preview
-
-
-# You'll need to implement these functions to interact with your database
-def fetch_conversations(query):
-    # Return a list of conversation objects with 'id' and 'timestamp'
-    pass
-
-def fetch_conversation_content(conversation_id):
-    # Retrieve the JSON content for the given conversation_id
-    pass
-
-def save_conversation_content(conversation_id, content):
-    # Save the JSON content for the given conversation_id
-    # Return True if successful, False otherwise
-    pass
-
 
 #
 # End of Chat Interface Tab Functions
