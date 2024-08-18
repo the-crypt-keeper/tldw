@@ -16,6 +16,128 @@ import sqlite3
 import logging
 
 
+
+########################################################################################################################################################################################################################################
+#
+# RAG Chunking
+# To fully integrate this chunking system, you'd need to:
+#
+# Create the UnvectorizedMediaChunks table in your SQLite database.
+# Modify your document ingestion process to use chunk_and_store_unvectorized.
+# Implement a background process that periodically calls vectorize_all_documents to process unvectorized chunks.
+import json
+from typing import List, Dict, Any
+from datetime import datetime
+
+
+def chunk_and_store_unvectorized(
+        db_connection,
+        media_id: int,
+        text: str,
+        chunk_size: int = 1000,
+        overlap: int = 100,
+        chunk_type: str = 'fixed-length'
+) -> List[int]:
+    chunks = create_chunks(text, chunk_size, overlap)
+    return store_unvectorized_chunks(db_connection, media_id, chunks, chunk_type)
+
+
+def create_chunks(text: str, chunk_size: int, overlap: int) -> List[Dict[str, Any]]:
+    words = text.split()
+    chunks = []
+    for i in range(0, len(words), chunk_size - overlap):
+        chunk_text = ' '.join(words[i:i + chunk_size])
+        start_char = text.index(words[i])
+        end_char = start_char + len(chunk_text)
+        chunks.append({
+            'text': chunk_text,
+            'start_char': start_char,
+            'end_char': end_char,
+            'index': len(chunks)
+        })
+    return chunks
+
+
+def store_unvectorized_chunks(
+        db_connection,
+        media_id: int,
+        chunks: List[Dict[str, Any]],
+        chunk_type: str
+) -> List[int]:
+    cursor = db_connection.cursor()
+    chunk_ids = []
+    for chunk in chunks:
+        cursor.execute("""
+            INSERT INTO UnvectorizedMediaChunks 
+            (media_id, chunk_text, chunk_index, start_char, end_char, chunk_type, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            media_id,
+            chunk['text'],
+            chunk['index'],
+            chunk['start_char'],
+            chunk['end_char'],
+            chunk_type,
+            json.dumps({'length': len(chunk['text'])})  # Example metadata
+        ))
+        chunk_ids.append(cursor.lastrowid)
+    db_connection.commit()
+    return chunk_ids
+
+
+def get_unvectorized_chunks(
+        db_connection,
+        media_id: int,
+        limit: int = 100,
+        offset: int = 0
+) -> List[Dict[str, Any]]:
+    cursor = db_connection.cursor()
+    cursor.execute("""
+        SELECT id, chunk_text, chunk_index, start_char, end_char, chunk_type, metadata
+        FROM UnvectorizedMediaChunks
+        WHERE media_id = ? AND is_processed = FALSE
+        ORDER BY chunk_index
+        LIMIT ? OFFSET ?
+    """, (media_id, limit, offset))
+    return [
+        {
+            'id': row[0],
+            'text': row[1],
+            'index': row[2],
+            'start_char': row[3],
+            'end_char': row[4],
+            'type': row[5],
+            'metadata': json.loads(row[6])
+        }
+        for row in cursor.fetchall()
+    ]
+
+
+def mark_chunks_as_processed(db_connection, chunk_ids: List[int]):
+    cursor = db_connection.cursor()
+    cursor.executemany("""
+        UPDATE UnvectorizedMediaChunks
+        SET is_processed = TRUE, last_modified = ?
+        WHERE id = ?
+    """, [(datetime.now(), chunk_id) for chunk_id in chunk_ids])
+    db_connection.commit()
+
+
+# Usage example
+def process_media_chunks(db_connection, media_id: int, text: str):
+    chunk_ids = chunk_and_store_unvectorized(db_connection, media_id, text)
+    print(f"Stored {len(chunk_ids)} unvectorized chunks for media_id {media_id}")
+
+    # Later, when you want to process these chunks:
+    unprocessed_chunks = get_unvectorized_chunks(db_connection, media_id)
+    # Process chunks (e.g., vectorize them)
+    # ...
+    # After processing, mark them as processed
+    mark_chunks_as_processed(db_connection, [chunk['id'] for chunk in unprocessed_chunks])
+###########################################################################################################################################################################################################
+#
+# RAG System
+
 # To use this updated RAG system in your existing application:
 #
 # Install required packages:
@@ -70,12 +192,6 @@ import logging
 
 
 
-
-
-
-
-
-
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -111,31 +227,33 @@ class RAGSystem:
         return self.model.encode([text])[0]
 
     def vectorize_document(self, doc_id: int, content: str):
-        vector = self._get_embedding(content)
+        chunks = create_chunks(content, chunk_size=1000, overlap=100)
+        for chunk in chunks:
+            vector = self._get_embedding(chunk['text'])
 
-        with psycopg2.connect(**self.pg_config) as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                INSERT INTO document_vectors (document_id, vector)
-                VALUES (%s, %s)
-                ON CONFLICT (document_id) DO UPDATE SET vector = EXCLUDED.vector
-                """, (doc_id, vector.tolist()))
-            conn.commit()
+            with psycopg2.connect(**self.pg_config) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                    INSERT INTO document_vectors (document_id, chunk_index, vector, metadata)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (document_id, chunk_index) DO UPDATE SET vector = EXCLUDED.vector
+                    """, (doc_id, chunk['index'], vector.tolist(), json.dumps(chunk)))
+                conn.commit()
 
     def vectorize_all_documents(self):
         with sqlite3.connect(self.sqlite_path) as sqlite_conn:
-            sqlite_cur = sqlite_conn.cursor()
-            sqlite_cur.execute("SELECT id, content FROM media")
-            for doc_id, content in sqlite_cur:
-                self.vectorize_document(doc_id, content)
+            unprocessed_chunks = get_unvectorized_chunks(sqlite_conn, limit=1000)
+            for chunk in unprocessed_chunks:
+                self.vectorize_document(chunk['id'], chunk['text'])
+            mark_chunks_as_processed(sqlite_conn, [chunk['id'] for chunk in unprocessed_chunks])
 
-    def semantic_search(self, query: str, top_k: int = 5) -> List[Tuple[int, float]]:
+    def semantic_search(self, query: str, top_k: int = 5) -> List[Tuple[int, int, float]]:
         query_vector = self._get_embedding(query)
 
         with psycopg2.connect(**self.pg_config) as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                SELECT document_id, 1 - (vector <-> %s) AS similarity
+                SELECT document_id, chunk_index, 1 - (vector <-> %s) AS similarity
                 FROM document_vectors
                 ORDER BY vector <-> %s ASC
                 LIMIT %s
