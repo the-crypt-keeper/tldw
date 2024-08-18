@@ -23,12 +23,13 @@ import shutil
 import tempfile
 import uuid
 import zipfile
-from datetime import datetime, time
+from datetime import datetime
 import json
 import logging
 import os.path
 from pathlib import Path
 import sqlite3
+from time import sleep
 from typing import Dict, List, Tuple, Optional
 import traceback
 from functools import wraps
@@ -2735,7 +2736,7 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         elif api_endpoint.lower() == "tabbyapi":
             response = summarize_with_tabbyapi(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "vllm":
-            response = summarize_with_vllm(input_data, prompt, temp, system_message)
+            response = summarize_with_vllm(input_data, prompt, system_message)
         elif api_endpoint.lower() == "local-llm":
             response = summarize_with_local_llm(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "huggingface":
@@ -2961,7 +2962,7 @@ def update_user_prompt(preset_name):
 
 def clear_chat():
     # Return empty list for chatbot and None for conversation_id
-    return [], None
+    return gr.update(value=[]), None
 
 
 # FIXME - add additional features....
@@ -3031,10 +3032,6 @@ def load_conversation(conversation_id):
         for msg in messages
     ]
     return history, conversation_id
-
-
-def clear_chat():
-    return gr.update(value=[]), None
 
 
 def update_message_in_chat(message_id, new_text, history):
@@ -3656,52 +3653,118 @@ def create_chat_management_tab():
         conversation_list = gr.Dropdown(label="Select Conversation", choices=[])
         conversation_mapping = gr.State({})
 
-        chat_content = gr.TextArea(label="Chat Content", lines=20, max_lines=50)
-        save_button = gr.Button("Save Changes")
+        with gr.Tabs():
+            with gr.TabItem("Edit"):
+                chat_content = gr.TextArea(label="Chat Content (JSON)", lines=20, max_lines=50)
+                save_button = gr.Button("Save Changes")
 
+            with gr.TabItem("Preview"):
+                chat_preview = gr.HTML(label="Chat Preview")
         result_message = gr.Markdown("")
 
         def search_conversations(query):
-            # Implement your search logic here
-            conversations = fetch_conversations(query)  # You'll need to implement this function
-            choices = [f"{conv['id']}: {conv['timestamp']}" for conv in conversations]
+            conversations = search_chat_conversations(query)
+            choices = [f"{conv['conversation_name']} (Media: {conv['media_title']}, ID: {conv['id']})" for conv in
+                       conversations]
             mapping = {choice: conv['id'] for choice, conv in zip(choices, conversations)}
             return gr.update(choices=choices), mapping
 
-        def load_conversation(selected):
-            conversation_id = conversation_mapping.value.get(selected)
-            if conversation_id:
-                # Fetch the entire conversation content
-                content = fetch_conversation_content(conversation_id)  # You'll need to implement this function
-                if content:
-                    formatted_content = format_conversation(content)
-                    return formatted_content
-            return "Please select a conversation or no conversation found."
+        def load_conversations(selected, conversation_mapping):
+            logging.info(f"Selected: {selected}")
+            logging.info(f"Conversation mapping: {conversation_mapping}")
 
-        def save_conversation(selected, content):
-            conversation_id = conversation_mapping.value.get(selected)
-            if conversation_id:
-                try:
-                    # Parse the content back into JSON
-                    parsed_content = parse_formatted_content(content)
-                    # Save the modified content
-                    success = save_conversation_content(conversation_id, parsed_content)  # You'll need to implement this function
-                    return "Changes saved successfully." if success else "Failed to save changes."
-                except json.JSONDecodeError:
-                    return "Error: Invalid JSON format. Please check your edits."
-            return "Please select a conversation before saving."
+            try:
+                if selected and selected in conversation_mapping:
+                    conversation_id = conversation_mapping[selected]
+                    messages = get_chat_messages(conversation_id)
+                    conversation_data = {
+                        "conversation_id": conversation_id,
+                        "messages": messages
+                    }
+                    json_content = json.dumps(conversation_data, indent=2)
 
-        def format_conversation(content):
+                    # Create HTML preview
+                    html_preview = "<div style='max-height: 500px; overflow-y: auto;'>"
+                    for msg in messages:
+                        sender_style = "background-color: #e6f3ff;" if msg[
+                                                                           'sender'] == 'user' else "background-color: #f0f0f0;"
+                        html_preview += f"<div style='margin-bottom: 10px; padding: 10px; border-radius: 5px; {sender_style}'>"
+                        html_preview += f"<strong>{msg['sender']}:</strong> {html.escape(msg['message'])}<br>"
+                        html_preview += f"<small>Timestamp: {msg['timestamp']}</small>"
+                        html_preview += "</div>"
+                    html_preview += "</div>"
+
+                    logging.info("Returning json_content and html_preview")
+                    return json_content, html_preview
+                else:
+                    logging.warning("No conversation selected or not in mapping")
+                    return "", "<p>No conversation selected</p>"
+            except Exception as e:
+                logging.error(f"Error in load_conversations: {str(e)}")
+                return f"Error: {str(e)}", "<p>Error loading conversation</p>"
+
+        def validate_conversation_json(content):
             try:
                 data = json.loads(content)
-                formatted = f"Conversation ID: {data['conversation_id']}\n"
-                formatted += f"Timestamp: {data['timestamp']}\n\n"
-                for message in data['history']:
-                    formatted += f"Role: {message['role']}\n"
-                    formatted += f"Content: {message['content'][1] if message['content'][1] else message['content'][0]}\n\n"
-                return formatted
-            except json.JSONDecodeError:
-                return "Error: Invalid JSON format"
+                if not isinstance(data, dict):
+                    return False, "Invalid JSON structure: root should be an object"
+                if "conversation_id" not in data or not isinstance(data["conversation_id"], int):
+                    return False, "Missing or invalid conversation_id"
+                if "messages" not in data or not isinstance(data["messages"], list):
+                    return False, "Missing or invalid messages array"
+                for msg in data["messages"]:
+                    if not all(key in msg for key in ["sender", "message"]):
+                        return False, "Invalid message structure: missing required fields"
+                return True, data
+            except json.JSONDecodeError as e:
+                return False, f"Invalid JSON: {str(e)}"
+
+        def save_conversation(selected, conversation_mapping, content):
+            if not selected or selected not in conversation_mapping:
+                return "Please select a conversation before saving."
+
+            conversation_id = conversation_mapping[selected]
+            is_valid, result = validate_conversation_json(content)
+
+            if not is_valid:
+                return f"Error: {result}"
+
+            conversation_data = result
+            if conversation_data["conversation_id"] != conversation_id:
+                return "Error: Conversation ID mismatch."
+
+            try:
+                with db.get_connection() as conn:
+                    conn.execute("BEGIN TRANSACTION")
+                    cursor = conn.cursor()
+
+                    # Backup original conversation
+                    cursor.execute("SELECT * FROM ChatMessages WHERE conversation_id = ?", (conversation_id,))
+                    original_messages = cursor.fetchall()
+                    backup_data = json.dumps({"conversation_id": conversation_id, "messages": original_messages})
+
+                    # You might want to save this backup_data somewhere
+
+                    # Delete existing messages
+                    cursor.execute("DELETE FROM ChatMessages WHERE conversation_id = ?", (conversation_id,))
+
+                    # Insert updated messages
+                    for message in conversation_data["messages"]:
+                        cursor.execute('''
+                            INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+                            VALUES (?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+                        ''', (conversation_id, message["sender"], message["message"], message.get("timestamp")))
+
+                    conn.commit()
+                    return "Conversation updated successfully."
+            except sqlite3.Error as e:
+                conn.rollback()
+                logging.error(f"Database error in save_conversation: {e}")
+                return f"Error updating conversation: {str(e)}"
+            except Exception as e:
+                conn.rollback()
+                logging.error(f"Unexpected error in save_conversation: {e}")
+                return f"Unexpected error: {str(e)}"
 
         def parse_formatted_content(formatted_content):
             lines = formatted_content.split('\n')
@@ -3732,18 +3795,19 @@ def create_chat_management_tab():
         )
 
         conversation_list.change(
-            load_conversation,
-            inputs=[conversation_list],
-            outputs=[chat_content]
+            load_conversations,
+            inputs=[conversation_list, conversation_mapping],
+            outputs=[chat_content, chat_preview]
         )
 
         save_button.click(
             save_conversation,
-            inputs=[conversation_list, chat_content],
-            outputs=[result_message]
+            inputs=[conversation_list, conversation_mapping, chat_content],
+            outputs=[result_message, chat_preview]
         )
 
-    return search_query, search_button, conversation_list, conversation_mapping, chat_content, save_button, result_message
+    return search_query, search_button, conversation_list, conversation_mapping, chat_content, save_button, result_message, chat_preview
+
 
 # You'll need to implement these functions to interact with your database
 def fetch_conversations(query):
@@ -4208,7 +4272,7 @@ def import_obsidian_vault(vault_path, progress=gr.Progress()):
                 errors.append(error_msg)
 
             progress((i + 1) / total_files, f"Imported {imported_files} of {total_files} files")
-            time.sleep(0.1)  # Small delay to prevent UI freezing
+            sleep(0.1)  # Small delay to prevent UI freezing
 
         return imported_files, total_files, errors
     except Exception as e:
@@ -5065,7 +5129,7 @@ def adjust_tone(text, concise, casual, api_name, api_key):
 
     prompt = f"Rewrite the following text to match these tones: {tone_prompt}. Text: {text}"
     # Performing tone adjustment request...
-    adjusted_text = perform_summarization(api_name, text, prompt, api_key, system_prompt=None)
+    adjusted_text = perform_summarization(api_name, text, prompt, api_key)
 
     return adjusted_text
 
