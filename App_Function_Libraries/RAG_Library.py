@@ -25,6 +25,9 @@ import logging
 # Create the UnvectorizedMediaChunks table in your SQLite database.
 # Modify your document ingestion process to use chunk_and_store_unvectorized.
 # Implement a background process that periodically calls vectorize_all_documents to process unvectorized chunks.
+
+# This chunking is pretty weak and needs improvement
+# See notes for improvements #FIXME
 import json
 from typing import List, Dict, Any
 from datetime import datetime
