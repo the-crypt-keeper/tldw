@@ -237,7 +237,7 @@ db = Database()
 
 
 # Function to create tables with the new media schema
-def create_tables() -> None:
+def create_tables(db) -> None:
     table_queries = [
         # CREATE TABLE statements
         '''
@@ -253,7 +253,8 @@ def create_tables() -> None:
             summary TEXT,
             transcription_model TEXT,
             is_trash BOOLEAN DEFAULT 0,
-            trash_date DATETIME
+            trash_date DATETIME,
+            vector_embedding BLOB
         )
         ''',
         '''
@@ -296,6 +297,7 @@ def create_tables() -> None:
         CREATE TABLE IF NOT EXISTS ChatConversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             media_id INTEGER,
+            media_name TEXT,
             conversation_name TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -322,84 +324,77 @@ def create_tables() -> None:
             FOREIGN KEY (media_id) REFERENCES Media(id)
         )
         ''',
+        '''
+        CREATE TABLE IF NOT EXISTS MediaChunks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER,
+            chunk_text TEXT,
+            start_index INTEGER,
+            end_index INTEGER,
+            vector_embedding BLOB,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
+        ''',
+        '''
+        CREATE TABLE IF NOT EXISTS UnvectorizedMediaChunks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER NOT NULL,
+            chunk_text TEXT NOT NULL,
+            chunk_index INTEGER NOT NULL,
+            start_char INTEGER NOT NULL,
+            end_char INTEGER NOT NULL,
+            chunk_type TEXT,
+            creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_processed BOOLEAN DEFAULT FALSE,
+            metadata TEXT,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
+        '''
+    ]
 
+    index_queries = [
         # CREATE INDEX statements
-        '''
-        CREATE INDEX IF NOT EXISTS idx_media_title ON Media(title);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_media_type ON Media(type);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_media_author ON Media(author);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_media_ingestion_date ON Media(ingestion_date);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON Keywords(keyword);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_mediakeywords_media_id ON MediaKeywords(media_id);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_mediakeywords_keyword_id ON MediaKeywords(keyword_id);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_media_version_media_id ON MediaVersion(media_id);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_mediamodifications_media_id ON MediaModifications(media_id);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_chatconversations_media_id ON ChatConversations(media_id);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id);
-        ''',
-        '''
-        CREATE INDEX IF NOT EXISTS idx_media_is_trash ON Media(is_trash);
-        ''',
-
+        'CREATE INDEX IF NOT EXISTS idx_media_title ON Media(title)',
+        'CREATE INDEX IF NOT EXISTS idx_media_type ON Media(type)',
+        'CREATE INDEX IF NOT EXISTS idx_media_author ON Media(author)',
+        'CREATE INDEX IF NOT EXISTS idx_media_ingestion_date ON Media(ingestion_date)',
+        'CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON Keywords(keyword)',
+        'CREATE INDEX IF NOT EXISTS idx_mediakeywords_media_id ON MediaKeywords(media_id)',
+        'CREATE INDEX IF NOT EXISTS idx_mediakeywords_keyword_id ON MediaKeywords(keyword_id)',
+        'CREATE INDEX IF NOT EXISTS idx_media_version_media_id ON MediaVersion(media_id)',
+        'CREATE INDEX IF NOT EXISTS idx_mediamodifications_media_id ON MediaModifications(media_id)',
+        'CREATE INDEX IF NOT EXISTS idx_chatconversations_media_id ON ChatConversations(media_id)',
+        'CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id)',
+        'CREATE INDEX IF NOT EXISTS idx_media_is_trash ON Media(is_trash)',
+        'CREATE INDEX IF NOT EXISTS idx_mediachunks_media_id ON MediaChunks(media_id)',
+        'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_media_id ON UnvectorizedMediaChunks(media_id)',
+        'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_is_processed ON UnvectorizedMediaChunks(is_processed)',
+        'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_chunk_type ON UnvectorizedMediaChunks(chunk_type)',
         # CREATE UNIQUE INDEX statements
-        '''
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url);
-        ''',
-        '''
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id);
-        ''',
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url)',
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id)'
+    ]
 
+    virtual_table_queries = [
         # CREATE VIRTUAL TABLE statements
-        '''
-        CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(title, content);
-        ''',
-        '''
-        CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword);
-        '''
+        'CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(title, content)',
+        'CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword)'
     ]
 
-    for query in table_queries:
-        db.execute_query(query)
+    all_queries = table_queries + index_queries + virtual_table_queries
 
-    for query in table_queries:
-        db.execute_query(query)
-
-    # Add new columns to the Media table if they don't exist
-    alter_queries = [
-        "ALTER TABLE Media ADD COLUMN is_trash BOOLEAN DEFAULT 0;",
-        "ALTER TABLE Media ADD COLUMN trash_date DATETIME;"
-    ]
-
-    for query in alter_queries:
+    for query in all_queries:
         try:
             db.execute_query(query)
         except Exception as e:
-            # If the column already exists, SQLite will throw an error. We can safely ignore it.
-            logging.debug(f"Note: {str(e)}")
+            logging.error(f"Error executing query: {query}")
+            logging.error(f"Error details: {str(e)}")
+            raise
 
-    logging.info("All tables and indexes created successfully.")
+    logging.info("All tables, indexes, and virtual tables created successfully.")
 
-create_tables()
+create_tables(db)
 
 
 def check_media_exists(title, url):
@@ -1662,7 +1657,7 @@ def delete_chat_message(message_id: int) -> None:
         raise DatabaseError(f"Error deleting chat message: {e}")
 
 
-def save_chat_history_to_database(chatbot, conversation_id, media_id, conversation_name):
+def save_chat_history_to_database(chatbot, conversation_id, media_id, media_name, conversation_name):
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -1670,10 +1665,17 @@ def save_chat_history_to_database(chatbot, conversation_id, media_id, conversati
             # If conversation_id is None, create a new conversation
             if conversation_id is None:
                 cursor.execute('''
-                    INSERT INTO ChatConversations (media_id, conversation_name, created_at, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (media_id, conversation_name))
+                    INSERT INTO ChatConversations (media_id, media_name, conversation_name, created_at, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (media_id, media_name, conversation_name))
                 conversation_id = cursor.lastrowid
+            else:
+                # If conversation exists, update the media_name
+                cursor.execute('''
+                    UPDATE ChatConversations
+                    SET media_name = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (media_name, conversation_id))
 
             # Save each message in the chatbot history
             for i, (user_msg, ai_msg) in enumerate(chatbot):
@@ -1701,6 +1703,38 @@ def save_chat_history_to_database(chatbot, conversation_id, media_id, conversati
         logging.error(f"Error saving chat history to database: {str(e)}")
         raise
 
+
+def get_conversation_name(conversation_id):
+    if conversation_id is None:
+        return None
+
+    try:
+        with sqlite3.connect('media_summary.db') as conn:  # Replace with your actual database name
+            cursor = conn.cursor()
+
+            query = """
+            SELECT conversation_name, media_name
+            FROM ChatConversations
+            WHERE id = ?
+            """
+
+            cursor.execute(query, (conversation_id,))
+            result = cursor.fetchone()
+
+            if result:
+                conversation_name, media_name = result
+                if conversation_name:
+                    return conversation_name
+                elif media_name:
+                    return f"{media_name}-chat"
+
+            return None  # Return None if no result found
+    except sqlite3.Error as e:
+        logging.error(f"Database error in get_conversation_name: {e}")
+        return None
+    except Exception as e:
+        logging.error(f"Unexpected error in get_conversation_name: {e}")
+        return None
 
 #
 # End of Chat-related Functions

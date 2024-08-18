@@ -46,7 +46,7 @@
   - Ingest content(video/audio/ebook/website/markdown) from a URL or a local file. Can be done in batches with a text file containing a list of URLs or paths to local files(CLI only) as well as from the GUI.
     - GUI can handle local file uploads, but not batched file uploads. Can handle multiple URLs though.
   - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
-    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, and Triton support planned) - Tabby/vLLM are in, but untested. Aphrodite you can use llama.cpp or kobold.cpp API and it should work...
+    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, ollama, and Triton support planned) - Tabby/vLLM are in, but untested. Aphrodite you can use llama.cpp or kobold.cpp API and it should work...
   - Recursive/'Rolling' summaries (i.e. chunking up input and doing a chain of summaries) are supported. 
     - The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
   - Everything is stored in a SQLite DB, so you can search across all the content you've ingested, and review or modify it.
@@ -308,8 +308,6 @@ options:
                         Mandatory if rolling summarization is enabled, defines the chunk  size.
                          Default is 0.01(lots of chunks) -> 1.00 (few chunks)
                          Currently only OpenAI works.
-  -model LLM_MODEL, --llm_model LLM_MODEL
-                        Model to use for LLM summarization (only used for vLLM/TabbyAPI)
   -k KEYWORDS [KEYWORDS ...], --keywords KEYWORDS [KEYWORDS ...]
                         Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)
   --log_file LOG_FILE   Where to save logfile (non-default)
@@ -508,6 +506,8 @@ Sample commands:
   * Bit.ai 
   * typeset.io/
   * https://www.getcoralai.com/
+  * https://getcahier.com/#features
+  * https://msty.app/
 ------------
 
 ### <a name="credits"></a>Credits
