@@ -506,8 +506,6 @@ Sample commands:
   * Bit.ai 
   * typeset.io/
   * https://www.getcoralai.com/
-  * https://getcahier.com/#features
-  * https://msty.app/
 ------------
 
 ### <a name="credits"></a>Credits

@@ -4587,7 +4587,7 @@ def create_import_book_tab():
                 gr.Markdown("...and have it tagged + summarized")
                 gr.Markdown(
                 "How to remove DRM from your ebooks: https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/")
-                import_files = gr.File(label="Upload epub file(s) for import", file_types=[".epub"], multiple=True)
+                import_file = gr.File(label="Upload file for import", file_types=[".epub"])
                 title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
                 keywords_input = gr.Textbox(label="Keywords(like genre or publish year)",
@@ -4626,16 +4626,7 @@ def create_import_book_tab():
                 with gr.Row():
                     import_output = gr.Textbox(label="Import Status")
 
-        def process_multiple_epubs(epub_files, title, author, keywords, custom_prompt, auto_summarize, api_name,
-                                   api_key):
-            results = []
-            for epub_file in epub_files:
-                result = import_epub(epub_file, title, author, keywords, custom_prompt, auto_summarize, api_name,
-                                     api_key)
-                results.append(result)
-            return "\n".join(results)
-
-        def import_epub(epub_file, title, author, keywords, custom_prompt, auto_summarize, api_name, api_key):
+        def import_epub(epub_file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
             try:
                 # Create a temporary directory to store the converted file
                 with tempfile.TemporaryDirectory() as temp_dir:
@@ -4652,14 +4643,16 @@ def create_import_book_tab():
                     with open(md_path, "r", encoding="utf-8") as md_file:
                         content = md_file.read()
 
-                return import_data(content, title or os.path.basename(epub_file.name), author, keywords, custom_prompt, auto_summarize, api_name, api_key)
+                    # Now process the content as you would with a text file
+                    return import_data(content, title, author, keywords, system_prompt_input,
+                                       custom_prompt_input, auto_summarize, api_name, api_key)
             except Exception as e:
-                return f"Error processing EPUB {epub_file.name}: {str(e)}"
+                return f"Error processing EPUB: {str(e)}"
 
         import_button.click(
-            fn=process_multiple_epubs,
-            inputs=[import_files, title_input, author_input, keywords_input, custom_prompt_input,
-                    auto_summarize_checkbox, api_name_input, api_key_input],
+            fn=import_epub,
+            inputs=[import_file, title_input, author_input, keywords_input, system_prompt_input,
+                    custom_prompt_input, auto_summarize_checkbox, api_name_input, api_key_input],
             outputs=import_output
         )
 
