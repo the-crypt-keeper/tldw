@@ -604,6 +604,103 @@ def summarize_with_vllm(
         return f"Error: Unexpected error during vLLM summarization - {str(e)}"
 
 
+def summarize_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/api/generate", api_key=None, temp=None, system_message=None, model=None):
+    try:
+        logging.debug("ollama: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            ollama_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                ollama_api_key = api_key
+                logging.info("Ollama: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                ollama_api_key = loaded_config_data['api_keys'].get('ollama')
+                if ollama_api_key:
+                    logging.info("Ollama: Using API key from config file")
+                else:
+                    logging.warning("Ollama: No API key found in config file")
+
+        model = loaded_config_data['models']['ollama']
+
+        # Load transcript
+        logging.debug("Ollama: Loading JSON data")
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Ollama: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Ollama: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"Ollama: Loaded data: {data}")
+        logging.debug(f"Ollama: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Ollama: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Ollama: Invalid input data format")
+
+        headers = {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+        }
+        if len(ollama_api_key) > 5:
+            headers['Authorization'] = f'Bearer {ollama_api_key}'
+
+        ollama_prompt = f"{custom_prompt} \n\n\n\n{text}"
+        if system_message == None:
+            system_message = "You are a helpful AI assistant."
+        logging.debug(f"llama: Prompt being sent is {ollama_prompt}")
+        if system_message is None:
+            system_message = "You are a helpful AI assistant."
+
+        data = {
+            "model": model,
+            "messages": [
+                {"role": "system",
+                 "content": system_message
+                 },
+                {"role": "user",
+                 "content": ollama_prompt
+                 }
+            ],
+        }
+
+        logging.debug("Ollama: Submitting request to API endpoint")
+        print("Ollama: Submitting request to API endpoint")
+        response = requests.post(api_url, headers=headers, json=data)
+        response_data = response.json()
+        logging.debug("API Response Data: %s", response_data)
+
+        if response.status_code == 200:
+            # if 'X' in response_data:
+            logging.debug(response_data)
+            summary = response_data['content'].strip()
+            logging.debug("Ollama: Summarization successful")
+            print("Summarization successful.")
+            return summary
+        else:
+            logging.error(f"Ollama: API request failed with status code {response.status_code}: {response.text}")
+            return f"Ollama: API request failed: {response.text}"
+
+    except Exception as e:
+        logging.error("Ollama: Error in processing: %s", str(e))
+        return f"Ollama: Error occurred while processing summary with ollama: {str(e)}"
+
+
 def save_summary_to_file(summary, file_path):
     logging.debug("Now saving summary to file...")
     base_name = os.path.splitext(os.path.basename(file_path))[0]

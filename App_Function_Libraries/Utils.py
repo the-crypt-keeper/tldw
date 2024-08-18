@@ -295,6 +295,10 @@ def load_and_log_configs():
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
         vllm_model = config.get('Local-API', 'vllm_model', fallback=None)
 
+        ollama_api_url = config.get('Local-API', 'ollama_api_IP', fallback='http://127.0.0.1:11434/api/generate')
+        ollama_api_key = config.get('Local-API', 'ollama_api_key', fallback=None)
+        ollama_model = config.get('Local-API', 'ollama_model', fallback=None)
+
         logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
         logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
         logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
@@ -325,7 +329,8 @@ def load_and_log_configs():
                 'llama': llama_api_key,
                 'ooba': ooba_api_key,
                 'tabby': tabby_api_key,
-                'vllm': vllm_api_key
+                'vllm': vllm_api_key,
+                'ollama': ollama_api_key
             },
             'models': {
                 'anthropic': anthropic_model,
@@ -336,7 +341,8 @@ def load_and_log_configs():
                 'openrouter': openrouter_model,
                 'deepseek': deepseek_model,
                 'vllm': vllm_model,
-                'tabby': tabby_model
+                'tabby': tabby_model,
+                'ollama': ollama_model
 
             },
             'local_api_ip': {
@@ -345,6 +351,7 @@ def load_and_log_configs():
                 'ooba': ooba_api_IP,
                 'tabby': tabby_api_IP,
                 'vllm': vllm_api_url,
+                'ollama': ollama_api_url
             },
             'output_path': output_path,
             'processing_choice': processing_choice
@@ -452,6 +459,30 @@ def save_segments_to_json(segments, file_name="transcription_segments.json"):
         json.dump(segments, json_file, ensure_ascii=False, indent=4)
 
     return json_file_path
+
+def generate_unique_filename(base_path, base_filename):
+    """Generate a unique filename by appending a counter if necessary."""
+    filename = base_filename
+    counter = 1
+    while os.path.exists(os.path.join(base_path, filename)):
+        name, ext = os.path.splitext(base_filename)
+        filename = f"{name}_{counter}{ext}"
+        counter += 1
+    return filename
+
+
+def generate_unique_identifier(file_path):
+    filename = os.path.basename(file_path)
+    timestamp = int(time.time())
+
+    # Generate a hash of the file content
+    hasher = hashlib.md5()
+    with open(file_path, 'rb') as f:
+        buf = f.read()
+        hasher.update(buf)
+    content_hash = hasher.hexdigest()[:8]  # Use first 8 characters of the hash
+
+    return f"local:{timestamp}:{content_hash}:{filename}"
 
 #
 #

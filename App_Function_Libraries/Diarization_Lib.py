@@ -33,7 +33,7 @@ import yaml
 
 def load_pipeline_from_pretrained(path_to_config: str | Path) -> SpeakerDiarization:
     path_to_config = Path(path_to_config).resolve()
-    print(f"Loading pyannote pipeline from {path_to_config}...")
+    logging.debug(f"Loading pyannote pipeline from {path_to_config}...")
 
     if not path_to_config.exists():
         raise FileNotFoundError(f"Config file not found: {path_to_config}")
@@ -44,11 +44,6 @@ def load_pipeline_from_pretrained(path_to_config: str | Path) -> SpeakerDiarizat
 
     # Store current working directory
     cwd = Path.cwd().resolve()
-
-    # Change to the directory containing the config file
-    cd_to = path_to_config.parent.resolve()
-    print(f"Changing working directory to {cd_to}")
-    os.chdir(cd_to)
 
     try:
         # Create a SpeakerDiarization pipeline
