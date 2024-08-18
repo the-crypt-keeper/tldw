@@ -43,7 +43,8 @@ import gradio as gr
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast, download_youtube_audio
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
-from App_Function_Libraries.PDF_Ingestion_Lib import process_and_cleanup_pdf
+from App_Function_Libraries.PDF_Ingestion_Lib import process_and_cleanup_pdf, extract_text_and_format_from_pdf, \
+    extract_metadata_from_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm, \
@@ -1721,24 +1722,45 @@ def create_pdf_ingestion_tab():
 
 def test_pdf_ingestion(pdf_file):
     if pdf_file is None:
-        return "No file uploaded"
+        return "No file uploaded", ""
 
     try:
-        result = process_and_cleanup_pdf(pdf_file, None, None, None)
-        return f"PDF ingested successfully. Result: {result}"
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create a path for the temporary PDF file
+            temp_path = os.path.join(temp_dir, "temp.pdf")
+
+            # Copy the contents of the uploaded file to the temporary file
+            shutil.copy(pdf_file.name, temp_path)
+
+            # Extract text and convert to Markdown
+            markdown_text = extract_text_and_format_from_pdf(temp_path)
+
+            # Extract metadata from PDF
+            metadata = extract_metadata_from_pdf(temp_path)
+
+            # Use metadata for title and author if not provided
+            title = metadata.get('title', os.path.splitext(os.path.basename(pdf_file.name))[0])
+            author = metadata.get('author', 'Unknown')
+
+        result = f"PDF '{title}' by {author} processed successfully."
+        return result, markdown_text
     except Exception as e:
-        return f"Error ingesting PDF: {str(e)}"
+        return f"Error ingesting PDF: {str(e)}", ""
 
 def create_pdf_ingestion_test_tab():
     with gr.TabItem("Test PDF Ingestion"):
-        pdf_file_input = gr.File(label="Upload PDF for testing")
-        test_button = gr.Button("Test PDF Ingestion")
-        test_output = gr.Textbox(label="Test Result")
-
+        with gr.Row():
+            with gr.Column():
+                pdf_file_input = gr.File(label="Upload PDF for testing")
+                test_button = gr.Button("Test PDF Ingestion")
+            with gr.Column():
+                test_output = gr.Textbox(label="Test Result")
+                pdf_content_output = gr.Textbox(label="PDF Content", lines=200)
         test_button.click(
             fn=test_pdf_ingestion,
             inputs=[pdf_file_input],
-            outputs=[test_output]
+            outputs=[test_output, pdf_content_output]
         )
 
 
