@@ -65,6 +65,7 @@ pydantic_core
 pydub
 pyee
 Pygments
+pymupdf
 pypandoc
 pyparsing
 pyreadline3
