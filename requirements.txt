@@ -118,3 +118,4 @@ torchaudio
 #torchaudio==2.2.2+cu121
 openai~=1.28.1
 tiktoken~=0.6.0
+pymupdf
