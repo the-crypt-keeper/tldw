@@ -74,7 +74,7 @@ log "Installation/Update process completed"
 echo "Installation/Update completed successfully!"
 echo "To activate the virtual environment in the future, run: source $install_dir/venv/bin/activate"
 echo "Starting TLDW now..."
-cd "$install_dir" || source venv/bin/activate
+cd "$install_dir" && source venv/bin/activate
 python3 summarize.py -gui
 
 # Functions
