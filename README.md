@@ -534,7 +534,6 @@ Sample commands:
   - Anything I come up with or hear about will either just be dropped in, or an issue will be created and then implemented.
   - With that out of the way, I plan to add the following in the future in no particular order:
     - RAG - Retrieval-Augmented Generation support. Do not want to use any existing libraries. Would prefer to do it all from scratch. 
-      - I plan to spend a few days diving deep and making it my sole focus and coming up with a more solid plan after that.
     - More API support - I want to add support for more APIs, and I want to make it easier to select between private/Public endpoints in the UI
     - Completely new UI - I want to make the UI more user-friendly and more intuitive. 
       - Gradio is great as PoC, but I think I've shown that this has value and is worth the continued effort.
@@ -555,12 +554,10 @@ Sample commands:
     - Offline diarization of speakers - Code is in, but there was some issue that was a headache so I said screw it.
       - Should work if you give it an HF api key in the code though...
 - **Next items of focus**
-  - Bugfixes for stability and file handling(Making sure files are removed when they should be)
-  - Add support for more APIs
   - Live audio recording + transcription
   - RAG support
 
-#### And because Who doesn't love a good quote? (Particularly relevant to this material/LLMs)
+#### And because Who doesn't love a good quote or two? (Particularly relevant to this material/LLMs)
 - `I like the lies-to-children motif, because it underlies the way we run our society and resonates nicely with Discworld. Like the reason for Unseen being a storehouse of knowledge - you arrive knowing everything and leave realising that you know practically nothing, therefore all the knowledge you had must be stored in the university. But it's like that in "real Science", too. You arrive with your sparkling A-levels all agleam, and the first job of the tutors is to reveal that what you thought was true is only true for a given value of "truth". Most of us need just "enough" knowledge of the sciences, and it's delivered to us in metaphors and analogies that bite us in the bum if we think they're the same as the truth.`
     * Terry Pratchett
 - `The first principle is that you must not fool yourself - and you are the easiest person to fool.`
