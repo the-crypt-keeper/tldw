@@ -166,7 +166,7 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
             headers['Authorization'] = f'Bearer {api_key}'
 
         llama_prompt = f"{custom_prompt} \n\n\n\n{text}"
-        if system_message == None:
+        if system_message is None:
             system_message = "You are a helpful AI assistant."
         logging.debug("llama: Prompt being sent is {llama_prompt}")
         if system_message is None:
@@ -661,7 +661,7 @@ def summarize_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:1
             headers['Authorization'] = f'Bearer {ollama_api_key}'
 
         ollama_prompt = f"{custom_prompt} \n\n\n\n{text}"
-        if system_message == None:
+        if system_message is None:
             system_message = "You are a helpful AI assistant."
         logging.debug(f"llama: Prompt being sent is {ollama_prompt}")
         if system_message is None:
