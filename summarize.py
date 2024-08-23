@@ -878,7 +878,7 @@ Sample commands:
         api_name = args.api_name
 
         summary = None  # Initialize to ensure it's always defined
-        if args.detail_level == None:
+        if args.detail_level is None:
             args.detail_level = 0.01
 
         # FIXME

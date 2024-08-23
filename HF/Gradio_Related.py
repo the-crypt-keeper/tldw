@@ -29,6 +29,7 @@ import logging
 import os.path
 from pathlib import Path
 import sqlite3
+import time
 from typing import Dict, List, Tuple, Optional
 import traceback
 from functools import wraps
@@ -4240,7 +4241,8 @@ def import_obsidian_vault(vault_path, progress=gr.Progress()):
                 errors.append(error_msg)
 
             progress((i + 1) / total_files, f"Imported {imported_files} of {total_files} files")
-            time.sleep(0.1)  # Small delay to prevent UI freezing
+            # Small delay to prevent UI freezing
+            time.sleep(0.1)
 
         return imported_files, total_files, errors
     except Exception as e:
