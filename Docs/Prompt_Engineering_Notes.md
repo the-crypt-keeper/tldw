@@ -46,8 +46,72 @@ I find that leaving everything to LLM in a sequence is not as effective as using
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ### Prompting Techniques<a name="prompt-techniques"></a>
 - https://arxiv.org/abs/2407.12994v1
-- 
-- Claude Power Move (CPM): (taken from a HN Post I think?)
+- **7 Categories of Prompts**
+	1. Queries for information
+	2. Task-specific
+	3. Context-supplying
+	4. Comparative
+	5. Opinion-eliciting
+	6. Reflective
+	7. Role-specific
+- **3 Types of Prompts**
+	1. Reductive Operations
+		- Examples:
+			* Summarization - Say the same thing with fewer words
+				* Lists, notes, exec summary
+			* Distillation
+				* Purify the underlying principals or facts
+					* Remove all the noise, extract axioms, foundations, etc
+			* Extraction - Retrieve specific kinds of information
+				* Question answering, listing names, extracting dates, etc.
+			* Characterizing - Describe the content of the text
+				* Describe either the text as a whole, or within the subject
+			* Analyzing - Find patterns or evaluate against a framework
+				* Structural analysis, rhetorical analysis, etc
+			* Evaluation - Measuring, Grading, judging the content
+				* Grading papers, evaluating against morals
+			* Critiquing - Provide feedback within the context of the text
+				* Provide recommendations for improvement
+	2. Transformational Operations
+		- Examples:
+			* Reformatting - Change the presentation only
+				* Prose to screenplay, xml to json
+			* Refactoring - Achieve same results with greater efficiency
+				* Say the same exact thing but differently 
+			* Language CHange - Translate between languages
+				* English -> Russian, C++ -> Rust
+			* Restructuring - Optimize structure for logical flow, etc
+				* Change order, add or remove structure
+			* Modification - Rewrite copy to achieve different intention
+				* Change tone, formality, diplomacy, style, etc.
+			* Clarification - Make something more comprehensible
+				* Embellish or more clearly articulate
+	3. Generative Operations
+		- Examples:
+			* Drafting - Generate a draft of some kind of document
+				* Code, fiction, legal copy, KB article, storytelling
+			* Planning - Given parameters, come up with plan
+				* Actions, projects, objectives, missions, constraints, context
+			* Brainstorming - Use imagine to list out possibilities
+				* Ideation, exploration of possibilities, problem solving, hypothesizing
+			* Amplification - Articulate and explicate something further
+				* Expanding and expounding, riffing on stuff
+- **Bloom's Taxonomy**
+	- What is:
+		* Heirarchical model to classify educational learning objectives into varying complexity and specificity.
+	1. Remembering - Recalling facts and concepts
+		* Retrieval and regurgitation
+	2. Understanding - Explaining ideas and concepts
+		* Connecting words to meanings
+	3. Applying - Using information in new situations
+		* Functional utility
+	4. Analyzing - Drawing connections among ideas
+		* Connecting the dots between concepts
+	5. Evaluating - Justifying a decision or action
+		Explication and articulation
+	6. Creating - Producing new or original work.
+		* Generating something that did not previously exist
+- **Claude Power Move (CPM)**: (taken from a HN Post I think?)
   * Come up with an abstract idea "Help me create a step-by-step plan to <do x> and in order to accomplish <y goal>". Send that to sonnet 3.5 for the reasoning engine.
   * Take the sonnet 3.5 output and feed it into opus with a "Please elaborate and improve this plan and give me 5 variations. think step-by-step and be creative" for the Opus creativity and depth.
   * Take the opus output back to sonnet 3.5 and say "Select the best option out of these 5, refine it and verify it accomplishes <y goal>". again reasoning and discrimination engine.
@@ -191,6 +255,7 @@ I find that leaving everything to LLM in a sequence is not as effective as using
 	* https://medium.com/@jelkhoury880/some-methodologies-in-prompt-engineering-fa1a0e1a9edb
 	* Collection of links/OpenAI: https://cookbook.openai.com/articles/related_resources
 	* https://lilianweng.github.io/posts/2023-03-15-prompt-engineering/
+
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
