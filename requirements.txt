@@ -106,16 +106,16 @@ ujson==5.9.0
 urllib3==2.2.2
 uvicorn==0.29.0
 watchfiles==0.21.0
-#websockets
 websockets==11.0.3
 yt-dlp
-#yt-dlp==2024.4.9
-#--extra-index-url https://download.pytorch.org/whl/cu113
 nltk
 torch
 torchaudio
-#torch==2.2.2+cu121
-#torchaudio==2.2.2+cu121
 openai~=1.28.1
 tiktoken~=0.6.0
 pymupdf
+#torch==2.2.2+cu121
+#torchaudio==2.2.2+cu121
+#websockets
+#yt-dlp==2024.4.9
+#--extra-index-url https://download.pytorch.org/whl/cu113
