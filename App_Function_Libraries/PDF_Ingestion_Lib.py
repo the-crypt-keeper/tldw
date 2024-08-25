@@ -168,7 +168,7 @@ from datetime import datetime
 
 import pymupdf
 
-from App_Function_Libraries.SQLite_DB import add_media_with_keywords
+from App_Function_Libraries.DB_Manager import add_media_with_keywords
 
 
 def extract_text_and_format_from_pdf(pdf_path):

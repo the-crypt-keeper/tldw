@@ -33,9 +33,6 @@ import requests
 import unicodedata
 from tqdm import tqdm
 
-from App_Function_Libraries.Video_DL_Ingestion_Lib import get_youtube
-
-
 #######################################################################################################################
 # Function Definitions
 #
@@ -65,126 +62,9 @@ def extract_text_from_segments(segments):
         logging.error(f"Unable to extract text from segments: {segments}")
         return "Error: Unable to extract transcription"
 
-
-def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5):
-    temp_path = dest_path + '.tmp'
-
-    for attempt in range(max_retries):
-        try:
-            # Check if a partial download exists and get its size
-            resume_header = {}
-            if os.path.exists(temp_path):
-                resume_header = {'Range': f'bytes={os.path.getsize(temp_path)}-'}
-
-            response = requests.get(url, stream=True, headers=resume_header)
-            response.raise_for_status()
-
-            # Get the total file size from headers
-            total_size = int(response.headers.get('content-length', 0))
-            initial_pos = os.path.getsize(temp_path) if os.path.exists(temp_path) else 0
-
-            mode = 'ab' if 'Range' in response.headers else 'wb'
-            with open(temp_path, mode) as temp_file, tqdm(
-                total=total_size, unit='B', unit_scale=True, desc=dest_path, initial=initial_pos, ascii=True
-            ) as pbar:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:  # filter out keep-alive new chunks
-                        temp_file.write(chunk)
-                        pbar.update(len(chunk))
-
-            # Verify the checksum if provided
-            if expected_checksum:
-                if not verify_checksum(temp_path, expected_checksum):
-                    os.remove(temp_path)
-                    raise ValueError("Downloaded file's checksum does not match the expected checksum")
-
-            # Move the file to the final destination
-            os.rename(temp_path, dest_path)
-            print("Download complete and verified!")
-            return dest_path
-
-        except Exception as e:
-            print(f"Attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                print(f"Retrying in {delay} seconds...")
-                time.sleep(delay)
-            else:
-                print("Max retries reached. Download failed.")
-                raise
-
-
-def verify_checksum(file_path, expected_checksum):
-    sha256_hash = hashlib.sha256()
-    with open(file_path, 'rb') as f:
-        for byte_block in iter(lambda: f.read(4096), b''):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest() == expected_checksum
-
-
-def create_download_directory(title):
-    base_dir = "Results"
-    # Remove characters that are illegal in Windows filenames and normalize
-    safe_title = normalize_title(title)
-    logging.debug(f"{title} successfully normalized")
-    session_path = os.path.join(base_dir, safe_title)
-    if not os.path.exists(session_path):
-        os.makedirs(session_path, exist_ok=True)
-        logging.debug(f"Created directory for downloaded video: {session_path}")
-    else:
-        logging.debug(f"Directory already exists for downloaded video: {session_path}")
-    return session_path
-
-
-def sanitize_filename(filename):
-    # Remove invalid characters and replace spaces with underscores
-    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
-    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
-    return sanitized
-
-
-def normalize_title(title):
-    # Normalize the string to 'NFKD' form and encode to 'ascii' ignoring non-ascii characters
-    title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('ascii')
-    title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '').replace('*', '').replace('?',
-                                                                                                                   '').replace(
-        '<', '').replace('>', '').replace('|', '')
-    return title
-
-
-def clean_youtube_url(url):
-    parsed_url = urlparse(url)
-    query_params = parse_qs(parsed_url.query)
-    if 'list' in query_params:
-        query_params.pop('list')
-    cleaned_query = urlencode(query_params, doseq=True)
-    cleaned_url = urlunparse(parsed_url._replace(query=cleaned_query))
-    return cleaned_url
-
-
-def extract_video_info(url):
-    info_dict = get_youtube(url)
-    title = info_dict.get('title', 'Untitled')
-    return info_dict, title
-
-
 def import_data(file):
     # Implement this function to import data from a file
     pass
-
-
-def safe_read_file(file_path):
-    encodings = ['utf-8', 'utf-16', 'ascii', 'latin-1', 'iso-8859-1', 'cp1252']
-    for encoding in encodings:
-        try:
-            with open(file_path, 'r', encoding=encoding) as file:
-                return file.read()
-        except UnicodeDecodeError:
-            continue
-        except FileNotFoundError:
-            return f"File not found: {file_path}"
-        except Exception as e:
-            return f"An error occurred: {e}"
-    return f"Unable to decode the file {file_path} with any of the attempted encodings: {encodings}"
 
 #
 #
@@ -206,7 +86,10 @@ def cleanup_downloads():
 
 #
 #
-#######################
+#######################################################################################################################
+
+
+#######################################################################################################################
 # Config loading
 #
 
@@ -361,10 +244,16 @@ def load_and_log_configs():
         logging.error(f"Error loading config: {str(e)}")
         return None
 
+#
+# End of Config loading
+#######################################################################################################################
+
+#######################################################################################################################
+#
+# Misc-Functions
 
 # Log file
 # logging.basicConfig(filename='debug-runtime.log', encoding='utf-8', level=logging.DEBUG)
-
 
 def format_metadata_as_text(metadata):
     if not metadata:
@@ -430,7 +319,14 @@ def convert_to_seconds(time_str):
     else:
         raise ValueError(f"Invalid time format: {time_str}")
 
+#
+# End of Misc-Functions
+#######################################################################################################################
 
+
+#######################################################################################################################
+#
+# File-saving Function Definitions
 def save_to_file(video_urls, filename):
     with open(filename, 'w') as file:
         file.write('\n'.join(video_urls))
@@ -460,6 +356,90 @@ def save_segments_to_json(segments, file_name="transcription_segments.json"):
 
     return json_file_path
 
+
+def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5):
+    temp_path = dest_path + '.tmp'
+
+    for attempt in range(max_retries):
+        try:
+            # Check if a partial download exists and get its size
+            resume_header = {}
+            if os.path.exists(temp_path):
+                resume_header = {'Range': f'bytes={os.path.getsize(temp_path)}-'}
+
+            response = requests.get(url, stream=True, headers=resume_header)
+            response.raise_for_status()
+
+            # Get the total file size from headers
+            total_size = int(response.headers.get('content-length', 0))
+            initial_pos = os.path.getsize(temp_path) if os.path.exists(temp_path) else 0
+
+            mode = 'ab' if 'Range' in response.headers else 'wb'
+            with open(temp_path, mode) as temp_file, tqdm(
+                total=total_size, unit='B', unit_scale=True, desc=dest_path, initial=initial_pos, ascii=True
+            ) as pbar:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:  # filter out keep-alive new chunks
+                        temp_file.write(chunk)
+                        pbar.update(len(chunk))
+
+            # Verify the checksum if provided
+            if expected_checksum:
+                if not verify_checksum(temp_path, expected_checksum):
+                    os.remove(temp_path)
+                    raise ValueError("Downloaded file's checksum does not match the expected checksum")
+
+            # Move the file to the final destination
+            os.rename(temp_path, dest_path)
+            print("Download complete and verified!")
+            return dest_path
+
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                print(f"Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                print("Max retries reached. Download failed.")
+                raise
+
+def create_download_directory(title):
+    base_dir = "Results"
+    # Remove characters that are illegal in Windows filenames and normalize
+    safe_title = normalize_title(title)
+    logging.debug(f"{title} successfully normalized")
+    session_path = os.path.join(base_dir, safe_title)
+    if not os.path.exists(session_path):
+        os.makedirs(session_path, exist_ok=True)
+        logging.debug(f"Created directory for downloaded video: {session_path}")
+    else:
+        logging.debug(f"Directory already exists for downloaded video: {session_path}")
+    return session_path
+
+
+def safe_read_file(file_path):
+    encodings = ['utf-8', 'utf-16', 'ascii', 'latin-1', 'iso-8859-1', 'cp1252']
+    for encoding in encodings:
+        try:
+            with open(file_path, 'r', encoding=encoding) as file:
+                return file.read()
+        except UnicodeDecodeError:
+            continue
+        except FileNotFoundError:
+            return f"File not found: {file_path}"
+        except Exception as e:
+            return f"An error occurred: {e}"
+    return f"Unable to decode the file {file_path} with any of the attempted encodings: {encodings}"
+
+#
+# End of Files-saving Function Definitions
+#######################################################################################################################
+
+
+#######################################################################################################################
+#
+# UUID-Functions
+
 def generate_unique_filename(base_path, base_filename):
     """Generate a unique filename by appending a counter if necessary."""
     filename = base_filename
@@ -485,7 +465,10 @@ def generate_unique_identifier(file_path):
     return f"local:{timestamp}:{content_hash}:{filename}"
 
 #
-#
+# End of UUID-Functions
+#######################################################################################################################
+
+
 #######################################################################################################################
 #
 # Backup code
@@ -495,5 +478,76 @@ def generate_unique_identifier(file_path):
 #######################################################################################################################
 
 
+#######################################################################################################################
+#
+# Sanitization/Verification Functions
+
+# Helper function to validate URL format
+def is_valid_url(url: str) -> bool:
+    regex = re.compile(
+        r'^(?:http|ftp)s?://'  # http:// or https://
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+        r'localhost|'  # localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|'  # ...or ipv4
+        r'\[?[A-F0-9]*:[A-F0-9:]+\]?)'  # ...or ipv6
+        r'(?::\d+)?'  # optional port
+        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    return re.match(regex, url) is not None
 
 
+def verify_checksum(file_path, expected_checksum):
+    sha256_hash = hashlib.sha256()
+    with open(file_path, 'rb') as f:
+        for byte_block in iter(lambda: f.read(4096), b''):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest() == expected_checksum
+
+
+def normalize_title(title):
+    # Normalize the string to 'NFKD' form and encode to 'ascii' ignoring non-ascii characters
+    title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('ascii')
+    title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '').replace('*', '').replace('?',
+                                                                                                                   '').replace(
+        '<', '').replace('>', '').replace('|', '')
+    return title
+
+
+def clean_youtube_url(url):
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+    if 'list' in query_params:
+        query_params.pop('list')
+    cleaned_query = urlencode(query_params, doseq=True)
+    cleaned_url = urlunparse(parsed_url._replace(query=cleaned_query))
+    return cleaned_url
+
+def sanitize_filename(filename):
+    # Remove invalid characters and replace spaces with underscores
+    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
+    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    return sanitized
+
+#
+# End of Sanitization/Verification Functions
+#######################################################################################################################
+
+
+#######################################################################################################################
+#
+# DB Config Loading
+
+
+def get_db_config():
+    config = configparser.ConfigParser()
+    config.read('config.txt')
+    return {
+        'type': config['Database']['type'],
+        'sqlite_path': config.get('Database', 'sqlite_path', fallback='media_summary.db'),
+        'elasticsearch_host': config.get('Database', 'elasticsearch_host', fallback='localhost'),
+        'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200)
+    }
+
+
+#
+# End of DB Config Loading
+#######################################################################################################################

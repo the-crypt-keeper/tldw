@@ -57,7 +57,7 @@ import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any
-
+from App_Function_Libraries.Utils import is_valid_url
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
@@ -69,6 +69,7 @@ import yaml
 #######################################################################################################################
 # Function Definitions
 #
+
 
 # Set up logging
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -234,6 +235,10 @@ class Database:
                 raise DatabaseError(f"Database error: {e}, Query: {query}")
 
 db = Database()
+
+def instantiate_SQLite_db():
+    global sqlite_db
+    sqlite_db = Database()
 
 
 # Function to create tables with the new media schema
@@ -914,19 +919,6 @@ def export_to_file(search_query: str, search_fields: List[str], keyword: str, pa
         return f"Results exported to {filename}"
     except (DatabaseError, InputError) as e:
         return str(e)
-
-
-# Helper function to validate URL format
-def is_valid_url(url: str) -> bool:
-    regex = re.compile(
-        r'^(?:http|ftp)s?://'  # http:// or https://
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
-        r'localhost|'  # localhost...
-        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|'  # ...or ipv4
-        r'\[?[A-F0-9]*:[A-F0-9:]+\]?)'  # ...or ipv6
-        r'(?::\d+)?'  # optional port
-        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
-    return re.match(regex, url) is not None
 
 
 # Helper function to validate date format
