@@ -32,83 +32,11 @@ from Local_Summarization_Lib import summarize_with_llama, summarize_with_oobaboo
 from Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, summarize_with_cohere, \
     summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, summarize_with_huggingface, \
     summarize_with_mistral
-from SQLite_DB import Database, create_tables, add_media_with_keywords
+from App_Function_Libraries.DB_Manager import ingest_article_to_db
 #
 #######################################################################################################################
 # Function Definitions
 #
-
-# FIXME -Need to update to reflect DB_Manager.py usage
-def ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date, custom_prompt):
-    try:
-        # Check if content is not empty or whitespace
-        if not content.strip():
-            raise ValueError("Content is empty.")
-
-        db = Database()
-        create_tables()
-        keyword_list = keywords.split(',') if keywords else ["default"]
-        keyword_str = ', '.join(keyword_list)
-
-        # Set default values for missing fields
-        url = url or 'Unknown'
-        title = title or 'Unknown'
-        author = author or 'Unknown'
-        keywords = keywords or 'default'
-        summary = summary or 'No summary available'
-        ingestion_date = ingestion_date or datetime.datetime.now().strftime('%Y-%m-%d')
-
-        # Log the values of all fields before calling add_media_with_keywords
-        logging.debug(f"URL: {url}")
-        logging.debug(f"Title: {title}")
-        logging.debug(f"Author: {author}")
-        logging.debug(f"Content: {content[:50]}... (length: {len(content)})")  # Log first 50 characters of content
-        logging.debug(f"Keywords: {keywords}")
-        logging.debug(f"Summary: {summary}")
-        logging.debug(f"Ingestion Date: {ingestion_date}")
-        logging.debug(f"Custom Prompt: {custom_prompt}")
-
-        # Check if any required field is empty and log the specific missing field
-        if not url:
-            logging.error("URL is missing.")
-            raise ValueError("URL is missing.")
-        if not title:
-            logging.error("Title is missing.")
-            raise ValueError("Title is missing.")
-        if not content:
-            logging.error("Content is missing.")
-            raise ValueError("Content is missing.")
-        if not keywords:
-            logging.error("Keywords are missing.")
-            raise ValueError("Keywords are missing.")
-        if not summary:
-            logging.error("Summary is missing.")
-            raise ValueError("Summary is missing.")
-        if not ingestion_date:
-            logging.error("Ingestion date is missing.")
-            raise ValueError("Ingestion date is missing.")
-        if not custom_prompt:
-            logging.error("Custom prompt is missing.")
-            raise ValueError("Custom prompt is missing.")
-
-        # Add media with keywords to the database
-        result = add_media_with_keywords(
-            url=url,
-            title=title,
-            media_type='article',
-            content=content,
-            keywords=keyword_str or "article_default",
-            prompt=custom_prompt or None,
-            summary=summary or "No summary generated",
-            transcription_model=None,  # or some default value if applicable
-            author=author or 'Unknown',
-            ingestion_date=ingestion_date
-        )
-        return result
-    except Exception as e:
-        logging.error(f"Failed to ingest article to the database: {e}")
-        return str(e)
-
 
 def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles, system_message=None):
     urls = [url.strip() for url in urls.split('\n') if url.strip()]
