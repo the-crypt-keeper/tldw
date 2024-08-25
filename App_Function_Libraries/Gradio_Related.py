@@ -54,14 +54,14 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface, perform_summarization, save_transcription_and_summary, \
     perform_transcription, summarize_chunk
-from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
+from App_Function_Libraries.DB_Manager import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
     load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt, search_and_display_items, \
-    get_conversation_name
+    get_conversation_name, get_db_config
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files, generate_unique_identifier, \
     generate_unique_filename
@@ -468,7 +468,9 @@ def create_chunking_inputs():
 
 def create_introduction_tab():
     with (gr.TabItem("Introduction")):
-        gr.Markdown("# tldw: Your LLM-powered Research Multi-tool")
+        db_config = get_db_config()
+        db_type = db_config['type']
+        gr.Markdown(f"# tldw: Your LLM-powered Research Multi-tool (Using {db_type.capitalize()} Database)")
         with gr.Row():
             with gr.Column():
                 gr.Markdown("""### What can it do?
@@ -5488,7 +5490,10 @@ def launch_ui(share_public=None, server_mode=False):
     """
 
     with gr.Blocks(theme='bethecloud/storj_theme',css=css) as iface:
-        gr.Markdown("# TL/DW: Too Long, Didn't Watch - Your Personal Research Multi-Tool")
+        db_config = get_db_config()
+        db_type = db_config['type']
+        gr.Markdown(f"# tl/dw: Your LLM-powered Research Multi-tool")
+        gr.Markdown(f"(Using {db_type.capitalize()} Database)")
         with gr.Tabs():
             with gr.TabItem("Transcription / Summarization / Ingestion"):
                 with gr.Tabs():

@@ -23,9 +23,9 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     summarize_with_huggingface, perform_transcription, perform_summarization
 from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav, speech_to_text
 from App_Function_Libraries.Local_File_Processing_Lib import read_paths_from_file, process_local_file
-from App_Function_Libraries.SQLite_DB import add_media_to_database, is_valid_url
+from App_Function_Libraries.DB_Manager import add_media_to_database
 from App_Function_Libraries.System_Checks_Lib import cuda_check, platform_check, check_ffmpeg
-from App_Function_Libraries.Utils import load_and_log_configs, sanitize_filename, create_download_directory, extract_text_from_segments
+from App_Function_Libraries.Utils import load_and_log_configs, create_download_directory, extract_text_from_segments
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 #
 # 3rd-Party Module Imports

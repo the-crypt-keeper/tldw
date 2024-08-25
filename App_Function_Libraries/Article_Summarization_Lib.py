@@ -38,6 +38,7 @@ from SQLite_DB import Database, create_tables, add_media_with_keywords
 # Function Definitions
 #
 
+# FIXME -Need to update to reflect DB_Manager.py usage
 def ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date, custom_prompt):
     try:
         # Check if content is not empty or whitespace
