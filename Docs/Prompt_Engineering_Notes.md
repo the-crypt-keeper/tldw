@@ -46,6 +46,7 @@ I find that leaving everything to LLM in a sequence is not as effective as using
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ### Prompting Techniques<a name="prompt-techniques"></a>
 - https://arxiv.org/abs/2407.12994v1
+- https://www.promptingguide.ai/
 - **7 Categories of Prompts**
 	1. Queries for information
 	2. Task-specific
