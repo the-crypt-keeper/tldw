@@ -32,6 +32,7 @@ from SQLite_DB import (
     add_keyword as sqlite_add_keyword,
     delete_keyword as sqlite_delete_keyword,
     export_keywords_to_csv as sqlite_export_keywords_to_csv,
+    ingest_article_to_db as sqlite_ingest_article_to_db,
     add_media_to_database as sqlite_add_media_to_database,
     import_obsidian_note_to_db as sqlite_import_obsidian_note_to_db,
     add_prompt as sqlite_add_prompt,
@@ -230,6 +231,15 @@ def check_media_and_whisper_model(*args, **kwargs):
         return sqlite_check_media_and_whisper_model(*args, **kwargs)
     elif db_type == 'elasticsearch':
         raise NotImplementedError("Elasticsearch version of check_media_and_whisper_model not yet implemented")
+
+def ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date, custom_prompt):
+    if db_type == 'sqlite':
+        return sqlite_ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date, custom_prompt)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of ingest_article_to_db not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
 
 #
 # End of DB-Ingestion functions
