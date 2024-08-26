@@ -1079,9 +1079,6 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 
             conn.commit()
 
-        # Auto-update ChromaDB embeddings
-        auto_update_chroma_embeddings(media_id, content)
-
         logging.info(f"Media '{info_dict.get('title', 'Untitled')}' successfully added/updated with ID: {media_id}")
 
         return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}"
