@@ -2298,6 +2298,32 @@ def create_rag_tab():
         search_button.click(perform_rag_search, inputs=[search_query, api_choice], outputs=[result_output, context_output])
 
 
+def create_embeddings_tab():
+    with gr.TabItem("Create Embeddings"):
+        gr.Markdown("# Create Embeddings for All Content")
+
+        with gr.Row():
+            with gr.Column():
+                embedding_api_choice = gr.Dropdown(
+                    choices=["OpenAI", "Local", "HuggingFace"],
+                    label="Select API for Embeddings",
+                    value="OpenAI"
+                )
+                create_button = gr.Button("Create Embeddings")
+
+            with gr.Column():
+                status_output = gr.Textbox(label="Status", lines=10)
+
+        def create_embeddings(api_choice):
+            try:
+                # Assuming you have a function that handles the creation of embeddings
+                status = create_all_embeddings(api_choice)
+                return status
+            except Exception as e:
+                return f"Error: {str(e)}"
+
+        create_button.click(create_embeddings, inputs=[embedding_api_choice], outputs=status_output)
+
 def search_prompts(query):
     try:
         conn = sqlite3.connect('prompts.db')
