@@ -33,7 +33,6 @@ from time import sleep
 from typing import Dict, List, Tuple, Optional
 import traceback
 from functools import wraps
-
 #
 # Import 3rd-Party Libraries
 import pypandoc
@@ -50,6 +49,7 @@ from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm, \
     summarize_with_ollama
+from App_Function_Libraries.RAG_Libary_2 import rag_search
 from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_cohere, \
     summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface, perform_summarization, save_transcription_and_summary, \
@@ -2118,7 +2118,7 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
                 elif api_endpoint.lower() == "local-llm":
                     summarization_response = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt)
                 elif api_endpoint.lower() == "huggingface":
-                    summarization_response = summarize_with_huggingface(api_key, input_data, user_prompt, temp, system_prompt)
+                    summarization_response = summarize_with_huggingface(api_key, input_data, user_prompt, temp)#, system_prompt)
                 elif api_endpoint.lower() == "ollama":
                     summarization_response = summarize_with_ollama(input_data, user_prompt, temp, system_prompt)
                 else:
@@ -2157,7 +2157,7 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
                 elif api_endpoint.lower() == "local-llm":
                     explanation_response = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt)
                 elif api_endpoint.lower() == "huggingface":
-                    explanation_response = summarize_with_huggingface(api_key, input_data, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_huggingface(api_key, input_data, user_prompt, temp)#, system_prompt)
                 elif api_endpoint.lower() == "ollama":
                     explanation_response = summarize_with_ollama(input_data, user_prompt, temp, system_prompt)
                 else:
@@ -2272,6 +2272,31 @@ def create_compare_transcripts_tab():
 ###########################################################################################################################################################################################################################
 #
 # Search Tab
+
+def create_rag_tab():
+    with gr.TabItem("RAG Search"):
+        gr.Markdown("# Retrieval-Augmented Generation (RAG) Search")
+
+        with gr.Row():
+            with gr.Column():
+                search_query = gr.Textbox(label="Enter your question", placeholder="What would you like to know?")
+                api_choice = gr.Dropdown(
+                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                    label="Select API for RAG",
+                    value="OpenAI"
+                )
+                search_button = gr.Button("Search")
+
+            with gr.Column():
+                result_output = gr.Textbox(label="Answer", lines=10)
+                context_output = gr.Textbox(label="Context", lines=10, visible=False)
+
+        def perform_rag_search(query, api_choice):
+            result = rag_search(query, api_choice)
+            return result['answer'], result['context']
+
+        search_button.click(perform_rag_search, inputs=[search_query, api_choice], outputs=[result_output, context_output])
+
 
 def search_prompts(query):
     try:
@@ -2896,7 +2921,7 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         elif api_endpoint.lower() == "local-llm":
             response = summarize_with_local_llm(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "huggingface":
-            response = summarize_with_huggingface(api_key, input_data, prompt, temp, system_message)
+            response = summarize_with_huggingface(api_key, input_data, prompt, temp)#, system_message)
         elif api_endpoint.lower() == "ollama":
             response = summarize_with_ollama(input_data, prompt, temp, system_message)
         else:
@@ -3757,7 +3782,7 @@ def create_chat_interface_four():
                 message, chat_history, {}, [],  # Empty media_content and selected_parts
                 api_endpoint, api_key, user_prompt, None,  # No conversation_id
                 False,  # Not saving conversation
-                temperature=temperature
+                temperature=temperature, system_prompt=""
             )
             chat_history.append((message, new_msg))
             return "", chat_history, chat_history
@@ -3786,7 +3811,7 @@ def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, t
     new_msg, new_history, new_conv_id = chat_wrapper(
         message, chat_history, media_content, selected_parts,
         api_endpoint, api_key, user_prompt, conversation_id,
-        save_conversation, temperature
+        save_conversation, temperature, system_prompt=""
     )
 
     if new_msg:
@@ -5509,6 +5534,7 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
+                create_rag_tab()
                 create_viewing_tab()
                 create_search_summaries_tab()
                 create_prompt_search_tab()

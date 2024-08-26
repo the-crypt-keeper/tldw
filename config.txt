@@ -50,6 +50,26 @@ sqlite_path = media_summary.db
 elasticsearch_host = localhost
 elasticsearch_port = 9200
 # Additionally you can use elasticsearch as the database type, just replace `sqlite` with `elasticsearch` for `type` and provide the `elasticsearch_host` and `elasticsearch_port` of your configured ES instance.
+chroma_db_path = chroma_db
+
+[Embeddings]
+provider = openai
+# Can be 'openai', 'local', or 'huggingface'
+model = text-embedding-3-small
+# Model name or path
+api_key = your_api_key_here
+api_url = http://localhost:8080/v1/embeddings
+# Only needed for 'local' provider
+
+[Chunking]
+method = words
+max_size = 400
+overlap = 200
+adaptive = false
+multi_level = false
+language = english
+
+
 
 
 #[Comments]

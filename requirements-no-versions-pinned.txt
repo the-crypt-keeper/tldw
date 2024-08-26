@@ -113,5 +113,7 @@ yt-dlp
 nltk
 torch
 torchaudio
+chromadb
+protobuf
 
 
