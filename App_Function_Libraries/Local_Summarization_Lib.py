@@ -40,6 +40,7 @@ logger = logging.getLogger()
 openai_api_key = "Fake_key"
 client = OpenAI(api_key=openai_api_key)
 
+# FIXME - temp is not used
 def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):

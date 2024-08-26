@@ -66,6 +66,7 @@ pydub==0.25.1
 pyee==11.1.0
 Pygments==2.18.0
 pypandoc_binary
+pypandoc
 pyparsing==3.1.2
 pyreadline3==3.4.1
 python-dateutil==2.9.0.post0
@@ -114,6 +115,8 @@ torchaudio
 openai~=1.28.1
 tiktoken~=0.6.0
 pymupdf
+chromadb
+protobuf==5.26.1
 #torch==2.2.2+cu121
 #torchaudio==2.2.2+cu121
 #websockets
