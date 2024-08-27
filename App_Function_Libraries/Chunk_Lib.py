@@ -163,18 +163,22 @@ def post_process_chunks(chunks: List[str]) -> List[str]:
 
 
 def get_chunk_metadata(chunk: str, full_text: str, chunk_type: str = "generic", chapter_number: Optional[int] = None, chapter_pattern: Optional[str] = None) -> Dict[str, Any]:
-    start_index = full_text.index(chunk)
-    metadata = {
-        'start_index': start_index,
-        'end_index': start_index + len(chunk),
-        'word_count': len(chunk.split()),
-        'char_count': len(chunk),
-        'chunk_type': chunk_type
-    }
-    if chunk_type == "chapter":
-        metadata['chapter_number'] = chapter_number
-        metadata['chapter_pattern'] = chapter_pattern
-    return metadata
+    try:
+        start_index = full_text.index(chunk)
+        metadata = {
+            'start_index': start_index,
+            'end_index': start_index + len(chunk),
+            'word_count': len(chunk.split()),
+            'char_count': len(chunk),
+            'chunk_type': chunk_type
+        }
+        if chunk_type == "chapter":
+            metadata['chapter_number'] = chapter_number
+            metadata['chapter_pattern'] = chapter_pattern
+        return metadata
+    except ValueError as e:
+        logging.error(f"Chunk not found in full_text: {chunk[:50]}... Full text length: {len(full_text)}")
+        raise
 
 
 # Hybrid approach, chunk each sentence while ensuring total token size does not exceed a maximum number

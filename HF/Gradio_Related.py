@@ -29,6 +29,7 @@ import logging
 import os.path
 from pathlib import Path
 import sqlite3
+import time
 from typing import Dict, List, Tuple, Optional
 import traceback
 from functools import wraps
@@ -51,7 +52,7 @@ from App_Function_Libraries.Summarization_General_Lib import summarize_with_open
     summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface, perform_summarization, save_transcription_and_summary, \
     perform_transcription, summarize_chunk
-from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
+from App_Function_Libraries.DB_Manager import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
@@ -4240,7 +4241,8 @@ def import_obsidian_vault(vault_path, progress=gr.Progress()):
                 errors.append(error_msg)
 
             progress((i + 1) / total_files, f"Imported {imported_files} of {total_files} files")
-            time.sleep(0.1)  # Small delay to prevent UI freezing
+            # Small delay to prevent UI freezing
+            time.sleep(0.1)
 
         return imported_files, total_files, errors
     except Exception as e:

@@ -57,7 +57,9 @@ import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any
-
+# Local Libraries
+from App_Function_Libraries.ChromaDB_Library import auto_update_chroma_embeddings
+from App_Function_Libraries.Utils import is_valid_url
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
@@ -69,6 +71,7 @@ import yaml
 #######################################################################################################################
 # Function Definitions
 #
+
 
 # Set up logging
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -234,6 +237,10 @@ class Database:
                 raise DatabaseError(f"Database error: {e}, Query: {query}")
 
 db = Database()
+
+def instantiate_SQLite_db():
+    global sqlite_db
+    sqlite_db = Database()
 
 
 # Function to create tables with the new media schema
@@ -629,6 +636,75 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
         raise DatabaseError(f"Unexpected error: {e}")
 
 
+def ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date, custom_prompt):
+    try:
+        # Check if content is not empty or whitespace
+        if not content.strip():
+            raise ValueError("Content is empty.")
+
+        keyword_list = keywords.split(',') if keywords else ["default"]
+        keyword_str = ', '.join(keyword_list)
+
+        # Set default values for missing fields
+        url = url or 'Unknown'
+        title = title or 'Unknown'
+        author = author or 'Unknown'
+        keywords = keywords or 'default'
+        summary = summary or 'No summary available'
+        ingestion_date = ingestion_date or datetime.now().strftime('%Y-%m-%d')
+
+        # Log the values of all fields before calling add_media_with_keywords
+        logging.debug(f"URL: {url}")
+        logging.debug(f"Title: {title}")
+        logging.debug(f"Author: {author}")
+        logging.debug(f"Content: {content[:50]}... (length: {len(content)})")  # Log first 50 characters of content
+        logging.debug(f"Keywords: {keywords}")
+        logging.debug(f"Summary: {summary}")
+        logging.debug(f"Ingestion Date: {ingestion_date}")
+        logging.debug(f"Custom Prompt: {custom_prompt}")
+
+        # Check if any required field is empty and log the specific missing field
+        if not url:
+            logging.error("URL is missing.")
+            raise ValueError("URL is missing.")
+        if not title:
+            logging.error("Title is missing.")
+            raise ValueError("Title is missing.")
+        if not content:
+            logging.error("Content is missing.")
+            raise ValueError("Content is missing.")
+        if not keywords:
+            logging.error("Keywords are missing.")
+            raise ValueError("Keywords are missing.")
+        if not summary:
+            logging.error("Summary is missing.")
+            raise ValueError("Summary is missing.")
+        if not ingestion_date:
+            logging.error("Ingestion date is missing.")
+            raise ValueError("Ingestion date is missing.")
+        if not custom_prompt:
+            logging.error("Custom prompt is missing.")
+            raise ValueError("Custom prompt is missing.")
+
+        # Add media with keywords to the database
+        result = add_media_with_keywords(
+            url=url,
+            title=title,
+            media_type='article',
+            content=content,
+            keywords=keyword_str or "article_default",
+            prompt=custom_prompt or None,
+            summary=summary or "No summary generated",
+            transcription_model=None,  # or some default value if applicable
+            author=author or 'Unknown',
+            ingestion_date=ingestion_date
+        )
+        return result
+    except Exception as e:
+        logging.error(f"Failed to ingest article to the database: {e}")
+        return str(e)
+
+
 def fetch_all_keywords() -> List[str]:
     try:
         with db.get_connection() as conn:
@@ -916,19 +992,6 @@ def export_to_file(search_query: str, search_fields: List[str], keyword: str, pa
         return str(e)
 
 
-# Helper function to validate URL format
-def is_valid_url(url: str) -> bool:
-    regex = re.compile(
-        r'^(?:http|ftp)s?://'  # http:// or https://
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
-        r'localhost|'  # localhost...
-        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|'  # ...or ipv4
-        r'\[?[A-F0-9]*:[A-F0-9:]+\]?)'  # ...or ipv6
-        r'(?::\d+)?'  # optional port
-        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
-    return re.match(regex, url) is not None
-
-
 # Helper function to validate date format
 def is_valid_date(date_string: str) -> bool:
     try:
@@ -936,7 +999,6 @@ def is_valid_date(date_string: str) -> bool:
         return True
     except ValueError:
         return False
-
 
 # Add ingested media to DB
 def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
@@ -957,25 +1019,113 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 
         logging.info(f"Adding media to database: URL={url}, Title={info_dict.get('title', 'Untitled')}, Type={media_type}")
 
-        result = add_media_with_keywords(
-            url=url,
-            title=info_dict.get('title', 'Untitled'),
-            media_type=media_type,
-            content=content,
-            keywords=','.join(keywords) if isinstance(keywords, list) else keywords,
-            prompt=custom_prompt_input or 'No prompt provided',
-            summary=summary or 'No summary provided',
-            transcription_model=whisper_model,
-            author=info_dict.get('uploader', 'Unknown'),
-            ingestion_date=datetime.now().strftime('%Y-%m-%d')
-        )
+        # Process keywords
+        if isinstance(keywords, str):
+            keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
+        elif isinstance(keywords, (list, tuple)):
+            keyword_list = [keyword.strip().lower() for keyword in keywords]
+        else:
+            keyword_list = ['default']
 
-        logging.info(f"Media added successfully: {result}")
-        return result
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
 
+            # Check if media already exists
+            cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
+            existing_media = cursor.fetchone()
+
+            if existing_media:
+                media_id = existing_media[0]
+                logging.info(f"Updating existing media with ID: {media_id}")
+
+                cursor.execute('''
+                UPDATE Media 
+                SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?
+                WHERE id = ?
+                ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
+                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), media_id))
+            else:
+                logging.info("Creating new media entry")
+
+                cursor.execute('''
+                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
+                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model))
+                media_id = cursor.lastrowid
+
+            logging.info(f"Adding new modification to MediaModifications for media ID: {media_id}")
+            cursor.execute('''
+            INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+            VALUES (?, ?, ?, ?)
+            ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
+
+            # Insert keywords and associate with media item
+            logging.info("Processing keywords")
+            for keyword in keyword_list:
+                cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+                cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                keyword_id = cursor.fetchone()[0]
+                cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)',
+                               (media_id, keyword_id))
+
+            # Update full-text search index
+            logging.info("Updating full-text search index")
+            cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
+                           (media_id, info_dict.get('title', 'Untitled'), content))
+
+            logging.info("Adding new media version")
+            add_media_version(media_id, custom_prompt_input, summary)
+
+            conn.commit()
+
+        logging.info(f"Media '{info_dict.get('title', 'Untitled')}' successfully added/updated with ID: {media_id}")
+
+        return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}"
+
+    except sqlite3.Error as e:
+        logging.error(f"SQL Error: {e}")
+        raise DatabaseError(f"Error adding media with keywords: {e}")
     except Exception as e:
-        logging.error(f"Error in add_media_to_database: {str(e)}")
-        raise
+        logging.error(f"Unexpected Error: {e}")
+        raise DatabaseError(f"Unexpected error: {e}")
+# def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
+#     try:
+#         # Extract content from segments
+#         if isinstance(segments, list):
+#             content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
+#         elif isinstance(segments, dict):
+#             content = segments.get('text', '') or segments.get('content', '')
+#         else:
+#             content = str(segments)
+#
+#         logging.debug(f"Extracted content (first 500 chars): {content[:500]}")
+#
+#         # Set default custom prompt if not provided
+#         if custom_prompt_input is None:
+#             custom_prompt_input = """No Custom Prompt Provided or Was Used."""
+#
+#         logging.info(f"Adding media to database: URL={url}, Title={info_dict.get('title', 'Untitled')}, Type={media_type}")
+#
+#         result = add_media_with_keywords(
+#             url=url,
+#             title=info_dict.get('title', 'Untitled'),
+#             media_type=media_type,
+#             content=content,
+#             keywords=','.join(keywords) if isinstance(keywords, list) else keywords,
+#             prompt=custom_prompt_input or 'No prompt provided',
+#             summary=summary or 'No summary provided',
+#             transcription_model=whisper_model,
+#             author=info_dict.get('uploader', 'Unknown'),
+#             ingestion_date=datetime.now().strftime('%Y-%m-%d')
+#         )
+#
+#         logging.info(f"Media added successfully: {result}")
+#         return result
+#
+#     except Exception as e:
+#         logging.error(f"Error in add_media_to_database: {str(e)}")
+#         raise
 
 
 #
@@ -1739,6 +1889,9 @@ def get_conversation_name(conversation_id):
 #
 # End of Chat-related Functions
 #######################################################################################################################
+
+
+#######################################################################################################################
 #
 # Functions to Compare Transcripts
 
@@ -1761,6 +1914,9 @@ def get_transcripts(media_id):
 
 #
 # End of Functions to Compare Transcripts
+#######################################################################################################################
+
+
 #######################################################################################################################
 #
 # Functions to handle deletion of media items
@@ -1854,7 +2010,7 @@ def user_delete_item(media_id: int, force: bool = False) -> str:
         else:
             return "Item is already in trash. Use force=True to delete permanently before 30 days."
 
-
 #
 # End of Functions to handle deletion of media items
 #######################################################################################################################
+

@@ -7,7 +7,6 @@ import os
 import sqlite3
 import argparse
 import re
-import sys
 
 DATABASE_PATH = '../../prompts.db'
 
