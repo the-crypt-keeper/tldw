@@ -33,7 +33,7 @@ import unicodedata
 # 3rd-Party Imports
 import yt_dlp
 
-from App_Function_Libraries.SQLite_DB import check_media_and_whisper_model
+from App_Function_Libraries.DB_Manager import check_media_and_whisper_model
 
 
 # Import Local

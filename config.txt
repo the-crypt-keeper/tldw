@@ -1,21 +1,21 @@
 [API]
-anthropic_api_key = <anthropic_api_key>
-anthropic_model = claude-3-sonnet-20240229
-cohere_api_key = <your_cohere_api_key>
+anthropic_api_key = <anthropic_API_Key>
+anthropic_model = claude-3-5-sonnet-20240620
+cohere_api_key = <Cohere_API_Key>
 cohere_model = command-r-plus
-groq_api_key = <your_groq_api_key>
+groq_api_key = <Groq_API_Key>
 groq_model = llama3-70b-8192
-openai_api_key = <openai_api_key>
-openai_model = gpt-4-turbo
-huggingface_api_token = <huggingface_api_token>
+openai_api_key = <OpenAI_API_Key>
+openai_model = gpt-4o
+huggingface_api_key = <huggingface_api_token>
 huggingface_model = CohereForAI/c4ai-command-r-plus
-openrouter_api_key = <openrouter_api_key>
+openrouter_api_key = <OpenRouter_API_Key>
 openrouter_model = mistralai/mistral-7b-instruct:free
-deepseek_api_key = <deepseek_api_key>
+deepseek_api_key = <DeepSeek_API_Key>
 deepseek_model = deepseek-chat
 
 [Local-API]
-kobold_api_key = <kobold api key>
+kobold_api_key =
 kobold_api_IP = http://127.0.0.1:5001/api/v1/generate
 llama_api_key = <llama.cpp api key>
 llama_api_IP = http://127.0.0.1:8080/completion
@@ -37,11 +37,38 @@ logging_file = Logs
 processing_choice = cuda
 
 [Settings]
-max_tokens = 100
+chunk_duration = 30
+words_per_second = 3
 
 [Prompts]
 prompt_sample = "What is the meaning of life?"
 video_summarize_prompt = "Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary."
+
+[Database]
+type = sqlite
+sqlite_path = media_summary.db
+elasticsearch_host = localhost
+elasticsearch_port = 9200
+# Additionally you can use elasticsearch as the database type, just replace `sqlite` with `elasticsearch` for `type` and provide the `elasticsearch_host` and `elasticsearch_port` of your configured ES instance.
+chroma_db_path = chroma_db
+
+[Embeddings]
+provider = openai
+# Can be 'openai', 'local', or 'huggingface'
+model = text-embedding-3-small
+# Model name or path
+api_key = your_api_key_here
+api_url = http://localhost:8080/v1/embeddings
+# Only needed for 'local' provider
+
+[Chunking]
+method = words
+max_size = 400
+overlap = 200
+adaptive = false
+multi_level = false
+language = english
+
 
 
 

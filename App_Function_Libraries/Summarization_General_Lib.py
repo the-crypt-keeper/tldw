@@ -30,11 +30,11 @@ from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summariz
 from App_Function_Libraries.Diarization_Lib import combine_transcription_and_diarization
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
-from App_Function_Libraries.SQLite_DB import is_valid_url, add_media_to_database
+from App_Function_Libraries.DB_Manager import add_media_to_database
 # Import Local
 from App_Function_Libraries.Utils import load_and_log_configs, load_comprehensive_config, sanitize_filename, \
-    clean_youtube_url, extract_video_info, create_download_directory
-from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video
+    clean_youtube_url, create_download_directory, is_valid_url
+from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 
 #
 #######################################################################################################################
@@ -1172,7 +1172,7 @@ def summarize_chunk(api_name, text, custom_prompt_input, api_key, temp=None, sys
         elif api_name.lower() == "local-llm":
             return summarize_with_local_llm(text, custom_prompt_input, temp, system_message)
         elif api_name.lower() == "huggingface":
-            return summarize_with_huggingface(api_key, text, custom_prompt_input, temp, system_message)
+            return summarize_with_huggingface(api_key, text, custom_prompt_input, temp, )#system_message)
         else:
             logging.warning(f"Unsupported API: {api_name}")
             return None
@@ -1392,7 +1392,7 @@ def process_url(
             return process_video_urls(urls, num_speakers, whisper_model, custom_prompt_input, offset, api_name, api_key, vad_filter,
                                       download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
                                       keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
-                                      chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens, chunk_by_semantic, semantic_chunk_size, semantic_chunk_overlap)
+                                      chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens, chunk_by_semantic, semantic_chunk_size, semantic_chunk_overlap, recursive_summarization)
         else:
             urls = [url]
 
@@ -1414,7 +1414,8 @@ def process_url(
     try:
         info_dict, title = extract_video_info(url)
         download_path = create_download_directory(title)
-        video_path = download_video(url, download_path, info_dict, download_video_flag)
+        current_whsiper_model = whisper_model
+        video_path = download_video(url, download_path, info_dict, download_video_flag, current_whsiper_model)
         global segments
         audio_file_path, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
 
@@ -1532,11 +1533,11 @@ def process_url(
         if chunk_text_by_words or chunk_text_by_sentences or chunk_text_by_paragraphs or chunk_text_by_tokens or chunk_by_semantic:
             # Combine chunked transcriptions into a single file
             # FIXME - validate this works....
-            json_file_path, summary_file_path = save_transcription_and_summary(combined_transcription_file_path, combined_summary_file_path, download_path)
+            json_file_path, summary_file_path = save_transcription_and_summary(combined_transcription_file_path, combined_summary_file_path, download_path, info_dict)
             add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
             return transcription_text, summary_text, json_file_path, summary_file_path, None, None
         else:
-            json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path)
+            json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path, info_dict)
             add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
             return transcription_text, summary_text, json_file_path, summary_file_path, None, None
 

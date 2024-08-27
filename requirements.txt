@@ -66,6 +66,7 @@ pydub==0.25.1
 pyee==11.1.0
 Pygments==2.18.0
 pypandoc_binary
+pypandoc
 pyparsing==3.1.2
 pyreadline3==3.4.1
 python-dateutil==2.9.0.post0
@@ -106,16 +107,18 @@ ujson==5.9.0
 urllib3==2.2.2
 uvicorn==0.29.0
 watchfiles==0.21.0
-#websockets
 websockets==11.0.3
 yt-dlp
-#yt-dlp==2024.4.9
-#--extra-index-url https://download.pytorch.org/whl/cu113
 nltk
 torch
 torchaudio
-#torch==2.2.2+cu121
-#torchaudio==2.2.2+cu121
 openai~=1.28.1
 tiktoken~=0.6.0
 pymupdf
+chromadb
+protobuf==5.26.1
+#torch==2.2.2+cu121
+#torchaudio==2.2.2+cu121
+#websockets
+#yt-dlp==2024.4.9
+#--extra-index-url https://download.pytorch.org/whl/cu113

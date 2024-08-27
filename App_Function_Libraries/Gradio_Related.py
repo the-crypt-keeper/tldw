@@ -33,7 +33,6 @@ from time import sleep
 from typing import Dict, List, Tuple, Optional
 import traceback
 from functools import wraps
-
 #
 # Import 3rd-Party Libraries
 import pypandoc
@@ -50,18 +49,19 @@ from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm, \
     summarize_with_ollama
+from App_Function_Libraries.RAG_Libary_2 import rag_search
 from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_cohere, \
     summarize_with_anthropic, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface, perform_summarization, save_transcription_and_summary, \
     perform_transcription, summarize_chunk
-from App_Function_Libraries.SQLite_DB import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
+from App_Function_Libraries.DB_Manager import update_media_content, list_prompts, search_and_display, db, DatabaseError, \
     fetch_prompt_details, keywords_browser_interface, add_keyword, delete_keyword, \
     export_keywords_to_csv, add_media_to_database, import_obsidian_note_to_db, add_prompt, \
     delete_chat_message, update_chat_message, add_chat_message, get_chat_messages, search_chat_conversations, \
     create_chat_conversation, save_chat_history_to_database, view_database, get_transcripts, get_trashed_items, \
     user_delete_item, empty_trash, create_automated_backup, backup_dir, db_path, add_or_update_prompt, \
     load_prompt_details, load_preset_prompts, insert_prompt_to_db, delete_prompt, search_and_display_items, \
-    get_conversation_name
+    get_conversation_name, get_db_config
 from App_Function_Libraries.Utils import sanitize_filename, extract_text_from_segments, create_download_directory, \
     convert_to_seconds, load_comprehensive_config, safe_read_file, downloaded_files, generate_unique_identifier, \
     generate_unique_filename
@@ -468,7 +468,9 @@ def create_chunking_inputs():
 
 def create_introduction_tab():
     with (gr.TabItem("Introduction")):
-        gr.Markdown("# tldw: Your LLM-powered Research Multi-tool")
+        db_config = get_db_config()
+        db_type = db_config['type']
+        gr.Markdown(f"# tldw: Your LLM-powered Research Multi-tool (Using {db_type.capitalize()} Database)")
         with gr.Row():
             with gr.Column():
                 gr.Markdown("""### What can it do?
@@ -2116,7 +2118,7 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
                 elif api_endpoint.lower() == "local-llm":
                     summarization_response = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt)
                 elif api_endpoint.lower() == "huggingface":
-                    summarization_response = summarize_with_huggingface(api_key, input_data, user_prompt, temp, system_prompt)
+                    summarization_response = summarize_with_huggingface(api_key, input_data, user_prompt, temp)#, system_prompt)
                 elif api_endpoint.lower() == "ollama":
                     summarization_response = summarize_with_ollama(input_data, user_prompt, temp, system_prompt)
                 else:
@@ -2155,7 +2157,7 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
                 elif api_endpoint.lower() == "local-llm":
                     explanation_response = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt)
                 elif api_endpoint.lower() == "huggingface":
-                    explanation_response = summarize_with_huggingface(api_key, input_data, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_huggingface(api_key, input_data, user_prompt, temp)#, system_prompt)
                 elif api_endpoint.lower() == "ollama":
                     explanation_response = summarize_with_ollama(input_data, user_prompt, temp, system_prompt)
                 else:
@@ -2270,6 +2272,57 @@ def create_compare_transcripts_tab():
 ###########################################################################################################################################################################################################################
 #
 # Search Tab
+
+def create_rag_tab():
+    with gr.TabItem("RAG Search"):
+        gr.Markdown("# Retrieval-Augmented Generation (RAG) Search")
+
+        with gr.Row():
+            with gr.Column():
+                search_query = gr.Textbox(label="Enter your question", placeholder="What would you like to know?")
+                api_choice = gr.Dropdown(
+                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                    label="Select API for RAG",
+                    value="OpenAI"
+                )
+                search_button = gr.Button("Search")
+
+            with gr.Column():
+                result_output = gr.Textbox(label="Answer", lines=10)
+                context_output = gr.Textbox(label="Context", lines=10, visible=False)
+
+        def perform_rag_search(query, api_choice):
+            result = rag_search(query, api_choice)
+            return result['answer'], result['context']
+
+        search_button.click(perform_rag_search, inputs=[search_query, api_choice], outputs=[result_output, context_output])
+
+
+def create_embeddings_tab():
+    with gr.TabItem("Create Embeddings"):
+        gr.Markdown("# Create Embeddings for All Content")
+
+        with gr.Row():
+            with gr.Column():
+                embedding_api_choice = gr.Dropdown(
+                    choices=["OpenAI", "Local", "HuggingFace"],
+                    label="Select API for Embeddings",
+                    value="OpenAI"
+                )
+                create_button = gr.Button("Create Embeddings")
+
+            with gr.Column():
+                status_output = gr.Textbox(label="Status", lines=10)
+
+        def create_embeddings(api_choice):
+            try:
+                # Assuming you have a function that handles the creation of embeddings
+                status = create_all_embeddings(api_choice)
+                return status
+            except Exception as e:
+                return f"Error: {str(e)}"
+
+        create_button.click(create_embeddings, inputs=[embedding_api_choice], outputs=status_output)
 
 def search_prompts(query):
     try:
@@ -2894,7 +2947,7 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         elif api_endpoint.lower() == "local-llm":
             response = summarize_with_local_llm(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "huggingface":
-            response = summarize_with_huggingface(api_key, input_data, prompt, temp, system_message)
+            response = summarize_with_huggingface(api_key, input_data, prompt, temp)#, system_message)
         elif api_endpoint.lower() == "ollama":
             response = summarize_with_ollama(input_data, prompt, temp, system_message)
         else:
@@ -3755,7 +3808,7 @@ def create_chat_interface_four():
                 message, chat_history, {}, [],  # Empty media_content and selected_parts
                 api_endpoint, api_key, user_prompt, None,  # No conversation_id
                 False,  # Not saving conversation
-                temperature=temperature
+                temperature=temperature, system_prompt=""
             )
             chat_history.append((message, new_msg))
             return "", chat_history, chat_history
@@ -3784,7 +3837,7 @@ def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, t
     new_msg, new_history, new_conv_id = chat_wrapper(
         message, chat_history, media_content, selected_parts,
         api_endpoint, api_key, user_prompt, conversation_id,
-        save_conversation, temperature
+        save_conversation, temperature, system_prompt=""
     )
 
     if new_msg:
@@ -5488,7 +5541,10 @@ def launch_ui(share_public=None, server_mode=False):
     """
 
     with gr.Blocks(theme='bethecloud/storj_theme',css=css) as iface:
-        gr.Markdown("# TL/DW: Too Long, Didn't Watch - Your Personal Research Multi-Tool")
+        db_config = get_db_config()
+        db_type = db_config['type']
+        gr.Markdown(f"# tl/dw: Your LLM-powered Research Multi-tool")
+        gr.Markdown(f"(Using {db_type.capitalize()} Database)")
         with gr.Tabs():
             with gr.TabItem("Transcription / Summarization / Ingestion"):
                 with gr.Tabs():
@@ -5504,6 +5560,7 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
+                create_rag_tab()
                 create_viewing_tab()
                 create_search_summaries_tab()
                 create_prompt_search_tab()
