@@ -74,7 +74,7 @@ def aggregate(
         "average_coherence": average_coherence,
     }
 
-def run_geval(document, summary, api_key, api_name=None):
+def run_geval(document, summary, api_key, api_name=None, save=False):
     prompts = {
         "coherence": """You will be given one summary written for a source document.
 
@@ -219,8 +219,12 @@ def run_geval(document, summary, api_key, api_name=None):
         "scores": scores,
         "average_scores": avg_scores
     }
+    logging.debug("Results: %s", results)
 
-    save_eval_results(results)
+    if save:
+        logging.debug("Saving results to geval_results.json")
+        save_eval_results(results)
+        logging.debug("Results saved to geval_results.json")
 
     return (f"Coherence: {scores['coherence']:.2f}\n"
             f"Consistency: {scores['consistency']:.2f}\n"
@@ -246,13 +250,14 @@ def create_geval_tab():
                     label="Select API"
                 )
                 api_key_input = gr.Textbox(label="API Key (if required)", type="password")
+                save_value = gr.Checkbox(label="Save Results to a JSON file(geval_results.json)")
                 evaluate_button = gr.Button("Evaluate Summary")
             with gr.Column():
                 output = gr.Textbox(label="Evaluation Results", lines=10)
 
         evaluate_button.click(
             fn=run_geval,
-            inputs=[document_input, summary_input, api_name_input, api_key_input],
+            inputs=[document_input, summary_input, api_name_input, api_key_input, save_value],
             outputs=output
         )
 
