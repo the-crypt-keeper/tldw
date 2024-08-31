@@ -1,5 +1,6 @@
 # **tl/dw: Too Long, Didnt Watch**
-## Download, Transcribe, Summarize & Chat with Video+Audio+Documents+Articles & Books. All automated. All local. All yours. 
+## Download, Transcribe, Summarize & Chat with Video+Audio+Documents+Articles & Books. 
+### All automated. All local. All yours.
 #### More: Full-Text-Search across everything ingested (RAG is wip), Local LLM inference as part of it(llamafile) for those who don't want to mess with setting up an LLM, and a WebApp(gradio as PoC) to interact with the script in a more user-friendly manner.
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
