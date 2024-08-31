@@ -46,6 +46,9 @@
     - **Search across all the content you've ingested, and review or modify it using SQLite FTS5 Search.**
       - Ability to tag content with keywords, and search across those tags.
     - **Chat with an LLM about the content you've ingested, or ask questions about it. (Multiple APIs Supported, 15 total)**
+      - **APIs Supported:** 
+        - **Commercial:** OpenAI / Anthropic / Cohere / DeepSeek / Groq / Mistral / OpenRouter / HuggingFace; 
+        - **Local:** Llama.cpp / Kobold.cpp / Oobabooga / TabbyAPI / vLLM / Ollama;
     - **Prompt storage and retrieval, as well as the ability to select prompts from the DB to use with your questions.**
     - **General Chat front-end**
       - Regular chat UI;
