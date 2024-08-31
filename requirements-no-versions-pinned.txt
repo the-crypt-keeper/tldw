@@ -92,6 +92,7 @@ sniffio
 starlette
 sympy
 termcolor
+textstat
 timm
 tiktoken
 tokenizers
