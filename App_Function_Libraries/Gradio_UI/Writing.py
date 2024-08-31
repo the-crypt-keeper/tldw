@@ -12,7 +12,6 @@ import os
 import gradio as gr
 from PIL import Image
 import textstat
-from textstat import flesch_reading_ease, flesch_kincaid_grade
 #
 # Local Imports
 from App_Function_Libraries.Summarization_General_Lib import perform_summarization
