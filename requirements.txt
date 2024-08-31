@@ -117,6 +117,7 @@ tiktoken~=0.6.0
 pymupdf
 chromadb
 protobuf==5.26.1
+textstat
 #torch==2.2.2+cu121
 #torchaudio==2.2.2+cu121
 #websockets
