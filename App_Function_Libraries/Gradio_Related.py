@@ -565,6 +565,7 @@ def create_introduction_tab():
             - **DB** - Database
             - **Prompt Engineering** - The process of designing prompts that are used to guide the output of a language model. Is a meme but also very much not.
             - **Quantization** - The process of converting a continuous range of values into a finite range of discrete values.
+                * https://github.com/ggerganov/llama.cpp/blob/cddae4884c853b1a7ab420458236d666e2e34423/examples/quantize/README.md#L27
             - **GGUF Files** - GGUF is a binary format that is designed for fast loading and saving of models, and for ease of reading. Models are traditionally developed using PyTorch or another framework, and then converted to GGUF for use in GGML. https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
             - **Inference Engine** - A software system that is designed to execute a model that has been trained by a machine learning algorithm. Llama.cpp and Kobold.cpp are examples of inference engines.
             - **Abliteration** - https://huggingface.co/blog/mlabonne/abliteration

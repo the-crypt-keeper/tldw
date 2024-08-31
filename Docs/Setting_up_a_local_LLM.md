@@ -1,4 +1,9 @@
 # Setting up a Local LLM
+
+# FIXME - last updated?
+
+https://github.com/ggerganov/llama.cpp/blob/cddae4884c853b1a7ab420458236d666e2e34423/examples/quantize/README.md#L27
+
 - **Setting up Local LLM Runner**
   - **Llama.cpp**
     - **Linux & Mac**
