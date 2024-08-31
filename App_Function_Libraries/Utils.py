@@ -144,6 +144,10 @@ def load_and_log_configs():
         logging.debug(
             f"Loaded DeepSeek API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:] if deepseek_api_key else None}")
 
+        mistral_api_key = config.get('API', 'mistral_api_key', fallback=None)
+        logging.debug(
+            f"Loaded Mistral API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
+
         # Models
         anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
         cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
@@ -152,6 +156,7 @@ def load_and_log_configs():
         huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
         openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
         deepseek_model = config.get('API', 'deepseek_model', fallback='deepseek-chat')
+        mistral_model = config.get('API', 'mistral_model', fallback='mistral-large-latest')
 
         logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
         logging.debug(f"Loaded Cohere Model: {cohere_model}")
@@ -159,6 +164,8 @@ def load_and_log_configs():
         logging.debug(f"Loaded OpenAI Model: {openai_model}")
         logging.debug(f"Loaded HuggingFace Model: {huggingface_model}")
         logging.debug(f"Loaded OpenRouter Model: {openrouter_model}")
+        logging.debug(f"Loaded Deepseek Model: {deepseek_model}")
+        logging.debug(f"Loaded Mistral Model: {mistral_model}")
 
         # Local-Models
         kobold_api_ip = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
@@ -181,6 +188,9 @@ def load_and_log_configs():
         ollama_api_url = config.get('Local-API', 'ollama_api_IP', fallback='http://127.0.0.1:11434/api/generate')
         ollama_api_key = config.get('Local-API', 'ollama_api_key', fallback=None)
         ollama_model = config.get('Local-API', 'ollama_model', fallback=None)
+
+        aphrodite_api_url = config.get('Local-API', 'aphrodite_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
+        aphrodite_api_key = config.get('Local-API', 'aphrodite_api_key', fallback='')
 
         logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
         logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
@@ -208,6 +218,7 @@ def load_and_log_configs():
                 'huggingface': huggingface_api_key,
                 'openrouter': openrouter_api_key,
                 'deepseek': deepseek_api_key,
+                'mistral': mistral_api_key,
                 'kobold': kobold_api_key,
                 'llama': llama_api_key,
                 'ooba': ooba_api_key,
@@ -223,6 +234,7 @@ def load_and_log_configs():
                 'huggingface': huggingface_model,
                 'openrouter': openrouter_model,
                 'deepseek': deepseek_model,
+                'mistral': mistral_model,
                 'vllm': vllm_model,
                 'tabby': tabby_model,
                 'ollama': ollama_model
@@ -234,7 +246,8 @@ def load_and_log_configs():
                 'ooba': ooba_api_IP,
                 'tabby': tabby_api_IP,
                 'vllm': vllm_api_url,
-                'ollama': ollama_api_url
+                'ollama': ollama_api_url,
+                'aphrodite': aphrodite_api_url
             },
             'output_path': output_path,
             'processing_choice': processing_choice
