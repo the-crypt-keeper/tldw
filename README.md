@@ -9,8 +9,11 @@
 
 **Use the Installer Script! Download and run it to install the necessary packages + launch tl/dw**
 - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Run-Install-Update.sh`
+  - `bash Linux-Run-Install-Update.sh`
 - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS-Run-Install-Update.sh`
+  - `bash MacOS-Run-Install-Update.sh`
 - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/WindowsRun-Install-Update.bat`
+    - Then double-click the downloaded batch file to run it.
 ----------
 
 ### Table of Contents
