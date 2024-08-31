@@ -1,0 +1,236 @@
+[
+  {
+    "name": "5 Whys Analysis",
+    "prompts": [
+      "Why did this happen?",
+      "Why did that happen?",
+      "Why did this subsequent event happen?",
+      "Why did this further event happen?",
+      "Why did this final event happen?"
+    ]
+  },
+  {
+    "name": "Summarization",
+    "prompts": [
+      "Summarize the following text:",
+      "Refine the summary to be more concise:"
+    ]
+  },
+  {
+    "name": "Question Answering",
+    "prompts": [
+      "Answer the following question based on the context:",
+      "Provide a more detailed answer:"
+    ]
+  },
+  {
+    "name": "Brainstorming",
+    "prompts": [
+      "Generate initial ideas based on the following topic:",
+      "Expand on the generated ideas:",
+      "Refine and prioritize the ideas:",
+      "Summarize the final set of ideas:"
+    ]
+  },
+  {
+    "name": "Code Review",
+    "prompts": [
+      "Review the following code for potential issues:",
+      "Suggest improvements or optimizations:",
+      "Explain how the suggested changes will improve the code:"
+    ]
+  },
+  {
+    "name": "Product Description",
+    "prompts": [
+      "Write an initial product description based on the provided details:",
+      "Enhance the description with key features and benefits:",
+      "Simplify and make the description more engaging:",
+      "Optimize the description for SEO:"
+    ]
+  },
+  {
+    "name": "SWOT Analysis",
+    "prompts": [
+      "Identify the strengths of the subject:",
+      "Identify the weaknesses of the subject:",
+      "Identify potential opportunities for the subject:",
+      "Identify potential threats to the subject:",
+      "Summarize the SWOT analysis:"
+    ]
+  },
+  {
+    "name": "User Story Creation",
+    "prompts": [
+      "Draft an initial user story for the feature:",
+      "Clarify the user needs and expected outcomes:",
+      "Refine the user story to ensure clarity and completeness:",
+      "Review and prioritize the user story for development:"
+    ]
+  },
+    {
+    "name": "Content Outline Creation",
+    "prompts": [
+      "Identify the main topic and subtopics to be covered:",
+      "Detail the key points under each subtopic:",
+      "Refine and organize the outline for logical flow:",
+      "Expand on any areas that need more detail:"
+    ]
+  },
+  {
+    "name": "Risk Assessment",
+    "prompts": [
+      "Identify potential risks associated with the project/decision:",
+      "Analyze the impact and likelihood of each risk:",
+      "Suggest mitigation strategies for high-priority risks:",
+      "Summarize the risk assessment and proposed actions:"
+    ]
+  },
+  {
+    "name": "Customer Feedback Analysis",
+    "prompts": [
+      "Summarize the main themes from the customer feedback:",
+      "Identify positive aspects and strengths based on feedback:",
+      "Highlight areas of concern or dissatisfaction:",
+      "Recommend actions based on the feedback analysis:"
+    ]
+  },
+  {
+    "name": "Decision-Making",
+    "prompts": [
+      "List the available options for the decision:",
+      "Evaluate the pros and cons of each option:",
+      "Consider the potential outcomes and impact of each option:",
+      "Make a recommendation based on the evaluation:"
+    ]
+  },
+  {
+    "name": "Goal Setting and Action Planning",
+    "prompts": [
+      "Define the main goal you want to achieve:",
+      "Break down the goal into smaller, actionable steps:",
+      "Set timelines and milestones for each step:",
+      "Identify resources and support needed to achieve the goal:",
+      "Review and adjust the plan as necessary:"
+    ]
+  },
+  {
+    "name": "User Experience (UX) Design",
+    "prompts": [
+      "Describe the user needs and pain points:",
+      "Brainstorm potential design solutions to address these needs:",
+      "Evaluate the feasibility and impact of each design solution:",
+      "Create a prototype or mockup based on the selected design:",
+      "Plan for user testing and feedback collection:"
+    ]
+  },
+  {
+    "name": "Root Cause Analysis",
+    "prompts": [
+      "Describe the problem or issue in detail:",
+      "Identify possible causes of the problem:",
+      "Use the '5 Whys' technique to drill down to the root cause:",
+      "Propose potential solutions to address the root cause:",
+      "Develop an action plan to implement the solution and monitor its effectiveness:"
+    ]
+  },
+{
+    "name": "Literature Review",
+    "prompts": [
+      "Summarize the key findings from the following research paper:",
+      "Identify gaps or unresolved questions in the literature:",
+      "Compare and contrast the methodologies used in different studies:",
+      "Synthesize the findings into a cohesive narrative:"
+    ]
+  },
+  {
+    "name": "Creative Writing",
+    "prompts": [
+      "Generate ideas for a story or poem based on the following theme:",
+      "Outline the main plot or structure of the story:",
+      "Write the first draft of the opening scene or stanza:",
+      "Refine the draft by focusing on character development or imagery:",
+      "Edit and polish the final version for clarity and impact:"
+    ]
+  },
+  {
+    "name": "Marketing Campaign Planning",
+    "prompts": [
+      "Define the target audience and campaign goals:",
+      "Brainstorm creative ideas for campaign messages and visuals:",
+      "Outline the channels and tactics to be used in the campaign:",
+      "Set a timeline and assign responsibilities:",
+      "Evaluate the campaign's performance and suggest improvements:"
+    ]
+  },
+  {
+    "name": "Event Planning",
+    "prompts": [
+      "Outline the purpose and goals of the event:",
+      "List the key activities and sessions for the event:",
+      "Plan the logistics, including venue, catering, and AV setup:",
+      "Develop a promotional strategy to attract attendees:",
+      "Create a contingency plan for potential issues:"
+    ]
+  },
+  {
+    "name": "Job Interview Preparation",
+    "prompts": [
+      "Research the company and summarize key information:",
+      "Identify the most common interview questions for this role:",
+      "Prepare answers to behavioral and situational questions:",
+      "Review your resume and highlight relevant experiences:",
+      "Develop questions to ask the interviewer:"
+    ]
+  },
+  {
+    "name": "Conflict Resolution",
+    "prompts": [
+      "Describe the conflict and the parties involved:",
+      "Identify the underlying causes of the conflict:",
+      "Explore potential solutions or compromises:",
+      "Plan a mediation or discussion session to address the conflict:",
+      "Evaluate the outcomes and ensure all parties are satisfied:"
+    ]
+  },
+  {
+    "name": "Time Management",
+    "prompts": [
+      "List all the tasks and activities you need to complete this week:",
+      "Prioritize the tasks based on urgency and importance:",
+      "Create a daily schedule, allocating time blocks for each task:",
+      "Identify any potential time-wasters or distractions:",
+      "Review your progress at the end of the week and adjust your approach:"
+    ]
+  },
+  {
+    "name": "Product Launch",
+    "prompts": [
+      "Define the product's unique value proposition and target market:",
+      "Outline the product development milestones and key deliverables:",
+      "Develop a go-to-market strategy, including pricing, distribution, and promotion:",
+      "Plan the launch event or activities:",
+      "Monitor the launch performance and gather customer feedback:"
+    ]
+  },
+  {
+    "name": "Personal Reflection and Growth",
+    "prompts": [
+      "Reflect on your recent experiences and identify key learnings:",
+      "Set personal goals based on your reflections:",
+      "Identify any habits or behaviors you want to change or improve:",
+      "Develop an action plan to work towards your goals:",
+      "Review your progress periodically and adjust your plan as needed:"
+    ]
+  },
+  {
+    "name": "Sales Pitch Development",
+    "prompts": [
+      "Identify the key features and benefits of the product or service:",
+      "Understand the customer's pain points and how your product addresses them:",
+      "Craft an initial sales pitch focusing on value and solutions:",
+      "Refine the pitch by addressing potential objections:",
+      "Practice delivering the pitch with confidence and clarity:"
+    ]
+  }
+]
