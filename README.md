@@ -25,8 +25,7 @@
 
 
 ### <a name="what"></a> What is this (TL/DW)?
-- **101**
-  - The end goal of this project, is to be a personal research multi-tool/data assistant/young lady's illustrated primer.
+- **What is now:**
   - A tool that can ingest: audio, videos, articles, free form text, documents, and books as text into a personal, offline database, so that you can then search and chat with it at any time on your own device/locally.
     - (+ act as a nice way of creating your personal 'media' database, a personal digital library with search!)
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
@@ -34,6 +33,52 @@
     - If anything, I'd like to see this project be used in schools, universities, and research institutions, or anyone who wants to keep a record of what they've consumed and be able to search and ask questions about it.
     - I believe that this project can be a great tool for learning and research, and I'd like to see it develop to a point where it could be reasonably used as such.
     - In the meantime, if you don't care about data ownership or privacy, https://notebooklm.google/ is a good alternative that works, is free, and has a working RAG setup (unlike mine :cry:).
+  - **Current features:** 
+    - Ingest content(Video/Audio/epub/PDF/txt/websites) from a URL or a local file. Can be done in batches or singularly
+    - Transcription of Video/Audio content.
+    - Automatic summarization of content using an LLM API endpoint of your choice.
+      - Various chunking options for summarization, as well as the ability to chain summaries together.
+      - Ability to download the generated transcript, and summary as text files from the UI.
+      - Ability to download the video/audio as files from the UI.
+      - Can also _just_ download the video/audio from a URL.
+    - Storage of all the above into a SQLite DB, with search, tagging, and export functionality.
+    - Search across all the content you've ingested, and review or modify it using SQLite FTS5 Search.
+      - Ability to tag content with keywords, and search across those tags.
+    - Chat with an LLM about the content you've ingested, or ask questions about it. (Multiple APIs Supported, 15! total)
+    - Prompt storage and retrieval, as well as the ability to select prompts from the DB to use with your questions.
+    - General Chat front-end
+      - Regular chat UI;
+      - 'Stacked' Chat UI;
+      - One prompt, multiple responses UI;
+      - Four independent prompts/conversations UI;
+      - Local LLM inference as part of it(llamafile) for those who don't want to mess with setting up an LLM.
+      - Chat management, with the ability to save, delete, edit, search and export chats. (WIP)
+      - Chat 'Workflows' - A way to string together multiple questions and responses into a single chat. (WIP)
+      - Chat 'Sessions' - A way to save a chat and come back to it later.
+      - Support for SillyTavern character cards, and the ability to store/select from them in the chat UI. (saves as a JSON file, not to the SQLite DB)
+    - Ability to edit any of the content you've ingested, as well as the ability to delete it. (Including prompts)
+    - Writing Tools
+      - Writing Feedback - A way to get feedback on your writing from an LLM, impersonating a variety of different authors.
+      - Grammar and Style checking - A way to check your writing for grammar and style issues.
+      - Tone analyzer + Editor - A way to check and modify the tone or style of your writing.
+      - Writing Prompts - A way to get writing prompts from an LLM from a desired author.
+    - Ability to import existing Markdown/text files into the DB, with the ability to set the title, author, and tags for the content.
+    - Ability to import a list of URLs from a text file, and ingest them all at once.
+    - Ability to import a list of local files(video/audio) from a text file, and ingest them all at once.
+    - Ability to import Obsidian Vaults into the DB. (Imported notes are automatically parsed for tags and titles)
+    - Ability to import prompts.
+      - Single or multiple at once, in a zip file.
+    - Export functionality for all content, as well as the ability to export the entire DB(It's SQLite...).
+    - Backup Management - A way to back up the DB, view backups, and restore from a backup. (WIP)
+    - 'Trashcan' Support - A way to 'soft' delete content, and restore it if needed. (Helps with accidental deletions)
+    - Ability to set various configurations via the `config.txt` file.
+- **Where its headed:**
+  - Act as a Multi-Purpose Research tool. The idea being that there is so much data one comes across, and we can store it all as text. (with tagging!)
+  - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your fingertips at a moments notice.
+  - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
+  - Basically a [cheap foreign knockoff](https://tvtropes.org/pmwiki/pmwiki.php/Main/ShoddyKnockoffProduct) [`Young Lady's Illustrated Primer`](https://en.wikipedia.org/wiki/The_Diamond_Age) that you'd buy from some [shady dude in a van at a swap meet](https://tvtropes.org/pmwiki/pmwiki.php/Main/TheLittleShopThatWasntThereYesterday).
+    * Some food for thought: https://notes.andymatuschak.org/z9R3ho4NmDFScAohj3J8J3Y
+    * I say this recognizing the inherent difficulties in replicating such a device and acknowledging the current limitations of technology.
 - **Don't care, give me code**
   * Install git for your style of OS, then run the following commands in a terminal:
     * Install git on windows - On your keyboard: press WINDOWS + R to open Run dialog box. Then, run the following command to install git:
@@ -55,13 +100,7 @@
   - Everything is stored in a SQLite DB, so you can search across all the content you've ingested, and review or modify it.
   - Additionally, you can use it as context for chatting with an LLM, or for asking questions about the content you've ingested.
     - Think about asking questions about a video you've watched, or a book you've read, and being able to get answers from an LLM about it.
-- **Project Goal**
-  - Act as a Multi-Purpose Research tool. The idea being that there is so much data one comes across, and we can store it all as text. (with tagging!)
-  - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your fingertips at a moments notice.
-  - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
-  - Basically a [cheap foreign knockoff](https://tvtropes.org/pmwiki/pmwiki.php/Main/ShoddyKnockoffProduct) [`Young Lady's Illustrated Primer`](https://en.wikipedia.org/wiki/The_Diamond_Age) that you'd buy from some [shady dude in a van at a swap meet](https://tvtropes.org/pmwiki/pmwiki.php/Main/TheLittleShopThatWasntThereYesterday).
-    * Some food for thought: https://notes.andymatuschak.org/z9R3ho4NmDFScAohj3J8J3Y
-    * I say this recognizing the inherent difficulties in replicating such a device and acknowledging the current limitations of technology.
+
 
 For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek. Flipside I would say none honestly. The (largest players) will gaslight you and charge you money for it. Fun.
 From @nrose 05/08/2024 on Threads:
