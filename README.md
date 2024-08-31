@@ -1,5 +1,6 @@
 # **tl/dw: Too Long, Didnt Watch**
-## Download, Transcribe, Summarize & Chat with Video+Audio+Documents+Articles & Books. All automated. All local. All yours. 
+## Download, Transcribe, Summarize & Chat with Video+Audio+Documents+Articles & Books. 
+### All automated. All local. All yours.
 #### More: Full-Text-Search across everything ingested (RAG is wip), Local LLM inference as part of it(llamafile) for those who don't want to mess with setting up an LLM, and a WebApp(gradio as PoC) to interact with the script in a more user-friendly manner.
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
@@ -34,19 +35,19 @@
     - I believe that this project can be a great tool for learning and research, and I'd like to see it develop to a point where it could be reasonably used as such.
     - In the meantime, if you don't care about data ownership or privacy, https://notebooklm.google/ is a good alternative that works, is free, and has a working RAG setup (unlike mine :cry:).
   - **Current features:** 
-    - Ingest content(Video/Audio/epub/PDF/txt/websites) from a URL(single or multiple at once) or a local file(drag+drop).
-    - Transcription of Video/Audio content using faster_whisper, with the ability to select the model to use.
-    - Automatic summarization of content using an LLM API endpoint of your choice. A default prompt is used but you can set your own.
+    - **Ingest content(Video/Audio/epub/PDF/txt/websites) from a URL(single or multiple at once) or a local file(drag+drop).**
+    - **Transcription of Video/Audio content using faster_whisper, with the ability to select the model to use.**
+    - **Automatic summarization of content using an LLM API endpoint of your choice. A default prompt is used but you can set your own.**
       - Various chunking options for summarization, as well as the ability to chain summaries together.
       - Ability to download the generated transcript, and summary as text files from the UI.
       - Ability to download the video/audio as files from the UI.
       - Can also _just_ download the video/audio from a URL. (Utilities tab)
-    - Storage of all the above into a SQLite DB, with search(name/content/author/URL/keyword), tagging, and export functionality.
-    - Search across all the content you've ingested, and review or modify it using SQLite FTS5 Search.
+    - **Storage of all the above into a SQLite DB, with search(name/content/author/URL/keyword), tagging, and export functionality.**
+    - **Search across all the content you've ingested, and review or modify it using SQLite FTS5 Search.**
       - Ability to tag content with keywords, and search across those tags.
-    - Chat with an LLM about the content you've ingested, or ask questions about it. (Multiple APIs Supported, 15! total)
-    - Prompt storage and retrieval, as well as the ability to select prompts from the DB to use with your questions.
-    - General Chat front-end
+    - **Chat with an LLM about the content you've ingested, or ask questions about it. (Multiple APIs Supported, 15 total)**
+    - **Prompt storage and retrieval, as well as the ability to select prompts from the DB to use with your questions.**
+    - **General Chat front-end**
       - Regular chat UI;
       - 'Stacked' Chat UI;
       - One prompt, multiple responses UI;
@@ -56,23 +57,23 @@
       - Chat 'Workflows' - A way to string together multiple questions and responses into a single chat. (WIP)
       - Chat 'Sessions' - A way to save a chat and come back to it later.
       - Support for SillyTavern character cards, and the ability to store/select from them in the chat UI. (saves as a JSON file, not to the SQLite DB)
-    - Ability to edit any of the content you've ingested, as well as the ability to delete it. (Including prompts)
-    - Writing Tools
+    - **Ability to edit any of the content you've ingested, as well as the ability to delete it. (Including prompts)**
+    - **Writing Tools**
       - Writing Feedback - A way to get feedback on your writing from an LLM, impersonating a variety of different authors.
       - Grammar and Style checking - A way to check your writing for grammar and style issues.
       - Tone analyzer + Editor - A way to check and modify the tone or style of your writing.
       - Writing Prompts - A way to get writing prompts from an LLM from a desired author.
-    - Import:
+    - **Import Functionality:**
       - Existing Markdown/text files into the DB, with the ability to set the title, author, and tags for the content.
       - List of URLs(web scraping), and ingest them all at once.
       - List of local files(video/audio) from a text file, and ingest them all at once.
       - Obsidian Vaults into the DB. (Imported notes are automatically parsed for tags and titles)
       - Prompts.
         - Single or multiple at once, in a zip file.
-    - Export functionality for all content, as well as the ability to export the entire DB(It's SQLite...).
-    - Backup Management - A way to back up the DB, view backups, and restore from a backup. (WIP)
-    - 'Trashcan' Support - A way to 'soft' delete content, and restore it if needed. (Helps with accidental deletions)
-    - Ability to set various configurations via the `config.txt` file.
+    - **Export functionality for all content, as well as the ability to export the entire DB(It's SQLite...).**
+    - **Backup Management - A way to back up the DB, view backups, and restore from a backup. (WIP)**
+    - **'Trashcan' Support - A way to 'soft' delete content, and restore it if needed. (Helps with accidental deletions)**
+    - **Ability to set various configurations via the `config.txt` file.**
 - **Where its headed:**
   - Act as a Multi-Purpose Research tool. The idea being that there is so much data one comes across, and we can store it all as text. (with tagging!)
   - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your fingertips at a moments notice.
@@ -119,17 +120,6 @@
       - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
   - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
     - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
-- **(not so)Short Summary**
-  - Ingest content(video/audio/ebook/website/markdown) from a URL or a local file. Can be done in batches with a text file containing a list of URLs or paths to local files(CLI only) as well as from the GUI.
-    - GUI can handle local file uploads, but not batched file uploads. Can handle multiple URLs though.
-  - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
-    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, ollama, and Triton support planned) - Tabby/vLLM are in, but untested. Aphrodite you can use llama.cpp or kobold.cpp API and it should work...
-  - Recursive/'Rolling' summaries (i.e. chunking up input and doing a chain of summaries) are supported. 
-    - The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
-  - Everything is stored in a SQLite DB, so you can search across all the content you've ingested, and review or modify it.
-  - Additionally, you can use it as context for chatting with an LLM, or for asking questions about the content you've ingested.
-    - Think about asking questions about a video you've watched, or a book you've read, and being able to get answers from an LLM about it.
-
 
 For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek. Flipside I would say none honestly. The (largest players) will gaslight you and charge you money for it. Fun.
 From @nrose 05/08/2024 on Threads:
@@ -149,7 +139,7 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 
 ----------
 
-### <a name="quickstart">Quickstart</a>Quickstart
+### <a name="quickstart">Quickstart</a>
 
 #### Automatic Quickstart
 1. **Download the Installer Script for your OS:**
@@ -317,75 +307,8 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   * List of Files(can be URLs and local files mixed): `python summarize.py ./path/to/your/text_file.txt"`
 - Download and run an LLM using only your system RAM! (Need at least 8GB Ram, realistically 12GB)
   * `python summarize.py -gui --local_llm`
-
-Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
-```
-usage: summarize.py [-h] [-v] [-api API_NAME] [-key API_KEY] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET] [-vad] [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-gui] [-demo] [-prompt CUSTOM_PROMPT] [-overwrite] [-roll] [-detail DETAIL_LEVEL] [-model LLM_MODEL]
-                    [-k KEYWORDS [KEYWORDS ...]] [--log_file LOG_FILE] [--local_llm] [--server_mode] [--share_public SHARE_PUBLIC] [--port PORT] [--ingest_text_file] [--text_title TEXT_TITLE] [--text_author TEXT_AUTHOR] [--diarize]
-                    [input_path]
-
-positional arguments:
-  input_path            Path or URL of the video
-
-options:
-  -h, --help            show this help message and exit
-  -v, --video           Download the video instead of just the audio
-  -api API_NAME, --api_name API_NAME
-                        API name for summarization (optional)
-  -key API_KEY, --api_key API_KEY
-                        API key for summarization (optional)
-  -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
-                        Number of speakers (default: 2)
-  -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
-                        Whisper model (default: small)| Options: tiny.en, tiny, base.en, base, small.en, small, medium.en, medium, large-v1, large-v2, large-v3, large, distil-large-v2, distil-medium.en, distil-small.en
-  -off OFFSET, --offset OFFSET
-                        Offset in seconds (default: 0)
-  -vad, --vad_filter    Enable VAD filter
-  -log {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
-                        Log level (default: INFO)
-  -gui, --user_interface
-                        Launch the Gradio user interface
-  -demo, --demo_mode    Enable demo mode
-  -prompt CUSTOM_PROMPT, --custom_prompt CUSTOM_PROMPT
-                        Pass in a custom prompt to be used in place of the existing one.
-                         (Probably should just modify the script itself...)
-  -overwrite, --overwrite
-                        Overwrite existing files
-  -roll, --rolling_summarization
-                        Enable rolling summarization
-  -detail DETAIL_LEVEL, --detail_level DETAIL_LEVEL
-                        Mandatory if rolling summarization is enabled, defines the chunk  size.
-                         Default is 0.01(lots of chunks) -> 1.00 (few chunks)
-                         Currently only OpenAI works.
-  -k KEYWORDS [KEYWORDS ...], --keywords KEYWORDS [KEYWORDS ...]
-                        Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)
-  --log_file LOG_FILE   Where to save logfile (non-default)
-  --local_llm           Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)
-  --server_mode         Run in server mode (This exposes the GUI/Server to the network)
-  --share_public SHARE_PUBLIC
-                        This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)
-  --port PORT           Port to run the server on
-  --ingest_text_file    Ingest .txt files as content instead of treating them as URL lists
-  --text_title TEXT_TITLE
-                        Title for the text file being ingested
-  --text_author TEXT_AUTHOR
-                        Author of the text file being ingested
-  --diarize             Enable speaker diarization
-
-
-Sample commands:
-    1. Simple Sample command structure:
-        summarize.py <path_to_video> -api openai -k tag_one tag_two tag_three
-
-    2. Rolling Summary Sample command structure:
-        summarize.py <path_to_video> -api openai -prompt "custom_prompt_goes_here-is-appended-after-transcription" -roll -detail 0.01 -k tag_one tag_two tag_three
-
-    3. FULL Sample command structure:
-        summarize.py <path_to_video> -api openai -ns 2 -wm small.en -off 0 -vad -log INFO -prompt "custom_prompt" -overwrite -roll -detail 0.01 -k tag_one tag_two tag_three
-
-    4. Sample command structure for UI debug logging printed to console:
-        summarize.py -gui -log DEBUG
-```
+- Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
+- **See `CLI_Reference.md` for a full list of CLI options and how to use them in the `Docs` folder**'
 - Download Audio only from URL -> Transcribe audio:
   >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
 
