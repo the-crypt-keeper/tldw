@@ -15,6 +15,7 @@
 #########################################
 #
 # Built-In Imports
+import base64
 import glob
 import html
 import math
@@ -38,11 +39,19 @@ from functools import wraps
 import pypandoc
 import yt_dlp
 import gradio as gr
+from PIL import Image
+from textstat import textstat
 #
 # Local Imports
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.Audio_Files import process_audio_files, process_podcast, download_youtube_audio
+from App_Function_Libraries.Chat_related_functions import get_character_names, load_characters, save_character
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
+from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic, \
+    chat_with_cohere, chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_vllm, \
+    chat_with_huggingface
+from App_Function_Libraries.LLM_API_Calls_Local import chat_with_llama, chat_with_kobold, chat_with_oobabooga, \
+    chat_with_tabbyapi, chat_with_local_llm, chat_with_ollama, chat_with_aphrodite
 from App_Function_Libraries.PDF_Ingestion_Lib import process_and_cleanup_pdf, extract_text_and_format_from_pdf, \
     extract_metadata_from_pdf
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import local_llm_gui_function
@@ -2297,7 +2306,7 @@ def create_rag_tab():
 
         search_button.click(perform_rag_search, inputs=[search_query, api_choice], outputs=[result_output, context_output])
 
-
+# FIXME - under construction
 def create_embeddings_tab():
     with gr.TabItem("Create Embeddings"):
         gr.Markdown("# Create Embeddings for All Content")
@@ -2317,6 +2326,7 @@ def create_embeddings_tab():
         def create_embeddings(api_choice):
             try:
                 # Assuming you have a function that handles the creation of embeddings
+                from App_Function_Libraries.ChromaDB_Library import create_all_embeddings
                 status = create_all_embeddings(api_choice)
                 return status
             except Exception as e:
@@ -2774,7 +2784,7 @@ def stop_llamafile():
 
 
 
-def create_llamafile_settings_tab():
+def create_chat_with_llamafile_tab():
     def get_model_files(directory):
         pattern = os.path.join(directory, "*.{gguf,llamafile}")
         return [os.path.basename(f) for f in glob.glob(pattern)]
@@ -2881,7 +2891,6 @@ def create_llamafile_advanced_inputs():
 #
 # Chat Interface Tab Functions
 
-
 def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt, temperature,
          system_message=None):
     try:
@@ -2889,18 +2898,18 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         logging.info(f"Debug - Chat Function - Media Content: {media_content}")
         logging.info(f"Debug - Chat Function - Selected Parts: {selected_parts}")
         logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
-        logging.info(f"Debug - Chat Function - Prompt: {prompt}")
+        #logging.info(f"Debug - Chat Function - Prompt: {prompt}")
 
         # Ensure selected_parts is a list
         if not isinstance(selected_parts, (list, tuple)):
             selected_parts = [selected_parts] if selected_parts else []
 
-        logging.debug(f"Debug - Chat Function - Selected Parts (after check): {selected_parts}")
+        #logging.debug(f"Debug - Chat Function - Selected Parts (after check): {selected_parts}")
 
         # Combine the selected parts of the media content
         combined_content = "\n\n".join([f"{part.capitalize()}: {media_content.get(part, '')}" for part in selected_parts if part in media_content])
         # Print first 500 chars
-        logging.debug(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")
+        #logging.debug(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")
 
         # Prepare the input for the API
         if not history:
@@ -2908,7 +2917,7 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         else:
             input_data = f"User: {message}\n"
         # Print first 500 chars
-        logging.info(f"Debug - Chat Function - Input Data: {input_data[:500]}...")
+        #logging.info(f"Debug - Chat Function - Input Data: {input_data[:500]}...")
 
         if system_message:
             print(f"System message: {system_message}")
@@ -2923,33 +2932,37 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         # Use the existing API request code based on the selected endpoint
         logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
         if api_endpoint.lower() == 'openai':
-            response = summarize_with_openai(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_openai(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "anthropic":
-            response = summarize_with_anthropic(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_anthropic(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "cohere":
-            response = summarize_with_cohere(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_cohere(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "groq":
-            response = summarize_with_groq(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_groq(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "openrouter":
-            response = summarize_with_openrouter(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_openrouter(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "deepseek":
-            response = summarize_with_deepseek(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_deepseek(api_key, input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "mistral":
+            response = chat_with_mistral(api_key, input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "llama.cpp":
-            response = summarize_with_llama(input_data, prompt, temp, system_message)
+            response = chat_with_llama(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "kobold":
-            response = summarize_with_kobold(input_data, api_key, prompt, temp, system_message)
+            response = chat_with_kobold(input_data, api_key, prompt, temp, system_message)
         elif api_endpoint.lower() == "ooba":
-            response = summarize_with_oobabooga(input_data, api_key, prompt, temp, system_message)
+            response = chat_with_oobabooga(input_data, api_key, prompt, temp, system_message)
         elif api_endpoint.lower() == "tabbyapi":
-            response = summarize_with_tabbyapi(input_data, prompt, temp, system_message)
+            response = chat_with_tabbyapi(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "vllm":
-            response = summarize_with_vllm(input_data, prompt, system_message)
+            response = chat_with_vllm(input_data, prompt, system_message)
         elif api_endpoint.lower() == "local-llm":
-            response = summarize_with_local_llm(input_data, prompt, temp, system_message)
+            response = chat_with_local_llm(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "huggingface":
-            response = summarize_with_huggingface(api_key, input_data, prompt, temp)#, system_message)
+            response = chat_with_huggingface(api_key, input_data, prompt, temp)#, system_message)
         elif api_endpoint.lower() == "ollama":
-            response = summarize_with_ollama(input_data, prompt, temp, system_message)
+            response = chat_with_ollama(input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "aphrodite":
+            response = chat_with_aphrodite(input_data, prompt, temp, system_message)
         else:
             raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
 
@@ -3187,8 +3200,8 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
 
         # Include the selected parts and custom_prompt only for the first message
         if not history and selected_parts:
-            content_to_analyze = "\n".join(selected_parts)
-            full_message = f"{custom_prompt}\n\n{message}\n\nContent to analyze:\n{content_to_analyze}"
+            message_body = "\n".join(selected_parts)
+            full_message = f"{custom_prompt}\n\n{message}\n\n{message_body}"
         elif custom_prompt:
             full_message = f"{custom_prompt}\n\n{message}"
         else:
@@ -3281,7 +3294,7 @@ def create_chat_interface():
                     use_prompt = gr.Checkbox(label="Use Prompt")
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
                 with gr.Row():
-                    temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
+                    temperature = gr.Slider(label="Temperature", minimum=0.00, maximum=1.0, step=0.05, value=0.7)
                 with gr.Row():
                     conversation_search = gr.Textbox(label="Search Conversations")
                 with gr.Row():
@@ -3480,7 +3493,7 @@ def create_chat_interface_stacked():
                     use_summary = gr.Checkbox(label="Use Summary")
                     use_prompt = gr.Checkbox(label="Use Prompt")
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
-                    temp = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
+                    temp = gr.Slider(label="Temperature", minimum=0.00, maximum=1.0, step=0.05, value=0.7)
                 with gr.Row():
                     conversation_search = gr.Textbox(label="Search Conversations")
                 with gr.Row():
@@ -3667,7 +3680,7 @@ def create_chat_interface_multi_api():
                                                         "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba",
                                                         "Tabbyapi", "VLLM","ollama", "HuggingFace"])
                     api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
-                    temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
+                    temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.05, value=0.7)
                     chatbot = gr.Chatbot(height=800, elem_classes="chat-window")
                     chatbots.append(chatbot)
                     api_endpoints.append(api_endpoint)
@@ -3785,7 +3798,7 @@ def create_chat_interface_four():
                                                             "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba",
                                                             "Tabbyapi", "VLLM","ollama", "HuggingFace"])
                         api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
-                        temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.1, value=0.7)
+                        temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.05, value=0.7)
                         chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
                         msg = gr.Textbox(label=f"Enter your message for Chat {i + 1}")
                         submit = gr.Button(f"Submit to Chat {i + 1}")
@@ -4025,6 +4038,81 @@ def create_chat_management_tab():
         )
 
     return search_query, search_button, conversation_list, conversation_mapping, chat_content, save_button, result_message, chat_preview
+
+
+# FIXME - busted and incomplete
+# Mock function to simulate LLM processing
+def process_with_llm(workflow, context, prompt):
+    return f"LLM output for {workflow} with context: {context[:30]}... and prompt: {prompt[:30]}..."
+
+
+# Load workflows from a JSON file
+json_path = Path('./Helper_Scripts/Workflows/Workflows.json')
+with json_path.open('r') as f:
+    workflows = json.load(f)
+
+
+# FIXME - broken Completely. Doesn't work.
+def chat_workflows_tab():
+    with gr.TabItem("Chat Workflows"):
+        with gr.Blocks() as chat_workflows_block:
+            gr.Markdown("# Workflows using LLMs")
+
+            workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
+            context_input = gr.Textbox(label="Context", lines=5)
+
+            # Create lists to hold UI components
+            prompt_inputs = []
+            process_buttons = []
+            output_boxes = []
+            max_prompts = max(len(wf['prompts']) for wf in workflows)
+
+            # Pre-create the maximum number of prompt sections
+            for i in range(max_prompts):
+                prompt_input = gr.Textbox(label=f"Prompt {i + 1}", lines=2, visible=False)
+                output_box = gr.Textbox(label=f"Output {i + 1}", lines=5, visible=False)
+                process_button = gr.Button(f"Process Prompt {i + 1}", visible=False)
+
+                prompt_inputs.append(prompt_input)
+                output_boxes.append(output_box)
+                process_buttons.append(process_button)
+
+                process_button.click(
+                    fn=lambda context, prompt, workflow_name, step=i: process(context, prompt, workflow_name, step),
+                    inputs=[context_input, prompt_input, workflow_selector],
+                    outputs=[output_box]
+                )
+
+            def process(context, prompt, workflow_name, step):
+                selected_workflow = next(wf for wf in workflows if wf['name'] == workflow_name)
+                # Update context with previous outputs
+                for j in range(step):
+                    context += f"\n\n{output_boxes[j].value}"
+                result = process_with_llm(selected_workflow['name'], context, prompt)
+                return result
+
+            def update_prompt_sections(workflow_name):
+                selected_workflow = next(wf for wf in workflows if wf['name'] == workflow_name)
+                num_prompts = len(selected_workflow['prompts'])
+
+                for i in range(max_prompts):
+                    if i < num_prompts:
+                        prompt_inputs[i].visible = True
+                        prompt_inputs[i].value = selected_workflow['prompts'][i]
+                        process_buttons[i].visible = True
+                        output_boxes[i].visible = True
+                    else:
+                        prompt_inputs[i].visible = False
+                        process_buttons[i].visible = False
+                        output_boxes[i].visible = False
+
+            # Bind the workflow selector to update the UI
+            workflow_selector.change(update_prompt_sections, inputs=[workflow_selector], outputs=[])
+
+        return chat_workflows_block
+
+
+
 
 #
 # End of Chat Interface Tab Functions
@@ -4582,29 +4670,25 @@ def create_import_item_tab():
         gr.Markdown("# Import a markdown file or text file into the database")
         gr.Markdown("...and have it tagged + summarized")
         with gr.Row():
-            import_file = gr.File(label="Upload file for import", file_types=["txt", "md"])
-        with gr.Row():
-            title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
-            author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
-        with gr.Row():
-            keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords, comma-separated")
-            custom_prompt_input = gr.Textbox(label="Custom Prompt",
+            with gr.Column():
+                import_file = gr.File(label="Upload file for import", file_types=["txt", "md"])
+                title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords, comma-separated")
+                custom_prompt_input = gr.Textbox(label="Custom Prompt",
                                              placeholder="Enter a custom prompt for summarization (optional)")
-        with gr.Row():
-            summary_input = gr.Textbox(label="Summary",
+                summary_input = gr.Textbox(label="Summary",
                                        placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
-        with gr.Row():
-            auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
-            api_name_input = gr.Dropdown(
+                auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
+                api_name_input = gr.Dropdown(
                 choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                          "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
                 label="API for Auto-summarization"
-            )
-            api_key_input = gr.Textbox(label="API Key", type="password")
-        with gr.Row():
-            import_button = gr.Button("Import Data")
-        with gr.Row():
-            import_output = gr.Textbox(label="Import Status")
+                )
+                api_key_input = gr.Textbox(label="API Key", type="password")
+            with gr.Column():
+                import_button = gr.Button("Import Data")
+                import_output = gr.Textbox(label="Import Status")
 
         import_button.click(
             fn=import_data,
@@ -4617,10 +4701,12 @@ def create_import_obsidian_vault_tab():
     with gr.TabItem("Import Obsidian Vault"):
         gr.Markdown("## Import Obsidian Vault")
         with gr.Row():
-            vault_path_input = gr.Textbox(label="Obsidian Vault Path (Local)")
-            vault_zip_input = gr.File(label="Upload Obsidian Vault (Zip)")
-        import_vault_button = gr.Button("Import Obsidian Vault")
-        import_status = gr.Textbox(label="Import Status", interactive=False)
+            with gr.Column():
+                vault_path_input = gr.Textbox(label="Obsidian Vault Path (Local)")
+                vault_zip_input = gr.File(label="Upload Obsidian Vault (Zip)")
+            with gr.Column():
+                import_vault_button = gr.Button("Import Obsidian Vault")
+                import_status = gr.Textbox(label="Import Status", interactive=False)
 
 
     def import_vault(vault_path, vault_zip):
@@ -5114,13 +5200,18 @@ def display_search_results_export_tab(search_query: str, search_type: str, page:
 
 def create_export_tab():
     with gr.Tab("Search and Export"):
-        search_query = gr.Textbox(label="Search Query")
-        search_type = gr.Radio(["Title", "URL", "Keyword", "Content"], label="Search By")
-        search_button = gr.Button("Search")
-
         with gr.Row():
-            prev_button = gr.Button("Previous Page")
-            next_button = gr.Button("Next Page")
+            with gr.Column():
+                gr.Markdown("# Search and Export Items")
+                gr.Markdown("Search for items and export them as markdown files")
+                gr.Markdown("You can also export items by keyword")
+                search_query = gr.Textbox(label="Search Query")
+                search_type = gr.Radio(["Title", "URL", "Keyword", "Content"], label="Search By")
+                search_button = gr.Button("Search")
+
+            with gr.Column():
+                prev_button = gr.Button("Previous Page")
+                next_button = gr.Button("Next Page")
 
         current_page = gr.State(1)
         total_pages = gr.State(1)
@@ -5143,7 +5234,7 @@ def create_export_tab():
         fn=search_and_update,
         inputs=[search_query, search_type, current_page],
         outputs=[search_results, error_output, current_page, total_pages, search_results],
-        show_progress=True
+        show_progress="full"
     )
 
 
@@ -5181,14 +5272,14 @@ def create_export_tab():
         fn=handle_export_selected,
         inputs=[search_results],
         outputs=[export_output, error_output],
-        show_progress=True
+        show_progress="full"
     )
 
     export_by_keyword_button.click(
         fn=export_items_by_keyword,
         inputs=[keyword_input],
         outputs=[export_output, error_output],
-        show_progress=True
+        show_progress="full"
     )
 
     def handle_item_selection(selected_items):
@@ -5220,7 +5311,7 @@ def create_export_tab():
         fn=handle_item_selection,
         inputs=[search_results],
         outputs=[export_output, error_output],
-        show_progress=True
+        show_progress="full"
     )
 
 
@@ -5245,24 +5336,33 @@ def restore_backup(backup_name):
 def create_backup_tab():
     with gr.Tab("Create Backup"):
         gr.Markdown("# Create a backup of the database")
-        create_button = gr.Button("Create Backup")
-        create_output = gr.Textbox(label="Result")
-        create_button.click(create_backup, inputs=[], outputs=create_output)
+        with gr.Row():
+            with gr.Column():
+                create_button = gr.Button("Create Backup")
+                create_output = gr.Textbox(label="Result")
+            with gr.Column():
+                create_button.click(create_backup, inputs=[], outputs=create_output)
 
 def create_view_backups_tab():
     with gr.TabItem("View Backups"):
         gr.Markdown("# Browse available backups")
-        view_button = gr.Button("View Backups")
-        backup_list = gr.Textbox(label="Available Backups")
-        view_button.click(list_backups, inputs=[], outputs=backup_list)
+        with gr.Row():
+            with gr.Column():
+                view_button = gr.Button("View Backups")
+            with gr.Column():
+                backup_list = gr.Textbox(label="Available Backups")
+                view_button.click(list_backups, inputs=[], outputs=backup_list)
+
 
 def create_restore_backup_tab():
     with gr.TabItem("Restore Backup"):
         gr.Markdown("# Restore a backup of the database")
-        backup_input = gr.Textbox(label="Backup Filename")
-        restore_button = gr.Button("Restore")
-        restore_output = gr.Textbox(label="Result")
-        restore_button.click(restore_backup, inputs=[backup_input], outputs=restore_output)
+        with gr.Column():
+            backup_input = gr.Textbox(label="Backup Filename")
+            restore_button = gr.Button("Restore")
+        with gr.Column():
+            restore_output = gr.Textbox(label="Result")
+            restore_button.click(restore_backup, inputs=[backup_input], outputs=restore_output)
 
 
 #
@@ -5273,43 +5373,49 @@ def create_restore_backup_tab():
 
 def create_export_keywords_tab():
     with gr.Tab("Export Keywords"):
-        export_keywords_button = gr.Button("Export Keywords")
-        export_keywords_output = gr.File(label="Download Exported Keywords")
-        export_keywords_status = gr.Textbox(label="Export Status")
+        with gr.Row():
+            with gr.Column():
+                export_keywords_button = gr.Button("Export Keywords")
+            with gr.Column():
+                export_keywords_output = gr.File(label="Download Exported Keywords")
+                export_keywords_status = gr.Textbox(label="Export Status")
 
-        export_keywords_button.click(
-            fn=export_keywords_to_csv,
-            outputs=[export_keywords_status, export_keywords_output]
-        )
+            export_keywords_button.click(
+                fn=export_keywords_to_csv,
+                outputs=[export_keywords_status, export_keywords_output]
+            )
 
 def create_view_keywords_tab():
     with gr.TabItem("View Keywords"):
         gr.Markdown("# Browse Keywords")
-        browse_output = gr.Markdown()
-        browse_button = gr.Button("View Existing Keywords")
-        browse_button.click(fn=keywords_browser_interface, outputs=browse_output)
+        with gr.Column():
+            browse_output = gr.Markdown()
+            browse_button = gr.Button("View Existing Keywords")
+            browse_button.click(fn=keywords_browser_interface, outputs=browse_output)
 
 
 def create_add_keyword_tab():
     with gr.TabItem("Add Keywords"):
         with gr.Row():
-            gr.Markdown("# Add Keywords to the Database")
-            add_input = gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here...")
-            add_button = gr.Button("Add Keywords")
-        with gr.Row():
-            add_output = gr.Textbox(label="Result")
-            add_button.click(fn=add_keyword, inputs=add_input, outputs=add_output)
+            with gr.Column():
+                gr.Markdown("# Add Keywords to the Database")
+                add_input = gr.Textbox(label="Add Keywords (comma-separated)", placeholder="Enter keywords here...")
+                add_button = gr.Button("Add Keywords")
+            with gr.Row():
+                add_output = gr.Textbox(label="Result")
+                add_button.click(fn=add_keyword, inputs=add_input, outputs=add_output)
 
 
 def create_delete_keyword_tab():
     with gr.Tab("Delete Keywords"):
         with gr.Row():
-            gr.Markdown("# Delete Keywords from the Database")
-            delete_input = gr.Textbox(label="Delete Keyword", placeholder="Enter keyword to delete here...")
-            delete_button = gr.Button("Delete Keyword")
-        with gr.Row():
-            delete_output = gr.Textbox(label="Result")
-            delete_button.click(fn=delete_keyword, inputs=delete_input, outputs=delete_output)
+            with gr.Column():
+                gr.Markdown("# Delete Keywords from the Database")
+                delete_input = gr.Textbox(label="Delete Keyword", placeholder="Enter keyword to delete here...")
+                delete_button = gr.Button("Delete Keyword")
+            with gr.Row():
+                delete_output = gr.Textbox(label="Result")
+                delete_button.click(fn=delete_keyword, inputs=delete_input, outputs=delete_output)
 
 #
 # End of Keyword Management Tab Functions
@@ -5344,17 +5450,16 @@ def grammar_style_check(input_text, custom_prompt, api_name, api_key, system_pro
     return perform_summarization(api_name, full_text, custom_prompt, api_key, system_prompt)
 
 
-def create_document_editing_tab():
-    with gr.Group():
-        with gr.Tab("Grammar and Style Check"):
-            with gr.Row():
-                with gr.Column():
-                    gr.Markdown("# Grammar and Style Check")
-                    gr.Markdown("This utility checks the grammar and style of the provided text by feeding it to an LLM and returning suggestions for improvement.")
-                    input_text = gr.Textbox(label="Input Text", lines=10)
-                    custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
-                    system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=5, visible=False)
-                    custom_prompt_input = gr.Textbox(label="user Prompt",
+def create_grammar_style_check_tab():
+    with gr.TabItem("Grammar and Style Check"):
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("# Grammar and Style Check")
+                gr.Markdown("This utility checks the grammar and style of the provided text by feeding it to an LLM and returning suggestions for improvement.")
+                input_text = gr.Textbox(label="Input Text", lines=10)
+                custom_prompt_checkbox = gr.Checkbox(label="Use Custom Prompt", value=False, visible=True)
+                system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Please analyze the provided text for grammar and style. Offer any suggestions or points to improve you can identify. Additionally please point out any misuses of any words or incorrect spellings.", lines=5, visible=False)
+                custom_prompt_input = gr.Textbox(label="user Prompt",
                                                      value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
 **Bulleted Note Creation Guidelines**
 
@@ -5374,65 +5479,621 @@ def create_document_editing_tab():
 """,
                                                      lines=3,
                                                      visible=False)
-                    custom_prompt_checkbox.change(
-                        fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
-                        inputs=[custom_prompt_checkbox],
-                        outputs=[custom_prompt_input, system_prompt_input]
-                    )
-                    api_name_input = gr.Dropdown(
-                        choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
-                        value=None,
-                        label="API for Grammar Check"
-                    )
-                    api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
-                                                   type="password")
-                    check_grammar_button = gr.Button("Check Grammar and Style")
+                custom_prompt_checkbox.change(
+                    fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+                    inputs=[custom_prompt_checkbox],
+                    outputs=[custom_prompt_input, system_prompt_input]
+                )
+                api_name_input = gr.Dropdown(
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
+                    value=None,
+                    label="API for Grammar Check"
+                )
+                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                                               type="password")
+                check_grammar_button = gr.Button("Check Grammar and Style")
 
-                with gr.Column():
-                    gr.Markdown("# Resulting Suggestions")
-                    gr.Markdown("(Keep in mind the API used can affect the quality of the suggestions)")
+            with gr.Column():
+                gr.Markdown("# Resulting Suggestions")
+                gr.Markdown("(Keep in mind the API used can affect the quality of the suggestions)")
 
-                    output_text = gr.Textbox(label="Grammar and Style Suggestions", lines=15)
+                output_text = gr.Textbox(label="Grammar and Style Suggestions", lines=15)
 
-                check_grammar_button.click(
-                    fn=grammar_style_check,
-                    inputs=[input_text, custom_prompt_input, api_name_input, api_key_input, system_prompt_input],
+            check_grammar_button.click(
+                fn=grammar_style_check,
+                inputs=[input_text, custom_prompt_input, api_name_input, api_key_input, system_prompt_input],
+                outputs=output_text
+            )
+
+
+def create_tone_adjustment_tab():
+    with gr.TabItem("Tone Analyzer & Editor"):
+        with gr.Row():
+            with gr.Column():
+                input_text = gr.Textbox(label="Input Text", lines=10)
+                concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
+                casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
+                api_name_input = gr.Dropdown(
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
+                    value=None,
+                    label="API for Grammar Check"
+                )
+                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                                               type="password")
+                adjust_btn = gr.Button("Adjust Tone")
+
+            with gr.Column():
+                output_text = gr.Textbox(label="Adjusted Text", lines=15)
+
+                adjust_btn.click(
+                    adjust_tone,
+                    inputs=[input_text, concise_slider, casual_slider],
                     outputs=output_text
                 )
 
-        # FIXME - Add actual function for this
-        with gr.Tab("Tone Analyzer & Editor"):
-            with gr.Row():
-                with gr.Column():
-                    input_text = gr.Textbox(label="Input Text", lines=10)
-                    concise_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Concise vs Expanded")
-                    casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
-                    api_name_input = gr.Dropdown(
-                        choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
-                        value=None,
-                        label="API for Grammar Check"
-                    )
-                    api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
-                                                   type="password")
-                    adjust_btn = gr.Button("Adjust Tone")
 
-                with gr.Column():
-                    output_text = gr.Textbox(label="Adjusted Text", lines=15)
+persona_prompts = {
+    "Hemingway": "As Ernest Hemingway, known for concise and straightforward prose, provide feedback on the following text:",
+    "Shakespeare": "Channel William Shakespeare's poetic style and provide feedback on the following text:",
+    "Jane Austen": "Embodying Jane Austen's wit and social commentary, critique the following text:",
+    "Stephen King": "With Stephen King's flair for suspense and horror, analyze the following text:",
+    "J.K. Rowling": "As J.K. Rowling, creator of the magical world of Harry Potter, review the following text:"
+}
 
-                    adjust_btn.click(
-                        adjust_tone,
-                        inputs=[input_text, concise_slider, casual_slider],
-                        outputs=output_text
-                    )
+def generate_writing_feedback(text, persona, aspect, api_name, api_key):
+    if isinstance(persona, dict):  # If it's a character card
+        base_prompt = f"You are {persona['name']}. {persona['personality']}\n\nScenario: {persona['scenario']}\n\nRespond to the following message in character:"
+    else:  # If it's a regular persona
+        base_prompt = persona_prompts.get(persona, f"As {persona}, provide feedback on the following text:")
+
+    if aspect != "Overall":
+        prompt = f"{base_prompt}\n\nFocus specifically on the {aspect.lower()} in the following text:\n\n{text}"
+    else:
+        prompt = f"{base_prompt}\n\n{text}"
+
+    return perform_summarization(api_name, text, prompt, api_key, system_message="You are a helpful AI assistant. You will respond to the user as if you were the persona declared in the user prompt.")
+
+def generate_writing_prompt(persona, api_name, api_key):
+    prompt = f"Generate a writing prompt in the style of {persona}. The prompt should inspire a short story or scene that reflects {persona}'s typical themes and writing style."
+    #FIXME
+    return perform_summarization(api_name, prompt, "", api_key, system_message="You are a helpful AI assistant. You will respond to the user as if you were the persona declared in the user prompt." )
+
+def calculate_readability(text):
+    ease = textstat.flesch_reading_ease(text)
+    grade = textstat.flesch_kincaid_grade(text)
+    return f"Readability: Flesch Reading Ease: {ease:.2f}, Flesch-Kincaid Grade Level: {grade:.2f}"
 
 
-        with gr.Tab("Creative Writing Assistant"):
-            gr.Markdown("# Utility to be added...")
+def generate_feedback_history_html(history):
+    html = "<h3>Recent Feedback History</h3>"
+    for entry in reversed(history):
+        html += f"<details><summary>{entry['persona']} Feedback</summary>"
+        html += f"<p><strong>Original Text:</strong> {entry['text'][:100]}...</p>"
 
-        with gr.Tab("Mikupad"):
-            gr.Markdown("I Wish. Gradio won't embed it successfully...")
+        feedback = entry.get('feedback')
+        if feedback:
+            html += f"<p><strong>Feedback:</strong> {feedback[:200]}...</p>"
+        else:
+            html += "<p><strong>Feedback:</strong> No feedback provided.</p>"
+
+        html += "</details>"
+    return html
+
+
+# FIXME
+def create_document_feedback_tab():
+    with gr.TabItem("Writing Feedback"):
+        with gr.Row():
+            with gr.Column(scale=2):
+                input_text = gr.Textbox(label="Your Writing", lines=10)
+                persona_dropdown = gr.Dropdown(
+                    label="Select Persona",
+                    choices=[
+                        "Agatha Christie",
+                        "Arthur Conan Doyle",
+                        "Charles Bukowski",
+                        "Charles Dickens",
+                        "Chinua Achebe",
+                        "Cormac McCarthy",
+                        "David Foster Wallace",
+                        "Edgar Allan Poe",
+                        "F. Scott Fitzgerald",
+                        "Flannery O'Connor",
+                        "Franz Kafka",
+                        "Fyodor Dostoevsky",
+                        "Gabriel Garcia Marquez",
+                        "George R.R. Martin",
+                        "George Orwell",
+                        "Haruki Murakami",
+                        "Hemingway",
+                        "Herman Melville",
+                        "Isabel Allende",
+                        "James Joyce",
+                        "Jane Austen",
+                        "J.K. Rowling",
+                        "J.R.R. Tolkien",
+                        "Jorge Luis Borges",
+                        "Kurt Vonnegut",
+                        "Leo Tolstoy",
+                        "Margaret Atwood",
+                        "Mark Twain",
+                        "Mary Shelley",
+                        "Milan Kundera",
+                        "Naguib Mahfouz",
+                        "Neil Gaiman",
+                        "Octavia Butler",
+                        "Philip K Dick",
+                        "Ray Bradbury",
+                        "Salman Rushdie",
+                        "Shakespeare",
+                        "Stephen King",
+                        "Toni Morrison",
+                        "T.S. Eliot",
+                        "Ursula K. Le Guin",
+                        "Virginia Woolf",
+                        "Virginia Woolf",
+                        "Zadie Smith"],
+                    value="Hemingway"
+                )
+                custom_persona_name = gr.Textbox(label="Custom Persona Name")
+                custom_persona_description = gr.Textbox(label="Custom Persona Description", lines=3)
+                add_custom_persona_button = gr.Button("Add Custom Persona")
+                aspect_dropdown = gr.Dropdown(
+                    label="Focus Feedback On",
+                    choices=["Overall", "Grammar", "Word choice", "Structure of delivery", "Character Development", "Character Dialogue", "Descriptive Language", "Plot Structure"],
+                    value="Overall"
+                )
+                api_name_input = gr.Dropdown(
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                    value=None,
+                    label="API for Feedback"
+                )
+                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", type="password")
+                get_feedback_button = gr.Button("Get Feedback")
+                generate_prompt_button = gr.Button("Generate Writing Prompt")
+
+            with gr.Column(scale=2):
+                feedback_output = gr.Textbox(label="Feedback", lines=15)
+                readability_output = gr.Textbox(label="Readability Metrics")
+                feedback_history_display = gr.HTML(label="Feedback History")
+
+        with gr.Row():
+            compare_personas = gr.CheckboxGroup(
+                choices=[
+                    "Agatha Christie",
+                    "Arthur Conan Doyle",
+                    "Charles Bukowski",
+                    "Charles Dickens",
+                    "Chinua Achebe",
+                    "Cormac McCarthy",
+                    "David Foster Wallace",
+                    "Edgar Allan Poe",
+                    "F. Scott Fitzgerald",
+                    "Flannery O'Connor",
+                    "Franz Kafka",
+                    "Fyodor Dostoevsky",
+                    "Gabriel Garcia Marquez",
+                    "George R.R. Martin",
+                    "George Orwell",
+                    "Haruki Murakami",
+                    "Hemingway",
+                    "Herman Melville",
+                    "Isabel Allende",
+                    "James Joyce",
+                    "Jane Austen",
+                    "J.K. Rowling",
+                    "J.R.R. Tolkien",
+                    "Jorge Luis Borges",
+                    "Kurt Vonnegut",
+                    "Leo Tolstoy",
+                    "Margaret Atwood",
+                    "Mark Twain",
+                    "Mary Shelley",
+                    "Milan Kundera",
+                    "Naguib Mahfouz",
+                    "Neil Gaiman",
+                    "Octavia Butler",
+                    "Philip K Dick",
+                    "Ray Bradbury",
+                    "Salman Rushdie",
+                    "Shakespeare",
+                    "Stephen King",
+                    "Toni Morrison",
+                    "T.S. Eliot",
+                    "Ursula K. Le Guin",
+                    "Virginia Woolf",
+                    "Virginia Woolf",
+                    "Zadie Smith"],
+                label="Compare Multiple Persona's Feedback at Once"
+            )
+        with gr.Row():
+            compare_button = gr.Button("Compare Feedback")
+
+    feedback_history = gr.State([])
+
+    def add_custom_persona(name, description):
+        updated_choices = persona_dropdown.choices + [name]
+        persona_prompts[name] = f"As {name}, {description}, provide feedback on the following text:"
+        return gr.update(choices=updated_choices)
+
+    def update_feedback_history(current_text, persona, feedback):
+        # Ensure feedback_history.value is initialized and is a list
+        if feedback_history.value is None:
+            feedback_history.value = []
+
+        history = feedback_history.value
+
+        # Append the new entry to the history
+        history.append({"text": current_text, "persona": persona, "feedback": feedback})
+
+        # Keep only the last 5 entries in the history
+        feedback_history.value = history[-10:]
+
+        # Generate and return the updated HTML
+        return generate_feedback_history_html(feedback_history.value)
+
+    def compare_feedback(text, selected_personas, api_name, api_key):
+        results = []
+        for persona in selected_personas:
+            feedback = generate_writing_feedback(text, persona, "Overall", api_name, api_key)
+            results.append(f"### {persona}'s Feedback:\n{feedback}\n\n")
+        return "\n".join(results)
+
+    add_custom_persona_button.click(
+        fn=add_custom_persona,
+        inputs=[custom_persona_name, custom_persona_description],
+        outputs=persona_dropdown
+    )
+
+    get_feedback_button.click(
+        fn=lambda text, persona, aspect, api_name, api_key: (
+            generate_writing_feedback(text, persona, aspect, api_name, api_key),
+            calculate_readability(text),
+            update_feedback_history(text, persona, generate_writing_feedback(text, persona, aspect, api_name, api_key))
+        ),
+        inputs=[input_text, persona_dropdown, aspect_dropdown, api_name_input, api_key_input],
+        outputs=[feedback_output, readability_output, feedback_history_display]
+    )
+
+    compare_button.click(
+        fn=compare_feedback,
+        inputs=[input_text, compare_personas, api_name_input, api_key_input],
+        outputs=feedback_output
+    )
+
+    generate_prompt_button.click(
+        fn=generate_writing_prompt,
+        inputs=[persona_dropdown, api_name_input, api_key_input],
+        outputs=input_text
+    )
+
+    return input_text, feedback_output, readability_output, feedback_history_display
+
+
+def create_creative_writing_tab():
+    with gr.TabItem("Creative Writing Assistant"):
+        gr.Markdown("# Utility to be added...")
+
+
+#FIXME - change to use chat function
+def chat_with_character(user_message, history, char_data, api_name_input, api_key):
+    if char_data is None:
+        return history, "Please import a character card first."
+
+    bot_message = generate_writing_feedback(user_message, char_data['name'], "Overall", api_name_input,
+                                            api_key)
+    history.append((user_message, bot_message))
+    return history, ""
+
+def import_character_card(file):
+    if file is None:
+        logging.warning("No file provided for character card import")
+        return None
+    try:
+        if file.name.lower().endswith(('.png', '.webp')):
+            logging.info(f"Attempting to import character card from image: {file.name}")
+            json_data = extract_json_from_image(file)
+            if json_data:
+                logging.info("JSON data extracted from image, attempting to parse")
+                return import_character_card_json(json_data)
+            else:
+                logging.warning("No JSON data found in the image")
+        else:
+            logging.info(f"Attempting to import character card from JSON file: {file.name}")
+            content = file.read().decode('utf-8')
+            return import_character_card_json(content)
+    except Exception as e:
+        logging.error(f"Error importing character card: {e}")
+    return None
+
+
+def import_character_card_json(json_content):
+    try:
+        # Remove any leading/trailing whitespace
+        json_content = json_content.strip()
+
+        # Log the first 100 characters of the content
+        logging.debug(f"JSON content (first 100 chars): {json_content[:100]}...")
+
+        card_data = json.loads(json_content)
+        logging.debug(f"Parsed JSON data keys: {list(card_data.keys())}")
+        if 'spec' in card_data and card_data['spec'] == 'chara_card_v2':
+            logging.info("Detected V2 character card")
+            return card_data['data']
+        else:
+            logging.info("Assuming V1 character card")
+            return card_data
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON decode error: {e}")
+        logging.error(f"Problematic JSON content: {json_content[:500]}...")
+    except Exception as e:
+        logging.error(f"Unexpected error parsing JSON: {e}")
+    return None
+
+
+def extract_json_from_image(image_file):
+    logging.debug(f"Attempting to extract JSON from image: {image_file.name}")
+    try:
+        with Image.open(image_file) as img:
+            logging.debug("Image opened successfully")
+            metadata = img.info
+            if 'chara' in metadata:
+                logging.debug("Found 'chara' in image metadata")
+                chara_content = metadata['chara']
+                logging.debug(f"Content of 'chara' metadata (first 100 chars): {chara_content[:100]}...")
+                try:
+                    decoded_content = base64.b64decode(chara_content).decode('utf-8')
+                    logging.debug(f"Decoded content (first 100 chars): {decoded_content[:100]}...")
+                    return decoded_content
+                except Exception as e:
+                    logging.error(f"Error decoding base64 content: {e}")
+
+            logging.debug("'chara' not found in metadata, checking for base64 encoded data")
+            raw_data = img.tobytes()
+            possible_json = raw_data.split(b'{', 1)[-1].rsplit(b'}', 1)[0]
+            if possible_json:
+                try:
+                    decoded = base64.b64decode(possible_json).decode('utf-8')
+                    if decoded.startswith('{') and decoded.endswith('}'):
+                        logging.debug("Found and decoded base64 JSON data")
+                        return '{' + decoded + '}'
+                except Exception as e:
+                    logging.error(f"Error decoding base64 data: {e}")
+
+            logging.warning("No JSON data found in the image")
+    except Exception as e:
+        logging.error(f"Error extracting JSON from image: {e}")
+    return None
+
+def load_chat_history(file):
+    try:
+        content = file.read().decode('utf-8')
+        chat_data = json.loads(content)
+        return chat_data['history'], chat_data['character']
+    except Exception as e:
+        logging.error(f"Error loading chat history: {e}")
+        return None, None
+
+def create_character_card_interaction_tab():
+    with gr.TabItem("Chat with a Character Card"):
+        gr.Markdown("# Chat with a Character Card")
+        with gr.Row():
+            with gr.Column(scale=1):
+                character_card_upload = gr.File(label="Upload Character Card")
+                import_card_button = gr.Button("Import Character Card")
+                load_characters_button = gr.Button("Load Existing Characters")
+                character_dropdown = gr.Dropdown(label="Select Character", choices=get_character_names())
+                api_name_input = gr.Dropdown(
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
+                             "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                    value=None,
+                    label="API for Interaction"
+                )
+                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)",
+                                           placeholder="Enter your API key here", type="password")
+                temperature_slider = gr.Slider(minimum=0.0, maximum=2.0, value=0.7, step=0.05, label="Temperature")
+                import_chat_button = gr.Button("Import Chat History")
+                chat_file_upload = gr.File(label="Upload Chat History JSON", visible=False)
+
+
+            with gr.Column(scale=2):
+                chat_history = gr.Chatbot(label="Conversation")
+                user_input = gr.Textbox(label="Your message")
+                send_message_button = gr.Button("Send Message")
+                regenerate_button = gr.Button("Regenerate Last Message")
+                save_chat_button = gr.Button("Save This Chat")
+                save_status = gr.Textbox(label="Save Status", interactive=False)
+
+    character_data = gr.State(None)
+
+    def import_chat_history(file, current_history, char_data):
+        loaded_history, char_name = load_chat_history(file)
+        if loaded_history is None:
+            return current_history, char_data, "Failed to load chat history."
+
+        # Check if the loaded chat is for the current character
+        if char_data and char_data.get('name') != char_name:
+            return current_history, char_data, f"Warning: Loaded chat is for character '{char_name}', but current character is '{char_data.get('name')}'. Chat not imported."
+
+        # If no character is selected, try to load the character from the chat
+        if not char_data:
+            new_char_data = load_character(char_name)[0]
+            if new_char_data:
+                char_data = new_char_data
+            else:
+                return current_history, char_data, f"Warning: Character '{char_name}' not found. Please select the character manually."
+
+        return loaded_history, char_data, f"Chat history for '{char_name}' imported successfully."
+
+    def import_character(file):
+        card_data = import_character_card(file)
+        if card_data:
+            save_character(card_data)
+            return card_data, gr.update(choices=get_character_names())
+        else:
+            return None, gr.update()
+
+    def load_character(name):
+        characters = load_characters()
+        char_data = characters.get(name)
+        if char_data:
+            first_message = char_data.get('first_mes', "Hello! I'm ready to chat.")
+            return char_data, [(None, first_message)] if first_message else []
+        return None, []
+
+    def character_chat_wrapper(message, history, char_data, api_endpoint, api_key, temperature):
+        logging.debug("Entered character_chat_wrapper")
+        if char_data is None:
+            return "Please select a character first.", history
+
+        # Prepare the character's background information
+        char_background = f"""
+        Name: {char_data.get('name', 'Unknown')}
+        Description: {char_data.get('description', 'N/A')}
+        Personality: {char_data.get('personality', 'N/A')}
+        Scenario: {char_data.get('scenario', 'N/A')}
+        """
+
+        # Prepare the system prompt for character impersonation
+        system_message = f"""You are roleplaying as the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI.
+
+        {char_background}
+
+        Additional instructions: {char_data.get('post_history_instructions', '')}
+        """
+
+        # Prepare media_content and selected_parts
+        media_content = {
+            'id': char_data.get('name'),
+            'title': char_data.get('name', 'Unknown Character'),
+            'content': char_background,
+            'description': char_data.get('description', ''),
+            'personality': char_data.get('personality', ''),
+            'scenario': char_data.get('scenario', '')
+        }
+        selected_parts = ['description', 'personality', 'scenario']
+
+        prompt = char_data.get('post_history_instructions', '')
+
+        # Prepare the input for the chat function
+        if not history:
+            full_message = f"{prompt}\n\n{message}" if prompt else message
+        else:
+            full_message = message
+
+        # Call the chat function
+        bot_message = chat(
+            message,
+            history,
+            media_content,
+            selected_parts,
+            api_endpoint,
+            api_key,
+            prompt,
+            temperature,
+            system_message
+        )
+
+        # Update history
+        history.append((message, bot_message))
+        return history
+
+    def save_chat_history(history, character_name):
+        # Create the Saved_Chats folder if it doesn't exist
+        save_directory = "Saved_Chats"
+        os.makedirs(save_directory, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"chat_history_{character_name}_{timestamp}.json"
+        filepath = os.path.join(save_directory, filename)
+
+        chat_data = {
+            "character": character_name,
+            "timestamp": timestamp,
+            "history": history
+        }
+
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(chat_data, f, ensure_ascii=False, indent=2)
+            return filepath
+        except Exception as e:
+            return f"Error saving chat: {str(e)}"
+
+    def save_current_chat(history, char_data):
+        if not char_data or not history:
+            return "No chat to save or character not selected."
+
+        character_name = char_data.get('name', 'Unknown')
+        result = save_chat_history(history, character_name)
+        if result.startswith("Error"):
+            return result
+        return f"Chat saved successfully as {result}"
+
+    def regenerate_last_message(history, char_data, api_name, api_key, temperature):
+        if not history:
+            return history
+
+        last_user_message = history[-1][0]
+        new_history = history[:-1]
+
+        return character_chat_wrapper(last_user_message, new_history, char_data, api_name, api_key, temperature)
+
+    import_chat_button.click(
+        fn=lambda: gr.update(visible=True),
+        outputs=chat_file_upload
+    )
+
+    chat_file_upload.change(
+        fn=import_chat_history,
+        inputs=[chat_file_upload, chat_history, character_data],
+        outputs=[chat_history, character_data, save_status]
+    )
+
+    import_card_button.click(
+        fn=import_character,
+        inputs=[character_card_upload],
+        outputs=[character_data, character_dropdown]
+    )
+
+    load_characters_button.click(
+        fn=lambda: gr.update(choices=get_character_names()),
+        outputs=character_dropdown
+    )
+
+    character_dropdown.change(
+        fn=load_character,
+        inputs=[character_dropdown],
+        outputs=[character_data, chat_history]
+    )
+
+    send_message_button.click(
+        fn=character_chat_wrapper,
+        inputs=[user_input, chat_history, character_data, api_name_input, api_key_input, temperature_slider],
+        outputs=[chat_history]
+    ).then(lambda: "", outputs=user_input)
+
+    regenerate_button.click(
+        fn=regenerate_last_message,
+        inputs=[chat_history, character_data, api_name_input, api_key_input, temperature_slider],
+        outputs=[chat_history]
+    )
+
+    save_chat_button.click(
+        fn=save_current_chat,
+        inputs=[chat_history, character_data],
+        outputs=[save_status]
+    )
+
+    return character_data, chat_history, user_input
+
+
+def create_mikupad_tab():
+    with gr.TabItem("Mikupad"):
+        gr.Markdown("I Wish. Gradio won't embed it successfully...")
 
 
 #
@@ -5561,6 +6222,7 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
                 create_rag_tab()
+                create_embeddings_tab()
                 create_viewing_tab()
                 create_search_summaries_tab()
                 create_prompt_search_tab()
@@ -5571,8 +6233,11 @@ def launch_ui(share_public=None, server_mode=False):
                 create_chat_interface_stacked()
                 create_chat_interface_multi_api()
                 create_chat_interface_four()
+                create_chat_with_llamafile_tab()
                 create_chat_management_tab()
-                create_llamafile_settings_tab()
+                chat_workflows_tab()
+                create_character_card_interaction_tab()
+
 
             with gr.TabItem("Edit Existing Items"):
                 create_media_edit_tab()
@@ -5583,7 +6248,13 @@ def launch_ui(share_public=None, server_mode=False):
                 #create_compare_transcripts_tab()
 
             with gr.TabItem("Writing Tools"):
-                create_document_editing_tab()
+                with gr.Tabs():
+                    create_document_feedback_tab()
+                    create_grammar_style_check_tab()
+                    create_tone_adjustment_tab()
+                    create_creative_writing_tab()
+                    create_mikupad_tab()
+
 
             with gr.TabItem("Keywords"):
                 create_view_keywords_tab()

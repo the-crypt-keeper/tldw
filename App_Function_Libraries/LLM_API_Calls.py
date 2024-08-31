@@ -19,16 +19,18 @@
 #
 #
 ####################
-import json
+#
 # Import necessary libraries
-import os
+import json
 import logging
+import os
 import time
 import requests
-import configparser
+#
 # Import 3rd-Party Libraries
 from openai import OpenAI
 from requests import RequestException
+#
 # Import Local libraries
 from App_Function_Libraries.Local_Summarization_Lib import openai_api_key, client
 from App_Function_Libraries.Utils import load_and_log_configs
@@ -36,6 +38,8 @@ from App_Function_Libraries.Utils import load_and_log_configs
 #######################################################################################################################
 # Function Definitions
 #
+
+#FIXME: Update to include full arguments
 
 def extract_text_from_segments(segments):
     logging.debug(f"Segments received: {segments}")
@@ -58,58 +62,96 @@ def extract_text_from_segments(segments):
 
 
 
-
-
-def chat_with_openai(api_key, input_data, custom_prompt_arg, system_prompt=None):
+def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     loaded_config_data = load_and_log_configs()
+
     try:
         # API key validation
         if api_key is None or api_key.strip() == "":
-            logging.info("OpenAI: API key not provided as parameter")
+            logging.info("OpenAI: #1 API key not provided as parameter")
             logging.info("OpenAI: Attempting to use API key from config file")
             api_key = loaded_config_data['api_keys']['openai']
 
         if api_key is None or api_key.strip() == "":
-            logging.error("OpenAI: API key not found or is empty")
+            logging.error("OpenAI: #2 API key not found or is empty")
             return "OpenAI: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
-        logging.debug("OpenAI: Using provided string data for chat input")
-        data = input_data
+        # Input data handling
+        logging.debug(f"OpenAI: Raw input data type: {type(input_data)}")
+        logging.debug(f"OpenAI: Raw input data (first 500 chars): {str(input_data)[:500]}...")
 
-        logging.debug(f"OpenAI: Loaded data: {data}")
-        logging.debug(f"OpenAI: Type of data: {type(data)}")
-
-        if system_prompt is not None:
-            logging.debug(f"OpenAI: Using provided system prompt:\n\n {system_prompt}")
-            pass
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                # It's likely a JSON string
+                logging.debug("OpenAI: Parsing provided JSON string data for summarization")
+                try:
+                    data = json.loads(input_data)
+                except json.JSONDecodeError as e:
+                    logging.error(f"OpenAI: Error parsing JSON string: {str(e)}")
+                    return f"OpenAI: Error parsing JSON input: {str(e)}"
+            elif os.path.isfile(input_data):
+                logging.debug("OpenAI: Loading JSON data from file for summarization")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                logging.debug("OpenAI: Using provided string data for summarization")
+                data = input_data
         else:
-            system_prompt = "You are a helpful assistant"
-            logging.debug(f"OpenAI: Using default system prompt:\n\n {system_prompt}")
+            data = input_data
+
+        logging.debug(f"OpenAI: Processed data type: {type(data)}")
+        logging.debug(f"OpenAI: Processed data (first 500 chars): {str(data)[:500]}...")
+
+        # Text extraction
+        if isinstance(data, dict):
+            if 'summary' in data:
+                logging.debug("OpenAI: Summary already exists in the loaded data")
+                return data['summary']
+            elif 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)  # Convert dict to string if no specific format
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError(f"OpenAI: Invalid input data format: {type(data)}")
 
         openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
+        logging.debug(f"OpenAI: Extracted text (first 500 chars): {text[:500]}...")
+        logging.debug(f"OpenAI: Custom prompt: {custom_prompt_arg}")
+
+        openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
+        logging.debug(f"OpenAI: Using model: {openai_model}")
 
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'Authorization': f'Bearer {openai_api_key}',
             'Content-Type': 'application/json'
         }
 
         logging.debug(
             f"OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
         logging.debug("openai: Preparing data + prompt for submittal")
-        openai_prompt = f"{data} \n\n\n\n{custom_prompt_arg}"
+        openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        if temp is None:
+            temp = 0.7
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+        temp = float(temp)
         data = {
             "model": openai_model,
             "messages": [
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": system_message},
                 {"role": "user", "content": openai_prompt}
             ],
             "max_tokens": 4096,
-            "temperature": 0.1
+            "temperature": temp
         }
 
-        logging.debug("openai: Posting request")
+        logging.debug("OpenAI: Posting request")
         response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
 
         if response.status_code == 200:
@@ -122,12 +164,18 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, system_prompt=None)
                 logging.warning("openai: Chat response not found in the response data")
                 return "openai: Chat not available"
         else:
-            logging.error(f"openai: Chat request failed with status code {response.status_code}")
-            logging.error(f"openai: Error response: {response.text}")
-            return f"openai: Failed to process chat request. Status code: {response.status_code}"
+            logging.error(f"OpenAI: Chat request failed with status code {response.status_code}")
+            logging.error(f"OpenAI: Error response: {response.text}")
+            return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
+    except json.JSONDecodeError as e:
+        logging.error(f"OpenAI: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"OpenAI: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"OpenAI: Error making API request: {str(e)}", exc_info=True)
+        return f"OpenAI: Error making API request: {str(e)}"
     except Exception as e:
-        logging.error(f"openai: Error in processing: {str(e)}", exc_info=True)
-        return f"openai: Error occurred while processing chat request: {str(e)}"
+        logging.error(f"OpenAI: Unexpected error: {str(e)}", exc_info=True)
+        return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
 def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None):
@@ -298,55 +346,92 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
 
 
 # https://console.groq.com/docs/quickstart
-def chat_with_groq(api_key, input_data, custom_prompt_arg, system_prompt=None):
-    loaded_config_data = load_and_log_configs()
+def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+    logging.debug("Groq: Summarization process starting...")
     try:
-        # API key validation
-        if api_key is None:
-            logging.info("groq: API key not provided as parameter")
-            logging.info("groq: Attempting to use API key from config file")
-            groq_api_key = loaded_config_data['api_keys']['groq']
+        logging.debug("Groq: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            groq_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                groq_api_key = api_key
+                logging.info("Groq: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                groq_api_key = loaded_config_data['api_keys'].get('groq')
+                if groq_api_key:
+                    logging.info("Groq: Using API key from config file")
+                else:
+                    logging.warning("Groq: No API key found in config file")
 
-        if api_key is None or api_key.strip() == "":
-            logging.error("groq: API key not found or is empty")
-            return "groq: API Key Not Provided/Found in Config file or is empty"
+        # Final check to ensure we have a valid API key
+        if not groq_api_key or not groq_api_key.strip():
+            logging.error("Anthropic: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid Anthropic API key available")
 
-        logging.debug(f"groq: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        logging.debug(f"Groq: Using API Key: {groq_api_key[:5]}...{groq_api_key[-5:]}")
 
-        logging.debug(f"Groq: Loaded data: {input_data}")
-        logging.debug(f"Groq: Type of data: {type(input_data)}")
+        # Transcript data handling & Validation
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Groq: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Groq: Using provided string data for summarization")
+            data = input_data
+
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"Groq: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        logging.debug(f"Groq: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Groq: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Groq: Invalid input data format")
 
         # Set the model to be used
         groq_model = loaded_config_data['models']['groq']
 
+        if temp is None:
+            temp = 0.2
+        temp = float(temp)
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'Authorization': f'Bearer {groq_api_key}',
             'Content-Type': 'application/json'
         }
 
-        if system_prompt is not None:
-            logging.debug("Groq: Using provided system prompt")
-            pass
-        else:
-            system_prompt = "You are a helpful assistant"
-
-        groq_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
-        logging.debug("groq: User Prompt being sent is {groq_prompt}")
-
-        logging.debug("groq: System Prompt being sent is {system_prompt}")
+        groq_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        logging.debug("groq: Prompt being sent is {groq_prompt}")
 
         data = {
             "messages": [
                 {
                     "role": "system",
-                    "content": f"{system_prompt}"
+                    "content": system_message,
                 },
                 {
                     "role": "user",
-                    "content": groq_prompt
+                    "content": groq_prompt,
                 }
             ],
-            "model": groq_model
+            "model": groq_model,
+            "temperature": temp
         }
 
         logging.debug("groq: Submitting request to API endpoint")
@@ -359,12 +444,12 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, system_prompt=None):
         if response.status_code == 200:
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("groq: Summarization successful")
-                print("Summarization successful.")
+                logging.debug("groq: Chat request successful")
+                print("Groq: Chat request successful.")
                 return summary
             else:
-                logging.error("Expected data not found in API response.")
-                return "Expected data not found in API response."
+                logging.error("Groq(chat): Expected data not found in API response.")
+                return "Groq(chat): Expected data not found in API response."
         else:
             logging.error(f"groq: API request failed with status code {response.status_code}: {response.text}")
             return f"groq: API request failed: {response.text}"
@@ -374,63 +459,97 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, system_prompt=None):
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
 
 
-def chat_with_openrouter(api_key, input_data, custom_prompt_arg, system_prompt=None):
-    loaded_config_data = load_and_log_configs()
+def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     import requests
     import json
     global openrouter_model, openrouter_api_key
-    # API key validation
-    if api_key is None:
-        logging.info("openrouter: API key not provided as parameter")
-        logging.info("openrouter: Attempting to use API key from config file")
-        openrouter_api_key = loaded_config_data['api_keys']['openrouter']
+    try:
+        logging.debug("OpenRouter: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            openrouter_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                openrouter_api_key = api_key
+                logging.info("OpenRouter: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                openrouter_api_key = loaded_config_data['api_keys'].get('openrouter')
+                if openrouter_api_key:
+                    logging.info("OpenRouter: Using API key from config file")
+                else:
+                    logging.warning("OpenRouter: No API key found in config file")
 
-    if api_key is None or api_key.strip() == "":
-        logging.error("openrouter: API key not found or is empty")
-        return "openrouter: API Key Not Provided/Found in Config file or is empty"
+        # Model Selection validation
+        logging.debug("OpenRouter: Validating model selection")
+        loaded_config_data = load_and_log_configs()
+        openrouter_model = loaded_config_data['models']['openrouter']
+        logging.debug(f"OpenRouter: Using model from config file: {openrouter_model}")
 
-    logging.debug(f"openai: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        # Final check to ensure we have a valid API key
+        if not openrouter_api_key or not openrouter_api_key.strip():
+            logging.error("OpenRouter: No valid API key available")
+            raise ValueError("No valid Anthropic API key available")
+    except Exception as e:
+        logging.error("OpenRouter: Error in processing: %s", str(e))
+        return f"OpenRouter: Error occurred while processing config file with OpenRouter: {str(e)}"
 
-    logging.debug(f"openrouter: Loaded data: {input_data}")
-    logging.debug(f"openrouter: Type of data: {type(input_data)}")
+    logging.debug(f"OpenRouter: Using API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:]}")
 
-    config = configparser.ConfigParser()
-    file_path = 'config.txt'
+    logging.debug(f"OpenRouter: Using Model: {openrouter_model}")
 
-    # Check if the file exists in the specified path
-    if os.path.exists(file_path):
-        config.read(file_path)
-    elif os.path.exists('config.txt'):  # Check in the current directory
-        config.read('../config.txt')
+    if isinstance(input_data, str) and os.path.isfile(input_data):
+        logging.debug("OpenRouter: Loading json data for summarization")
+        with open(input_data, 'r') as file:
+            data = json.load(file)
     else:
-        print("config.txt not found in the specified path or current directory.")
-    openrouter_model = loaded_config_data['models']['openrouter']
+        logging.debug("OpenRouter: Using provided string data for summarization")
+        data = input_data
 
-    if system_prompt is not None:
-        logging.debug("OpenRouter: Using provided system prompt")
-        pass
+    # DEBUG - Debug logging to identify sent data
+    logging.debug(f"OpenRouter: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+    logging.debug(f"OpenRouter: Type of data: {type(data)}")
+
+    if isinstance(data, dict) and 'summary' in data:
+        # If the loaded data is a dictionary and already contains a summary, return it
+        logging.debug("OpenRouter: Summary already exists in the loaded data")
+        return data['summary']
+
+    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+    if isinstance(data, list):
+        segments = data
+        text = extract_text_from_segments(segments)
+    elif isinstance(data, str):
+        text = data
     else:
-        system_prompt = "You are a helpful assistant"
+        raise ValueError("OpenRouter: Invalid input data format")
 
     openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
     logging.debug(f"openrouter: User Prompt being sent is {openrouter_prompt}")
 
-    logging.debug(f"openrouter: System Prompt being sent is {system_prompt}")
+    if temp is None:
+        temp = 0.1
+    temp = float(temp)
+    if system_message is None:
+        system_message = "You are a helpful AI assistant who does whatever the user requests."
 
     try:
-        logging.debug("openrouter: Submitting request to API endpoint")
-        print("openrouter: Submitting request to API endpoint")
+        logging.debug("OpenRouter: Submitting request to API endpoint")
+        print("OpenRouter: Submitting request to API endpoint")
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {openrouter_api_key}",
             },
             data=json.dumps({
-                "model": f"{openrouter_model}",
+                "model": openrouter_model,
                 "messages": [
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": system_message},
                     {"role": "user", "content": openrouter_prompt}
-                ]
+                ],
+                "temperature": temp
             })
         )
 
@@ -452,6 +571,7 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, system_prompt=N
     except Exception as e:
         logging.error("openrouter: Error in processing: %s", str(e))
         return f"openrouter: Error occurred while processing chat request with openrouter: {str(e)}"
+
 
 # FIXME: This function is not yet implemented properly
 def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None):
@@ -506,46 +626,88 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
         return None
 
 
-def chat_with_deepseek(api_key, input_data, custom_prompt_arg, system_prompt=None):
-    loaded_config_data = load_and_log_configs()
+def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+    logging.debug("DeepSeek: Summarization process starting...")
     try:
-        # API key validation
-        if api_key is None or api_key.strip() == "":
-            logging.info("DeepSeek: API key not provided as parameter")
-            logging.info("DeepSeek: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['deepseek']
+        logging.debug("DeepSeek: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            deepseek_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                deepseek_api_key = api_key
+                logging.info("DeepSeek: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                deepseek_api_key = loaded_config_data['api_keys'].get('deepseek')
+                if deepseek_api_key:
+                    logging.info("DeepSeek: Using API key from config file")
+                else:
+                    logging.warning("DeepSeek: No API key found in config file")
 
-        if api_key is None or api_key.strip() == "":
-            logging.error("DeepSeek: API key not found or is empty")
-            return "DeepSeek: API Key Not Provided/Found in Config file or is empty"
+        # Final check to ensure we have a valid API key
+        if not deepseek_api_key or not deepseek_api_key.strip():
+            logging.error("DeepSeek: No valid API key available")
+            # You might want to raise an exception here or handle this case as appropriate for your application
+            # For example: raise ValueError("No valid deepseek API key available")
 
-        logging.debug(f"DeepSeek: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        logging.debug(f"DeepSeek: Using API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:]}")
+
+        # Input data handling
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("DeepSeek: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("DeepSeek: Using provided string data for summarization")
+            data = input_data
+
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"DeepSeek: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        logging.debug(f"DeepSeek: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("DeepSeek: Summary already exists in the loaded data")
+            return data['summary']
+
+        # Text extraction
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("DeepSeek: Invalid input data format")
 
         deepseek_model = loaded_config_data['models']['deepseek'] or "deepseek-chat"
+
+        if temp is None:
+            temp = 0.1
+        temp = float(temp)
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
 
         headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json'
         }
 
-        if system_prompt is not None:
-            logging.debug(f"Deepseek: Using provided system prompt: {system_prompt}")
-            pass
-        else:
-            system_prompt = "You are a helpful assistant"
-
         logging.debug(
             f"Deepseek API Key: {api_key[:5]}...{api_key[-5:] if api_key else None}")
-        logging.debug("openai: Preparing data + prompt for submittal")
-        deepseek_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
+        logging.debug("DeepSeek: Preparing data + prompt for submittal")
+        deepseek_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         data = {
             "model": deepseek_model,
             "messages": [
-                {"role": "system", "content": f"{system_prompt}"},
+                {"role": "system", "content": system_message},
                 {"role": "user", "content": deepseek_prompt}
             ],
             "stream": False,
-            "temperature": 0.8
+            "temperature": temp
         }
 
         logging.debug("DeepSeek: Posting request")
@@ -567,6 +729,96 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, system_prompt=Non
     except Exception as e:
         logging.error(f"DeepSeek: Error in processing: {str(e)}", exc_info=True)
         return f"DeepSeek: Error occurred while processing chat request: {str(e)}"
+
+
+def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+    logging.debug("Mistral: Chat request made")
+    try:
+        logging.debug("Mistral: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            mistral_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                mistral_api_key = api_key
+                logging.info("Mistral: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                mistral_api_key = loaded_config_data['api_keys'].get('mistral')
+                if mistral_api_key:
+                    logging.info("Mistral: Using API key from config file")
+                else:
+                    logging.warning("Mistral: No API key found in config file")
+
+        # Final check to ensure we have a valid API key
+        if not mistral_api_key or not mistral_api_key.strip():
+            logging.error("Mistral: No valid API key available")
+            return "Mistral: No valid API key available"
+
+        logging.debug(f"Mistral: Using API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:]}")
+
+        logging.debug("Mistral: Using provided string data")
+        data = input_data
+
+        # Text extraction
+        if isinstance(input_data, list):
+            text = extract_text_from_segments(input_data)
+        elif isinstance(input_data, str):
+            text = input_data
+        else:
+            raise ValueError("Mistral: Invalid input data format")
+
+        mistral_model = loaded_config_data['models'].get('mistral', "mistral-large-latest")
+
+        temp = float(temp) if temp is not None else 0.2
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+
+        headers = {
+            'Authorization': f'Bearer {mistral_api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        logging.debug(
+            f"Deepseek API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
+        logging.debug("Mistral: Preparing data + prompt for submittal")
+        mistral_prompt = f"{custom_prompt_arg}\n\n\n\n{text} "
+        data = {
+            "model": mistral_model,
+            "messages": [
+                {"role": "system",
+                 "content": system_message},
+                {"role": "user",
+                "content": mistral_prompt}
+            ],
+            "temperature": temp,
+            "top_p": 1,
+            "max_tokens": 4096,
+            "stream": False,
+            "safe_prompt": False
+        }
+
+        logging.debug("Mistral: Posting request")
+        response = requests.post('https://api.mistral.ai/v1/chat/completions', headers=headers, json=data)
+
+        if response.status_code == 200:
+            response_data = response.json()
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                summary = response_data['choices'][0]['message']['content'].strip()
+                logging.debug("Mistral: request successful")
+                return summary
+            else:
+                logging.warning("Mistral: Chat response not found in the response data")
+                return "Mistral: Chat response not available"
+        else:
+            logging.error(f"Mistral: Chat request failed with status code {response.status_code}")
+            logging.error(f"Mistral: Error response: {response.text}")
+            return f"Mistral: Failed to process summary. Status code: {response.status_code}. Error: {response.text}"
+    except Exception as e:
+        logging.error(f"Mistral: Error in processing: {str(e)}", exc_info=True)
+        return f"Mistral: Error occurred while processing Chat: {str(e)}"
 
 
 

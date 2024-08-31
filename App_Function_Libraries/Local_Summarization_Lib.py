@@ -112,6 +112,7 @@ def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message
         print("Error occurred while processing summary with Local LLM:", str(e))
         return "Local LLM: Error occurred while processing summary"
 
+
 def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/completion", api_key=None, temp=None, system_message=None):
     try:
         logging.debug("Llama.cpp: Loading and validating configurations")

@@ -27,32 +27,55 @@ from Utils import *
 #
 
 
-def chat_with_local_llm(input_data, user_prompt, system_prompt=None):
+def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None):
     try:
-        if system_prompt is None:
-            system_prompt_arg = "You are a helpful assistant."
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Local LLM: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("openai: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"Local LLM: Loaded data: {data}")
+        logging.debug(f"Local LLM: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Local LLM: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Invalid input data format")
+
+        if system_message is None:
+            system_message = "You are a helpful AI assistant."
 
         headers = {
             'Content-Type': 'application/json'
         }
 
         logging.debug("Local LLM: Preparing data + prompt for submittal")
-        local_llm_prompt = f"{user_prompt}\n\n\n\n{input_data} "
+        local_llm_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         data = {
             "messages": [
                 {
                     "role": "system",
-                    "content": f"{system_prompt}"
+                    "content": system_message
                 },
                 {
                     "role": "user",
-                    "content": f"{local_llm_prompt}"
+                    "content": local_llm_prompt
                 }
             ],
             "max_tokens": 28000,  # Adjust tokens as needed
         }
-        logging.debug("Local LLM: System Prompt to be used: %s", system_prompt)
-        logging.debug("Local LLM: User Prompt to be used: %s", user_prompt)
         logging.debug("Local LLM: Posting request")
         response = requests.post('http://127.0.0.1:8080/v1/chat/completions', headers=headers, json=data)
 
@@ -60,8 +83,8 @@ def chat_with_local_llm(input_data, user_prompt, system_prompt=None):
             response_data = response.json()
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Local LLM: Chat request successful")
-                print("Local LLM: Chat request successful.")
+                logging.debug("Local LLM: Summarization successful")
+                print("Local LLM: Summarization successful.")
                 return summary
             else:
                 logging.warning("Local LLM: Chat response not found in the response data")
@@ -135,24 +158,60 @@ def chat_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/co
 
 # System prompts not supported through API requests.
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_IP="http://127.0.0.1:5001/api/v1/generate"):
-    loaded_config_data = load_and_log_configs()
+def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None):
+    logging.debug("Kobold: Summarization process starting...")
     try:
-        # API key validation
-        if api_key is None:
-            logging.info("Kobold.cpp: API key not provided as parameter")
-            logging.info("Kobold.cpp: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['kobold']
+        logging.debug("Kobold: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            kobold_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                kobold_api_key = api_key
+                logging.info("Kobold: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                kobold_api_key = loaded_config_data['api_keys'].get('kobold')
+                if kobold_api_key:
+                    logging.info("Kobold: Using API key from config file")
+                else:
+                    logging.warning("Kobold: No API key found in config file")
 
-        if api_key is None or api_key.strip() == "":
-            logging.info("Kobold.cpp: API key not found or is empty")
+        logging.debug(f"Kobold: Using API Key: {kobold_api_key[:5]}...{kobold_api_key[-5:]}")
+
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Kobold.cpp: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Kobold.cpp: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"Kobold.cpp: Loaded data: {data}")
+        logging.debug(f"Kobold.cpp: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Kobold.cpp: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Kobold.cpp: Invalid input data format")
 
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
         }
 
-        kobold_prompt = f"{custom_prompt_input} \n\n\n\n{input_data}"
+        kobold_prompt = f"{custom_prompt_input}\n\n\n\n{text}"
         logging.debug("kobold: Prompt being sent is {kobold_prompt}")
 
         # FIXME
@@ -160,28 +219,41 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_IP="ht
         data = {
             "max_context_length": 8096,
             "max_length": 4096,
-            "prompt": f"{custom_prompt_input}\n\n\n\n{input_data}"
+            "prompt": kobold_prompt,
+            "temperature": 0.7,
+            #"top_p": 0.9,
+            #"top_k": 100
+            #"rep_penalty": 1.0,
         }
 
         logging.debug("kobold: Submitting request to API endpoint")
         print("kobold: Submitting request to API endpoint")
-        response = requests.post(kobold_api_IP, headers=headers, json=data)
-        response_data = response.json()
-        logging.debug("kobold: API Response Data: %s", response_data)
+        kobold_api_ip = loaded_config_data['local_api_ip']['kobold']
+        try:
+            response = requests.post(kobold_api_ip, headers=headers, json=data)
+            logging.debug("kobold: API Response Status Code: %d", response.status_code)
 
-        if response.status_code == 200:
-            if 'results' in response_data and len(response_data['results']) > 0:
-                summary = response_data['results'][0]['text'].strip()
-                logging.debug("kobold: Chat request successful!")
-                print("Chat request successful!")
-                return summary
+            if response.status_code == 200:
+                try:
+                    response_data = response.json()
+                    logging.debug("kobold: API Response Data: %s", response_data)
+
+                    if response_data and 'results' in response_data and len(response_data['results']) > 0:
+                        summary = response_data['results'][0]['text'].strip()
+                        logging.debug("kobold: Chat request successful")
+                        return summary
+                    else:
+                        logging.error("Expected data not found in API response.")
+                        return "Expected data not found in API response."
+                except ValueError as e:
+                    logging.error("kobold: Error parsing JSON response: %s", str(e))
+                    return f"Error parsing JSON response: {str(e)}"
             else:
-                logging.error("Expected data not found in API response.")
-                return "Expected data not found in API response."
-        else:
-            logging.error(f"kobold: API request failed with status code {response.status_code}: {response.text}")
-            return f"kobold: API request failed: {response.text}"
-
+                logging.error(f"kobold: API request failed with status code {response.status_code}: {response.text}")
+                return f"kobold: API request failed: {response.text}"
+        except Exception as e:
+            logging.error("kobold: Error in processing: %s", str(e))
+            return f"kobold: Error occurred while processing summary with kobold: {str(e)}"
     except Exception as e:
         logging.error("kobold: Error in processing: %s", str(e))
         return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
@@ -286,7 +358,7 @@ def chat_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="ht
         'text': text,
         'model': 'tabby'  # Specify the model if needed
     }
-    tabby_api_ip = loaded_config_data['local_apis']['tabby']['ip']
+    tabby_api_ip = loaded_config_data['local_api']['tabby']['ip']
     try:
         response = requests.post(tabby_api_ip, headers=headers, json=data2)
         response.raise_for_status()
@@ -298,7 +370,7 @@ def chat_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="ht
 
 
 # FIXME aphrodite engine - code was literally tab complete in one go from copilot... :/
-def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://" + load_and_log_configs()['local_apis']['aphrodite']['ip']):
+def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:8080/completion"):
     loaded_config_data = load_and_log_configs()
     model = loaded_config_data['models']['aphrodite']
     # API key validation
@@ -327,6 +399,8 @@ def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="h
         return "Error summarizing with Aphrodite."
 
 
+def chat_with_ollama(input_data, prompt, temp, system_message):
+    pass
 
 
 def save_summary_to_file(summary, file_path):
