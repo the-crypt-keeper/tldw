@@ -56,7 +56,6 @@ packaging==24.0
 pandas==2.2.2
 pillow==10.3.0
 playwright
-protobuf==5.26.1
 psutil==5.9.8
 pyannote.audio
 pycryptodomex==3.20.0
@@ -116,7 +115,7 @@ openai~=1.28.1
 tiktoken~=0.6.0
 pymupdf
 chromadb
-protobuf==5.26.1
+protobuf==4.25.4
 textstat
 elasticsearch
 #torch==2.2.2+cu121
