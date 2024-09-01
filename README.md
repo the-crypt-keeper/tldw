@@ -11,12 +11,12 @@
 
 
 **Use the Installer Script! Download and run it to install the necessary packages + launch tl/dw**
-- **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Run-Install-Update.sh`
-  - `bash Linux-Run-Install-Update.sh`
+- **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
+  - `chmod +x Linux_Install_Update.sh && ./Linux_Run_tldw.sh`
 - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS-Run-Install-Update.sh`
   - `bash MacOS-Run-Install-Update.sh`
-- **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/WindowsRun-Install-Update.bat`
-    - Then double-click the downloaded batch file to run it.
+- **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+    - Then double-click the downloaded batch file `Windows_Install_Update.bat` to install it, and `Windows_Run_tldw.bat` to run it.
 ----------
 
 ### Table of Contents
@@ -39,6 +39,8 @@
   - **Current features:** 
     - **Ingest content(Video/Audio/epub/PDF/txt/websites) from a URL(single or multiple at once) or a local file(drag+drop).**
     - **Transcription of Video/Audio content using faster_whisper, with the ability to select the model to use.**
+      - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
+      - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
     - **Automatic summarization of content using an LLM API endpoint of your choice. A default prompt is used but you can set your own.**
       - Various chunking options for summarization, as well as the ability to chain summaries together.
       - Ability to download the generated transcript, and summary as text files from the UI.
@@ -115,16 +117,12 @@
       - Offline diarization of speakers - Code is in, but there was some issue that was a headache so I said screw it.
         - Should work if you give it an HF api key in the code though...
 - **Don't care, give me code**
-  * Install git for your style of OS, then run the following commands in a terminal:
-    * Install git on windows - On your keyboard: press WINDOWS + R to open Run dialog box. Then, run the following command to install git:
-      * `cmd /c winget install -e --id Git.Git`
-    * `git clone https://github.com/rmusser01/tldw` -> `cd tldw/Helper_Scripts/Installer_Scripts` -> `Linux: ./Linux-Install.sh` / `Windows: Windows-installer.bat` / `MacOS: MacOS-Install_Updater.sh`
-      * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three`
-        * Works but is not going to receive functionality updates, so I recommend using the GUI.
-      - GUI usage: `python summarize.py -gui`
-      - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
-  - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
-    - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
+   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Install.sh`
+   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
+   - GUI usage: `python summarize.py -gui`
+   - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
+
 
 For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek. Flipside I would say none honestly. The (largest players) will gaslight you and charge you money for it. Fun.
 From @nrose 05/08/2024 on Threads:
@@ -149,13 +147,16 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 #### Automatic Quickstart
 1. **Download the Installer Script for your OS:**
    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Install.sh`
-   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows-Installer.bat`
-   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS-Install_Updater.sh`
+   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
 2. **Run the Installer Script:**
-   - **Linux:** `bash Linux-Install.sh`
-   - **Windows:** `Windows-Installer.bat`
-     - This will install tldw to the directory from where the script is ran. It will also create shortcut on your desktop to the script to make it easy to launch.
+   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
+     - This will install tldw to the directory from where the script is ran.
+     - `chmod +x Linux_Install_Update.sh && ./Linux_Run_tldw.sh`
+   - **Windows:** `Windows_Install_Update.bat`
+     - This will install tldw to the directory from where the script is ran.
    - **MacOS:** `bash MacOS-Install_Updater.sh`
+     - This will install tldw to the directory from where the script is ran.
 3. **Follow the prompts to install the necessary packages and setup the program.**
 4. **You are Ready to Go! You should see tldw start up at the end of the script, assuming everything worked as expected**
 5. **BE SURE TO UPDATE 'config.txt' WITH YOUR API KEYS AND SETTINGS!** - You need to do this unless you want to manually input your API keys everytime you interact with a commercial LLM...
