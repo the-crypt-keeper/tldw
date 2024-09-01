@@ -28,7 +28,7 @@
 
 
 ### <a name="what"></a> What is this (TL/DW)?
-- **What is now:**
+- **What it is now:**
   - A tool that can ingest: audio, videos, articles, free form text, documents, and books as text into a personal, offline database, so that you can then search and chat with it at any time on your own device/locally.
     - (+ act as a nice way of creating your personal 'media' database, a personal digital library with search!)
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
@@ -151,9 +151,11 @@ None of these companies exist to provide AI services in 2024. They’re only doi
    - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
 2. **Run the Installer Script:**
    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
-     - This will install tldw to the directory from where the script is ran.
      - `chmod +x Linux_Install_Update.sh && ./Linux_Run_tldw.sh`
+     - `./Linux_Install_Update.sh`
+     - This will install tldw to the directory from where the script is ran.
    - **Windows:** `Windows_Install_Update.bat`
+     - Double-click the downloaded batch file to install it.
      - This will install tldw to the directory from where the script is ran.
    - **MacOS:** `bash MacOS-Install_Updater.sh`
      - This will install tldw to the directory from where the script is ran.
