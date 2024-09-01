@@ -118,6 +118,7 @@ pymupdf
 chromadb
 protobuf==5.26.1
 textstat
+elasticsearch
 #torch==2.2.2+cu121
 #torchaudio==2.2.2+cu121
 #websockets

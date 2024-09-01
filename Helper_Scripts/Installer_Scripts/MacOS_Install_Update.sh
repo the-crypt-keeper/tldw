@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Interactive TLDW macOS Installer and Updater Script
+# TLDW macOS Installer and Updater Script
 
 # Set up logging
 log_file="$(dirname "$0")/tldw_install_log.txt"
@@ -24,7 +24,6 @@ ask_permission() {
         * ) echo "Invalid input. Please enter 'y' or 'n'."; ask_permission "$1";;
     esac
 }
-
 
 # Function to install Homebrew
 install_homebrew() {
@@ -52,22 +51,13 @@ install_package() {
     fi
 }
 
-# Check and install Python3
-if ! command_exists python3; then
-    echo "Python3 is required for this installation."
-    install_package python3
-fi
-
-# Check and install git
-if ! command_exists git; then
-    echo "Git is required for this installation."
-    install_package git
-fi
-
-# Check and install ffmpeg
-if ! command_exists ffmpeg; then
-    install_package ffmpeg
-fi
+# Check and install required packages
+for package in python3 git ffmpeg; do
+    if ! command_exists $package; then
+        echo "$package is required for this installation."
+        install_package $package
+    fi
+done
 
 install_dir="$(dirname "$0")/tldw"
 
@@ -166,7 +156,4 @@ fi
 
 log "Installation/Update process completed"
 echo "Installation/Update completed successfully!"
-echo "To activate the virtual environment in the future, run: source $install_dir/venv/bin/activate"
-echo "To start using TLDW, please refer to the project documentation."
-echo "Otherwise, hang on a sec as tldw launches..."
-python3 summarize.py -gui
+echo "To run TLDW, use the run_tldw.sh script"

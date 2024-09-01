@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Improved TLDW Linux Installer and Updater Script
+# TLDW Installation and Update Script
 
 # Set up logging
 log_file="$(dirname "$0")/tldw_install_log.txt"
@@ -13,12 +13,6 @@ log "Starting TLDW installation/update process"
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
-}
-
-cleanup() {
-    log "Performing cleanup"
-    # Deactivate virtual environment
-    deactivate
 }
 
 # Function to install packages based on the package manager
@@ -34,26 +28,14 @@ install_package() {
     fi
 }
 
-# Check and install Python3
-if ! command_exists python3; then
-    echo "Python3 not found. Installing..."
-    log "Installing Python3"
-    install_package python3
-fi
-
-# Check and install git
-if ! command_exists git; then
-    echo "Git not found. Installing..."
-    log "Installing Git"
-    install_package git
-fi
-
-# Check and install ffmpeg
-if ! command_exists ffmpeg; then
-    echo "ffmpeg not found. Installing..."
-    log "Installing ffmpeg"
-    install_package ffmpeg
-fi
+# Check and install required packages
+for package in python3 git ffmpeg; do
+    if ! command_exists $package; then
+        echo "$package not found. Installing..."
+        log "Installing $package"
+        install_package $package
+    fi
+done
 
 install_dir="$(dirname "$0")/tldw"
 
@@ -69,13 +51,9 @@ else
     fresh_install
 fi
 
-cleanup
 log "Installation/Update process completed"
 echo "Installation/Update completed successfully!"
-echo "To activate the virtual environment in the future, run: source $install_dir/venv/bin/activate"
-echo "Starting TLDW now..."
-cd "$install_dir" && source venv/bin/activate
-python3 summarize.py -gui
+echo "To run TLDW, use the run_tldw.sh script"
 
 # Functions
 
