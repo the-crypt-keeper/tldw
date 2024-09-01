@@ -13,10 +13,11 @@
 ####################################################################################################
 #
 # Functions:
-from App_Function_Libraries.ms_g_eval import validate_inputs, detailed_api_error, get_summarize_function
+from App_Function_Libraries.Chat import chat_api_call
+from App_Function_Libraries.ms_g_eval import validate_inputs, detailed_api_error
 
 
-def simplified_geval(transcript: str, summary: str, api_name: str, api_key: str) -> str:
+def simplified_geval(transcript: str, summary: str, api_name: str, api_key: str, temp: float = 0.7) -> str:
     """
     Perform a simplified version of G-Eval using a single query to evaluate the summary.
 
@@ -25,6 +26,7 @@ def simplified_geval(transcript: str, summary: str, api_name: str, api_key: str)
         summary (str): The summary to be evaluated
         api_name (str): The name of the LLM API to use
         api_key (str): The API key for the chosen LLM
+        temp (float, optional): The temperature parameter for the API call. Defaults to 0.7.
 
     Returns:
         str: The evaluation result
@@ -58,12 +60,22 @@ Relevance: [score] - [brief explanation]
 Overall Assessment: [Your overall assessment of the summary's quality]
 """
 
-    # FIXME
-    summarize_function = get_summarize_function(api_name)
-
     try:
-        response = summarize_function(api_key, prompt, "", temp=0.7, system_prompt="You are a helpful AI assistant tasked with evaluating summaries.")
+        result = chat_api_call(
+            api_name,
+            api_key,
+            prompt,
+            "",
+            temp=temp,
+            system_message="You are a helpful AI assistant tasked with evaluating summaries."
+        )
     except Exception as e:
         return detailed_api_error(api_name, e)
 
-    return response
+    formatted_result = f"""
+    Confabulation Check Results:
+
+    {result}
+    """
+
+    return formatted_result

@@ -257,7 +257,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_chat_with_llamafile_tab()
                 create_chat_management_tab()
                 chat_workflows_tab()
-                from App_Function_Libraries.Gradio_UI.Writing import create_character_card_interaction_tab
+                from App_Function_Libraries.Gradio_UI.Writing_tab import create_character_card_interaction_tab
                 create_character_card_interaction_tab()
 
 
@@ -271,15 +271,15 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Writing Tools"):
                 with gr.Tabs():
-                    from App_Function_Libraries.Gradio_UI.Writing import create_document_feedback_tab
+                    from App_Function_Libraries.Gradio_UI.Writing_tab import create_document_feedback_tab
                     create_document_feedback_tab()
-                    from App_Function_Libraries.Gradio_UI.Writing import create_grammar_style_check_tab
+                    from App_Function_Libraries.Gradio_UI.Writing_tab import create_grammar_style_check_tab
                     create_grammar_style_check_tab()
-                    from App_Function_Libraries.Gradio_UI.Writing import create_tone_adjustment_tab
+                    from App_Function_Libraries.Gradio_UI.Writing_tab import create_tone_adjustment_tab
                     create_tone_adjustment_tab()
-                    from App_Function_Libraries.Gradio_UI.Writing import create_creative_writing_tab
+                    from App_Function_Libraries.Gradio_UI.Writing_tab import create_creative_writing_tab
                     create_creative_writing_tab()
-                    from App_Function_Libraries.Gradio_UI.Writing import create_mikupad_tab
+                    from App_Function_Libraries.Gradio_UI.Writing_tab import create_mikupad_tab
                     create_mikupad_tab()
 
 

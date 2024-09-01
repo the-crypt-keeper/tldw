@@ -1,4 +1,4 @@
-# Writing.py
+# Writing_tab.py
 # Description: This file contains the functions that are used for writing in the Gradio UI.
 #
 # Imports
@@ -482,7 +482,7 @@ def create_character_card_interaction_tab():
                 character_card_upload = gr.File(label="Upload Character Card")
                 import_card_button = gr.Button("Import Character Card")
                 load_characters_button = gr.Button("Load Existing Characters")
-                from App_Function_Libraries.Chat_related_functions import get_character_names
+                from App_Function_Libraries.Chat import get_character_names
                 character_dropdown = gr.Dropdown(label="Select Character", choices=get_character_names())
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
@@ -529,14 +529,14 @@ def create_character_card_interaction_tab():
     def import_character(file):
         card_data = import_character_card(file)
         if card_data:
-            from App_Function_Libraries.Chat_related_functions import save_character
+            from App_Function_Libraries.Chat import save_character
             save_character(card_data)
             return card_data, gr.update(choices=get_character_names())
         else:
             return None, gr.update()
 
     def load_character(name):
-        from App_Function_Libraries.Chat_related_functions import load_characters
+        from App_Function_Libraries.Chat import load_characters
         characters = load_characters()
         char_data = characters.get(name)
         if char_data:
@@ -696,5 +696,5 @@ def create_mikupad_tab():
         gr.Markdown("I Wish. Gradio won't embed it successfully...")
 
 #
-# End of Writing.py
+# End of Writing_tab.py
 ########################################################################################################################

@@ -7,13 +7,13 @@
 # Scripts taken from https://github.com/microsoft/promptflow/tree/main/examples/flows/evaluation/eval-summarization and modified.
 #
 import configparser
-import json
-
-import gradio as gr
 import inspect
+import json
 import logging
 import re
 from typing import Dict, Callable, List, Any
+
+import gradio as gr
 from tenacity import (
     RetryError,
     Retrying,
@@ -23,12 +23,7 @@ from tenacity import (
     wait_random_exponential,
 )
 
-from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
-    summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm, \
-    summarize_with_ollama
-from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, \
-    summarize_with_cohere, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
-    summarize_with_huggingface, summarize_with_mistral
+from App_Function_Libraries.Chat import chat_api_call
 
 #
 #######################################################################################################################
@@ -290,11 +285,10 @@ def parse_output(output: str, max: float) -> float:
 def geval_summarization(
     prompt_with_src_and_gen: str,
     max_score: float,
-    api_name: str,
+    api_endpoint: str,
     api_key: str,
 ) -> float:
-    summarize_function = get_summarize_function(api_name)
-    model = get_model_from_config(api_name)
+    model = get_model_from_config(api_endpoint)
 
     try:
         for attempt in Retrying(
@@ -305,9 +299,16 @@ def geval_summarization(
             stop=stop_after_attempt(10),
         ):
             with attempt:
-                response = summarize_function(api_key, prompt_with_src_and_gen, "", temp=0.7, system_prompt="You are a helpful AI assistant")
+                system_message="You are a helpful AI assistant"
+                # TEMP setting for Confabulation check
+                temp = 0.7
+                logging.info(f"Debug - geval_summarization Function - API Endpoint: {api_endpoint}")
+                try:
+                    response = chat_api_call(api_endpoint, api_key, prompt_with_src_and_gen, "", temp, system_message)
+                except Exception as e:
+                    raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
     except RetryError:
-        logger.exception(f"geval {api_name} call failed\nInput prompt was: {prompt_with_src_and_gen}")
+        logger.exception(f"geval {api_endpoint} call failed\nInput prompt was: {prompt_with_src_and_gen}")
         raise
 
     try:
@@ -317,31 +318,6 @@ def geval_summarization(
         score = 0
 
     return score
-
-
-def get_summarize_function(api_name: str):
-    summarize_functions = {
-        "openai": summarize_with_openai,
-        "anthropic": summarize_with_anthropic,
-        "cohere": summarize_with_cohere,
-        "groq": summarize_with_groq,
-        "openrouter": summarize_with_openrouter,
-        "deepseek": summarize_with_deepseek,
-        "huggingface": summarize_with_huggingface,
-        "mistral": summarize_with_mistral,
-        "llama.cpp": summarize_with_llama,
-        "kobold": summarize_with_kobold,
-        "ooba": summarize_with_oobabooga,
-        "tabbyapi": summarize_with_tabbyapi,
-        "vllm": summarize_with_vllm,
-        "local-llm": summarize_with_local_llm,
-        "ollama": summarize_with_ollama
-    }
-    api_name_lower = api_name.lower()
-    if api_name_lower not in summarize_functions:
-        raise ValueError(f"Unsupported API: {api_name}")
-    return summarize_functions[api_name_lower]
-
 
 
 def get_model_from_config(api_name: str) -> str:
@@ -397,8 +373,6 @@ def validate_inputs(document: str, summary: str, api_name: str, api_key: str) ->
     if api_name.lower() not in ["openai", "anthropic", "cohere", "groq", "openrouter", "deepseek", "huggingface",
                                 "mistral", "llama.cpp", "kobold", "ooba", "tabbyapi", "vllm", "local-llm", "ollama"]:
         raise ValueError(f"Unsupported API: {api_name}")
-    if not api_key.strip() and api_name.lower() not in ["local-llm", "ollama"]:
-        raise ValueError("API key is required for non-local APIs")
 
 
 def detailed_api_error(api_name: str, error: Exception) -> str:
