@@ -9,6 +9,8 @@ import os
 # External Imports
 import gradio as gr
 import yt_dlp
+
+from App_Function_Libraries.Confabulation_check import simplified_geval
 #
 # Local Imports
 from App_Function_Libraries.DB_Manager import load_preset_prompts, add_media_to_database
@@ -122,7 +124,7 @@ def create_video_transcription_tab():
                 summarize_recursively = gr.Checkbox(label="Enable Recursive Summarization", value=False)
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
                 use_time_input = gr.Checkbox(label="Use Start and End Time", value=False)
-
+                confab_checkbox = gr.Checkbox(label="Perform Confabulation Check of Summary", value=False)
                 with gr.Row(visible=False) as time_input_box:
                     gr.Markdown("### Start and End time")
                     with gr.Column():
@@ -422,7 +424,7 @@ def create_video_transcription_tab():
                                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                        use_multi_level_chunking, chunk_language, summarize_recursively, api_name,
                                        api_key, keywords, use_cookies, cookies, batch_size,
-                                       timestamp_option, keep_original_video):
+                                       timestamp_option, keep_original_video, confab_checkbox):
                 global result
                 try:
                     logging.info("process_videos_wrapper(): process_videos_wrapper called")
@@ -450,42 +452,42 @@ def create_video_transcription_tab():
 
                     if not inputs:
                         raise ValueError("No input provided. Please enter URLs or upload a video file.")
-                    try:
-                        result = process_videos_with_error_handling(
-                            inputs, start_time, end_time, diarize, whisper_model,
-                            custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
-                            chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                            use_multi_level_chunking, chunk_language, api_name,
-                            api_key, keywords, use_cookies, cookies, batch_size,
-                            timestamp_option, keep_original_video, summarize_recursively
-                        )
-                    except Exception as e:
-                        logging.error(
-                            f"process_videos_wrapper(): Error in process_videos_with_error_handling: {str(e)}",
-                            exc_info=True)
 
-                    logging.info("process_videos_wrapper(): process_videos_with_error_handling completed")
+                    result = process_videos_with_error_handling(
+                        inputs, start_time, end_time, diarize, whisper_model,
+                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
+                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
+                        use_multi_level_chunking, chunk_language, api_name,
+                        api_key, keywords, use_cookies, cookies, batch_size,
+                        timestamp_option, keep_original_video, summarize_recursively
+                    )
+
+                    simple_geval_result = None
+                    if confab_checkbox:
+                        logging.info("Confabulation check enabled")
+                        # Assuming result[2] contains the summary and result[1] contains the transcript
+                        # Performing simple G-Eval on the summary
+                        simple_geval_result = simplified_geval(result[1], result[2], api_name, api_key)
+                        logging.info(f"Simplified G-Eval result: {simple_geval_result}")
 
                     # Ensure that result is a tuple with 5 elements
                     if not isinstance(result, tuple) or len(result) != 5:
                         raise ValueError(
                             f"process_videos_wrapper(): Expected 5 outputs, but got {len(result) if isinstance(result, tuple) else 1}")
 
-                    return result
+                    # Add simple_geval_result to the output
+                    return result + (simple_geval_result,)
+
                 except Exception as e:
                     logging.error(f"process_videos_wrapper(): Error in process_videos_wrapper: {str(e)}", exc_info=True)
-                    # Return a tuple with 5 elements in case of any error
+                    # Return a tuple with 6 elements in case of any error (including None for simple_geval_result)
                     return (
-                        # progress_output
-                        f"process_videos_wrapper(): An error occurred: {str(e)}",
-                        # error_output
-                        str(e),
-                        # results_output
-                        f"<div class='error'>Error: {str(e)}</div>",
-                        # download_transcription
-                        None,
-                        # download_summary
-                        None
+                        f"process_videos_wrapper(): An error occurred: {str(e)}",  # progress_output
+                        str(e),  # error_output
+                        f"<div class='error'>Error: {str(e)}</div>",  # results_output
+                        None,  # download_transcription
+                        None,  # download_summary
+                        None  # simple_geval_result
                     )
 
             # FIXME - remove dead args for process_url_with_metadata
@@ -685,7 +687,7 @@ def create_video_transcription_tab():
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                     use_multi_level_chunking, chunk_language, summarize_recursively, api_name_input, api_key_input,
                     keywords_input, use_cookies_input, cookies_input, batch_size_input,
-                    timestamp_option, keep_original_video
+                    timestamp_option, keep_original_video, confab_checkbox
                 ],
                 outputs=[progress_output, error_output, results_output, download_transcription, download_summary]
             )
