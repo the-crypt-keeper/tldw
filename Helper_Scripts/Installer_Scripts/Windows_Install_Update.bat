@@ -160,6 +160,7 @@ goto :eof
 :cleanup
 call :log "Performing cleanup"
 :: Deactivate virtual environment
+
 call .\venv\Scripts\deactivate.bat
 goto :eof
 
