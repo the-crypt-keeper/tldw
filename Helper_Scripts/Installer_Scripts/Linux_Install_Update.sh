@@ -28,35 +28,6 @@ install_package() {
     fi
 }
 
-# Check and install required packages
-for package in python3 git ffmpeg; do
-    if ! command_exists $package; then
-        echo "$package not found. Installing..."
-        log "Installing $package"
-        install_package $package
-    fi
-done
-
-install_dir="$(dirname "$0")/tldw"
-
-# Check if this is an update or new installation
-if [ -d "$install_dir" ]; then
-    read -p "TLDW directory found. Do you want to update? (y/n): " update_choice
-    if [[ $update_choice == "y" || $update_choice == "Y" ]]; then
-        update
-    else
-        fresh_install
-    fi
-else
-    fresh_install
-fi
-
-log "Installation/Update process completed"
-echo "Installation/Update completed successfully!"
-echo "To run TLDW, use the run_tldw.sh script"
-
-# Functions
-
 update() {
     log "Updating existing installation"
     cd "$install_dir" || exit
@@ -129,6 +100,9 @@ setup_environment() {
     # Upgrade pip and install wheel
     pip install --upgrade pip wheel
 
+    # Read GPU choice
+    gpu_choice=$(cat "$install_dir/gpu_choice.txt")
+
     # Install PyTorch based on GPU support choice
     if [ "$gpu_choice" == "cuda" ]; then
         pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118
@@ -143,3 +117,32 @@ setup_environment() {
     # Install other requirements
     pip install -r requirements.txt
 }
+
+# Main script execution
+
+# Check and install required packages
+for package in python3 git ffmpeg; do
+    if ! command_exists $package; then
+        echo "$package not found. Installing..."
+        log "Installing $package"
+        install_package $package
+    fi
+done
+
+install_dir="$(dirname "$0")/tldw"
+
+# Check if this is an update or new installation
+if [ -d "$install_dir" ]; then
+    read -p "TLDW directory found. Do you want to update? (y/n): " update_choice
+    if [[ $update_choice == "y" || $update_choice == "Y" ]]; then
+        update
+    else
+        fresh_install
+    fi
+else
+    fresh_install
+fi
+
+log "Installation/Update process completed"
+echo "Installation/Update completed successfully!"
+echo "To run TLDW, use the run_tldw.sh script"
