@@ -116,7 +116,7 @@ openai~=1.28.1
 tiktoken~=0.6.0
 pymupdf
 chromadb
-protobuf==5.26.1
+protobuf==4.25.4
 textstat
 elasticsearch
 #torch==2.2.2+cu121
