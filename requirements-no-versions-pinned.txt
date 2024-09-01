@@ -116,5 +116,7 @@ torch
 torchaudio
 chromadb
 protobuf
+textstat
+elasticsearch
 
 
