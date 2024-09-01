@@ -2,11 +2,13 @@
 #########################################
 # Gradio UI Functions Library
 # I fucking hate Gradio.
+# Yea, fuck Gradio. https://github.com/gradio-app/gradio/pull/8263 & https://github.com/gradio-app/gradio/issues/7968
 #
 #########################################
 #
 # Built-In Imports
 import logging
+import os
 #
 # Import 3rd-Party Libraries
 import gradio as gr
@@ -46,6 +48,10 @@ from App_Function_Libraries.Gradio_UI.geval import create_geval_tab
 #######################################################################################################################
 # Function Definitions
 #
+
+
+# Disable Gradio Analytics
+os.environ['GRADIO_ANALYTICS_ENABLED'] = 'False'
 
 
 custom_prompt_input = None
@@ -319,10 +325,11 @@ def launch_ui(share_public=None, server_mode=False):
 
     # Launch the interface
     server_port_variable = 7860
+    GRADIO_ANALYTICS_ENABLED = False
     if share==True:
         iface.launch(share=True)
     elif server_mode and not share_public:
-        iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable)
+        iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable, )
     else:
         try:
             iface.launch(share=False)
