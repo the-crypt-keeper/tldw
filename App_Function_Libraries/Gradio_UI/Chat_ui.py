@@ -956,61 +956,68 @@ with json_path.open('r') as f:
 # FIXME - broken Completely. Doesn't work.
 def chat_workflows_tab():
     with gr.TabItem("Chat Workflows"):
-        with gr.Blocks() as chat_workflows_block:
-            gr.Markdown("# Workflows using LLMs")
+        gr.Markdown("# Workflows using LLMs")
 
-            workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
-            context_input = gr.Textbox(label="Context", lines=5)
+        workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
+        context_input = gr.Textbox(label="Context", lines=5)
 
-            # Create lists to hold UI components
+        # Create a container for dynamic components
+        with gr.Column() as dynamic_components:
             prompt_inputs = []
-            process_buttons = []
             output_boxes = []
-            max_prompts = max(len(wf['prompts']) for wf in workflows)
+            process_buttons = []
 
-            # Pre-create the maximum number of prompt sections
-            for i in range(max_prompts):
-                prompt_input = gr.Textbox(label=f"Prompt {i + 1}", lines=2, visible=False)
-                output_box = gr.Textbox(label=f"Output {i + 1}", lines=5, visible=False)
-                process_button = gr.Button(f"Process Prompt {i + 1}", visible=False)
+            # Create the maximum number of components needed
+            max_steps = max(len(wf['prompts']) for wf in workflows)
+            for i in range(max_steps):
+                prompt_inputs.append(gr.Textbox(label=f"Prompt {i + 1}", lines=2, visible=False))
+                output_boxes.append(gr.Textbox(label=f"Output {i + 1}", lines=5, visible=False))
+                process_buttons.append(gr.Button(f"Process Prompt {i + 1}", visible=False))
 
-                prompt_inputs.append(prompt_input)
-                output_boxes.append(output_box)
-                process_buttons.append(process_button)
+        def update_workflow_ui(workflow_name):
+            selected_workflow = next(wf for wf in workflows if wf['name'] == workflow_name)
+            num_prompts = len(selected_workflow['prompts'])
 
-                process_button.click(
-                    fn=lambda context, prompt, workflow_name, step=i: process(context, prompt, workflow_name, step),
-                    inputs=[context_input, prompt_input, workflow_selector],
-                    outputs=[output_box]
-                )
+            updates = []
+            for i in range(max_steps):
+                if i < num_prompts:
+                    updates.extend([
+                        gr.update(value=selected_workflow['prompts'][i], visible=True),  # Prompt input
+                        gr.update(value="", visible=True),  # Output box
+                        gr.update(visible=True)  # Process button
+                    ])
+                else:
+                    updates.extend([
+                        gr.update(visible=False),  # Prompt input
+                        gr.update(visible=False),  # Output box
+                        gr.update(visible=False)  # Process button
+                    ])
 
-            def process(context, prompt, workflow_name, step):
-                selected_workflow = next(wf for wf in workflows if wf['name'] == workflow_name)
-                # Update context with previous outputs
-                for j in range(step):
-                    context += f"\n\n{output_boxes[j].value}"
-                result = process_with_llm(selected_workflow['name'], context, prompt)
-                return result
+            return updates
 
-            def update_prompt_sections(workflow_name):
-                selected_workflow = next(wf for wf in workflows if wf['name'] == workflow_name)
-                num_prompts = len(selected_workflow['prompts'])
+        def process(context, prompt, workflow_name, step):
+            # Update context with previous outputs
+            for j in range(step):
+                context += f"\n\n{output_boxes[j].value}"
+            result = process_with_llm(workflow_name, context, prompt)
+            return result
 
-                for i in range(max_prompts):
-                    if i < num_prompts:
-                        prompt_inputs[i].visible = True
-                        prompt_inputs[i].value = selected_workflow['prompts'][i]
-                        process_buttons[i].visible = True
-                        output_boxes[i].visible = True
-                    else:
-                        prompt_inputs[i].visible = False
-                        process_buttons[i].visible = False
-                        output_boxes[i].visible = False
+        # Set up event handlers
+        workflow_selector.change(
+            update_workflow_ui,
+            inputs=[workflow_selector],
+            outputs=prompt_inputs + output_boxes + process_buttons
+        )
 
-            # Bind the workflow selector to update the UI
-            workflow_selector.change(update_prompt_sections, inputs=[workflow_selector], outputs=[])
+        # Set up process button click events
+        for i, button in enumerate(process_buttons):
+            button.click(
+                fn=lambda context, prompt, wf_name, step=i: process(context, prompt, wf_name, step),
+                inputs=[context_input, prompt_inputs[i], workflow_selector],
+                outputs=[output_boxes[i]]
+            )
 
-        return chat_workflows_block
+    return workflow_selector, context_input, dynamic_components
 
 #
 # End of Chat_ui.py
