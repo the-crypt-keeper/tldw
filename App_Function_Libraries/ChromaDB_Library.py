@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 
 import chromadb
 import requests
+from chromadb import Settings
 
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 
@@ -17,7 +18,7 @@ from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 config = configparser.ConfigParser()
 config.read('config.txt')
 chroma_db_path = config.get('Database', 'chroma_db_path', fallback='chroma_db')
-chroma_client = chromadb.PersistentClient(path=chroma_db_path)
+chroma_client = chromadb.PersistentClient(path=chroma_db_path, settings=Settings(anonymized_telemetry=False))
 
 # Get embedding settings
 embedding_provider = config.get('Embeddings', 'provider', fallback='openai')
