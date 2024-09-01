@@ -178,6 +178,7 @@ def create_video_transcription_tab():
                 progress_output = gr.Textbox(label="Progress")
                 error_output = gr.Textbox(label="Errors", visible=False)
                 results_output = gr.HTML(label="Results")
+                confabulation_output = gr.Textbox(label="Confabulation Check Results", visible=False)
                 download_transcription = gr.File(label="Download All Transcriptions as JSON")
                 download_summary = gr.File(label="Download All Summaries as Text")
 
@@ -462,21 +463,20 @@ def create_video_transcription_tab():
                         timestamp_option, keep_original_video, summarize_recursively
                     )
 
-                    simple_geval_result = None
+                    confabulation_result = None
                     if confab_checkbox:
                         logging.info("Confabulation check enabled")
-                        # Assuming result[2] contains the summary and result[1] contains the transcript
-                        # Performing simple G-Eval on the summary
-                        simple_geval_result = simplified_geval(result[1], result[2], api_name, api_key)
-                        logging.info(f"Simplified G-Eval result: {simple_geval_result}")
+                        # Assuming result[1] contains the transcript and result[2] contains the summary
+                        confabulation_result = simplified_geval(result[1], result[2], api_name, api_key)
+                        logging.info(f"Simplified G-Eval result: {confabulation_result}")
 
                     # Ensure that result is a tuple with 5 elements
                     if not isinstance(result, tuple) or len(result) != 5:
                         raise ValueError(
                             f"process_videos_wrapper(): Expected 5 outputs, but got {len(result) if isinstance(result, tuple) else 1}")
 
-                    # Add simple_geval_result to the output
-                    return result + (simple_geval_result,)
+                    # Return the confabulation result along with other outputs
+                    return (*result, confabulation_result)
 
                 except Exception as e:
                     logging.error(f"process_videos_wrapper(): Error in process_videos_wrapper: {str(e)}", exc_info=True)
@@ -592,7 +592,6 @@ def create_video_transcription_tab():
                     with open(segments_json_path, 'w') as f:
                         json.dump(segments_with_metadata, f, indent=2)
 
-                    # FIXME - why isnt this working?
                     # Delete the .wav file after successful transcription
                     files_to_delete = [audio_file_path]
                     for file_path in files_to_delete:
@@ -679,6 +678,14 @@ def create_video_transcription_tab():
                     logging.error(f"Error in process_url_with_metadata: {str(e)}", exc_info=True)
                     return None, None, None, None, None, None
 
+            def toggle_confabulation_output(checkbox_value):
+                return gr.update(visible=checkbox_value)
+
+            confab_checkbox.change(
+                fn=toggle_confabulation_output,
+                inputs=[confab_checkbox],
+                outputs=[confabulation_output]
+            )
             process_button.click(
                 fn=process_videos_wrapper,
                 inputs=[
@@ -689,5 +696,5 @@ def create_video_transcription_tab():
                     keywords_input, use_cookies_input, cookies_input, batch_size_input,
                     timestamp_option, keep_original_video, confab_checkbox
                 ],
-                outputs=[progress_output, error_output, results_output, download_transcription, download_summary]
+                outputs=[progress_output, error_output, results_output, download_transcription, download_summary, confabulation_output]
             )

@@ -25,7 +25,6 @@ from typing import Union
 
 import requests
 # Import 3rd-party Libraries
-from openai import OpenAI
 # Import Local
 from App_Function_Libraries.Utils import load_and_log_configs
 from App_Function_Libraries.Utils import extract_text_from_segments
@@ -36,9 +35,6 @@ from App_Function_Libraries.Utils import extract_text_from_segments
 
 logger = logging.getLogger()
 
-# Dirty hack for vLLM
-openai_api_key = "Fake_key"
-client = OpenAI(api_key=openai_api_key)
 
 # FIXME - temp is not used
 def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None):

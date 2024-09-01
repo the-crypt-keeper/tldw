@@ -28,11 +28,9 @@ import time
 import requests
 #
 # Import 3rd-Party Libraries
-from openai import OpenAI
 from requests import RequestException
 #
 # Import Local libraries
-from App_Function_Libraries.Local_Summarization_Lib import openai_api_key, client
 from App_Function_Libraries.Utils import load_and_log_configs
 #
 #######################################################################################################################
@@ -64,19 +62,19 @@ def extract_text_from_segments(segments):
 
 def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     loaded_config_data = load_and_log_configs()
-
+    openai_api_key = api_key
     try:
         # API key validation
-        if api_key is None or api_key.strip() == "":
-            logging.info("OpenAI: #1 API key not provided as parameter")
+        if not openai_api_key:
+            logging.info("OpenAI: API key not provided as parameter")
             logging.info("OpenAI: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['openai']
+            openai_api_key = loaded_config_data['api_keys']['openai']
 
-        if api_key is None or api_key.strip() == "":
-            logging.error("OpenAI: #2 API key not found or is empty")
+        if not openai_api_key:
+            logging.error("OpenAI: API key not found or is empty")
             return "OpenAI: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        logging.debug(f"OpenAI: Using API Key: {openai_api_key[:5]}...{openai_api_key[-5:]}")
 
         # Input data handling
         logging.debug(f"OpenAI: Raw input data type: {type(input_data)}")
@@ -120,7 +118,6 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_m
         else:
             raise ValueError(f"OpenAI: Invalid input data format: {type(data)}")
 
-        openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
         logging.debug(f"OpenAI: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"OpenAI: Custom prompt: {custom_prompt_arg}")
 
@@ -182,13 +179,14 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
     try:
         loaded_config_data = load_and_log_configs()
         global anthropic_api_key
+        anthropic_api_key = api_key
         # API key validation
-        if api_key is None:
+        if not api_key:
             logging.info("Anthropic: API key not provided as parameter")
             logging.info("Anthropic: Attempting to use API key from config file")
             anthropic_api_key = loaded_config_data['api_keys']['anthropic']
 
-        if api_key is None or api_key.strip() == "":
+        if not api_key or api_key.strip() == "":
             logging.error("Anthropic: API key not found or is empty")
             return "Anthropic: API Key Not Provided/Found in Config file or is empty"
 
@@ -275,15 +273,16 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 # Summarize with Cohere
 def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_prompt=None):
     global cohere_api_key
+    cohere_api_key = api_key
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
-        if api_key is None:
+        if not api_key:
             logging.info("cohere: API key not provided as parameter")
             logging.info("cohere: Attempting to use API key from config file")
             cohere_api_key = loaded_config_data['api_keys']['cohere']
 
-        if api_key is None or api_key.strip() == "":
+        if not api_key or api_key.strip() == "":
             logging.error("cohere: API key not found or is empty")
             return "cohere: API Key Not Provided/Found in Config file or is empty"
 
@@ -580,11 +579,11 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
     logging.debug(f"huggingface: Summarization process starting...")
     try:
         # API key validation
-        if api_key is None:
+        if not api_key:
             logging.info("HuggingFace: API key not provided as parameter")
             logging.info("HuggingFace: Attempting to use API key from config file")
             huggingface_api_key = loaded_config_data['api_keys']['openai']
-        if api_key is None or api_key.strip() == "":
+        if not api_key or api_key.strip() == "":
             logging.error("HuggingFace: API key not found or is empty")
             return "HuggingFace: API Key Not Provided/Found in Config file or is empty"
         logging.debug(f"HuggingFace: Using API Key: {api_key[:5]}...{api_key[-5:]}")
@@ -824,59 +823,59 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
 
 # Stashed in here since OpenAI usage.... #FIXME
 # FIXME - https://docs.vllm.ai/en/latest/getting_started/quickstart.html .... Great docs.
-def chat_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions", system_prompt=None):
-    loaded_config_data = load_and_log_configs()
-    llm_model = loaded_config_data['models']['vllm']
-    # API key validation
-    if api_key is None:
-        logging.info("vLLM: API key not provided as parameter")
-        logging.info("vLLM: Attempting to use API key from config file")
-        api_key = loaded_config_data['api_keys']['llama']
-
-    if api_key is None or api_key.strip() == "":
-        logging.info("vLLM: API key not found or is empty")
-    vllm_client = OpenAI(
-        base_url=vllm_api_url,
-        api_key=custom_prompt_input
-    )
-
-    if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("vLLM: Loading json data for summarization")
-        with open(input_data, 'r') as file:
-            data = json.load(file)
-    else:
-        logging.debug("vLLM: Using provided string data for summarization")
-        data = input_data
-
-    logging.debug(f"vLLM: Loaded data: {data}")
-    logging.debug(f"vLLM: Type of data: {type(data)}")
-
-    if isinstance(data, dict) and 'summary' in data:
-        # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("vLLM: Summary already exists in the loaded data")
-        return data['summary']
-
-    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-    if isinstance(data, list):
-        segments = data
-        text = extract_text_from_segments(segments)
-    elif isinstance(data, str):
-        text = data
-    else:
-        raise ValueError("Invalid input data format")
-
-
-    custom_prompt = custom_prompt_input
-
-    completion = client.chat.completions.create(
-        model=llm_model,
-        messages=[
-            {"role": "system", "content": f"{system_prompt}"},
-            {"role": "user", "content": f"{text} \n\n\n\n{custom_prompt}"}
-        ]
-    )
-    vllm_summary = completion.choices[0].message.content
-    return vllm_summary
+# def chat_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions", system_prompt=None):
+#     loaded_config_data = load_and_log_configs()
+#     llm_model = loaded_config_data['models']['vllm']
+#     # API key validation
+#     if api_key is None:
+#         logging.info("vLLM: API key not provided as parameter")
+#         logging.info("vLLM: Attempting to use API key from config file")
+#         api_key = loaded_config_data['api_keys']['llama']
+#
+#     if api_key is None or api_key.strip() == "":
+#         logging.info("vLLM: API key not found or is empty")
+#     vllm_client = OpenAI(
+#         base_url=vllm_api_url,
+#         api_key=custom_prompt_input
+#     )
+#
+#     if isinstance(input_data, str) and os.path.isfile(input_data):
+#         logging.debug("vLLM: Loading json data for summarization")
+#         with open(input_data, 'r') as file:
+#             data = json.load(file)
+#     else:
+#         logging.debug("vLLM: Using provided string data for summarization")
+#         data = input_data
+#
+#     logging.debug(f"vLLM: Loaded data: {data}")
+#     logging.debug(f"vLLM: Type of data: {type(data)}")
+#
+#     if isinstance(data, dict) and 'summary' in data:
+#         # If the loaded data is a dictionary and already contains a summary, return it
+#         logging.debug("vLLM: Summary already exists in the loaded data")
+#         return data['summary']
+#
+#     # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+#     if isinstance(data, list):
+#         segments = data
+#         text = extract_text_from_segments(segments)
+#     elif isinstance(data, str):
+#         text = data
+#     else:
+#         raise ValueError("Invalid input data format")
+#
+#
+#     custom_prompt = custom_prompt_input
+#
+#     completion = client.chat.completions.create(
+#         model=llm_model,
+#         messages=[
+#             {"role": "system", "content": f"{system_prompt}"},
+#             {"role": "user", "content": f"{text} \n\n\n\n{custom_prompt}"}
+#         ]
+#     )
+#     vllm_summary = completion.choices[0].message.content
+#     return vllm_summary
 
 
 

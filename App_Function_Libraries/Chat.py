@@ -8,23 +8,71 @@ import os
 import re
 import tempfile
 from datetime import datetime
-
-from App_Function_Libraries.DB_Manager import get_conversation_name, save_chat_history_to_database
-from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_cohere, \
-    chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface, chat_with_vllm
-from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
-    chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi
-from App_Function_Libraries.SQLite_DB import load_media_content
-from App_Function_Libraries.Utils import generate_unique_filename
-
-
+from pathlib import Path
 #
 # External Imports
 #
 # Local Imports
+from App_Function_Libraries.DB_Manager import get_conversation_name, save_chat_history_to_database
+from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_cohere, \
+    chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface#, chat_with_vllm
+from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
+    chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi
+from App_Function_Libraries.SQLite_DB import load_media_content
+from App_Function_Libraries.Utils import generate_unique_filename
 #
-
 ####################################################################################################
+#
+# Functions:
+
+def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message=None):
+    if not api_key:
+        api_key = None
+    try:
+        logging.info(f"Debug - Chat API Call - API Endpoint: {api_endpoint}")
+        logging.info(f"Debug - Chat API Call - API Key: {api_key}")
+        logging.info(f"Debug - Chat chat_api_call - API Endpoint: {api_endpoint}")
+        if api_endpoint.lower() == 'openai':
+            response = chat_with_openai(api_key, input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "anthropic":
+            response = chat_with_anthropic(api_key, input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "cohere":
+            response = chat_with_cohere(api_key, input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "groq":
+            response = chat_with_groq(api_key, input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "openrouter":
+            response = chat_with_openrouter(api_key, input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "deepseek":
+            response = chat_with_deepseek(api_key, input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "mistral":
+            response = chat_with_mistral(api_key, input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "llama.cpp":
+            response = chat_with_llama(input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "kobold":
+            response = chat_with_kobold(input_data, api_key, prompt, temp, system_message)
+        elif api_endpoint.lower() == "ooba":
+            response = chat_with_oobabooga(input_data, api_key, prompt, temp, system_message)
+        elif api_endpoint.lower() == "tabbyapi":
+            response = chat_with_tabbyapi(input_data, prompt, temp, system_message)
+        #elif api_endpoint.lower() == "vllm":
+        #    response = chat_with_vllm(input_data, prompt, system_message)
+        elif api_endpoint.lower() == "local-llm":
+            response = chat_with_local_llm(input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "huggingface":
+            response = chat_with_huggingface(api_key, input_data, prompt, temp)  # , system_message)
+        elif api_endpoint.lower() == "ollama":
+            response = chat_with_ollama(input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "aphrodite":
+            response = chat_with_aphrodite(input_data, prompt, temp, system_message)
+        else:
+            raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
+
+        return response
+
+    except Exception as e:
+        logging.error(f"Error in chat function: {str(e)}")
+        return f"An error occurred: {str(e)}"
+
 def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt, temperature,
          system_message=None):
     try:
@@ -65,47 +113,11 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         logging.debug(f"Debug - Chat Function - Prompt: {prompt}")
 
         # Use the existing API request code based on the selected endpoint
-        logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
-        if api_endpoint.lower() == 'openai':
-            response = chat_with_openai(api_key, input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "anthropic":
-            response = chat_with_anthropic(api_key, input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "cohere":
-            response = chat_with_cohere(api_key, input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "groq":
-            response = chat_with_groq(api_key, input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "openrouter":
-            response = chat_with_openrouter(api_key, input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "deepseek":
-            response = chat_with_deepseek(api_key, input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "mistral":
-            response = chat_with_mistral(api_key, input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "llama.cpp":
-            response = chat_with_llama(input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "kobold":
-            response = chat_with_kobold(input_data, api_key, prompt, temp, system_message)
-        elif api_endpoint.lower() == "ooba":
-            response = chat_with_oobabooga(input_data, api_key, prompt, temp, system_message)
-        elif api_endpoint.lower() == "tabbyapi":
-            response = chat_with_tabbyapi(input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "vllm":
-            response = chat_with_vllm(input_data, prompt, system_message)
-        elif api_endpoint.lower() == "local-llm":
-            response = chat_with_local_llm(input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "huggingface":
-            response = chat_with_huggingface(api_key, input_data, prompt, temp)  # , system_message)
-        elif api_endpoint.lower() == "ollama":
-            response = chat_with_ollama(input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "aphrodite":
-            response = chat_with_aphrodite(input_data, prompt, temp, system_message)
-        else:
-            raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
-
-        return response
-
+        response = chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message)
     except Exception as e:
         logging.error(f"Error in chat function: {str(e)}")
         return f"An error occurred: {str(e)}"
+
 
 
 def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
@@ -266,6 +278,33 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
     else:
         print(f"Debug - Update Chat Content - No item selected or item not in mapping")
         return {}, []
+
+
+CHARACTERS_FILE = Path('.', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
+
+def save_character(character_data):
+    if CHARACTERS_FILE.exists():
+        with CHARACTERS_FILE.open('r') as f:
+            characters = json.load(f)
+    else:
+        characters = {}
+
+    characters[character_data['name']] = character_data
+
+    with CHARACTERS_FILE.open('w') as f:
+        json.dump(characters, f, indent=2)
+
+
+def load_characters():
+    if os.path.exists(CHARACTERS_FILE):
+        with open(CHARACTERS_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+
+def get_character_names():
+    characters = load_characters()
+    return list(characters.keys())
 
 
 #
