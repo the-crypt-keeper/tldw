@@ -152,14 +152,14 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 2. **Run the Installer Script:**
    - **Linux:** 
      - `chmod +x Linux_Install_Update.sh && chmod +x ./Linux_Run_tldw.sh`
-     - `./Linux_Install_Update.sh`
+     - `./Linux_Install_Update.sh` and then `./Linux_Run_tldw.sh`
      - This will install tldw to the directory from where the script is ran.
    - **Windows:** `Windows_Install_Update.bat`
      - Double-click the downloaded batch file to install it.
      - This will install tldw to the directory from where the script is ran.
    - **MacOS:** `bash MacOS-Install_Updater.sh`
-     - `chmod +x MacOS_Install_Update.sh && chmod +x ./MacOS_Run_tldw.sh`
-     - `./MacOS_Install_Update.sh && ./MacOS_Run_tldw.sh`
+     - `chmod +x MacOS_Install_Update.sh` and then `chmod +x ./MacOS_Run_tldw.sh`
+     - `./MacOS_Install_Update.sh` and then `./MacOS_Run_tldw.sh`
      - This will install tldw to the directory from where the script is ran.
 3. **Follow the prompts to install the necessary packages and setup the program.**
 4. **You are Ready to Go! You should see tldw start up at the end of the script, assuming everything worked as expected**
