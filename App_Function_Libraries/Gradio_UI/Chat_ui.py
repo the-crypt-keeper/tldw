@@ -959,62 +959,91 @@ def chat_workflows_tab():
         gr.Markdown("# Workflows using LLMs")
 
         workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
-        context_input = gr.Textbox(label="Context", lines=5)
+        context_input = gr.Textbox(label="Initial Context (optional)", lines=5)
 
         # Create a container for dynamic components
         with gr.Column() as dynamic_components:
-            prompt_inputs = []
+            prompt_displays = []
+            user_inputs = []
             output_boxes = []
             process_buttons = []
 
             # Create the maximum number of components needed
             max_steps = max(len(wf['prompts']) for wf in workflows)
             for i in range(max_steps):
-                prompt_inputs.append(gr.Textbox(label=f"Prompt {i + 1}", lines=2, visible=False))
-                output_boxes.append(gr.Textbox(label=f"Output {i + 1}", lines=5, visible=False))
-                process_buttons.append(gr.Button(f"Process Prompt {i + 1}", visible=False))
+                prompt_displays.append(gr.Markdown(visible=False))
+                user_inputs.append(gr.Textbox(label=f"Your Response", lines=2, visible=False))
+                output_boxes.append(gr.Textbox(label=f"AI Output", lines=5, visible=False))
+                process_buttons.append(gr.Button(f"Process Step {i + 1}", visible=False))
 
         def update_workflow_ui(workflow_name):
             selected_workflow = next(wf for wf in workflows if wf['name'] == workflow_name)
             num_prompts = len(selected_workflow['prompts'])
 
-            updates = []
+            prompt_updates = []
+            input_updates = []
+            output_updates = []
+            button_updates = []
+
             for i in range(max_steps):
                 if i < num_prompts:
-                    updates.extend([
-                        gr.update(value=selected_workflow['prompts'][i], visible=True),  # Prompt input
-                        gr.update(value="", visible=True),  # Output box
-                        gr.update(visible=True)  # Process button
-                    ])
+                    prompt_updates.append(
+                        gr.update(value=f"**Step {i + 1}:** {selected_workflow['prompts'][i]}", visible=True))
+                    input_updates.append(gr.update(value="", visible=True, interactive=(i == 0)))
+                    output_updates.append(gr.update(value="", visible=True))
+                    button_updates.append(gr.update(visible=(i == 0)))
                 else:
-                    updates.extend([
-                        gr.update(visible=False),  # Prompt input
-                        gr.update(visible=False),  # Output box
-                        gr.update(visible=False)  # Process button
-                    ])
+                    prompt_updates.append(gr.update(visible=False))
+                    input_updates.append(gr.update(visible=False))
+                    output_updates.append(gr.update(visible=False))
+                    button_updates.append(gr.update(visible=False))
 
-            return updates
+            return prompt_updates + input_updates + output_updates + button_updates
 
-        def process(context, prompt, workflow_name, step):
-            # Update context with previous outputs
-            for j in range(step):
-                context += f"\n\n{output_boxes[j].value}"
-            result = process_with_llm(workflow_name, context, prompt)
-            return result
+        def process(context, user_inputs, workflow_name, step):
+            selected_workflow = next(wf for wf in workflows if wf['name'] == workflow_name)
+
+            # Build up the context from previous steps
+            full_context = context + "\n\n"
+            for i in range(step + 1):
+                full_context += f"Question: {selected_workflow['prompts'][i]}\n"
+                full_context += f"Answer: {user_inputs[i]}\n"
+                if i < step:
+                    full_context += f"AI Output: {output_boxes[i].value}\n\n"
+
+            result = process_with_llm(workflow_name, full_context, selected_workflow['prompts'][step])
+
+            prompt_updates = [gr.update() for _ in range(max_steps)]
+            input_updates = []
+            output_updates = [gr.update() for _ in range(max_steps)]
+            button_updates = []
+
+            for i in range(len(selected_workflow['prompts'])):
+                if i == step + 1:
+                    input_updates.append(gr.update(interactive=True))
+                    button_updates.append(gr.update(visible=True))
+                elif i > step + 1:
+                    input_updates.append(gr.update(interactive=False))
+                    button_updates.append(gr.update(visible=False))
+                else:
+                    input_updates.append(gr.update(interactive=False))
+                    button_updates.append(gr.update(visible=False))
+
+            return [result] + prompt_updates + input_updates + output_updates + button_updates
 
         # Set up event handlers
         workflow_selector.change(
             update_workflow_ui,
             inputs=[workflow_selector],
-            outputs=prompt_inputs + output_boxes + process_buttons
+            outputs=prompt_displays + user_inputs + output_boxes + process_buttons
         )
 
         # Set up process button click events
         for i, button in enumerate(process_buttons):
             button.click(
-                fn=lambda context, prompt, wf_name, step=i: process(context, prompt, wf_name, step),
-                inputs=[context_input, prompt_inputs[i], workflow_selector],
-                outputs=[output_boxes[i]]
+                fn=lambda context, *user_inputs, wf_name, step=i: process(context, user_inputs, wf_name, step),
+                inputs=[context_input] + user_inputs + [workflow_selector],
+                outputs=[output_boxes[i]] + prompt_displays + user_inputs + output_boxes + process_buttons
             )
 
     return workflow_selector, context_input, dynamic_components
