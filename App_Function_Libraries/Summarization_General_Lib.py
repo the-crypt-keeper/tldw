@@ -43,6 +43,47 @@ from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extrac
 config = load_comprehensive_config()
 openai_api_key = config.get('API', 'openai_api_key', fallback=None)
 
+
+def summarize(input_data, custom_prompt_arg, api_name, api_key, temp, system_message):
+    try:
+        if api_name.lower() == "openai":
+            return summarize_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "anthropic":
+            return summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "cohere":
+            return summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "groq":
+            return summarize_with_groq(api_key, input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "huggingface":
+            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp)
+        elif api_name.lower() == "openrouter":
+            return summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "deepseek":
+            return summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "mistral":
+            return summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "llama.cpp":
+            return summarize_with_llama(input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "kobold":
+            return summarize_with_kobold(input_data, api_key, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "ooba":
+            return summarize_with_oobabooga(input_data, api_key, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "tabbyapi":
+            return summarize_with_tabbyapi(input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "vllm":
+            return summarize_with_vllm(input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "local-llm":
+            return summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message)
+        elif api_name.lower() == "huggingface":
+            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp, )#system_message)
+        else:
+            return f"Error: Invalid API Name {api_name}"
+
+    except Exception as e:
+        logging.error(f"Error in summarize function: {str(e)}", exc_info=True)
+        return f"Error: {str(e)}"
+
+
 def extract_text_from_segments(segments):
     logging.debug(f"Segments received: {segments}")
     logging.debug(f"Type of segments: {type(segments)}")
@@ -65,18 +106,18 @@ def extract_text_from_segments(segments):
 
 def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
     loaded_config_data = load_and_log_configs()
-
     try:
         # API key validation
-        if api_key is None or api_key.strip() == "":
+        if not api_key or api_key.strip() == "":
             logging.info("OpenAI: #1 API key not provided as parameter")
             logging.info("OpenAI: Attempting to use API key from config file")
             api_key = loaded_config_data['api_keys']['openai']
 
-        if api_key is None or api_key.strip() == "":
+        if not api_key or api_key.strip() == "":
             logging.error("OpenAI: #2 API key not found or is empty")
             return "OpenAI: API Key Not Provided/Found in Config file or is empty"
 
+        openai_api_key = api_key
         logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
         # Input data handling
@@ -121,7 +162,6 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
         else:
             raise ValueError(f"OpenAI: Invalid input data format: {type(data)}")
 
-        openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
         logging.debug(f"OpenAI: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"OpenAI: Custom prompt: {custom_prompt_arg}")
 
@@ -205,6 +245,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
         if not anthropic_api_key or not anthropic_api_key.strip():
             logging.error("Anthropic: No valid API key available")
             # You might want to raise an exception here or handle this case as appropriate for your application
+            #FIXME
             # For example: raise ValueError("No valid Anthropic API key available")
 
 
@@ -344,6 +385,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         if not cohere_api_key or not cohere_api_key.strip():
             logging.error("Cohere: No valid API key available")
             # You might want to raise an exception here or handle this case as appropriate for your application
+            # FIXME
             # For example: raise ValueError("No valid Anthropic API key available")
 
         if custom_prompt_arg is None:
@@ -455,6 +497,7 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, syste
         if not groq_api_key or not groq_api_key.strip():
             logging.error("Anthropic: No valid API key available")
             # You might want to raise an exception here or handle this case as appropriate for your application
+            # FIXME
             # For example: raise ValueError("No valid Anthropic API key available")
 
         logging.debug(f"Groq: Using API Key: {groq_api_key[:5]}...{groq_api_key[-5:]}")
@@ -683,6 +726,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
         if not huggingface_api_key or not huggingface_api_key.strip():
             logging.error("HuggingFace: No valid API key available")
             # You might want to raise an exception here or handle this case as appropriate for your application
+            # FIXME
             # For example: raise ValueError("No valid Anthropic API key available")
 
 
@@ -772,6 +816,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
         if not deepseek_api_key or not deepseek_api_key.strip():
             logging.error("DeepSeek: No valid API key available")
             # You might want to raise an exception here or handle this case as appropriate for your application
+            # FIXME
             # For example: raise ValueError("No valid deepseek API key available")
 
 
@@ -877,6 +922,7 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
         if not mistral_api_key or not mistral_api_key.strip():
             logging.error("Mistral: No valid API key available")
             # You might want to raise an exception here or handle this case as appropriate for your application
+            # FIXME
             # For example: raise ValueError("No valid deepseek API key available")
 
 
@@ -1145,39 +1191,14 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
 def summarize_chunk(api_name, text, custom_prompt_input, api_key, temp=None, system_message=None):
     logging.debug("Entered 'summarize_chunk' function")
     try:
-        if api_name.lower() == 'openai':
-            return summarize_with_openai(api_key, text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "anthropic":
-            return summarize_with_anthropic(api_key, text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "cohere":
-            return summarize_with_cohere(api_key, text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "groq":
-            return summarize_with_groq(api_key, text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "openrouter":
-            return summarize_with_openrouter(api_key, text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "deepseek":
-            return summarize_with_deepseek(api_key, text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "mistral":
-            return summarize_with_mistral(api_key, text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "llama.cpp":
-            return summarize_with_llama(text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "kobold":
-            return summarize_with_kobold(text, api_key, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "ooba":
-            return summarize_with_oobabooga(text, api_key, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "tabbyapi":
-            return summarize_with_tabbyapi(text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "vllm":
-            return summarize_with_vllm(text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "local-llm":
-            return summarize_with_local_llm(text, custom_prompt_input, temp, system_message)
-        elif api_name.lower() == "huggingface":
-            return summarize_with_huggingface(api_key, text, custom_prompt_input, temp, )#system_message)
-        else:
-            logging.warning(f"Unsupported API: {api_name}")
+        result = summarize(text, custom_prompt_input, api_name, api_key, temp, system_message)
+        if result is None or result.startswith("Error:"):
+            logging.warning(f"Summarization with {api_name} failed: {result}")
             return None
+        logging.info(f"Summarization with {api_name} successful")
+        return result
     except Exception as e:
-        logging.error(f"Error in summarize_chunk with {api_name}: {str(e)}")
+        logging.error(f"Error in summarize_chunk with {api_name}: {str(e)}", exc_info=True)
         return None
 
 

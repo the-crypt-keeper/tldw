@@ -261,6 +261,17 @@ def load_and_log_configs():
 # End of Config loading
 #######################################################################################################################
 
+
+#######################################################################################################################
+#
+# Prompt Handling Functions
+
+
+
+#
+# End of Prompt Handling Functions
+### #############################################################################################################
+
 #######################################################################################################################
 #
 # Misc-Functions
@@ -539,6 +550,43 @@ def sanitize_filename(filename):
     sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
     sanitized = re.sub(r'\s+', ' ', sanitized).strip()
     return sanitized
+
+
+def format_transcription(content):
+    # Replace '\n' with actual line breaks
+    content = content.replace('\\n', '\n')
+    # Split the content by newlines first
+    lines = content.split('\n')
+    formatted_lines = []
+    for line in lines:
+        # Add extra space after periods for better readability
+        line = line.replace('.', '. ').replace('.  ', '. ')
+
+        # Split into sentences using a more comprehensive regex
+        sentences = re.split('(?<=[.!?]) +', line)
+
+        # Trim whitespace from each sentence and add a line break
+        formatted_sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+
+        # Join the formatted sentences
+        formatted_lines.append(' '.join(formatted_sentences))
+
+    # Join the lines with HTML line breaks
+    formatted_content = '<br>'.join(formatted_lines)
+
+    return formatted_content
+
+
+def format_file_path(file_path, fallback_path=None):
+    if file_path and os.path.exists(file_path):
+        logging.debug(f"File exists: {file_path}")
+        return file_path
+    elif fallback_path and os.path.exists(fallback_path):
+        logging.debug(f"File does not exist: {file_path}. Returning fallback path: {fallback_path}")
+        return fallback_path
+    else:
+        logging.debug(f"File does not exist: {file_path}. No fallback path available.")
+        return None
 
 #
 # End of Sanitization/Verification Functions

@@ -1,12 +1,14 @@
-# **tl/dw: Too Long, Didnt Watch**
+![License](https://img.shields.io/badge/license-apache2.0-green)
+# **tl/dw: Too Long, Didnt Watch** 
 ## Download, Transcribe, Summarize & Chat with Video+Audio+Documents+Articles & Books. 
 ### All automated. All local. All yours.
+## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer) 
 #### More: Full-Text-Search across everything ingested (RAG is wip), Local LLM inference as part of it(llamafile) for those who don't want to mess with setting up an LLM, and a WebApp(gradio as PoC) to interact with the script in a more user-friendly manner.
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
-## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
 
 
-![License](https://img.shields.io/badge/license-apache2.0-green)
+
+
 
 **Use the Installer Script! Download and run it to install the necessary packages + launch tl/dw**
 - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Run-Install-Update.sh`
@@ -48,7 +50,7 @@
     - **Chat with an LLM about the content you've ingested, or ask questions about it. (Multiple APIs Supported, 15 total)**
       - **APIs Supported:** 
         - **Commercial:** OpenAI / Anthropic / Cohere / DeepSeek / Groq / Mistral / OpenRouter / HuggingFace; 
-        - **Local:** Llama.cpp / Kobold.cpp / Oobabooga / TabbyAPI / vLLM / Ollama;
+        - **Local:** Llama.cpp / Kobold.cpp / Oobabooga / TabbyAPI / vLLM / Ollama / ;
     - **Prompt storage and retrieval, as well as the ability to select prompts from the DB to use with your questions.**
     - **General Chat front-end**
       - Regular chat UI;

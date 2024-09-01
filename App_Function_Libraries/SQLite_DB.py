@@ -58,7 +58,6 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any
 # Local Libraries
-from App_Function_Libraries.ChromaDB_Library import auto_update_chroma_embeddings
 from App_Function_Libraries.Utils import is_valid_url
 # Third-Party Libraries
 import gradio as gr
