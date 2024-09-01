@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Improved TLDW Windows Installer and Updater Script
+:: TLDW Windows Installer and Updater Script
 
 :: Set up logging
 set "log_file=%~dp0tldw_install_log.txt"
@@ -45,12 +45,7 @@ if exist "%install_dir%" (
 call :cleanup
 call :log "Installation/Update process completed"
 echo Installation/Update completed successfully!
-echo To activate the virtual environment in the future, run: %install_dir%\venv\Scripts\activate.bat
-echo To start using TLDW, please refer to the project documentation.
-
-:: Launch TLDW
-call :launch_tldw
-
+echo To run TLDW, use the run_tldw.bat script.
 pause
 exit /b 0
 
@@ -82,6 +77,7 @@ if /i "!confirm_update!"=="y" (
     echo Update cancelled.
     exit /b 0
 )
+call :setup_environment
 goto :eof
 
 :fresh_install
@@ -99,7 +95,6 @@ if /i "%gpu_support%"=="y" (
         set "gpu_choice=amd"
     ) else (
         echo Invalid choice. Defaulting to CPU installation.
-        set "gpu_support=n"
         set "gpu_choice=cpu"
     )
 ) else (
@@ -166,14 +161,6 @@ goto :eof
 call :log "Performing cleanup"
 :: Deactivate virtual environment
 call .\venv\Scripts\deactivate.bat
-goto :eof
-
-:launch_tldw
-call :log "Launching TLDW"
-echo Launching TLDW...
-cd "%install_dir%"
-call .\venv\Scripts\activate.bat
-start cmd /k "python tldw.py"
 goto :eof
 
 :log
