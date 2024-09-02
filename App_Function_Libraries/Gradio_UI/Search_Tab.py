@@ -12,7 +12,7 @@ import gradio as gr
 
 from App_Function_Libraries.DB_Manager import view_database, search_and_display_items
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
-from App_Function_Libraries.RAG_Libary_2 import rag_search
+from App_Function_Libraries.RAG.RAG_Libary_2 import rag_search
 
 #
 # Local Imports
@@ -96,7 +96,7 @@ def create_embeddings_tab():
         def create_embeddings(api_choice):
             try:
                 # Assuming you have a function that handles the creation of embeddings
-                from App_Function_Libraries.ChromaDB_Library import create_all_embeddings
+                from App_Function_Libraries.RAG.ChromaDB_Library import create_all_embeddings
                 status = create_all_embeddings(api_choice)
                 return status
             except Exception as e:
