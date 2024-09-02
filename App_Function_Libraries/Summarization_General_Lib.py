@@ -32,7 +32,7 @@ from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama,
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 # Import Local
-from App_Function_Libraries.Utils import load_and_log_configs, load_comprehensive_config, sanitize_filename, \
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, load_comprehensive_config, sanitize_filename, \
     clean_youtube_url, create_download_directory, is_valid_url
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 

@@ -26,8 +26,8 @@ from typing import Union
 import requests
 # Import 3rd-party Libraries
 # Import Local
-from App_Function_Libraries.Utils import load_and_log_configs
-from App_Function_Libraries.Utils import extract_text_from_segments
+from App_Function_Libraries.Utils.Utils import load_and_log_configs
+from App_Function_Libraries.Utils.Utils import extract_text_from_segments
 #
 #######################################################################################################################
 # Function Definitions

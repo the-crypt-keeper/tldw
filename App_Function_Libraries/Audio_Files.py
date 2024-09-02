@@ -34,7 +34,7 @@ from App_Function_Libraries.DB.DB_Manager import add_media_to_database, add_medi
     check_media_and_whisper_model
 from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
-from App_Function_Libraries.Utils import create_download_directory, save_segments_to_json, downloaded_files, \
+from App_Function_Libraries.Utils.Utils import create_download_directory, save_segments_to_json, downloaded_files, \
     sanitize_filename
 from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
 
