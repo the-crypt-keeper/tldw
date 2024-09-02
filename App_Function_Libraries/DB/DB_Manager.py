@@ -23,7 +23,7 @@ from elasticsearch import Elasticsearch
 ####
 
 # Import your existing SQLite functions
-from SQLite_DB import (
+from App_Function_Libraries.DB.SQLite_DB import (
     update_media_content as sqlite_update_media_content,
     list_prompts as sqlite_list_prompts,
     search_and_display as sqlite_search_and_display,
