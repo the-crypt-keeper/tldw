@@ -10,7 +10,7 @@
 import gradio as gr
 #
 # Internal Imports
-from App_Function_Libraries.DB_Manager import add_keyword, delete_keyword, keywords_browser_interface, export_keywords_to_csv
+from App_Function_Libraries.DB.DB_Manager import add_keyword, delete_keyword, keywords_browser_interface, export_keywords_to_csv
 #
 #
 ######################################################################################################################

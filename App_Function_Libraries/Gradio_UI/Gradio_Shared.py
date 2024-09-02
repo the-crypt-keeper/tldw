@@ -12,8 +12,8 @@ from typing import List, Tuple
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.DB_Manager import list_prompts, db, search_and_display, fetch_prompt_details
-from App_Function_Libraries.SQLite_DB import DatabaseError
+from App_Function_Libraries.DB.DB_Manager import list_prompts, db, search_and_display, fetch_prompt_details
+from App_Function_Libraries.DB.SQLite_DB import DatabaseError
 from App_Function_Libraries.Utils import format_transcription
 #
 ##############################################################################################################

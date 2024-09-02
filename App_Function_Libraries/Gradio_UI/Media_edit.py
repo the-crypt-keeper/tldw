@@ -9,10 +9,10 @@ import uuid
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.DB_Manager import add_prompt, update_media_content, db, add_or_update_prompt, \
+from App_Function_Libraries.DB.DB_Manager import add_prompt, update_media_content, db, add_or_update_prompt, \
     load_prompt_details
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_prompt_dropdown
-from App_Function_Libraries.SQLite_DB import fetch_item_details
+from App_Function_Libraries.DB.SQLite_DB import fetch_item_details
 
 
 def create_media_edit_tab():

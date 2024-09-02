@@ -16,7 +16,7 @@ import gradio as gr
 import pypandoc
 #
 # Local Imports
-from App_Function_Libraries.DB_Manager import insert_prompt_to_db, load_preset_prompts, import_obsidian_note_to_db, \
+from App_Function_Libraries.DB.DB_Manager import insert_prompt_to_db, load_preset_prompts, import_obsidian_note_to_db, \
     add_media_to_database
 from App_Function_Libraries.Prompt_Handling import import_prompt_from_file, import_prompts_from_zip#
 from App_Function_Libraries.Summarization_General_Lib import perform_summarization

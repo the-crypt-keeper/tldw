@@ -10,7 +10,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
-from App_Function_Libraries.DB_Manager import update_media_content, load_preset_prompts
+from App_Function_Libraries.DB.DB_Manager import update_media_content, load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import fetch_item_details, fetch_items_by_keyword, \
     fetch_items_by_content, fetch_items_by_title_or_url

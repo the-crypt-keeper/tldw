@@ -30,7 +30,7 @@ from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 # Local Imports
-from App_Function_Libraries.DB_Manager import add_media_to_database, add_media_with_keywords, \
+from App_Function_Libraries.DB.DB_Manager import add_media_to_database, add_media_with_keywords, \
     check_media_and_whisper_model
 from App_Function_Libraries.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization

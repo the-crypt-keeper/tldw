@@ -8,7 +8,7 @@ import shutil
 import tempfile
 from typing import List, Dict, Optional, Tuple
 import gradio as gr
-from App_Function_Libraries.DB_Manager import DatabaseError, create_automated_backup, db_path, backup_dir
+from App_Function_Libraries.DB.DB_Manager import DatabaseError, create_automated_backup, db_path, backup_dir
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import fetch_item_details, fetch_items_by_keyword, browse_items
 
 logger = logging.getLogger(__name__)
