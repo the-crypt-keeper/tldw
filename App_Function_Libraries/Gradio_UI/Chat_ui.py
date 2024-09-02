@@ -15,7 +15,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Chat import chat, save_chat_history, update_chat_content, save_chat_history_to_db_wrapper
-from App_Function_Libraries.DB_Manager import add_chat_message, search_chat_conversations, create_chat_conversation, \
+from App_Function_Libraries.DB.DB_Manager import add_chat_message, search_chat_conversations, create_chat_conversation, \
     get_chat_messages, update_chat_message, delete_chat_message, load_preset_prompts, db
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
 

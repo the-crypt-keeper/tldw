@@ -8,7 +8,7 @@ import logging
 # External Imports
 import gradio as gr
 
-from App_Function_Libraries.DB_Manager import get_transcripts
+from App_Function_Libraries.DB.DB_Manager import get_transcripts
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import browse_items
 from App_Function_Libraries.Utils import format_transcription
 

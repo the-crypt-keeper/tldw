@@ -10,7 +10,7 @@ import sqlite3
 # External Imports
 import gradio as gr
 
-from App_Function_Libraries.DB_Manager import view_database, search_and_display_items
+from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
 from App_Function_Libraries.RAG.RAG_Libary_2 import rag_search
 

@@ -9,7 +9,7 @@ import sqlite3
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.DB_Manager import delete_prompt, empty_trash, get_trashed_items, user_delete_item
+from App_Function_Libraries.DB.DB_Manager import delete_prompt, empty_trash, get_trashed_items, user_delete_item
 
 
 def delete_item(media_id, force):

@@ -14,7 +14,7 @@ import os
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.DB_Manager import get_db_config
+from App_Function_Libraries.DB.DB_Manager import get_db_config
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Chat_ui import chat_workflows_tab, create_chat_management_tab, \
     create_chat_interface_four, create_chat_interface_multi_api, create_chat_interface_stacked, create_chat_interface

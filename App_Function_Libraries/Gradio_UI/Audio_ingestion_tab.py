@@ -8,7 +8,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Audio_Files import process_audio_files
-from App_Function_Libraries.DB_Manager import load_preset_prompts
+from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models
 #

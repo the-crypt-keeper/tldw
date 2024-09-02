@@ -13,7 +13,7 @@ import yt_dlp
 from App_Function_Libraries.Confabulation_check import simplified_geval
 #
 # Local Imports
-from App_Function_Libraries.DB_Manager import load_preset_prompts, add_media_to_database
+from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, add_media_to_database
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models, update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import error_handler
 from App_Function_Libraries.Summarization_General_Lib import perform_transcription, perform_summarization, \

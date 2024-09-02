@@ -30,7 +30,7 @@ from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summariz
 from App_Function_Libraries.Diarization_Lib import combine_transcription_and_diarization
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
-from App_Function_Libraries.DB_Manager import add_media_to_database
+from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 # Import Local
 from App_Function_Libraries.Utils import load_and_log_configs, load_comprehensive_config, sanitize_filename, \
     clean_youtube_url, create_download_directory, is_valid_url

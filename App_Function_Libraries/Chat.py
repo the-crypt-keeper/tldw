@@ -13,12 +13,12 @@ from pathlib import Path
 # External Imports
 #
 # Local Imports
-from App_Function_Libraries.DB_Manager import get_conversation_name, save_chat_history_to_database
+from App_Function_Libraries.DB.DB_Manager import get_conversation_name, save_chat_history_to_database
 from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_cohere, \
     chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface#, chat_with_vllm
 from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
     chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi
-from App_Function_Libraries.SQLite_DB import load_media_content
+from App_Function_Libraries.DB.SQLite_DB import load_media_content
 from App_Function_Libraries.Utils import generate_unique_filename
 #
 ####################################################################################################

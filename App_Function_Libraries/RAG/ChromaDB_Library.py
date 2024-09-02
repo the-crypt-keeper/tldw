@@ -76,7 +76,7 @@ def process_and_store_content(content: str, collection_name: str, media_id: int)
     store_in_chroma(collection_name, texts, embeddings, ids)
 
     # Store the chunks in SQLite FTS as well
-    from App_Function_Libraries.DB_Manager import db
+    from App_Function_Libraries.DB.DB_Manager import db
     with db.get_connection() as conn:
         cursor = conn.cursor()
         for text in texts:
@@ -192,7 +192,7 @@ def get_all_content_from_database() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: A list of dictionaries, each containing the media ID, content, title, and other relevant fields.
     """
     try:
-        from App_Function_Libraries.DB_Manager import db
+        from App_Function_Libraries.DB.DB_Manager import db
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -218,7 +218,7 @@ def get_all_content_from_database() -> List[Dict[str, Any]]:
 
     except sqlite3.Error as e:
         logging.error(f"Error retrieving all content from database: {e}")
-        from App_Function_Libraries.SQLite_DB import DatabaseError
+        from App_Function_Libraries.DB.SQLite_DB import DatabaseError
         raise DatabaseError(f"Error retrieving all content from database: {e}")
 
 
