@@ -835,7 +835,7 @@ def add_media_version(media_id: int, prompt: str, summary: str) -> None:
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
-def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
+def sqlite_search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
     if page < 1:
         raise ValueError("Page number must be 1 or greater.")
 
@@ -886,7 +886,7 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
 
 # Gradio function to handle user input and display results with pagination, with better feedback
 def search_and_display(search_query, search_fields, keywords, page):
-    results = search_db(search_query, search_fields, keywords, page)
+    results = sqlite_search_db(search_query, search_fields, keywords, page)
 
     if isinstance(results, pd.DataFrame):
         # Convert DataFrame to a list of tuples or lists
@@ -964,7 +964,7 @@ def format_results(results):
 # Function to export search results to CSV or markdown with pagination
 def export_to_file(search_query: str, search_fields: List[str], keyword: str, page: int = 1, results_per_file: int = 1000, export_format: str = 'csv'):
     try:
-        results = search_db(search_query, search_fields, keyword, page, results_per_file)
+        results = sqlite_search_db(search_query, search_fields, keyword, page, results_per_file)
         if not results:
             return "No results found to export."
 

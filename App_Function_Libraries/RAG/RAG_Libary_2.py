@@ -3,8 +3,8 @@ import configparser
 from typing import Dict, Any
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
-from Article_Extractor_Lib import scrape_article
-from SQLite_DB import search_db, db
+from App_Function_Libraries.Article_Extractor_Lib import scrape_article
+from App_Function_Libraries.DB.DB_Manager import search_db, db
 # 3rd-Party Imports
 import openai
 # Initialize OpenAI client (adjust this based on your API key management)
