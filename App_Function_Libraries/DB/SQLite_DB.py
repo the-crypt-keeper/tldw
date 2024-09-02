@@ -493,6 +493,23 @@ def check_media_and_whisper_model(title=None, url=None, current_whisper_model=No
         return False, f"Media found with same whisper model (ID: {media_id})"
 
 
+def sqlite_add_media_chunk(db, media_id: int, chunk_text: str, start_index: int, end_index: int, vector_embedding: bytes):
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, vector_embedding) VALUES (?, ?, ?, ?, ?)",
+            (media_id, chunk_text, start_index, end_index, vector_embedding)
+        )
+        conn.commit()
+
+def sqlite_update_fts_for_media(db, media_id: int):
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO media_fts (rowid, title, content) SELECT id, title, content FROM Media WHERE id = ?", (media_id,))
+        conn.commit()
+
+#
+# End of Media-related Functions
 #######################################################################################################################
 # Keyword-related Functions
 #

@@ -4,7 +4,7 @@ from typing import Dict, Any
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
 from App_Function_Libraries.Article_Extractor_Lib import scrape_article
-from App_Function_Libraries.DB.DB_Manager import search_db, db
+from App_Function_Libraries.DB.DB_Manager import add_media_to_database, search_db, db
 # 3rd-Party Imports
 import openai
 # Initialize OpenAI client (adjust this based on your API key management)
@@ -20,10 +20,13 @@ def rag_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
     # Extract content
     article_data = scrape_article(url)
     content = article_data['content']
+    title = article_data['title']
+
+    # Store the article in the database and get the media_id
+    media_id = add_media_to_database(url, title, 'article', content)
 
     # Process and store content
-    collection_name = "article_" + str(hash(url))
-    # FIXME
+    collection_name = f"article_{media_id}"
     process_and_store_content(content, collection_name, media_id)
 
     # Perform searches
@@ -97,10 +100,13 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
 def preprocess_all_content():
     with db.get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, content FROM Media")
+        cursor.execute("SELECT id, content, type FROM Media WHERE id NOT IN (SELECT DISTINCT media_id FROM MediaChunks)")
         for row in cursor.fetchall():
-            # FIXME
-            process_and_store_content(row[1], f"media_{row[0]}", media_id)
+            media_id = row[0]
+            content = row[1]
+            media_type = row[2]
+            collection_name = f"{media_type}_{media_id}"
+            process_and_store_content(content, collection_name, media_id)
 
 
 # Function to perform RAG search across all stored content

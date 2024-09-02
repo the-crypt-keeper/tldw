@@ -59,7 +59,8 @@ from App_Function_Libraries.DB.SQLite_DB import (
     add_media_with_keywords as sqlite_add_media_with_keywords,
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model,
     DatabaseError, create_document_version as sqlite_create_document_version,
-    get_document_version as sqlite_get_document_version, sqlite_search_db
+    get_document_version as sqlite_get_document_version, sqlite_search_db, sqlite_add_media_chunk,
+    sqlite_update_fts_for_media
 )
 
 class Database:
@@ -189,6 +190,7 @@ def search_and_display(*args, **kwargs):
 # End of DB-Searching functions
 ############################################################################################################
 
+
 ############################################################################################################
 #
 # Transcript-related Functions
@@ -203,6 +205,7 @@ def get_transcripts(*args, **kwargs):
 #
 # End of Transcript-related Functions
 ############################################################################################################
+
 
 ############################################################################################################
 #
@@ -286,6 +289,26 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
         raise NotImplementedError("Elasticsearch version of ingest_article_to_db not yet implemented")
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
+
+
+def add_media_chunk(media_id: int, chunk_text: str, start_index: int, end_index: int, vector_embedding: bytes):
+    if db_type == 'sqlite':
+        sqlite_add_media_chunk(db, media_id, chunk_text, start_index, end_index, vector_embedding)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def update_fts_for_media(media_id: int):
+    if db_type == 'sqlite':
+        sqlite_update_fts_for_media(db, media_id)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
 
 #
 # End of DB-Ingestion functions

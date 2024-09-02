@@ -75,14 +75,12 @@ def process_and_store_content(content: str, collection_name: str, media_id: int)
     # Store the texts, embeddings, and IDs in ChromaDB
     store_in_chroma(collection_name, texts, embeddings, ids)
 
-    # Store the chunks in SQLite FTS as well
-    from App_Function_Libraries.DB.DB_Manager import db
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        for text in texts:
-            cursor.execute("INSERT INTO media_fts (content) VALUES (?)", (text,))
-        conn.commit()
+    # Store the chunks in SQLite
+    for i, text in enumerate(texts):
+        add_media_chunk(media_id, text, chunks[i]['start'], chunks[i]['end'], embeddings[i])
 
+    # Update the FTS table
+    update_fts_for_media(media_id)
 
 # Function to store documents and their embeddings in ChromaDB
 def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str]):
