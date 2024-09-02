@@ -60,7 +60,7 @@ from App_Function_Libraries.DB.SQLite_DB import (
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model,
     DatabaseError, create_document_version as sqlite_create_document_version,
     get_document_version as sqlite_get_document_version, sqlite_search_db, sqlite_add_media_chunk,
-    sqlite_update_fts_for_media
+    sqlite_update_fts_for_media, sqlite_get_unprocessed_media
 )
 
 class Database:
@@ -306,6 +306,16 @@ def update_fts_for_media(media_id: int):
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+
+def get_unprocessed_media():
+    if db_type == 'sqlite':
+        return sqlite_get_unprocessed_media(db)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_unprocessed_media not yet implemented")
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 

@@ -508,6 +508,13 @@ def sqlite_update_fts_for_media(db, media_id: int):
         cursor.execute("INSERT OR REPLACE INTO media_fts (rowid, title, content) SELECT id, title, content FROM Media WHERE id = ?", (media_id,))
         conn.commit()
 
+
+def sqlite_get_unprocessed_media(db):
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, content, type FROM Media WHERE id NOT IN (SELECT DISTINCT media_id FROM MediaChunks)")
+        return cursor.fetchall()
+
 #
 # End of Media-related Functions
 #######################################################################################################################
