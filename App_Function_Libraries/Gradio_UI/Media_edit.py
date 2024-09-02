@@ -173,7 +173,7 @@ def create_media_edit_and_clone_tab():
 
 
 def create_prompt_edit_tab():
-    with gr.TabItem("Edit Prompts"):
+    with gr.TabItem("Add & Edit Prompts"):
         with gr.Row():
             with gr.Column():
                 prompt_dropdown = gr.Dropdown(
