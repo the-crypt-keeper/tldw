@@ -777,7 +777,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
         response = requests.post(API_URL, headers=headers, json=data)
 
         if response.status_code == 200:
-            summary = response.json()[0]['summary_text']
+            summary = response.json()[0]['generated_text'].strip()
             logging.debug("huggingface: Summarization successful")
             print("Summarization successful.")
             return summary
