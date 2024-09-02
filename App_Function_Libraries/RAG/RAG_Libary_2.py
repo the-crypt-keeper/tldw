@@ -10,6 +10,10 @@ import openai
 # Initialize OpenAI client (adjust this based on your API key management)
 openai.api_key = "your-openai-api-key"
 
+config = configparser.ConfigParser()
+config.read('config.txt')
+
+
 
 # Main RAG pipeline function
 def rag_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
@@ -19,7 +23,8 @@ def rag_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
 
     # Process and store content
     collection_name = "article_" + str(hash(url))
-    process_and_store_content(content, collection_name)
+    # FIXME
+    process_and_store_content(content, collection_name, media_id)
 
     # Perform searches
     vector_results = vector_search(collection_name, query, k=5)
@@ -37,8 +42,6 @@ def rag_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
         "context": context
     }
 
-config = configparser.ConfigParser()
-config.read('config.txt')
 
 def generate_answer(api_choice: str, context: str, query: str) -> str:
     prompt = f"Context: {context}\n\nQuestion: {query}"
@@ -96,7 +99,8 @@ def preprocess_all_content():
         cursor = conn.cursor()
         cursor.execute("SELECT id, content FROM Media")
         for row in cursor.fetchall():
-            process_and_store_content(row[1], f"media_{row[0]}")
+            # FIXME
+            process_and_store_content(row[1], f"media_{row[0]}", media_id)
 
 
 # Function to perform RAG search across all stored content
