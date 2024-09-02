@@ -221,6 +221,17 @@ def get_all_content_from_database() -> List[Dict[str, Any]]:
         from App_Function_Libraries.SQLite_DB import DatabaseError
         raise DatabaseError(f"Error retrieving all content from database: {e}")
 
+
+def store_in_chroma_with_citation(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], sources: List[str]):
+    collection = chroma_client.get_or_create_collection(name=collection_name)
+    collection.add(
+        documents=texts,
+        embeddings=embeddings,
+        ids=ids,
+        metadatas=[{'source': source} for source in sources]
+    )
+
+
 #
 # End of Functions for ChromaDB
 #######################################################################################################################

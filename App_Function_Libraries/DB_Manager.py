@@ -58,7 +58,8 @@ from SQLite_DB import (
     get_conversation_name as sqlite_get_conversation_name,
     add_media_with_keywords as sqlite_add_media_with_keywords,
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model,
-    DatabaseError
+    DatabaseError, create_document_version as sqlite_create_document_version,
+    get_document_version as sqlite_get_document_version
 )
 
 class Database:
@@ -200,10 +201,31 @@ def get_transcripts(*args, **kwargs):
 
 def add_media_to_database(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_add_media_to_database(*args, **kwargs)
+        result = sqlite_add_media_to_database(*args, **kwargs)
+
+        # Extract content
+        segments = args[2]
+        if isinstance(segments, list):
+            content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
+        elif isinstance(segments, dict):
+            content = segments.get('text', '') or segments.get('content', '')
+        else:
+            content = str(segments)
+
+        # Extract media_id from the result
+        # Assuming the result is in the format "Media 'Title' added/updated successfully with ID: {media_id}"
+        import re
+        match = re.search(r"with ID: (\d+)", result)
+        if match:
+            media_id = int(match.group(1))
+
+            # Create initial document version
+            sqlite_create_document_version(media_id, content)
+
+        return result
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
-        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+        raise NotImplementedError("Elasticsearch version of add_media_to_database not yet implemented")
 
 
 def import_obsidian_note_to_db(*args, **kwargs):
@@ -213,12 +235,27 @@ def import_obsidian_note_to_db(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
+
 def update_media_content(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_update_media_content(*args, **kwargs)
+        result = sqlite_update_media_content(*args, **kwargs)
+
+        # Extract media_id and content
+        selected_item = args[0]
+        item_mapping = args[1]
+        content_input = args[2]
+
+        if selected_item and item_mapping and selected_item in item_mapping:
+            media_id = item_mapping[selected_item]
+
+            # Create new document version
+            sqlite_create_document_version(media_id, content_input)
+
+        return result
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
-        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+        raise NotImplementedError("Elasticsearch version of update_media_content not yet implemented")
+
 
 def add_media_with_keywords(*args, **kwargs):
     if db_type == 'sqlite':
@@ -443,6 +480,7 @@ def empty_trash(*args, **kwargs):
 # End of Trash-related Functions
 ############################################################################################################
 
+
 ############################################################################################################
 #
 # DB-Backup Functions
@@ -457,6 +495,31 @@ def create_automated_backup(*args, **kwargs):
 #
 # End of DB-Backup Functions
 ############################################################################################################
+
+
+############################################################################################################
+#
+# Document Versioning Functions
+
+def create_document_version(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_create_document_version(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of create_document_version not yet implemented")
+
+def get_document_version(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_document_version(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_document_version not yet implemented")
+
+#
+# End of Document Versioning Functions
+############################################################################################################
+
+
 
 ############################################################################################################
 #
