@@ -24,7 +24,7 @@ import textstat
 #
 # Import Local
 from App_Function_Libraries.Tokenization_Methods_Lib import openai_tokenize
-from App_Function_Libraries.Utils import load_comprehensive_config
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 
 
 #

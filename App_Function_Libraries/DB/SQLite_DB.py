@@ -58,7 +58,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any
 # Local Libraries
-from App_Function_Libraries.Utils import is_valid_url
+from App_Function_Libraries.Utils.Utils import is_valid_url
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd

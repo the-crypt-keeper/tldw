@@ -31,7 +31,7 @@ import requests
 from requests import RequestException
 #
 # Import Local libraries
-from App_Function_Libraries.Utils import load_and_log_configs
+from App_Function_Libraries.Utils.Utils import load_and_log_configs
 #
 #######################################################################################################################
 # Function Definitions

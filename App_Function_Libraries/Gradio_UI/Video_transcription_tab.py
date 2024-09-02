@@ -18,7 +18,7 @@ from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models, updat
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import error_handler
 from App_Function_Libraries.Summarization_General_Lib import perform_transcription, perform_summarization, \
     save_transcription_and_summary
-from App_Function_Libraries.Utils import convert_to_seconds, safe_read_file, format_transcription, \
+from App_Function_Libraries.Utils.Utils import convert_to_seconds, safe_read_file, format_transcription, \
     create_download_directory, generate_unique_identifier, extract_text_from_segments
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, extract_metadata, download_video
 #

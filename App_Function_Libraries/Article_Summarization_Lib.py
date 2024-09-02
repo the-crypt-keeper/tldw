@@ -24,7 +24,7 @@ import requests
 # 3rd-Party Imports
 from tqdm import tqdm
 
-from App_Function_Libraries.Utils import sanitize_filename
+from App_Function_Libraries.Utils.Utils import sanitize_filename
 # Local Imports
 from Article_Extractor_Lib import scrape_article
 from Local_Summarization_Lib import summarize_with_llama, summarize_with_oobabooga, summarize_with_tabbyapi, \
