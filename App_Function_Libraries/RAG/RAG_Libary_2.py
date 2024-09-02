@@ -4,7 +4,7 @@ from typing import Dict, Any
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
 from App_Function_Libraries.Article_Extractor_Lib import scrape_article
-from App_Function_Libraries.DB.DB_Manager import add_media_to_database, search_db, db
+from App_Function_Libraries.DB.DB_Manager import add_media_to_database, search_db, db, get_unprocessed_media
 # 3rd-Party Imports
 import openai
 # Initialize OpenAI client (adjust this based on your API key management)
@@ -98,15 +98,13 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
 
 # Function to preprocess and store all existing content in the database
 def preprocess_all_content():
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, content, type FROM Media WHERE id NOT IN (SELECT DISTINCT media_id FROM MediaChunks)")
-        for row in cursor.fetchall():
-            media_id = row[0]
-            content = row[1]
-            media_type = row[2]
-            collection_name = f"{media_type}_{media_id}"
-            process_and_store_content(content, collection_name, media_id)
+    unprocessed_media = get_unprocessed_media()
+    for row in unprocessed_media:
+        media_id = row[0]
+        content = row[1]
+        media_type = row[2]
+        collection_name = f"{media_type}_{media_id}"
+        process_and_store_content(content, collection_name, media_id)
 
 
 # Function to perform RAG search across all stored content
