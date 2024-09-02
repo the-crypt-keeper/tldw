@@ -3,7 +3,7 @@ import logging
 import os
 from contextlib import contextmanager
 from time import sleep
-from typing import Tuple
+from typing import Tuple, List
 import sqlite3
 # 3rd-Party Libraries
 from elasticsearch import Elasticsearch
@@ -59,7 +59,7 @@ from App_Function_Libraries.DB.SQLite_DB import (
     add_media_with_keywords as sqlite_add_media_with_keywords,
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model,
     DatabaseError, create_document_version as sqlite_create_document_version,
-    get_document_version as sqlite_get_document_version
+    get_document_version as sqlite_get_document_version, sqlite_search_db
 )
 
 class Database:
@@ -154,6 +154,15 @@ else:
 ############################################################################################################
 #
 # DB-Searching functions
+
+def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
+    if db_type == 'sqlite':
+        return sqlite_search_db(search_query, search_fields, keywords, page, results_per_page)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version when available
+        raise NotImplementedError("Elasticsearch version of search_db not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
 
 def view_database(*args, **kwargs):
     if db_type == 'sqlite':
