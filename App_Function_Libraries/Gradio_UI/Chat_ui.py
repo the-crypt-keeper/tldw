@@ -941,12 +941,6 @@ def create_chat_management_tab():
     return search_query, search_button, conversation_list, conversation_mapping, chat_content, save_button, result_message, chat_preview
 
 
-# FIXME - busted and incomplete
-# Mock function to simulate LLM processing
-def process_with_llm(workflow, context, prompt):
-    return f"LLM output for {workflow} with context: {context[:30]}... and prompt: {prompt[:30]}..."
-
-
 # Load workflows from a JSON file
 json_path = Path('./Helper_Scripts/Workflows/Workflows.json')
 with json_path.open('r') as f:
@@ -958,7 +952,16 @@ def chat_workflows_tab():
     with gr.TabItem("Chat Workflows"):
         gr.Markdown("# Workflows using LLMs")
 
-        workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
+        with gr.Row():
+            workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
+            api_selector = gr.Dropdown(
+                label="Select API Endpoint",
+                choices=["OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
+                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                value="OpenAI"
+            )
+            api_key_input = gr.Textbox(label="API Key (optional)", type="password")
+
         context_input = gr.Textbox(label="Initial Context (optional)", lines=5)
 
         # Create a container for dynamic components
@@ -967,6 +970,7 @@ def chat_workflows_tab():
             user_inputs = []
             output_boxes = []
             process_buttons = []
+            regenerate_buttons = []
 
             # Create the maximum number of components needed
             max_steps = max(len(wf['prompts']) for wf in workflows)
@@ -974,7 +978,9 @@ def chat_workflows_tab():
                 prompt_displays.append(gr.Markdown(visible=False))
                 user_inputs.append(gr.Textbox(label=f"Your Response", lines=2, visible=False))
                 output_boxes.append(gr.Textbox(label=f"AI Output", lines=5, visible=False))
-                process_buttons.append(gr.Button(f"Process Step {i + 1}", visible=False))
+                with gr.Row():
+                    process_buttons.append(gr.Button(f"Process Step {i + 1}", visible=False))
+                    regenerate_buttons.append(gr.Button(f"🔄 Regenerate", visible=False))
 
         def update_workflow_ui(workflow_name):
             selected_workflow = next(wf for wf in workflows if wf['name'] == workflow_name)
@@ -984,6 +990,7 @@ def chat_workflows_tab():
             input_updates = []
             output_updates = []
             button_updates = []
+            regenerate_updates = []
 
             for i in range(max_steps):
                 if i < num_prompts:
@@ -992,15 +999,17 @@ def chat_workflows_tab():
                     input_updates.append(gr.update(value="", visible=True, interactive=(i == 0)))
                     output_updates.append(gr.update(value="", visible=True))
                     button_updates.append(gr.update(visible=(i == 0)))
+                    regenerate_updates.append(gr.update(visible=False))
                 else:
                     prompt_updates.append(gr.update(visible=False))
                     input_updates.append(gr.update(visible=False))
                     output_updates.append(gr.update(visible=False))
                     button_updates.append(gr.update(visible=False))
+                    regenerate_updates.append(gr.update(visible=False))
 
-            return prompt_updates + input_updates + output_updates + button_updates
+            return prompt_updates + input_updates + output_updates + button_updates + regenerate_updates
 
-        def process(context, user_inputs, workflow_name, step):
+        def process(context, user_inputs, workflow_name, api_endpoint, api_key, step):
             selected_workflow = next(wf for wf in workflows if wf['name'] == workflow_name)
 
             # Build up the context from previous steps
@@ -1011,42 +1020,69 @@ def chat_workflows_tab():
                 if i < step:
                     full_context += f"AI Output: {output_boxes[i].value}\n\n"
 
-            result = process_with_llm(workflow_name, full_context, selected_workflow['prompts'][step])
+            result = process_with_llm(workflow_name, full_context, selected_workflow['prompts'][step], api_endpoint,
+                                      api_key)
 
             prompt_updates = [gr.update() for _ in range(max_steps)]
             input_updates = []
             output_updates = [gr.update() for _ in range(max_steps)]
             button_updates = []
+            regenerate_updates = []
 
             for i in range(len(selected_workflow['prompts'])):
-                if i == step + 1:
+                if i == step:
+                    regenerate_updates.append(gr.update(visible=True))
+                elif i == step + 1:
                     input_updates.append(gr.update(interactive=True))
                     button_updates.append(gr.update(visible=True))
+                    regenerate_updates.append(gr.update(visible=False))
                 elif i > step + 1:
                     input_updates.append(gr.update(interactive=False))
                     button_updates.append(gr.update(visible=False))
+                    regenerate_updates.append(gr.update(visible=False))
                 else:
                     input_updates.append(gr.update(interactive=False))
                     button_updates.append(gr.update(visible=False))
+                    regenerate_updates.append(gr.update(visible=True))
 
-            return [result] + prompt_updates + input_updates + output_updates + button_updates
+            return [result] + prompt_updates + input_updates + output_updates + button_updates + regenerate_updates
 
         # Set up event handlers
         workflow_selector.change(
             update_workflow_ui,
             inputs=[workflow_selector],
-            outputs=prompt_displays + user_inputs + output_boxes + process_buttons
+            outputs=prompt_displays + user_inputs + output_boxes + process_buttons + regenerate_buttons
         )
 
         # Set up process button click events
         for i, button in enumerate(process_buttons):
             button.click(
-                fn=lambda context, *user_inputs, wf_name, step=i: process(context, user_inputs, wf_name, step),
-                inputs=[context_input] + user_inputs + [workflow_selector],
-                outputs=[output_boxes[i]] + prompt_displays + user_inputs + output_boxes + process_buttons
+                fn=lambda context, *user_inputs, wf_name, api_endpoint, api_key, step=i: process(context, user_inputs,
+                                                                                                 wf_name, api_endpoint,
+                                                                                                 api_key, step),
+                inputs=[context_input] + user_inputs + [workflow_selector, api_selector, api_key_input],
+                outputs=[output_boxes[
+                             i]] + prompt_displays + user_inputs + output_boxes + process_buttons + regenerate_buttons
             )
 
-    return workflow_selector, context_input, dynamic_components
+        # Set up regenerate button click events
+        for i, button in enumerate(regenerate_buttons):
+            button.click(
+                fn=lambda context, *user_inputs, wf_name, api_endpoint, api_key, step=i: process(context, user_inputs,
+                                                                                                 wf_name, api_endpoint,
+                                                                                                 api_key, step),
+                inputs=[context_input] + user_inputs + [workflow_selector, api_selector, api_key_input],
+                outputs=[output_boxes[
+                             i]] + prompt_displays + user_inputs + output_boxes + process_buttons + regenerate_buttons
+            )
+
+    return workflow_selector, api_selector, api_key_input, context_input, dynamic_components
+
+
+# Mock function to simulate LLM processing
+def process_with_llm(workflow, context, prompt, api_endpoint, api_key):
+    api_key_snippet = api_key[:5] + "..." if api_key else "Not provided"
+    return f"LLM output using {api_endpoint} (API Key: {api_key_snippet}) for {workflow} with context: {context[:30]}... and prompt: {prompt[:30]}..."
 
 #
 # End of Chat_ui.py
