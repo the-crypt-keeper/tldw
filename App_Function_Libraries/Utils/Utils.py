@@ -93,11 +93,12 @@ def cleanup_downloads():
 # Config loading
 #
 
+
 def load_comprehensive_config():
     # Get the directory of the current script
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    # Go up one level to the project root directory
-    project_root = os.path.dirname(current_dir)
+    # Go up two levels to the project root directory
+    project_root = os.path.dirname(os.path.dirname(current_dir))
     # Construct the path to the config file in the project root directory
     config_path = os.path.join(project_root, 'config.txt')
     # Create a ConfigParser object

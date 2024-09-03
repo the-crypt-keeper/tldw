@@ -8,6 +8,8 @@ import requests
 from chromadb import Settings
 
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
+from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media
+from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
 
 #######################################################################################################################
 #
@@ -75,14 +77,12 @@ def process_and_store_content(content: str, collection_name: str, media_id: int)
     # Store the texts, embeddings, and IDs in ChromaDB
     store_in_chroma(collection_name, texts, embeddings, ids)
 
-    # Store the chunks in SQLite FTS as well
-    from App_Function_Libraries.DB_Manager import db
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        for text in texts:
-            cursor.execute("INSERT INTO media_fts (content) VALUES (?)", (text,))
-        conn.commit()
+    # Store the chunk metadata in SQLite
+    for i, chunk in enumerate(chunks):
+        add_media_chunk(media_id, chunk['text'], chunk['start'], chunk['end'], ids[i])
 
+    # Update the FTS table
+    update_fts_for_media(media_id)
 
 # Function to store documents and their embeddings in ChromaDB
 def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str]):
@@ -105,20 +105,17 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[str]:
 
 
 def create_embedding(text: str) -> List[float]:
+    global embedding_provider, embedding_model, embedding_api_url, embedding_api_key
+
     if embedding_provider == 'openai':
-        import openai
-        openai.api_key = embedding_api_key
-        response = openai.Embedding.create(input=text, model=embedding_model)
-        return response['data'][0]['embedding']
+        return get_openai_embeddings(text, embedding_model)
     elif embedding_provider == 'local':
-        # FIXME - This is a placeholder for API calls to a local embedding model
         response = requests.post(
             embedding_api_url,
             json={"text": text, "model": embedding_model},
             headers={"Authorization": f"Bearer {embedding_api_key}"}
         )
         return response.json()['embedding']
-    # FIXME - this seems correct, but idk....
     elif embedding_provider == 'huggingface':
         from transformers import AutoTokenizer, AutoModel
         import torch
@@ -137,11 +134,8 @@ def create_embedding(text: str) -> List[float]:
         raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
 
 
-def create_all_embeddings(api_choice: str) -> str:
+def create_all_embeddings(api_choice: str, model_or_url: str) -> str:
     try:
-        global embedding_provider
-        embedding_provider = api_choice
-
         all_content = get_all_content_from_database()
 
         if not all_content:
@@ -167,7 +161,10 @@ def create_all_embeddings(api_choice: str) -> str:
                 continue  # Skip if embedding already exists
 
             # Create the embedding
-            embedding = create_embedding(text)
+            if api_choice == "openai":
+                embedding = create_openai_embedding(text, model_or_url)
+            else:  # Llama.cpp
+                embedding = create_llamacpp_embedding(text, model_or_url)
 
             # Collect the text, embedding, and ID for batch storage
             texts_to_embed.append(text)
@@ -184,6 +181,23 @@ def create_all_embeddings(api_choice: str) -> str:
         return f"Error: {str(e)}"
 
 
+def create_openai_embedding(text: str, model: str) -> List[float]:
+    openai_api_key = config['API']['openai_api_key']
+    embedding = get_openai_embeddings(text, model)
+    return embedding
+
+
+def create_llamacpp_embedding(text: str, api_url: str) -> List[float]:
+    response = requests.post(
+        api_url,
+        json={"input": text}
+    )
+    if response.status_code == 200:
+        return response.json()['embedding']
+    else:
+        raise Exception(f"Error from Llama.cpp API: {response.text}")
+
+
 def get_all_content_from_database() -> List[Dict[str, Any]]:
     """
     Retrieve all media content from the database that requires embedding.
@@ -192,7 +206,7 @@ def get_all_content_from_database() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: A list of dictionaries, each containing the media ID, content, title, and other relevant fields.
     """
     try:
-        from App_Function_Libraries.DB_Manager import db
+        from App_Function_Libraries.DB.DB_Manager import db
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -218,8 +232,55 @@ def get_all_content_from_database() -> List[Dict[str, Any]]:
 
     except sqlite3.Error as e:
         logging.error(f"Error retrieving all content from database: {e}")
-        from App_Function_Libraries.SQLite_DB import DatabaseError
+        from App_Function_Libraries.DB.SQLite_DB import DatabaseError
         raise DatabaseError(f"Error retrieving all content from database: {e}")
+
+
+def store_in_chroma_with_citation(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], sources: List[str]):
+    collection = chroma_client.get_or_create_collection(name=collection_name)
+    collection.add(
+        documents=texts,
+        embeddings=embeddings,
+        ids=ids,
+        metadatas=[{'source': source} for source in sources]
+    )
+
+
+def check_embedding_status(selected_item):
+    if not selected_item:
+        return "Please select an item", ""
+    item_id = selected_item.split('(')[0].strip()
+    collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
+    result = collection.get(ids=[f"doc_{item_id}"])
+    if result['ids']:
+        embedding = result['embeddings'][0]
+        embedding_preview = str(embedding[:50])  # Convert first 50 elements to string
+        return f"Embedding exists for item: {item_id}", f"Embedding preview: {embedding_preview}..."
+    else:
+        return f"No embedding found for item: {item_id}", ""
+
+
+def create_new_embedding(selected_item, api_choice, openai_model, llamacpp_url):
+    if not selected_item:
+        return "Please select an item"
+    item_id = selected_item.split('(')[0].strip()
+    items = get_all_content_from_database()
+    item = next((item for item in items if item['title'] == item_id), None)
+    if not item:
+        return f"Item not found: {item_id}"
+
+    try:
+        if api_choice == "OpenAI":
+            embedding = create_embedding(item['content'])
+        else:  # Llama.cpp
+            embedding = create_embedding(item['content'])
+
+        collection_name = "all_content_embeddings"
+        store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item['id']}"])
+        return f"New embedding created and stored for item: {item_id}"
+    except Exception as e:
+        return f"Error creating embedding: {str(e)}"
+
 
 #
 # End of Functions for ChromaDB

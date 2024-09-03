@@ -6,24 +6,25 @@
 #
 ####
 # Import necessary libraries
+import hashlib
 import logging
 import re
-
-from typing import List, Optional, Tuple, Dict, Any
-
-from openai import OpenAI
-from tqdm import tqdm
+from typing import Any, Dict, List, Optional, Tuple
 #
 # Import 3rd party
+from openai import OpenAI
+from tqdm import tqdm
+from langdetect import detect
 from transformers import GPT2Tokenizer
 import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import textstat
 #
 # Import Local
 from App_Function_Libraries.Tokenization_Methods_Lib import openai_tokenize
-from App_Function_Libraries.Utils import load_comprehensive_config
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 
 
 #
@@ -43,6 +44,15 @@ tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 config = load_comprehensive_config()
 openai_api_key = config.get('API', 'openai_api_key', fallback=None)
 
+
+def detect_language(text: str) -> str:
+    try:
+        return detect(text)
+    except:
+        # Default to English if detection fails
+        return 'en'
+
+
 def load_document(file_path):
     with open(file_path, 'r') as file:
         text = file.read()
@@ -51,20 +61,27 @@ def load_document(file_path):
 
 def improved_chunking_process(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:
     chunk_method = chunk_options.get('method', 'words')
-    max_chunk_size = chunk_options.get('max_size', 300)
+    base_size = chunk_options.get('base_size', 1000)
+    min_size = chunk_options.get('min_size', 100)
+    max_size = chunk_options.get('max_size', 2000)
     overlap = chunk_options.get('overlap', 0)
-    language = chunk_options.get('language', 'english')
+    language = chunk_options.get('language', None)
     adaptive = chunk_options.get('adaptive', False)
     multi_level = chunk_options.get('multi_level', False)
 
+    if language is None:
+        language = detect_language(text)
+
     if adaptive:
-        max_chunk_size = adaptive_chunk_size(text, max_chunk_size)
+        max_chunk_size = adaptive_chunk_size(text, base_size, min_size, max_size)
+    else:
+        max_chunk_size = base_size
 
     if multi_level:
         chunks = multi_level_chunking(text, chunk_method, max_chunk_size, overlap, language)
     else:
         if chunk_method == 'words':
-            chunks = chunk_text_by_words(text, max_chunk_size, overlap)
+            chunks = chunk_text_by_words(text, max_chunk_size, overlap, language)
         elif chunk_method == 'sentences':
             chunks = chunk_text_by_sentences(text, max_chunk_size, overlap, language)
         elif chunk_method == 'paragraphs':
@@ -77,15 +94,23 @@ def improved_chunking_process(text: str, chunk_options: Dict[str, Any]) -> List[
             # No chunking applied
             chunks = [text]
 
-    return [{'text': chunk, 'metadata': get_chunk_metadata(chunk, text)} for chunk in chunks]
+    chunks_with_metadata = []
+    for i, chunk in enumerate(chunks):
+        metadata = get_chunk_metadata(
+            chunk,
+            text,
+            chunk_type=chunk_method,
+            language=language
+        )
+        metadata['chunk_index'] = i
+        metadata['total_chunks'] = len(chunks)
 
+        chunks_with_metadata.append({
+            'text': chunk,
+            'metadata': metadata
+        })
 
-def adaptive_chunk_size(text: str, base_size: int) -> int:
-    # Simple adaptive logic: adjust chunk size based on text complexity
-    avg_word_length = sum(len(word) for word in text.split()) / len(text.split())
-    if avg_word_length > 6:  # Arbitrary threshold for "complex" text
-        return int(base_size * 0.8)  # Reduce chunk size for complex text
-    return base_size
+    return chunks_with_metadata
 
 
 def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, language: str) -> List[str]:
@@ -96,7 +121,7 @@ def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, la
     chunks = []
     for para in paragraphs:
         if method == 'words':
-            chunks.extend(chunk_text_by_words(para, max_size, overlap))
+            chunks.extend(chunk_text_by_words(para, max_size, overlap, language))
         elif method == 'sentences':
             chunks.extend(chunk_text_by_sentences(para, max_size, overlap, language))
         else:
@@ -105,8 +130,20 @@ def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, la
     return chunks
 
 
-def chunk_text_by_words(text: str, max_words: int = 300, overlap: int = 0) -> List[str]:
-    words = text.split()
+def chunk_text_by_words(text: str, max_words: int = 300, overlap: int = 0, language: str = None) -> List[str]:
+    if language is None:
+        language = detect_language(text)
+
+    if language.startswith('zh'):  # Chinese
+        import jieba
+        words = list(jieba.cut(text))
+    elif language == 'ja':  # Japanese
+        import fugashi
+        tagger = fugashi.Tagger()
+        words = [word.surface for word in tagger(text)]
+    else:  # Default to simple splitting for other languages
+        words = text.split()
+
     chunks = []
     for i in range(0, len(words), max_words - overlap):
         chunk = ' '.join(words[i:i + max_words])
@@ -114,10 +151,22 @@ def chunk_text_by_words(text: str, max_words: int = 300, overlap: int = 0) -> Li
     return post_process_chunks(chunks)
 
 
-def chunk_text_by_sentences(text: str, max_sentences: int = 10, overlap: int = 0, language: str = 'english') -> List[
-    str]:
+def chunk_text_by_sentences(text: str, max_sentences: int = 10, overlap: int = 0, language: str = None) -> List[str]:
+    if language is None:
+        language = detect_language(text)
+
     nltk.download('punkt', quiet=True)
-    sentences = nltk.sent_tokenize(text, language=language)
+
+    if language.startswith('zh'):  # Chinese
+        import jieba
+        sentences = list(jieba.cut(text, cut_all=False))
+    elif language == 'ja':  # Japanese
+        import fugashi
+        tagger = fugashi.Tagger()
+        sentences = [word.surface for word in tagger(text) if word.feature.pos1 in ['記号', '補助記号'] and word.surface.strip()]
+    else:  # Default to NLTK for other languages
+        sentences = sent_tokenize(text, language=language)
+
     chunks = []
     for i in range(0, len(sentences), max_sentences - overlap):
         chunk = ' '.join(sentences[i:i + max_sentences])
@@ -162,23 +211,49 @@ def post_process_chunks(chunks: List[str]) -> List[str]:
     return [chunk.strip() for chunk in chunks if chunk.strip()]
 
 
-def get_chunk_metadata(chunk: str, full_text: str, chunk_type: str = "generic", chapter_number: Optional[int] = None, chapter_pattern: Optional[str] = None) -> Dict[str, Any]:
+def get_chunk_metadata(chunk: str, full_text: str, chunk_type: str = "generic",
+                       chapter_number: Optional[int] = None,
+                       chapter_pattern: Optional[str] = None,
+                       language: str = None) -> Dict[str, Any]:
     try:
         start_index = full_text.index(chunk)
+        end_index = start_index + len(chunk)
+        # Calculate a hash for the chunk
+        chunk_hash = hashlib.md5(chunk.encode()).hexdigest()
+
         metadata = {
             'start_index': start_index,
-            'end_index': start_index + len(chunk),
+            'end_index': end_index,
             'word_count': len(chunk.split()),
             'char_count': len(chunk),
-            'chunk_type': chunk_type
+            'chunk_type': chunk_type,
+            'language': language,
+            'chunk_hash': chunk_hash,
+            'relative_position': start_index / len(full_text),
+            'readability_score': textstat.flesch_reading_ease(chunk)
         }
+
         if chunk_type == "chapter":
             metadata['chapter_number'] = chapter_number
             metadata['chapter_pattern'] = chapter_pattern
+
+        # Add readability score (you might need to install 'textstat')
+        metadata['readability_score'] = textstat.flesch_reading_ease(chunk)
+
         return metadata
     except ValueError as e:
         logging.error(f"Chunk not found in full_text: {chunk[:50]}... Full text length: {len(full_text)}")
         raise
+
+
+def process_document_with_metadata(text: str, chunk_options: Dict[str, Any],
+                                   document_metadata: Dict[str, Any]) -> Dict[str, Any]:
+    chunks = improved_chunking_process(text, chunk_options)
+
+    return {
+        'document_metadata': document_metadata,
+        'chunks': chunks
+    }
 
 
 # Hybrid approach, chunk each sentence while ensuring total token size does not exceed a maximum number
@@ -214,6 +289,9 @@ def chunk_on_delimiter(input_string: str,
         print(f"Warning: {dropped_chunk_count} chunks were dropped due to exceeding the token limit.")
     combined_chunks = [f"{chunk}{delimiter}" for chunk in combined_chunks]
     return combined_chunks
+
+
+
 
 # ????FIXME
 def recursive_summarize_chunks(chunks, summarize_func, custom_prompt, temp=None, system_prompt=None):
@@ -273,7 +351,7 @@ Natural language processing has its roots in the 1950s. Already in 1950, Alan Tu
 #
 
 # Chunk text into segments based on semantic similarity
-def count_units(text, unit='tokens'):
+def count_units(text, unit='words'):
     if unit == 'words':
         return len(text.split())
     elif unit == 'tokens':
@@ -321,21 +399,20 @@ def semantic_chunking(text, max_chunk_size=2000, unit='words'):
     return chunks
 
 
-def semantic_chunk_long_file(file_path, max_chunk_size=1000, overlap=100):
+def semantic_chunk_long_file(file_path, max_chunk_size=1000, overlap=100, unit='words'):
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             content = file.read()
 
-        chunks = semantic_chunking(content, max_chunk_size, overlap)
+        chunks = semantic_chunking(content, max_chunk_size, unit)
         return chunks
     except Exception as e:
         logging.error(f"Error chunking text file: {str(e)}")
         return None
+
+#
+#
 #######################################################################################################################
-
-
-
-
 
 
 #######################################################################################################################
@@ -361,7 +438,7 @@ def combine_chunks_with_no_minimum(
         chunk_delimiter="\n\n",
         header: Optional[str] = None,
         add_ellipsis_for_overflow=False,
-) -> Tuple[List[str], List[int]]:
+) -> Tuple[List[str], List[List[int]], int]:
     dropped_chunk_count = 0
     output = []  # list to hold the final combined chunks
     output_indices = []  # list to hold the indices of the final combined chunks
@@ -579,7 +656,108 @@ def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Di
 #         print(chunk['text'])
 #         print(f"Metadata: {chunk['metadata']}\n")
 
+#
+# End of ebook chapter chunking
+#######################################################################################################################
 
+#######################################################################################################################
+#
+# Functions for adapative chunking:
+
+# FIXME - punkt
+def adaptive_chunk_size(text: str, base_size: int = 1000, min_size: int = 500, max_size: int = 2000) -> int:
+    # Ensure NLTK data is downloaded
+    nltk.download('punkt', quiet=True)
+
+    # Tokenize the text into sentences
+    sentences = sent_tokenize(text)
+
+    # Calculate average sentence length
+    avg_sentence_length = sum(len(s.split()) for s in sentences) / len(sentences)
+
+    # Adjust chunk size based on average sentence length
+    if avg_sentence_length < 10:
+        size_factor = 1.2  # Increase chunk size for short sentences
+    elif avg_sentence_length > 20:
+        size_factor = 0.8  # Decrease chunk size for long sentences
+    else:
+        size_factor = 1.0
+
+    # Calculate adaptive chunk size
+    adaptive_size = int(base_size * size_factor)
+
+    # Ensure chunk size is within bounds
+    return max(min_size, min(adaptive_size, max_size))
+
+# Non-Punkt version
+# def adaptive_chunk_size(text: str, base_size: int, min_size: int = 100, max_size: int = 2000) -> int:
+#     # Adaptive logic: adjust chunk size based on text complexity
+#     words = text.split()
+#     if not words:
+#         return base_size  # Return base_size if text is empty
+#
+#     avg_word_length = sum(len(word) for word in words) / len(words)
+#
+#     if avg_word_length > 6:  # Threshold for "complex" text
+#         adjusted_size = int(base_size * 0.8)  # Reduce chunk size for complex text
+#     elif avg_word_length < 4:  # Threshold for "simple" text
+#         adjusted_size = int(base_size * 1.2)  # Increase chunk size for simple text
+#     else:
+#         adjusted_size = base_size
+#
+#     # Ensure the chunk size is within the specified range
+#     return max(min_size, min(adjusted_size, max_size))
+
+
+def adaptive_chunking(text: str, base_size: int = 1000, min_size: int = 500, max_size: int = 2000) -> List[str]:
+    chunk_size = adaptive_chunk_size(text, base_size, min_size, max_size)
+    words = text.split()
+    chunks = []
+    current_chunk = []
+    current_length = 0
+
+    for word in words:
+        if current_length + len(word) > chunk_size and current_chunk:
+            chunks.append(' '.join(current_chunk))
+            current_chunk = []
+            current_length = 0
+        current_chunk.append(word)
+        current_length += len(word) + 1  # +1 for space
+
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
+
+    return chunks
+
+# FIXME - usage example
+# chunk_options = {
+#     'method': 'words',  # or any other method
+#     'base_size': 1000,
+#     'min_size': 100,
+#     'max_size': 2000,
+#     'adaptive': True,
+#     'language': 'en'
+# }
+#chunks = improved_chunking_process(your_text, chunk_options)
+
+
+# Example of chunking a document with metadata
+# document_metadata = {
+#     'title': 'Example Document',
+#     'author': 'John Doe',
+#     'creation_date': '2023-06-14',
+#     'source': 'https://example.com/document',
+#     'document_type': 'article'
+# }
+#
+# chunk_options = {
+#     'method': 'sentences',
+#     'base_size': 1000,
+#     'adaptive': True,
+#     'language': 'en'
+# }
+#
+# processed_document = process_document_with_metadata(your_text, chunk_options, document_metadata)
 
 
 #

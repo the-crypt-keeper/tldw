@@ -58,7 +58,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any
 # Local Libraries
-from App_Function_Libraries.Utils import is_valid_url
+from App_Function_Libraries.Utils.Utils import is_valid_url
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
@@ -337,10 +337,9 @@ def create_tables(db) -> None:
             chunk_text TEXT,
             start_index INTEGER,
             end_index INTEGER,
-            vector_embedding BLOB,
+            chunk_id TEXT,
             FOREIGN KEY (media_id) REFERENCES Media(id)
-        )
-        ''',
+        )''',
         '''
         CREATE TABLE IF NOT EXISTS UnvectorizedMediaChunks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -356,7 +355,17 @@ def create_tables(db) -> None:
             metadata TEXT,
             FOREIGN KEY (media_id) REFERENCES Media(id)
         )
+        ''',
         '''
+        CREATE TABLE IF NOT EXISTS DocumentVersions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER NOT NULL,
+            version_number INTEGER NOT NULL,
+            content TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (media_id) REFERENCES Media(id)
+        )
+        ''',
     ]
 
     index_queries = [
@@ -379,7 +388,9 @@ def create_tables(db) -> None:
         'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_chunk_type ON UnvectorizedMediaChunks(chunk_type)',
         # CREATE UNIQUE INDEX statements
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url)',
-        'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id)'
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id)',
+        'CREATE INDEX IF NOT EXISTS idx_document_versions_media_id ON DocumentVersions(media_id)',
+        'CREATE INDEX IF NOT EXISTS idx_document_versions_version_number ON DocumentVersions(version_number)',
     ]
 
     virtual_table_queries = [
@@ -481,6 +492,30 @@ def check_media_and_whisper_model(title=None, url=None, current_whisper_model=No
         return False, f"Media found with same whisper model (ID: {media_id})"
 
 
+def sqlite_add_media_chunk(db, media_id: int, chunk_text: str, start_index: int, end_index: int, chunk_id: str):
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id) VALUES (?, ?, ?, ?, ?)",
+            (media_id, chunk_text, start_index, end_index, chunk_id)
+        )
+        conn.commit()
+
+def sqlite_update_fts_for_media(db, media_id: int):
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO media_fts (rowid, title, content) SELECT id, title, content FROM Media WHERE id = ?", (media_id,))
+        conn.commit()
+
+
+def sqlite_get_unprocessed_media(db):
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, content, type FROM Media WHERE id NOT IN (SELECT DISTINCT media_id FROM MediaChunks)")
+        return cursor.fetchall()
+
+#
+# End of Media-related Functions
 #######################################################################################################################
 # Keyword-related Functions
 #
@@ -823,7 +858,7 @@ def add_media_version(media_id: int, prompt: str, summary: str) -> None:
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
-def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
+def sqlite_search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
     if page < 1:
         raise ValueError("Page number must be 1 or greater.")
 
@@ -874,7 +909,7 @@ def search_db(search_query: str, search_fields: List[str], keywords: str, page: 
 
 # Gradio function to handle user input and display results with pagination, with better feedback
 def search_and_display(search_query, search_fields, keywords, page):
-    results = search_db(search_query, search_fields, keywords, page)
+    results = sqlite_search_db(search_query, search_fields, keywords, page)
 
     if isinstance(results, pd.DataFrame):
         # Convert DataFrame to a list of tuples or lists
@@ -952,7 +987,7 @@ def format_results(results):
 # Function to export search results to CSV or markdown with pagination
 def export_to_file(search_query: str, search_fields: List[str], keyword: str, page: int = 1, results_per_file: int = 1000, export_format: str = 'csv'):
     try:
-        results = search_db(search_query, search_fields, keyword, page, results_per_file)
+        results = sqlite_search_db(search_query, search_fields, keyword, page, results_per_file)
         if not results:
             return "No results found to export."
 
@@ -998,6 +1033,7 @@ def is_valid_date(date_string: str) -> bool:
         return True
     except ValueError:
         return False
+
 
 # Add ingested media to DB
 def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
@@ -1076,6 +1112,9 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
             logging.info("Adding new media version")
             add_media_version(media_id, custom_prompt_input, summary)
 
+            # Create initial document version
+            create_document_version(media_id, content)
+
             conn.commit()
 
         logging.info(f"Media '{info_dict.get('title', 'Untitled')}' successfully added/updated with ID: {media_id}")
@@ -1088,44 +1127,6 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
     except Exception as e:
         logging.error(f"Unexpected Error: {e}")
         raise DatabaseError(f"Unexpected error: {e}")
-# def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
-#     try:
-#         # Extract content from segments
-#         if isinstance(segments, list):
-#             content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
-#         elif isinstance(segments, dict):
-#             content = segments.get('text', '') or segments.get('content', '')
-#         else:
-#             content = str(segments)
-#
-#         logging.debug(f"Extracted content (first 500 chars): {content[:500]}")
-#
-#         # Set default custom prompt if not provided
-#         if custom_prompt_input is None:
-#             custom_prompt_input = """No Custom Prompt Provided or Was Used."""
-#
-#         logging.info(f"Adding media to database: URL={url}, Title={info_dict.get('title', 'Untitled')}, Type={media_type}")
-#
-#         result = add_media_with_keywords(
-#             url=url,
-#             title=info_dict.get('title', 'Untitled'),
-#             media_type=media_type,
-#             content=content,
-#             keywords=','.join(keywords) if isinstance(keywords, list) else keywords,
-#             prompt=custom_prompt_input or 'No prompt provided',
-#             summary=summary or 'No summary provided',
-#             transcription_model=whisper_model,
-#             author=info_dict.get('uploader', 'Unknown'),
-#             ingestion_date=datetime.now().strftime('%Y-%m-%d')
-#         )
-#
-#         logging.info(f"Media added successfully: {result}")
-#         return result
-#
-#     except Exception as e:
-#         logging.error(f"Error in add_media_to_database: {str(e)}")
-#         raise
-
 
 #
 # End of ....
@@ -1400,14 +1401,18 @@ def update_media_content(selected_item, item_mapping, content_input, prompt_inpu
                         VALUES (?, ?, ?, CURRENT_TIMESTAMP)
                     """, (media_id, prompt_input, summary_input))
 
+                # Create new document version
+                new_version = create_document_version(media_id, content_input)
+
                 conn.commit()
 
-            return f"Content updated successfully for media ID: {media_id}"
+            return f"Content updated successfully for media ID: {media_id}. New version: {new_version}"
         else:
             return "No item selected or invalid selection"
     except Exception as e:
         logging.error(f"Error updating media content: {e}")
         return f"Error updating content: {str(e)}"
+
 
 def search_media_database(query: str) -> List[Tuple[int, str, str]]:
     try:
@@ -2012,4 +2017,73 @@ def user_delete_item(media_id: int, force: bool = False) -> str:
 #
 # End of Functions to handle deletion of media items
 #######################################################################################################################
+#
+# Functions to manage document versions
 
+def create_document_version(media_id: int, content: str) -> int:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get the latest version number
+            cursor.execute('''
+                SELECT MAX(version_number) 
+                FROM DocumentVersions 
+                WHERE media_id = ?
+            ''', (media_id,))
+
+            latest_version = cursor.fetchone()[0] or 0
+            new_version = latest_version + 1
+
+            # Insert new version
+            cursor.execute('''
+                INSERT INTO DocumentVersions (media_id, version_number, content)
+                VALUES (?, ?, ?)
+            ''', (media_id, new_version, content))
+
+            conn.commit()
+            return new_version
+    except sqlite3.Error as e:
+        logging.error(f"Error creating document version: {e}")
+        raise DatabaseError(f"Error creating document version: {e}")
+
+
+def get_document_version(media_id: int, version_number: int = None) -> Dict[str, Any]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            if version_number is None:
+                # Get the latest version
+                cursor.execute('''
+                    SELECT id, version_number, content, created_at
+                    FROM DocumentVersions
+                    WHERE media_id = ?
+                    ORDER BY version_number DESC
+                    LIMIT 1
+                ''', (media_id,))
+            else:
+                cursor.execute('''
+                    SELECT id, version_number, content, created_at
+                    FROM DocumentVersions
+                    WHERE media_id = ? AND version_number = ?
+                ''', (media_id, version_number))
+
+            result = cursor.fetchone()
+
+            if result:
+                return {
+                    'id': result[0],
+                    'version_number': result[1],
+                    'content': result[2],
+                    'created_at': result[3]
+                }
+            else:
+                return None
+    except sqlite3.Error as e:
+        logging.error(f"Error retrieving document version: {e}")
+        raise DatabaseError(f"Error retrieving document version: {e}")
+
+#
+# End of Functions to manage document versions
+#######################################################################################################################

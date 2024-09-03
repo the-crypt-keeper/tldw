@@ -7,7 +7,7 @@
 import gradio as gr
 
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
-from App_Function_Libraries.DB_Manager import load_preset_prompts
+from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 
 

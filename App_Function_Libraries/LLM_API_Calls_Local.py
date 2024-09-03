@@ -4,10 +4,11 @@
 # This library is used to perform summarization with a 'local' inference engine.
 #
 ####
+from typing import Union
 
 ####################
 # Function List
-# FIXME - UPDATE Function Arguments
+# FIXME - UPDATE
 # 1. chat_with_local_llm(text, custom_prompt_arg)
 # 2. chat_with_llama(api_url, text, token, custom_prompt)
 # 3. chat_with_kobold(api_url, text, kobold_api_token, custom_prompt)
@@ -20,7 +21,7 @@
 ####################
 # Import necessary libraries
 # Import Local
-from Utils import *
+from App_Function_Libraries.Utils.Utils import *
 #
 #######################################################################################################################
 # Function Definitions
@@ -399,8 +400,205 @@ def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="h
         return "Error summarizing with Aphrodite."
 
 
-def chat_with_ollama(input_data, prompt, temp, system_message):
-    pass
+# FIXME
+def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/api/generate", api_key=None, temp=None, system_message=None, model=None):
+    try:
+        logging.debug("ollama: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            ollama_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                ollama_api_key = api_key
+                logging.info("Ollama: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                ollama_api_key = loaded_config_data['api_keys'].get('ollama')
+                if ollama_api_key:
+                    logging.info("Ollama: Using API key from config file")
+                else:
+                    logging.warning("Ollama: No API key found in config file")
+
+        model = loaded_config_data['models']['ollama']
+
+        # Load transcript
+        logging.debug("Ollama: Loading JSON data")
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("Ollama: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("Ollama: Using provided string data for summarization")
+            data = input_data
+
+        logging.debug(f"Ollama: Loaded data: {data}")
+        logging.debug(f"Ollama: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("Ollama: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Ollama: Invalid input data format")
+
+        headers = {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+        }
+        if len(ollama_api_key) > 5:
+            headers['Authorization'] = f'Bearer {ollama_api_key}'
+
+        ollama_prompt = f"{custom_prompt} \n\n\n\n{text}"
+        if system_message is None:
+            system_message = "You are a helpful AI assistant."
+        logging.debug(f"llama: Prompt being sent is {ollama_prompt}")
+        if system_message is None:
+            system_message = "You are a helpful AI assistant."
+
+        data = {
+            "model": model,
+            "messages": [
+                {"role": "system",
+                 "content": system_message
+                 },
+                {"role": "user",
+                 "content": ollama_prompt
+                 }
+            ],
+        }
+
+        logging.debug("Ollama: Submitting request to API endpoint")
+        print("Ollama: Submitting request to API endpoint")
+        response = requests.post(api_url, headers=headers, json=data)
+        response_data = response.json()
+        logging.debug("API Response Data: %s", response_data)
+
+        if response.status_code == 200:
+            # if 'X' in response_data:
+            logging.debug(response_data)
+            summary = response_data['content'].strip()
+            logging.debug("Ollama: Chat request successful")
+            print("\n\nChat request successful.")
+            return summary
+        else:
+            logging.error(f"\n\nOllama: API request failed with status code {response.status_code}: {response.text}")
+            return f"Ollama: API request failed: {response.text}"
+
+    except Exception as e:
+        logging.error("\n\nOllama: Error in processing: %s", str(e))
+        return f"Ollama: Error occurred while processing summary with ollama: {str(e)}"
+
+def chat_with_vllm(
+        input_data: Union[str, dict, list],
+        custom_prompt_input: str,
+        api_key: str = None,
+        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions",
+        model: str = None,
+        system_prompt: str = None,
+        temp: float = 0.7
+) -> str:
+    logging.debug("vLLM: Summarization process starting...")
+    try:
+        logging.debug("vLLM: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            vllm_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                vllm_api_key = api_key
+                logging.info("vLLM: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                vllm_api_key = loaded_config_data['api_keys'].get('vllm')
+                if vllm_api_key:
+                    logging.info("vLLM: Using API key from config file")
+                else:
+                    logging.warning("vLLM: No API key found in config file")
+
+        logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:]}")
+        # Process input data
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("vLLM: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("vLLM: Using provided data for summarization")
+            data = input_data
+
+        logging.debug(f"vLLM: Type of data: {type(data)}")
+
+        # Extract text for summarization
+        if isinstance(data, dict) and 'summary' in data:
+            logging.debug("vLLM: Summary already exists in the loaded data")
+            return data['summary']
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
+        elif isinstance(data, str):
+            text = data
+        elif isinstance(data, dict):
+            text = json.dumps(data)
+        else:
+            raise ValueError("Invalid input data format")
+
+        logging.debug(f"vLLM: Extracted text (showing first 500 chars): {text[:500]}...")
+
+        if system_prompt is None:
+            system_prompt = "You are a helpful AI assistant."
+
+        model = model or loaded_config_data['models']['vllm']
+        if system_prompt is None:
+            system_prompt = "You are a helpful AI assistant."
+
+        # Prepare the API request
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"{custom_prompt_input}\n\n{text}"}
+            ]
+        }
+
+        # Make the API call
+        logging.debug(f"vLLM: Sending request to {vllm_api_url}")
+        response = requests.post(vllm_api_url, headers=headers, json=payload)
+
+        # Check for successful response
+        response.raise_for_status()
+
+        # Extract and return the summary
+        response_data = response.json()
+        if 'choices' in response_data and len(response_data['choices']) > 0:
+            summary = response_data['choices'][0]['message']['content']
+            logging.debug("vLLM: Summarization successful")
+            logging.debug(f"vLLM: Summary (first 500 chars): {summary[:500]}...")
+            return summary
+        else:
+            raise ValueError("Unexpected response format from vLLM API")
+
+    except requests.RequestException as e:
+        logging.error(f"vLLM: API request failed: {str(e)}")
+        return f"Error: vLLM API request failed - {str(e)}"
+    except json.JSONDecodeError as e:
+        logging.error(f"vLLM: Failed to parse API response: {str(e)}")
+        return f"Error: Failed to parse vLLM API response - {str(e)}"
+    except Exception as e:
+        logging.error(f"vLLM: Unexpected error during summarization: {str(e)}")
+        return f"Error: Unexpected error during vLLM summarization - {str(e)}"
 
 
 def save_summary_to_file(summary, file_path):
