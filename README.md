@@ -1,6 +1,6 @@
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 # **tl/dw: Too Long, Didnt Watch** 
-## Download, Transcribe, Summarize & Chat with Video+Audio+Documents+Articles & Books. 
+## Download, Transcribe, Summarize & Chat with your Videos+Audio+Documents+Web Articles & Books. 
 ### All automated. All local. All yours.
 ## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
 - The demo is now blocked by Youtube unless you provide a session cookie for a logged in session. Additionally, there's an ongoing issue with file permissions relating to HF spaces, so the Demo is more of a 'poke around and look' vs 'use it as intended' at the moment.
