@@ -50,6 +50,7 @@
     - **Storage of all the above into a SQLite DB, with search(name/content/author/URL/keyword), tagging, and export functionality.**
     - **Search across all the content you've ingested, and review or modify it using SQLite FTS5 Search.**
       - Ability to tag content with keywords, and search across those tags.
+      - Now also RAG support for search, so you can ask questions about the content you've ingested. (BM25+Vector Embeddings using FTS5 and ChromaDB)
     - **Chat with an LLM about the content you've ingested, or ask questions about it. (Multiple APIs Supported, 15 total)**
       - **APIs Supported:** 
         - **Commercial:** OpenAI / Anthropic / Cohere / DeepSeek / Groq / Mistral / OpenRouter / HuggingFace; 
@@ -97,7 +98,7 @@
     - Firstly, you can check all planned features on the issues page: https://github.com/rmusser01/tldw/issues
     - Anything I come up with or hear about will either just be dropped in, or an issue will be created and then implemented.
     - I plan to add the following in the future in no particular order:
-      - RAG - Retrieval-Augmented Generation support.Naive/basic implementation is in. Would like to expand and build out a test suite for it. 
+      - Better RAG implementation - Retrieval-Augmented Generation support. A naive/basic implementation is in. Would like to expand and build out a test suite for it. 
       - More API support - I want to add support for more APIs, and I want to make it easier to select between private/Public endpoints in the UI
       - Completely new UI - I want to make the UI more user-friendly and more intuitive. (This will come after migration to FastAPI)
         - Gradio is great as PoC, but I think I've shown that this has value and is worth the continued effort.
