@@ -777,6 +777,7 @@ def create_chat_management_tab():
             with gr.TabItem("Edit"):
                 chat_content = gr.TextArea(label="Chat Content (JSON)", lines=20, max_lines=50)
                 save_button = gr.Button("Save Changes")
+                delete_button = gr.Button("Delete Conversation", variant="stop")
 
             with gr.TabItem("Preview"):
                 chat_preview = gr.HTML(label="Chat Preview")
@@ -898,6 +899,38 @@ def create_chat_management_tab():
                 logging.error(f"Unexpected error in save_conversation: {e}")
                 return f"Unexpected error: {str(e)}", "<p>Unexpected error occurred</p>"
 
+        def delete_conversation(selected, conversation_mapping):
+            if not selected or selected not in conversation_mapping:
+                return "Please select a conversation before deleting.", "<p>No changes made</p>", gr.update(choices=[])
+
+            conversation_id = conversation_mapping[selected]
+
+            try:
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+
+                    # Delete messages associated with the conversation
+                    cursor.execute("DELETE FROM ChatMessages WHERE conversation_id = ?", (conversation_id,))
+
+                    # Delete the conversation itself
+                    cursor.execute("DELETE FROM ChatConversations WHERE id = ?", (conversation_id,))
+
+                    conn.commit()
+
+                # Update the conversation list
+                remaining_conversations = [choice for choice in conversation_mapping.keys() if choice != selected]
+                updated_mapping = {choice: conversation_mapping[choice] for choice in remaining_conversations}
+
+                return "Conversation deleted successfully.", "<p>Conversation deleted</p>", gr.update(choices=remaining_conversations)
+            except sqlite3.Error as e:
+                conn.rollback()
+                logging.error(f"Database error in delete_conversation: {e}")
+                return f"Error deleting conversation: {str(e)}", "<p>Error occurred while deleting</p>", gr.update()
+            except Exception as e:
+                conn.rollback()
+                logging.error(f"Unexpected error in delete_conversation: {e}")
+                return f"Unexpected error: {str(e)}", "<p>Unexpected error occurred</p>", gr.update()
+
         def parse_formatted_content(formatted_content):
             lines = formatted_content.split('\n')
             conversation_id = int(lines[0].split(': ')[1])
@@ -938,7 +971,13 @@ def create_chat_management_tab():
             outputs=[result_message, chat_preview]
         )
 
-    return search_query, search_button, conversation_list, conversation_mapping, chat_content, save_button, result_message, chat_preview
+        delete_button.click(
+            delete_conversation,
+            inputs=[conversation_list, conversation_mapping],
+            outputs=[result_message, chat_preview, conversation_list]
+        )
+
+    return search_query, search_button, conversation_list, conversation_mapping, chat_content, save_button, delete_button, result_message, chat_preview
 
 
 # Load workflows from a JSON file
