@@ -105,20 +105,18 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[str]:
 
 
 def create_embedding(text: str) -> List[float]:
+    global embedding_provider, embedding_model, embedding_api_url, embedding_api_key
+
     if embedding_provider == 'openai':
-        import openai
-        openai.api_key = embedding_api_key
-        response = openai.Embedding.create(input=text, model=embedding_model)
+        response = get_openai_embeddings(text, embedding_model)
         return response['data'][0]['embedding']
     elif embedding_provider == 'local':
-        # FIXME - This is a placeholder for API calls to a local embedding model
         response = requests.post(
             embedding_api_url,
             json={"text": text, "model": embedding_model},
             headers={"Authorization": f"Bearer {embedding_api_key}"}
         )
         return response.json()['embedding']
-    # FIXME - this seems correct, but idk....
     elif embedding_provider == 'huggingface':
         from transformers import AutoTokenizer, AutoModel
         import torch
@@ -135,6 +133,8 @@ def create_embedding(text: str) -> List[float]:
         return embeddings[0].tolist()  # Convert to list for consistency
     else:
         raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
+
+
 
 
 def create_all_embeddings(api_choice: str, model_or_url: str) -> str:
@@ -187,7 +187,7 @@ def create_all_embeddings(api_choice: str, model_or_url: str) -> str:
 def create_openai_embedding(text: str, model: str) -> List[float]:
     openai_api_key = config['API']['openai_api_key']
     # FIXME - Use existing API function for this
-    response = get_openai_embeddings(input=text, model=model)
+    response = get_openai_embeddings(text, model)
     return response['data'][0]['embedding']
 
 
@@ -248,6 +248,40 @@ def store_in_chroma_with_citation(collection_name: str, texts: List[str], embedd
         ids=ids,
         metadatas=[{'source': source} for source in sources]
     )
+
+
+def check_embedding_status(selected_item):
+    if not selected_item:
+        return "Please select an item"
+    item_id = selected_item.split('(')[0].strip()
+    collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
+    embedding_exists = len(collection.get(ids=[f"doc_{item_id}"])['ids']) > 0
+    if embedding_exists:
+        return f"Embedding exists for item: {item_id}"
+    else:
+        return f"No embedding found for item: {item_id}"
+
+
+def create_new_embedding(selected_item, api_choice, openai_model, llamacpp_url):
+    if not selected_item:
+        return "Please select an item"
+    item_id = selected_item.split('(')[0].strip()
+    items = get_all_content_from_database()
+    item = next((item for item in items if item['title'] == item_id), None)
+    if not item:
+        return f"Item not found: {item_id}"
+
+    try:
+        if api_choice == "OpenAI":
+            embedding = create_embedding(item['content'])
+        else:  # Llama.cpp
+            embedding = create_embedding(item['content'])
+
+        collection_name = "all_content_embeddings"
+        store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item['id']}"])
+        return f"New embedding created and stored for item: {item_id}"
+    except Exception as e:
+        return f"Error creating embedding: {str(e)}"
 
 
 #
