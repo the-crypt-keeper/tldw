@@ -12,6 +12,8 @@ import gradio as gr
 
 from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
+from App_Function_Libraries.RAG.ChromaDB_Library import get_all_content_from_database, chroma_client, \
+     store_in_chroma, create_embedding
 from App_Function_Libraries.RAG.RAG_Libary_2 import rag_search
 
 #
@@ -120,6 +122,101 @@ def create_embeddings_tab():
             inputs=[embedding_api_choice, openai_model_choice, llamacpp_url],
             outputs=status_output
         )
+
+
+def create_view_embeddings_tab():
+    with gr.TabItem("View/Update Embeddings"):
+        gr.Markdown("# View and Update Embeddings")
+
+        with gr.Row():
+            with gr.Column():
+                item_dropdown = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                refresh_button = gr.Button("Refresh Item List")
+                embedding_status = gr.Textbox(label="Embedding Status", interactive=False)
+
+            with gr.Column():
+                create_new_embedding_button = gr.Button("Create New Embedding")
+                embedding_provider = gr.Radio(
+                    choices=["openai", "local", "huggingface"],
+                    label="Embedding Provider",
+                    value="openai"
+                )
+                embedding_model = gr.Textbox(
+                    label="Embedding Model",
+                    value="text-embedding-3-small",
+                    visible=True
+                )
+                embedding_api_url = gr.Textbox(
+                    label="API URL (for local provider)",
+                    value="http://localhost:8080/embedding",
+                    visible=False
+                )
+
+        def get_items_with_embedding_status():
+            items = get_all_content_from_database()
+            collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
+            choices = []
+            for item in items:
+                embedding_exists = len(collection.get(ids=[f"doc_{item['id']}"])['ids']) > 0
+                status = "Embedding exists" if embedding_exists else "No embedding"
+                choices.append(f"{item['title']} ({status})")
+            return choices
+
+        def check_embedding_status(selected_item):
+            if not selected_item:
+                return "Please select an item"
+            item_id = selected_item.split('(')[0].strip()
+            collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
+            embedding_exists = len(collection.get(ids=[f"doc_{item_id}"])['ids']) > 0
+            if embedding_exists:
+                return f"Embedding exists for item: {item_id}"
+            else:
+                return f"No embedding found for item: {item_id}"
+
+        def create_new_embedding(selected_item, provider, model, api_url):
+            if not selected_item:
+                return "Please select an item"
+            item_id = selected_item.split('(')[0].strip()
+            items = get_all_content_from_database()
+            item = next((item for item in items if item['title'] == item_id), None)
+            if not item:
+                return f"Item not found: {item_id}"
+
+            try:
+                global embedding_provider, embedding_model, embedding_api_url
+                embedding_provider = provider
+                embedding_model = model
+                embedding_api_url = api_url
+
+                embedding = create_embedding(item['content'])
+
+                collection_name = "all_content_embeddings"
+                store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item['id']}"])
+                return f"New embedding created and stored for item: {item_id}"
+            except Exception as e:
+                return f"Error creating embedding: {str(e)}"
+
+        def update_provider_options(provider):
+            return (
+                gr.update(visible=True),
+                gr.update(visible=provider == "local")
+            )
+
+        refresh_button.click(get_items_with_embedding_status, outputs=item_dropdown)
+        item_dropdown.change(check_embedding_status, inputs=[item_dropdown], outputs=embedding_status)
+        create_new_embedding_button.click(
+            create_new_embedding,
+            inputs=[item_dropdown, embedding_provider, embedding_model, embedding_api_url],
+            outputs=embedding_status
+        )
+        embedding_provider.change(
+            update_provider_options,
+            inputs=[embedding_provider],
+            outputs=[embedding_model, embedding_api_url]
+        )
+
+        # Initialize the dropdown
+        refresh_button.click(get_items_with_embedding_status, outputs=item_dropdown)
 
 
 def create_search_tab():

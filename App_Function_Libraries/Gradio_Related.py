@@ -33,7 +33,8 @@ from App_Function_Libraries.Gradio_UI.PDF_ingestion_tab import create_pdf_ingest
 from App_Function_Libraries.Gradio_UI.Podcast_tab import create_podcast_tab
 from App_Function_Libraries.Gradio_UI.Re_summarize_tab import create_resummary_tab
 from App_Function_Libraries.Gradio_UI.Search_Tab import create_prompt_view_tab, create_prompt_search_tab, \
-    create_search_summaries_tab, create_viewing_tab, create_embeddings_tab, create_rag_tab, create_search_tab
+    create_search_summaries_tab, create_viewing_tab, create_embeddings_tab, create_rag_tab, create_search_tab, \
+    create_view_embeddings_tab
 from App_Function_Libraries.Gradio_UI.Trash import create_view_trash_tab, create_empty_trash_tab, \
     create_delete_trash_tab
 from App_Function_Libraries.Gradio_UI.Utilities import create_utilities_yt_timestamp_tab, create_utilities_yt_audio_tab, \
@@ -250,6 +251,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_search_tab()
                 create_rag_tab()
                 create_embeddings_tab()
+                create_view_embeddings_tab()
                 create_viewing_tab()
                 create_search_summaries_tab()
                 create_prompt_search_tab()
