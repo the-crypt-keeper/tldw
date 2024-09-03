@@ -127,7 +127,7 @@ def create_embeddings_tab():
 def create_view_embeddings_tab():
     with gr.TabItem("View/Update Embeddings"):
         gr.Markdown("# View and Update Embeddings")
-
+        item_mapping = gr.State({})
         with gr.Row():
             with gr.Column():
                 item_dropdown = gr.Dropdown(label="Select Item", choices=[], interactive=True)
@@ -153,36 +153,53 @@ def create_view_embeddings_tab():
                 )
 
         def get_items_with_embedding_status():
-            items = get_all_content_from_database()
-            collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
-            choices = []
-            for item in items:
-                embedding_exists = len(collection.get(ids=[f"doc_{item['id']}"])['ids']) > 0
-                status = "Embedding exists" if embedding_exists else "No embedding"
-                choices.append(f"{item['title']} ({status})")
-            return choices
+            try:
+                items = get_all_content_from_database()
+                collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
+                choices = []
+                new_item_mapping = {}
+                for item in items:
+                    embedding_exists = len(collection.get(ids=[f"doc_{item['id']}"])['ids']) > 0
+                    status = "Embedding exists" if embedding_exists else "No embedding"
+                    choice = f"{item['title']} ({status})"
+                    choices.append(choice)
+                    new_item_mapping[choice] = item['id']
+                return gr.update(choices=choices), new_item_mapping
+            except Exception as e:
+                print(f"Error in get_items_with_embedding_status: {str(e)}")
+                return gr.update(choices=["Error: Unable to fetch items"]), {}
 
-        def check_embedding_status(selected_item):
+        def check_embedding_status(selected_item, item_mapping):
             if not selected_item:
                 return "Please select an item"
-            item_id = selected_item.split('(')[0].strip()
-            collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
-            embedding_exists = len(collection.get(ids=[f"doc_{item_id}"])['ids']) > 0
-            if embedding_exists:
-                return f"Embedding exists for item: {item_id}"
-            else:
-                return f"No embedding found for item: {item_id}"
-
-        def create_new_embedding(selected_item, provider, model, api_url):
-            if not selected_item:
-                return "Please select an item"
-            item_id = selected_item.split('(')[0].strip()
-            items = get_all_content_from_database()
-            item = next((item for item in items if item['title'] == item_id), None)
-            if not item:
-                return f"Item not found: {item_id}"
 
             try:
+                item_id = item_mapping.get(selected_item)
+                if item_id is None:
+                    return f"Invalid item selected: {selected_item}"
+
+                item_title = selected_item.rsplit(' (', 1)[0]
+                status = "Embedding exists" if "(Embedding exists)" in selected_item else "No embedding"
+                return f"Status for item '{item_title}' (ID: {item_id}): {status}"
+            except Exception as e:
+                print(f"Error in check_embedding_status: {str(e)}")
+                return f"Error processing item: {selected_item}"
+
+        def create_new_embedding(selected_item, provider, model, api_url, item_mapping):
+            if not selected_item:
+                return "Please select an item"
+
+            try:
+                item_id = item_mapping.get(selected_item)
+                if item_id is None:
+                    return f"Invalid item selected: {selected_item}"
+
+                item_title = selected_item.rsplit(' (', 1)[0]
+                items = get_all_content_from_database()
+                item = next((item for item in items if item['id'] == item_id), None)
+                if not item:
+                    return f"Item not found: {item_title}"
+
                 global embedding_provider, embedding_model, embedding_api_url
                 embedding_provider = provider
                 embedding_model = model
@@ -191,9 +208,10 @@ def create_view_embeddings_tab():
                 embedding = create_embedding(item['content'])
 
                 collection_name = "all_content_embeddings"
-                store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item['id']}"])
-                return f"New embedding created and stored for item: {item_id}"
+                store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item_id}"])
+                return f"New embedding created and stored for item: {item_title} (ID: {item_id})"
             except Exception as e:
+                print(f"Error in create_new_embedding: {str(e)}")
                 return f"Error creating embedding: {str(e)}"
 
         def update_provider_options(provider):
@@ -202,11 +220,18 @@ def create_view_embeddings_tab():
                 gr.update(visible=provider == "local")
             )
 
-        refresh_button.click(get_items_with_embedding_status, outputs=item_dropdown)
-        item_dropdown.change(check_embedding_status, inputs=[item_dropdown], outputs=embedding_status)
+        refresh_button.click(
+            get_items_with_embedding_status,
+            outputs=[item_dropdown, item_mapping]
+        )
+        item_dropdown.change(
+            check_embedding_status,
+            inputs=[item_dropdown, item_mapping],
+            outputs=embedding_status
+        )
         create_new_embedding_button.click(
             create_new_embedding,
-            inputs=[item_dropdown, embedding_provider, embedding_model, embedding_api_url],
+            inputs=[item_dropdown, embedding_provider, embedding_model, embedding_api_url, item_mapping],
             outputs=embedding_status
         )
         embedding_provider.change(
@@ -215,8 +240,7 @@ def create_view_embeddings_tab():
             outputs=[embedding_model, embedding_api_url]
         )
 
-        # Initialize the dropdown
-        refresh_button.click(get_items_with_embedding_status, outputs=item_dropdown)
+    return item_dropdown, refresh_button, embedding_status, create_new_embedding_button, embedding_provider, embedding_model, embedding_api_url
 
 
 def create_search_tab():
