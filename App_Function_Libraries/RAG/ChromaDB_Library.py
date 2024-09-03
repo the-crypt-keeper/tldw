@@ -248,14 +248,16 @@ def store_in_chroma_with_citation(collection_name: str, texts: List[str], embedd
 
 def check_embedding_status(selected_item):
     if not selected_item:
-        return "Please select an item"
+        return "Please select an item", ""
     item_id = selected_item.split('(')[0].strip()
     collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
-    embedding_exists = len(collection.get(ids=[f"doc_{item_id}"])['ids']) > 0
-    if embedding_exists:
-        return f"Embedding exists for item: {item_id}"
+    result = collection.get(ids=[f"doc_{item_id}"])
+    if result['ids']:
+        embedding = result['embeddings'][0]
+        embedding_preview = str(embedding[:50])  # Convert first 50 elements to string
+        return f"Embedding exists for item: {item_id}", f"Embedding preview: {embedding_preview}..."
     else:
-        return f"No embedding found for item: {item_id}"
+        return f"No embedding found for item: {item_id}", ""
 
 
 def create_new_embedding(selected_item, api_choice, openai_model, llamacpp_url):
