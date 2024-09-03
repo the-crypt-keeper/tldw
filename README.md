@@ -36,7 +36,7 @@
     - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off, and I don't see it as more worthwhile than some other endeavors.
     - If anything, I'd like to see this project be used in schools, universities, and research institutions, or anyone who wants to keep a record of what they've consumed and be able to search and ask questions about it.
     - I believe that this project can be a great tool for learning and research, and I'd like to see it develop to a point where it could be reasonably used as such.
-    - In the meantime, if you don't care about data ownership or privacy, https://notebooklm.google/ is a good alternative that works, is free, and has a working RAG setup (unlike mine :cry:).
+    - In the meantime, if you don't care about data ownership or privacy, https://notebooklm.google/ is a good alternative that works and is free.
   - **Current features:** 
     - **Ingest content(Video/Audio/epub/PDF/txt/websites) from a URL(single or multiple at once) or a local file(drag+drop).**
     - **Transcription of Video/Audio content using faster_whisper, with the ability to select the model to use.**
@@ -97,9 +97,9 @@
     - Firstly, you can check all planned features on the issues page: https://github.com/rmusser01/tldw/issues
     - Anything I come up with or hear about will either just be dropped in, or an issue will be created and then implemented.
     - I plan to add the following in the future in no particular order:
-      - RAG - Retrieval-Augmented Generation support. Do not want to use any existing libraries. Would prefer to do it all from scratch. 
+      - RAG - Retrieval-Augmented Generation support.Naive/basic implementation is in. Would like to expand and build out a test suite for it. 
       - More API support - I want to add support for more APIs, and I want to make it easier to select between private/Public endpoints in the UI
-      - Completely new UI - I want to make the UI more user-friendly and more intuitive. 
+      - Completely new UI - I want to make the UI more user-friendly and more intuitive. (This will come after migration to FastAPI)
         - Gradio is great as PoC, but I think I've shown that this has value and is worth the continued effort.
       - Add support for 'streaming' answers, so it feels more 'real-time'
       - Add TTS/STT support for the UI so you can ask questions directly to the model or have it speak out the results to you.
@@ -110,8 +110,7 @@
         - https://github.com/lmg-anon/mikupad 
         - https://github.com/datacrystals/AIStoryWriter
       - Evaluations for Summarization process
-        - Setup eval for user-ran testing
-        - Do some prompt engineering
+        - Currently G-Eval is setup as an option for Video summaries. Need to add it to other input pages and look at other (easy) methods of evaluation
       - Evaluations for whisper transcription accuracy
         - Identify accuracy of used models.
         - Set it up so users can test against their own datasets
@@ -125,7 +124,12 @@
    - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
 
 
-For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek. Flipside I would say none honestly. The (largest players) will gaslight you and charge you money for it. Fun.
+For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek, gpt4o. 
+Flipside I would say none, honestly. The (largest players) will gaslight you and charge you money for it. Fun.
+
+That being said they obviously can provide help/be useful(helped me make this app), but it's important to remember that they're not your friend, and they're not there to help you. They are there to make money not off you, but off large institutions and your data.
+You are just a stepping stone to their goals.
+
 From @nrose 05/08/2024 on Threads:
 ```
 No, it’s a design. First they train it, then they optimize it. Optimize it for what- better answers?
