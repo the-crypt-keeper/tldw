@@ -337,10 +337,9 @@ def create_tables(db) -> None:
             chunk_text TEXT,
             start_index INTEGER,
             end_index INTEGER,
-            vector_embedding BLOB,
+            chunk_id TEXT,
             FOREIGN KEY (media_id) REFERENCES Media(id)
-        )
-        ''',
+        )''',
         '''
         CREATE TABLE IF NOT EXISTS UnvectorizedMediaChunks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -493,12 +492,12 @@ def check_media_and_whisper_model(title=None, url=None, current_whisper_model=No
         return False, f"Media found with same whisper model (ID: {media_id})"
 
 
-def sqlite_add_media_chunk(db, media_id: int, chunk_text: str, start_index: int, end_index: int, vector_embedding: bytes):
+def sqlite_add_media_chunk(db, media_id: int, chunk_text: str, start_index: int, end_index: int, chunk_id: str):
     with db.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, vector_embedding) VALUES (?, ?, ?, ?, ?)",
-            (media_id, chunk_text, start_index, end_index, vector_embedding)
+            "INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id) VALUES (?, ?, ?, ?, ?)",
+            (media_id, chunk_text, start_index, end_index, chunk_id)
         )
         conn.commit()
 

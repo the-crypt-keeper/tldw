@@ -24,9 +24,6 @@ from App_Function_Libraries.RAG.RAG_Libary_2 import rag_search
 
 logger = logging.getLogger()
 
-
-
-
 # FIXME - SQL functions to be moved to DB_Manager
 def search_prompts(query):
     try:
@@ -40,16 +37,6 @@ def search_prompts(query):
     except sqlite3.Error as e:
         print(f"Error searching prompts: {e}")
         return []
-
-
-
-
-
-
-
-
-
-
 
 
 def create_rag_tab():
@@ -83,28 +70,57 @@ def create_embeddings_tab():
 
         with gr.Row():
             with gr.Column():
-                embedding_api_choice = gr.Dropdown(
-                    choices=["OpenAI", "Local", "HuggingFace"],
+                embedding_api_choice = gr.Radio(
+                    choices=["Llama.cpp", "OpenAI"],
                     label="Select API for Embeddings",
                     value="OpenAI"
+                )
+                openai_model_choice = gr.Radio(
+                    choices=["text-embedding-3-small", "text-embedding-3-large"],
+                    label="OpenAI Embedding Model (Assumes you have your API key set up in 'config.txt')",
+                    value="text-embedding-3-small",
+                    visible=True
+                )
+                llamacpp_url = gr.Textbox(
+                    label="Llama.cpp Embedding API URL",
+                    placeholder="http://localhost:8080/embedding",
+                    visible=False
                 )
                 create_button = gr.Button("Create Embeddings")
 
             with gr.Column():
                 status_output = gr.Textbox(label="Status", lines=10)
 
-        def create_embeddings(api_choice):
+        def update_api_options(api_choice):
+            return (
+                gr.update(visible=api_choice == "OpenAI"),
+                gr.update(visible=api_choice == "Llama.cpp")
+            )
+
+        embedding_api_choice.change(
+            fn=update_api_options,
+            inputs=[embedding_api_choice],
+            outputs=[openai_model_choice, llamacpp_url]
+        )
+
+        def create_embeddings(api_choice, openai_model, llamacpp_url):
             try:
-                # Assuming you have a function that handles the creation of embeddings
                 from App_Function_Libraries.RAG.ChromaDB_Library import create_all_embeddings
-                status = create_all_embeddings(api_choice)
+                if api_choice == "OpenAI":
+                    status = create_all_embeddings("openai", openai_model)
+                else:  # Llama.cpp
+                    status = create_all_embeddings("llamacpp", llamacpp_url)
                 return status
-            except Exception as e:
+            except ValueError as e:
                 return f"Error: {str(e)}"
+            except Exception as e:
+                return f"Unexpected error: {str(e)}"
 
-        create_button.click(create_embeddings, inputs=[embedding_api_choice], outputs=status_output)
-
-
+        create_button.click(
+            fn=create_embeddings,
+            inputs=[embedding_api_choice, openai_model_choice, llamacpp_url],
+            outputs=status_output
+        )
 
 
 def create_search_tab():

@@ -8,6 +8,8 @@ import requests
 from chromadb import Settings
 
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
+from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media
+from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
 
 #######################################################################################################################
 #
@@ -75,9 +77,9 @@ def process_and_store_content(content: str, collection_name: str, media_id: int)
     # Store the texts, embeddings, and IDs in ChromaDB
     store_in_chroma(collection_name, texts, embeddings, ids)
 
-    # Store the chunks in SQLite
-    for i, text in enumerate(texts):
-        add_media_chunk(media_id, text, chunks[i]['start'], chunks[i]['end'], embeddings[i])
+    # Store the chunk metadata in SQLite
+    for i, chunk in enumerate(chunks):
+        add_media_chunk(media_id, chunk['text'], chunk['start'], chunk['end'], ids[i])
 
     # Update the FTS table
     update_fts_for_media(media_id)
@@ -135,11 +137,8 @@ def create_embedding(text: str) -> List[float]:
         raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
 
 
-def create_all_embeddings(api_choice: str) -> str:
+def create_all_embeddings(api_choice: str, model_or_url: str) -> str:
     try:
-        global embedding_provider
-        embedding_provider = api_choice
-
         all_content = get_all_content_from_database()
 
         if not all_content:
@@ -165,7 +164,10 @@ def create_all_embeddings(api_choice: str) -> str:
                 continue  # Skip if embedding already exists
 
             # Create the embedding
-            embedding = create_embedding(text)
+            if api_choice == "openai":
+                embedding = create_openai_embedding(text, model_or_url)
+            else:  # Llama.cpp
+                embedding = create_llamacpp_embedding(text, model_or_url)
 
             # Collect the text, embedding, and ID for batch storage
             texts_to_embed.append(text)
@@ -180,6 +182,24 @@ def create_all_embeddings(api_choice: str) -> str:
     except Exception as e:
         logging.error(f"Error during embedding creation: {str(e)}")
         return f"Error: {str(e)}"
+
+
+def create_openai_embedding(text: str, model: str) -> List[float]:
+    openai_api_key = config['API']['openai_api_key']
+    # FIXME - Use existing API function for this
+    response = get_openai_embeddings(input=text, model=model)
+    return response['data'][0]['embedding']
+
+
+def create_llamacpp_embedding(text: str, api_url: str) -> List[float]:
+    response = requests.post(
+        api_url,
+        json={"input": text}
+    )
+    if response.status_code == 200:
+        return response.json()['embedding']
+    else:
+        raise Exception(f"Error from Llama.cpp API: {response.text}")
 
 
 def get_all_content_from_database() -> List[Dict[str, Any]]:
