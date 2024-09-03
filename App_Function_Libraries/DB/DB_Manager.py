@@ -291,9 +291,9 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
         raise ValueError(f"Unsupported database type: {db_type}")
 
 
-def add_media_chunk(media_id: int, chunk_text: str, start_index: int, end_index: int, vector_embedding: bytes):
+def add_media_chunk(media_id: int, chunk_text: str, start_index: int, end_index: int, chunk_id: str):
     if db_type == 'sqlite':
-        sqlite_add_media_chunk(db, media_id, chunk_text, start_index, end_index, vector_embedding)
+        sqlite_add_media_chunk(db, media_id, chunk_text, start_index, end_index, chunk_id)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version not yet implemented")
