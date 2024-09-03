@@ -84,6 +84,7 @@ def create_embeddings_tab():
                 llamacpp_url = gr.Textbox(
                     label="Llama.cpp Embedding API URL",
                     placeholder="http://localhost:8080/embedding",
+                    value="http://localhost:8080/embedding",  # Default value
                     visible=False
                 )
                 create_button = gr.Button("Create Embeddings")
@@ -111,10 +112,8 @@ def create_embeddings_tab():
                 else:  # Llama.cpp
                     status = create_all_embeddings("llamacpp", llamacpp_url)
                 return status
-            except ValueError as e:
-                return f"Error: {str(e)}"
             except Exception as e:
-                return f"Unexpected error: {str(e)}"
+                return f"Error: {str(e)}"
 
         create_button.click(
             fn=create_embeddings,
