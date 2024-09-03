@@ -108,8 +108,7 @@ def create_embedding(text: str) -> List[float]:
     global embedding_provider, embedding_model, embedding_api_url, embedding_api_key
 
     if embedding_provider == 'openai':
-        response = get_openai_embeddings(text, embedding_model)
-        return response['data'][0]['embedding']
+        return get_openai_embeddings(text, embedding_model)
     elif embedding_provider == 'local':
         response = requests.post(
             embedding_api_url,
@@ -133,8 +132,6 @@ def create_embedding(text: str) -> List[float]:
         return embeddings[0].tolist()  # Convert to list for consistency
     else:
         raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
-
-
 
 
 def create_all_embeddings(api_choice: str, model_or_url: str) -> str:
@@ -186,9 +183,8 @@ def create_all_embeddings(api_choice: str, model_or_url: str) -> str:
 
 def create_openai_embedding(text: str, model: str) -> List[float]:
     openai_api_key = config['API']['openai_api_key']
-    # FIXME - Use existing API function for this
-    response = get_openai_embeddings(text, model)
-    return response['data'][0]['embedding']
+    embedding = get_openai_embeddings(text, model)
+    return embedding
 
 
 def create_llamacpp_embedding(text: str, api_url: str) -> List[float]:
