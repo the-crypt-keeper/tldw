@@ -24,7 +24,7 @@ import requests
 # 3rd-Party Imports
 from tqdm import tqdm
 
-from App_Function_Libraries.Utils import sanitize_filename
+from App_Function_Libraries.Utils.Utils import sanitize_filename
 # Local Imports
 from Article_Extractor_Lib import scrape_article
 from Local_Summarization_Lib import summarize_with_llama, summarize_with_oobabooga, summarize_with_tabbyapi, \
@@ -32,7 +32,7 @@ from Local_Summarization_Lib import summarize_with_llama, summarize_with_oobaboo
 from Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, summarize_with_cohere, \
     summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, summarize_with_huggingface, \
     summarize_with_mistral
-from App_Function_Libraries.DB_Manager import ingest_article_to_db
+from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
 #
 #######################################################################################################################
 # Function Definitions

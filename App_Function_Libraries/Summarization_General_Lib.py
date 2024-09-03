@@ -30,9 +30,9 @@ from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summariz
 from App_Function_Libraries.Diarization_Lib import combine_transcription_and_diarization
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
-from App_Function_Libraries.DB_Manager import add_media_to_database
+from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 # Import Local
-from App_Function_Libraries.Utils import load_and_log_configs, load_comprehensive_config, sanitize_filename, \
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, load_comprehensive_config, sanitize_filename, \
     clean_youtube_url, create_download_directory, is_valid_url
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 
@@ -777,7 +777,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
         response = requests.post(API_URL, headers=headers, json=data)
 
         if response.status_code == 200:
-            summary = response.json()[0]['summary_text']
+            summary = response.json()[0]['generated_text'].strip()
             logging.debug("huggingface: Summarization successful")
             print("Summarization successful.")
             return summary

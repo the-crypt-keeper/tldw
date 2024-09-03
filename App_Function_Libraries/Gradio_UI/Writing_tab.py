@@ -304,7 +304,7 @@ def create_document_feedback_tab():
                     "Virginia Woolf",
                     "Virginia Woolf",
                     "Zadie Smith"],
-                label="Compare Multiple Persona's Feedback at Once"
+                label="Compare Multiple Persona's Feedback at Once(Compares existing feedback, doesn't create new ones)"
             )
         with gr.Row():
             compare_button = gr.Button("Compare Feedback")

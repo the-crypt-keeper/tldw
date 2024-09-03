@@ -6,7 +6,7 @@
 # External Imports
 import gradio as gr
 
-from App_Function_Libraries.DB_Manager import get_db_config
+from App_Function_Libraries.DB.DB_Manager import get_db_config
 
 
 #
