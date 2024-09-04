@@ -284,6 +284,14 @@ None of these companies exist to provide AI services in 2024. They’re only doi
        - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
        - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
 
+- **Encrypting your Database at rest using 7zip**
+  - 7zip since its cross-platform and easy to use.
+  - https://superuser.com/questions/1377414/how-to-encrypt-txt-files-with-aes256-via-windows-7z-command-line
+  - `7za u -mx -mhe -pPASSWORD ARCHIVE-FILE-NAME.7Z SOURCE-FILE`
+    - `-pPASSWORD` - sets the password to `PASSWORD`
+    - `u` - updates the archive
+    - `-mx` - sets the compression level to default (-mx1 == fastest, -mx9 == best)
+    - `-mhe` - encrypts the file headers - No unencrypted filenames in the archive
 - **Setting up Epub to Markdown conversion with Pandoc**
     - **Linux / MacOS / Windows**
         - Download and install from: https://pandoc.org/installing.html
