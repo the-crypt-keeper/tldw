@@ -115,7 +115,7 @@ def create_summarize_explain_tab():
 
         explain_summarize_button.click(
             fn=summarize_explain_text,
-            inputs=[text_to_work_input, api_endpoint, api_key_input, summarization_checkbox, explanation_checkbox, custom_prompt_checkbox, custom_prompt_input, system_prompt_input],
+            inputs=[text_to_work_input, api_endpoint, api_key_input, summarization_checkbox, explanation_checkbox, custom_prompt_input, system_prompt_input],
             outputs=[summarization_output, explanation_output, custom_prompt_output]
         )
 
