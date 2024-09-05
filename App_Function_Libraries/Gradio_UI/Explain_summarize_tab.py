@@ -6,6 +6,9 @@ import logging
 #
 # External Imports
 import gradio as gr
+
+from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
+from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 #
 # Local Imports
 from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
@@ -31,6 +34,67 @@ def create_summarize_explain_tab():
                 with gr.Row():
                     explanation_checkbox = gr.Checkbox(label="Explain Text", value=True)
                     summarization_checkbox = gr.Checkbox(label="Summarize Text", value=True)
+                    with gr.Row():
+                        custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                             value=False,
+                                                             visible=True)
+                        preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                             value=False,
+                                                             visible=True)
+                    with gr.Row():
+                        preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                    choices=load_preset_prompts(),
+                                                    visible=False)
+                    with gr.Row():
+                        custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                         placeholder="Enter custom prompt here",
+                                                         lines=3,
+                                                         visible=False)
+                    with gr.Row():
+                        system_prompt_input = gr.Textbox(label="System Prompt",
+                                                         value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                **Bulleted Note Creation Guidelines**
+
+                **Headings**:
+                - Based on referenced topics, not categories like quotes or terms
+                - Surrounded by **bold** formatting 
+                - Not listed as bullet points
+                - No space between headings and list items underneath
+
+                **Emphasis**:
+                - **Important terms** set in bold font
+                - **Text ending in a colon**: also bolded
+
+                **Review**:
+                - Ensure adherence to specified format
+                - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                """,
+                                                         lines=3,
+                                                         visible=False,
+                                                         interactive=True)
+                    custom_prompt_checkbox.change(
+                        fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+                        inputs=[custom_prompt_checkbox],
+                        outputs=[custom_prompt_input, system_prompt_input]
+                    )
+                    preset_prompt_checkbox.change(
+                        fn=lambda x: gr.update(visible=x),
+                        inputs=[preset_prompt_checkbox],
+                        outputs=[preset_prompt]
+                    )
+
+                    def update_prompts(preset_name):
+                        prompts = update_user_prompt(preset_name)
+                        return (
+                            gr.update(value=prompts["user_prompt"], visible=True),
+                            gr.update(value=prompts["system_prompt"], visible=True)
+                        )
+
+                    preset_prompt.change(
+                        update_prompts,
+                        inputs=preset_prompt,
+                        outputs=[custom_prompt_input, system_prompt_input]
+                    )
                 api_endpoint = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
                              "OpenRouter",
@@ -44,16 +108,18 @@ def create_summarize_explain_tab():
 
             with gr.Column():
                 summarization_output = gr.Textbox(label="Summary:", lines=20)
-                explanation_output = gr.Textbox(label="Explanation:", lines=50)
+                explanation_output = gr.Textbox(label="Explanation:", lines=20)
+                custom_prompt_output = gr.Textbox(label="Custom Prompt:", lines=20, visible=False)
 
         explain_summarize_button.click(
             fn=summarize_explain_text,
-            inputs=[text_to_work_input, api_endpoint, api_key_input, summarization_checkbox, explanation_checkbox],
-            outputs=[summarization_output, explanation_output]
+            inputs=[text_to_work_input, api_endpoint, api_key_input, summarization_checkbox, explanation_checkbox, custom_prompt_checkbox, custom_prompt_input, system_prompt_input],
+            outputs=[summarization_output, explanation_output, custom_prompt_output]
         )
 
 
-def summarize_explain_text(message, api_endpoint, api_key, summarization, explanation):
+def summarize_explain_text(message, api_endpoint, api_key, summarization, explanation, custom_prompt, custom_system_prompt,):
+    global custom_prompt_output
     summarization_response = None
     explanation_response = None
     temp = 0.7
@@ -176,6 +242,52 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
             logging.error(f"Error in summarization: {str(e)}")
             response2 = f"An error occurred during summarization: {str(e)}"
 
+        try:
+            if custom_prompt:
+                system_prompt = custom_system_prompt
+                user_prompt = custom_prompt + input_data
+                # Use the existing API request code based on the selected endpoint
+                logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
+                if api_endpoint.lower() == 'openai':
+                    custom_prompt_output = summarize_with_openai(api_key, input_data, user_prompt, temp, system_prompt)
+                elif api_endpoint.lower() == "anthropic":
+                    custom_prompt_output = summarize_with_anthropic(api_key, input_data, user_prompt, temp,
+                                                                    system_prompt)
+                elif api_endpoint.lower() == "cohere":
+                    custom_prompt_output = summarize_with_cohere(api_key, input_data, user_prompt, temp, system_prompt)
+                elif api_endpoint.lower() == "groq":
+                    custom_prompt_output = summarize_with_groq(api_key, input_data, user_prompt, temp, system_prompt)
+                elif api_endpoint.lower() == "openrouter":
+                    custom_prompt_output = summarize_with_openrouter(api_key, input_data, user_prompt, temp,
+                                                                     system_prompt)
+                elif api_endpoint.lower() == "deepseek":
+                    custom_prompt_output = summarize_with_deepseek(api_key, input_data, user_prompt, temp,
+                                                                   system_prompt)
+                elif api_endpoint.lower() == "llama.cpp":
+                    custom_prompt_output = summarize_with_llama(input_data, user_prompt, temp, system_prompt)
+                elif api_endpoint.lower() == "kobold":
+                    custom_prompt_output = summarize_with_kobold(input_data, api_key, user_prompt, temp, system_prompt)
+                elif api_endpoint.lower() == "ooba":
+                    custom_prompt_output = summarize_with_oobabooga(input_data, api_key, user_prompt, temp,
+                                                                    system_prompt)
+                elif api_endpoint.lower() == "tabbyapi":
+                    custom_prompt_output = summarize_with_tabbyapi(input_data, user_prompt, temp, system_prompt)
+                elif api_endpoint.lower() == "vllm":
+                    custom_prompt_output = summarize_with_vllm(input_data, user_prompt, system_prompt)
+                elif api_endpoint.lower() == "local-llm":
+                    custom_prompt_output = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt)
+                elif api_endpoint.lower() == "huggingface":
+                    custom_prompt_output = summarize_with_huggingface(api_key, input_data, user_prompt,
+                                                                      temp)  # , system_prompt)
+                elif api_endpoint.lower() == "ollama":
+                    custom_prompt_output = summarize_with_ollama(input_data, user_prompt, temp, system_prompt)
+                else:
+                    raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
+        except Exception as e:
+            logging.error(f"Error in summarization: {str(e)}")
+            response2 = f"An error occurred during summarization: {str(e)}"
+
+
         if summarization_response:
             response1 = f"Summary: {summarization_response}"
         else:
@@ -186,7 +298,12 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
         else:
             response2 = "Explanation: No explanation requested"
 
-        return response1, response2
+        if custom_prompt_output:
+            response3 = f"Custom Prompt: {custom_prompt_output}"
+        else:
+            response3 = "Custom Prompt: No custom prompt requested"
+
+        return response1, response2, response3
 
     except Exception as e:
         logging.error(f"Error in chat function: {str(e)}")
