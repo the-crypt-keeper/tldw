@@ -15,6 +15,7 @@ Pillow==10.4.0
 playwright==1.44.0
 psycopg2==2.9.9
 pyannote.audio
+pyaudio
 pymupdf==1.24.9
 pypandoc==1.13
 pypandoc_binary==1.13
@@ -33,4 +34,7 @@ tqdm==4.66.4
 trafilatura==1.9.0
 transformers==4.41.1
 typing-extensions==4.9.0
+wave
 yt_dlp==2024.8.6
+
+
