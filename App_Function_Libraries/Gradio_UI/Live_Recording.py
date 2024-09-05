@@ -21,7 +21,7 @@ def create_live_recording_tab():
         gr.Markdown("# Live Audio Recording and Transcription")
         with gr.Row():
             with gr.Column():
-                duration = gr.Slider(minimum=1, maximum=60, value=10, label="Recording Duration (seconds)")
+                duration = gr.Slider(minimum=1, maximum=8000, value=15, label="Recording Duration (seconds)")
                 whisper_models_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
                 vad_filter = gr.Checkbox(label="Use VAD Filter")
                 save_recording = gr.Checkbox(label="Save Recording")
@@ -32,7 +32,7 @@ def create_live_recording_tab():
                 output = gr.Textbox(label="Transcription", lines=10)
                 audio_output = gr.Audio(label="Recorded Audio", visible=False)
 
-        def record_and_transcribe(duration, whisper_model, vad_filter, save_recording, save_to_db, custom_title):
+        def record_and_transcribe(duration, whisper_model, vad_filter, save_recording):
             audio_data = record_audio(duration)
             temp_file = save_audio_temp(audio_data)
             segments = speech_to_text(temp_file, whisper_model=whisper_model, vad_filter=vad_filter)
