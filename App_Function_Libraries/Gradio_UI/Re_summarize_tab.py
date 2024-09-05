@@ -41,67 +41,63 @@ def create_resummary_tab():
                         value="Local-LLM", label="API Name")
                     api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here", type="password")
 
-                    with gr.Row():
-                        custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-                                                             value=False,
-                                                             visible=True)
-                        preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
-                                                             value=False,
-                                                             visible=True)
-                    with gr.Row():
-                        preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                                    choices=load_preset_prompts(),
-                                                    visible=False)
-                    with gr.Row():
-                        custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                         placeholder="Enter custom prompt here",
-                                                         lines=3,
-                                                         visible=False)
-                    with gr.Row():
-                        system_prompt_input = gr.Textbox(label="System Prompt",
-                                                         value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
-                **Bulleted Note Creation Guidelines**
+                chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)
+                with gr.Row(visible=False) as chunking_options_box:
+                    chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens', 'chapters'],
+                                               label="Chunking Method", value='words')
+                    max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50, label="Max Chunk Size")
+                    chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
 
-                **Headings**:
-                - Based on referenced topics, not categories like quotes or terms
-                - Surrounded by **bold** formatting 
-                - Not listed as bullet points
-                - No space between headings and list items underneath
+                with gr.Row():
+                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                     value=False,
+                                                     visible=True)
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                     value=False,
+                                                     visible=True)
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=load_preset_prompts(),
+                                                visible=False)
+                with gr.Row():
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt here",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Row():
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+**Bulleted Note Creation Guidelines**
 
-                **Emphasis**:
-                - **Important terms** set in bold font
-                - **Text ending in a colon**: also bolded
+**Headings**:
+- Based on referenced topics, not categories like quotes or terms
+- Surrounded by **bold** formatting 
+- Not listed as bullet points
+- No space between headings and list items underneath
 
-                **Review**:
-                - Ensure adherence to specified format
-                - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
-                """,
-                                                         lines=3,
-                                                         visible=False,
-                                                         interactive=True)
-                    custom_prompt_checkbox.change(
-                        fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
-                        inputs=[custom_prompt_checkbox],
-                        outputs=[custom_prompt_input, system_prompt_input]
+**Emphasis**:
+- **Important terms** set in bold font
+- **Text ending in a colon**: also bolded
+
+**Review**:
+- Ensure adherence to specified format
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+""",
+                                                     lines=3,
+                                                     visible=False)
+
+                def update_prompts(preset_name):
+                    prompts = update_user_prompt(preset_name)
+                    return (
+                        gr.update(value=prompts["user_prompt"], visible=True),
+                        gr.update(value=prompts["system_prompt"], visible=True)
                     )
-                    preset_prompt_checkbox.change(
-                        fn=lambda x: gr.update(visible=x),
-                        inputs=[preset_prompt_checkbox],
-                        outputs=[preset_prompt]
-                    )
 
-                    def update_prompts(preset_name):
-                        prompts = update_user_prompt(preset_name)
-                        return (
-                            gr.update(value=prompts["user_prompt"], visible=True),
-                            gr.update(value=prompts["system_prompt"], visible=True)
-                        )
-
-                    preset_prompt.change(
-                        update_prompts,
-                        inputs=preset_prompt,
-                        outputs=[custom_prompt_input, system_prompt_input]
-                    )
+                preset_prompt.change(
+                    update_prompts,
+                    inputs=preset_prompt,
+                    outputs=[custom_prompt_input, system_prompt_input]
+                )
 
                 resummarize_button = gr.Button("Re-Summarize")
             with gr.Column():
@@ -125,6 +121,12 @@ def create_resummary_tab():
         outputs=[items_output, item_mapping]
     )
 
+    chunking_options_checkbox.change(
+        fn=lambda x: gr.update(visible=x),
+        inputs=[chunking_options_checkbox],
+        outputs=[chunking_options_box]
+    )
+
     custom_prompt_checkbox.change(
         fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
         inputs=[custom_prompt_checkbox],
@@ -133,11 +135,12 @@ def create_resummary_tab():
 
     resummarize_button.click(
         fn=resummarize_content_wrapper,
-        inputs=[items_output, item_mapping, api_name_input, api_key_input, custom_prompt_checkbox, custom_prompt_input],
+        inputs=[items_output, item_mapping, api_name_input, api_key_input, chunking_options_checkbox, chunk_method,
+                max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt_input],
         outputs=result_output
     )
 
-    return search_query_input, search_type_input, search_button, items_output, item_mapping, api_name_input, api_key_input, custom_prompt_checkbox, custom_prompt_input, resummarize_button, result_output
+    return search_query_input, search_type_input, search_button, items_output, item_mapping, api_name_input, api_key_input, chunking_options_checkbox, chunking_options_box, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt_input, resummarize_button, result_output
 
 
 def update_resummarize_dropdown(search_query, search_type):
