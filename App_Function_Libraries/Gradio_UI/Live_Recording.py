@@ -2,6 +2,7 @@
 # Description: Gradio UI for live audio recording and transcription.
 #
 # Import necessary modules and functions
+import logging
 import os
 # External Imports
 import gradio as gr
@@ -61,16 +62,25 @@ def create_live_recording_tab():
             if custom_title.strip() == "":
                 custom_title = "Self-recorded Audio"
 
-            add_media_to_database(
-                url="self_recorded",
-                info_dict={"title": custom_title, "uploader": "self-recorded"},
-                segments=[{"Text": transcription}],
-                summary="",
-                keywords="self-recorded,audio",
-                custom_prompt_input="",
-                whisper_model="self-recorded"
-            )
-            return "Transcription saved to database successfully."
+            try:
+                add_media_to_database(
+                    url="self_recorded",
+                    info_dict={
+                        "title": custom_title,
+                        "uploader": "self-recorded",
+                        "webpage_url": "self_recorded"  # Add this line
+                    },
+                    segments=[{"Text": transcription}],
+                    summary="",
+                    keywords=["self-recorded", "audio"],  # Change this to a list
+                    custom_prompt_input="",
+                    whisper_model="self-recorded",
+                    media_type="audio"  # Add this line
+                )
+                return "Transcription saved to database successfully."
+            except Exception as e:
+                logging.error(f"Error saving transcription to database: {str(e)}")
+                return f"Error saving transcription to database: {str(e)}"
 
         def update_custom_title_visibility(save_to_db):
             return gr.update(visible=save_to_db)
