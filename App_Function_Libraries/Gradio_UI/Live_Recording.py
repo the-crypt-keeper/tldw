@@ -27,7 +27,7 @@ def create_live_recording_tab():
                 whisper_models_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
                 vad_filter = gr.Checkbox(label="Use VAD Filter")
                 save_recording = gr.Checkbox(label="Save Recording")
-                save_to_db = gr.Checkbox(label="Save Transcription to Database")
+                save_to_db = gr.Checkbox(label="Save Transcription to Database(Must be checked to save - can be checked afer transcription)", value=False)
                 custom_title = gr.Textbox(label="Custom Title (for database)", visible=False)
                 record_button = gr.Button("Start Recording")
                 stop_button = gr.Button("Stop Recording")
@@ -112,7 +112,7 @@ def create_live_recording_tab():
             outputs=[custom_title]
         )
 
-        gr.Button("Save to Database(Need to check 'Save Transcription to Database first')").click(
+        gr.Button("Save to Database").click(
             fn=save_transcription_to_db,
             inputs=[output, custom_title],
             outputs=gr.Textbox(label="Database Save Status")
