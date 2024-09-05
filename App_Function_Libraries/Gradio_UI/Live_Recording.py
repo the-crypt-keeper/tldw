@@ -64,7 +64,7 @@ def create_live_recording_tab():
 
         record_button.click(
             fn=record_and_transcribe,
-            inputs=[duration, whisper_models_input, vad_filter, save_recording, save_to_db, custom_title],
+            inputs=[duration, whisper_models_input, vad_filter, save_recording],
             outputs=[output, audio_output]
         )
 
