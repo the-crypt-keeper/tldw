@@ -120,6 +120,8 @@ textstat
 langdetect
 elasticsearch
 jieba
+pyaudio
+wave
 fugashi
 #torch==2.2.2+cu121
 #torchaudio==2.2.2+cu121

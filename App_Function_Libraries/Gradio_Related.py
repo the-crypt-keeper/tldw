@@ -26,6 +26,7 @@ from App_Function_Libraries.Gradio_UI.Import_Functionality import create_import_
 from App_Function_Libraries.Gradio_UI.Introduction_tab import create_introduction_tab
 from App_Function_Libraries.Gradio_UI.Keywords import create_view_keywords_tab, create_add_keyword_tab, \
     create_delete_keyword_tab, create_export_keywords_tab
+from App_Function_Libraries.Gradio_UI.Live_Recording import create_live_recording_tab
 from App_Function_Libraries.Gradio_UI.Llamafile_tab import create_chat_with_llamafile_tab
 from App_Function_Libraries.Gradio_UI.Media_edit import create_prompt_clone_tab, create_prompt_edit_tab, \
     create_media_edit_and_clone_tab, create_media_edit_tab
@@ -246,6 +247,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_pdf_ingestion_test_tab()
                     create_resummary_tab()
                     create_summarize_explain_tab()
+                    create_live_recording_tab()
 
             with gr.TabItem("Search / Detailed View"):
                 create_search_tab()
