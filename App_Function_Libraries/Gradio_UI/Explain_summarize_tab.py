@@ -34,82 +34,81 @@ def create_summarize_explain_tab():
                 with gr.Row():
                     explanation_checkbox = gr.Checkbox(label="Explain Text", value=True)
                     summarization_checkbox = gr.Checkbox(label="Summarize Text", value=True)
-                    with gr.Row():
-                        custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-                                                             value=False,
-                                                             visible=True)
-                        preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
-                                                             value=False,
-                                                             visible=True)
-                    with gr.Row():
-                        preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                                    choices=load_preset_prompts(),
-                                                    visible=False)
-                    with gr.Row():
-                        custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                         placeholder="Enter custom prompt here",
-                                                         lines=3,
-                                                         visible=False)
-                    with gr.Row():
-                        system_prompt_input = gr.Textbox(label="System Prompt",
-                                                         value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
-                **Bulleted Note Creation Guidelines**
+                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                         value=False,
+                                                         visible=True)
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                         value=False,
+                                                         visible=True)
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=load_preset_prompts(),
+                                                visible=False)
+                with gr.Row():
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt here",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Row():
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+            **Bulleted Note Creation Guidelines**
 
-                **Headings**:
-                - Based on referenced topics, not categories like quotes or terms
-                - Surrounded by **bold** formatting 
-                - Not listed as bullet points
-                - No space between headings and list items underneath
+            **Headings**:
+            - Based on referenced topics, not categories like quotes or terms
+            - Surrounded by **bold** formatting 
+            - Not listed as bullet points
+            - No space between headings and list items underneath
 
-                **Emphasis**:
-                - **Important terms** set in bold font
-                - **Text ending in a colon**: also bolded
+            **Emphasis**:
+            - **Important terms** set in bold font
+            - **Text ending in a colon**: also bolded
 
-                **Review**:
-                - Ensure adherence to specified format
-                - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
-                """,
-                                                         lines=3,
-                                                         visible=False,
-                                                         interactive=True)
-                    custom_prompt_checkbox.change(
-                        fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
-                        inputs=[custom_prompt_checkbox],
-                        outputs=[custom_prompt_input, system_prompt_input]
-                    )
-                    preset_prompt_checkbox.change(
-                        fn=lambda x: gr.update(visible=x),
-                        inputs=[preset_prompt_checkbox],
-                        outputs=[preset_prompt]
-                    )
-
-                    def update_prompts(preset_name):
-                        prompts = update_user_prompt(preset_name)
-                        return (
-                            gr.update(value=prompts["user_prompt"], visible=True),
-                            gr.update(value=prompts["system_prompt"], visible=True)
-                        )
-
-                    preset_prompt.change(
-                        update_prompts,
-                        inputs=preset_prompt,
-                        outputs=[custom_prompt_input, system_prompt_input]
-                    )
-                api_endpoint = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                             "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
-                    value=None,
-                    label="API for Summarization (Optional)"
+            **Review**:
+            - Ensure adherence to specified format
+            - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+            """,
+                                                     lines=3,
+                                                     visible=False,
+                                                     interactive=True)
+                custom_prompt_checkbox.change(
+                    fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+                    inputs=[custom_prompt_checkbox],
+                    outputs=[custom_prompt_input, system_prompt_input]
                 )
-                api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here",
-                                           type="password")
-                explain_summarize_button = gr.Button("Explain/Summarize")
+                preset_prompt_checkbox.change(
+                    fn=lambda x: gr.update(visible=x),
+                    inputs=[preset_prompt_checkbox],
+                    outputs=[preset_prompt]
+                )
 
-            with gr.Column():
-                summarization_output = gr.Textbox(label="Summary:", lines=20)
-                explanation_output = gr.Textbox(label="Explanation:", lines=20)
-                custom_prompt_output = gr.Textbox(label="Custom Prompt:", lines=20, visible=False)
+                def update_prompts(preset_name):
+                    prompts = update_user_prompt(preset_name)
+                    return (
+                        gr.update(value=prompts["user_prompt"], visible=True),
+                        gr.update(value=prompts["system_prompt"], visible=True)
+                    )
+
+                preset_prompt.change(
+                    update_prompts,
+                    inputs=preset_prompt,
+                    outputs=[custom_prompt_input, system_prompt_input]
+                )
+            api_endpoint = gr.Dropdown(
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
+                         "OpenRouter",
+                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                value=None,
+                label="API for Summarization (Optional)"
+            )
+            api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here",
+                                       type="password")
+            explain_summarize_button = gr.Button("Explain/Summarize")
+
+        with gr.Column():
+            summarization_output = gr.Textbox(label="Summary:", lines=20)
+            explanation_output = gr.Textbox(label="Explanation:", lines=20)
+            custom_prompt_output = gr.Textbox(label="Custom Prompt:", lines=20, visible=False)
 
         explain_summarize_button.click(
             fn=summarize_explain_text,
