@@ -6,7 +6,8 @@ import os
 # External Imports
 import gradio as gr
 # Local Imports
-from App_Function_Libraries.Audio_Transcription_Lib import (record_audio, speech_to_text, save_audio_temp)
+from App_Function_Libraries.Audio_Transcription_Lib import (record_audio, speech_to_text, save_audio_temp,
+                                                            stop_recording)
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 #
 #######################################################################################################################
@@ -27,13 +28,25 @@ def create_live_recording_tab():
                 save_recording = gr.Checkbox(label="Save Recording")
                 save_to_db = gr.Checkbox(label="Save Transcription to Database")
                 custom_title = gr.Textbox(label="Custom Title (for database)", visible=False)
-                record_button = gr.Button("Record and Transcribe")
+                record_button = gr.Button("Start Recording")
+                stop_button = gr.Button("Stop Recording")
             with gr.Column():
                 output = gr.Textbox(label="Transcription", lines=10)
                 audio_output = gr.Audio(label="Recorded Audio", visible=False)
 
-        def record_and_transcribe(duration, whisper_model, vad_filter, save_recording):
-            audio_data = record_audio(duration)
+        recording_state = gr.State(value=None)
+
+        def start_recording(duration):
+            p, stream, audio_queue, stop_event, audio_thread = record_audio(duration)
+            return (p, stream, audio_queue, stop_event, audio_thread)
+
+        def end_recording_and_transcribe(recording_state, whisper_model, vad_filter, save_recording, save_to_db, custom_title):
+            if recording_state is None:
+                return "Recording hasn't started yet.", None
+
+            p, stream, audio_queue, stop_event, audio_thread = recording_state
+            audio_data = stop_recording(p, stream, audio_queue, stop_event, audio_thread)
+
             temp_file = save_audio_temp(audio_data)
             segments = speech_to_text(temp_file, whisper_model=whisper_model, vad_filter=vad_filter)
             transcription = "\n".join([segment["Text"] for segment in segments])
@@ -63,8 +76,14 @@ def create_live_recording_tab():
             return gr.update(visible=save_to_db)
 
         record_button.click(
-            fn=record_and_transcribe,
-            inputs=[duration, whisper_models_input, vad_filter, save_recording],
+            fn=start_recording,
+            inputs=[duration],
+            outputs=[recording_state]
+        )
+
+        stop_button.click(
+            fn=end_recording_and_transcribe,
+            inputs=[recording_state, whisper_models_input, vad_filter, save_recording, save_to_db, custom_title],
             outputs=[output, audio_output]
         )
 

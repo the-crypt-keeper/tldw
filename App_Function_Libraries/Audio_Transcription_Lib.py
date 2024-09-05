@@ -17,9 +17,11 @@ import gc
 import json
 import logging
 import os
+import queue
 import sys
 import subprocess
 import tempfile
+import threading
 import time
 import configparser
 # DEBUG Imports
@@ -197,10 +199,29 @@ def record_audio(duration, sample_rate=16000, chunk_size=1024):
 
     print("Recording...")
     frames = []
+    stop_recording = threading.Event()
+    audio_queue = queue.Queue()
 
-    for _ in range(0, int(sample_rate / chunk_size * duration)):
-        data = stream.read(chunk_size)
-        frames.append(data)
+    def audio_callback():
+        for _ in range(0, int(sample_rate / chunk_size * duration)):
+            if stop_recording.is_set():
+                break
+            data = stream.read(chunk_size)
+            audio_queue.put(data)
+
+    audio_thread = threading.Thread(target=audio_callback)
+    audio_thread.start()
+
+    return p, stream, audio_queue, stop_recording, audio_thread
+
+
+def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
+    stop_recording_event.set()
+    audio_thread.join()
+
+    frames = []
+    while not audio_queue.empty():
+        frames.append(audio_queue.get())
 
     print("Recording finished.")
 
