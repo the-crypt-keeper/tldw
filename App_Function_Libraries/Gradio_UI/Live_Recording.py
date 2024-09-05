@@ -63,21 +63,30 @@ def create_live_recording_tab():
                 custom_title = "Self-recorded Audio"
 
             try:
-                add_media_to_database(
-                    url="self_recorded",
-                    info_dict={
-                        "title": custom_title,
-                        "uploader": "self-recorded",
-                        "webpage_url": "self_recorded"  # Add this line
-                    },
-                    segments=[{"Text": transcription}],
-                    summary="",
-                    keywords=["self-recorded", "audio"],  # Change this to a list
-                    custom_prompt_input="",
-                    whisper_model="self-recorded",
-                    media_type="audio"  # Add this line
+                url = "self_recorded"
+                info_dict = {
+                    "title": custom_title,
+                    "uploader": "self-recorded",
+                    "webpage_url": url
+                }
+                segments = [{"Text": transcription}]
+                summary = ""
+                keywords = ["self-recorded", "audio"]
+                custom_prompt_input = ""
+                whisper_model = "self-recorded"
+                media_type = "audio"
+
+                result = add_media_to_database(
+                    url=url,
+                    info_dict=info_dict,
+                    segments=segments,
+                    summary=summary,
+                    keywords=keywords,
+                    custom_prompt_input=custom_prompt_input,
+                    whisper_model=whisper_model,
+                    media_type=media_type
                 )
-                return "Transcription saved to database successfully."
+                return f"Transcription saved to database successfully. {result}"
             except Exception as e:
                 logging.error(f"Error saving transcription to database: {str(e)}")
                 return f"Error saving transcription to database: {str(e)}"
@@ -103,7 +112,7 @@ def create_live_recording_tab():
             outputs=[custom_title]
         )
 
-        gr.Button("Save to Database").click(
+        gr.Button("Save to Database(Need to check 'Save Transcription to Database first')").click(
             fn=save_transcription_to_db,
             inputs=[output, custom_title],
             outputs=gr.Textbox(label="Database Save Status")
