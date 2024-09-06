@@ -4,7 +4,7 @@
 # This library is used to perform any/all DB operations related to SQLite.
 #
 ####
-
+import configparser
 ####################
 # Function List
 # FIXME - UPDATE Function Arguments
@@ -77,7 +77,29 @@ import yaml
 #logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# FIXME - Setup properly and test/add documentation for its existence...
+config = configparser.ConfigParser()
+config.read('config.txt')
+sqlite_path = config.get('Database', 'sqlite_path', fallback='media_summary.db')
+backup_path = config.get('Database', 'backup_path', fallback='database_backups')
 
+db_path = sqlite_path
+backup_dir = backup_path
+#create_automated_backup(db_path, backup_dir)
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#backup_file = create_automated_backup(db_path, backup_dir)
+#upload_to_s3(backup_file, 'your-s3-bucket-name', f"database_backups/{os.path.basename(backup_file)}")
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#create_incremental_backup(db_path, backup_dir)
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#rotate_backups(backup_dir)
+
+#
+#
+#######################################################################################################################
 #
 # Backup-related functions
 
@@ -107,7 +129,7 @@ def create_automated_backup(db_path, backup_dir):
 
     # Create a timestamped backup file name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = os.path.join(backup_dir, f"backup_{timestamp}.db")
+    backup_file = os.path.join(backup_dir, f"media_db_backup_{timestamp}.db")
 
     # Copy the database file
     shutil.copy2(db_path, backup_file)
@@ -137,22 +159,6 @@ def rotate_backups(backup_dir, max_backups=10):
         old_backup = backups.pop()
         os.remove(os.path.join(backup_dir, old_backup))
         print(f"Removed old backup: {old_backup}")
-
-
-# FIXME - Setup properly and test/add documentation for its existence...
-db_path = "path/to/your/database.db"
-backup_dir = "path/to/backup/directory"
-#create_automated_backup(db_path, backup_dir)
-
-# FIXME - Setup properly and test/add documentation for its existence...
-#backup_file = create_automated_backup(db_path, backup_dir)
-#upload_to_s3(backup_file, 'your-s3-bucket-name', f"database_backups/{os.path.basename(backup_file)}")
-
-# FIXME - Setup properly and test/add documentation for its existence...
-#create_incremental_backup(db_path, backup_dir)
-
-# FIXME - Setup properly and test/add documentation for its existence...
-#rotate_backups(backup_dir)
 
 #
 #
