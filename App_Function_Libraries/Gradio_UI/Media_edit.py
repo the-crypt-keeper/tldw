@@ -10,7 +10,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import add_prompt, update_media_content, db, add_or_update_prompt, \
-    load_prompt_details
+    load_prompt_details, fetch_keywords_for_media, update_keywords_for_media
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_prompt_dropdown
 from App_Function_Libraries.DB.SQLite_DB import fetch_item_details
 
@@ -32,32 +32,58 @@ def create_media_edit_tab():
         prompt_input = gr.Textbox(label="Edit Prompt", lines=3)
         summary_input = gr.Textbox(label="Edit Summary", lines=5)
 
+        # Adding keyword input box for editing
+        keywords_input = gr.Textbox(label="Edit Keywords (comma-separated)", placeholder="Enter keywords here...")
+
         update_button = gr.Button("Update Media Content")
         status_message = gr.Textbox(label="Status", interactive=False)
 
+        # Function to update the dropdown with search results
         search_button.click(
             fn=update_dropdown,
             inputs=[search_query_input, search_type_input],
             outputs=[items_output, item_mapping]
         )
 
+        # Function to load selected media content including keywords
         def load_selected_media_content(selected_item, item_mapping):
             if selected_item and item_mapping and selected_item in item_mapping:
                 media_id = item_mapping[selected_item]
-                # FIXME - fetch_item_details is not handled by DB_Manager!
                 content, prompt, summary = fetch_item_details(media_id)
-                return content, prompt, summary
-            return "No item selected or invalid selection", "", ""
 
+                # Fetch keywords for the selected item
+                keywords = fetch_keywords_for_media(media_id)
+                keywords_str = ", ".join(keywords) if keywords else ""
+
+                return content, prompt, summary, keywords_str
+            return "No item selected or invalid selection", "", "", ""
+
+        # Load the selected media content and associated keywords
         items_output.change(
             fn=load_selected_media_content,
             inputs=[items_output, item_mapping],
-            outputs=[content_input, prompt_input, summary_input]
+            outputs=[content_input, prompt_input, summary_input, keywords_input]
         )
 
+        # Function to update media content, prompt, summary, and keywords
+        def update_media_with_keywords(selected_item, item_mapping, content, prompt, summary, keywords):
+            if selected_item and item_mapping and selected_item in item_mapping:
+                media_id = item_mapping[selected_item]
+
+                # Split keywords into a list
+                keyword_list = [kw.strip() for kw in keywords.split(",") if kw.strip()]
+
+                # Update content, prompt, summary, and keywords in the database
+                status = update_media_content(media_id, content, prompt, summary)
+                keyword_status = update_keywords_for_media(media_id, keyword_list)
+
+                return f"{status}\nKeywords: {keyword_status}"
+            return "No item selected or invalid selection"
+
+        # Update button click event
         update_button.click(
-            fn=update_media_content,
-            inputs=[items_output, item_mapping, content_input, prompt_input, summary_input],
+            fn=update_media_with_keywords,
+            inputs=[items_output, item_mapping, content_input, prompt_input, summary_input, keywords_input],
             outputs=status_message
         )
 

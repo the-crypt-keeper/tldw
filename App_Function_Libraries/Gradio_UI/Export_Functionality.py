@@ -8,7 +8,7 @@ import shutil
 import tempfile
 from typing import List, Dict, Optional, Tuple
 import gradio as gr
-from App_Function_Libraries.DB.DB_Manager import DatabaseError, create_automated_backup, db_path, backup_dir
+from App_Function_Libraries.DB.DB_Manager import DatabaseError
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import fetch_item_details, fetch_items_by_keyword, browse_items
 
 logger = logging.getLogger(__name__)
@@ -264,51 +264,3 @@ def create_export_tab():
     )
 
 
-
-def create_backup():
-    backup_file = create_automated_backup(db_path, backup_dir)
-    return f"Backup created: {backup_file}"
-
-def list_backups():
-    backups = [f for f in os.listdir(backup_dir) if f.endswith('.db')]
-    return "\n".join(backups)
-
-def restore_backup(backup_name):
-    backup_path = os.path.join(backup_dir, backup_name)
-    if os.path.exists(backup_path):
-        shutil.copy2(backup_path, db_path)
-        return f"Database restored from {backup_name}"
-    else:
-        return "Backup file not found"
-
-
-def create_backup_tab():
-    with gr.Tab("Create Backup"):
-        gr.Markdown("# Create a backup of the database")
-        with gr.Row():
-            with gr.Column():
-                create_button = gr.Button("Create Backup")
-                create_output = gr.Textbox(label="Result")
-            with gr.Column():
-                create_button.click(create_backup, inputs=[], outputs=create_output)
-
-def create_view_backups_tab():
-    with gr.TabItem("View Backups"):
-        gr.Markdown("# Browse available backups")
-        with gr.Row():
-            with gr.Column():
-                view_button = gr.Button("View Backups")
-            with gr.Column():
-                backup_list = gr.Textbox(label="Available Backups")
-                view_button.click(list_backups, inputs=[], outputs=backup_list)
-
-
-def create_restore_backup_tab():
-    with gr.TabItem("Restore Backup"):
-        gr.Markdown("# Restore a backup of the database")
-        with gr.Column():
-            backup_input = gr.Textbox(label="Backup Filename")
-            restore_button = gr.Button("Restore")
-        with gr.Column():
-            restore_output = gr.Textbox(label="Result")
-            restore_button.click(restore_backup, inputs=[backup_input], outputs=restore_output)

@@ -19,13 +19,15 @@ from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_pr
 from App_Function_Libraries.Gradio_UI.Chat_ui import chat_workflows_tab, create_chat_management_tab, \
     create_chat_interface_four, create_chat_interface_multi_api, create_chat_interface_stacked, create_chat_interface
 from App_Function_Libraries.Gradio_UI.Explain_summarize_tab import create_summarize_explain_tab
-from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab, create_backup_tab, \
-    create_view_backups_tab, create_restore_backup_tab
+from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab
+from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
+    create_restore_backup_tab
 from App_Function_Libraries.Gradio_UI.Import_Functionality import create_import_single_prompt_tab, \
     create_import_obsidian_vault_tab, create_import_item_tab, create_import_book_tab, create_import_multiple_prompts_tab
 from App_Function_Libraries.Gradio_UI.Introduction_tab import create_introduction_tab
 from App_Function_Libraries.Gradio_UI.Keywords import create_view_keywords_tab, create_add_keyword_tab, \
     create_delete_keyword_tab, create_export_keywords_tab
+from App_Function_Libraries.Gradio_UI.Live_Recording import create_live_recording_tab
 from App_Function_Libraries.Gradio_UI.Llamafile_tab import create_chat_with_llamafile_tab
 from App_Function_Libraries.Gradio_UI.Media_edit import create_prompt_clone_tab, create_prompt_edit_tab, \
     create_media_edit_and_clone_tab, create_media_edit_tab
@@ -36,10 +38,11 @@ from App_Function_Libraries.Gradio_UI.Search_Tab import create_prompt_view_tab, 
     create_search_summaries_tab, create_viewing_tab, create_embeddings_tab, create_rag_tab, create_search_tab, \
     create_view_embeddings_tab
 from App_Function_Libraries.Gradio_UI.Trash import create_view_trash_tab, create_empty_trash_tab, \
-    create_delete_trash_tab
+    create_delete_trash_tab, create_search_and_mark_trash_tab
 from App_Function_Libraries.Gradio_UI.Utilities import create_utilities_yt_timestamp_tab, create_utilities_yt_audio_tab, \
     create_utilities_yt_video_tab
 from App_Function_Libraries.Gradio_UI.Video_transcription_tab import create_video_transcription_tab
+from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
 #
 # Gradio UI Imports
@@ -246,16 +249,15 @@ def launch_ui(share_public=None, server_mode=False):
                     create_pdf_ingestion_test_tab()
                     create_resummary_tab()
                     create_summarize_explain_tab()
+                    create_live_recording_tab()
 
-            with gr.TabItem("Search / Detailed View"):
+            with gr.TabItem("Search / RAG / Embeddings"):
                 create_search_tab()
                 create_rag_tab()
                 create_embeddings_tab()
                 create_view_embeddings_tab()
-                create_viewing_tab()
                 create_search_summaries_tab()
                 create_prompt_search_tab()
-                create_prompt_view_tab()
 
             with gr.TabItem("Chat with an LLM"):
                 create_chat_interface()
@@ -268,9 +270,13 @@ def launch_ui(share_public=None, server_mode=False):
                 from App_Function_Libraries.Gradio_UI.Writing_tab import create_character_card_interaction_tab
                 create_character_card_interaction_tab()
 
+            with gr.TabItem("View DB Items"):
+                create_viewing_tab()
+                create_prompt_view_tab()
 
-            with gr.TabItem("Edit Existing Items"):
+            with gr.TabItem("Manage / Edit Existing Items"):
                 create_media_edit_tab()
+                create_manage_items_tab()
                 create_media_edit_and_clone_tab()
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
@@ -315,6 +321,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_utilities_yt_timestamp_tab()
 
             with gr.TabItem("Trashcan"):
+                create_search_and_mark_trash_tab()
                 create_view_trash_tab()
                 create_delete_trash_tab()
                 create_empty_trash_tab()

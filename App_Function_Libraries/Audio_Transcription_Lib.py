@@ -4,8 +4,6 @@
 # This library is used to perform transcription of audio files.
 # Currently, uses faster_whisper for transcription.
 #
-####
-import configparser
 ####################
 # Function List
 #
@@ -19,13 +17,16 @@ import gc
 import json
 import logging
 import os
+import queue
 import sys
 import subprocess
+import tempfile
+import threading
 import time
-
+import configparser
 # DEBUG Imports
 #from memory_profiler import profile
-
+import pyaudio
 # Import Local
 #
 #######################################################################################################################
@@ -186,6 +187,60 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
     except Exception as e:
         logging.error("speech-to-text: Error transcribing audio: %s", str(e))
         raise RuntimeError("speech-to-text: Error transcribing audio")
+
+
+def record_audio(duration, sample_rate=16000, chunk_size=1024):
+    p = pyaudio.PyAudio()
+    stream = p.open(format=pyaudio.paInt16,
+                    channels=1,
+                    rate=sample_rate,
+                    input=True,
+                    frames_per_buffer=chunk_size)
+
+    print("Recording...")
+    frames = []
+    stop_recording = threading.Event()
+    audio_queue = queue.Queue()
+
+    def audio_callback():
+        for _ in range(0, int(sample_rate / chunk_size * duration)):
+            if stop_recording.is_set():
+                break
+            data = stream.read(chunk_size)
+            audio_queue.put(data)
+
+    audio_thread = threading.Thread(target=audio_callback)
+    audio_thread.start()
+
+    return p, stream, audio_queue, stop_recording, audio_thread
+
+
+def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
+    stop_recording_event.set()
+    audio_thread.join()
+
+    frames = []
+    while not audio_queue.empty():
+        frames.append(audio_queue.get())
+
+    print("Recording finished.")
+
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+
+    return b''.join(frames)
+
+def save_audio_temp(audio_data, sample_rate=16000):
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+        import wave
+        wf = wave.open(temp_file.name, 'wb')
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(audio_data)
+        wf.close()
+        return temp_file.name
 
 #
 #
