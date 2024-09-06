@@ -19,8 +19,8 @@ from App_Function_Libraries.DB.DB_Manager import (
 
 # FIXME - add mark_as_trash ability to the UI
 
-# FIXME - add ability to edit an items full media content / update_media_content function
 
+# FIXME - Doesn't work. also need ot merge this tab wtih Edit Existing Items tab....
 def create_manage_items_tab():
     with gr.TabItem("Edit/Manage DB Items"):
         search_input = gr.Textbox(label="Search for Media (title or ID)")

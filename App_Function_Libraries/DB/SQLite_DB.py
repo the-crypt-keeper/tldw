@@ -785,6 +785,50 @@ def export_keywords_to_csv():
         logger.error(f"Error exporting keywords to CSV: {e}")
         return None, f"Error exporting keywords: {e}"
 
+def fetch_keywords_for_media(media_id):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT k.keyword
+                FROM Keywords k
+                JOIN MediaKeywords mk ON k.id = mk.keyword_id
+                WHERE mk.media_id = ?
+            ''', (media_id,))
+            keywords = [row[0] for row in cursor.fetchall()]
+        return keywords
+    except sqlite3.Error as e:
+        logging.error(f"Error fetching keywords: {e}")
+        return []
+
+def update_keywords_for_media(media_id, keyword_list):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Remove old keywords
+            cursor.execute('DELETE FROM MediaKeywords WHERE media_id = ?', (media_id,))
+
+            # Add new keywords
+            for keyword in keyword_list:
+                cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+                cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                keyword_id = cursor.fetchone()[0]
+                cursor.execute('INSERT INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
+
+            conn.commit()
+        return "Keywords updated successfully."
+    except sqlite3.Error as e:
+        logging.error(f"Error updating keywords: {e}")
+        return "Error updating keywords."
+
+#
+# End of Keyword-related functions
+#######################################################################################################################
+#
+# Media-related Functions
+
+
 
 # Function to fetch items based on search query and type
 def browse_items(search_query, search_type):
