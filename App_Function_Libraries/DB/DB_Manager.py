@@ -3,7 +3,7 @@ import logging
 import os
 from contextlib import contextmanager
 from time import sleep
-from typing import Tuple, List, Union
+from typing import Tuple, List, Union, Dict
 import sqlite3
 # 3rd-Party Libraries
 from elasticsearch import Elasticsearch
@@ -60,7 +60,13 @@ from App_Function_Libraries.DB.SQLite_DB import (
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model,
     DatabaseError, create_document_version as sqlite_create_document_version,
     get_document_version as sqlite_get_document_version, sqlite_search_db, sqlite_add_media_chunk,
-    sqlite_update_fts_for_media, sqlite_get_unprocessed_media
+    sqlite_update_fts_for_media, sqlite_get_unprocessed_media, fetch_item_details as sqlite_fetch_item_details, \
+    search_media_database as sqlite_search_media_database, mark_as_trash as sqlite_mark_as_trash, \
+    get_media_transcripts as sqlite_get_media_transcripts, get_specific_transcript as sqlite_get_specific_transcript, \
+    get_media_summaries as sqlite_get_media_summaries, get_specific_summary as sqlite_get_specific_summary, \
+    get_media_prompts as sqlite_get_media_prompts, get_specific_prompt as sqlite_get_specific_prompt, \
+    delete_specific_transcript as sqlite_delete_specific_transcript, delete_specific_summary as sqlite_delete_specific_summary, \
+    delete_specific_prompt as sqlite_delete_specific_prompt,
 )
 #
 # End of imports
@@ -400,6 +406,97 @@ def delete_prompt(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
+def search_media_database(query: str) -> List[Tuple[int, str, str]]:
+    if db_type == 'sqlite':
+        return sqlite_search_media_database(query)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version when available
+        raise NotImplementedError("Elasticsearch version of search_media_database not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def mark_as_trash(media_id: int) -> None:
+    if db_type == 'sqlite':
+        return sqlite_mark_as_trash(media_id)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version when available
+        raise NotImplementedError("Elasticsearch version of mark_as_trash not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def get_media_transcripts(media_id: int) -> List[Dict]:
+    if db_type == 'sqlite':
+        return sqlite_get_media_transcripts(media_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of get_media_transcripts not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def get_specific_transcript(transcript_id: int) -> Dict:
+    if db_type == 'sqlite':
+        return sqlite_get_specific_transcript(transcript_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of get_specific_transcript not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def get_media_summaries(media_id: int) -> List[Dict]:
+    if db_type == 'sqlite':
+        return sqlite_get_media_summaries(media_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of get_media_summaries not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def get_specific_summary(summary_id: int) -> Dict:
+    if db_type == 'sqlite':
+        return sqlite_get_specific_summary(summary_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of get_specific_summary not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def get_media_prompts(media_id: int) -> List[Dict]:
+    if db_type == 'sqlite':
+        return sqlite_get_media_prompts(media_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of get_media_prompts not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def get_specific_prompt(prompt_id: int) -> Dict:
+    if db_type == 'sqlite':
+        return sqlite_get_specific_prompt(prompt_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of get_specific_prompt not yet implemented")
+    else:
+        return {'error': f"Unsupported database type: {db_type}"}
+
+def delete_specific_transcript(transcript_id: int) -> str:
+    if db_type == 'sqlite':
+        return sqlite_delete_specific_transcript(transcript_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of delete_specific_transcript not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def delete_specific_summary(summary_id: int) -> str:
+    if db_type == 'sqlite':
+        return sqlite_delete_specific_summary(summary_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of delete_specific_summary not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def delete_specific_prompt(prompt_id: int) -> str:
+    if db_type == 'sqlite':
+        return sqlite_delete_specific_prompt(prompt_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of delete_specific_prompt not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+
 #
 # End of Prompt-related functions
 ############################################################################################################
@@ -530,6 +627,26 @@ def empty_trash(*args, **kwargs):
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+
+def fetch_item_details(media_id: int) -> Tuple[str, str, str]:
+    """
+    Fetch the details of a media item including content, prompt, and summary.
+
+    Args:
+        media_id (int): The ID of the media item.
+
+    Returns:
+        Tuple[str, str, str]: A tuple containing (content, prompt, summary).
+        If an error occurs, it returns empty strings for each field.
+    """
+    if db_type == 'sqlite':
+        return sqlite_fetch_item_details(media_id)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version when available
+        raise NotImplementedError("Elasticsearch version of fetch_item_details not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
 
 #
 # End of Trash-related Functions

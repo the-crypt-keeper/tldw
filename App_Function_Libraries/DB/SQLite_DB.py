@@ -2020,6 +2020,182 @@ def user_delete_item(media_id: int, force: bool = False) -> str:
         else:
             return "Item is already in trash. Use force=True to delete permanently before 30 days."
 
+def get_media_transcripts(media_id):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, whisper_model, transcription, created_at
+            FROM Transcripts
+            WHERE media_id = ?
+            ORDER BY created_at DESC
+            ''', (media_id,))
+            results = cursor.fetchall()
+            return [
+                {
+                    'id': row[0],
+                    'whisper_model': row[1],
+                    'content': row[2],
+                    'created_at': row[3]
+                }
+                for row in results
+            ]
+    except Exception as e:
+        logging.error(f"Error in get_media_transcripts: {str(e)}")
+        return []
+
+def get_specific_transcript(transcript_id: int) -> Dict:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, whisper_model, transcription, created_at
+            FROM Transcripts
+            WHERE id = ?
+            ''', (transcript_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'whisper_model': result[1],
+                    'content': result[2],
+                    'created_at': result[3]
+                }
+            return {'error': f"No transcript found with ID {transcript_id}"}
+    except Exception as e:
+        logging.error(f"Error in get_specific_transcript: {str(e)}")
+        return {'error': f"Error retrieving transcript: {str(e)}"}
+
+def get_media_summaries(media_id: int) -> List[Dict]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, summary, modification_date
+            FROM MediaModifications
+            WHERE media_id = ? AND summary IS NOT NULL
+            ORDER BY modification_date DESC
+            ''', (media_id,))
+            results = cursor.fetchall()
+            return [
+                {
+                    'id': row[0],
+                    'content': row[1],
+                    'created_at': row[2]
+                }
+                for row in results
+            ]
+    except Exception as e:
+        logging.error(f"Error in get_media_summaries: {str(e)}")
+
+def get_specific_summary(summary_id: int) -> Dict:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, summary, modification_date
+            FROM MediaModifications
+            WHERE id = ?
+            ''', (summary_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'content': result[1],
+                    'created_at': result[2]
+                }
+            return {'error': f"No summary found with ID {summary_id}"}
+    except Exception as e:
+        logging.error(f"Error in get_specific_summary: {str(e)}")
+        return {'error': f"Error retrieving summary: {str(e)}"}
+
+def get_media_prompts(media_id: int) -> List[Dict]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, prompt, modification_date
+            FROM MediaModifications
+            WHERE media_id = ? AND prompt IS NOT NULL
+            ORDER BY modification_date DESC
+            ''', (media_id,))
+            results = cursor.fetchall()
+            return [
+                {
+                    'id': row[0],
+                    'content': row[1],
+                    'created_at': row[2]
+                }
+                for row in results
+            ]
+    except Exception as e:
+        logging.error(f"Error in get_media_prompts: {str(e)}")
+        return []
+
+def get_specific_prompt(prompt_id: int) -> Dict:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, prompt, modification_date
+            FROM MediaModifications
+            WHERE id = ?
+            ''', (prompt_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'content': result[1],
+                    'created_at': result[2]
+                }
+            return {'error': f"No prompt found with ID {prompt_id}"}
+    except Exception as e:
+        logging.error(f"Error in get_specific_prompt: {str(e)}")
+        return {'error': f"Error retrieving prompt: {str(e)}"}
+
+
+def delete_specific_transcript(transcript_id: int) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM Transcripts WHERE id = ?', (transcript_id,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                return f"Transcript with ID {transcript_id} has been deleted successfully."
+            else:
+                return f"No transcript found with ID {transcript_id}."
+    except Exception as e:
+        logging.error(f"Error in delete_specific_transcript: {str(e)}")
+        return f"Error deleting transcript: {str(e)}"
+
+def delete_specific_summary(summary_id: int) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE MediaModifications SET summary = NULL WHERE id = ?', (summary_id,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                return f"Summary with ID {summary_id} has been deleted successfully."
+            else:
+                return f"No summary found with ID {summary_id}."
+    except Exception as e:
+        logging.error(f"Error in delete_specific_summary: {str(e)}")
+        return f"Error deleting summary: {str(e)}"
+
+def delete_specific_prompt(prompt_id: int) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE MediaModifications SET prompt = NULL WHERE id = ?', (prompt_id,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                return f"Prompt with ID {prompt_id} has been deleted successfully."
+            else:
+                return f"No prompt found with ID {prompt_id}."
+    except Exception as e:
+        logging.error(f"Error in delete_specific_prompt: {str(e)}")
+        return f"Error deleting prompt: {str(e)}"
+
 #
 # End of Functions to handle deletion of media items
 #######################################################################################################################
@@ -2085,10 +2261,11 @@ def get_document_version(media_id: int, version_number: int = None) -> Dict[str,
                     'created_at': result[3]
                 }
             else:
-                return None
+                return {'error': f"No document version found for media_id {media_id}" + (f" and version_number {version_number}" if version_number is not None else "")}
     except sqlite3.Error as e:
-        logging.error(f"Error retrieving document version: {e}")
-        raise DatabaseError(f"Error retrieving document version: {e}")
+        error_message = f"Error retrieving document version: {e}"
+        logging.error(error_message)
+        return {'error': error_message}
 
 #
 # End of Functions to manage document versions
