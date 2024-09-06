@@ -270,11 +270,11 @@ def launch_ui(share_public=None, server_mode=False):
                 from App_Function_Libraries.Gradio_UI.Writing_tab import create_character_card_interaction_tab
                 create_character_card_interaction_tab()
 
-            with gr.TabItem("View / Edit DB Items"):
+            with gr.TabItem("View DB Items"):
                 create_viewing_tab()
                 create_prompt_view_tab()
 
-            with gr.TabItem("Edit Existing Items"):
+            with gr.TabItem("Manage / Edit Existing Items"):
                 create_media_edit_tab()
                 create_manage_items_tab()
                 create_media_edit_and_clone_tab()
@@ -320,7 +320,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_utilities_yt_audio_tab()
                 create_utilities_yt_timestamp_tab()
 
-            with gr.TabItem("Manage Items/Trashcan"):
+            with gr.TabItem("Trashcan"):
                 create_search_and_mark_trash_tab()
                 create_view_trash_tab()
                 create_delete_trash_tab()

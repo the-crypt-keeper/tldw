@@ -66,7 +66,8 @@ from App_Function_Libraries.DB.SQLite_DB import (
     get_media_summaries as sqlite_get_media_summaries, get_specific_summary as sqlite_get_specific_summary, \
     get_media_prompts as sqlite_get_media_prompts, get_specific_prompt as sqlite_get_specific_prompt, \
     delete_specific_transcript as sqlite_delete_specific_transcript, delete_specific_summary as sqlite_delete_specific_summary, \
-    delete_specific_prompt as sqlite_delete_specific_prompt,
+    delete_specific_prompt as sqlite_delete_specific_prompt, fetch_keywords_for_media as sqlite_fetch_keywords_for_media, \
+    update_keywords_for_media as sqlite_update_keywords_for_media
 )
 #
 # End of imports
@@ -387,7 +388,7 @@ def load_prompt_details(*args, **kwargs):
 
 def load_preset_prompts(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_load_preset_prompts(*args, **kwargs)
+        return sqlite_load_preset_prompts()
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
@@ -507,7 +508,7 @@ def delete_specific_prompt(prompt_id: int) -> str:
 
 def keywords_browser_interface(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_keywords_browser_interface(*args, **kwargs)
+        return sqlite_keywords_browser_interface()
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
@@ -530,7 +531,21 @@ def delete_keyword(*args, **kwargs):
 
 def export_keywords_to_csv(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_export_keywords_to_csv(*args, **kwargs)
+        return sqlite_export_keywords_to_csv()
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def update_keywords_for_media(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_update_keywords_for_media(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def fetch_keywords_for_media(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_fetch_keywords_for_media(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
@@ -609,7 +624,7 @@ def get_conversation_name(*args, **kwargs):
 
 def get_trashed_items(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_get_trashed_items(*args, **kwargs)
+        return sqlite_get_trashed_items()
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
