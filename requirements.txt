@@ -109,8 +109,6 @@ watchfiles==0.21.0
 websockets==11.0.3
 yt-dlp
 nltk
-torch
-torchaudio
 openai~=1.28.1
 tiktoken~=0.6.0
 pymupdf
@@ -122,8 +120,9 @@ elasticsearch
 jieba
 pyaudio
 fugashi
-#torch==2.2.2+cu121
-#torchaudio==2.2.2+cu121
+--extra-index-url https://download.pytorch.org/whl/cu123
+torch
+torchaudio
 #websockets
 #yt-dlp==2024.4.9
 #--extra-index-url https://download.pytorch.org/whl/cu113
