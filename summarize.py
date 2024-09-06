@@ -33,6 +33,9 @@ from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extrac
 #
 # Other Tokenizers
 #
+# Code responsible for launching GUI and leading to most functionality on line 838-862: launch UI launches the Gradio UI, which starts in the `Gradio_Related.py` file, where every tab it loads proceeds to load that page in a chain,
+# this means that the `Gradio_Related.py` file is the main file for the UI, and then calls out to all the other pieces, through the individual tabs.
+# So if you're trying to understand the codebase, start with `Gradio_Related.py` and then follow the chain of calls to understand how the UI is built/works on the backend as I've isolated/grouped most things together.
 #######################
 # Logging Setup
 #
@@ -832,7 +835,9 @@ Sample commands:
                                       keywords=args.keywords)
             print(result)
         sys.exit(0)
-
+########################################################################################################################
+#
+#   Launch the UI
     # Launch the GUI
     if args.user_interface:
         if local_llm:
@@ -855,7 +860,7 @@ Sample commands:
     elif not args.input_path:
         parser.print_help()
         sys.exit(1)
-
+########################################################################################################################
     else:
         logging.info('Starting the transcription and summarization process.')
         logging.info(f'Input path: {args.input_path}')

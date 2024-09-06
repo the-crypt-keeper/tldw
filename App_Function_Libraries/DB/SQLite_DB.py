@@ -4,7 +4,7 @@
 # This library is used to perform any/all DB operations related to SQLite.
 #
 ####
-
+import configparser
 ####################
 # Function List
 # FIXME - UPDATE Function Arguments
@@ -77,7 +77,29 @@ import yaml
 #logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# FIXME - Setup properly and test/add documentation for its existence...
+config = configparser.ConfigParser()
+config.read('config.txt')
+sqlite_path = config.get('Database', 'sqlite_path', fallback='media_summary.db')
+backup_path = config.get('Database', 'backup_path', fallback='database_backups')
 
+db_path = sqlite_path
+backup_dir = backup_path
+#create_automated_backup(db_path, backup_dir)
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#backup_file = create_automated_backup(db_path, backup_dir)
+#upload_to_s3(backup_file, 'your-s3-bucket-name', f"database_backups/{os.path.basename(backup_file)}")
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#create_incremental_backup(db_path, backup_dir)
+
+# FIXME - Setup properly and test/add documentation for its existence...
+#rotate_backups(backup_dir)
+
+#
+#
+#######################################################################################################################
 #
 # Backup-related functions
 
@@ -107,7 +129,7 @@ def create_automated_backup(db_path, backup_dir):
 
     # Create a timestamped backup file name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = os.path.join(backup_dir, f"backup_{timestamp}.db")
+    backup_file = os.path.join(backup_dir, f"media_db_backup_{timestamp}.db")
 
     # Copy the database file
     shutil.copy2(db_path, backup_file)
@@ -137,22 +159,6 @@ def rotate_backups(backup_dir, max_backups=10):
         old_backup = backups.pop()
         os.remove(os.path.join(backup_dir, old_backup))
         print(f"Removed old backup: {old_backup}")
-
-
-# FIXME - Setup properly and test/add documentation for its existence...
-db_path = "path/to/your/database.db"
-backup_dir = "path/to/backup/directory"
-#create_automated_backup(db_path, backup_dir)
-
-# FIXME - Setup properly and test/add documentation for its existence...
-#backup_file = create_automated_backup(db_path, backup_dir)
-#upload_to_s3(backup_file, 'your-s3-bucket-name', f"database_backups/{os.path.basename(backup_file)}")
-
-# FIXME - Setup properly and test/add documentation for its existence...
-#create_incremental_backup(db_path, backup_dir)
-
-# FIXME - Setup properly and test/add documentation for its existence...
-#rotate_backups(backup_dir)
 
 #
 #
@@ -778,6 +784,50 @@ def export_keywords_to_csv():
     except Exception as e:
         logger.error(f"Error exporting keywords to CSV: {e}")
         return None, f"Error exporting keywords: {e}"
+
+def fetch_keywords_for_media(media_id):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT k.keyword
+                FROM Keywords k
+                JOIN MediaKeywords mk ON k.id = mk.keyword_id
+                WHERE mk.media_id = ?
+            ''', (media_id,))
+            keywords = [row[0] for row in cursor.fetchall()]
+        return keywords
+    except sqlite3.Error as e:
+        logging.error(f"Error fetching keywords: {e}")
+        return []
+
+def update_keywords_for_media(media_id, keyword_list):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Remove old keywords
+            cursor.execute('DELETE FROM MediaKeywords WHERE media_id = ?', (media_id,))
+
+            # Add new keywords
+            for keyword in keyword_list:
+                cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+                cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                keyword_id = cursor.fetchone()[0]
+                cursor.execute('INSERT INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', (media_id, keyword_id))
+
+            conn.commit()
+        return "Keywords updated successfully."
+    except sqlite3.Error as e:
+        logging.error(f"Error updating keywords: {e}")
+        return "Error updating keywords."
+
+#
+# End of Keyword-related functions
+#######################################################################################################################
+#
+# Media-related Functions
+
 
 
 # Function to fetch items based on search query and type
@@ -2014,6 +2064,182 @@ def user_delete_item(media_id: int, force: bool = False) -> str:
         else:
             return "Item is already in trash. Use force=True to delete permanently before 30 days."
 
+def get_media_transcripts(media_id):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, whisper_model, transcription, created_at
+            FROM Transcripts
+            WHERE media_id = ?
+            ORDER BY created_at DESC
+            ''', (media_id,))
+            results = cursor.fetchall()
+            return [
+                {
+                    'id': row[0],
+                    'whisper_model': row[1],
+                    'content': row[2],
+                    'created_at': row[3]
+                }
+                for row in results
+            ]
+    except Exception as e:
+        logging.error(f"Error in get_media_transcripts: {str(e)}")
+        return []
+
+def get_specific_transcript(transcript_id: int) -> Dict:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, whisper_model, transcription, created_at
+            FROM Transcripts
+            WHERE id = ?
+            ''', (transcript_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'whisper_model': result[1],
+                    'content': result[2],
+                    'created_at': result[3]
+                }
+            return {'error': f"No transcript found with ID {transcript_id}"}
+    except Exception as e:
+        logging.error(f"Error in get_specific_transcript: {str(e)}")
+        return {'error': f"Error retrieving transcript: {str(e)}"}
+
+def get_media_summaries(media_id: int) -> List[Dict]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, summary, modification_date
+            FROM MediaModifications
+            WHERE media_id = ? AND summary IS NOT NULL
+            ORDER BY modification_date DESC
+            ''', (media_id,))
+            results = cursor.fetchall()
+            return [
+                {
+                    'id': row[0],
+                    'content': row[1],
+                    'created_at': row[2]
+                }
+                for row in results
+            ]
+    except Exception as e:
+        logging.error(f"Error in get_media_summaries: {str(e)}")
+
+def get_specific_summary(summary_id: int) -> Dict:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, summary, modification_date
+            FROM MediaModifications
+            WHERE id = ?
+            ''', (summary_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'content': result[1],
+                    'created_at': result[2]
+                }
+            return {'error': f"No summary found with ID {summary_id}"}
+    except Exception as e:
+        logging.error(f"Error in get_specific_summary: {str(e)}")
+        return {'error': f"Error retrieving summary: {str(e)}"}
+
+def get_media_prompts(media_id: int) -> List[Dict]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, prompt, modification_date
+            FROM MediaModifications
+            WHERE media_id = ? AND prompt IS NOT NULL
+            ORDER BY modification_date DESC
+            ''', (media_id,))
+            results = cursor.fetchall()
+            return [
+                {
+                    'id': row[0],
+                    'content': row[1],
+                    'created_at': row[2]
+                }
+                for row in results
+            ]
+    except Exception as e:
+        logging.error(f"Error in get_media_prompts: {str(e)}")
+        return []
+
+def get_specific_prompt(prompt_id: int) -> Dict:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT id, prompt, modification_date
+            FROM MediaModifications
+            WHERE id = ?
+            ''', (prompt_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'content': result[1],
+                    'created_at': result[2]
+                }
+            return {'error': f"No prompt found with ID {prompt_id}"}
+    except Exception as e:
+        logging.error(f"Error in get_specific_prompt: {str(e)}")
+        return {'error': f"Error retrieving prompt: {str(e)}"}
+
+
+def delete_specific_transcript(transcript_id: int) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM Transcripts WHERE id = ?', (transcript_id,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                return f"Transcript with ID {transcript_id} has been deleted successfully."
+            else:
+                return f"No transcript found with ID {transcript_id}."
+    except Exception as e:
+        logging.error(f"Error in delete_specific_transcript: {str(e)}")
+        return f"Error deleting transcript: {str(e)}"
+
+def delete_specific_summary(summary_id: int) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE MediaModifications SET summary = NULL WHERE id = ?', (summary_id,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                return f"Summary with ID {summary_id} has been deleted successfully."
+            else:
+                return f"No summary found with ID {summary_id}."
+    except Exception as e:
+        logging.error(f"Error in delete_specific_summary: {str(e)}")
+        return f"Error deleting summary: {str(e)}"
+
+def delete_specific_prompt(prompt_id: int) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE MediaModifications SET prompt = NULL WHERE id = ?', (prompt_id,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                return f"Prompt with ID {prompt_id} has been deleted successfully."
+            else:
+                return f"No prompt found with ID {prompt_id}."
+    except Exception as e:
+        logging.error(f"Error in delete_specific_prompt: {str(e)}")
+        return f"Error deleting prompt: {str(e)}"
+
 #
 # End of Functions to handle deletion of media items
 #######################################################################################################################
@@ -2079,10 +2305,11 @@ def get_document_version(media_id: int, version_number: int = None) -> Dict[str,
                     'created_at': result[3]
                 }
             else:
-                return None
+                return {'error': f"No document version found for media_id {media_id}" + (f" and version_number {version_number}" if version_number is not None else "")}
     except sqlite3.Error as e:
-        logging.error(f"Error retrieving document version: {e}")
-        raise DatabaseError(f"Error retrieving document version: {e}")
+        error_message = f"Error retrieving document version: {e}"
+        logging.error(error_message)
+        return {'error': error_message}
 
 #
 # End of Functions to manage document versions
