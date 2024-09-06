@@ -8,6 +8,7 @@ fire==0.6.0
 gradio==4.42.0
 Jinja2==3.1.4
 langchain==0.2.15
+langdetect
 nltk==3.8.1
 numpy
 pandas==2.2.2
@@ -27,7 +28,7 @@ scikit_learn==1.5.1
 sentence_transformers==3.0.1
 streamlit==1.38.0
 tenacity==8.5.0
-textstat==0.7.4
+textstat
 tiktoken==0.7.0
 #torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 --force-reinstall --no-cache
 tqdm==4.66.4

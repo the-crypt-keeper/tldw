@@ -19,8 +19,9 @@ from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_pr
 from App_Function_Libraries.Gradio_UI.Chat_ui import chat_workflows_tab, create_chat_management_tab, \
     create_chat_interface_four, create_chat_interface_multi_api, create_chat_interface_stacked, create_chat_interface
 from App_Function_Libraries.Gradio_UI.Explain_summarize_tab import create_summarize_explain_tab
-from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab, create_backup_tab, \
-    create_view_backups_tab, create_restore_backup_tab
+from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab
+from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
+    create_restore_backup_tab
 from App_Function_Libraries.Gradio_UI.Import_Functionality import create_import_single_prompt_tab, \
     create_import_obsidian_vault_tab, create_import_item_tab, create_import_book_tab, create_import_multiple_prompts_tab
 from App_Function_Libraries.Gradio_UI.Introduction_tab import create_introduction_tab

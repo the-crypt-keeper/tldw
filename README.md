@@ -283,7 +283,10 @@ None of these companies exist to provide AI services in 2024. They’re only doi
        - Then, after downloading and selecting a model, it'll launch the model using llamafile, so you'll have a browser window/tab opened with a frontend to the model/llama.cpp server.
        - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
        - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
-
+- **Setting up Backups**
+  - Manual backups are possible through the GUI. These use the `VACUUM` command to create a new DB file at your backup folder location. (default is `./tldw_DB_Backups/`
+  - If you'd like something more automated + don't have to think about it: https://litestream.io/getting-started/
+    - This will allow you to have a backup of your DB that is always up-to-date, and can be restored with a single command. + It's free.
 - **Encrypting your Database at rest using 7zip**
   - 7zip since its cross-platform and easy to use.
   - https://superuser.com/questions/1377414/how-to-encrypt-txt-files-with-aes256-via-windows-7z-command-line

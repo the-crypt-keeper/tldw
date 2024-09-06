@@ -3,7 +3,7 @@ import logging
 import os
 from contextlib import contextmanager
 from time import sleep
-from typing import Tuple, List
+from typing import Tuple, List, Union
 import sqlite3
 # 3rd-Party Libraries
 from elasticsearch import Elasticsearch
@@ -62,6 +62,26 @@ from App_Function_Libraries.DB.SQLite_DB import (
     get_document_version as sqlite_get_document_version, sqlite_search_db, sqlite_add_media_chunk,
     sqlite_update_fts_for_media, sqlite_get_unprocessed_media
 )
+#
+# End of imports
+############################################################################################################
+#
+# Globals
+
+config = configparser.ConfigParser()
+config.read('config.txt')
+
+db_path: str = config.get('Database', 'sqlite_path', fallback='media_summary.db')
+
+backup_path: str = config.get('Database', 'backup_path', fallback='database_backups')
+
+backup_dir: Union[str, bytes] = os.environ.get('DB_BACKUP_DIR', backup_path)
+
+#
+# End of Globals
+############################################################################################################
+#
+# Database Manager Class
 
 class Database:
     def __init__(self, db_path=None):
@@ -132,13 +152,6 @@ elif db_type == 'elasticsearch':
     }])
 else:
     raise ValueError(f"Unsupported database type: {db_type}")
-
-db_path = db_config['sqlite_path']
-
-# Update this path to the directory where you want to store the database backups
-backup_dir = os.environ.get('DB_BACKUP_DIR', 'path/to/backup/directory')
-
-
 
 
 if db_type == 'sqlite':
