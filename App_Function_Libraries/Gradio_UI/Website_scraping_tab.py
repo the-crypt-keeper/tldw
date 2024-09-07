@@ -114,6 +114,8 @@ def create_website_scraping_tab():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt", value=False, visible=True)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt", value=False, visible=True)
                 with gr.Row():
+                    temp_slider = gr.Slider(0.1, 2.0, 0.7, label="Temperature")
+                with gr.Row():
                     preset_prompt = gr.Dropdown(
                         label="Select Preset Prompt",
                         choices=load_preset_prompts(),
@@ -130,22 +132,22 @@ def create_website_scraping_tab():
                     system_prompt_input = gr.Textbox(
                         label="System Prompt",
                         value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
-**Bulleted Note Creation Guidelines**
-
-**Headings**:
-- Based on referenced topics, not categories like quotes or terms
-- Surrounded by **bold** formatting 
-- Not listed as bullet points
-- No space between headings and list items underneath
-
-**Emphasis**:
-- **Important terms** set in bold font
-- **Text ending in a colon**: also bolded
-
-**Review**:
-- Ensure adherence to specified format
-- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
-""",
+                                **Bulleted Note Creation Guidelines**
+                                
+                                **Headings**:
+                                - Based on referenced topics, not categories like quotes or terms
+                                - Surrounded by **bold** formatting 
+                                - Not listed as bullet points
+                                - No space between headings and list items underneath
+                                
+                                **Emphasis**:
+                                - **Important terms** set in bold font
+                                - **Text ending in a colon**: also bolded
+                                
+                                **Review**:
+                                - Ensure adherence to specified format
+                                - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                                """,
                         lines=3,
                         visible=False
                     )
@@ -294,7 +296,7 @@ def create_website_scraping_tab():
             fn=scrape_and_summarize_wrapper,
             inputs=[scrape_method, url_input, url_level, max_pages, max_depth, summarize_checkbox,
                     website_custom_prompt_input, api_name_input, api_key_input, keywords_input,
-                    custom_article_title_input, system_prompt_input, gr.Slider(0.1, 2.0, 0.7, label="Temperature")],
+                    custom_article_title_input, system_prompt_input, temp_slider],
             outputs=[result_output]
 )
 
