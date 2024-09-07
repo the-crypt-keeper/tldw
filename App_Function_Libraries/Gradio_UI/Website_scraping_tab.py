@@ -113,11 +113,6 @@ def create_website_scraping_tab():
                     placeholder="Enter custom titles for the articles, one per line",
                     lines=5
                 )
-                custom_article_title_input = gr.Textbox(
-                    label="Custom Article Titles (Optional, one per line)",
-                    placeholder="Enter custom titles for the articles, one per line",
-                    lines=5
-                )
                 with gr.Row():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt", value=False, visible=True)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt", value=False, visible=True)
