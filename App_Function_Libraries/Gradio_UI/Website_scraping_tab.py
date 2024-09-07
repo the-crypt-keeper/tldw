@@ -2,21 +2,28 @@
 # Gradio UI for scraping websites
 #
 # Imports
+import asyncio
 import json
-from typing import Optional, List, Dict
-from urllib.parse import urlparse
+import logging
+import os
+import random
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, List, Dict, Any
+from urllib.parse import urlparse, urljoin
 
 #
 # External Imports
 import gradio as gr
+from playwright.async_api import TimeoutError, async_playwright
+from playwright.sync_api import sync_playwright
 
 #
 # Local Imports
-from App_Function_Libraries.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, scrape_article, \
-    collect_internal_links
+from App_Function_Libraries.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, scrape_article
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
+from App_Function_Libraries.Summarization_General_Lib import summarize
 
 
 #
@@ -24,50 +31,222 @@ from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 #
 # Functions:
 
-def recursive_scrape(
+def get_url_depth(url: str) -> int:
+    return len(urlparse(url).path.strip('/').split('/'))
+
+
+def sync_recursive_scrape(url_input, max_pages, max_depth, progress_callback, delay=1.0):
+    def run_async_scrape():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(
+            recursive_scrape(url_input, max_pages, max_depth, progress_callback, delay)
+        )
+
+    with ThreadPoolExecutor() as executor:
+        future = executor.submit(run_async_scrape)
+        return future.result()
+
+
+async def recursive_scrape(
         base_url: str,
         max_pages: int,
         max_depth: int,
-        custom_prompt: Optional[str],
-        api_name: Optional[str],
-        api_key: Optional[str],
-        keywords: str,
-        system_prompt: Optional[str],
-        progress_callback: callable
+        progress_callback: callable,
+        delay: float = 1.0,
+        resume_file: str = 'scrape_progress.json',
+        user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
 ) -> List[Dict]:
-    def get_url_depth(url: str) -> int:
-        return len(urlparse(url).path.strip('/').split('/'))
+    async def save_progress():
+        temp_file = resume_file + ".tmp"
+        with open(temp_file, 'w') as f:
+            json.dump({
+                'visited': list(visited),
+                'to_visit': to_visit,
+                'scraped_articles': scraped_articles,
+                'pages_scraped': pages_scraped
+            }, f)
+        os.replace(temp_file, resume_file)  # Atomic replace
 
-    # Collect all internal links using your existing function
-    all_links = collect_internal_links(base_url)
+    def is_valid_url(url: str) -> bool:
+        return url.startswith("http") and len(url) > 0
 
-    # Filter links based on max_depth
-    filtered_links = [link for link in all_links if get_url_depth(link) <= max_depth]
+    # Load progress if resume file exists
+    if os.path.exists(resume_file):
+        with open(resume_file, 'r') as f:
+            progress_data = json.load(f)
+            visited = set(progress_data['visited'])
+            to_visit = progress_data['to_visit']
+            scraped_articles = progress_data['scraped_articles']
+            pages_scraped = progress_data['pages_scraped']
+    else:
+        visited = set()
+        to_visit = [(base_url, 0)]  # (url, depth)
+        scraped_articles = []
+        pages_scraped = 0
 
-    # Sort links by depth to prioritize shallower pages
-    filtered_links.sort(key=get_url_depth)
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(user_agent=user_agent)
 
-    scraped_articles = []
-    pages_scraped = 0
+            try:
+                while to_visit and pages_scraped < max_pages:
+                    current_url, current_depth = to_visit.pop(0)
 
-    for link in filtered_links:
-        if pages_scraped >= max_pages:
-            break
+                    if current_url in visited or current_depth > max_depth:
+                        continue
 
-        # Update progress
-        progress_callback(f"Scraping page {pages_scraped + 1}/{max_pages}: {link}")
+                    visited.add(current_url)
 
-        # Use your existing scrape_article function
-        article_data = scrape_article(link)
+                    # Update progress
+                    progress_callback(f"Scraping page {pages_scraped + 1}/{max_pages}: {current_url}")
 
-        if article_data and article_data['extraction_successful']:
-            scraped_articles.append(article_data)
-            pages_scraped += 1
+                    try:
+                        await asyncio.sleep(random.uniform(delay * 0.8, delay * 1.2))
 
-    # Final progress update
-    progress_callback(f"Scraping completed. Total pages scraped: {pages_scraped}")
+                        # This function should be implemented to handle asynchronous scraping
+                        article_data = await scrape_article_async(context, current_url)
 
-    return scraped_articles
+                        if article_data and article_data['extraction_successful']:
+                            scraped_articles.append(article_data)
+                            pages_scraped += 1
+
+                        # If we haven't reached max depth, add child links to to_visit
+                        if current_depth < max_depth:
+                            page = await context.new_page()
+                            await page.goto(current_url)
+                            await page.wait_for_load_state("networkidle")
+
+                            links = await page.eval_on_selector_all('a[href]',
+                                                                    "(elements) => elements.map(el => el.href)")
+                            for link in links:
+                                child_url = urljoin(base_url, link)
+                                if is_valid_url(child_url) and child_url.startswith(
+                                        base_url) and child_url not in visited and should_scrape_url(child_url):
+                                    to_visit.append((child_url, current_depth + 1))
+
+                            await page.close()
+
+                    except Exception as e:
+                        logging.error(f"Error scraping {current_url}: {str(e)}")
+
+                    # Save progress periodically (e.g., every 10 pages)
+                    if pages_scraped % 10 == 0:
+                        await save_progress()
+
+            finally:
+                await browser.close()
+
+    finally:
+        # These statements are now guaranteed to be reached after the scraping is done
+        await save_progress()
+
+        # Remove the progress file when scraping is completed successfully
+        if os.path.exists(resume_file):
+            os.remove(resume_file)
+
+        # Final progress update
+        progress_callback(f"Scraping completed. Total pages scraped: {pages_scraped}")
+
+        return scraped_articles
+
+
+async def scrape_article_async(context, url: str) -> Dict[str, Any]:
+    page = await context.new_page()
+    try:
+        await page.goto(url)
+        await page.wait_for_load_state("networkidle")
+
+        title = await page.title()
+        content = await page.content()
+
+        return {
+            'url': url,
+            'title': title,
+            'content': content,
+            'extraction_successful': True
+        }
+    except Exception as e:
+        logging.error(f"Error scraping article {url}: {str(e)}")
+        return {
+            'url': url,
+            'extraction_successful': False,
+            'error': str(e)
+        }
+    finally:
+        await page.close()
+
+
+def scrape_article_sync(url: str) -> Dict[str, Any]:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(url)
+            page.wait_for_load_state("networkidle")
+
+            title = page.title()
+            content = page.content()
+
+            return {
+                'url': url,
+                'title': title,
+                'content': content,
+                'extraction_successful': True
+            }
+        except Exception as e:
+            logging.error(f"Error scraping article {url}: {str(e)}")
+            return {
+                'url': url,
+                'extraction_successful': False,
+                'error': str(e)
+            }
+        finally:
+            browser.close()
+
+
+def should_scrape_url(url: str) -> bool:
+    parsed_url = urlparse(url)
+    path = parsed_url.path.lower()
+
+    # List of patterns to exclude
+    exclude_patterns = [
+        '/tag/', '/category/', '/author/', '/search/', '/page/',
+        'wp-content', 'wp-includes', 'wp-json', 'wp-admin',
+        'login', 'register', 'cart', 'checkout', 'account',
+        '.jpg', '.png', '.gif', '.pdf', '.zip'
+    ]
+
+    # Check if the URL contains any exclude patterns
+    if any(pattern in path for pattern in exclude_patterns):
+        return False
+
+    # Add more sophisticated checks here
+    # For example, you might want to only include URLs with certain patterns
+    include_patterns = ['/article/', '/post/', '/blog/']
+    if any(pattern in path for pattern in include_patterns):
+        return True
+
+    # By default, return True if no exclusion or inclusion rules matched
+    return True
+
+
+async def scrape_with_retry(url: str, max_retries: int = 3, retry_delay: float = 5.0):
+    for attempt in range(max_retries):
+        try:
+            return await scrape_article(url)
+        except TimeoutError:
+            if attempt < max_retries - 1:
+                logging.warning(f"Timeout error scraping {url}. Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                logging.error(f"Failed to scrape {url} after {max_retries} attempts.")
+                return None
+        except Exception as e:
+            logging.error(f"Error scraping {url}: {str(e)}")
+            return None
+
 
 def create_website_scraping_tab():
     with gr.TabItem("Website Scraping"):
@@ -113,14 +292,12 @@ def create_website_scraping_tab():
                     placeholder="Enter custom titles for the articles, one per line",
                     lines=5
                 )
-                custom_article_title_input = gr.Textbox(
-                    label="Custom Article Titles (Optional, one per line)",
-                    placeholder="Enter custom titles for the articles, one per line",
-                    lines=5
-                )
                 with gr.Row():
+                    summarize_checkbox = gr.Checkbox(label="Summarize Articles", value=False)
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt", value=False, visible=True)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt", value=False, visible=True)
+                with gr.Row():
+                    temp_slider = gr.Slider(0.1, 2.0, 0.7, label="Temperature")
                 with gr.Row():
                     preset_prompt = gr.Dropdown(
                         label="Select Preset Prompt",
@@ -138,29 +315,31 @@ def create_website_scraping_tab():
                     system_prompt_input = gr.Textbox(
                         label="System Prompt",
                         value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
-**Bulleted Note Creation Guidelines**
-
-**Headings**:
-- Based on referenced topics, not categories like quotes or terms
-- Surrounded by **bold** formatting 
-- Not listed as bullet points
-- No space between headings and list items underneath
-
-**Emphasis**:
-- **Important terms** set in bold font
-- **Text ending in a colon**: also bolded
-
-**Review**:
-- Ensure adherence to specified format
-- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
-""",
+                                **Bulleted Note Creation Guidelines**
+                                
+                                **Headings**:
+                                - Based on referenced topics, not categories like quotes or terms
+                                - Surrounded by **bold** formatting 
+                                - Not listed as bullet points
+                                - No space between headings and list items underneath
+                                
+                                **Emphasis**:
+                                - **Important terms** set in bold font
+                                - **Text ending in a colon**: also bolded
+                                
+                                **Review**:
+                                - Ensure adherence to specified format
+                                - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                                """,
                         lines=3,
                         visible=False
                     )
 
                 api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],
+                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
+                             "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace",
+                             "Custom-OpenAI-API"],
                     value=None,
                     label="API Name (Mandatory for Summarization)"
                 )
@@ -221,24 +400,28 @@ def create_website_scraping_tab():
             outputs=[website_custom_prompt_input, system_prompt_input]
         )
 
-        def scrape_and_summarize_wrapper(
+        async def scrape_and_summarize_wrapper(
                 scrape_method: str,
                 url_input: str,
                 url_level: Optional[int],
                 max_pages: int,
                 max_depth: int,
+                summarize_checkbox: bool,
                 custom_prompt: Optional[str],
                 api_name: Optional[str],
                 api_key: Optional[str],
                 keywords: str,
                 custom_titles: Optional[str],
                 system_prompt: Optional[str],
-                progress=gr.Progress()
+                temperature: float = 0.7,
+                progress: gr.Progress = gr.Progress()
         ) -> str:
             try:
+                result: List[Dict[str, Any]] = []
+
                 if scrape_method == "Individual URLs":
-                    result = scrape_and_summarize_multiple(url_input, custom_prompt, api_name, api_key, keywords,
-                                                           custom_titles, system_prompt)
+                    result = await scrape_and_summarize_multiple(url_input, custom_prompt, api_name, api_key, keywords,
+                                                                 custom_titles, system_prompt)
                 elif scrape_method == "Sitemap":
                     result = scrape_from_sitemap(url_input)
                 elif scrape_method == "URL Level":
@@ -247,20 +430,29 @@ def create_website_scraping_tab():
                             json.dumps({"error": "URL level is required for URL Level scraping."}))
                     result = scrape_by_url_level(url_input, url_level)
                 elif scrape_method == "Recursive Scraping":
-                    result = recursive_scrape(
-                        url_input, max_pages, max_depth, custom_prompt, api_name, api_key, keywords, system_prompt,
-                        progress.update
-                    )
+                    result = await recursive_scrape(url_input, max_pages, max_depth, progress.update, delay=1.0)
                 else:
                     return convert_json_to_markdown(json.dumps({"error": f"Unknown scraping method: {scrape_method}"}))
 
-                # Ensure result is always a list
-                if not isinstance(result, list):
+                # Ensure result is always a list of dictionaries
+                if isinstance(result, dict):
                     result = [result]
+                elif not isinstance(result, list):
+                    raise TypeError(f"Unexpected result type: {type(result)}")
+
+                if summarize_checkbox:
+                    total_articles = len(result)
+                    for i, article in enumerate(result):
+                        progress.update(f"Summarizing article {i + 1}/{total_articles}")
+                        summary = summarize(article['content'], custom_prompt, api_name, api_key, temperature,
+                                            system_prompt)
+                        article['summary'] = summary
 
                 # Concatenate all content
                 all_content = "\n\n".join(
-                    [f"# {article.get('title', 'Untitled')}\n\n{article.get('content', '')}" for article in result])
+                    [f"# {article.get('title', 'Untitled')}\n\n{article.get('content', '')}\n\n" +
+                     (f"Summary: {article.get('summary', '')}" if summarize_checkbox else "")
+                     for article in result])
 
                 # Collect all unique URLs
                 all_urls = list(set(article.get('url', '') for article in result if article.get('url')))
@@ -269,8 +461,9 @@ def create_website_scraping_tab():
                 website_collection = {
                     "base_url": url_input,
                     "scrape_method": scrape_method,
-                    "api_used": api_name,
-                    "keywords": keywords,
+                    "summarization_performed": summarize_checkbox,
+                    "api_used": api_name if summarize_checkbox else None,
+                    "keywords": keywords if summarize_checkbox else None,
                     "url_level": url_level if scrape_method == "URL Level" else None,
                     "max_pages": max_pages if scrape_method == "Recursive Scraping" else None,
                     "max_depth": max_depth if scrape_method == "Recursive Scraping" else None,
@@ -284,10 +477,12 @@ def create_website_scraping_tab():
             except Exception as e:
                 return convert_json_to_markdown(json.dumps({"error": f"An error occurred: {str(e)}"}))
 
+        # Update the scrape_button.click to include the temperature parameter
         scrape_button.click(
-            fn=scrape_and_summarize_wrapper,
-            inputs=[scrape_method, url_input, url_level, max_pages, max_depth, website_custom_prompt_input,
-                    api_name_input, api_key_input, keywords_input, custom_article_title_input, system_prompt_input],
+            fn=lambda *args: asyncio.run(scrape_and_summarize_wrapper(*args)),
+            inputs=[scrape_method, url_input, url_level, max_pages, max_depth, summarize_checkbox,
+                    website_custom_prompt_input, api_name_input, api_key_input, keywords_input,
+                    custom_article_title_input, system_prompt_input, temp_slider],
             outputs=[result_output]
         )
 
@@ -340,97 +535,6 @@ def convert_json_to_markdown(json_str: str) -> str:
         return f"# Error\n\nMissing key in JSON data: {str(e)}"
     except Exception as e:
         return f"# Error\n\nAn unexpected error occurred: {str(e)}"
-
-
-# Old
-# def create_website_scraping_tab():
-#     with gr.TabItem("Website Scraping"):
-#         gr.Markdown("# Scrape Websites & Summarize Articles using a Headless Chrome Browser!")
-#         with gr.Row():
-#             with gr.Column():
-#                 url_input = gr.Textbox(label="Article URLs", placeholder="Enter article URLs here, one per line", lines=5)
-#                 custom_article_title_input = gr.Textbox(label="Custom Article Titles (Optional, one per line)",
-#                                                         placeholder="Enter custom titles for the articles, one per line",
-#                                                         lines=5)
-#                 with gr.Row():
-#                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-#                                                      value=False,
-#                                                      visible=True)
-#                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
-#                                                      value=False,
-#                                                      visible=True)
-#                 with gr.Row():
-#                     preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-#                                                 choices=load_preset_prompts(),
-#                                                 visible=False)
-#                 with gr.Row():
-#                     website_custom_prompt_input = gr.Textbox(label="Custom Prompt",
-#                                                      placeholder="Enter custom prompt here",
-#                                                      lines=3,
-#                                                      visible=False)
-#                 with gr.Row():
-#                     system_prompt_input = gr.Textbox(label="System Prompt",
-#                                                      value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
-# **Bulleted Note Creation Guidelines**
 #
-# **Headings**:
-# - Based on referenced topics, not categories like quotes or terms
-# - Surrounded by **bold** formatting
-# - Not listed as bullet points
-# - No space between headings and list items underneath
-#
-# **Emphasis**:
-# - **Important terms** set in bold font
-# - **Text ending in a colon**: also bolded
-#
-# **Review**:
-# - Ensure adherence to specified format
-# - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
-# """,
-#                                                      lines=3,
-#                                                      visible=False)
-#
-#                 custom_prompt_checkbox.change(
-#                     fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
-#                     inputs=[custom_prompt_checkbox],
-#                     outputs=[website_custom_prompt_input, system_prompt_input]
-#                 )
-#                 preset_prompt_checkbox.change(
-#                     fn=lambda x: gr.update(visible=x),
-#                     inputs=[preset_prompt_checkbox],
-#                     outputs=[preset_prompt]
-#                 )
-#
-#                 def update_prompts(preset_name):
-#                     prompts = update_user_prompt(preset_name)
-#                     return (
-#                         gr.update(value=prompts["user_prompt"], visible=True),
-#                         gr.update(value=prompts["system_prompt"], visible=True)
-#                     )
-#
-#                 preset_prompt.change(
-#                     update_prompts,
-#                     inputs=preset_prompt,
-#                     outputs=[website_custom_prompt_input, system_prompt_input]
-#                 )
-#
-#                 api_name_input = gr.Dropdown(
-#                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-#                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"], value=None, label="API Name (Mandatory for Summarization)")
-#                 api_key_input = gr.Textbox(label="API Key (Mandatory if API Name is specified)",
-#                                            placeholder="Enter your API key here; Ignore if using Local API or Built-in API", type="password")
-#                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
-#                                             value="default,no_keyword_set", visible=True)
-#
-#                 scrape_button = gr.Button("Scrape and Summarize")
-#             with gr.Column():
-#                 result_output = gr.Textbox(label="Result", lines=20)
-#
-#                 scrape_button.click(
-#                     fn=scrape_and_summarize_multiple,
-#                     inputs=[url_input, website_custom_prompt_input, api_name_input, api_key_input, keywords_input,
-#                             custom_article_title_input, system_prompt_input],
-#                     outputs=result_output
-#                 )
-
-
+# End of File
+########################################################################################################################

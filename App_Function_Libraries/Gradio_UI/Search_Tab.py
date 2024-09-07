@@ -9,16 +9,14 @@ import sqlite3
 #
 # External Imports
 import gradio as gr
-
+#
+# Local Imports
 from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
 from App_Function_Libraries.RAG.ChromaDB_Library import get_all_content_from_database, chroma_client, \
      store_in_chroma, create_embedding
 from App_Function_Libraries.RAG.RAG_Libary_2 import rag_search
 
-#
-# Local Imports
-#
 #
 ###################################################################################################
 #
@@ -48,6 +46,20 @@ def create_rag_tab():
         with gr.Row():
             with gr.Column():
                 search_query = gr.Textbox(label="Enter your question", placeholder="What would you like to know?")
+
+                keyword_filtering_checkbox = gr.Checkbox(label="Enable Keyword Filtering", value=False)
+
+                keywords_input = gr.Textbox(
+                    label="Enter keywords (comma-separated)",
+                    value="keyword1, keyword2, ...",
+                    visible=False
+                )
+
+                keyword_instructions = gr.Markdown(
+                    "Enter comma-separated keywords to filter your search results.",
+                    visible=False
+                )
+
                 api_choice = gr.Dropdown(
                     choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
                     label="Select API for RAG",
@@ -59,11 +71,24 @@ def create_rag_tab():
                 result_output = gr.Textbox(label="Answer", lines=10)
                 context_output = gr.Textbox(label="Context", lines=10, visible=False)
 
-        def perform_rag_search(query, api_choice):
-            result = rag_search(query, api_choice)
+        def toggle_keyword_filtering(checkbox_value):
+            return {
+                keywords_input: gr.update(visible=checkbox_value),
+                keyword_instructions: gr.update(visible=checkbox_value)
+            }
+
+        keyword_filtering_checkbox.change(
+            toggle_keyword_filtering,
+            inputs=[keyword_filtering_checkbox],
+            outputs=[keywords_input, keyword_instructions]
+        )
+
+        def perform_rag_search(query, keywords, api_choice):
+            result = rag_search(query, api_choice, keywords)
             return result['answer'], result['context']
 
-        search_button.click(perform_rag_search, inputs=[search_query, api_choice], outputs=[result_output, context_output])
+        search_button.click(perform_rag_search, inputs=[search_query, keywords_input, api_choice], outputs=[result_output, context_output])
+
 
 # FIXME - under construction
 def create_embeddings_tab():
@@ -233,13 +258,14 @@ def create_view_embeddings_tab():
                 embedding = create_embedding(item['content'])
 
                 collection_name = "all_content_embeddings"
-                store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item_id}"])
+                metadata = {"media_id": item_id}  # Add metadata with media_id
+                store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item_id}"], [metadata])
 
                 embedding_preview = str(embedding[:500])  # Convert first 500 elements to string
                 status = f"New embedding created and stored for item: {item_title} (ID: {item_id})"
                 return status, f"First 500 elements of new embedding:\n{embedding_preview}"
             except Exception as e:
-                print(f"Error in create_new_embedding: {str(e)}")
+                logging.error(f"Error in create_new_embedding: {str(e)}")
                 return f"Error creating embedding: {str(e)}", ""
 
         def update_provider_options(provider):
