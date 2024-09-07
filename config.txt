@@ -1,21 +1,21 @@
 [API]
-anthropic_api_key = <anthropic_API_Key>
-anthropic_model = claude-3-5-sonnet-20240620
-cohere_api_key = <Cohere_API_Key>
+anthropic_api_key = <anthropic_api_key>
+anthropic_model = claude-3-sonnet-20240229
+cohere_api_key = <your_cohere_api_key>
 cohere_model = command-r-plus
-groq_api_key = <Groq_API_Key>
+groq_api_key = <your_groq_api_key>
 groq_model = llama3-70b-8192
-openai_api_key = <OpenAI_API_Key>
-openai_model = gpt-4o
-huggingface_api_key = <huggingface_api_token>
+openai_api_key = <openai_api_key>
+openai_model = gpt-4-turbo
+huggingface_api_token = <huggingface_api_token>
 huggingface_model = CohereForAI/c4ai-command-r-plus
-openrouter_api_key = <OpenRouter_API_Key>
+openrouter_api_key = <openrouter_api_key>
 openrouter_model = mistralai/mistral-7b-instruct:free
-deepseek_api_key = <DeepSeek_API_Key>
+deepseek_api_key = <deepseek_api_key>
 deepseek_model = deepseek-chat
 
 [Local-API]
-kobold_api_key =
+kobold_api_key = <kobold api key>
 kobold_api_IP = http://127.0.0.1:5001/api/v1/generate
 llama_api_key = <llama.cpp api key>
 llama_api_IP = http://127.0.0.1:8080/completion
@@ -47,6 +47,8 @@ video_summarize_prompt = "Above is the transcript of a video. Please read throug
 [Database]
 type = sqlite
 sqlite_path = media_summary.db
+backup_path = /tldw_DB_Backups/
+#Path to the backup location for the database. If the path does not exist, the backup will not be created.
 elasticsearch_host = localhost
 elasticsearch_port = 9200
 # Additionally you can use elasticsearch as the database type, just replace `sqlite` with `elasticsearch` for `type` and provide the `elasticsearch_host` and `elasticsearch_port` of your configured ES instance.
@@ -68,29 +70,3 @@ overlap = 200
 adaptive = false
 multi_level = false
 language = english
-
-
-
-
-#[Comments]
-#OpenAI Models:
-#    f
-#Anthropic Models:
-#    f
-#Cohere Models:
-#    f
-#DeepSeek Models:
-#    f
-#Groq Models:
-#    f
-#Mistral Models:
-#    mistral-large-latest
-#    open-mistral-nemo
-#    codestral-latest
-#    mistral-embed
-#    open-mistral-7b
-#    open-mixtral-8x7b
-#    open-mixtral-8x22b
-#    open-codestral-mamba
-
-

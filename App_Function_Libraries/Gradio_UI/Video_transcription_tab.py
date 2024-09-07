@@ -108,7 +108,7 @@ def create_video_transcription_tab():
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
                              "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace", "Custom-OpenAI-API"],
                     value=None, label="API Name (Mandatory)")
                 api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here",
                                            type="password")
