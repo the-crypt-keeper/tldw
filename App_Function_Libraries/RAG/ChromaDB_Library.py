@@ -39,6 +39,8 @@ chunk_options = {
 }
 
 
+
+
 def auto_update_chroma_embeddings(media_id: int, content: str):
     """
     Automatically update ChromaDB embeddings when a new item is ingested into the SQLite database.
@@ -63,45 +65,75 @@ def auto_update_chroma_embeddings(media_id: int, content: str):
 
 
 # Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite
+# def process_and_store_content(content: str, collection_name: str, media_id: int):
+#     # Process the content into chunks
+#     chunks = improved_chunking_process(content, chunk_options)
+#     texts = [chunk['text'] for chunk in chunks]
+#
+#     # Generate embeddings for each chunk
+#     embeddings = [create_embedding(text) for text in texts]
+#
+#     # Create unique IDs for each chunk using the media_id and chunk index
+#     ids = [f"{media_id}_chunk_{i}" for i in range(len(texts))]
+#
+#     # Store the texts, embeddings, and IDs in ChromaDB
+#     store_in_chroma(collection_name, texts, embeddings, ids)
+#
+#     # Store the chunk metadata in SQLite
+#     for i, chunk in enumerate(chunks):
+#         add_media_chunk(media_id, chunk['text'], chunk['start'], chunk['end'], ids[i])
+#
+#     # Update the FTS table
+#     update_fts_for_media(media_id)
+
+# Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite with metadata
 def process_and_store_content(content: str, collection_name: str, media_id: int):
-    # Process the content into chunks
     chunks = improved_chunking_process(content, chunk_options)
     texts = [chunk['text'] for chunk in chunks]
-
-    # Generate embeddings for each chunk
     embeddings = [create_embedding(text) for text in texts]
-
-    # Create unique IDs for each chunk using the media_id and chunk index
     ids = [f"{media_id}_chunk_{i}" for i in range(len(texts))]
+    metadatas = [{"media_id": media_id} for _ in range(len(texts))]
 
-    # Store the texts, embeddings, and IDs in ChromaDB
-    store_in_chroma(collection_name, texts, embeddings, ids)
+    store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
 
-    # Store the chunk metadata in SQLite
     for i, chunk in enumerate(chunks):
         add_media_chunk(media_id, chunk['text'], chunk['start'], chunk['end'], ids[i])
 
-    # Update the FTS table
     update_fts_for_media(media_id)
 
+
 # Function to store documents and their embeddings in ChromaDB
-def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str]):
+def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], metadatas: List[Dict[str, Any]]):
     collection = chroma_client.get_or_create_collection(name=collection_name)
     collection.add(
         documents=texts,
         embeddings=embeddings,
-        ids=ids
+        ids=ids,
+        metadatas=metadatas
     )
 
-# Function to perform vector search using ChromaDB
-def vector_search(collection_name: str, query: str, k: int = 10) -> List[str]:
+# # Function to perform vector search using ChromaDB
+# def vector_search(collection_name: str, query: str, k: int = 10) -> List[str]:
+#     query_embedding = create_embedding(query)
+#     collection = chroma_client.get_collection(name=collection_name)
+#     results = collection.query(
+#         query_embeddings=[query_embedding],
+#         n_results=k
+#     )
+#     return results['documents'][0]
+
+# Function to perform vector search using ChromaDB + Keywords from the media_db
+def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[str, Any]]:
     query_embedding = create_embedding(query)
     collection = chroma_client.get_collection(name=collection_name)
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=k
+        n_results=k,
+        include=["documents", "metadatas"]
     )
-    return results['documents'][0]
+    return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
+
+
 
 
 def create_embedding(text: str) -> List[float]:
