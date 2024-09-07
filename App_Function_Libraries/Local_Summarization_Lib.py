@@ -601,6 +601,7 @@ def summarize_with_vllm(
         return f"Error: Unexpected error during vLLM summarization - {str(e)}"
 
 
+# FIXME - update to be a summarize request
 def summarize_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/api/generate", api_key=None, temp=None, system_message=None, model=None):
     try:
         logging.debug("ollama: Loading and validating configurations")
@@ -696,6 +697,126 @@ def summarize_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:1
     except Exception as e:
         logging.error("Ollama: Error in processing: %s", str(e))
         return f"Ollama: Error occurred while processing summary with ollama: {str(e)}"
+
+
+# FIXME - update to be a summarize request
+def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+    loaded_config_data = load_and_log_configs()
+    custom_openai_api_key = api_key
+    try:
+        # API key validation
+        if not custom_openai_api_key:
+            logging.info("Custom OpenAI API: API key not provided as parameter")
+            logging.info("Custom OpenAI API: Attempting to use API key from config file")
+            custom_openai_api_key = loaded_config_data['api_keys']['custom_openai_api_key']
+
+        if not custom_openai_api_key:
+            logging.error("Custom OpenAI API: API key not found or is empty")
+            return "Custom OpenAI API: API Key Not Provided/Found in Config file or is empty"
+
+        logging.debug(f"Custom OpenAI API: Using API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:]}")
+
+        # Input data handling
+        logging.debug(f"Custom OpenAI API: Raw input data type: {type(input_data)}")
+        logging.debug(f"Custom OpenAI API: Raw input data (first 500 chars): {str(input_data)[:500]}...")
+
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                # It's likely a JSON string
+                logging.debug("Custom OpenAI API: Parsing provided JSON string data for summarization")
+                try:
+                    data = json.loads(input_data)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Custom OpenAI API: Error parsing JSON string: {str(e)}")
+                    return f"Custom OpenAI API: Error parsing JSON input: {str(e)}"
+            elif os.path.isfile(input_data):
+                logging.debug("Custom OpenAI API: Loading JSON data from file for summarization")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                logging.debug("Custom OpenAI API: Using provided string data for summarization")
+                data = input_data
+        else:
+            data = input_data
+
+        logging.debug(f"Custom OpenAI API: Processed data type: {type(data)}")
+        logging.debug(f"Custom OpenAI API: Processed data (first 500 chars): {str(data)[:500]}...")
+
+        # Text extraction
+        if isinstance(data, dict):
+            if 'summary' in data:
+                logging.debug("Custom OpenAI API: Summary already exists in the loaded data")
+                return data['summary']
+            elif 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)  # Convert dict to string if no specific format
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError(f"Custom OpenAI API: Invalid input data format: {type(data)}")
+
+        logging.debug(f"Custom OpenAI API: Extracted text (first 500 chars): {text[:500]}...")
+        logging.debug(f"v: Custom prompt: {custom_prompt_arg}")
+
+        openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
+        logging.debug(f"Custom OpenAI API: Using model: {openai_model}")
+
+        headers = {
+            'Authorization': f'Bearer {custom_openai_api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        logging.debug(
+            f"OpenAI API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
+        logging.debug("Custom OpenAI API: Preparing data + prompt for submittal")
+        openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        if temp is None:
+            temp = 0.7
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+        temp = float(temp)
+        data = {
+            "model": openai_model,
+            "messages": [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": openai_prompt}
+            ],
+            "max_tokens": 4096,
+            "temperature": temp
+        }
+
+        custom_openai_url = loaded_config_data['Local_api_ip']['custom_openai_api_ip']
+
+        logging.debug("Custom OpenAI API: Posting request")
+        response = requests.post(custom_openai_url, headers=headers, json=data)
+        logging.debug(f"Custom OpenAI API full API response data: {response}")
+        if response.status_code == 200:
+            response_data = response.json()
+            logging.debug(response_data)
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                chat_response = response_data['choices'][0]['message']['content'].strip()
+                logging.debug("Custom OpenAI API: Chat Sent successfully")
+                logging.debug(f"Custom OpenAI API: Chat response: {chat_response}")
+                return chat_response
+            else:
+                logging.warning("Custom OpenAI API: Chat response not found in the response data")
+                return "Custom OpenAI API: Chat not available"
+        else:
+            logging.error(f"Custom OpenAI API: Chat request failed with status code {response.status_code}")
+            logging.error(f"Custom OpenAI API: Error response: {response.text}")
+            return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
+    except json.JSONDecodeError as e:
+        logging.error(f"Custom OpenAI API: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"Custom OpenAI API: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"Custom OpenAI API: Error making API request: {str(e)}", exc_info=True)
+        return f"Custom OpenAI API: Error making API request: {str(e)}"
+    except Exception as e:
+        logging.error(f"Custom OpenAI API: Unexpected error: {str(e)}", exc_info=True)
+        return f"Custom OpenAI API: Unexpected error occurred: {str(e)}"
 
 
 def save_summary_to_file(summary, file_path):
