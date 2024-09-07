@@ -51,22 +51,22 @@ def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, ke
     for i, url in tqdm(enumerate(urls), total=len(urls), desc="Processing URLs"):
         custom_title = custom_titles[i] if i < len(custom_titles) else None
         try:
-            result = scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_title, system_message)
-            results.append(f"Results for URL {i + 1}:\n{result}")
+            article = scrape_article(url)
+            if article and article['extraction_successful']:
+                if custom_title:
+                    article['title'] = custom_title
+                results.append(article)
         except Exception as e:
             error_message = f"Error processing URL {i + 1} ({url}): {str(e)}"
             errors.append(error_message)
-            results.append(f"Failed to process URL {i + 1}: {url}")
 
         # Update progress
         progress((i + 1) / len(urls), desc=f"Processed {i + 1}/{len(urls)} URLs")
 
-    # Combine results and errors
-    combined_output = "\n".join(results)
     if errors:
-        combined_output += "\n\nErrors encountered:\n" + "\n".join(errors)
+        logging.error("\n".join(errors))
 
-    return combined_output
+    return results
 
 
 def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_article_title, system_message=None):
@@ -185,6 +185,31 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
                                                 article_custom_prompt)
 
         return f"Title: {title}\nAuthor: {author}\nIngestion Result: {ingestion_result}\n\nSummary: {summary}\n\nArticle Contents: {content}"
+    except Exception as e:
+        logging.error(f"Error processing URL {url}: {str(e)}")
+        return f"Failed to process URL {url}: {str(e)}"
+
+
+def scrape_and_no_summarize_then_ingest(url, keywords, custom_article_title):
+    try:
+        # Step 1: Scrape the article
+        article_data = scrape_article(url)
+        print(f"Scraped Article Data: {article_data}")  # Debugging statement
+        if not article_data:
+            return "Failed to scrape the article."
+
+        # Use the custom title if provided, otherwise use the scraped title
+        title = custom_article_title.strip() if custom_article_title else article_data.get('title', 'Untitled')
+        author = article_data.get('author', 'Unknown')
+        content = article_data.get('content', '')
+        ingestion_date = datetime.now().strftime('%Y-%m-%d')
+
+        print(f"Title: {title}, Author: {author}, Content Length: {len(content)}")  # Debugging statement
+
+        # Step 2: Ingest the article into the database
+        ingestion_result = ingest_article_to_db(url, title, author, content, keywords, ingestion_date, None, None)
+
+        return f"Title: {title}\nAuthor: {author}\nIngestion Result: {ingestion_result}\n\nArticle Contents: {content}"
     except Exception as e:
         logging.error(f"Error processing URL {url}: {str(e)}")
         return f"Failed to process URL {url}: {str(e)}"
