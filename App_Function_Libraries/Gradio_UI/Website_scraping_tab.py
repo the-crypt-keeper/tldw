@@ -3,7 +3,7 @@
 #
 # Imports
 import json
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from urllib.parse import urlparse
 
 #
@@ -17,6 +17,7 @@ from App_Function_Libraries.Article_Extractor_Lib import scrape_from_sitemap, sc
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
+from App_Function_Libraries.Summarization_General_Lib import summarize
 
 
 #
@@ -28,11 +29,6 @@ def recursive_scrape(
         base_url: str,
         max_pages: int,
         max_depth: int,
-        custom_prompt: Optional[str],
-        api_name: Optional[str],
-        api_key: Optional[str],
-        keywords: str,
-        system_prompt: Optional[str],
         progress_callback: callable
 ) -> List[Dict]:
     def get_url_depth(url: str) -> int:
@@ -114,6 +110,7 @@ def create_website_scraping_tab():
                     lines=5
                 )
                 with gr.Row():
+                    summarize_checkbox = gr.Checkbox(label="Summarize Articles", value=False)
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt", value=False, visible=True)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt", value=False, visible=True)
                 with gr.Row():
@@ -217,20 +214,24 @@ def create_website_scraping_tab():
         )
 
         def scrape_and_summarize_wrapper(
-                scrape_method: str,
-                url_input: str,
-                url_level: Optional[int],
-                max_pages: int,
-                max_depth: int,
-                custom_prompt: Optional[str],
-                api_name: Optional[str],
-                api_key: Optional[str],
-                keywords: str,
-                custom_titles: Optional[str],
-                system_prompt: Optional[str],
-                progress=gr.Progress()
+            scrape_method: str,
+            url_input: str,
+            url_level: Optional[int],
+            max_pages: int,
+            max_depth: int,
+            summarize_checkbox: bool,
+            custom_prompt: Optional[str],
+            api_name: Optional[str],
+            api_key: Optional[str],
+            keywords: str,
+            custom_titles: Optional[str],
+            system_prompt: Optional[str],
+            temperature: float = 0.7,
+            progress: gr.Progress = gr.Progress()
         ) -> str:
             try:
+                result: List[Dict[str, Any]] = []
+
                 if scrape_method == "Individual URLs":
                     result = scrape_and_summarize_multiple(url_input, custom_prompt, api_name, api_key, keywords,
                                                            custom_titles, system_prompt)
@@ -242,20 +243,28 @@ def create_website_scraping_tab():
                             json.dumps({"error": "URL level is required for URL Level scraping."}))
                     result = scrape_by_url_level(url_input, url_level)
                 elif scrape_method == "Recursive Scraping":
-                    result = recursive_scrape(
-                        url_input, max_pages, max_depth, custom_prompt, api_name, api_key, keywords, system_prompt,
-                        progress.update
-                    )
+                    result = recursive_scrape(url_input, max_pages, max_depth, progress.update)
                 else:
                     return convert_json_to_markdown(json.dumps({"error": f"Unknown scraping method: {scrape_method}"}))
 
-                # Ensure result is always a list
-                if not isinstance(result, list):
+                # Ensure result is always a list of dictionaries
+                if isinstance(result, dict):
                     result = [result]
+                elif not isinstance(result, list):
+                    raise TypeError(f"Unexpected result type: {type(result)}")
+
+                if summarize_checkbox:
+                    total_articles = len(result)
+                    for i, article in enumerate(result):
+                        progress.update(f"Summarizing article {i+1}/{total_articles}")
+                        summary = summarize(article['content'], custom_prompt, api_name, api_key, temperature, system_prompt)
+                        article['summary'] = summary
 
                 # Concatenate all content
                 all_content = "\n\n".join(
-                    [f"# {article.get('title', 'Untitled')}\n\n{article.get('content', '')}" for article in result])
+                    [f"# {article.get('title', 'Untitled')}\n\n{article.get('content', '')}\n\n" +
+                     (f"Summary: {article.get('summary', '')}" if summarize_checkbox else "")
+                     for article in result])
 
                 # Collect all unique URLs
                 all_urls = list(set(article.get('url', '') for article in result if article.get('url')))
@@ -264,8 +273,9 @@ def create_website_scraping_tab():
                 website_collection = {
                     "base_url": url_input,
                     "scrape_method": scrape_method,
-                    "api_used": api_name,
-                    "keywords": keywords,
+                    "summarization_performed": summarize_checkbox,
+                    "api_used": api_name if summarize_checkbox else None,
+                    "keywords": keywords if summarize_checkbox else None,
                     "url_level": url_level if scrape_method == "URL Level" else None,
                     "max_pages": max_pages if scrape_method == "Recursive Scraping" else None,
                     "max_depth": max_depth if scrape_method == "Recursive Scraping" else None,
@@ -279,12 +289,14 @@ def create_website_scraping_tab():
             except Exception as e:
                 return convert_json_to_markdown(json.dumps({"error": f"An error occurred: {str(e)}"}))
 
+        # Update the scrape_button.click to include the temperature parameter
         scrape_button.click(
             fn=scrape_and_summarize_wrapper,
-            inputs=[scrape_method, url_input, url_level, max_pages, max_depth, website_custom_prompt_input,
-                    api_name_input, api_key_input, keywords_input, custom_article_title_input, system_prompt_input],
+            inputs=[scrape_method, url_input, url_level, max_pages, max_depth, summarize_checkbox,
+                    website_custom_prompt_input, api_name_input, api_key_input, keywords_input,
+                    custom_article_title_input, system_prompt_input, gr.Slider(0.1, 2.0, 0.7, label="Temperature")],
             outputs=[result_output]
-        )
+)
 
 
 def convert_json_to_markdown(json_str: str) -> str:
