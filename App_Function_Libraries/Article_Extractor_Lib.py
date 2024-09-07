@@ -60,6 +60,7 @@ def scrape_article(url):
             await browser.close()
             return content
 
+    # FIXME - Add option for extracting comments/tables/images
     def extract_article_data(html: str, url: str) -> dict:
         downloaded = trafilatura.extract(html, include_comments=False, include_tables=False, include_images=False)
         metadata = trafilatura.extract_metadata(html)
@@ -176,6 +177,29 @@ def generate_temp_sitemap_from_links(links: set) -> str:
     logging.info(f"Temporary sitemap created at: {temp_file_path}")
     return temp_file_path
 
+
+def generate_sitemap_for_url(url: str) -> List[Dict[str, str]]:
+    """
+    Generate a sitemap for the given URL using the create_filtered_sitemap function.
+
+    Args:
+        url (str): The base URL to generate the sitemap for
+
+    Returns:
+        List[Dict[str, str]]: A list of dictionaries, each containing 'url' and 'title' keys
+    """
+    with tempfile.NamedTemporaryFile(mode="w+", suffix=".xml", delete=False) as temp_file:
+        create_filtered_sitemap(url, temp_file.name, is_content_page)
+        temp_file.seek(0)
+        tree = ET.parse(temp_file.name)
+        root = tree.getroot()
+
+        sitemap = []
+        for url_elem in root.findall(".//{http://www.sitemaps.org/schemas/sitemap/0.9}url"):
+            loc = url_elem.find("{http://www.sitemaps.org/schemas/sitemap/0.9}loc").text
+            sitemap.append({"url": loc, "title": loc.split("/")[-1] or url})  # Use the last part of the URL as a title
+
+    return sitemap
 
 def scrape_entire_site(base_url: str) -> List[Dict]:
     """

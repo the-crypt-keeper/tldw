@@ -96,7 +96,7 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
         # Generate bot response
         bot_message = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
                            temperature, system_prompt)
-
+        logging.debug(f"Bot message being returned: {bot_message}")
         if save_conversation:
             # Add assistant message to the database
             add_chat_message(conversation_id, "assistant", bot_message)
@@ -281,11 +281,10 @@ def create_chat_interface():
             inputs=[preset_prompt_checkbox],
             outputs=[preset_prompt]
         )
-
         submit.click(
             chat_wrapper,
-            inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
-                    conversation_id, save_conversation, temperature, system_prompt_input],
+            inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id,
+                    save_conversation, temperature, system_prompt_input],
             outputs=[msg, chatbot, conversation_id]
         ).then(  # Clear the message box after submission
             lambda x: gr.update(value=""),
@@ -1015,7 +1014,7 @@ def chat_workflows_tab():
             max_steps = max(len(wf['prompts']) for wf in workflows)
             for i in range(max_steps):
                 prompt_displays.append(gr.Markdown(visible=False))
-                user_inputs.append(gr.Textbox(label=f"Your Response", lines=2, visible=False))
+                user_inputs.append(gr.Textbox(label=f"Your Input", lines=2, visible=False))
                 output_boxes.append(gr.Textbox(label=f"AI Output", lines=5, visible=False))
                 with gr.Row():
                     process_buttons.append(gr.Button(f"Process Step {i + 1}", visible=False))

@@ -157,6 +157,12 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
             }
             logging.debug("Segment: %s", chunk)
             segments.append(chunk)
+            # Print to verify its working
+            print(f"{segment_chunk.start:.2f}s - {segment_chunk.end:.2f}s | {segment_chunk.text}")
+
+            # Log it as well.
+            logging.debug(
+                f"Transcribed Segment: {segment_chunk.start:.2f}s - {segment_chunk.end:.2f}s | {segment_chunk.text}")
 
         if segments:
             segments[0]["Text"] = f"This text was transcribed using whisper model: {whisper_model}\n\n" + segments[0]["Text"]

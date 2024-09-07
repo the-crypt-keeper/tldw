@@ -97,7 +97,7 @@ def get_openai_embeddings(input_data: str, model: str) -> List[float]:
     try:
         logging.debug("OpenAI: Posting request to embeddings API")
         response = requests.post('https://api.openai.com/v1/embeddings', headers=headers, json=request_data)
-
+        logging.debug(f"Full API response data: {response}")
         if response.status_code == 200:
             response_data = response.json()
             if 'data' in response_data and len(response_data['data']) > 0:
@@ -209,12 +209,14 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_m
 
         logging.debug("OpenAI: Posting request")
         response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
-
+        logging.debug(f"Full API response data: {response}")
         if response.status_code == 200:
             response_data = response.json()
+            logging.debug(response_data)
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 chat_response = response_data['choices'][0]['message']['content'].strip()
                 logging.debug("openai: Chat Sent successfully")
+                logging.debug(f"openai: Chat response: {chat_response}")
                 return chat_response
             else:
                 logging.warning("openai: Chat response not found in the response data")
@@ -294,7 +296,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             try:
                 logging.debug("anthropic: Posting request to API")
                 response = requests.post('https://api.anthropic.com/v1/messages', headers=headers, json=data)
-
+                logging.debug(f"Full API response data: {response}")
                 # Check if the status code indicates success
                 if response.status_code == 200:
                     logging.debug("anthropic: Post submittal successful")
@@ -382,7 +384,7 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
         print("cohere: Submitting request to API endpoint")
         response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
         response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+        logging.debug(f"Full API response data: {response_data}")
 
         if response.status_code == 200:
             if 'text' in response_data:
@@ -497,9 +499,10 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
         response = requests.post('https://api.groq.com/openai/v1/chat/completions', headers=headers, json=data)
 
         response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+        logging.debug(f"Full API response data: {response_data}")
 
         if response.status_code == 200:
+            logging.debug(response_data)
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
                 logging.debug("groq: Chat request successful")
@@ -612,7 +615,7 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
         )
 
         response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+        logging.debug("Full API Response Data: %s", response_data)
 
         if response.status_code == 200:
             if 'choices' in response_data and len(response_data['choices']) > 0:
@@ -669,7 +672,7 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
         logging.debug("huggingface: Submitting request...")
 
         response = requests.post(API_URL, headers=headers, json=data)
-
+        logging.debug(f"Full API response data: {response}")
         if response.status_code == 200:
             summary = response.json()[0]['generated_text'].strip()
             logging.debug("huggingface: Chat request successful")
@@ -770,9 +773,10 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system
 
         logging.debug("DeepSeek: Posting request")
         response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=data)
-
+        logging.debug(f"Full API response data: {response}")
         if response.status_code == 200:
             response_data = response.json()
+            logging.debug(response_data)
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
                 logging.debug("DeepSeek: Chat request successful")
@@ -860,9 +864,10 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
 
         logging.debug("Mistral: Posting request")
         response = requests.post('https://api.mistral.ai/v1/chat/completions', headers=headers, json=data)
-
+        logging.debug(f"Full API response data: {response}")
         if response.status_code == 200:
             response_data = response.json()
+            logging.debug(response_data)
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content'].strip()
                 logging.debug("Mistral: request successful")

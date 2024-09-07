@@ -83,7 +83,7 @@ def create_grammar_style_check_tab():
                 )
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],
                     value=None,
                     label="API for Grammar Check"
                 )
@@ -113,7 +113,7 @@ def create_tone_adjustment_tab():
                 casual_slider = gr.Slider(minimum=0, maximum=1, value=0.5, label="Casual vs Professional")
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],
                     value=None,
                     label="API for Grammar Check"
                 )
@@ -244,7 +244,7 @@ def create_document_feedback_tab():
                 )
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace", "Custom-OpenAI-API"],
                     value=None,
                     label="API for Feedback"
                 )
@@ -375,7 +375,6 @@ def create_creative_writing_tab():
         gr.Markdown("# Utility to be added...")
 
 
-#FIXME - change to use chat function
 def chat_with_character(user_message, history, char_data, api_name_input, api_key):
     if char_data is None:
         return history, "Please import a character card first."
@@ -474,6 +473,8 @@ def load_chat_history(file):
         logging.error(f"Error loading chat history: {e}")
         return None, None
 
+
+# FIXME This should be in the chat tab....
 def create_character_card_interaction_tab():
     with gr.TabItem("Chat with a Character Card"):
         gr.Markdown("# Chat with a Character Card")
@@ -486,9 +487,10 @@ def create_character_card_interaction_tab():
                 character_dropdown = gr.Dropdown(label="Select Character", choices=get_character_names())
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                             "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                             "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace", "Custom-OpenAI-API"],
                     value=None,
-                    label="API for Interaction"
+                    # FIXME - make it so the user cant' click `Send Message` without first setting an API + Chatbot
+                    label="API for Interaction(Mandatory)"
                 )
                 api_key_input = gr.Textbox(label="API Key (if not set in config.txt)",
                                            placeholder="Enter your API key here", type="password")

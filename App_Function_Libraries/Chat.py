@@ -15,9 +15,9 @@ from pathlib import Path
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_conversation_name, save_chat_history_to_database
 from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_cohere, \
-    chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface#, chat_with_vllm
+    chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface  #, chat_with_vllm
 from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
-    chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi
+    chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi, chat_with_vllm, chat_with_custom_openai
 from App_Function_Libraries.DB.SQLite_DB import load_media_content
 from App_Function_Libraries.Utils.Utils import generate_unique_filename
 #
@@ -54,8 +54,8 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
             response = chat_with_oobabooga(input_data, api_key, prompt, temp, system_message)
         elif api_endpoint.lower() == "tabbyapi":
             response = chat_with_tabbyapi(input_data, prompt, temp, system_message)
-        #elif api_endpoint.lower() == "vllm":
-        #    response = chat_with_vllm(input_data, prompt, system_message)
+        elif api_endpoint.lower() == "vllm":
+            response = chat_with_vllm(input_data, prompt, system_message)
         elif api_endpoint.lower() == "local-llm":
             response = chat_with_local_llm(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "huggingface":
@@ -64,6 +64,8 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
             response = chat_with_ollama(input_data, prompt, temp, system_message)
         elif api_endpoint.lower() == "aphrodite":
             response = chat_with_aphrodite(input_data, prompt, temp, system_message)
+        elif api_endpoint.lower() == "custom-openai-api":
+            response = chat_with_custom_openai(api_key, input_data, prompt, temp, system_message)
         else:
             raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
 
@@ -114,6 +116,8 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
 
         # Use the existing API request code based on the selected endpoint
         response = chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message)
+
+        return response
     except Exception as e:
         logging.error(f"Error in chat function: {str(e)}")
         return f"An error occurred: {str(e)}"
@@ -282,17 +286,27 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
 
 CHARACTERS_FILE = Path('.', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
 
+
 def save_character(character_data):
-    if CHARACTERS_FILE.exists():
-        with CHARACTERS_FILE.open('r') as f:
-            characters = json.load(f)
-    else:
-        characters = {}
+    characters_file = os.path.join(os.path.dirname(__file__), '..', 'Helper_Scripts', 'Character_Cards',
+                                   'Characters.json')
 
-    characters[character_data['name']] = character_data
+    try:
+        if os.path.exists(characters_file):
+            with open(characters_file, 'r') as f:
+                characters = json.load(f)
+        else:
+            characters = {}
 
-    with CHARACTERS_FILE.open('w') as f:
-        json.dump(characters, f, indent=2)
+        char_name = character_data['name']
+        characters[char_name] = character_data
+
+        with open(characters_file, 'w') as f:
+            json.dump(characters, f, indent=2)
+
+        print(f"Character '{char_name}' saved successfully.")
+    except Exception as e:
+        print(f"Error saving character: {str(e)}")
 
 
 def load_characters():

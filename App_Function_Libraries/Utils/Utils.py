@@ -193,6 +193,11 @@ def load_and_log_configs():
         aphrodite_api_url = config.get('Local-API', 'aphrodite_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         aphrodite_api_key = config.get('Local-API', 'aphrodite_api_key', fallback='')
 
+        custom_openai_api_key = config.get('API', 'custom_openai_api_key', fallback=None)
+        custom_openai_api_url = config.get('API', 'custom_openai_url', fallback=None)
+        logging.debug(
+            f"Loaded Custom openai-like endpoint API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
+
         logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
         logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
         logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
@@ -225,7 +230,9 @@ def load_and_log_configs():
                 'ooba': ooba_api_key,
                 'tabby': tabby_api_key,
                 'vllm': vllm_api_key,
-                'ollama': ollama_api_key
+                'ollama': ollama_api_key,
+                'aphrodite': aphrodite_api_key,
+                'custom_openai_api_key': custom_openai_api_key
             },
             'models': {
                 'anthropic': anthropic_model,
@@ -248,10 +255,19 @@ def load_and_log_configs():
                 'tabby': tabby_api_IP,
                 'vllm': vllm_api_url,
                 'ollama': ollama_api_url,
-                'aphrodite': aphrodite_api_url
+                'aphrodite': aphrodite_api_url,
+                'custom_openai_api_ip': custom_openai_api_url
             },
             'output_path': output_path,
-            'processing_choice': processing_choice
+            'processing_choice': processing_choice,
+            'db_config': {
+                'prompt_path': prompt_path,
+                'db_type': config.get('Database', 'type', fallback='sqlite'),
+                'sqlite_path': config.get('Database', 'sqlite_path', fallback='media_summary.db'),
+                'elasticsearch_host': config.get('Database', 'elasticsearch_host', fallback='localhost'),
+                'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200),
+                'chroma_db_path': config.get('Database', 'chroma_db_path', fallback='chroma.db')
+            },
         }
 
     except Exception as e:
