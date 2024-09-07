@@ -24,7 +24,7 @@ from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 
 def create_website_scraping_tab():
     with gr.TabItem("Website Scraping"):
-        gr.Markdown("# Scrape Websites & Summarize Articles using a Headless Chrome Browser!")
+        gr.Markdown("# Scrape Websites & Summarize Articles")
         with gr.Row():
             with gr.Column():
                 scrape_method = gr.Radio(
@@ -92,7 +92,7 @@ def create_website_scraping_tab():
 
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],
                     value=None,
                     label="API Name (Mandatory for Summarization)"
                 )

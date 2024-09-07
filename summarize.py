@@ -179,7 +179,9 @@ source_languages = {
     "es": "Spanish",
     "ru": "Russian",
     "ko": "Korean",
-    "fr": "French"
+    "fr": "French",
+    "it": "Italian",
+    "ja": "Japanese",
 }
 source_language_list = [key[0] for key in source_languages.items()]
 

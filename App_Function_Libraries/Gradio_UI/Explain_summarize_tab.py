@@ -75,10 +75,11 @@ def create_summarize_explain_tab():
                     api_endpoint = gr.Dropdown(
                         choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
                                  "OpenRouter",
-                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace", "Custom-OpenAI-API"],
                         value=None,
-                        label="API for Summarization (Optional)"
+                        label="API to be used for request (Mandatory)"
                     )
+                with gr.Row():
                     api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here",
                                                type="password")
                 with gr.Row():

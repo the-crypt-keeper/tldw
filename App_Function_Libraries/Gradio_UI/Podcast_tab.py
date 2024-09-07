@@ -99,7 +99,7 @@ def create_podcast_tab():
 
                 podcast_api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp",
-                             "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
+                             "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],
                     value=None,
                     label="API Name for Summarization (Optional)"
                 )
