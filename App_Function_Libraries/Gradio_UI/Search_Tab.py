@@ -51,7 +51,7 @@ def create_rag_tab():
 
                 keywords_input = gr.Textbox(
                     label="Enter keywords (comma-separated)",
-                    placeholder="keyword1, keyword2, ...",
+                    value="keyword1, keyword2, ...",
                     visible=False
                 )
 

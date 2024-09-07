@@ -144,6 +144,7 @@ def rag_search(query: str, api_choice: str, keywords: str = "") -> Dict[str, Any
         "context": context
     }
 
+
 # RAG Search with keyword filtering
 def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = "") -> Dict[str, Any]:
     try:
@@ -159,14 +160,19 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = "") -> Di
         # Perform full-text search
         fts_results = search_db(query, ["content"], "", page=1, results_per_page=5)
 
-        # Combine results
-        all_results = vector_results + [{"content": result['content'], "metadata": {"media_id": result['id']}} for result in fts_results]
+        # Combine results, ensuring each result has a 'metadata' field with 'media_id'
+        all_results = vector_results + [
+            {
+                "content": result['content'],
+                "metadata": {"media_id": result['id']}
+            } for result in fts_results
+        ]
 
         # Filter results based on keywords
         filtered_results = filter_results_by_keywords(all_results, keyword_list)
 
         if not filtered_results:
-            logger.warning(f"No results found after keyword filtering. Query: {query}, Keywords: {keywords}")
+            logging.info(f"No results found after keyword filtering. Query: {query}, Keywords: {keywords}")
             return {
                 "answer": "I couldn't find any relevant information based on your query and keywords.",
                 "context": ""
@@ -184,11 +190,12 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = "") -> Di
             "context": context
         }
     except Exception as e:
-        logger.error(f"Error in enhanced_rag_pipeline: {str(e)}")
+        logging.error(f"Error in enhanced_rag_pipeline: {str(e)}")
         return {
             "answer": "An error occurred while processing your request.",
             "context": ""
         }
+
 
 def filter_results_by_keywords(results: List[Dict[str, Any]], keywords: List[str]) -> List[Dict[str, Any]]:
     if not keywords:
@@ -196,14 +203,22 @@ def filter_results_by_keywords(results: List[Dict[str, Any]], keywords: List[str
 
     filtered_results = []
     for result in results:
-        media_id = result['metadata'].get('media_id')
-        if media_id is not None:
-            try:
-                media_keywords = fetch_keywords_for_media(media_id)
-                if any(keyword in [mk.lower() for mk in media_keywords] for keyword in keywords):
-                    filtered_results.append(result)
-            except Exception as e:
-                logger.error(f"Error fetching keywords for media_id {media_id}: {str(e)}")
+        try:
+            metadata = result.get('metadata', {})
+            if not isinstance(metadata, dict):
+                logging.warning(f"Unexpected metadata type: {type(metadata)}. Expected dict.")
+                continue
+
+            media_id = metadata.get('media_id')
+            if media_id is None:
+                logging.warning(f"No media_id found in metadata: {metadata}")
+                continue
+
+            media_keywords = fetch_keywords_for_media(media_id)
+            if any(keyword.lower() in [mk.lower() for mk in media_keywords] for keyword in keywords):
+                filtered_results.append(result)
+        except Exception as e:
+            logging.error(f"Error processing result: {result}. Error: {str(e)}")
 
     return filtered_results
 
