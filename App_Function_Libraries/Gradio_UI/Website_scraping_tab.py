@@ -1,26 +1,73 @@
 # Website_scraping_tab.py
 # Gradio UI for scraping websites
-import json
-from typing import Optional
-
+#
 # Imports
+import json
+from typing import Optional, List, Dict
+from urllib.parse import urlparse
+
 #
 # External Imports
 import gradio as gr
 
-from App_Function_Libraries.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level
+#
+# Local Imports
+from App_Function_Libraries.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, scrape_article, \
+    collect_internal_links
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 
 
 #
-# Local Imports
-#
-#
 ########################################################################################################################
 #
 # Functions:
+
+def recursive_scrape(
+        base_url: str,
+        max_pages: int,
+        max_depth: int,
+        custom_prompt: Optional[str],
+        api_name: Optional[str],
+        api_key: Optional[str],
+        keywords: str,
+        system_prompt: Optional[str],
+        progress_callback: callable
+) -> List[Dict]:
+    def get_url_depth(url: str) -> int:
+        return len(urlparse(url).path.strip('/').split('/'))
+
+    # Collect all internal links using your existing function
+    all_links = collect_internal_links(base_url)
+
+    # Filter links based on max_depth
+    filtered_links = [link for link in all_links if get_url_depth(link) <= max_depth]
+
+    # Sort links by depth to prioritize shallower pages
+    filtered_links.sort(key=get_url_depth)
+
+    scraped_articles = []
+    pages_scraped = 0
+
+    for link in filtered_links:
+        if pages_scraped >= max_pages:
+            break
+
+        # Update progress
+        progress_callback(f"Scraping page {pages_scraped + 1}/{max_pages}: {link}")
+
+        # Use your existing scrape_article function
+        article_data = scrape_article(link)
+
+        if article_data and article_data['extraction_successful']:
+            scraped_articles.append(article_data)
+            pages_scraped += 1
+
+    # Final progress update
+    progress_callback(f"Scraping completed. Total pages scraped: {pages_scraped}")
+
+    return scraped_articles
 
 def create_website_scraping_tab():
     with gr.TabItem("Website Scraping"):
@@ -28,13 +75,13 @@ def create_website_scraping_tab():
         with gr.Row():
             with gr.Column():
                 scrape_method = gr.Radio(
-                    ["Individual URLs", "Sitemap", "URL Level"],
+                    ["Individual URLs", "Sitemap", "URL Level", "Recursive Scraping"],
                     label="Scraping Method",
                     value="Individual URLs"
                 )
                 url_input = gr.Textbox(
                     label="Article URLs or Base URL",
-                    placeholder="Enter article URLs here, one per line, or base URL for sitemap/URL level scraping",
+                    placeholder="Enter article URLs here, one per line, or base URL for sitemap/URL level/recursive scraping",
                     lines=5
                 )
                 url_level = gr.Slider(
@@ -44,6 +91,27 @@ def create_website_scraping_tab():
                     label="URL Level (for URL Level scraping)",
                     value=2,
                     visible=False
+                )
+                max_pages = gr.Slider(
+                    minimum=1,
+                    maximum=100,
+                    step=1,
+                    label="Maximum Pages to Scrape (for Recursive Scraping)",
+                    value=10,
+                    visible=False
+                )
+                max_depth = gr.Slider(
+                    minimum=1,
+                    maximum=10,
+                    step=1,
+                    label="Maximum Depth (for Recursive Scraping)",
+                    value=3,
+                    visible=False
+                )
+                custom_article_title_input = gr.Textbox(
+                    label="Custom Article Titles (Optional, one per line)",
+                    placeholder="Enter custom titles for the articles, one per line",
+                    lines=5
                 )
                 custom_article_title_input = gr.Textbox(
                     label="Custom Article Titles (Optional, one per line)",
@@ -110,27 +178,23 @@ def create_website_scraping_tab():
 
                 scrape_button = gr.Button("Scrape and Summarize")
             with gr.Column():
+                progress_output = gr.Textbox(label="Progress", lines=3)
                 result_output = gr.Textbox(label="Result", lines=20)
 
-        def update_url_input_label(method):
-            if method == "Individual URLs":
-                return gr.update(label="Article URLs", placeholder="Enter article URLs here, one per line")
-            else:
-                return gr.update(label="Base URL", placeholder="Enter the base URL for sitemap/URL level scraping")
-
-        def toggle_url_level_visibility(method):
-            return gr.update(visible=(method == "URL Level"))
-
-        scrape_method.change(
-            fn=update_url_input_label,
-            inputs=[scrape_method],
-            outputs=[url_input]
-        )
+        def update_ui_for_scrape_method(method):
+            url_level_update = gr.update(visible=(method == "URL Level"))
+            max_pages_update = gr.update(visible=(method == "Recursive Scraping"))
+            max_depth_update = gr.update(visible=(method == "Recursive Scraping"))
+            url_input_update = gr.update(
+                label="Article URLs" if method == "Individual URLs" else "Base URL",
+                placeholder="Enter article URLs here, one per line" if method == "Individual URLs" else "Enter the base URL for scraping"
+            )
+            return url_level_update, max_pages_update, max_depth_update, url_input_update
 
         scrape_method.change(
-            fn=toggle_url_level_visibility,
+            fn=update_ui_for_scrape_method,
             inputs=[scrape_method],
-            outputs=[url_level]
+            outputs=[url_level, max_pages, max_depth, url_input]
         )
 
         custom_prompt_checkbox.change(
@@ -161,31 +225,16 @@ def create_website_scraping_tab():
                 scrape_method: str,
                 url_input: str,
                 url_level: Optional[int],
+                max_pages: int,
+                max_depth: int,
                 custom_prompt: Optional[str],
                 api_name: Optional[str],
                 api_key: Optional[str],
                 keywords: str,
                 custom_titles: Optional[str],
-                system_prompt: Optional[str]
+                system_prompt: Optional[str],
+                progress=gr.Progress()
         ) -> str:
-            """
-            Wrapper function to handle different scraping methods and summarization.
-            Returns markdown-formatted string of the website collection data.
-
-            Args:
-                scrape_method (str): The method of scraping ('Individual URLs', 'Sitemap', or 'URL Level')
-                url_input (str): The input URL(s) or base URL
-                url_level (Optional[int]): The URL level for URL Level scraping
-                custom_prompt (Optional[str]): Custom prompt for summarization
-                api_name (Optional[str]): Name of the API to use for summarization
-                api_key (Optional[str]): API key for the chosen API
-                keywords (str): Keywords for summarization
-                custom_titles (Optional[str]): Custom titles for articles
-                system_prompt (Optional[str]): System prompt for summarization
-
-            Returns:
-                str: Markdown-formatted string containing concatenated content and metadata for the entire website
-            """
             try:
                 if scrape_method == "Individual URLs":
                     result = scrape_and_summarize_multiple(url_input, custom_prompt, api_name, api_key, keywords,
@@ -197,6 +246,11 @@ def create_website_scraping_tab():
                         return convert_json_to_markdown(
                             json.dumps({"error": "URL level is required for URL Level scraping."}))
                     result = scrape_by_url_level(url_input, url_level)
+                elif scrape_method == "Recursive Scraping":
+                    result = recursive_scrape(
+                        url_input, max_pages, max_depth, custom_prompt, api_name, api_key, keywords, system_prompt,
+                        progress.update
+                    )
                 else:
                     return convert_json_to_markdown(json.dumps({"error": f"Unknown scraping method: {scrape_method}"}))
 
@@ -218,6 +272,8 @@ def create_website_scraping_tab():
                     "api_used": api_name,
                     "keywords": keywords,
                     "url_level": url_level if scrape_method == "URL Level" else None,
+                    "max_pages": max_pages if scrape_method == "Recursive Scraping" else None,
+                    "max_depth": max_depth if scrape_method == "Recursive Scraping" else None,
                     "total_articles_scraped": len(result),
                     "urls_scraped": all_urls,
                     "content": all_content
@@ -230,9 +286,9 @@ def create_website_scraping_tab():
 
         scrape_button.click(
             fn=scrape_and_summarize_wrapper,
-            inputs=[scrape_method, url_input, url_level, website_custom_prompt_input, api_name_input, api_key_input,
-                    keywords_input, custom_article_title_input, system_prompt_input],
-            outputs=result_output
+            inputs=[scrape_method, url_input, url_level, max_pages, max_depth, website_custom_prompt_input,
+                    api_name_input, api_key_input, keywords_input, custom_article_title_input, system_prompt_input],
+            outputs=[result_output]
         )
 
 
