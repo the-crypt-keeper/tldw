@@ -8,7 +8,7 @@ import requests
 from chromadb import Settings
 
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
-from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media
+from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media, db
 from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
 
 #######################################################################################################################
@@ -176,36 +176,33 @@ def create_all_embeddings(api_choice: str, model_or_url: str) -> str:
         texts_to_embed = []
         embeddings_to_store = []
         ids_to_store = []
+        metadatas_to_store = []
         collection_name = "all_content_embeddings"
 
-        # Initialize or get the ChromaDB collection
         collection = chroma_client.get_or_create_collection(name=collection_name)
 
         for content_item in all_content:
             media_id = content_item['id']
             text = content_item['content']
 
-            # Check if the embedding already exists in ChromaDB
             embedding_exists = collection.get(ids=[f"doc_{media_id}"])
 
-            if embedding_exists:
+            if embedding_exists['ids']:
                 logging.info(f"Embedding already exists for media ID {media_id}, skipping...")
-                continue  # Skip if embedding already exists
+                continue
 
-            # Create the embedding
             if api_choice == "openai":
                 embedding = create_openai_embedding(text, model_or_url)
             else:  # Llama.cpp
                 embedding = create_llamacpp_embedding(text, model_or_url)
 
-            # Collect the text, embedding, and ID for batch storage
             texts_to_embed.append(text)
             embeddings_to_store.append(embedding)
             ids_to_store.append(f"doc_{media_id}")
+            metadatas_to_store.append({"media_id": media_id})
 
-        # Store all new embeddings in ChromaDB
         if texts_to_embed and embeddings_to_store:
-            store_in_chroma(collection_name, texts_to_embed, embeddings_to_store, ids_to_store)
+            store_in_chroma(collection_name, texts_to_embed, embeddings_to_store, ids_to_store, metadatas_to_store)
 
         return "Embeddings created and stored successfully for all new content."
     except Exception as e:
@@ -238,7 +235,6 @@ def get_all_content_from_database() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: A list of dictionaries, each containing the media ID, content, title, and other relevant fields.
     """
     try:
-        from App_Function_Libraries.DB.DB_Manager import db
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -248,7 +244,6 @@ def get_all_content_from_database() -> List[Dict[str, Any]]:
             """)
             media_items = cursor.fetchall()
 
-            # Convert the results into a list of dictionaries
             all_content = [
                 {
                     'id': item[0],
@@ -286,8 +281,9 @@ def check_embedding_status(selected_item):
     result = collection.get(ids=[f"doc_{item_id}"])
     if result['ids']:
         embedding = result['embeddings'][0]
+        metadata = result['metadatas'][0]
         embedding_preview = str(embedding[:50])  # Convert first 50 elements to string
-        return f"Embedding exists for item: {item_id}", f"Embedding preview: {embedding_preview}..."
+        return f"Embedding exists for item: {item_id}", f"Embedding preview: {embedding_preview}...\nMetadata: {metadata}"
     else:
         return f"No embedding found for item: {item_id}", ""
 
@@ -308,7 +304,7 @@ def create_new_embedding(selected_item, api_choice, openai_model, llamacpp_url):
             embedding = create_embedding(item['content'])
 
         collection_name = "all_content_embeddings"
-        store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item['id']}"])
+        store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item['id']}"], [{"media_id": item['id']}])
         return f"New embedding created and stored for item: {item_id}"
     except Exception as e:
         return f"Error creating embedding: {str(e)}"
