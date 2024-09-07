@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import time
+from typing import Optional
 
 import requests
 from requests import RequestException
@@ -44,7 +45,14 @@ config = load_comprehensive_config()
 openai_api_key = config.get('API', 'openai_api_key', fallback=None)
 
 
-def summarize(input_data, custom_prompt_arg, api_name, api_key, temp, system_message):
+def summarize(
+    input_data: str,
+    custom_prompt_arg: Optional[str],
+    api_name: str,
+    api_key: Optional[str],
+    temp: float,
+    system_message: Optional[str]
+) -> str:
     try:
         if api_name.lower() == "openai":
             return summarize_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message)
@@ -71,7 +79,7 @@ def summarize(input_data, custom_prompt_arg, api_name, api_key, temp, system_mes
         elif api_name.lower() == "tabbyapi":
             return summarize_with_tabbyapi(input_data, custom_prompt_arg, temp, system_message)
         elif api_name.lower() == "vllm":
-            return summarize_with_vllm(input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_vllm(input_data, custom_prompt_arg, None, system_message)
         elif api_name.lower() == "local-llm":
             return summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message)
         elif api_name.lower() == "huggingface":
