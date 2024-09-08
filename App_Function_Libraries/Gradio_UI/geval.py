@@ -3,7 +3,7 @@
 # We will use the G-Eval API to evaluate the quality of the generated summaries.
 
 import gradio as gr
-from App_Function_Libraries.ms_g_eval import run_geval
+from App_Function_Libraries.Benchmarks_Evaluations.ms_g_eval import run_geval
 
 def create_geval_tab():
     with gr.Tab("G-Eval"):
