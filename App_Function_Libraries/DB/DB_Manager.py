@@ -67,7 +67,7 @@ from App_Function_Libraries.DB.SQLite_DB import (
     get_media_prompts as sqlite_get_media_prompts, get_specific_prompt as sqlite_get_specific_prompt, \
     delete_specific_transcript as sqlite_delete_specific_transcript, delete_specific_summary as sqlite_delete_specific_summary, \
     delete_specific_prompt as sqlite_delete_specific_prompt, fetch_keywords_for_media as sqlite_fetch_keywords_for_media, \
-    update_keywords_for_media as sqlite_update_keywords_for_media
+    update_keywords_for_media as sqlite_update_keywords_for_media, check_media_exists as sqlite_check_media_exists, \
 )
 #
 # End of imports
@@ -202,6 +202,13 @@ def search_and_display_items(*args, **kwargs):
 def search_and_display(*args, **kwargs):
     if db_type == 'sqlite':
         return sqlite_search_and_display(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def check_media_exists(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_check_media_exists(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
