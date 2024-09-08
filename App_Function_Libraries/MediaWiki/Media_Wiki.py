@@ -1,18 +1,24 @@
-import os
-import re
+# Media_Wiki.py
+# Description: This file contains the functions to import MediaWiki dumps into the media_db and Chroma databases.
+#
+# Imports
+#
+#######################################################################################################################
+import asyncio
 import json
 import logging
-import asyncio
-from typing import List, Dict, Any, Iterator
+import os
+import re
 from concurrent.futures import ThreadPoolExecutor
-from tqdm import tqdm
-import yaml
-import mwxml
+from typing import List, Dict, Any, Iterator
+
 import mwparserfromhell
+import mwxml
+import yaml
+from tqdm import tqdm
 
 # FIXME Add check_media_exists to DB_Manager.py
 from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords, check_media_exists
-from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content
 
 # Set up logging
@@ -21,7 +27,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Load configuration
 def load_mediawiki_import_config():
-    with open('mediawiki_import_config.yaml', 'r') as f:
+    with open('Config_Files\\mediawiki_import_config.yaml', 'r') as f:
         return yaml.safe_load(f)
 
 
