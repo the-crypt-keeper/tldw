@@ -95,18 +95,23 @@ def cleanup_downloads():
 
 
 def load_comprehensive_config():
-    # Get the directory of the current script
+    # Get the directory of the current script (Utils.py)
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    # Go up two levels to the project root directory
+
+    # Go up two levels to the project root directory (tldw)
     project_root = os.path.dirname(os.path.dirname(current_dir))
-    # Construct the path to the config file in the project root directory
-    config_path = os.path.join(project_root, 'config.txt')
-    # Create a ConfigParser object
-    config = configparser.ConfigParser()
-    # Read the configuration file
-    files_read = config.read(config_path)
-    if not files_read:
+
+    # Construct the path to the config file
+    config_path = os.path.join(project_root, 'Config_Files', 'config.txt')
+
+    # Check if the config file exists
+    if not os.path.exists(config_path):
         raise FileNotFoundError(f"Config file not found at {config_path}")
+
+    # Read the config file
+    config = configparser.ConfigParser()
+    config.read(config_path)
+
     return config
 
 
@@ -616,8 +621,16 @@ def format_file_path(file_path, fallback_path=None):
 
 
 def get_db_config():
+    # Get the directory of the current script
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Go up two levels to the project root directory (tldw)
+    project_root = os.path.dirname(os.path.dirname(current_dir))
+    # Construct the path to the config file
+    config_path = os.path.join(project_root, 'Config_Files', 'config.txt')
+    # Read the config file
     config = configparser.ConfigParser()
-    config.read('config.txt')
+    config.read(config_path)
+    # Return the database configuration
     return {
         'type': config['Database']['type'],
         'sqlite_path': config.get('Database', 'sqlite_path', fallback='media_summary.db'),

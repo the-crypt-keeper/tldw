@@ -87,7 +87,7 @@ def create_grammar_style_check_tab():
                     value=None,
                     label="API for Grammar Check"
                 )
-                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                api_key_input = gr.Textbox(label="API Key (if not set in Config_Files/config.txt)", placeholder="Enter your API key here",
                                                type="password")
                 check_grammar_button = gr.Button("Check Grammar and Style")
 
@@ -117,7 +117,7 @@ def create_tone_adjustment_tab():
                     value=None,
                     label="API for Grammar Check"
                 )
-                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", placeholder="Enter your API key here",
+                api_key_input = gr.Textbox(label="API Key (if not set in Config_Files/config.txt)", placeholder="Enter your API key here",
                                                type="password")
                 adjust_btn = gr.Button("Adjust Tone")
 
@@ -248,7 +248,7 @@ def create_document_feedback_tab():
                     value=None,
                     label="API for Feedback"
                 )
-                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)", type="password")
+                api_key_input = gr.Textbox(label="API Key (if not set in Config_Files/config.txt)", type="password")
                 get_feedback_button = gr.Button("Get Feedback")
                 generate_prompt_button = gr.Button("Generate Writing Prompt")
 
@@ -492,7 +492,7 @@ def create_character_card_interaction_tab():
                     # FIXME - make it so the user cant' click `Send Message` without first setting an API + Chatbot
                     label="API for Interaction(Mandatory)"
                 )
-                api_key_input = gr.Textbox(label="API Key (if not set in config.txt)",
+                api_key_input = gr.Textbox(label="API Key (if not set in Config_Files/config.txt)",
                                            placeholder="Enter your API key here", type="password")
                 temperature_slider = gr.Slider(minimum=0.0, maximum=2.0, value=0.7, step=0.05, label="Temperature")
                 import_chat_button = gr.Button("Import Chat History")

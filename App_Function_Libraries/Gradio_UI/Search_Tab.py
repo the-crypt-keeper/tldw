@@ -104,7 +104,7 @@ def create_embeddings_tab():
                 )
                 openai_model_choice = gr.Radio(
                     choices=["text-embedding-3-small", "text-embedding-3-large"],
-                    label="OpenAI Embedding Model (Assumes you have your API key set up in 'config.txt')",
+                    label="OpenAI Embedding Model (Assumes you have your API key set up in 'Config_Files/config.txt')",
                     value="text-embedding-3-small",
                     visible=True
                 )

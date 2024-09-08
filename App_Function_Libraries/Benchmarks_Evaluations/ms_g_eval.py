@@ -10,6 +10,7 @@ import configparser
 import inspect
 import json
 import logging
+import os
 import re
 from typing import Dict, Callable, List, Any
 
@@ -31,8 +32,14 @@ from App_Function_Libraries.Chat import chat_api_call
 # Start of G-Eval.py
 
 logger = logging.getLogger(__name__)
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct the path to the config file
+config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
+# Read the config file
 config = configparser.ConfigParser()
-config.read('config.txt')
+config.read(config_path)
+
 
 def aggregate(
     fluency_list: List[float],
