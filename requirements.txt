@@ -13,14 +13,14 @@ click==8.1.7
 colorama==0.4.6
 coloredlogs==15.0.1
 contourpy==1.2.1
+#Inference Engine for whisper
 ctranslate2==4.2.1
+#
 cycler==0.12.1
 dnspython==2.6.1
 email_validator==2.1.1
 fastapi==0.111.0
 fastapi-cli==0.0.3
-faster-whisper==1.0.1
-ffmpeg==1.4
 ffmpy==0.3.2
 filelock==3.13.4
 fire==0.6.0
@@ -50,27 +50,33 @@ mutagen==1.47.0
 networkx==3.3
 numpy==1.26.4
 onnxruntime==1.17.3
-openai
 orjson==3.10.3
 packaging==24.0
 pandas==2.2.2
 pillow==10.3.0
+#Browser Scraping
 playwright
+trafilatura
+#
 psutil==5.9.8
+#Audio Processing
 pyannote.audio
+faster-whisper==1.0.1
+#
 pycryptodomex==3.20.0
 pydantic==2.7.1
 pydantic_core==2.18.2
 pydub==0.25.1
 pyee==11.1.0
 Pygments==2.18.0
+#Epub parsing
 pypandoc_binary
 pypandoc
+#
 pyparsing==3.1.2
 pyreadline3==3.4.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
-python-ffmpeg==2.0.12
 python-multipart==0.0.9
 pytz==2024.1
 PyYAML==6.0.1
@@ -80,7 +86,6 @@ requests==2.32.2
 rich==13.7.1
 rpds-py==0.18.1
 ruff==0.4.3
-safetensors==0.4.2
 semantic-version==2.10.0
 sentencepiece==0.2.0
 setuptools==69.5.1
@@ -97,8 +102,10 @@ tomlkit==0.12.0
 toolz==0.12.1
 torchvision==0.17.2
 tqdm==4.66.3
-trafilatura
+#Inference Engine
 transformers==4.39.3
+safetensors==0.4.2
+#
 typer==0.12.3
 typing_extensions==4.11.0
 tzdata==2024.1
@@ -107,19 +114,47 @@ urllib3==2.2.2
 uvicorn==0.29.0
 watchfiles==0.21.0
 websockets==11.0.3
+#Video download support
 yt-dlp
+#
+#Video conversion
+ffmpeg==1.4
+python-ffmpeg==2.0.12
+# FIXME I"m not sure I actually need this...
+#
 nltk
-openai~=1.28.1
+#OpenAI
+openai
+#openai~=1.28.1
+#
+#Tokenizer
 tiktoken~=0.6.0
+#
+#PDF Ingestion
 pymupdf
+#
+#ChromaDB/RAG DB
 chromadb
 protobuf==4.25.4
+#
+#Writing Tab tools
 textstat
 langdetect
+#
+#ElasticSearch/OpenSearch
 elasticsearch
+#
+#Chinese/Japanse Support
 jieba
-pyaudio
 fugashi
+#
+#Voice recording
+pyaudio
+#
+#Media Wiki
+mwxml
+mwparserfromhell
+#
 --extra-index-url https://download.pytorch.org/whl/cu123
 torch
 torchaudio
