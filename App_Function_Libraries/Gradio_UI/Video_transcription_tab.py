@@ -19,7 +19,7 @@ from App_Function_Libraries.Summarization_General_Lib import perform_transcripti
 from App_Function_Libraries.Utils.Utils import convert_to_seconds, safe_read_file, format_transcription, \
     create_download_directory, generate_unique_identifier, extract_text_from_segments
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, extract_metadata, download_video
-from App_Function_Libraries.ms_g_eval import run_geval
+from App_Function_Libraries.Benchmarks_Evaluations.ms_g_eval import run_geval
 #
 #######################################################################################################################
 #
