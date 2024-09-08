@@ -4,6 +4,7 @@
 # Import necessary modules and functions
 import configparser
 import logging
+import os
 from typing import Dict, Any, List, Optional
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
@@ -20,7 +21,13 @@ import openai
 # Initialize OpenAI client (adjust this based on your API key management)
 openai.api_key = "your-openai-api-key"
 
+# Get the directory of the current script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct the path to the config file
+config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
+# Read the config file
 config = configparser.ConfigParser()
+# Read the configuration file
 config.read('config.txt')
 
 # Main RAG pipeline function
