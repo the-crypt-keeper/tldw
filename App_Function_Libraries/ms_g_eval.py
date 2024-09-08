@@ -69,7 +69,12 @@ def aggregate(
         "average_coherence": average_coherence,
     }
 
-def run_geval(document, summary, api_key, api_name=None, save=False):
+def run_geval(transcript: str, summary: str, api_key: str, api_name: str = None, save: bool = False):
+    try:
+        validate_inputs(transcript, summary, api_name, api_key)
+    except ValueError as e:
+        return str(e)
+
     prompts = {
         "coherence": """You will be given one summary written for a source document.
 
@@ -198,11 +203,13 @@ def run_geval(document, summary, api_key, api_name=None, save=False):
     }
 
     scores = {}
+    explanations = {}
     for metric, prompt in prompts.items():
-        full_prompt = prompt.replace("{{Document}}", document).replace("{{Summary}}", summary)
+        full_prompt = prompt.replace("{{Document}}", transcript).replace("{{Summary}}", summary)
         try:
             score = geval_summarization(full_prompt, 5 if metric != "fluency" else 3, api_name, api_key)
             scores[metric] = score
+            explanations[metric] = "Score based on the evaluation criteria."
         except Exception as e:
             error_message = detailed_api_error(api_name, e)
             return error_message
@@ -216,21 +223,32 @@ def run_geval(document, summary, api_key, api_name=None, save=False):
     }
     logging.debug("Results: %s", results)
 
-    if save:
+    if save is not None:
         logging.debug("Saving results to geval_results.json")
         save_eval_results(results)
         logging.debug("Results saved to geval_results.json")
 
-    return (f"Coherence: {scores['coherence']:.2f}\n"
-            f"Consistency: {scores['consistency']:.2f}\n"
-            f"Fluency: {scores['fluency']:.2f}\n"
-            f"Relevance: {scores['relevance']:.2f}\n"
-            f"Average Scores:\n"
-            f"  Fluency: {avg_scores['average_fluency']:.2f}\n"
-            f"  Consistency: {avg_scores['average_consistency']:.2f}\n"
-            f"  Relevance: {avg_scores['average_relevance']:.2f}\n"
-            f"  Coherence: {avg_scores['average_coherence']:.2f}\n"
-            f"Results saved to geval_results.json")
+    formatted_result = f"""
+    Confabulation Check Results:
+
+    Coherence: {scores['coherence']:.2f} - {explanations['coherence']}
+    Consistency: {scores['consistency']:.2f} - {explanations['consistency']}
+    Fluency: {scores['fluency']:.2f} - {explanations['fluency']}
+    Relevance: {scores['relevance']:.2f} - {explanations['relevance']}
+
+    Overall Assessment: The summary has been evaluated on four key metrics. 
+    The average scores are:
+      Fluency: {avg_scores['average_fluency']:.2f}
+      Consistency: {avg_scores['average_consistency']:.2f}
+      Relevance: {avg_scores['average_relevance']:.2f}
+      Coherence: {avg_scores['average_coherence']:.2f}
+
+    These scores indicate the overall quality of the summary in terms of its 
+    coherence, consistency with the original text, fluency of language, and 
+    relevance of content.
+    """
+
+    return formatted_result
 
 
 def create_geval_tab():
