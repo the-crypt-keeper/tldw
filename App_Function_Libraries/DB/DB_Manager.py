@@ -1,3 +1,7 @@
+# DB_Manager.py
+# Description: This file contains the DatabaseManager class, which is responsible for managing the database connection, i.e. either SQLite or Elasticsearch.
+#
+# Imports
 import configparser
 import logging
 import os
@@ -5,23 +9,10 @@ from contextlib import contextmanager
 from time import sleep
 from typing import Tuple, List, Union, Dict
 import sqlite3
+#
 # 3rd-Party Libraries
 from elasticsearch import Elasticsearch
-
-############################################################################################################
 #
-# This file contains the DatabaseManager class, which is responsible for managing the database connection, i.e. either SQLite or Elasticsearch.
-
-####
-# The DatabaseManager class provides the following methods:
-# - add_media: Add a new media item to the database
-# - fetch_items_by_keyword: Fetch media items from the database based on a keyword
-# - fetch_item_details: Fetch details of a specific media item from the database
-# - update_media_content: Update the content of a specific media item in the database
-# - search_and_display_items: Search for media items in the database and display the results
-# - close_connection: Close the database connection
-####
-
 # Import your existing SQLite functions
 from App_Function_Libraries.DB.SQLite_DB import (
     update_media_content as sqlite_update_media_content,
@@ -70,13 +61,20 @@ from App_Function_Libraries.DB.SQLite_DB import (
     update_keywords_for_media as sqlite_update_keywords_for_media, check_media_exists as sqlite_check_media_exists, \
 )
 #
+# Local Imports
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+#
 # End of imports
 ############################################################################################################
 #
 # Globals
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct the path to the config file
+config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
+# Read the config file
 config = configparser.ConfigParser()
-config.read('config.txt')
+config.read(config_path)
 
 db_path: str = config.get('Database', 'sqlite_path', fallback='media_summary.db')
 
@@ -136,15 +134,48 @@ class Database:
             conn.close()
         self.pool.clear()
 
+#
+# End of Database Manager Class
+############################################################################################################
+#
+# Database Config loading
+
 def get_db_config():
-    config = configparser.ConfigParser()
-    config.read('config.txt')
-    return {
-        'type': config['Database']['type'],
-        'sqlite_path': config.get('Database', 'sqlite_path', fallback='media_summary.db'),
-        'elasticsearch_host': config.get('Database', 'elasticsearch_host', fallback='localhost'),
-        'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200)
-    }
+    try:
+        config = load_comprehensive_config()
+
+        # Check if 'Database' section exists
+        if 'Database' not in config:
+            print("Warning: 'Database' section not found in config. Using default values.")
+            return {
+                'type': 'sqlite',
+                'sqlite_path': 'media_summary.db',
+                'elasticsearch_host': 'localhost',
+                'elasticsearch_port': 9200
+            }
+
+        return {
+            'type': config.get('Database', 'type', fallback='sqlite'),
+            'sqlite_path': config.get('Database', 'sqlite_path', fallback='media_summary.db'),
+            'elasticsearch_host': config.get('Database', 'elasticsearch_host', fallback='localhost'),
+            'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200)
+        }
+    except FileNotFoundError:
+        print("Warning: Config file not found. Using default database configuration.")
+        return {
+            'type': 'sqlite',
+            'sqlite_path': 'media_summary.db',
+            'elasticsearch_host': 'localhost',
+            'elasticsearch_port': 9200
+        }
+    except Exception as e:
+        print(f"Error reading config: {str(e)}. Using default database configuration.")
+        return {
+            'type': 'sqlite',
+            'sqlite_path': 'media_summary.db',
+            'elasticsearch_host': 'localhost',
+            'elasticsearch_port': 9200
+        }
 
 db_config = get_db_config()
 db_type = db_config['type']
@@ -171,7 +202,8 @@ elif db_type == 'elasticsearch':
     }])
 else:
     raise ValueError(f"Unsupported database type: {db_type}")
-
+#
+# End of Database Config loading
 ############################################################################################################
 #
 # DB-Searching functions

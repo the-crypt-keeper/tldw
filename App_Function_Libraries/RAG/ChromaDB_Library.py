@@ -1,5 +1,6 @@
 import configparser
 import logging
+import os
 import sqlite3
 from typing import List, Dict, Any
 
@@ -17,8 +18,12 @@ from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
 
 # Get ChromaDB settings
 # Load configuration
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct the path to the config file
+config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
+# Read the config file
 config = configparser.ConfigParser()
-config.read('config.txt')
+config.read(config_path)
 chroma_db_path = config.get('Database', 'chroma_db_path', fallback='chroma_db')
 chroma_client = chromadb.PersistentClient(path=chroma_db_path, settings=Settings(anonymized_telemetry=False))
 

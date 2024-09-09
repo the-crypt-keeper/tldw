@@ -4,6 +4,7 @@
 # Import necessary modules and functions
 import configparser
 import logging
+import os
 from typing import Dict, Any, List, Optional
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
@@ -12,6 +13,9 @@ from App_Function_Libraries.DB.DB_Manager import add_media_to_database, search_d
     fetch_keywords_for_media
 # 3rd-Party Imports
 import openai
+
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+
 #
 ########################################################################################################################
 #
@@ -20,7 +24,13 @@ import openai
 # Initialize OpenAI client (adjust this based on your API key management)
 openai.api_key = "your-openai-api-key"
 
+# Get the directory of the current script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct the path to the config file
+config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
+# Read the config file
 config = configparser.ConfigParser()
+# Read the configuration file
 config.read('config.txt')
 
 # Main RAG pipeline function
@@ -87,6 +97,9 @@ def rag_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
 
 
 def generate_answer(api_choice: str, context: str, query: str) -> str:
+    logging.debug("Entering generate_answer function")
+    config = load_comprehensive_config()
+    logging.debug(f"Config sections: {config.sections()}")
     prompt = f"Context: {context}\n\nQuestion: {query}"
     if api_choice == "OpenAI":
         from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai
@@ -178,39 +191,22 @@ def rag_search(query: str, api_choice: str, keywords: str = "") -> Dict[str, Any
 
 
 # RAG Search with keyword filtering
-def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = "") -> Dict[str, Any]:
+def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> Dict[str, Any]:
     try:
-        # Process keywords
+        # Process keywords if provided
         keyword_list = [k.strip().lower() for k in keywords.split(',')] if keywords else []
 
-        # Fetch relevant media IDs based on keywords
+        # Fetch relevant media IDs based on keywords if keywords are provided
         relevant_media_ids = fetch_relevant_media_ids(keyword_list) if keyword_list else None
 
-        # Perform vector search with keyword filtering
-        all_collections = chroma_client.list_collections()
-        vector_results = []
-        for collection in all_collections:
-            collection_results = vector_search(collection.name, query, k=5)
-            filtered_results = [
-                result for result in collection_results
-                if relevant_media_ids is None or result['metadata'].get('media_id') in relevant_media_ids
-            ]
-            vector_results.extend(filtered_results)
+        # Perform vector search
+        vector_results = perform_vector_search(query, relevant_media_ids)
 
-        # Perform full-text search with keyword filtering
-        fts_results = search_db(query, ["content"], "", page=1, results_per_page=5)
-        filtered_fts_results = [
-            result for result in fts_results
-            if relevant_media_ids is None or result['id'] in relevant_media_ids
-        ]
+        # Perform full-text search
+        fts_results = perform_full_text_search(query, relevant_media_ids)
 
         # Combine results
-        all_results = vector_results + [
-            {
-                "content": result['content'],
-                "metadata": {"media_id": result['id']}
-            } for result in filtered_fts_results
-        ]
+        all_results = vector_results + fts_results
 
         if not all_results:
             logging.info(f"No results found. Query: {query}, Keywords: {keywords}")
@@ -220,8 +216,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = "") -> Di
             }
 
         # Extract content from results
-        context_texts = [result['content'] for result in all_results[:10]]  # Limit to top 10 results
-        context = "\n".join(context_texts)
+        context = "\n".join([result['content'] for result in all_results[:10]])  # Limit to top 10 results
 
         # Generate answer using the selected API
         answer = generate_answer(api_choice, context, query)
@@ -236,6 +231,32 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = "") -> Di
             "answer": "An error occurred while processing your request.",
             "context": ""
         }
+
+
+def perform_vector_search(query: str, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
+    all_collections = chroma_client.list_collections()
+    vector_results = []
+    for collection in all_collections:
+        collection_results = vector_search(collection.name, query, k=5)
+        filtered_results = [
+            result for result in collection_results
+            if relevant_media_ids is None or result['metadata'].get('media_id') in relevant_media_ids
+        ]
+        vector_results.extend(filtered_results)
+    return vector_results
+
+
+def perform_full_text_search(query: str, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
+    fts_results = search_db(query, ["content"], "", page=1, results_per_page=5)
+    filtered_fts_results = [
+        {
+            "content": result['content'],
+            "metadata": {"media_id": result['id']}
+        }
+        for result in fts_results
+        if relevant_media_ids is None or result['id'] in relevant_media_ids
+    ]
+    return filtered_fts_results
 
 
 def fetch_relevant_media_ids(keywords: List[str]) -> List[int]:
