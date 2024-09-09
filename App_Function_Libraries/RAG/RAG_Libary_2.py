@@ -11,11 +11,10 @@ from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_conten
 from App_Function_Libraries.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database, search_db, get_unprocessed_media, \
     fetch_keywords_for_media
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+#
 # 3rd-Party Imports
 import openai
-
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config
-
 #
 ########################################################################################################################
 #
