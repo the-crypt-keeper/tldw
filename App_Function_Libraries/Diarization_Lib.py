@@ -12,18 +12,22 @@
 #
 ####################
 # Import necessary libraries
+import json
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Any
-#
-# Import 3rd Party Libraries
+
+
 from tqdm import tqdm
 import soundfile as sf
-from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
-import yaml
 #
 # Import Local Libraries
 from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
+#
+# Import 3rd Party Libraries
+from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
+import yaml
 #
 #######################################################################################################################
 # Function Definitions
@@ -92,7 +96,7 @@ def load_pipeline_from_pretrained(path_to_config: str | Path) -> SpeakerDiarizat
 
     return pipeline
 
-# FIXME - optimize this function
+
 def audio_diarization(audio_file_path: str) -> list:
     logging.info('audio-diarization: Loading pyannote pipeline')
 
@@ -110,22 +114,7 @@ def audio_diarization(audio_file_path: str) -> list:
 
     try:
         logging.info('audio-diarization: Starting diarization...')
-
-        # Get audio duration
-        with sf.SoundFile(audio_file_path) as audio_file:
-            duration = len(audio_file) / audio_file.samplerate
-
-        # Initialize progress bar
-        pbar = tqdm(total=100, desc="Diarization Progress", unit="%")
-
-        # Custom callback function to update progress
-        def progress_callback(current_time: float):
-            progress = min(100, int((current_time / duration) * 100))
-            pbar.n = progress
-            pbar.refresh()
-
-        # Perform diarization with progress callback
-        diarization_result = pipeline(audio_file_path, callback=progress_callback)
+        diarization_result = pipeline(audio_file_path)
 
         segments = []
         for turn, _, speaker in diarization_result.itertracks(yield_label=True):
@@ -136,8 +125,6 @@ def audio_diarization(audio_file_path: str) -> list:
             }
             logging.debug(f"Segment: {segment}")
             segments.append(segment)
-
-        pbar.close()
         logging.info("audio-diarization: Diarization completed with pyannote")
 
         return segments
