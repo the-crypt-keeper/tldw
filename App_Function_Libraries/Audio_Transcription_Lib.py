@@ -41,8 +41,12 @@ import pyaudio
 
 whisper_model_instance = None
 # Retrieve processing choice from the configuration file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct the path to the config file
+config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
+# Read the config file
 config = configparser.ConfigParser()
-config.read('config.txt')
+config.read(config_path)
 processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
 

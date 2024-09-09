@@ -9,8 +9,6 @@ import os
 # External Imports
 import gradio as gr
 import yt_dlp
-
-from App_Function_Libraries.Confabulation_check import simplified_geval
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, add_media_to_database
@@ -21,8 +19,9 @@ from App_Function_Libraries.Summarization_General_Lib import perform_transcripti
 from App_Function_Libraries.Utils.Utils import convert_to_seconds, safe_read_file, format_transcription, \
     create_download_directory, generate_unique_identifier, extract_text_from_segments
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, extract_metadata, download_video
+from App_Function_Libraries.Benchmarks_Evaluations.ms_g_eval import run_geval
 #
-################################################################################################################################################################
+#######################################################################################################################
 #
 # Functions:
 
@@ -467,7 +466,7 @@ def create_video_transcription_tab():
                     if confab_checkbox:
                         logging.info("Confabulation check enabled")
                         # Assuming result[1] contains the transcript and result[2] contains the summary
-                        confabulation_result = simplified_geval(result[1], result[2], api_name, api_key)
+                        confabulation_result = run_geval(result[1], result[2], api_key, api_name)
                         logging.info(f"Simplified G-Eval result: {confabulation_result}")
 
                     # Ensure that result is a tuple with 5 elements

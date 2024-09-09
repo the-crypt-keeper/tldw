@@ -80,8 +80,14 @@ def load_pipeline_from_pretrained(path_to_config: str | Path) -> SpeakerDiarizat
 
 def audio_diarization(audio_file_path):
     logging.info('audio-diarization: Loading pyannote pipeline')
+
+    #config file loading
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Construct the path to the config file
+    config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
+    # Read the config file
     config = configparser.ConfigParser()
-    config.read('config.txt')
+    config.read(config_path)
     processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
     base_dir = Path(__file__).parent.resolve()

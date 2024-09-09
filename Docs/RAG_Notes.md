@@ -21,6 +21,8 @@ RAG 101
 	https://generativeai.pub/advanced-rag-retrieval-strategy-query-rewriting-a1dd61815ff0
 	https://medium.com/@yufan1602/modular-rag-and-rag-flow-part-%E2%85%B0-e69b32dc13a3
 	https://pub.towardsai.net/rag-architecture-advanced-rag-3fea83e0d189?gi=47c0b76dbee0
+	https://towardsdatascience.com/3-advanced-document-retrieval-techniques-to-improve-rag-systems-0703a2375e1c
+
 
 Articles
 	https://posts.specterops.io/summoning-ragnarok-with-your-nemesis-7c4f0577c93b?gi=7318858af6c3
@@ -38,6 +40,10 @@ Architecture Design
 Papers
 	- Rags to Riches - https://huggingface.co/papers/2406.12824
 		* LLMs will use foreign knowledge sooner than parametric information.
+	- Lit Search
+		* https://arxiv.org/pdf/2407.18940
+		* https://arxiv.org/abs/2407.18940
+
 
 Building
 	https://techcommunity.microsoft.com/t5/microsoft-developer-community/building-the-ultimate-nerdland-podcast-chatbot-with-rag-and-llm/ba-p/4175577
@@ -49,6 +55,45 @@ Building
 	https://www.youtube.com/watch?v=Balro-DxFyk&list=PLwPYSl1MQp4FpIzn48ypesKYzLvUBQpPF&index=5
 	https://github.com/jxnl/n-levels-of-rag
 	https://rito.hashnode.dev/building-a-multi-hop-qa-with-dspy-and-qdrant
+
+
+Chunking
+	https://archive.is/h0oBZ
+	https://python.langchain.com/v0.1/docs/modules/data_connection/document_transformers/
+
+
+Multi-Modal RAG
+	https://docs.llamaindex.ai/en/v0.10.17/examples/multi_modal/multi_modal_pdf_tables.html
+	https://archive.is/oIhNp
+	https://arxiv.org/html/2407.01449v2
+
+
+Query Expansoin
+	https://arxiv.org/abs/2305.03653
+
+Cross-Encoder Ranking
+	* Deep Neural network that processes two input sequences together as a single input. Allows the model to directly compare and contrast the inputs, understanding their relationship in a more integrated and nuanced manner.
+	* https://www.sbert.net/examples/applications/retrieve_rerank/README.html
+
+
+
+### Aligning with the Money
+1. Why is it needed in the first place?
+2. Identify & Document the Context
+	* What is the business objective?
+	* What led to this objective being identified?
+	* Why is this the most ideal solution?
+	* What other solutions have been evaluated?
+3. Identify the intended use patterns
+	* What questions will it answer?
+	* What answers and what kinds of answers are users expecting?
+4. Identify the amount + type of data to be archived/referenced
+	* Need to identify what methods of metadata creation and settings will be the most cost efficient in time complexity.
+	* How will you be receiving the data?
+	* Will you be receiving the data or is it on you to obtain it?
+5. What does success look like and how will you know you've achieved it?
+	* What are the key metrics/values to measure/track?
+	* How are these connected to the 'Success State'?
 
 
 
@@ -94,6 +139,17 @@ Building
 		- You can add metadata to your vector data in all vector databases. Metadata can later help to (pre-)filter the entire vector database before we perform a vector search.
 	4. **Optimize Indexing Structure**
 		* `Full Search vs. Approximate Nearest Neighbor, HNSW vs. IVFPQ`
+		- Types of Data:
+			1. Text
+				* Chunked and turned into vector embeddings
+			2. Images and Diagrams
+				* Turn into vector embeddings using a multi-modal/vision model 
+			3. Tables
+				* Summarized with an LLM, descriptions embedded and used for indexing
+				* After retrieval, table is used as is.
+			4. Code snippets
+				* Chunked using ?
+				* Turned into vector embeddings using an embedding model
 		1. Chunk Optimization
 			- Semantic splitter - optimize chunk size used for embedding
 			- Small-to-Big
@@ -161,6 +217,27 @@ Building
 					1. First, the sub-question strategy generates multiple sub-questions from the user query using LLM (Large Language Model).
 					2. Then, each sub-question undergoes the RAG process to obtain its own answer (retrieval generation).
 					3. Finally, the answers to all sub-questions are merged to obtain the final answer. 
+					4. Sub Question prompt: - https://github.com/run-llama/llama_index/blob/main/llama-index-integrations/question_gen/llama-index-question-gen-openai/llama_index/question_gen/openai/base.py#L18-L45
+					```
+					You are a world class state of the art agent.
+
+					You have access to multiple tools, each representing a different data source or API.
+					Each of the tools has a name and a description, formatted as a JSON dictionary.
+					The keys of the dictionary are the names of the tools and the values are the \
+					descriptions.
+					Your purpose is to help answer a complex user question by generating a list of sub \
+					questions that can be answered by the tools.
+
+					These are the guidelines you consider when completing your task:
+					* Be as specific as possible
+					* The sub questions should be relevant to the user question
+					* The sub questions should be answerable by the tools provided
+					* You can generate multiple sub questions for each tool
+					* Tools must be specified by their name, not their description
+					* You don't need to use a tool if you don't think it's relevant
+
+					Output the list of sub questions by calling the SubQuestionList function.
+					```
 			2. Step-Back Prompting
 				* http://arxiv.org/pdf/2310.06117
 				* `technique that guides LLM to extract advanced concepts and basic principles from specific instances through abstraction, using these concepts and principles to guide reasoning. This approach significantly improves LLM’s ability to follow the correct reasoning path to solve problems.`
@@ -183,8 +260,12 @@ Building
 		- Literally just ask the LLM to do it.
 	11. **Query Extension**
 	12. **Query Expansion**
-		1. Query Expansion with generated answers
+		* 
+		1. Query Expansion with a generated answer
+			* Paper: https://arxiv.org/abs/2212.10496
 			* `We use the LLM to generate an answer, before performing the similarity search. If it is a question that can only be answered using our internal knowledge, we indirectly ask the model to hallucinate, and use the hallucinated answer to search for content that is similar to the answer and not the user query itself.`
+			* Given an input query, this method first instructs an LLM to provide a hypothetical answer, whatever its correctness. 
+				* Then, the query and the generated answer are combined in a prompt and sent to the retrieval system.
 			- Implementations:
 				- HyDE (Hypothetical Document Embeddings)
 				- Rewrite-Retrieve-Read
@@ -192,6 +273,9 @@ Building
 				- Query2Doc
 				- ITER-RETGEN
 				- Others?
+		2. Query Expansion with multiple related questions
+			* We ask the LLM to generate N questions related to the original query and then send them all to the retrieval system
+			* 
 	13. **Multiple System Prompts**
 		* Generate multiple prompts, consolidate answer
 	14. **Query Routing** - Let LLM decide which datastore to use for information retrieval based on user's query
@@ -218,13 +302,31 @@ Building
 			* `The text chunk with the highest similarity score represents the best-matching content found. Before sending the content to the LLM we add  each small text chunk's assigned  “parent” chunks, which do not necessarily have to be the chunk before and after the text chunk found.`
 			* We can build on top of that concept and set up a whole hierarchy like a decision tree with different levels of Parent Nodes, Child Nodes and Leaf Nodes. We could for example have 3 levels, with different chunk sizes - See https://docs.llamaindex.ai/en/stable/examples/retrievers/auto_merging_retriever/
 4. **Generation & Post-Generation**
-	1. **Self-RAG**
-		* https://github.com/AkariAsai/self-rag
-	2. **Rewrite-Retrieve-Read (RRR)**
+	1. **Self-Reflective RAG / Self-RAG**
+		- Fine-tuned models/first paper on it:
+			* https://arxiv.org/abs/2310.11511
+			* https://github.com/AkariAsai/self-rag
+		- Articles
+			* https://blog.langchain.dev/agentic-rag-with-langgraph/
+		- Info:
+			* We can use outside systems to quantify the quality of retrieval items and generations, and if necessary, re-perform the query or retrieval with a modified input.
+	2. **Corrective RAG**
+		- Key Pieces:
+			1. Retrieval Evaluator:
+				* A lightweight retrieval evaluator is introduced to assess the relevance of retrieved documents.
+    			- It assigns a confidence score and triggers one of three actions:
+ 			    	* Correct: If the document is relevant, refine it to extract key knowledge.
+        			* Incorrect: If the document is irrelevant, discard it and perform a web search for external knowledge.
+        			* Ambiguous: If the evaluator is uncertain, combine internal and external knowledge sources.
+			2. Decompose-then-Recompose Algorithm:
+				* A process to refine retrieved documents by breaking them down into smaller knowledge strips, filtering irrelevant content, and recomposing important information.
+			3. Web Search for Corrections:
+				* When incorrect retrieval occurs, the system leverages large-scale web search to find more diverse and accurate external knowledge.`
+	3. **Rewrite-Retrieve-Read (RRR)**
 		* https://arxiv.org/pdf/2305.14283 
-	3. **Choosing the appropriate/correct model**
-	4. **Agents**
-	5. **Evaluation**
+	4. **Choosing the appropriate/correct model**
+	5. **Agents**
+	6. **Evaluation**
 		- Metrics:
 			- Generation
 				1. Faithfulness - How factually accurate is the generated answer?
@@ -477,6 +579,7 @@ JSON file store Vector indexing
 		- Reciprocal Rank Fusion
 			* `RRF, is a technique that combines the rankings of multiple search result lists to generate a single unified ranking. Developed in collaboration with the University of Waterloo (CAN) and Google, RRF produces results that are more effective than reordering chunks under any single branch.`
 			* https://towardsdatascience.com/forget-rag-the-future-is-rag-fusion-1147298d8ad1
+			* https://safjan.com/implementing-rank-fusion-in-python/
 - Semantic dissonance
 	* `the discordance between your task’s intended meaning, the RAG’s understanding of it, and the underlying knowledge that’s stored.`
 - Poor explainability of embeddings
