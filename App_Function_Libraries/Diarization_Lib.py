@@ -200,14 +200,42 @@ def combine_transcription_and_diarization(audio_file_path: str) -> List[Dict[str
     logging.info('combine-transcription-and-diarization: Starting transcription and diarization...')
 
     try:
+        logging.info('Performing speech-to-text...')
         transcription_result = speech_to_text(audio_file_path)
-        diarization_result = audio_diarization(audio_file_path)
+        logging.info(f"Transcription result type: {type(transcription_result)}")
+        logging.info(f"Transcription result: {transcription_result[:3] if isinstance(transcription_result, list) and len(transcription_result) > 3 else transcription_result}")
 
-        if not isinstance(transcription_result, list) or not isinstance(diarization_result, list):
-            raise ValueError("Unexpected format for transcription or diarization results")
+        logging.info('Performing audio diarization...')
+        diarization_result = audio_diarization(audio_file_path)
+        logging.info(f"Diarization result type: {type(diarization_result)}")
+        logging.info(f"Diarization result sample: {diarization_result[:3] if isinstance(diarization_result, list) and len(diarization_result) > 3 else diarization_result}")
+
+        if not transcription_result:
+            logging.error("Empty result from transcription")
+            return []
+
+        if not diarization_result:
+            logging.error("Empty result from diarization")
+            return []
+
+        # Handle the case where transcription_result is a dict with a 'segments' key
+        if isinstance(transcription_result, dict) and 'segments' in transcription_result:
+            transcription_segments = transcription_result['segments']
+        elif isinstance(transcription_result, list):
+            transcription_segments = transcription_result
+        else:
+            logging.error(f"Unexpected transcription result format: {type(transcription_result)}")
+            return []
+
+        logging.info(f"Number of transcription segments: {len(transcription_segments)}")
+        logging.info(f"Transcription segments sample: {transcription_segments[:3] if len(transcription_segments) > 3 else transcription_segments}")
+
+        if not isinstance(diarization_result, list):
+            logging.error(f"Unexpected diarization result format: {type(diarization_result)}")
+            return []
 
         combined_result = []
-        for transcription_segment in transcription_result:
+        for transcription_segment in transcription_segments:
             if not isinstance(transcription_segment, dict):
                 logging.warning(f"Unexpected transcription segment format: {transcription_segment}")
                 continue
@@ -218,11 +246,15 @@ def combine_transcription_and_diarization(audio_file_path: str) -> List[Dict[str
                     continue
 
                 try:
-                    if (transcription_segment.get('Time_Start', 0) >= diarization_segment.get('start', 0) and
-                        transcription_segment.get('Time_End', 0) <= diarization_segment.get('end', 0)):
+                    trans_start = transcription_segment.get('Time_Start', 0)
+                    trans_end = transcription_segment.get('Time_End', 0)
+                    diar_start = diarization_segment.get('start', 0)
+                    diar_end = diarization_segment.get('end', 0)
+
+                    if trans_start >= diar_start and trans_end <= diar_end:
                         combined_segment = {
-                            "Time_Start": transcription_segment.get('Time_Start', 0),
-                            "Time_End": transcription_segment.get('Time_End', 0),
+                            "Time_Start": trans_start,
+                            "Time_End": trans_end,
                             "Speaker": diarization_segment.get('speaker', 'Unknown'),
                             "Text": transcription_segment.get('Text', '')
                         }
@@ -230,13 +262,19 @@ def combine_transcription_and_diarization(audio_file_path: str) -> List[Dict[str
                         break
                 except Exception as e:
                     logging.error(f"Error processing segment: {str(e)}")
+                    logging.error(f"Transcription segment: {transcription_segment}")
+                    logging.error(f"Diarization segment: {diarization_segment}")
                     continue
 
+        logging.info(f"Combined result length: {len(combined_result)}")
+        logging.info(f"Combined result sample: {combined_result[:3] if len(combined_result) > 3 else combined_result}")
         return combined_result
 
     except Exception as e:
-        logging.error(f"Error in combine_transcription_and_diarization: {str(e)}")
+        logging.error(f"Error in combine_transcription_and_diarization: {str(e)}", exc_info=True)
         return []
+
+
 #
 #
 #######################################################################################################################
