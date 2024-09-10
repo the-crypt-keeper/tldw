@@ -58,7 +58,8 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any
 # Local Libraries
-from App_Function_Libraries.Utils.Utils import is_valid_url
+from App_Function_Libraries.Utils.Utils import is_valid_url, get_project_relative_path, get_database_path, \
+    get_database_dir, ensure_directory_exists
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
@@ -71,6 +72,10 @@ import yaml
 # Function Definitions
 #
 
+def ensure_database_directory():
+    os.makedirs(get_database_dir(), exist_ok=True)
+
+ensure_database_directory()
 
 # Set up logging
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -78,17 +83,26 @@ import yaml
 logger = logging.getLogger(__name__)
 
 # FIXME - Setup properly and test/add documentation for its existence...
-current_dir = os.path.dirname(os.path.abspath(__file__))
 # Construct the path to the config file
-config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
+config_path = get_project_relative_path('Config_Files/config.txt')
+
 # Read the config file
 config = configparser.ConfigParser()
 config.read(config_path)
-sqlite_path = config.get('Database', 'sqlite_path', fallback='media_summary.db')
-backup_path = config.get('Database', 'backup_path', fallback='database_backups')
 
+# Get the SQLite path from the config, or use the default if not specified
+sqlite_path = config.get('Database', 'sqlite_path', fallback=get_database_path('media_summary.db'))
+
+# Get the backup path from the config, or use the default if not specified
+backup_path = config.get('Database', 'backup_path', fallback='database_backups')
+backup_path = get_project_relative_path(backup_path)
+
+# Set the final paths
 db_path = sqlite_path
 backup_dir = backup_path
+
+print(f"Database path: {db_path}")
+print(f"Backup directory: {backup_dir}")
 #create_automated_backup(db_path, backup_dir)
 
 # FIXME - Setup properly and test/add documentation for its existence...
@@ -204,46 +218,70 @@ class InputError(Exception):
 
 
 # Database connection function with connection pooling
+
 class Database:
     def __init__(self, db_name=None):
         self.db_name = db_name or os.getenv('DB_NAME', 'media_summary.db')
+        self.db_path = get_database_path(self.db_name)
+        ensure_directory_exists(os.path.dirname(self.db_path))
         self.pool = []
         self.pool_size = 10
+        logging.info(f"Database initialized with path: {self.db_path}")
 
     @contextmanager
     def get_connection(self):
+        conn = None
+        try:
+            conn = self._get_connection_from_pool()
+            yield conn
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            raise e
+        finally:
+            if conn:
+                conn.commit()
+                self.release_connection(conn)
+
+    def _get_connection_from_pool(self):
         retry_count = 5
         retry_delay = 1
-        conn = None
         while retry_count > 0:
             try:
-                conn = self.pool.pop() if self.pool else sqlite3.connect(self.db_name, check_same_thread=False)
-                yield conn
-                self.pool.append(conn)
-                return
+                if self.pool:
+                    return self.pool.pop()
+                else:
+                    return sqlite3.connect(self.db_path, check_same_thread=False)
             except sqlite3.OperationalError as e:
                 if 'database is locked' in str(e):
                     logging.warning(f"Database is locked, retrying in {retry_delay} seconds...")
                     retry_count -= 1
                     time.sleep(retry_delay)
                 else:
+                    logging.error(f"Database error: {e}")
                     raise DatabaseError(f"Database error: {e}")
             except Exception as e:
+                logging.error(f"Unexpected error: {e}")
                 raise DatabaseError(f"Unexpected error: {e}")
-            finally:
-                # Ensure the connection is returned to the pool even on failure
-                if conn:
-                    self.pool.append(conn)
         raise DatabaseError("Database is locked and retries have been exhausted")
+
+    def release_connection(self, conn):
+        if len(self.pool) < self.pool_size:
+            self.pool.append(conn)
+        else:
+            conn.close()
 
     def execute_query(self, query: str, params: Tuple = ()) -> None:
         with self.get_connection() as conn:
-            try:
-                cursor = conn.cursor()
-                cursor.execute(query, params)
-                conn.commit()
-            except sqlite3.Error as e:
-                raise DatabaseError(f"Database error: {e}, Query: {query}")
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+
+    def close_all_connections(self):
+        for conn in self.pool:
+            conn.close()
+        self.pool.clear()
+        logging.info("All database connections closed")
+
 
 db = Database()
 
@@ -907,8 +945,9 @@ def add_media_version(media_id: int, prompt: str, summary: str) -> None:
             VALUES (?, ?, ?, ?, ?)
             ''', (media_id, current_version + 1, prompt, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
             conn.commit()
-    except sqlite3.Error as e:
-        raise DatabaseError(f"Error adding media version: {e}")
+    except DatabaseError as e:
+        logging.error(f"Error adding media version: {e}")
+        raise
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
@@ -1089,35 +1128,27 @@ def is_valid_date(date_string: str) -> bool:
         return False
 
 
-# Add ingested media to DB
 def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
+    db = Database()
     try:
-        # Extract content from segments
-        if isinstance(segments, list):
-            content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
-        elif isinstance(segments, dict):
-            content = segments.get('text', '') or segments.get('content', '')
-        else:
-            content = str(segments)
-
-        logging.debug(f"Extracted content (first 500 chars): {content[:500]}")
-
-        # Set default custom prompt if not provided
-        if custom_prompt_input is None:
-            custom_prompt_input = """No Custom Prompt Provided or Was Used."""
-
-        logging.info(f"Adding media to database: URL={url}, Title={info_dict.get('title', 'Untitled')}, Type={media_type}")
-
-        # Process keywords
-        if isinstance(keywords, str):
-            keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
-        elif isinstance(keywords, (list, tuple)):
-            keyword_list = [keyword.strip().lower() for keyword in keywords]
-        else:
-            keyword_list = ['default']
-
         with db.get_connection() as conn:
             cursor = conn.cursor()
+
+            # Extract content from segments
+            if isinstance(segments, list):
+                content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
+            elif isinstance(segments, dict):
+                content = segments.get('text', '') or segments.get('content', '')
+            else:
+                content = str(segments)
+
+            # Process keywords
+            if isinstance(keywords, str):
+                keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
+            elif isinstance(keywords, (list, tuple)):
+                keyword_list = [keyword.strip().lower() for keyword in keywords]
+            else:
+                keyword_list = ['default']
 
             # Check if media already exists
             cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
@@ -1125,8 +1156,6 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 
             if existing_media:
                 media_id = existing_media[0]
-                logging.info(f"Updating existing media with ID: {media_id}")
-
                 cursor.execute('''
                 UPDATE Media 
                 SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?
@@ -1134,8 +1163,6 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
                 ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
                       info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), media_id))
             else:
-                logging.info("Creating new media entry")
-
                 cursor.execute('''
                 INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -1143,14 +1170,13 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
                       info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model))
                 media_id = cursor.lastrowid
 
-            logging.info(f"Adding new modification to MediaModifications for media ID: {media_id}")
+            # Add modification
             cursor.execute('''
             INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
             VALUES (?, ?, ?, ?)
             ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
 
-            # Insert keywords and associate with media item
-            logging.info("Processing keywords")
+            # Process keywords
             for keyword in keyword_list:
                 cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
                 cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
@@ -1159,28 +1185,126 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
                                (media_id, keyword_id))
 
             # Update full-text search index
-            logging.info("Updating full-text search index")
             cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
                            (media_id, info_dict.get('title', 'Untitled'), content))
 
-            logging.info("Adding new media version")
-            add_media_version(media_id, custom_prompt_input, summary)
-
-            # Create initial document version
-            create_document_version(media_id, content)
-
-            conn.commit()
-
-        logging.info(f"Media '{info_dict.get('title', 'Untitled')}' successfully added/updated with ID: {media_id}")
+            # Add media version
+            cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
+            current_version = cursor.fetchone()[0] or 0
+            cursor.execute('''
+            INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (
+            media_id, current_version + 1, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
 
         return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}"
 
     except sqlite3.Error as e:
-        logging.error(f"SQL Error: {e}")
+        logging.error(f"Database error: {e}")
         raise DatabaseError(f"Error adding media with keywords: {e}")
     except Exception as e:
-        logging.error(f"Unexpected Error: {e}")
+        logging.error(f"Unexpected error: {e}")
         raise DatabaseError(f"Unexpected error: {e}")
+
+# Add ingested media to DB
+# def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
+#     max_retries = 5
+#     base_delay = 0.1
+#
+#     for attempt in range(max_retries):
+#         try:
+#             with db.get_connection() as conn:
+#                 cursor = conn.cursor()
+#                 conn.execute("BEGIN TRANSACTION")
+#
+#                 try:
+#                     # Extract content from segments
+#                     if isinstance(segments, list):
+#                         content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
+#                     elif isinstance(segments, dict):
+#                         content = segments.get('text', '') or segments.get('content', '')
+#                     else:
+#                         content = str(segments)
+#
+#                     # Process keywords
+#                     if isinstance(keywords, str):
+#                         keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
+#                     elif isinstance(keywords, (list, tuple)):
+#                         keyword_list = [keyword.strip().lower() for keyword in keywords]
+#                     else:
+#                         keyword_list = ['default']
+#
+#                     # Check if media already exists
+#                     cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
+#                     existing_media = cursor.fetchone()
+#
+#                     if existing_media:
+#                         media_id = existing_media[0]
+#                         cursor.execute('''
+#                         UPDATE Media
+#                         SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?
+#                         WHERE id = ?
+#                         ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
+#                               info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), media_id))
+#                     else:
+#                         cursor.execute('''
+#                         INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
+#                         VALUES (?, ?, ?, ?, ?, ?, ?)
+#                         ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
+#                               info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model))
+#                         media_id = cursor.lastrowid
+#
+#                     # Add modification
+#                     cursor.execute('''
+#                     INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+#                     VALUES (?, ?, ?, ?)
+#                     ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
+#
+#                     # Process keywords
+#                     for keyword in keyword_list:
+#                         cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+#                         cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+#                         keyword_id = cursor.fetchone()[0]
+#                         cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)',
+#                                        (media_id, keyword_id))
+#
+#                     # Update full-text search index
+#                     cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
+#                                    (media_id, info_dict.get('title', 'Untitled'), content))
+#
+#                     # Add media version
+#                     cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
+#                     current_version = cursor.fetchone()[0] or 0
+#                     cursor.execute('''
+#                     INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
+#                     VALUES (?, ?, ?, ?, ?)
+#                     ''', (media_id, current_version + 1, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+#
+#                     # Create initial document version
+#                     create_document_version(media_id, content)
+#                     # Commit the transaction
+#                     conn.commit()
+#                     logging.info(
+#                         f"Media '{info_dict.get('title', 'Untitled')}' successfully added/updated with ID: {media_id}")
+#                     return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}"
+#
+#                 except Exception as e:
+#                     conn.rollback()
+#                     raise e
+#
+#         except sqlite3.OperationalError as e:
+#             if 'database is locked' in str(e) and attempt < max_retries - 1:
+#                 delay = base_delay * (2 ** attempt)
+#                 logging.warning(f"Database is locked, retrying in {delay:.2f} seconds...")
+#                 time.sleep(delay)
+#             else:
+#                 logging.error(f"Database error after {attempt + 1} attempts: {e}")
+#                 raise DatabaseError(f"Error adding media with keywords: {e}")
+#         except Exception as e:
+#             logging.error(f"Unexpected error: {e}")
+#             raise DatabaseError(f"Unexpected error: {e}")
+#
+#     raise DatabaseError("Failed to add media to database after multiple attempts")
 
 #
 # End of ....
@@ -1189,7 +1313,7 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 # Functions to manage prompts DB
 
 def create_prompts_db():
-    with sqlite3.connect('prompts.db') as conn:
+    with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
         cursor.executescript('''
             CREATE TABLE IF NOT EXISTS Prompts (
@@ -1225,7 +1349,7 @@ def add_prompt(name, details, system, user=None, keywords=None):
         return "Name and system prompt are required."
 
     try:
-        with sqlite3.connect('prompts.db') as conn:
+        with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO Prompts (name, details, system, user)
@@ -1252,7 +1376,7 @@ def add_prompt(name, details, system, user=None, keywords=None):
 
 
 def fetch_prompt_details(name):
-    with sqlite3.connect('prompts.db') as conn:
+    with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
         cursor.execute('''
             SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
@@ -1267,7 +1391,7 @@ def fetch_prompt_details(name):
 
 def list_prompts(page=1, per_page=10):
     offset = (page - 1) * per_page
-    with sqlite3.connect('prompts.db') as conn:
+    with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT name FROM Prompts LIMIT ? OFFSET ?', (per_page, offset))
         prompts = [row[0] for row in cursor.fetchall()]
@@ -1283,7 +1407,7 @@ def list_prompts(page=1, per_page=10):
 # FIXME - see above statement.
 def load_preset_prompts():
     try:
-        with sqlite3.connect('prompts.db') as conn:
+        with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
             cursor.execute('SELECT name FROM Prompts ORDER BY name ASC')
             prompts = [row[0] for row in cursor.fetchall()]
@@ -1297,10 +1421,34 @@ def insert_prompt_to_db(title, description, system_prompt, user_prompt, keywords
     return add_prompt(title, description, system_prompt, user_prompt, keywords)
 
 
+def get_prompt_db_connection():
+    prompt_db_path = get_database_path('prompts.db')
+    return sqlite3.connect(prompt_db_path)
+
+
+def search_prompts(query):
+    try:
+        with get_prompt_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+                FROM Prompts p
+                LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
+                LEFT JOIN Keywords k ON pk.keyword_id = k.id
+                WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
+                GROUP BY p.id
+                ORDER BY p.name
+            """, (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'))
+            return cursor.fetchall()
+    except sqlite3.Error as e:
+        logging.error(f"Error searching prompts: {e}")
+        return []
+
+
 def search_prompts_by_keyword(keyword, page=1, per_page=10):
     normalized_keyword = normalize_keyword(keyword)
     offset = (page - 1) * per_page
-    with sqlite3.connect('prompts.db') as conn:
+    with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
         cursor.execute('''
             SELECT DISTINCT p.name
@@ -1328,7 +1476,7 @@ def search_prompts_by_keyword(keyword, page=1, per_page=10):
 
 def update_prompt_keywords(prompt_name, new_keywords):
     try:
-        with sqlite3.connect('prompts.db') as conn:
+        with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
 
             cursor.execute('SELECT id FROM Prompts WHERE name = ?', (prompt_name,))
@@ -1386,7 +1534,7 @@ def load_prompt_details(selected_prompt):
 
 def update_prompt_in_db(title, description, system_prompt, user_prompt):
     try:
-        with sqlite3.connect('prompts.db') as conn:
+        with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE Prompts SET details = ?, system = ?, user = ? WHERE name = ?",
@@ -1403,7 +1551,7 @@ create_prompts_db()
 
 def delete_prompt(prompt_id):
     try:
-        with sqlite3.connect('prompts.db') as conn:
+        with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
 
             # Delete associated keywords
@@ -1610,7 +1758,7 @@ def view_database(page: int, results_per_page: int) -> Tuple[str, str, int]:
 def search_and_display_items(query, search_type, page, entries_per_page,char_count):
     offset = (page - 1) * entries_per_page
     try:
-        with sqlite3.connect('media_summary.db') as conn:
+        with sqlite3.connect('./Databases/media_summary.db') as conn:
             cursor = conn.cursor()
 
             # Adjust the SQL query based on the search type
