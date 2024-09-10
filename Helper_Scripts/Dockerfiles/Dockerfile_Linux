@@ -2,8 +2,11 @@
 # docker build -t tldw-app --build-arg GPU_SUPPORT=cpu .
 # docker run -p 7860:7860 -v tldw_volume:/tldw tldw-app
 
+# Use Nvidia image:
+FROM nvidia/cuda:12.0.0-runtime-ubuntu22.04
+
 # Use an official Python runtime as a parent image
-FROM python:3.10.15-slim-bookworm
+#FROM python:3.10.15-slim-bookworm
 
 
 # Set build arguments
