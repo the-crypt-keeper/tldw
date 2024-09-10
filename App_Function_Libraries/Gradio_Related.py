@@ -16,7 +16,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_db_config
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
-from App_Function_Libraries.Gradio_UI.Chat_ui import chat_workflows_tab, create_chat_management_tab, \
+from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
     create_chat_interface_four, create_chat_interface_multi_api, create_chat_interface_stacked, create_chat_interface
 from App_Function_Libraries.Gradio_UI.Explain_summarize_tab import create_summarize_explain_tab
 from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab
@@ -45,6 +45,7 @@ from App_Function_Libraries.Gradio_UI.Utilities import create_utilities_yt_times
 from App_Function_Libraries.Gradio_UI.Video_transcription_tab import create_video_transcription_tab
 from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
+from App_Function_Libraries.Gradio_UI.Chat_Workflows import chat_workflows_tab
 #
 # Gradio UI Imports
 from App_Function_Libraries.Gradio_UI.geval import create_geval_tab
