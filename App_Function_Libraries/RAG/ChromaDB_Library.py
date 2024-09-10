@@ -1,30 +1,32 @@
+# ChromaDB_Library.py
+# Description: Functions for managing embeddings in ChromaDB
+#
+# Imports:
 import configparser
 import logging
-import os
 import sqlite3
 from typing import List, Dict, Any
-
+# 3rd-Party Imports:
 import chromadb
 import requests
 from chromadb import Settings
-
+#
+# Local Imports:
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media, db
 from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
-
+from App_Function_Libraries.Utils.Utils import get_database_path, get_project_relative_path, ensure_directory_exists
+#
 #######################################################################################################################
 #
-# Functions for ChromaDB
+# Config Settings for ChromaDB Functions
 
 # Get ChromaDB settings
-# Load configuration
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Construct the path to the config file
-config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
-# Read the config file
+config_path = get_project_relative_path('Config_Files/config.txt')
 config = configparser.ConfigParser()
 config.read(config_path)
-chroma_db_path = config.get('Database', 'chroma_db_path', fallback='chroma_db')
+chroma_db_path = config.get('Database', 'chroma_db_path', fallback=get_database_path('chroma_db'))
+ensure_directory_exists(chroma_db_path)
 chroma_client = chromadb.PersistentClient(path=chroma_db_path, settings=Settings(anonymized_telemetry=False))
 
 # Get embedding settings
@@ -43,8 +45,10 @@ chunk_options = {
     'language': config.get('Chunking', 'language', fallback='english')
 }
 
-
-
+# End of Config Settings
+#######################################################################################################################
+#
+# Functions:
 
 def auto_update_chroma_embeddings(media_id: int, content: str):
     """
@@ -93,17 +97,25 @@ def auto_update_chroma_embeddings(media_id: int, content: str):
 
 # Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite with metadata
 def process_and_store_content(content: str, collection_name: str, media_id: int):
+    # Process the content into chunks
     chunks = improved_chunking_process(content, chunk_options)
     texts = [chunk['text'] for chunk in chunks]
+
+    # Generate embeddings for each chunk
     embeddings = [create_embedding(text) for text in texts]
+    # Create unique IDs for each chunk using the media_id and chunk index
     ids = [f"{media_id}_chunk_{i}" for i in range(len(texts))]
+    # Create metadata for each chunk tagged to the media_id
     metadatas = [{"media_id": media_id} for _ in range(len(texts))]
 
+    # Store the texts, embeddings, and IDs in ChromaDB
     store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
 
+    # Store the chunk metadata in SQLite
     for i, chunk in enumerate(chunks):
         add_media_chunk(media_id, chunk['text'], chunk['start'], chunk['end'], ids[i])
 
+    # Update FTS table
     update_fts_for_media(media_id)
 
 

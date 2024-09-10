@@ -12,10 +12,12 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items
+from App_Function_Libraries.DB.SQLite_DB import search_prompts
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
 from App_Function_Libraries.RAG.ChromaDB_Library import get_all_content_from_database, chroma_client, \
      store_in_chroma, create_embedding
 from App_Function_Libraries.RAG.RAG_Libary_2 import rag_search
+from App_Function_Libraries.Utils.Utils import get_database_path
 
 #
 ###################################################################################################
@@ -23,20 +25,6 @@ from App_Function_Libraries.RAG.RAG_Libary_2 import rag_search
 # Functions:
 
 logger = logging.getLogger()
-
-# FIXME - SQL functions to be moved to DB_Manager
-def search_prompts(query):
-    try:
-        conn = sqlite3.connect('prompts.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, details, system, user FROM Prompts WHERE name LIKE ? OR details LIKE ?",
-                       (f"%{query}%", f"%{query}%"))
-        results = cursor.fetchall()
-        conn.close()
-        return results
-    except sqlite3.Error as e:
-        print(f"Error searching prompts: {e}")
-        return []
 
 
 def create_rag_tab():
@@ -479,7 +467,7 @@ def create_prompt_view_tab():
         def view_database(page, entries_per_page):
             offset = (page - 1) * entries_per_page
             try:
-                with sqlite3.connect('prompts.db') as conn:
+                with sqlite3.connect(get_database_path('prompts.db')) as conn:
                     cursor = conn.cursor()
                     cursor.execute('''
                         SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
@@ -582,11 +570,13 @@ def create_prompt_search_tab():
                 pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
         search_results_output = gr.HTML()
 
+        # This is dirty and shouldn't be in the UI code, but it's a quick way to get the search working.
+        # FIXME - SQL functions to be moved to DB_Manager
         def search_and_display_prompts(query, page, entries_per_page):
             offset = (page - 1) * entries_per_page
             try:
                 # FIXME - SQL functions to be moved to DB_Manager
-                with sqlite3.connect('prompts.db') as conn:
+                with sqlite3.connect(get_database_path('prompts.db')) as conn:
                     cursor = conn.cursor()
                     cursor.execute('''
                         SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
