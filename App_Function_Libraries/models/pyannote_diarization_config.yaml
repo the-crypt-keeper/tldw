@@ -1,8 +1,8 @@
 pipeline:
   params:
     clustering: AgglomerativeClustering
-    embedding: C:/Users/GDesktop-1/Working/tldw/App_Function_Libraries/models/pyannote_model_wespeaker-voxceleb-resnet34-LM.bin #models/pyannote_model_wespeaker-voxceleb-resnet34-LM.bin
-    segmentation: C:/Users/GDesktop-1/Working/tldw/App_Function_Libraries/models/pyannote_model_segmentation-3.0.bin #models/pyannote_model_segmentation-3.0.bin
+    embedding: /FULL/PATH/TO/SCRIPT/tldw/App_Function_Libraries/models/pyannote_model_wespeaker-voxceleb-resnet34-LM.bin #models/pyannote_model_wespeaker-voxceleb-resnet34-LM.bin
+    segmentation: /FULL/PATH/TO/SCRIPT/tldw/App_Function_Libraries/models/pyannote_model_segmentation-3.0.bin #models/pyannote_model_segmentation-3.0.bin
 
 params:
   segmentation:
