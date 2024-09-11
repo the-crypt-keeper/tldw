@@ -4,27 +4,25 @@ import configparser
 # FIXME
 CONFIG_PATH = './Config_Files/config.txt'
 
-
 def load_config():
     config = configparser.ConfigParser()
     config.read(CONFIG_PATH)
     return config
 
-
 def save_config(config):
     with open(CONFIG_PATH, 'w') as configfile:
         config.write(configfile)
 
-
 def get_config_as_text():
     with open(CONFIG_PATH, 'r') as file:
-        return file.read()
-
+        content = file.read()
+    return content, "Config refreshed successfully"
 
 def save_config_from_text(text):
     with open(CONFIG_PATH, 'w') as file:
         file.write(text)
     return "Config saved successfully"
+
 
 def create_config_editor_tab():
     with gr.TabItem("Edit Config"):
@@ -41,14 +39,13 @@ def create_config_editor_tab():
         with gr.Row():
             output = gr.Textbox(label="Output")
 
-            # Event handlers
-            refresh_button.click(get_config_as_text, inputs=[],
-                                 outputs=[config_text, output])
+        # Event handlers
+        refresh_button.click(get_config_as_text, inputs=[], outputs=[config_text, output])
 
-            config_text.change(lambda: None, None, None)  # Dummy handler to enable changes
-            save_text_button.click(save_config_from_text, inputs=[config_text], outputs=[output])
+        config_text.change(lambda: None, None, None)  # Dummy handler to enable changes
+        save_text_button.click(save_config_from_text, inputs=[config_text], outputs=[output])
 
         # Initialize the interface
-        config_text.value = get_config_as_text()
+        config_text.value = get_config_as_text()[0]  # Only set the config text, not the output message
 
     return refresh_button, config_text, save_text_button, output
