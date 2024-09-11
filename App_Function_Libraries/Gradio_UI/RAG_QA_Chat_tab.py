@@ -21,7 +21,7 @@ from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, load_chat_hi
 # Functions:
 
 def create_rag_qa_chat_tab():
-    with gr.TabItem("RAG QA Chat"):
+    with gr.TabItem("RAG QA Chat (WIP)"):
         gr.Markdown("# RAG QA Chat")
 
         with gr.Row():
