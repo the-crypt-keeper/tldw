@@ -9,12 +9,9 @@ import chromadb
 from chromadb import Settings
 #
 # Local Imports:
-#from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 from App_Function_Libraries.RAG.Embeddings_Create import chunk_for_embedding
-from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media, \
-    get_all_content_from_database
-from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, create_llamacpp_embedding, \
-    create_openai_embedding
+from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media
+from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
 from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, \
     load_comprehensive_config
 #

@@ -54,7 +54,7 @@ def rag_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
         # Process and store content
         collection_name = f"article_{media_id}"
         try:
-            process_and_store_content(content, collection_name, media_id)
+            process_and_store_content(content, collection_name, media_id, title)
         except Exception as e:
             logging.error(f"Error processing and storing content: {str(e)}")
             return {"error": "Failed to process and store content", "details": str(e)}
@@ -216,7 +216,7 @@ def preprocess_all_content():
         content = row[1]
         media_type = row[2]
         collection_name = f"{media_type}_{media_id}"
-        process_and_store_content(content, collection_name, media_id)
+        process_and_store_content(content, collection_name, media_id, "")
 
 
 def perform_vector_search(query: str, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
