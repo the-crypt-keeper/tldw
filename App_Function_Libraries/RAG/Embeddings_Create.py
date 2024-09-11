@@ -4,6 +4,8 @@
 # Imports:
 import logging
 from typing import List, Dict, Any
+
+import numpy as np
 #
 # 3rd-Party Imports:
 import requests
@@ -36,40 +38,84 @@ overlap = loaded_config['Embeddings']['overlap']
 # FIXME - Add logging
 
 # FIXME - refactor/setup to use config file & perform chunking
-def create_embedding(text: str) -> List[float]:
+def create_embedding(text: str, provider: str, model: str, api_url: str = None, api_key: str = None) -> List[float]:
     try:
-        if embedding_provider == 'openai':
-            embedding = get_openai_embeddings(text, embedding_model)
-        elif embedding_provider == 'local':
-            response = requests.post(
-                embedding_api_url,
-                json={"text": text, "model": embedding_model},
-                headers={"Authorization": f"Bearer {embedding_api_key}"}
-            )
-            response.raise_for_status()
-            embedding = response.json().get('embedding', None)
-        elif embedding_provider == 'huggingface':
-            tokenizer = AutoTokenizer.from_pretrained(embedding_model)
-            model = AutoModel.from_pretrained(embedding_model)
-
-            inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-            with torch.no_grad():
-                outputs = model(**inputs)
-
-            embeddings = outputs.last_hidden_state.mean(dim=1)
-            embedding = embeddings[0].tolist()
+        if provider == 'openai':
+            embedding = get_openai_embeddings(text, model)
+        elif provider == 'local':
+            embedding = create_local_embedding(text, model, api_url, api_key)
+        elif provider == 'huggingface':
+            embedding = create_huggingface_embedding(text, model)
+        elif provider == 'llamacpp':
+            embedding = create_llamacpp_embedding(text, api_url)
         else:
-            raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
+            raise ValueError(f"Unsupported embedding provider: {provider}")
 
-        if not embedding:
-            raise ValueError(f"Failed to create embedding for text: {text[:50]}...")
+        if isinstance(embedding, np.ndarray):
+            embedding = embedding.tolist()
+        elif isinstance(embedding, torch.Tensor):
+            embedding = embedding.detach().cpu().numpy().tolist()
 
-        logging.info(f"Embedding created successfully for text: {text[:50]}... First 5 values: {embedding[:5]}")
         return embedding
 
     except Exception as e:
         logging.error(f"Error creating embedding: {str(e)}")
         raise
+
+
+def create_huggingface_embedding(text: str, model: str) -> List[float]:
+    tokenizer = AutoTokenizer.from_pretrained(model)
+    model = AutoModel.from_pretrained(model)
+
+    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+    with torch.no_grad():
+        outputs = model(**inputs)
+
+    embeddings = outputs.last_hidden_state.mean(dim=1)
+    return embeddings[0].tolist()
+
+
+# FIXME
+def create_stella_embeddings(text: str) -> List[float]:
+    if embedding_provider == 'local':
+        # Load the model and tokenizer
+        tokenizer = AutoTokenizer.from_pretrained("dunzhang/stella_en_400M_v5")
+        model = AutoModel.from_pretrained("dunzhang/stella_en_400M_v5")
+
+        # Tokenize and encode the text
+        inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+
+        # Generate embeddings
+        with torch.no_grad():
+            outputs = model(**inputs)
+
+        # Use the mean of the last hidden state as the sentence embedding
+        embeddings = outputs.last_hidden_state.mean(dim=1)
+
+        return embeddings[0].tolist()  # Convert to list for consistency
+    elif embedding_provider == 'openai':
+        return get_openai_embeddings(text, embedding_model)
+    else:
+        raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
+
+
+def create_llamacpp_embedding(text: str, api_url: str) -> List[float]:
+    response = requests.post(
+        api_url,
+        json={"input": text}
+    )
+    response.raise_for_status()
+    return response.json()['embedding']
+
+
+def create_local_embedding(text: str, model: str, api_url: str, api_key: str) -> List[float]:
+    response = requests.post(
+        api_url,
+        json={"text": text, "model": model},
+        headers={"Authorization": f"Bearer {api_key}"}
+    )
+    response.raise_for_status()
+    return response.json().get('embedding', None)
 
 
 def chunk_for_embedding(text: str, file_name: str, api_name, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
@@ -115,38 +161,6 @@ def create_openai_embedding(text: str, model: str) -> List[float]:
     return embedding
 
 
-def create_llamacpp_embedding(text: str, api_url: str) -> List[float]:
-    response = requests.post(
-        api_url,
-        json={"input": text}
-    )
-    if response.status_code == 200:
-        return response.json()['embedding']
-    else:
-        raise Exception(f"Error from Llama.cpp API: {response.text}")
-
-
-def create_stella_embeddings(text: str) -> List[float]:
-    if embedding_provider == 'local':
-        # Load the model and tokenizer
-        tokenizer = AutoTokenizer.from_pretrained("dunzhang/stella_en_400M_v5")
-        model = AutoModel.from_pretrained("dunzhang/stella_en_400M_v5")
-
-        # Tokenize and encode the text
-        inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-
-        # Generate embeddings
-        with torch.no_grad():
-            outputs = model(**inputs)
-
-        # Use the mean of the last hidden state as the sentence embedding
-        embeddings = outputs.last_hidden_state.mean(dim=1)
-
-        return embeddings[0].tolist()  # Convert to list for consistency
-    elif embedding_provider == 'openai':
-        return get_openai_embeddings(text, embedding_model)
-    else:
-        raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
 
 #
 # End of File.

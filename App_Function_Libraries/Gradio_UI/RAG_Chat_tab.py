@@ -9,15 +9,13 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import get_all_content_from_database, chroma_client, \
-    check_embedding_status, create_new_embedding, create_embeddings
+    check_embedding_status, store_in_chroma
+from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
 from App_Function_Libraries.RAG.RAG_Libary_2 import enhanced_rag_pipeline
 #
 ########################################################################################################################
 #
 # Functions:
-
-
-
 
 def create_rag_tab():
     with gr.TabItem("RAG Search"):
@@ -79,21 +77,18 @@ def create_embeddings_tab():
 
         with gr.Row():
             with gr.Column():
-                embedding_api_choice = gr.Radio(
-                    choices=["Llama.cpp", "OpenAI"],
-                    label="Select API for Embeddings",
-                    value="OpenAI"
+                embedding_provider = gr.Radio(
+                    choices=["openai", "local", "huggingface"],
+                    label="Select Embedding Provider",
+                    value="openai"
                 )
-                openai_model_choice = gr.Radio(
-                    choices=["text-embedding-3-small", "text-embedding-3-large"],
-                    label="OpenAI Embedding Model (Assumes you have your API key set up in 'Config_Files/config.txt')",
-                    value="text-embedding-3-small",
-                    visible=True
+                embedding_model = gr.Textbox(
+                    label="Embedding Model",
+                    value="text-embedding-3-small"
                 )
-                llamacpp_url = gr.Textbox(
-                    label="Llama.cpp Embedding API URL",
-                    placeholder="http://localhost:8080/embedding",
-                    value="http://localhost:8080/embedding",  # Default value
+                embedding_api_url = gr.Textbox(
+                    label="API URL (for local provider)",
+                    value="http://localhost:8080/embedding",
                     visible=False
                 )
                 create_button = gr.Button("Create Embeddings")
@@ -101,21 +96,43 @@ def create_embeddings_tab():
             with gr.Column():
                 status_output = gr.Textbox(label="Status", lines=10)
 
-        def update_api_options(api_choice):
-            return (
-                gr.update(visible=api_choice == "OpenAI"),
-                gr.update(visible=api_choice == "Llama.cpp")
-            )
+        def update_provider_options(provider):
+            return gr.update(visible=provider == "local")
 
-        embedding_api_choice.change(
-            fn=update_api_options,
-            inputs=[embedding_api_choice],
-            outputs=[openai_model_choice, llamacpp_url]
+        embedding_provider.change(
+            fn=update_provider_options,
+            inputs=[embedding_provider],
+            outputs=[embedding_api_url]
         )
 
+        def create_all_embeddings(provider, model, api_url):
+            try:
+                all_content = get_all_content_from_database()
+                if not all_content:
+                    return "No content found in the database."
+
+                collection_name = "all_content_embeddings"
+                collection = chroma_client.get_or_create_collection(name=collection_name)
+
+                for item in all_content:
+                    media_id = item['id']
+                    text = item['content']
+
+                    existing = collection.get(ids=[f"doc_{media_id}"])
+                    if existing['ids']:
+                        continue
+
+                    embedding = create_embedding(text, provider, model, api_url)
+                    store_in_chroma(collection_name, [text], [embedding], [f"doc_{media_id}"], [{"media_id": media_id}])
+
+                return "Embeddings created and stored successfully for all new content."
+            except Exception as e:
+                logging.error(f"Error during embedding creation: {str(e)}")
+                return f"Error: {str(e)}"
+
         create_button.click(
-            fn=create_embeddings,
-            inputs=[embedding_api_choice, openai_model_choice, llamacpp_url],
+            fn=create_all_embeddings,
+            inputs=[embedding_provider, embedding_model, embedding_api_url],
             outputs=status_output
         )
 
@@ -133,7 +150,7 @@ def create_view_embeddings_tab():
 
             with gr.Column():
                 create_new_embedding_button = gr.Button("Create New Embedding")
-                embedding_provider_chat = gr.Radio(
+                embedding_provider = gr.Radio(
                     choices=["openai", "local", "huggingface"],
                     label="Embedding Provider",
                     value="openai"
@@ -172,10 +189,35 @@ def create_view_embeddings_tab():
                 return gr.update(choices=["Error: Unable to fetch items"]), {}
 
         def update_provider_options(provider):
-            return (
-                gr.update(visible=True),
-                gr.update(visible=provider == "local")
-            )
+            return gr.update(visible=provider == "local")
+
+        def create_new_embedding_for_item(selected_item, provider, model, api_url, item_mapping):
+            if not selected_item:
+                return "Please select an item", ""
+
+            try:
+                item_id = item_mapping.get(selected_item)
+                if item_id is None:
+                    return f"Invalid item selected: {selected_item}", ""
+
+                items = get_all_content_from_database()
+                item = next((item for item in items if item['id'] == item_id), None)
+                if not item:
+                    return f"Item not found: {item_id}", ""
+
+                embedding = create_embedding(item['content'], provider, model, api_url)
+
+                collection_name = "all_content_embeddings"
+                metadata = {"media_id": item_id, "title": item['title']}
+                store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item_id}"],
+                                [{"media_id": item_id, "title": item['title']}])
+
+                embedding_preview = str(embedding[:50])
+                status = f"New embedding created and stored for item: {item['title']} (ID: {item_id})"
+                return status, f"First 50 elements of new embedding:\n{embedding_preview}\n\nMetadata: {metadata}"
+            except Exception as e:
+                logging.error(f"Error in create_new_embedding_for_item: {str(e)}")
+                return f"Error creating embedding: {str(e)}", ""
 
         refresh_button.click(
             get_items_with_embedding_status,
@@ -187,17 +229,17 @@ def create_view_embeddings_tab():
             outputs=[embedding_status, embedding_preview]
         )
         create_new_embedding_button.click(
-            create_new_embedding,
-            inputs=[item_dropdown, embedding_provider_chat, embedding_model, embedding_api_url, item_mapping],
+            create_new_embedding_for_item,
+            inputs=[item_dropdown, embedding_provider, embedding_model, embedding_api_url, item_mapping],
             outputs=[embedding_status, embedding_preview]
         )
-        embedding_provider_chat.change(
+        embedding_provider.change(
             update_provider_options,
-            inputs=[embedding_provider_chat],
-            outputs=[embedding_model, embedding_api_url]
+            inputs=[embedding_provider],
+            outputs=[embedding_api_url]
         )
 
-    return item_dropdown, refresh_button, embedding_status, embedding_preview, create_new_embedding_button, embedding_provider_chat, embedding_model, embedding_api_url
+    return item_dropdown, refresh_button, embedding_status, embedding_preview, create_new_embedding_button, embedding_provider, embedding_model, embedding_api_url
 
 #
 # End of file
