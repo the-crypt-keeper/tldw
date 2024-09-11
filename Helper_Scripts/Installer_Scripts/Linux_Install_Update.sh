@@ -105,7 +105,7 @@ setup_environment() {
 
     # Install PyTorch based on GPU support choice
     if [ "$gpu_choice" == "cuda" ]; then
-        pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118
+        pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu123
     elif [ "$gpu_choice" == "amd" ]; then
         pip install torch-directml
     else

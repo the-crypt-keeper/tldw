@@ -29,21 +29,28 @@ from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 
 #
 #######################################################################################################################
-# Function Definitions
+# Config Settings
 #
-
+#
 # FIXME - Make sure it only downloads if it already exists, and does a check first.
 # Ensure NLTK data is downloaded
 def ntlk_prep():
     nltk.download('punkt')
-
+#
 # Load GPT2 tokenizer
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-
-# Load Config file for API keys
+#
+# Load configuration
 config = load_comprehensive_config()
-openai_api_key = config.get('API', 'openai_api_key', fallback=None)
-
+#chunk_options = config.get('Chunking', {})
+chunk_options = config.get('Chunking', {}) if isinstance(config, dict) else {}
+#
+openai_api_key = config.get('API', 'openai_api_key')
+#
+# End of settings
+#######################################################################################################################
+#
+# Functions:
 
 def detect_language(text: str) -> str:
     try:
@@ -59,15 +66,19 @@ def load_document(file_path):
     return re.sub('\\s+', ' ', text).strip()
 
 
-def improved_chunking_process(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:
-    chunk_method = chunk_options.get('method', 'words')
-    base_size = chunk_options.get('base_size', 1000)
-    min_size = chunk_options.get('min_size', 100)
-    max_size = chunk_options.get('max_size', 2000)
-    overlap = chunk_options.get('overlap', 0)
-    language = chunk_options.get('language', None)
-    adaptive = chunk_options.get('adaptive', False)
-    multi_level = chunk_options.get('multi_level', False)
+def improved_chunking_process(text: str, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    options = chunk_options.copy()
+    if custom_chunk_options:
+        options.update(custom_chunk_options)
+
+    chunk_method = options.get('method', 'words')
+    base_size = options.get('base_size', 1000)
+    min_size = options.get('min_size', 100)
+    max_size = options.get('max_size', 2000)
+    overlap = options.get('overlap', 0)
+    language = options.get('language', None)
+    adaptive = options.get('adaptive', False)
+    multi_level = options.get('multi_level', False)
 
     if language is None:
         language = detect_language(text)
@@ -80,19 +91,7 @@ def improved_chunking_process(text: str, chunk_options: Dict[str, Any]) -> List[
     if multi_level:
         chunks = multi_level_chunking(text, chunk_method, max_chunk_size, overlap, language)
     else:
-        if chunk_method == 'words':
-            chunks = chunk_text_by_words(text, max_chunk_size, overlap, language)
-        elif chunk_method == 'sentences':
-            chunks = chunk_text_by_sentences(text, max_chunk_size, overlap, language)
-        elif chunk_method == 'paragraphs':
-            chunks = chunk_text_by_paragraphs(text, max_chunk_size, overlap)
-        elif chunk_method == 'tokens':
-            chunks = chunk_text_by_tokens(text, max_chunk_size, overlap)
-        elif chunk_method == 'chapters':
-            return chunk_ebook_by_chapters(text, chunk_options)
-        else:
-            # No chunking applied
-            chunks = [text]
+        chunks = chunk_text(text, chunk_method, max_chunk_size, overlap, language)
 
     chunks_with_metadata = []
     for i, chunk in enumerate(chunks):
@@ -128,6 +127,29 @@ def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, la
             chunks.append(para)
 
     return chunks
+
+
+def chunk_text(text: str, method: str, max_size: int, overlap: int, language: str) -> List[str]:
+    if method == 'words':
+        return chunk_text_by_words(text, max_size, overlap, language)
+    elif method == 'sentences':
+        return chunk_text_by_sentences(text, max_size, overlap, language)
+    elif method == 'paragraphs':
+        return chunk_text_by_paragraphs(text, max_size, overlap)
+    elif method == 'tokens':
+        return chunk_text_by_tokens(text, max_size, overlap)
+    elif method == 'semantic':
+        return semantic_chunking(text, max_size)
+    else:
+        return [text]
+
+def determine_chunk_position(relative_position: float) -> str:
+    if relative_position < 0.33:
+        return "This chunk is from the beginning of the document"
+    elif relative_position < 0.66:
+        return "This chunk is from the middle of the document"
+    else:
+        return "This chunk is from the end of the document"
 
 
 def chunk_text_by_words(text: str, max_words: int = 300, overlap: int = 0, language: str = None) -> List[str]:
