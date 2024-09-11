@@ -8,7 +8,8 @@ import logging
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.RAG.ChromaDB_Library import get_all_content_from_database, chroma_client, \
+from App_Function_Libraries.DB.DB_Manager import get_all_content_from_database
+from App_Function_Libraries.RAG.ChromaDB_Library import chroma_client, \
     check_embedding_status, store_in_chroma
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
 from App_Function_Libraries.RAG.RAG_Libary_2 import enhanced_rag_pipeline

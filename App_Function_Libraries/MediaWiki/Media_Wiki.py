@@ -1,26 +1,25 @@
 # Media_Wiki.py
 # Description: This file contains the functions to import MediaWiki dumps into the media_db and Chroma databases.
+#######################################################################################################################
 #
 # Imports
-#
-#######################################################################################################################
-import asyncio
 import json
 import logging
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Iterator, Optional
-
+# 3rd-Party Imports
 import mwparserfromhell
 import mwxml
 import yaml
-from tqdm import tqdm
-
-# FIXME Add check_media_exists to DB_Manager.py
+#
+# Local Imports
 from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords, check_media_exists
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content
-
+#
+#######################################################################################################################
+#
+# Functions:
 
 def setup_logger(name: str, level: int = logging.INFO, log_file: Optional[str] = None) -> logging.Logger:
     """Set up and return a logger with the given name and level."""
@@ -102,34 +101,8 @@ def optimized_chunking(text: str, chunk_options: Dict[str, Any]) -> List[Dict[st
     return chunks
 
 
-async def process_mediawiki_content_async(content: List[Dict[str, Any]], wiki_name: str, chunk_options: Dict[str, Any],
-                                          single_item: bool = False):
-    loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor() as executor:
-        if single_item:
-            combined_content = "\n\n".join([f"# {item['title']}\n\n{item['content']}" for item in content])
-            combined_title = f"MediaWiki Dump: {wiki_name}"
-            await loop.run_in_executor(executor, process_single_item, combined_content, combined_title, wiki_name,
-                                       chunk_options, True)
-        else:
-            tasks = [
-                loop.run_in_executor(
-                    executor,
-                    process_single_item,
-                    item['content'],
-                    item['title'],
-                    wiki_name,
-                    chunk_options,
-                    False,
-                    item
-                )
-                for item in content
-            ]
-            await asyncio.gather(*tasks)
-
-
-async def process_single_item(content: str, title: str, wiki_name: str, chunk_options: Dict[str, Any],
-                              is_combined: bool = False, item: Dict[str, Any] = None):
+def process_single_item(content: str, title: str, wiki_name: str, chunk_options: Dict[str, Any],
+                        is_combined: bool = False, item: Dict[str, Any] = None):
     try:
         url = f"mediawiki:{wiki_name}" if is_combined else f"mediawiki:{wiki_name}:{title}"
 
@@ -149,7 +122,7 @@ async def process_single_item(content: str, title: str, wiki_name: str, chunk_op
 
             chunks = optimized_chunking(content, chunk_options)
             for chunk in chunks:
-                process_and_store_content(chunk['text'], f"mediawiki_{wiki_name}", media_id)
+                process_and_store_content(chunk['text'], f"mediawiki_{wiki_name}", media_id, title)
             logger.info(f"Successfully processed item: {title}")
         else:
             logger.info(f"Skipping existing article: {title}")
@@ -169,14 +142,15 @@ def save_checkpoint(file_path: str, last_processed_id: int):
         json.dump({'last_processed_id': last_processed_id}, f)
 
 
-async def import_mediawiki_dump(
+def import_mediawiki_dump(
         file_path: str,
         wiki_name: str,
         namespaces: List[int] = None,
         skip_redirects: bool = False,
         chunk_options: Dict[str, Any] = None,
-        single_item: bool = False
-) -> str:
+        single_item: bool = False,
+        progress_callback: Any = None
+) -> Iterator[str]:
     try:
         if chunk_options is None:
             chunk_options = config['chunking']
@@ -184,24 +158,58 @@ async def import_mediawiki_dump(
         checkpoint_file = f"{wiki_name}_import_checkpoint.json"
         last_processed_id = load_checkpoint(checkpoint_file)
 
+        total_pages = count_pages(file_path, namespaces, skip_redirects)
+        processed_pages = 0
+
+        yield f"Found {total_pages} pages to process."
+
         for item in parse_mediawiki_dump(file_path, namespaces, skip_redirects):
             if item['page_id'] <= last_processed_id:
                 continue
-            await process_single_item(item['content'], item['title'], wiki_name, chunk_options, False, item)
+            process_single_item(item['content'], item['title'], wiki_name, chunk_options, False, item)
             save_checkpoint(checkpoint_file, item['page_id'])
-            logger.info(f"Processed and saved checkpoint for page: {item['title']}")
+            processed_pages += 1
+            if progress_callback is not None:
+                progress_callback(processed_pages / total_pages, f"Processed page: {item['title']}")
+            yield f"Processed page {processed_pages}/{total_pages}: {item['title']}"
 
         os.remove(checkpoint_file)  # Remove checkpoint file after successful import
-        return f"Successfully imported and indexed MediaWiki dump: {wiki_name}"
+        yield f"Successfully imported and indexed MediaWiki dump: {wiki_name}"
     except FileNotFoundError:
-        logging.error(f"MediaWiki dump file not found: {file_path}")
-        return f"Error: File not found - {file_path}"
+        logger.error(f"MediaWiki dump file not found: {file_path}")
+        yield f"Error: File not found - {file_path}"
     except PermissionError:
-        logging.error(f"Permission denied when trying to read: {file_path}")
-        return f"Error: Permission denied - {file_path}"
+        logger.error(f"Permission denied when trying to read: {file_path}")
+        yield f"Error: Permission denied - {file_path}"
     except Exception as e:
         logger.exception(f"Error during MediaWiki import: {str(e)}")
-        return f"Error during import: {str(e)}"
+        yield f"Error during import: {str(e)}"
+
+def count_pages(file_path: str, namespaces: List[int] = None, skip_redirects: bool = False) -> int:
+    """
+    Count the number of pages in a MediaWiki XML dump file.
+
+    Args:
+    file_path (str): Path to the MediaWiki XML dump file.
+    namespaces (List[int], optional): List of namespace IDs to include. If None, include all namespaces.
+    skip_redirects (bool, optional): Whether to skip redirect pages.
+
+    Returns:
+    int: The number of pages in the dump file.
+    """
+    try:
+        dump = mwxml.Dump.from_file(open(file_path, encoding='utf-8'))
+        count = 0
+        for page in dump.pages:
+            if skip_redirects and page.redirect:
+                continue
+            if namespaces and page.namespace not in namespaces:
+                continue
+            count += 1
+        return count
+    except Exception as e:
+        logger.error(f"Error counting pages in MediaWiki dump: {str(e)}")
+        return 0
 
 #
 # End of Media_Wiki.py

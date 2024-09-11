@@ -5,6 +5,7 @@
 import configparser
 import os
 import logging
+import threading
 from contextlib import contextmanager
 from typing import Tuple, List, Union, Dict
 import sqlite3
@@ -92,11 +93,14 @@ backup_dir: Union[str, bytes] = os.environ.get('DB_BACKUP_DIR', backup_path)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
 class Database:
     def __init__(self, db_name='media_summary.db'):
         self.db_path = get_database_path(db_name)
         self.pool = []
         self.pool_size = 10
+        self.lock = threading.Lock()
+        self.timeout = 60.0  # 60 seconds timeout
 
     @contextmanager
     def get_connection(self):
@@ -107,7 +111,8 @@ class Database:
                 if self.pool:
                     conn = self.pool.pop()
                 else:
-                    conn = sqlite3.connect(self.db_path, check_same_thread=False)
+                    conn = sqlite3.connect(self.db_path, timeout=self.timeout, check_same_thread=False)
+                    conn.execute("PRAGMA journal_mode=WAL;")  # Enable WAL mode
                 yield conn
                 self.pool.append(conn)
                 return
@@ -124,20 +129,80 @@ class Database:
         raise DatabaseError("Database is locked and retries have been exhausted")
 
     def execute_query(self, query: str, params: Tuple = ()) -> None:
-        with self.get_connection() as conn:
-            try:
-                cursor = conn.cursor()
-                cursor.execute(query, params)
-                conn.commit()
-            except sqlite3.Error as e:
-                logger.error(f"Database error: {e}, Query: {query}")
-                raise DatabaseError(f"Database error: {e}, Query: {query}")
+        with self.lock:  # Use a global lock for write operations
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute(query, params)
+                    conn.commit()
+                except sqlite3.Error as e:
+                    logger.error(f"Database error: {e}, Query: {query}")
+                    raise DatabaseError(f"Database error: {e}, Query: {query}")
+
+    def execute_many(self, query: str, params_list: List[Tuple]) -> None:
+        with self.lock:  # Use a global lock for write operations
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.executemany(query, params_list)
+                    conn.commit()
+                except sqlite3.Error as e:
+                    logger.error(f"Database error: {e}, Query: {query}")
+                    raise DatabaseError(f"Database error: {e}, Query: {query}")
 
     def close_all_connections(self):
         for conn in self.pool:
             conn.close()
         self.pool.clear()
 
+
+#
+# class Database:
+#     def __init__(self, db_name='media_summary.db'):
+#         self.db_path = get_database_path(db_name)
+#         self.pool = []
+#         self.pool_size = 10
+#
+#     @contextmanager
+#     def get_connection(self):
+#         retry_count = 5
+#         retry_delay = 1
+#         while retry_count > 0:
+#             try:
+#                 if self.pool:
+#                     conn = self.pool.pop()
+#                 else:
+#                     conn = sqlite3.connect(self.db_path, check_same_thread=False)
+#                 yield conn
+#                 self.pool.append(conn)
+#                 return
+#             except sqlite3.OperationalError as e:
+#                 if 'database is locked' in str(e):
+#                     logger.warning(f"Database is locked, retrying in {retry_delay} seconds...")
+#                     retry_count -= 1
+#                     time.sleep(retry_delay)
+#                     retry_delay *= 2  # Exponential backoff
+#                 else:
+#                     raise DatabaseError(f"Database error: {e}")
+#             except Exception as e:
+#                 raise DatabaseError(f"Unexpected error: {e}")
+#         raise DatabaseError("Database is locked and retries have been exhausted")
+#
+#     def execute_query(self, query: str, params: Tuple = ()) -> None:
+#         with self.get_connection() as conn:
+#             try:
+#                 cursor = conn.cursor()
+#                 cursor.execute(query, params)
+#                 conn.commit()
+#             except sqlite3.Error as e:
+#                 logger.error(f"Database error: {e}, Query: {query}")
+#                 raise DatabaseError(f"Database error: {e}, Query: {query}")
+#
+#     def close_all_connections(self):
+#         for conn in self.pool:
+#             conn.close()
+#         self.pool.clear()
+#
 
 #
 # End of Database Manager Class
