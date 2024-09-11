@@ -18,6 +18,7 @@ from App_Function_Libraries.DB.DB_Manager import get_db_config
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
     create_chat_interface_four, create_chat_interface_multi_api, create_chat_interface_stacked, create_chat_interface
+from App_Function_Libraries.Gradio_UI.Config_tab import create_config_editor_tab
 from App_Function_Libraries.Gradio_UI.Explain_summarize_tab import create_summarize_explain_tab
 from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab
 from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
@@ -340,6 +341,9 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Introduction/Help"):
                 create_introduction_tab()
+
+            with gr.TabItem("Config Editor"):
+                create_config_editor_tab()
 
     # Launch the interface
     server_port_variable = 7860
