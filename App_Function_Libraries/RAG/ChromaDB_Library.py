@@ -9,6 +9,7 @@ import chromadb
 from chromadb import Settings
 #
 # Local Imports:
+#from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 from App_Function_Libraries.RAG.Embeddings_Create import chunk_for_embedding
 from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media, \
     get_all_content_from_database
@@ -55,27 +56,85 @@ chunk_options = {
 #
 # Functions:
 
-def auto_update_chroma_embeddings(media_id: int, content: str):
-    """
-    Automatically update ChromaDB embeddings when a new item is ingested into the SQLite database.
 
-    :param media_id: The ID of the newly ingested media item
-    :param content: The content of the newly ingested media item
-    """
-    collection_name = f"media_{media_id}"
+def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str):
+    try:
+        logging.debug(f"Processing content for media_id {media_id} in collection {collection_name}")
+        chunks = chunk_for_embedding(content, file_name, chunk_options)
 
-    # Initialize or get the ChromaDB collection
-    collection = chroma_client.get_or_create_collection(name=collection_name)
+        texts, embeddings, ids, metadatas = [], [], [], []
 
-    # Check if embeddings already exist for this media_id
-    existing_embeddings = collection.get(ids=[f"{media_id}_chunk_{i}" for i in range(len(content))])
+        for i, chunk in enumerate(chunks, 1):
+            try:
+                chunk_text = chunk['text']
+                chunk_embedding = create_embedding(chunk_text, embedding_provider, embedding_model, embedding_api_url)
+                chunk_id = f"{media_id}_chunk_{i}"
 
-    if existing_embeddings and len(existing_embeddings) > 0:
-        logging.info(f"Embeddings already exist for media ID {media_id}, skipping...")
-    else:
-        # Process and store content if embeddings do not already exist
-        process_and_store_content(content, collection_name, media_id, f"media_{media_id}")
-        logging.info(f"Updated ChromaDB embeddings for media ID: {media_id}")
+                texts.append(chunk_text)
+                embeddings.append(chunk_embedding)
+                ids.append(chunk_id)
+                metadatas.append({
+                    "media_id": media_id,
+                    "chunk_index": i,
+                    "total_chunks": len(chunks),
+                    "start_index": chunk['metadata']['start_index'],
+                    "end_index": chunk['metadata']['end_index'],
+                    "file_name": file_name,
+                    "relative_position": chunk['metadata']['relative_position']
+                })
+
+                logging.info(f"Processed chunk {i}/{len(chunks)} for media_id {media_id}. Chunk ID: {chunk_id}")
+                add_media_chunk(media_id, chunk_text, chunk['metadata']['start_index'], chunk['metadata']['end_index'], chunk_id)
+
+            except Exception as e:
+                logging.error(f"Error processing chunk {i} for media_id {media_id}: {str(e)}")
+
+        store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
+        update_fts_for_media(media_id)
+
+    except Exception as e:
+        logging.error(f"Error in process_and_store_content for media_id {media_id}: {str(e)}")
+        raise
+
+
+def check_embedding_status(selected_item, item_mapping):
+    if not selected_item:
+        return "Please select an item", ""
+
+    try:
+        item_id = item_mapping.get(selected_item)
+        if item_id is None:
+            return f"Invalid item selected: {selected_item}", ""
+
+        item_title = selected_item.rsplit(' (', 1)[0]
+        collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
+
+        result = collection.get(ids=[f"doc_{item_id}"], include=["embeddings", "metadatas"])
+        logging.info(f"ChromaDB result for item '{item_title}' (ID: {item_id}): {result}")
+
+        if not result['ids']:
+            return f"No embedding found for item '{item_title}' (ID: {item_id})", ""
+
+        if not result['embeddings'] or not result['embeddings'][0]:
+            return f"Embedding data missing for item '{item_title}' (ID: {item_id})", ""
+
+        embedding = result['embeddings'][0]
+        metadata = result['metadatas'][0] if result['metadatas'] else {}
+        embedding_preview = str(embedding[:50])
+        status = f"Embedding exists for item '{item_title}' (ID: {item_id})"
+        return status, f"First 50 elements of embedding:\n{embedding_preview}\n\nMetadata: {metadata}"
+
+    except Exception as e:
+        logging.error(f"Error in check_embedding_status: {str(e)}")
+        return f"Error processing item: {selected_item}. Details: {str(e)}", ""
+
+def reset_chroma_collection(collection_name: str):
+    try:
+        chroma_client.delete_collection(collection_name)
+        chroma_client.create_collection(collection_name)
+        logging.info(f"Reset ChromaDB collection: {collection_name}")
+    except Exception as e:
+        logging.error(f"Error resetting ChromaDB collection: {str(e)}")
 
 
 # Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite
@@ -100,326 +159,32 @@ def auto_update_chroma_embeddings(media_id: int, content: str):
 #     # Update the FTS table
 #     update_fts_for_media(media_id)
 
-# Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite with metadata
-# def process_and_store_content(content: str, collection_name: str, media_id: int):
-#     # Process the content into chunks
-#     chunks = improved_chunking_process(content, chunk_options)
-#     texts = [chunk['text'] for chunk in chunks]
-#
-#     # Generate embeddings for each chunk
-#     embeddings = [create_embedding(text) for text in texts]
-#     # Create unique IDs for each chunk using the media_id and chunk index
-#     ids = [f"{media_id}_chunk_{i}" for i in range(len(texts))]
-#     # Create metadata for each chunk tagged to the media_id
-#     metadatas = [{"media_id": media_id} for _ in range(len(texts))]
-#
-#     # Store the texts, embeddings, and IDs in ChromaDB
-#     store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
-#
-#     # Store the chunk metadata in SQLite
-#     for i, chunk in enumerate(chunks):
-#         add_media_chunk(media_id, chunk['text'], chunk['start'], chunk['end'], ids[i])
-#
-#     # Update FTS table
-#     update_fts_for_media(media_id)
-
-# Function to store media according to ID and their embeddings in ChromaDB
-# def process_and_store_content(content: str, collection_name: str, media_id: int):
-#     # Process the content into chunks
-#     chunks = improved_chunking_process(content, chunk_options)
-#
-#     texts = []
-#     embeddings = []
-#     ids = []
-#     metadatas = []
-#
-#     for i, chunk in enumerate(chunks):
-#         chunk_text = chunk['text']
-#         chunk_embedding = create_embedding(chunk_text)
-#         chunk_id = f"{media_id}_chunk_{i}"
-#
-#         texts.append(chunk_text)
-#         embeddings.append(chunk_embedding)
-#         ids.append(chunk_id)
-#         metadatas.append({
-#             "media_id": media_id,
-#             "chunk_index": i,
-#             "start_index": chunk['metadata']['start_index'],
-#             "end_index": chunk['metadata']['end_index']
-#         })
-#
-#         # Store the chunk metadata in SQLite
-#         add_media_chunk(media_id, chunk_text, chunk['metadata']['start_index'], chunk['metadata']['end_index'], chunk_id)
-#
-#     # Get or create the collection
-#     collection = chroma_client.get_or_create_collection(name=collection_name)
-#
-#     # Check for existing IDs and update or add as necessary
-#     existing_ids = collection.get(ids=ids)['ids']
-#     new_ids = [id for id in ids if id not in existing_ids]
-#     update_ids = [id for id in ids if id in existing_ids]
-#
-#     if new_ids:
-#         collection.add(
-#             documents=[text for i, text in enumerate(texts) if ids[i] in new_ids],
-#             embeddings=[emb for i, emb in enumerate(embeddings) if ids[i] in new_ids],
-#             ids=new_ids,
-#             metadatas=[meta for i, meta in enumerate(metadatas) if ids[i] in new_ids]
-#         )
-#
-#     if update_ids:
-#         collection.update(
-#             documents=[text for i, text in enumerate(texts) if ids[i] in update_ids],
-#             embeddings=[emb for i, emb in enumerate(embeddings) if ids[i] in update_ids],
-#             ids=update_ids,
-#             metadatas=[meta for i, meta in enumerate(metadatas) if ids[i] in update_ids]
-#         )
-#
-#     # Update FTS table
-#     update_fts_for_media(media_id)
-
-# Function to store media according to ID and their embeddings in ChromaDB using chunking + Metadata
-def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str):
-    try:
-        # Use the new chunk_for_embedding function to chunk the content
-        chunks = chunk_for_embedding(content, file_name, chunk_options)
-
-        texts = []
-        embeddings = []
-        ids = []
-        metadatas = []
-
-        # Process each chunk
-        for i, chunk in enumerate(chunks, 1):
-            try:
-                chunk_text = chunk['text']
-                chunk_embedding = create_embedding(chunk_text)
-                chunk_id = f"{media_id}_chunk_{i}"
-
-                texts.append(chunk_text)
-                embeddings.append(chunk_embedding)
-                ids.append(chunk_id)
-                metadatas.append({
-                    "media_id": media_id,
-                    "chunk_index": i,
-                    "total_chunks": len(chunks),
-                    "start_index": chunk['metadata']['start_index'],
-                    "end_index": chunk['metadata']['end_index'],
-                    "file_name": file_name,
-                    "relative_position": chunk['metadata']['relative_position']
-                })
-
-                # Log each chunk processing
-                logging.info(f"Processed chunk {i}/{len(chunks)} for media_id {media_id}. Chunk ID: {chunk_id}")
-                add_media_chunk(media_id, chunk_text, chunk['metadata']['start_index'], chunk['metadata']['end_index'], chunk_id)
-
-            except Exception as e:
-                logging.error(f"Error processing chunk {i} for media_id {media_id}: {str(e)}")
-
-        # Get or create the collection
-        collection = chroma_client.get_or_create_collection(name=collection_name)
-
-        # Check for existing IDs and update or add as necessary
-        existing_ids = collection.get(ids=ids)['ids']
-        new_ids = [id for id in ids if id not in existing_ids]
-        update_ids = [id for id in ids if id in existing_ids]
-
-        if new_ids:
-            logging.info(f"Adding new embeddings for IDs: {new_ids}")
-            collection.add(
-                documents=[text for i, text in enumerate(texts) if ids[i] in new_ids],
-                embeddings=[emb for i, emb in enumerate(embeddings) if ids[i] in new_ids],
-                ids=new_ids,
-                metadatas=[meta for i, meta in enumerate(metadatas) if ids[i] in new_ids]
-            )
-            logging.info(f"Successfully added new embeddings for new IDs: {new_ids}")
-
-        if update_ids:
-            logging.info(f"Updating embeddings for existing IDs: {update_ids}")
-            collection.update(
-                documents=[text for i, text in enumerate(texts) if ids[i] in update_ids],
-                embeddings=[emb for i, emb in enumerate(embeddings) if ids[i] in update_ids],
-                ids=update_ids,
-                metadatas=[meta for i, meta in enumerate(metadatas) if ids[i] in update_ids]
-            )
-            logging.info(f"Successfully updated embeddings for existing IDs: {update_ids}")
-
-        # Update FTS (Full-Text Search) table for the media
-        update_fts_for_media(media_id)
-
-    except Exception as e:
-        logging.error(f"Error in process_and_store_content for media_id {media_id}: {str(e)}")
-        raise
-
-def create_all_embeddings(api_choice: str, model_or_url: str) -> str:
-    try:
-        all_content = get_all_content_from_database()
-
-        if not all_content:
-            return "No content found in the database."
-
-        texts_to_embed = []
-        embeddings_to_store = []
-        ids_to_store = []
-        metadatas_to_store = []
-        collection_name = "all_content_embeddings"
-
-        collection = chroma_client.get_or_create_collection(name=collection_name)
-
-        for content_item in all_content:
-            media_id = content_item['id']
-            text = content_item['content']
-
-            embedding_exists = collection.get(ids=[f"doc_{media_id}"])
-
-            if embedding_exists['ids']:
-                logging.info(f"Embedding already exists for media ID {media_id}, skipping...")
-                continue
-
-            # FIXME - Refactor to use the create_embedding function
-            if api_choice == "openai":
-                embedding = create_openai_embedding(text, model_or_url)
-            else:  # Llama.cpp
-                embedding = create_llamacpp_embedding(text, model_or_url)
-
-            texts_to_embed.append(text)
-            embeddings_to_store.append(embedding)
-            ids_to_store.append(f"doc_{media_id}")
-            metadatas_to_store.append({"media_id": media_id})
-
-        if texts_to_embed and embeddings_to_store:
-            store_in_chroma(collection_name, texts_to_embed, embeddings_to_store, ids_to_store, metadatas_to_store)
-
-        return "Embeddings created and stored successfully for all new content."
-    except Exception as e:
-        logging.error(f"Error during embedding creation: {str(e)}")
-        return f"Error: {str(e)}"
-
-
-def check_embedding_status(selected_item, item_mapping):
-    if not selected_item:
-        return "Please select an item", ""
-
-    try:
-        item_id = item_mapping.get(selected_item)
-        if item_id is None:
-            return f"Invalid item selected: {selected_item}", ""
-
-        item_title = selected_item.rsplit(' (', 1)[0]
-        collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
-
-        try:
-            result = collection.get(ids=[f"doc_{item_id}"])
-            logging.info(f"ChromaDB result for item '{item_title}' (ID: {item_id}): {result}")
-        except Exception as e:
-            logging.error(f"Error getting embedding for item {item_id}: {str(e)}")
-            return f"Error retrieving embedding for item '{item_title}' (ID: {item_id})", ""
-
-        if not result['ids']:
-            logging.error(f"No embedding found for item '{item_title}' (ID: {item_id})")
-            return f"No embedding found for item '{item_title}' (ID: {item_id})", ""
-
-        if not result['embeddings'] or not result['embeddings'][0]:
-            logging.error(f"Embedding data missing for item '{item_title}' (ID: {item_id})")
-            return f"Embedding data missing for item '{item_title}' (ID: {item_id})", ""
-
-        embedding = result['embeddings'][0]
-        metadata = result['metadatas'][0] if result['metadatas'] else {}
-        embedding_preview = str(embedding[:50])  # Convert first 50 elements to string
-        status = f"Embedding exists for item '{item_title}' (ID: {item_id})"
-        return status, f"First 50 elements of embedding:\n{embedding_preview}\n\nMetadata: {metadata}"
-
-    except Exception as e:
-        logging.error(f"Error in check_embedding_status: {str(e)}")
-        return f"Error processing item: {selected_item}. Details: {str(e)}", ""
-
-
-def create_embeddings(api_choice, openai_model, llamacpp_url):
-    try:
-        if api_choice == "OpenAI":
-            status = create_all_embeddings("openai", openai_model)
-        else:  # Llama.cpp
-            status = create_all_embeddings("llamacpp", llamacpp_url)
-        return status
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-
-def create_new_embedding(selected_item, provider, model, api_url, item_mapping):
-    if not selected_item:
-        return "Please select an item", ""
-
-    try:
-        item_id = item_mapping.get(selected_item)
-        if item_id is None:
-            return f"Invalid item selected: {selected_item}", ""
-
-        items = get_all_content_from_database()
-        item = next((item for item in items if item['id'] == item_id), None)
-        if not item:
-            return f"Item not found: {item_id}", ""
-
-        # Set global variables based on the selected provider
-        global embedding_provider, embedding_model, embedding_api_url
-        embedding_provider = provider
-        embedding_model = model
-        embedding_api_url = api_url
-
-        # Use the existing create_embedding function
-        embedding = create_embedding(item['content'])
-
-        print(f"Created embedding for item '{item['title']}' (ID: {item_id}). First 50 elements: {embedding[:50]}")
-
-        collection_name = "all_content_embeddings"
-        metadata = {"media_id": item_id, "title": item['title']}
-        store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item_id}"], [metadata])
-
-        # Verify the embedding was stored correctly
-        collection = chroma_client.get_collection(name=collection_name)
-        result = collection.get(ids=[f"doc_{item_id}"])
-        print(f"Verification result after storing: {result}")
-
-        embedding_preview = str(embedding[:50])
-        status = f"New embedding created and stored for item: {item['title']} (ID: {item_id})"
-        return status, f"First 50 elements of new embedding:\n{embedding_preview}\n\nMetadata: {metadata}"
-    except Exception as e:
-        logging.error(f"Error in create_new_embedding: {str(e)}")
-        return f"Error creating embedding: {str(e)}", ""
-
-
-# Function to store documents and their embeddings in ChromaDB
 def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], metadatas: List[Dict[str, Any]]):
     try:
         collection = chroma_client.get_or_create_collection(name=collection_name)
 
-        # Check for existing IDs
-        existing = collection.get(ids=ids)
-        existing_ids = existing.get('ids', [])
+        # Log the inputs for debugging
+        logging.debug(f"Storing in ChromaDB - Collection: {collection_name}")
+        logging.debug(f"Texts (first 100 chars): {texts[0][:100]}...")
+        logging.debug(f"Embeddings (first 5 values): {embeddings[0][:5]}")
+        logging.debug(f"IDs: {ids}")
+        logging.debug(f"Metadatas: {metadatas}")
 
-        new_ids = [id for id in ids if id not in existing_ids]
-        update_ids = [id for id in ids if id in existing_ids]
+        # Use upsert instead of add/update
+        collection.upsert(
+            documents=texts,
+            embeddings=embeddings,
+            ids=ids,
+            metadatas=metadatas
+        )
 
-        # Add new entries
-        if new_ids:
-            logging.info(f"Adding new embeddings for IDs: {new_ids}")
-            collection.add(
-                documents=[text for i, text in enumerate(texts) if ids[i] in new_ids],
-                embeddings=[emb for i, emb in enumerate(embeddings) if ids[i] in new_ids],
-                ids=new_ids,
-                metadatas=[meta for i, meta in enumerate(metadatas) if ids[i] in new_ids]
-            )
-            logging.info(f"Successfully added new embeddings for {new_ids}")
-
-        # Update existing entries
-        if update_ids:
-            logging.info(f"Updating embeddings for existing IDs: {update_ids}")
-            collection.update(
-                documents=[text for i, text in enumerate(texts) if ids[i] in update_ids],
-                embeddings=[emb for i, emb in enumerate(embeddings) if ids[i] in update_ids],
-                ids=update_ids,
-                metadatas=[meta for i, meta in enumerate(metadatas) if ids[i] in update_ids]
-            )
-            logging.info(f"Successfully updated embeddings for {update_ids}")
+        # Verify storage
+        for doc_id in ids:
+            result = collection.get(ids=[doc_id], include=["embeddings"])
+            if not result['embeddings'] or result['embeddings'][0] is None:
+                logging.error(f"Failed to store embedding for {doc_id}")
+            else:
+                logging.info(f"Embedding stored successfully for {doc_id}")
 
     except Exception as e:
         logging.error(f"Error storing embeddings in ChromaDB: {str(e)}")
@@ -429,8 +194,7 @@ def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[Lis
 # Function to perform vector search using ChromaDB + Keywords from the media_db
 def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[str, Any]]:
     try:
-        logger.info(f"Converting query to vectors: {query}")
-        query_embedding = create_embedding(query)
+        query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
         collection = chroma_client.get_collection(name=collection_name)
         results = collection.query(
             query_embeddings=[query_embedding],
@@ -439,18 +203,9 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
         )
         return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
     except Exception as e:
-        logger.error(f"Error in vector_search: {str(e)}")
+        logging.error(f"Error in vector_search: {str(e)}")
         raise
 
-
-def store_in_chroma_with_citation(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], sources: List[str]):
-    collection = chroma_client.get_or_create_collection(name=collection_name)
-    collection.add(
-        documents=texts,
-        embeddings=embeddings,
-        ids=ids,
-        metadatas=[{'source': source} for source in sources]
-    )
 
 #
 # End of Functions for ChromaDB
