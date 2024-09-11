@@ -50,7 +50,7 @@ def summarize(
     custom_prompt_arg: Optional[str],
     api_name: str,
     api_key: Optional[str],
-    temp: float,
+    temp: Optional[float],
     system_message: Optional[str]
 ) -> str:
     try:

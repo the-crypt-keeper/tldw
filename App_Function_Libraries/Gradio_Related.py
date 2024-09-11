@@ -16,8 +16,9 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_db_config
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
-from App_Function_Libraries.Gradio_UI.Chat_ui import chat_workflows_tab, create_chat_management_tab, \
+from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
     create_chat_interface_four, create_chat_interface_multi_api, create_chat_interface_stacked, create_chat_interface
+from App_Function_Libraries.Gradio_UI.Config_tab import create_config_editor_tab
 from App_Function_Libraries.Gradio_UI.Explain_summarize_tab import create_summarize_explain_tab
 from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab
 from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
@@ -34,9 +35,11 @@ from App_Function_Libraries.Gradio_UI.Media_edit import create_prompt_clone_tab,
 from App_Function_Libraries.Gradio_UI.Media_wiki_tab import create_mediawiki_import_tab
 from App_Function_Libraries.Gradio_UI.PDF_ingestion_tab import create_pdf_ingestion_tab, create_pdf_ingestion_test_tab
 from App_Function_Libraries.Gradio_UI.Podcast_tab import create_podcast_tab
+from App_Function_Libraries.Gradio_UI.RAG_QA_Chat_tab import create_rag_qa_chat_tab
 from App_Function_Libraries.Gradio_UI.Re_summarize_tab import create_resummary_tab
 from App_Function_Libraries.Gradio_UI.Search_Tab import create_prompt_view_tab, create_prompt_search_tab, \
-    create_search_summaries_tab, create_viewing_tab, create_embeddings_tab, create_rag_tab, create_search_tab, \
+    create_search_summaries_tab, create_viewing_tab,  create_search_tab
+from App_Function_Libraries.Gradio_UI.RAG_Chat_tab import create_embeddings_tab, create_rag_tab, \
     create_view_embeddings_tab
 from App_Function_Libraries.Gradio_UI.Trash import create_view_trash_tab, create_empty_trash_tab, \
     create_delete_trash_tab, create_search_and_mark_trash_tab
@@ -45,9 +48,10 @@ from App_Function_Libraries.Gradio_UI.Utilities import create_utilities_yt_times
 from App_Function_Libraries.Gradio_UI.Video_transcription_tab import create_video_transcription_tab
 from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
+from App_Function_Libraries.Gradio_UI.Chat_Workflows import chat_workflows_tab
 #
 # Gradio UI Imports
-from App_Function_Libraries.Gradio_UI.geval import create_geval_tab
+from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
 
 #
 #######################################################################################################################
@@ -252,13 +256,16 @@ def launch_ui(share_public=None, server_mode=False):
                     create_summarize_explain_tab()
                     create_live_recording_tab()
 
-            with gr.TabItem("Search / RAG / Embeddings"):
+            with gr.TabItem("Text Search "):
                 create_search_tab()
-                create_rag_tab()
-                create_embeddings_tab()
-                create_view_embeddings_tab()
                 create_search_summaries_tab()
                 create_prompt_search_tab()
+
+            with gr.TabItem("RAG Search / Embeddings"):
+                create_rag_tab()
+                create_rag_qa_chat_tab()
+                create_embeddings_tab()
+                create_view_embeddings_tab()
 
             with gr.TabItem("Chat with an LLM"):
                 create_chat_interface()
@@ -330,9 +337,13 @@ def launch_ui(share_public=None, server_mode=False):
 
             with gr.TabItem("Evaluations"):
                 create_geval_tab()
+                create_infinite_bench_tab()
 
             with gr.TabItem("Introduction/Help"):
                 create_introduction_tab()
+
+            with gr.TabItem("Config Editor"):
+                create_config_editor_tab()
 
     # Launch the interface
     server_port_variable = 7860

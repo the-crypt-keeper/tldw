@@ -27,6 +27,9 @@ import configparser
 # DEBUG Imports
 #from memory_profiler import profile
 import pyaudio
+
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+
 # Import Local
 #
 #######################################################################################################################
@@ -40,13 +43,7 @@ import pyaudio
 
 
 whisper_model_instance = None
-# Retrieve processing choice from the configuration file
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Construct the path to the config file
-config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
-# Read the config file
-config = configparser.ConfigParser()
-config.read(config_path)
+config = load_comprehensive_config()
 processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
 

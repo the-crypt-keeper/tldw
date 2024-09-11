@@ -27,6 +27,7 @@ import os
 import re
 import time
 from datetime import timedelta
+from typing import Union, AnyStr
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 import requests
@@ -117,11 +118,33 @@ def load_comprehensive_config():
     config.read(config_path)
 
     # Log the sections found in the config file
-    logging.debug(f"Sections found in config: {config.sections()}")
+    logging.debug("load_comprehensive_config(): Sections found in config: {config.sections()}")
 
     return config
 
 
+def get_project_root():
+    """Get the project root directory."""
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def get_database_dir():
+    return get_project_relative_path('Databases')
+
+def get_database_path(db_name: Union[str, os.PathLike[AnyStr]]) -> str:
+    """Get the full path for a database file."""
+    return os.path.join(get_database_dir(), str(db_name))
+
+def get_project_relative_path(relative_path: Union[str, os.PathLike[AnyStr]]) -> str:
+    """Convert a relative path to a path relative to the project root."""
+    return os.path.join(get_project_root(), str(relative_path))
+
+def get_chromadb_path():
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(project_root, 'Databases', 'chroma_db')
+
+def ensure_directory_exists(path):
+    """Ensure that a directory exists, creating it if necessary."""
+    os.makedirs(path, exist_ok=True)
 
 # FIXME - update to include prompt path in return statement
 def load_and_log_configs():
@@ -226,7 +249,7 @@ def load_and_log_configs():
         logging.debug(f"Processing choice set to: {processing_choice}")
 
         # Prompts - FIXME
-        prompt_path = config.get('Prompts', 'prompt_path', fallback='prompts.db')
+        prompt_path = config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')
 
         return {
             'api_keys': {
@@ -274,18 +297,19 @@ def load_and_log_configs():
             'output_path': output_path,
             'processing_choice': processing_choice,
             'db_config': {
-                'prompt_path': prompt_path,
+                'prompt_path': get_project_relative_path(config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')),
                 'db_type': config.get('Database', 'type', fallback='sqlite'),
-                'sqlite_path': config.get('Database', 'sqlite_path', fallback='media_summary.db'),
+                'sqlite_path': get_project_relative_path(config.get('Database', 'sqlite_path', fallback='Databases/media_summary.db')),
                 'elasticsearch_host': config.get('Database', 'elasticsearch_host', fallback='localhost'),
                 'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200),
-                'chroma_db_path': config.get('Database', 'chroma_db_path', fallback='chroma.db')
+                'chroma_db_path': get_project_relative_path(config.get('Database', 'chroma_db_path', fallback='Databases/chroma.db'))
             },
         }
 
     except Exception as e:
         logging.error(f"Error loading config: {str(e)}")
         return None
+
 
 #
 # End of Config loading
@@ -641,10 +665,12 @@ def get_db_config():
     # Return the database configuration
     return {
         'type': config['Database']['type'],
-        'sqlite_path': config.get('Database', 'sqlite_path', fallback='media_summary.db'),
+        'sqlite_path': config.get('Database', 'sqlite_path', fallback='./Databases/media_summary.db'),
         'elasticsearch_host': config.get('Database', 'elasticsearch_host', fallback='localhost'),
         'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200)
     }
+
+
 
 
 #

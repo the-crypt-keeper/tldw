@@ -3,12 +3,13 @@
 #
 # Imports
 import configparser
-import logging
 import os
+import logging
+import threading
 from contextlib import contextmanager
-from time import sleep
 from typing import Tuple, List, Union, Dict
 import sqlite3
+import time
 #
 # 3rd-Party Libraries
 from elasticsearch import Elasticsearch
@@ -59,24 +60,25 @@ from App_Function_Libraries.DB.SQLite_DB import (
     delete_specific_transcript as sqlite_delete_specific_transcript, delete_specific_summary as sqlite_delete_specific_summary, \
     delete_specific_prompt as sqlite_delete_specific_prompt, fetch_keywords_for_media as sqlite_fetch_keywords_for_media, \
     update_keywords_for_media as sqlite_update_keywords_for_media, check_media_exists as sqlite_check_media_exists, \
+    search_prompts as sqlite_search_prompts, get_media_content as sqlite_get_media_content, \
+    get_paginated_files as sqlite_get_paginated_files, get_media_title as sqlite_get_media_title, \
+    get_all_content_from_database as sqlite_get_all_content_from_database,
 )
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config, get_database_path, get_project_relative_path
 #
 # End of imports
 ############################################################################################################
 #
 # Globals
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Construct the path to the config file
-config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
-# Read the config file
+# Load configuration from config file
+config_path = get_project_relative_path('Config_Files/config.txt')
 config = configparser.ConfigParser()
 config.read(config_path)
 
-db_path: str = config.get('Database', 'sqlite_path', fallback='media_summary.db')
+db_path: str = config.get('Database', 'sqlite_path', fallback='./Databases/media_summary.db')
 
 backup_path: str = config.get('Database', 'backup_path', fallback='database_backups')
 
@@ -88,51 +90,119 @@ backup_dir: Union[str, bytes] = os.environ.get('DB_BACKUP_DIR', backup_path)
 #
 # Database Manager Class
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+
 class Database:
-    def __init__(self, db_path=None):
-        self.db_path = db_path or os.getenv('DB_NAME', 'media_summary.db')
+    def __init__(self, db_name='media_summary.db'):
+        self.db_path = get_database_path(db_name)
         self.pool = []
         self.pool_size = 10
+        self.lock = threading.Lock()
+        self.timeout = 60.0  # 60 seconds timeout
 
     @contextmanager
     def get_connection(self):
         retry_count = 5
         retry_delay = 1
-        conn = None
         while retry_count > 0:
             try:
-                conn = self.pool.pop() if self.pool else sqlite3.connect(self.db_path, check_same_thread=False)
+                if self.pool:
+                    conn = self.pool.pop()
+                else:
+                    conn = sqlite3.connect(self.db_path, timeout=self.timeout, check_same_thread=False)
+                    conn.execute("PRAGMA journal_mode=WAL;")  # Enable WAL mode
                 yield conn
                 self.pool.append(conn)
                 return
             except sqlite3.OperationalError as e:
                 if 'database is locked' in str(e):
-                    logging.warning(f"Database is locked, retrying in {retry_delay} seconds...")
+                    logger.warning(f"Database is locked, retrying in {retry_delay} seconds...")
                     retry_count -= 1
-                    sleep(retry_delay)
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
                 else:
                     raise DatabaseError(f"Database error: {e}")
             except Exception as e:
                 raise DatabaseError(f"Unexpected error: {e}")
-            finally:
-                # Ensure the connection is returned to the pool even on failure
-                if conn and conn not in self.pool:
-                    self.pool.append(conn)
         raise DatabaseError("Database is locked and retries have been exhausted")
 
     def execute_query(self, query: str, params: Tuple = ()) -> None:
-        with self.get_connection() as conn:
-            try:
-                cursor = conn.cursor()
-                cursor.execute(query, params)
-                conn.commit()
-            except sqlite3.Error as e:
-                raise DatabaseError(f"Database error: {e}, Query: {query}")
+        with self.lock:  # Use a global lock for write operations
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute(query, params)
+                    conn.commit()
+                except sqlite3.Error as e:
+                    logger.error(f"Database error: {e}, Query: {query}")
+                    raise DatabaseError(f"Database error: {e}, Query: {query}")
+
+    def execute_many(self, query: str, params_list: List[Tuple]) -> None:
+        with self.lock:  # Use a global lock for write operations
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.executemany(query, params_list)
+                    conn.commit()
+                except sqlite3.Error as e:
+                    logger.error(f"Database error: {e}, Query: {query}")
+                    raise DatabaseError(f"Database error: {e}, Query: {query}")
 
     def close_all_connections(self):
         for conn in self.pool:
             conn.close()
         self.pool.clear()
+
+
+#
+# class Database:
+#     def __init__(self, db_name='media_summary.db'):
+#         self.db_path = get_database_path(db_name)
+#         self.pool = []
+#         self.pool_size = 10
+#
+#     @contextmanager
+#     def get_connection(self):
+#         retry_count = 5
+#         retry_delay = 1
+#         while retry_count > 0:
+#             try:
+#                 if self.pool:
+#                     conn = self.pool.pop()
+#                 else:
+#                     conn = sqlite3.connect(self.db_path, check_same_thread=False)
+#                 yield conn
+#                 self.pool.append(conn)
+#                 return
+#             except sqlite3.OperationalError as e:
+#                 if 'database is locked' in str(e):
+#                     logger.warning(f"Database is locked, retrying in {retry_delay} seconds...")
+#                     retry_count -= 1
+#                     time.sleep(retry_delay)
+#                     retry_delay *= 2  # Exponential backoff
+#                 else:
+#                     raise DatabaseError(f"Database error: {e}")
+#             except Exception as e:
+#                 raise DatabaseError(f"Unexpected error: {e}")
+#         raise DatabaseError("Database is locked and retries have been exhausted")
+#
+#     def execute_query(self, query: str, params: Tuple = ()) -> None:
+#         with self.get_connection() as conn:
+#             try:
+#                 cursor = conn.cursor()
+#                 cursor.execute(query, params)
+#                 conn.commit()
+#             except sqlite3.Error as e:
+#                 logger.error(f"Database error: {e}, Query: {query}")
+#                 raise DatabaseError(f"Database error: {e}, Query: {query}")
+#
+#     def close_all_connections(self):
+#         for conn in self.pool:
+#             conn.close()
+#         self.pool.clear()
+#
 
 #
 # End of Database Manager Class
@@ -144,69 +214,68 @@ def get_db_config():
     try:
         config = load_comprehensive_config()
 
-        # Check if 'Database' section exists
         if 'Database' not in config:
             print("Warning: 'Database' section not found in config. Using default values.")
-            return {
-                'type': 'sqlite',
-                'sqlite_path': 'media_summary.db',
-                'elasticsearch_host': 'localhost',
-                'elasticsearch_port': 9200
-            }
+            return default_db_config()
 
         return {
             'type': config.get('Database', 'type', fallback='sqlite'),
-            'sqlite_path': config.get('Database', 'sqlite_path', fallback='media_summary.db'),
+            'sqlite_path': config.get('Database', 'sqlite_path', fallback='Databases/media_summary.db'),
             'elasticsearch_host': config.get('Database', 'elasticsearch_host', fallback='localhost'),
             'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200)
         }
     except FileNotFoundError:
         print("Warning: Config file not found. Using default database configuration.")
-        return {
-            'type': 'sqlite',
-            'sqlite_path': 'media_summary.db',
-            'elasticsearch_host': 'localhost',
-            'elasticsearch_port': 9200
-        }
+        return default_db_config()
     except Exception as e:
         print(f"Error reading config: {str(e)}. Using default database configuration.")
-        return {
-            'type': 'sqlite',
-            'sqlite_path': 'media_summary.db',
-            'elasticsearch_host': 'localhost',
-            'elasticsearch_port': 9200
-        }
+        return default_db_config()
 
+
+def default_db_config():
+    """Return the default database configuration with project-relative paths."""
+    return {
+        'type': 'sqlite',
+        'sqlite_path': get_database_path('media_summary.db'),
+        'elasticsearch_host': 'localhost',
+        'elasticsearch_port': 9200
+    }
+
+
+def ensure_directory_exists(file_path):
+    directory = os.path.dirname(file_path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print(f"Created directory: {directory}")
+
+# Use the config to set up the database
 db_config = get_db_config()
 db_type = db_config['type']
 
 if db_type == 'sqlite':
-    # Use the config path if provided, otherwise fall back to default
-    db = Database(db_config.get('sqlite_path'))
+    db = Database(os.path.basename(db_config['sqlite_path']))
 elif db_type == 'elasticsearch':
-    es = Elasticsearch([{
-        'host': db_config['elasticsearch_host'],
-        'port': db_config['elasticsearch_port']
-    }])
+    # Implement Elasticsearch setup here if needed
+    raise NotImplementedError("Elasticsearch support not yet implemented")
 else:
     raise ValueError(f"Unsupported database type: {db_type}")
 
+# Print database path for debugging
+print(f"Database path: {db.db_path}")
 
-if db_type == 'sqlite':
-    conn = sqlite3.connect(db_config['sqlite_path'])
-    cursor = conn.cursor()
-elif db_type == 'elasticsearch':
-    es = Elasticsearch([{
-        'host': db_config['elasticsearch_host'],
-        'port': db_config['elasticsearch_port']
-    }])
-else:
-    raise ValueError(f"Unsupported database type: {db_type}")
+# Sanity Check for SQLite DB
+# FIXME - Remove this after testing / Writing Unit tests
+# try:
+#     db.execute_query("CREATE TABLE IF NOT EXISTS test_table (id INTEGER PRIMARY KEY)")
+#     logger.info("Successfully created test table")
+# except DatabaseError as e:
+#     logger.error(f"Failed to create test table: {e}")
+
 #
 # End of Database Config loading
 ############################################################################################################
 #
-# DB-Searching functions
+# DB Search functions
 
 def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
     if db_type == 'sqlite':
@@ -231,6 +300,13 @@ def search_and_display_items(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
+def get_all_content_from_database():
+    if db_type == 'sqlite':
+        return sqlite_get_all_content_from_database()
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
 def search_and_display(*args, **kwargs):
     if db_type == 'sqlite':
         return sqlite_search_and_display(*args, **kwargs)
@@ -244,6 +320,21 @@ def check_media_exists(*args, **kwargs):
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def get_paginated_files(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_paginated_files(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def get_media_title(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_media_title(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
 
 #
 # End of DB-Searching functions
@@ -386,7 +477,7 @@ def get_unprocessed_media():
 
 ############################################################################################################
 #
-# Prompt-related functions
+# Prompt-related functions #FIXME rename /resort
 
 def list_prompts(*args, **kwargs):
     if db_type == 'sqlite':
@@ -395,6 +486,12 @@ def list_prompts(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
+def search_prompts(query):
+    if db_type == 'sqlite':
+        return sqlite_search_prompts(query)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
 def fetch_prompt_details(*args, **kwargs):
     if db_type == 'sqlite':
@@ -461,6 +558,14 @@ def mark_as_trash(media_id: int) -> None:
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version when available
         raise NotImplementedError("Elasticsearch version of mark_as_trash not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def get_media_content(media_id: int) -> str:
+    if db_type == 'sqlite':
+        return sqlite_get_media_content(media_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of get_media_content not yet implemented")
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 
