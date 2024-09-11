@@ -45,10 +45,7 @@ logger = setup_logger('mediawiki_import', log_file='mediawiki_import.log')
 def load_mediawiki_import_config():
     with open(os.path.join('Config_Files', 'mediawiki_import_config.yaml'), 'r') as f:
         return yaml.safe_load(f)
-
-
 config = load_mediawiki_import_config()
-
 
 def parse_mediawiki_dump(file_path: str, namespaces: List[int] = None, skip_redirects: bool = False) -> Iterator[
     Dict[str, Any]]:
