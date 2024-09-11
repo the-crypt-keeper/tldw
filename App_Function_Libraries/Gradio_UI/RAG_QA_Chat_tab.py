@@ -44,7 +44,7 @@ def create_rag_qa_chat_tab():
                 file_upload = gr.File(label="Upload File", visible=False)
 
                 api_choice = gr.Dropdown(
-                    choices=["OpenAI", "Anthropic", "Cohere", "Local-LLM"],
+                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
                     label="Select API for RAG",
                     value="OpenAI"
                 )
