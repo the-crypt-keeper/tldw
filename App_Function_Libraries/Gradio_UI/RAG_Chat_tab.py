@@ -8,14 +8,15 @@ import logging
 import gradio as gr
 #
 # Local Imports
+from App_Function_Libraries.RAG.ChromaDB_Library import get_all_content_from_database, chroma_client, \
+    check_embedding_status, create_new_embedding, create_embeddings
+from App_Function_Libraries.RAG.RAG_Libary_2 import enhanced_rag_pipeline
 #
 ########################################################################################################################
 #
 # Functions:
 
-from App_Function_Libraries.RAG.ChromaDB_Library import get_all_content_from_database, chroma_client, \
-     store_in_chroma, create_embedding
-from App_Function_Libraries.RAG.RAG_Libary_2 import enhanced_rag_pipeline
+
 
 
 def create_rag_tab():
@@ -112,17 +113,6 @@ def create_embeddings_tab():
             outputs=[openai_model_choice, llamacpp_url]
         )
 
-        def create_embeddings(api_choice, openai_model, llamacpp_url):
-            try:
-                from App_Function_Libraries.RAG.ChromaDB_Library import create_all_embeddings
-                if api_choice == "OpenAI":
-                    status = create_all_embeddings("openai", openai_model)
-                else:  # Llama.cpp
-                    status = create_all_embeddings("llamacpp", llamacpp_url)
-                return status
-            except Exception as e:
-                return f"Error: {str(e)}"
-
         create_button.click(
             fn=create_embeddings,
             inputs=[embedding_api_choice, openai_model_choice, llamacpp_url],
@@ -181,74 +171,6 @@ def create_view_embeddings_tab():
                 print(f"Error in get_items_with_embedding_status: {str(e)}")
                 return gr.update(choices=["Error: Unable to fetch items"]), {}
 
-        def check_embedding_status(selected_item, item_mapping):
-            if not selected_item:
-                return "Please select an item", ""
-
-            try:
-                item_id = item_mapping.get(selected_item)
-                if item_id is None:
-                    return f"Invalid item selected: {selected_item}", ""
-
-                item_title = selected_item.rsplit(' (', 1)[0]
-                collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
-
-                try:
-                    result = collection.get(ids=[f"doc_{item_id}"])
-                except Exception as e:
-                    print(f"Error getting embedding for item {item_id}: {str(e)}")
-                    return f"Error retrieving embedding for item '{item_title}' (ID: {item_id})", ""
-
-                if result is None:
-                    return f"No result returned for item '{item_title}' (ID: {item_id})", ""
-
-                if not result.get('ids'):
-                    return f"No embedding found for item '{item_title}' (ID: {item_id})", ""
-
-                if not result.get('embeddings'):
-                    return f"Embedding data missing for item '{item_title}' (ID: {item_id})", ""
-
-                embedding = result['embeddings'][0]
-                embedding_preview = str(embedding[:500])  # Convert first 500 elements to string
-                status = f"Embedding exists for item '{item_title}' (ID: {item_id})"
-                return status, f"First 500 elements of embedding:\n{embedding_preview}"
-            except Exception as e:
-                print(f"Error in check_embedding_status: {str(e)}")
-                return f"Error processing item: {selected_item}. Details: {str(e)}", ""
-
-        def create_new_embedding(selected_item, provider, model, api_url, item_mapping):
-            if not selected_item:
-                return "Please select an item", ""
-
-            try:
-                item_id = item_mapping.get(selected_item)
-                if item_id is None:
-                    return f"Invalid item selected: {selected_item}", ""
-
-                item_title = selected_item.rsplit(' (', 1)[0]
-                items = get_all_content_from_database()
-                item = next((item for item in items if item['id'] == item_id), None)
-                if not item:
-                    return f"Item not found: {item_title}", ""
-
-                global embedding_provider_chat, embedding_model, embedding_api_url
-                embedding_provider_chat = provider
-                embedding_model = model
-                embedding_api_url = api_url
-
-                embedding = create_embedding(item['content'])
-
-                collection_name = "all_content_embeddings"
-                metadata = {"media_id": item_id}  # Add metadata with media_id
-                store_in_chroma(collection_name, [item['content']], [embedding], [f"doc_{item_id}"], [metadata])
-
-                embedding_preview = str(embedding[:500])  # Convert first 500 elements to string
-                status = f"New embedding created and stored for item: {item_title} (ID: {item_id})"
-                return status, f"First 500 elements of new embedding:\n{embedding_preview}"
-            except Exception as e:
-                logging.error(f"Error in create_new_embedding: {str(e)}")
-                return f"Error creating embedding: {str(e)}", ""
-
         def update_provider_options(provider):
             return (
                 gr.update(visible=True),
@@ -276,4 +198,8 @@ def create_view_embeddings_tab():
         )
 
     return item_dropdown, refresh_button, embedding_status, embedding_preview, create_new_embedding_button, embedding_provider_chat, embedding_model, embedding_api_url
+
+#
+# End of file
+########################################################################################################################
 
