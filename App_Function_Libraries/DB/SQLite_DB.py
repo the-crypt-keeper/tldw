@@ -2217,6 +2217,21 @@ def user_delete_item(media_id: int, force: bool = False) -> str:
             return "Item is already in trash. Use force=True to delete permanently before 30 days."
 
 
+def get_chunk_text(media_id: int, chunk_index: int) -> str:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT content FROM MediaChunks WHERE media_id = ? AND chunk_index = ?",
+                       (media_id, chunk_index))
+        result = cursor.fetchone()
+    return result[0] if result else None
+
+def get_full_document(media_id: int) -> str:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
+        result = cursor.fetchone()
+    return result[0] if result else None
+
 def get_all_content_from_database() -> List[Dict[str, Any]]:
     """
     Retrieve all media content from the database that requires embedding.

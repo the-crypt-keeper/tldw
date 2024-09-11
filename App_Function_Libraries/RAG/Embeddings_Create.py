@@ -2,6 +2,7 @@
 # Description: Functions for Creating and managing Embeddings in ChromaDB with LLama.cpp/OpenAI/Transformers
 #
 # Imports:
+import logging
 from typing import List, Dict, Any
 #
 # 3rd-Party Imports:
@@ -36,30 +37,39 @@ overlap = loaded_config['Embeddings']['overlap']
 
 # FIXME - refactor/setup to use config file & perform chunking
 def create_embedding(text: str) -> List[float]:
+    try:
+        if embedding_provider == 'openai':
+            embedding = get_openai_embeddings(text, embedding_model)
+        elif embedding_provider == 'local':
+            response = requests.post(
+                embedding_api_url,
+                json={"text": text, "model": embedding_model},
+                headers={"Authorization": f"Bearer {embedding_api_key}"}
+            )
+            response.raise_for_status()
+            embedding = response.json().get('embedding', None)
+        elif embedding_provider == 'huggingface':
+            tokenizer = AutoTokenizer.from_pretrained(embedding_model)
+            model = AutoModel.from_pretrained(embedding_model)
 
-    if embedding_provider == 'openai':
-        return get_openai_embeddings(text, embedding_model)
-    elif embedding_provider == 'local':
-        response = requests.post(
-            embedding_api_url,
-            json={"text": text, "model": embedding_model},
-            headers={"Authorization": f"Bearer {embedding_api_key}"}
-        )
-        return response.json()['embedding']
-    elif embedding_provider == 'huggingface':
-        tokenizer = AutoTokenizer.from_pretrained(embedding_model)
-        model = AutoModel.from_pretrained(embedding_model)
+            inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+            with torch.no_grad():
+                outputs = model(**inputs)
 
-        inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-        with torch.no_grad():
-            outputs = model(**inputs)
+            embeddings = outputs.last_hidden_state.mean(dim=1)
+            embedding = embeddings[0].tolist()
+        else:
+            raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
 
-        # Use the mean of the last hidden state as the sentence embedding
-        embeddings = outputs.last_hidden_state.mean(dim=1)
-        # Convert to list for consistency
-        return embeddings[0].tolist()
-    else:
-        raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
+        if not embedding:
+            raise ValueError(f"Failed to create embedding for text: {text[:50]}...")
+
+        logging.info(f"Embedding created successfully for text: {text[:50]}... First 5 values: {embedding[:5]}")
+        return embedding
+
+    except Exception as e:
+        logging.error(f"Error creating embedding: {str(e)}")
+        raise
 
 
 def chunk_for_embedding(text: str, file_name: str, api_name, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
