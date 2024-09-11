@@ -1,6 +1,6 @@
 #######################################################################################################################
 #
-# geval.py
+# Evaluations_Benchmarks_tab.py
 #
 # Description: This file contains the code to evaluate the generated text using G-Eval metric.
 #

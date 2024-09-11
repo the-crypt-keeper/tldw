@@ -118,7 +118,7 @@ def load_comprehensive_config():
     config.read(config_path)
 
     # Log the sections found in the config file
-    logging.debug(f"Sections found in config: {config.sections()}")
+    logging.debug("load_comprehensive_config(): Sections found in config: {config.sections()}")
 
     return config
 
