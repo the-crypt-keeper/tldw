@@ -2216,6 +2216,69 @@ def user_delete_item(media_id: int, force: bool = False) -> str:
         else:
             return "Item is already in trash. Use force=True to delete permanently before 30 days."
 
+
+def get_all_content_from_database() -> List[Dict[str, Any]]:
+    """
+    Retrieve all media content from the database that requires embedding.
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries, each containing the media ID, content, title, and other relevant fields.
+    """
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, content, title, author, type
+                FROM Media
+                WHERE is_trash = 0  -- Exclude items marked as trash
+            """)
+            media_items = cursor.fetchall()
+
+            all_content = [
+                {
+                    'id': item[0],
+                    'content': item[1],
+                    'title': item[2],
+                    'author': item[3],
+                    'type': item[4]
+                }
+                for item in media_items
+            ]
+
+        return all_content
+
+    except sqlite3.Error as e:
+        logger.error(f"Error retrieving all content from database: {e}")
+        raise DatabaseError(f"Error retrieving all content from database: {e}")
+
+
+def get_media_content(media_id: int) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
+            result = cursor.fetchone()
+            if result is None:
+                raise ValueError(f"No media found with id {media_id}")
+            return result[0]
+    except sqlite3.Error as e:
+        logging.error(f"Database error in get_media_content: {e}")
+        raise DatabaseError(f"Failed to retrieve media content: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error in get_media_content: {e}")
+        raise
+
+def get_media_title(media_id: int) -> str:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT title FROM Media WHERE id = ?", (media_id,))
+            result = cursor.fetchone()
+            return result[0] if result else f"Unknown Source (ID: {media_id})"
+    except sqlite3.Error as e:
+        logging.error(f"Database error in get_media_title: {e}")
+        return f"Unknown Source (ID: {media_id})"
+
 def get_media_transcripts(media_id):
     try:
         with db.get_connection() as conn:
@@ -2391,6 +2454,35 @@ def delete_specific_prompt(prompt_id: int) -> str:
     except Exception as e:
         logging.error(f"Error in delete_specific_prompt: {str(e)}")
         return f"Error deleting prompt: {str(e)}"
+
+
+def get_paginated_files(page: int = 1, results_per_page: int = 50) -> Tuple[List[Tuple[int, str]], int, int]:
+    try:
+        offset = (page - 1) * results_per_page
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get total count of media items
+            cursor.execute("SELECT COUNT(*) FROM Media")
+            total_entries = cursor.fetchone()[0]
+
+            # Fetch paginated results
+            cursor.execute("""
+                SELECT id, title 
+                FROM Media 
+                ORDER BY title
+                LIMIT ? OFFSET ?
+            """, (results_per_page, offset))
+            results = cursor.fetchall()
+
+        # Calculate total pages
+        total_pages = (total_entries + results_per_page - 1) // results_per_page
+
+        return results, total_pages, page
+    except sqlite3.Error as e:
+        logging.error(f"Error fetching paginated files: {e}")
+        raise DatabaseError(f"Error fetching paginated files: {e}")
+
 
 #
 # End of Functions to handle deletion of media items

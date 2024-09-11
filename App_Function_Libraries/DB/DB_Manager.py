@@ -59,7 +59,9 @@ from App_Function_Libraries.DB.SQLite_DB import (
     delete_specific_transcript as sqlite_delete_specific_transcript, delete_specific_summary as sqlite_delete_specific_summary, \
     delete_specific_prompt as sqlite_delete_specific_prompt, fetch_keywords_for_media as sqlite_fetch_keywords_for_media, \
     update_keywords_for_media as sqlite_update_keywords_for_media, check_media_exists as sqlite_check_media_exists, \
-    search_prompts as sqlite_search_prompts,
+    search_prompts as sqlite_search_prompts, get_media_content as sqlite_get_media_content, \
+    get_paginated_files as sqlite_get_paginated_files, get_media_title as sqlite_get_media_title, \
+    get_all_content_from_database as sqlite_get_all_content_from_database,
 )
 #
 # Local Imports
@@ -208,7 +210,7 @@ print(f"Database path: {db.db_path}")
 # End of Database Config loading
 ############################################################################################################
 #
-# DB-Searching functions
+# DB Search functions
 
 def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
     if db_type == 'sqlite':
@@ -233,6 +235,13 @@ def search_and_display_items(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
+def get_all_content_from_database():
+    if db_type == 'sqlite':
+        return sqlite_get_all_content_from_database()
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
 def search_and_display(*args, **kwargs):
     if db_type == 'sqlite':
         return sqlite_search_and_display(*args, **kwargs)
@@ -246,6 +255,21 @@ def check_media_exists(*args, **kwargs):
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def get_paginated_files(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_paginated_files(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def get_media_title(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_media_title(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
 
 #
 # End of DB-Searching functions
@@ -388,7 +412,7 @@ def get_unprocessed_media():
 
 ############################################################################################################
 #
-# Prompt-related functions
+# Prompt-related functions #FIXME rename /resort
 
 def list_prompts(*args, **kwargs):
     if db_type == 'sqlite':
@@ -469,6 +493,14 @@ def mark_as_trash(media_id: int) -> None:
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version when available
         raise NotImplementedError("Elasticsearch version of mark_as_trash not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def get_media_content(media_id: int) -> str:
+    if db_type == 'sqlite':
+        return sqlite_get_media_content(media_id)
+    elif db_type == 'elasticsearch':
+        raise NotImplementedError("Elasticsearch version of get_media_content not yet implemented")
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 
