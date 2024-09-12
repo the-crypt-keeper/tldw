@@ -20,7 +20,6 @@ import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import textstat
 #
 # Import Local
 from App_Function_Libraries.Tokenization_Methods_Lib import openai_tokenize
@@ -67,6 +66,7 @@ def load_document(file_path):
 
 
 def improved_chunking_process(text: str, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    logging.debug("Improved chunking process started...")
     options = chunk_options.copy()
     if custom_chunk_options:
         options.update(custom_chunk_options)
@@ -113,6 +113,7 @@ def improved_chunking_process(text: str, custom_chunk_options: Dict[str, Any] = 
 
 
 def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, language: str) -> List[str]:
+    logging.debug("Multi-level chunking process started...")
     # First level: chunk by paragraphs
     paragraphs = chunk_text_by_paragraphs(text, max_size * 2, overlap)
 
@@ -131,14 +132,19 @@ def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, la
 
 def chunk_text(text: str, method: str, max_size: int, overlap: int, language: str) -> List[str]:
     if method == 'words':
+        logging.debug("Chunking by words...")
         return chunk_text_by_words(text, max_size, overlap, language)
     elif method == 'sentences':
+        logging.debug("Chunking by sentences...")
         return chunk_text_by_sentences(text, max_size, overlap, language)
     elif method == 'paragraphs':
+        logging.debug("Chunking by paragraphs...")
         return chunk_text_by_paragraphs(text, max_size, overlap)
     elif method == 'tokens':
+        logging.debug("Chunking by tokens...")
         return chunk_text_by_tokens(text, max_size, overlap)
     elif method == 'semantic':
+        logging.debug("Chunking by semantic similarity...")
         return semantic_chunking(text, max_size)
     else:
         return [text]
@@ -153,6 +159,7 @@ def determine_chunk_position(relative_position: float) -> str:
 
 
 def chunk_text_by_words(text: str, max_words: int = 300, overlap: int = 0, language: str = None) -> List[str]:
+    logging.debug("chunk_text_by_words...")
     if language is None:
         language = detect_language(text)
 
@@ -174,6 +181,7 @@ def chunk_text_by_words(text: str, max_words: int = 300, overlap: int = 0, langu
 
 
 def chunk_text_by_sentences(text: str, max_sentences: int = 10, overlap: int = 0, language: str = None) -> List[str]:
+    logging.debug("chunk_text_by_sentences...")
     if language is None:
         language = detect_language(text)
 
@@ -197,6 +205,7 @@ def chunk_text_by_sentences(text: str, max_sentences: int = 10, overlap: int = 0
 
 
 def chunk_text_by_paragraphs(text: str, max_paragraphs: int = 5, overlap: int = 0) -> List[str]:
+    logging.debug("chunk_text_by_paragraphs...")
     paragraphs = re.split(r'\n\s*\n', text)
     chunks = []
     for i in range(0, len(paragraphs), max_paragraphs - overlap):
@@ -206,6 +215,7 @@ def chunk_text_by_paragraphs(text: str, max_paragraphs: int = 5, overlap: int = 
 
 
 def chunk_text_by_tokens(text: str, max_tokens: int = 1000, overlap: int = 0) -> List[str]:
+    logging.debug("chunk_text_by_tokens...")
     # This is a simplified token-based chunking. For more accurate tokenization,
     # consider using a proper tokenizer like GPT-2 TokenizerFast
     words = text.split()
@@ -233,11 +243,13 @@ def post_process_chunks(chunks: List[str]) -> List[str]:
     return [chunk.strip() for chunk in chunks if chunk.strip()]
 
 
+# FIXME - F
 def get_chunk_metadata(chunk: str, full_text: str, chunk_type: str = "generic",
                        chapter_number: Optional[int] = None,
                        chapter_pattern: Optional[str] = None,
                        language: str = None) -> Dict[str, Any]:
     try:
+        logging.debug("get_chunk_metadata...")
         start_index = full_text.index(chunk)
         end_index = start_index + len(chunk)
         # Calculate a hash for the chunk
@@ -251,16 +263,12 @@ def get_chunk_metadata(chunk: str, full_text: str, chunk_type: str = "generic",
             'chunk_type': chunk_type,
             'language': language,
             'chunk_hash': chunk_hash,
-            'relative_position': start_index / len(full_text),
-            'readability_score': textstat.flesch_reading_ease(chunk)
+            'relative_position': start_index / len(full_text)
         }
 
         if chunk_type == "chapter":
             metadata['chapter_number'] = chapter_number
             metadata['chapter_pattern'] = chapter_pattern
-
-        # Add readability score (you might need to install 'textstat')
-        metadata['readability_score'] = textstat.flesch_reading_ease(chunk)
 
         return metadata
     except ValueError as e:
@@ -280,6 +288,7 @@ def process_document_with_metadata(text: str, chunk_options: Dict[str, Any],
 
 # Hybrid approach, chunk each sentence while ensuring total token size does not exceed a maximum number
 def chunk_text_hybrid(text, max_tokens=1000):
+    logging.debug("chunk_text_hybrid...")
     sentences = nltk.tokenize.sent_tokenize(text)
     chunks = []
     current_chunk = []
@@ -300,10 +309,12 @@ def chunk_text_hybrid(text, max_tokens=1000):
 
     return chunks
 
+
 # Thanks openai
 def chunk_on_delimiter(input_string: str,
                        max_tokens: int,
                        delimiter: str) -> List[str]:
+    logging.debug("chunk_on_delimiter...")
     chunks = input_string.split(delimiter)
     combined_chunks, _, dropped_chunk_count = combine_chunks_with_no_minimum(
         chunks, max_tokens, chunk_delimiter=delimiter, add_ellipsis_for_overflow=True)
@@ -317,6 +328,7 @@ def chunk_on_delimiter(input_string: str,
 
 # ????FIXME
 def recursive_summarize_chunks(chunks, summarize_func, custom_prompt, temp=None, system_prompt=None):
+    logging.debug("recursive_summarize_chunks...")
     summarized_chunks = []
     current_summary = ""
 
@@ -385,6 +397,7 @@ def count_units(text, unit='words'):
 
 
 def semantic_chunking(text, max_chunk_size=2000, unit='words'):
+    logging.debug("semantic_chunking...")
     nltk.download('punkt', quiet=True)
     sentences = sent_tokenize(text)
     vectorizer = TfidfVectorizer()
@@ -422,6 +435,7 @@ def semantic_chunking(text, max_chunk_size=2000, unit='words'):
 
 
 def semantic_chunk_long_file(file_path, max_chunk_size=1000, overlap=100, unit='words'):
+    logging.debug("semantic_chunk_long_file...")
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             content = file.read()
@@ -584,6 +598,7 @@ def rolling_summarize(text: str,
 
 
 def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:
+    logging.debug("chunk_ebook_by_chapters")
     max_chunk_size = chunk_options.get('max_size', 300)
     overlap = chunk_options.get('overlap', 0)
     custom_pattern = chunk_options.get('custom_chapter_pattern', None)
@@ -732,6 +747,7 @@ def adaptive_chunk_size(text: str, base_size: int = 1000, min_size: int = 500, m
 
 
 def adaptive_chunking(text: str, base_size: int = 1000, min_size: int = 500, max_size: int = 2000) -> List[str]:
+    logging.debug("adaptive_chunking...")
     chunk_size = adaptive_chunk_size(text, base_size, min_size, max_size)
     words = text.split()
     chunks = []

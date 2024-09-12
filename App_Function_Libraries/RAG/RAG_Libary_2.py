@@ -54,7 +54,10 @@ def rag_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
         # Process and store content
         collection_name = f"article_{media_id}"
         try:
-            # FIXME - Add api_name
+            # FIXME
+            # def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str,
+            #                               create_embeddings: bool = False, create_summary: bool = False,
+            #                               api_name: str = None):
             process_and_store_content(content, collection_name, media_id, title)
         except Exception as e:
             logging.error(f"Error processing and storing content: {str(e)}")
@@ -217,7 +220,10 @@ def preprocess_all_content():
         content = row[1]
         media_type = row[2]
         collection_name = f"{media_type}_{media_id}"
-        # FIXME - API name
+        # FIXME
+        # def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str,
+        #                               create_embeddings: bool = False, create_summary: bool = False,
+        #                               api_name: str = None):
         process_and_store_content(content, collection_name, media_id, "")
 
 

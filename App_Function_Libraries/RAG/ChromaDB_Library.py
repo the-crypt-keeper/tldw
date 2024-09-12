@@ -11,8 +11,9 @@ from itertools import islice
 #
 # Local Imports:
 from App_Function_Libraries.RAG.Embeddings_Create import chunk_for_embedding, create_embeddings_batch
-from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media, db
+from App_Function_Libraries.DB.DB_Manager import update_fts_for_media, db
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
+from App_Function_Libraries.Summarization_General_Lib import summarize
 from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, \
     load_comprehensive_config
 #
@@ -64,45 +65,48 @@ def batched(iterable, n):
         yield batch
 
 
+# FIXME - Fix summarization of entire document/storign in chunk issue
 # FIXME - update all uses to reflect 'api_name' parameter
-def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str, api_name: str = None):
+def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str,
+                              create_embeddings: bool = False, create_summary: bool = False, api_name: str = None):
     try:
         logging.debug(f"Processing content for media_id {media_id} in collection {collection_name}")
-        api_name = None if not api_name else api_name
-        chunks = chunk_for_embedding(content, file_name, api_name, chunk_options)
-        texts, embeddings, ids, metadatas = [], [], [], []
+
+        full_summary = None
+        if create_summary and api_name:
+            full_summary = summarize(content, None, api_name, None, None, None)
+
+        chunks = chunk_for_embedding(content, file_name, full_summary, chunk_options)
 
         with db.get_connection() as conn:
             cursor = conn.cursor()
 
-            for batch in batched(enumerate(chunks, 1), 10):  # Process in batches of 10
-                batch_texts = [chunk['text'] for _, chunk in batch]
-                batch_embeddings = create_embeddings_batch(batch_texts, embedding_provider, embedding_model, embedding_api_url)
-
-                for (i, chunk), embedding in zip(batch, batch_embeddings):
-                    chunk_id = f"{media_id}_chunk_{i}"
-
-                    texts.append(chunk['text'])
-                    embeddings.append(embedding)
-                    ids.append(chunk_id)
-                    metadatas.append({
-                        "media_id": str(media_id),
-                        "chunk_index": i,
-                        "total_chunks": len(chunks),
-                        "start_index": int(chunk['metadata']['start_index']),
-                        "end_index": int(chunk['metadata']['end_index']),
-                        "file_name": str(file_name),
-                        "relative_position": float(chunk['metadata']['relative_position'])
-                    })
-
-                    cursor.execute('''
-                    INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
-                    VALUES (?, ?, ?, ?, ?)
-                    ''', (media_id, chunk['text'], chunk['metadata']['start_index'], chunk['metadata']['end_index'], chunk_id))
+            for i, chunk in enumerate(chunks, 1):
+                chunk_id = f"{media_id}_chunk_{i}"
+                cursor.execute('''
+                INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
+                VALUES (?, ?, ?, ?, ?)
+                ''', (
+                media_id, chunk['text'], chunk['metadata']['start_index'], chunk['metadata']['end_index'], chunk_id))
 
             conn.commit()
 
-        store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
+        if create_embeddings:
+            texts = [chunk['text'] for chunk in chunks]
+            embeddings = create_embeddings_batch(texts, embedding_provider, embedding_model, embedding_api_url)
+            ids = [f"{media_id}_chunk_{i}" for i in range(1, len(chunks) + 1)]
+            metadatas = [{
+                "media_id": str(media_id),
+                "chunk_index": i,
+                "total_chunks": len(chunks),
+                "start_index": int(chunk['metadata']['start_index']),
+                "end_index": int(chunk['metadata']['end_index']),
+                "file_name": str(file_name),
+                "relative_position": float(chunk['metadata']['relative_position'])
+            } for i, chunk in enumerate(chunks, 1)]
+
+            store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
+
         update_fts_for_media(media_id)
 
     except Exception as e:
