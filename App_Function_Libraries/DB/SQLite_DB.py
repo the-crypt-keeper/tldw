@@ -49,6 +49,7 @@ import csv
 import html
 import logging
 import os
+import queue
 import re
 import shutil
 import sqlite3
@@ -59,7 +60,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
 # Local Libraries
-from App_Function_Libraries.Utils.Utils import is_valid_url, get_project_relative_path, get_database_path, \
+from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
     get_database_dir
 # Third-Party Libraries
 import gradio as gr
@@ -2654,6 +2655,52 @@ def get_document_version(media_id: int, version_number: int = None) -> Dict[str,
 # End of Functions to manage document versions
 #######################################################################################################################
 
+
+def batch_insert_chunks(conn, chunks, media_id):
+    cursor = conn.cursor()
+    chunk_data = [(
+        media_id,
+        chunk['text'],
+        chunk['metadata']['start_index'],
+        chunk['metadata']['end_index'],
+        f"{media_id}_chunk_{i}"
+    ) for i, chunk in enumerate(chunks, 1)]
+
+    cursor.executemany('''
+    INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
+    VALUES (?, ?, ?, ?, ?)
+    ''', chunk_data)
+
+
+chunk_queue = queue.Queue()
+
+def chunk_processor():
+    while True:
+        chunk_batch = chunk_queue.get()
+        if chunk_batch is None:
+            break
+        try:
+            with db.get_connection() as conn:
+                conn.execute("BEGIN TRANSACTION")
+                try:
+                    batch_insert_chunks(conn, chunk_batch['chunks'], chunk_batch['media_id'])
+                    conn.commit()
+                except Exception as e:
+                    conn.rollback()
+                    logging.error(f"Error in batch insert: {str(e)}")
+        except Exception as e:
+            logging.error(f"Error processing chunk batch: {str(e)}")
+        finally:
+            chunk_queue.task_done()
+
+# Start the chunk processor thread
+chunk_processor_thread = threading.Thread(target=chunk_processor)
+chunk_processor_thread.start()
+
+# Make sure to properly shut down the chunk processor when your application exits
+def shutdown_chunk_processor():
+    chunk_queue.put(None)
+    chunk_processor_thread.join()
 
 def update_media_chunks_table():
     with db.get_connection() as conn:
