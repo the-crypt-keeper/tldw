@@ -6,7 +6,7 @@ import logging
 import time
 from functools import wraps
 from threading import Lock, Timer
-from typing import List, Dict, Any
+from typing import List
 #
 # 3rd-Party Imports:
 import requests
@@ -16,7 +16,6 @@ import torch
 # Local Imports:
 from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
-from App_Function_Libraries.Chunk_Lib import chunk_options, improved_chunking_process, determine_chunk_position
 #
 #######################################################################################################################
 #
@@ -180,36 +179,6 @@ def create_stella_embeddings(text: str) -> List[float]:
         return get_openai_embeddings(text, embedding_model)
     else:
         raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
-
-
-def chunk_for_embedding(text: str, file_name: str, full_summary: str, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-    options = chunk_options.copy()
-    if custom_chunk_options:
-        options.update(custom_chunk_options)
-
-    chunks = improved_chunking_process(text, options)
-    total_chunks = len(chunks)
-
-    chunked_text_with_headers = []
-    for i, chunk in enumerate(chunks, 1):
-        chunk_text = chunk['text']
-        chunk_position = determine_chunk_position(chunk['metadata']['relative_position'])
-
-        chunk_header = f"""
-        Original Document: {file_name}
-        Full Document Summary: {full_summary or "Full document summary not available."}
-        Chunk: {i} of {total_chunks}
-        Position: {chunk_position}
-
-        --- Chunk Content ---
-        """
-
-        full_chunk_text = chunk_header + chunk_text
-        chunk['text'] = full_chunk_text
-        chunk['metadata']['file_name'] = file_name
-        chunked_text_with_headers.append(chunk)
-
-    return chunked_text_with_headers
 
 
 def create_openai_embedding(text: str, model: str) -> List[float]:

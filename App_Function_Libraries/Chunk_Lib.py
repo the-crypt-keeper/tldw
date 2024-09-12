@@ -24,8 +24,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 # Import Local
 from App_Function_Libraries.Tokenization_Methods_Lib import openai_tokenize
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
-
-
 #
 #######################################################################################################################
 # Config Settings
@@ -41,9 +39,16 @@ tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 #
 # Load configuration
 config = load_comprehensive_config()
-#chunk_options = config.get('Chunking', {})
-chunk_options = config.get('Chunking', {}) if isinstance(config, dict) else {}
-#
+# Embedding Chunking options
+chunk_options = {
+    'method': config.get('Chunking', 'method', fallback='words'),
+    'max_size': config.getint('Chunking', 'max_size', fallback=400),
+    'overlap': config.getint('Chunking', 'overlap', fallback=200),
+    'adaptive': config.getboolean('Chunking', 'adaptive', fallback=False),
+    'multi_level': config.getboolean('Chunking', 'multi_level', fallback=False),
+    'language': config.get('Chunking', 'language', fallback='english')
+}
+
 openai_api_key = config.get('API', 'openai_api_key')
 #
 # End of settings
@@ -448,6 +453,44 @@ def semantic_chunk_long_file(file_path, max_chunk_size=1000, overlap=100, unit='
 
 #
 #
+#######################################################################################################################
+
+
+#######################################################################################################################
+#
+#  Embedding Chunking
+
+def chunk_for_embedding(text: str, file_name: str, full_summary: str, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    options = chunk_options.copy()
+    if custom_chunk_options:
+        options.update(custom_chunk_options)
+
+    chunks = improved_chunking_process(text, options)
+    total_chunks = len(chunks)
+
+    chunked_text_with_headers = []
+    for i, chunk in enumerate(chunks, 1):
+        chunk_text = chunk['text']
+        chunk_position = determine_chunk_position(chunk['metadata']['relative_position'])
+
+        chunk_header = f"""
+        Original Document: {file_name}
+        Full Document Summary: {full_summary or "Full document summary not available."}
+        Chunk: {i} of {total_chunks}
+        Position: {chunk_position}
+
+        --- Chunk Content ---
+        """
+
+        full_chunk_text = chunk_header + chunk_text
+        chunk['text'] = full_chunk_text
+        chunk['metadata']['file_name'] = file_name
+        chunked_text_with_headers.append(chunk)
+
+    return chunked_text_with_headers
+
+#
+# End of Embedding Chunking
 #######################################################################################################################
 
 
