@@ -11,7 +11,7 @@ from itertools import islice
 #
 # Local Imports:
 from App_Function_Libraries.RAG.Embeddings_Create import chunk_for_embedding, create_embeddings_batch
-from App_Function_Libraries.DB.DB_Manager import update_fts_for_media, db
+from App_Function_Libraries.DB.DB_Manager import update_fts_for_media, db, batch_insert_chunks
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
 from App_Function_Libraries.Summarization_General_Lib import summarize
 from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, \
@@ -79,17 +79,14 @@ def process_and_store_content(content: str, collection_name: str, media_id: int,
         chunks = chunk_for_embedding(content, file_name, full_summary, chunk_options)
 
         with db.get_connection() as conn:
-            cursor = conn.cursor()
-
-            for i, chunk in enumerate(chunks, 1):
-                chunk_id = f"{media_id}_chunk_{i}"
-                cursor.execute('''
-                INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
-                VALUES (?, ?, ?, ?, ?)
-                ''', (
-                media_id, chunk['text'], chunk['metadata']['start_index'], chunk['metadata']['end_index'], chunk_id))
-
-            conn.commit()
+            conn.execute("BEGIN TRANSACTION")
+            try:
+                batch_insert_chunks(conn, chunks, media_id)
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                logging.error(f"Error in batch insert: {str(e)}")
+                raise
 
         if create_embeddings:
             texts = [chunk['text'] for chunk in chunks]

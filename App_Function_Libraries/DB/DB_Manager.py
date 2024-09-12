@@ -63,7 +63,7 @@ from App_Function_Libraries.DB.SQLite_DB import (
     search_prompts as sqlite_search_prompts, get_media_content as sqlite_get_media_content, \
     get_paginated_files as sqlite_get_paginated_files, get_media_title as sqlite_get_media_title, \
     get_all_content_from_database as sqlite_get_all_content_from_database, get_next_media_id as sqlite_get_next_media_id, \
-
+    batch_insert_chunks as sqlite_batch_insert_chunks,
 )
 #
 # Local Imports
@@ -451,6 +451,15 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
 def add_media_chunk(*args, **kwargs):
     if db_type == 'sqlite':
         sqlite_add_media_chunk(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def batch_insert_chunks(*args, **kwargs):
+    if db_type == 'sqlite':
+        sqlite_batch_insert_chunks(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version not yet implemented")
