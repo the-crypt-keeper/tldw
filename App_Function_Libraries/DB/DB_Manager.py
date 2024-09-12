@@ -5,7 +5,9 @@
 import configparser
 import os
 import logging
+import queue
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import Tuple, List, Union, Dict
 import sqlite3
@@ -94,7 +96,103 @@ backup_dir: Union[str, bytes] = os.environ.get('DB_BACKUP_DIR', backup_path)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Chunk Processor Class
+class ChunkProcessor:
+    def __init__(self, db, num_workers=5, batch_size=100, max_retries=3):
+        self.db = db
+        self.chunk_queue = queue.Queue()
+        self.num_workers = num_workers
+        self.batch_size = batch_size
+        self.max_retries = max_retries
+        self.executor = ThreadPoolExecutor(max_workers=num_workers)
+        self.stop_event = threading.Event()
+        self.processed_count = 0
+        self.error_count = 0
 
+    def start(self):
+        for _ in range(self.num_workers):
+            self.executor.submit(self.worker)
+
+    def stop(self):
+        self.stop_event.set()
+        self.executor.shutdown(wait=True)
+
+    def worker(self):
+        while not self.stop_event.is_set():
+            batch = []
+            try:
+                while len(batch) < self.batch_size:
+                    try:
+                        item = self.chunk_queue.get(timeout=1)
+                        batch.append(item)
+                    except queue.Empty:
+                        if len(batch) > 0:
+                            break
+                        if self.stop_event.is_set():
+                            return
+
+                if batch:
+                    self.process_batch(batch)
+            except Exception as e:
+                logger.error(f"Error in worker: {str(e)}")
+                self.error_count += 1
+
+    def process_batch(self, batch):
+        retries = 0
+        while retries < self.max_retries:
+            try:
+                with self.db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("BEGIN TRANSACTION")
+                    try:
+                        for item in batch:
+                            self.batch_insert_chunks(cursor, item['chunks'], item['media_id'])
+                        conn.commit()
+                        self.processed_count += len(batch)
+                        for _ in range(len(batch)):
+                            self.chunk_queue.task_done()
+                        return
+                    except Exception as e:
+                        conn.rollback()
+                        logger.error(f"Error in batch insert (attempt {retries + 1}): {str(e)}")
+                        retries += 1
+                        time.sleep(1)
+            except Exception as e:
+                logger.error(f"Error getting database connection (attempt {retries + 1}): {str(e)}")
+                retries += 1
+                time.sleep(1)
+
+        logger.error(f"Failed to process batch after {self.max_retries} attempts")
+        self.error_count += len(batch)
+        for _ in range(len(batch)):
+            self.chunk_queue.task_done()
+
+    def batch_insert_chunks(self, cursor, chunks, media_id):
+        chunk_data = [(
+            media_id,
+            chunk['text'],
+            chunk['metadata']['start_index'],
+            chunk['metadata']['end_index'],
+            f"{media_id}_chunk_{i}"
+        ) for i, chunk in enumerate(chunks, 1)]
+
+        cursor.executemany('''
+        INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
+        VALUES (?, ?, ?, ?, ?)
+        ''', chunk_data)
+
+    def add_task(self, chunks, media_id):
+        self.chunk_queue.put({'chunks': chunks, 'media_id': media_id})
+
+    def get_stats(self):
+        return {
+            'processed_count': self.processed_count,
+            'error_count': self.error_count,
+            'queue_size': self.chunk_queue.qsize()
+        }
+
+
+# Database Manager Class
 class Database:
     def __init__(self, db_name='media_summary.db'):
         self.db_path = get_database_path(db_name)
@@ -102,6 +200,8 @@ class Database:
         self.pool_size = 10
         self.lock = threading.Lock()
         self.timeout = 60.0  # 60 seconds timeout
+        self.chunk_processor = ChunkProcessor(self)
+        self.chunk_processor.start()
 
     @contextmanager
     def get_connection(self):
@@ -155,6 +255,8 @@ class Database:
         for conn in self.pool:
             conn.close()
         self.pool.clear()
+        self.chunk_processor.stop()
+        logger.info("All database connections closed and chunk processor stopped")
 
 
 #
@@ -876,6 +978,22 @@ def close_connection():
     if db_type == 'sqlite':
         db.close_all_connections()
     # Elasticsearch doesn't need explicit closing
+
+############################################################################################################
+
+############################################################################################################
+#
+# Chunking logging
+
+# Periodically log stats
+def log_chunk_processor_stats():
+    while True:
+        time.sleep(60)  # Log every minute
+        stats = db.chunk_processor.get_stats()
+        logger.info(f"Chunk Processor Stats: {stats}")
+
+# Start stats logging in a separate thread
+threading.Thread(target=log_chunk_processor_stats, daemon=True).start()
 
 #
 # End of file
