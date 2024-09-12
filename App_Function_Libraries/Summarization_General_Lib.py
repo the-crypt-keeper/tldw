@@ -54,6 +54,7 @@ def summarize(
     system_message: Optional[str]
 ) -> str:
     try:
+        logging.debug(f"api_name type: {type(api_name)}, value: {api_name}")
         if api_name.lower() == "openai":
             return summarize_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message)
         elif api_name.lower() == "anthropic":

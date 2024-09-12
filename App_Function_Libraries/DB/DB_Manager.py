@@ -51,7 +51,7 @@ from App_Function_Libraries.DB.SQLite_DB import (
     add_media_with_keywords as sqlite_add_media_with_keywords,
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model,
     DatabaseError, create_document_version as sqlite_create_document_version,
-    get_document_version as sqlite_get_document_version, sqlite_search_db, sqlite_add_media_chunk,
+    get_document_version as sqlite_get_document_version, sqlite_search_db, add_media_chunk as sqlite_add_media_chunk,
     sqlite_update_fts_for_media, sqlite_get_unprocessed_media, fetch_item_details as sqlite_fetch_item_details, \
     search_media_database as sqlite_search_media_database, mark_as_trash as sqlite_mark_as_trash, \
     get_media_transcripts as sqlite_get_media_transcripts, get_specific_transcript as sqlite_get_specific_transcript, \
@@ -62,7 +62,8 @@ from App_Function_Libraries.DB.SQLite_DB import (
     update_keywords_for_media as sqlite_update_keywords_for_media, check_media_exists as sqlite_check_media_exists, \
     search_prompts as sqlite_search_prompts, get_media_content as sqlite_get_media_content, \
     get_paginated_files as sqlite_get_paginated_files, get_media_title as sqlite_get_media_title, \
-    get_all_content_from_database as sqlite_get_all_content_from_database,
+    get_all_content_from_database as sqlite_get_all_content_from_database, get_next_media_id as sqlite_get_next_media_id, \
+
 )
 #
 # Local Imports
@@ -335,6 +336,12 @@ def get_media_title(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
+def get_next_media_id():
+    if db_type == 'sqlite':
+        return sqlite_get_next_media_id()
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
 #
 # End of DB-Searching functions
@@ -441,9 +448,9 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
         raise ValueError(f"Unsupported database type: {db_type}")
 
 
-def add_media_chunk(media_id: int, chunk_text: str, start_index: int, end_index: int, chunk_id: str):
+def add_media_chunk(*args, **kwargs):
     if db_type == 'sqlite':
-        sqlite_add_media_chunk(db, media_id, chunk_text, start_index, end_index, chunk_id)
+        sqlite_add_media_chunk(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version not yet implemented")
