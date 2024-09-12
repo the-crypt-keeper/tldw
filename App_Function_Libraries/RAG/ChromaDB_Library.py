@@ -7,10 +7,11 @@ from typing import List, Dict, Any
 # 3rd-Party Imports:
 import chromadb
 from chromadb import Settings
+from itertools import islice
 #
 # Local Imports:
-from App_Function_Libraries.RAG.Embeddings_Create import chunk_for_embedding
-from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media
+from App_Function_Libraries.RAG.Embeddings_Create import chunk_for_embedding, create_embeddings_batch
+from App_Function_Libraries.DB.DB_Manager import add_media_chunk, update_fts_for_media, db
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
 from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, \
     load_comprehensive_config
@@ -53,38 +54,53 @@ chunk_options = {
 #
 # Functions:
 
+def batched(iterable, n):
+    "Batch data into lists of length n. The last batch may be shorter."
+    it = iter(iterable)
+    while True:
+        batch = list(islice(it, n))
+        if not batch:
+            return
+        yield batch
 
-def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str):
+
+# FIXME - update all uses to reflect 'api_name' parameter
+def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str, api_name: str = None):
     try:
         logging.debug(f"Processing content for media_id {media_id} in collection {collection_name}")
-        chunks = chunk_for_embedding(content, file_name, chunk_options)
-
+        api_name = None if not api_name else api_name
+        chunks = chunk_for_embedding(content, file_name, api_name, chunk_options)
         texts, embeddings, ids, metadatas = [], [], [], []
 
-        for i, chunk in enumerate(chunks, 1):
-            try:
-                chunk_text = chunk['text']
-                chunk_embedding = create_embedding(chunk_text, embedding_provider, embedding_model, embedding_api_url)
-                chunk_id = f"{media_id}_chunk_{i}"
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
 
-                texts.append(chunk_text)
-                embeddings.append(chunk_embedding)
-                ids.append(chunk_id)
-                metadatas.append({
-                    "media_id": media_id,
-                    "chunk_index": i,
-                    "total_chunks": len(chunks),
-                    "start_index": chunk['metadata']['start_index'],
-                    "end_index": chunk['metadata']['end_index'],
-                    "file_name": file_name,
-                    "relative_position": chunk['metadata']['relative_position']
-                })
+            for batch in batched(enumerate(chunks, 1), 10):  # Process in batches of 10
+                batch_texts = [chunk['text'] for _, chunk in batch]
+                batch_embeddings = create_embeddings_batch(batch_texts, embedding_provider, embedding_model, embedding_api_url)
 
-                logging.info(f"Processed chunk {i}/{len(chunks)} for media_id {media_id}. Chunk ID: {chunk_id}")
-                add_media_chunk(media_id, chunk_text, chunk['metadata']['start_index'], chunk['metadata']['end_index'], chunk_id)
+                for (i, chunk), embedding in zip(batch, batch_embeddings):
+                    chunk_id = f"{media_id}_chunk_{i}"
 
-            except Exception as e:
-                logging.error(f"Error processing chunk {i} for media_id {media_id}: {str(e)}")
+                    texts.append(chunk['text'])
+                    embeddings.append(embedding)
+                    ids.append(chunk_id)
+                    metadatas.append({
+                        "media_id": str(media_id),
+                        "chunk_index": i,
+                        "total_chunks": len(chunks),
+                        "start_index": int(chunk['metadata']['start_index']),
+                        "end_index": int(chunk['metadata']['end_index']),
+                        "file_name": str(file_name),
+                        "relative_position": float(chunk['metadata']['relative_position'])
+                    })
+
+                    cursor.execute('''
+                    INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
+                    VALUES (?, ?, ?, ?, ?)
+                    ''', (media_id, chunk['text'], chunk['metadata']['start_index'], chunk['metadata']['end_index'], chunk_id))
+
+            conn.commit()
 
         store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
         update_fts_for_media(media_id)
@@ -134,28 +150,6 @@ def reset_chroma_collection(collection_name: str):
         logging.error(f"Error resetting ChromaDB collection: {str(e)}")
 
 
-# Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite
-# def process_and_store_content(content: str, collection_name: str, media_id: int):
-#     # Process the content into chunks
-#     chunks = improved_chunking_process(content, chunk_options)
-#     texts = [chunk['text'] for chunk in chunks]
-#
-#     # Generate embeddings for each chunk
-#     embeddings = [create_embedding(text) for text in texts]
-#
-#     # Create unique IDs for each chunk using the media_id and chunk index
-#     ids = [f"{media_id}_chunk_{i}" for i in range(len(texts))]
-#
-#     # Store the texts, embeddings, and IDs in ChromaDB
-#     store_in_chroma(collection_name, texts, embeddings, ids)
-#
-#     # Store the chunk metadata in SQLite
-#     for i, chunk in enumerate(chunks):
-#         add_media_chunk(media_id, chunk['text'], chunk['start'], chunk['end'], ids[i])
-#
-#     # Update the FTS table
-#     update_fts_for_media(media_id)
-
 def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], metadatas: List[Dict[str, Any]]):
     try:
         collection = chroma_client.get_or_create_collection(name=collection_name)
@@ -202,6 +196,29 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
     except Exception as e:
         logging.error(f"Error in vector_search: {str(e)}")
         raise
+
+
+# Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite
+# def process_and_store_content(content: str, collection_name: str, media_id: int):
+#     # Process the content into chunks
+#     chunks = improved_chunking_process(content, chunk_options)
+#     texts = [chunk['text'] for chunk in chunks]
+#
+#     # Generate embeddings for each chunk
+#     embeddings = [create_embedding(text) for text in texts]
+#
+#     # Create unique IDs for each chunk using the media_id and chunk index
+#     ids = [f"{media_id}_chunk_{i}" for i in range(len(texts))]
+#
+#     # Store the texts, embeddings, and IDs in ChromaDB
+#     store_in_chroma(collection_name, texts, embeddings, ids)
+#
+#     # Store the chunk metadata in SQLite
+#     for i, chunk in enumerate(chunks):
+#         add_media_chunk(media_id, chunk['text'], chunk['start'], chunk['end'], ids[i])
+#
+#     # Update the FTS table
+#     update_fts_for_media(media_id)
 
 
 #
