@@ -139,8 +139,13 @@ def process_single_item(content: str, title: str, wiki_name: str, chunk_options:
         chunks = optimized_chunking(content, chunk_options)
         for i, chunk in enumerate(chunks):
             logging.debug(f"Processing chunk {i + 1}/{len(chunks)} for item: {title}")
+
+            # FIXME
+            # def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str,
+            #                               create_embeddings: bool = False, create_summary: bool = False,
+            #                               api_name: str = None):
             if api_name:
-                process_and_store_content(chunk['text'], f"mediawiki_{wiki_name}", media_id, title, api_name)
+                process_and_store_content(chunk['text'], f"mediawiki_{wiki_name}", media_id, title, True, True, api_name)
             else:
                 process_and_store_content(chunk['text'], f"mediawiki_{wiki_name}", media_id, title)
         logging.info(f"Successfully processed item: {title}")
