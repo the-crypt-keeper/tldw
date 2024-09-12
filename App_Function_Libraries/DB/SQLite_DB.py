@@ -429,6 +429,7 @@ def create_tables(db) -> None:
             is_trash BOOLEAN DEFAULT 0,
             trash_date DATETIME,
             vector_embedding BLOB
+            chunking_status TEXT DEFAULT 'pending'
         )
         ''',
         '''
@@ -2926,13 +2927,13 @@ def chunk_processor():
             chunk_queue.task_done()
 
 # Start the chunk processor thread
-chunk_processor_thread = threading.Thread(target=chunk_processor)
-chunk_processor_thread.start()
+#chunk_processor_thread = threading.Thread(target=chunk_processor)
+#chunk_processor_thread.start()
 
 # Make sure to properly shut down the chunk processor when your application exits
-def shutdown_chunk_processor():
-    chunk_queue.put(None)
-    chunk_processor_thread.join()
+# def shutdown_chunk_processor():
+#     chunk_queue.put(None)
+#     chunk_processor_thread.join()
 
 #FIXME - add into main db creation code
 def update_media_chunks_table():
