@@ -993,7 +993,7 @@ def log_chunk_processor_stats():
         logger.info(f"Chunk Processor Stats: {stats}")
 
 # Start stats logging in a separate thread
-threading.Thread(target=log_chunk_processor_stats, daemon=True).start()
+#threading.Thread(target=log_chunk_processor_stats, daemon=True).start()
 
 #
 # End of file

@@ -10,8 +10,9 @@ from chromadb import Settings
 from itertools import islice
 #
 # Local Imports:
-from App_Function_Libraries.RAG.Embeddings_Create import chunk_for_embedding, create_embeddings_batch
-from App_Function_Libraries.DB.DB_Manager import update_fts_for_media, db, batch_insert_chunks, Database
+from App_Function_Libraries.Chunk_Lib import chunk_for_embedding, chunk_options
+from App_Function_Libraries.RAG.Embeddings_Create import create_embeddings_batch
+from App_Function_Libraries.DB.DB_Manager import update_fts_for_media, db
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
 from App_Function_Libraries.Summarization_General_Lib import summarize
 from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, \
@@ -39,16 +40,6 @@ embedding_provider = config.get('Embeddings', 'embedding_provider', fallback='op
 embedding_model = config.get('Embeddings', 'embedding_model', fallback='text-embedding-3-small')
 embedding_api_key = config.get('Embeddings', 'api_key', fallback='')
 embedding_api_url = config.get('Embeddings', 'api_url', fallback='')
-#
-# Chunking options
-chunk_options = {
-    'method': config.get('Chunking', 'method', fallback='words'),
-    'max_size': config.getint('Chunking', 'max_size', fallback=400),
-    'overlap': config.getint('Chunking', 'overlap', fallback=200),
-    'adaptive': config.getboolean('Chunking', 'adaptive', fallback=False),
-    'multi_level': config.getboolean('Chunking', 'multi_level', fallback=False),
-    'language': config.get('Chunking', 'language', fallback='english')
-}
 #
 # End of Config Settings
 #######################################################################################################################
