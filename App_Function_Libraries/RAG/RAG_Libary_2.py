@@ -165,49 +165,49 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
     logging.debug(f"Config sections: {config.sections()}")
     prompt = f"Context: {context}\n\nQuestion: {query}"
     if api_choice == "OpenAI":
-        from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai
+        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai
         return summarize_with_openai(config['API']['openai_api_key'], prompt, "")
     elif api_choice == "Anthropic":
-        from App_Function_Libraries.Summarization_General_Lib import summarize_with_anthropic
+        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_anthropic
         return summarize_with_anthropic(config['API']['anthropic_api_key'], prompt, "")
     elif api_choice == "Cohere":
-        from App_Function_Libraries.Summarization_General_Lib import summarize_with_cohere
+        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_cohere
         return summarize_with_cohere(config['API']['cohere_api_key'], prompt, "")
     elif api_choice == "Groq":
-        from App_Function_Libraries.Summarization_General_Lib import summarize_with_groq
+        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_groq
         return summarize_with_groq(config['API']['groq_api_key'], prompt, "")
     elif api_choice == "OpenRouter":
-        from App_Function_Libraries.Summarization_General_Lib import summarize_with_openrouter
+        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openrouter
         return summarize_with_openrouter(config['API']['openrouter_api_key'], prompt, "")
     elif api_choice == "HuggingFace":
-        from App_Function_Libraries.Summarization_General_Lib import summarize_with_huggingface
+        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_huggingface
         return summarize_with_huggingface(config['API']['huggingface_api_key'], prompt, "")
     elif api_choice == "DeepSeek":
-        from App_Function_Libraries.Summarization_General_Lib import summarize_with_deepseek
+        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_deepseek
         return summarize_with_deepseek(config['API']['deepseek_api_key'], prompt, "")
     elif api_choice == "Mistral":
-        from App_Function_Libraries.Summarization_General_Lib import summarize_with_mistral
+        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_mistral
         return summarize_with_mistral(config['API']['mistral_api_key'], prompt, "")
     elif api_choice == "Local-LLM":
-        from App_Function_Libraries.Local_Summarization_Lib import summarize_with_local_llm
+        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_local_llm
         return summarize_with_local_llm(config['API']['local_llm_path'], prompt, "")
     elif api_choice == "Llama.cpp":
-        from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama
+        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama
         return summarize_with_llama(config['API']['llama_api_key'], prompt, "")
     elif api_choice == "Kobold":
-        from App_Function_Libraries.Local_Summarization_Lib import summarize_with_kobold
+        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_kobold
         return summarize_with_kobold(config['API']['kobold_api_key'], prompt, "")
     elif api_choice == "Ooba":
-        from App_Function_Libraries.Local_Summarization_Lib import summarize_with_oobabooga
+        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_oobabooga
         return summarize_with_oobabooga(config['API']['ooba_api_key'], prompt, "")
     elif api_choice == "TabbyAPI":
-        from App_Function_Libraries.Local_Summarization_Lib import summarize_with_tabbyapi
+        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_tabbyapi
         return summarize_with_tabbyapi(config['API']['tabby_api_key'], prompt, "")
     elif api_choice == "vLLM":
-        from App_Function_Libraries.Local_Summarization_Lib import summarize_with_vllm
+        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_vllm
         return summarize_with_vllm(config['API']['vllm_api_key'], prompt, "")
     elif api_choice == "ollama":
-        from App_Function_Libraries.Local_Summarization_Lib import summarize_with_ollama
+        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_ollama
         return summarize_with_ollama(config['API']['ollama_api_key'], prompt, "")
     else:
         raise ValueError(f"Unsupported API choice: {api_choice}")

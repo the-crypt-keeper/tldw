@@ -29,7 +29,7 @@ from App_Function_Libraries.Audio_Transcription_Lib import convert_to_wav, speec
 from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summarize, recursive_summarize_chunks, \
     improved_chunking_process
 from App_Function_Libraries.Diarization_Lib import combine_transcription_and_diarization
-from App_Function_Libraries.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
+from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 # Import Local

@@ -135,7 +135,10 @@ def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, la
     return chunks
 
 
-def chunk_text(text: str, method: str, max_size: int, overlap: int, language: str) -> List[str]:
+
+# FIXME - ensure language detection occurs in each chunk function
+def chunk_text(text: str, method: str, max_size: int, overlap: int, language: str=None) -> List[str]:
+
     if method == 'words':
         logging.debug("Chunking by words...")
         return chunk_text_by_words(text, max_size, overlap, language)
@@ -769,24 +772,24 @@ def adaptive_chunk_size(text: str, base_size: int = 1000, min_size: int = 500, m
     # Ensure chunk size is within bounds
     return max(min_size, min(adaptive_size, max_size))
 
-# Non-Punkt version
-# def adaptive_chunk_size(text: str, base_size: int, min_size: int = 100, max_size: int = 2000) -> int:
-#     # Adaptive logic: adjust chunk size based on text complexity
-#     words = text.split()
-#     if not words:
-#         return base_size  # Return base_size if text is empty
-#
-#     avg_word_length = sum(len(word) for word in words) / len(words)
-#
-#     if avg_word_length > 6:  # Threshold for "complex" text
-#         adjusted_size = int(base_size * 0.8)  # Reduce chunk size for complex text
-#     elif avg_word_length < 4:  # Threshold for "simple" text
-#         adjusted_size = int(base_size * 1.2)  # Increase chunk size for simple text
-#     else:
-#         adjusted_size = base_size
-#
-#     # Ensure the chunk size is within the specified range
-#     return max(min_size, min(adjusted_size, max_size))
+
+def adaptive_chunk_size_non_punkt(text: str, base_size: int, min_size: int = 100, max_size: int = 2000) -> int:
+    # Adaptive logic: adjust chunk size based on text complexity
+    words = text.split()
+    if not words:
+        return base_size  # Return base_size if text is empty
+
+    avg_word_length = sum(len(word) for word in words) / len(words)
+
+    if avg_word_length > 6:  # Threshold for "complex" text
+        adjusted_size = int(base_size * 0.8)  # Reduce chunk size for complex text
+    elif avg_word_length < 4:  # Threshold for "simple" text
+        adjusted_size = int(base_size * 1.2)  # Increase chunk size for simple text
+    else:
+        adjusted_size = base_size
+
+    # Ensure the chunk size is within the specified range
+    return max(min_size, min(adjusted_size, max_size))
 
 
 def adaptive_chunking(text: str, base_size: int = 1000, min_size: int = 500, max_size: int = 2000) -> List[str]:

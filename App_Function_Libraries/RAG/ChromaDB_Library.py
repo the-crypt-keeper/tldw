@@ -14,7 +14,7 @@ from App_Function_Libraries.Chunk_Lib import chunk_for_embedding, chunk_options
 from App_Function_Libraries.RAG.Embeddings_Create import create_embeddings_batch
 from App_Function_Libraries.DB.DB_Manager import update_fts_for_media, db
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
-from App_Function_Libraries.Summarization_General_Lib import summarize
+from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
 from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, \
     load_comprehensive_config
 #
@@ -181,6 +181,27 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
     except Exception as e:
         logging.error(f"Error in vector_search: {str(e)}")
         raise
+
+def schedule_embedding(media_id: int, content: str, media_name: str, summary: str):
+    try:
+        chunks = chunk_for_embedding(content, media_name, summary, chunk_options)
+        texts = [chunk['text'] for chunk in chunks]
+        embeddings = create_embeddings_batch(texts, embedding_provider, embedding_model, embedding_api_url)
+        ids = [f"{media_id}_chunk_{i}" for i in range(len(chunks))]
+        metadatas = [{
+            "media_id": str(media_id),
+            "chunk_index": i,
+            "total_chunks": len(chunks),
+            "start_index": chunk['metadata']['start_index'],
+            "end_index": chunk['metadata']['end_index'],
+            "file_name": media_name,
+            "relative_position": chunk['metadata']['relative_position']
+        } for i, chunk in enumerate(chunks)]
+
+        store_in_chroma("all_content_embeddings", texts, embeddings, ids, metadatas)
+
+    except Exception as e:
+        logging.error(f"Error scheduling embedding for media_id {media_id}: {str(e)}")
 
 
 # Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite

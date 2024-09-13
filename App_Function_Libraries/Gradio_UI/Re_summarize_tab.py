@@ -14,7 +14,7 @@ from App_Function_Libraries.DB.DB_Manager import update_media_content, load_pres
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import fetch_item_details, fetch_items_by_keyword, \
     fetch_items_by_content, fetch_items_by_title_or_url
-from App_Function_Libraries.Summarization_General_Lib import summarize_chunk
+from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_chunk
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 #
