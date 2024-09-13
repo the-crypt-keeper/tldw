@@ -32,7 +32,7 @@ from App_Function_Libraries.Gradio_UI.Live_Recording import create_live_recordin
 from App_Function_Libraries.Gradio_UI.Llamafile_tab import create_chat_with_llamafile_tab
 from App_Function_Libraries.Gradio_UI.Media_edit import create_prompt_clone_tab, create_prompt_edit_tab, \
     create_media_edit_and_clone_tab, create_media_edit_tab
-from App_Function_Libraries.Gradio_UI.Media_wiki_tab import create_mediawiki_import_tab
+from App_Function_Libraries.Gradio_UI.Media_wiki_tab import create_mediawiki_import_tab, create_mediawiki_config_tab
 from App_Function_Libraries.Gradio_UI.PDF_ingestion_tab import create_pdf_ingestion_tab, create_pdf_ingestion_test_tab
 from App_Function_Libraries.Gradio_UI.Podcast_tab import create_podcast_tab
 from App_Function_Libraries.Gradio_UI.RAG_QA_Chat_tab import create_rag_qa_chat_tab
@@ -311,12 +311,15 @@ def launch_ui(share_public=None, server_mode=False):
                 create_delete_keyword_tab()
                 create_export_keywords_tab()
 
-            with gr.TabItem("Import/Export"):
+            with gr.TabItem("Import"):
                 create_import_item_tab()
                 create_import_obsidian_vault_tab()
                 create_import_single_prompt_tab()
                 create_import_multiple_prompts_tab()
                 create_mediawiki_import_tab()
+                create_mediawiki_config_tab()
+
+            with gr.TabItem("Export"):
                 create_export_tab()
 
             with gr.TabItem("Backup Management"):

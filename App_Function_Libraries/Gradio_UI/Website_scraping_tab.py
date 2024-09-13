@@ -23,7 +23,7 @@ from App_Function_Libraries.Article_Extractor_Lib import scrape_from_sitemap, sc
 from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
-from App_Function_Libraries.Summarization_General_Lib import summarize
+from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
 
 
 #

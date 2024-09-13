@@ -14,7 +14,7 @@ from PIL import Image
 import textstat
 #
 # Local Imports
-from App_Function_Libraries.Summarization_General_Lib import perform_summarization
+from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
 from App_Function_Libraries.Chat import chat
 #
 ########################################################################################################################

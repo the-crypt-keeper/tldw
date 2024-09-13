@@ -14,7 +14,7 @@ import yt_dlp
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, add_media_to_database
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models, update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import error_handler
-from App_Function_Libraries.Summarization_General_Lib import perform_transcription, perform_summarization, \
+from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_transcription, perform_summarization, \
     save_transcription_and_summary
 from App_Function_Libraries.Utils.Utils import convert_to_seconds, safe_read_file, format_transcription, \
     create_download_directory, generate_unique_identifier, extract_text_from_segments
