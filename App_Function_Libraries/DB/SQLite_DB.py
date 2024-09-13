@@ -61,7 +61,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
 
-from App_Function_Libraries.Chunk_Lib import chunk_for_embedding, chunk_options
+from App_Function_Libraries.Chunk_Lib import chunk_options, chunk_text
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
     get_database_dir
@@ -395,17 +395,7 @@ class Database:
 
 db = Database()
 
-# Periodically log stats
-def log_chunk_processor_stats():
-    while True:
-        time.sleep(60)  # Log every minute
-        stats = Database().chunk_processor.get_stats()
-        logging.info(f"Chunk Processor Stats: {stats}")
-
-# Start stats logging in a separate thread
-threading.Thread(target=log_chunk_processor_stats, daemon=True).start()
-
-def instantiate_SQLite_db():
+def instantiate_sqlite_db():
     global sqlite_db
     sqlite_db = Database()
 
@@ -1397,8 +1387,11 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
                 conn.commit()
 
                 # Schedule chunking
-                # FIXME - validate this function call
-                schedule_chunking(media_id, content, summary, media_name=info_dict.get('title', 'Untitled'))
+                schedule_chunking(media_id, content, info_dict.get('title', 'Untitled'))
+
+                # FIXME - Figure out how to schedule chunk embedding
+                # Schedule chunk conversion to embeddings & Ingestion into ChromaDB
+                # schedule_embedding(media_id, content, info_dict.get('title', 'Untitled'), summary)
 
                 return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}. Chunking scheduled."
 
@@ -1415,18 +1408,19 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 
 
 # FIXME: This function is not complete and needs to be implemented
-def schedule_chunking(media_id: int, content: str, summary: str, media_name: str):
-    # This function should be called after the main media insertion is successful
+def schedule_chunking(media_id: int, content: str, media_name: str):
     try:
-        chunks = chunk_for_embedding(content, media_name, summary, chunk_options)
+        chunks = chunk_text(content, chunk_options['method'], chunk_options['max_size'], chunk_options['overlap'])
         db = Database()
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            for chunk in chunks:
+            for i, chunk in enumerate(chunks):
                 cursor.execute('''
-                INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index)
-                VALUES (?, ?, ?, ?)
-                ''', (media_id, chunk['text'], chunk['metadata']['start_index'], chunk['metadata']['end_index']))
+                INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
+                VALUES (?, ?, ?, ?, ?)
+                ''', (media_id, chunk, i * chunk_options['max_size'],
+                      min((i + 1) * chunk_options['max_size'], len(content)),
+                      f"{media_id}_chunk_{i}"))
             conn.commit()
 
         # Update chunking status
@@ -1438,6 +1432,7 @@ def schedule_chunking(media_id: int, content: str, summary: str, media_name: str
     except Exception as e:
         logging.error(f"Error scheduling chunking for media_id {media_id}: {str(e)}")
         # You might want to update the chunking_status to 'failed' here
+
 
 #9/12
 # def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
@@ -2961,3 +2956,20 @@ def update_media_chunks_table():
 update_media_chunks_table()
 # Above function is a dirty hack that should be merged into the initial DB creation statement. This is a placeholder
 # FIXME
+
+def ensure_chunking_status_column(db):
+    try:
+        db.execute_query('''
+        ALTER TABLE Media
+        ADD COLUMN chunking_status TEXT DEFAULT 'pending'
+        ''')
+        logging.info("Added chunking_status column to Media table")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" not in str(e).lower():
+            logging.error(f"Error adding chunking_status column: {e}")
+        else:
+            logging.info("chunking_status column already exists in Media table")
+    except Exception as e:
+        logging.error(f"Unexpected error adding chunking_status column: {e}")
+
+ensure_chunking_status_column(db)

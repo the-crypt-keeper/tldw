@@ -110,13 +110,13 @@
         - https://github.com/the-crypt-keeper/LLooM 
         - https://github.com/lmg-anon/mikupad 
         - https://github.com/datacrystals/AIStoryWriter
-      - Evaluations for Summarization process
-        - Currently G-Eval is setup as an option for Video summaries. Need to add it to other input pages and look at other (easy) methods of evaluation
+      - Support for multiple different Evaluations
+        - G-Eval summarization check is available in the video transcript tab, as well as under the `Benchmarks` tab.
+        - I'd like to add more benchmarks so that user can identify/measure how well their config works, so they can tweak things and have an idea if its better/worse.
       - Evaluations for whisper transcription accuracy
+        - Following with the above, I'd like to do the same for speech transcription.
         - Identify accuracy of used models.
         - Set it up so users can test against their own datasets
-      - Offline diarization of speakers - Code is in, but there was some issue that was a headache so I said screw it.
-        - Should work if you give it an HF api key in the code though...
 - **Don't care, give me code**
    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Install.sh`
    - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
