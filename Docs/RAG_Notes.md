@@ -1,38 +1,38 @@
 # RAG Notes
 
 
-RAG 101
-	https://www.youtube.com/watch?v=nc0BupOkrhI
-	https://arxiv.org/abs/2401.08406
-	https://github.com/NirDiamant/RAG_Techniques?tab=readme-ov-file
-	https://github.com/jxnl/n-levels-of-rag
-	https://winder.ai/llm-architecture-rag-implementation-design-patterns/
-	https://medium.com/@yufan1602/modular-rag-and-rag-flow-part-%E2%85%B0-e69b32dc13a3
+### Links
+- RAG 101
+  * https://www.youtube.com/watch?v=nc0BupOkrhI
+  * https://arxiv.org/abs/2401.08406
+  * https://github.com/NirDiamant/RAG_Techniques?tab=readme-ov-file
+  * https://github.com/jxnl/n-levels-of-rag
+  * https://winder.ai/llm-architecture-rag-implementation-design-patterns/ 
+  * https://medium.com/@yufan1602/modular-rag-and-rag-flow-part-%E2%85%B0-e69b32dc13a3
 
 
-201
-	https://medium.com/@cdg2718/why-your-rag-doesnt-work-9755726dd1e9
-	https://www.cazton.com/blogs/technical/advanced-rag-techniques
-	https://medium.com/@krtarunsingh/advanced-rag-techniques-unlocking-the-next-level-040c205b95bc
-	https://pub.towardsai.net/advanced-rag-techniques-an-illustrated-overview-04d193d8fec6
-	https://winder.ai/llm-architecture-rag-implementation-design-patterns/
-	https://towardsdatascience.com/17-advanced-rag-techniques-to-turn-your-rag-app-prototype-into-a-production-ready-solution-5a048e36cdc8
-	https://medium.com/@samarrana407/mastering-rag-advanced-methods-to-enhance-retrieval-augmented-generation-4b611f6ca99a
-	https://generativeai.pub/advanced-rag-retrieval-strategy-query-rewriting-a1dd61815ff0
-	https://medium.com/@yufan1602/modular-rag-and-rag-flow-part-%E2%85%B0-e69b32dc13a3
-	https://pub.towardsai.net/rag-architecture-advanced-rag-3fea83e0d189?gi=47c0b76dbee0
-	https://towardsdatascience.com/3-advanced-document-retrieval-techniques-to-improve-rag-systems-0703a2375e1c
+- RAG 201
+	* https://medium.com/@cdg2718/why-your-rag-doesnt-work-9755726dd1e9
+    * https://www.cazton.com/blogs/technical/advanced-rag-techniques
+    * https://medium.com/@krtarunsingh/advanced-rag-techniques-unlocking-the-next-level-040c205b95bc
+    * https://pub.towardsai.net/advanced-rag-techniques-an-illustrated-overview-04d193d8fec6
+    * https://winder.ai/llm-architecture-rag-implementation-design-patterns/
+    * https://towardsdatascience.com/17-advanced-rag-techniques-to-turn-your-rag-app-prototype-into-a-production-ready-solution-5a048e36cdc8
+    * https://medium.com/@samarrana407/mastering-rag-advanced-methods-to-enhance-retrieval-augmented-generation-4b611f6ca99a
+    * https://generativeai.pub/advanced-rag-retrieval-strategy-query-rewriting-a1dd61815ff0
+    * https://medium.com/@yufan1602/modular-rag-and-rag-flow-part-%E2%85%B0-e69b32dc13a3
+    * https://pub.towardsai.net/rag-architecture-advanced-rag-3fea83e0d189?gi=47c0b76dbee0
+    * https://towardsdatascience.com/3-advanced-document-retrieval-techniques-to-improve-rag-systems-0703a2375e1c
 
+- Articles
+	* https://posts.specterops.io/summoning-ragnarok-with-your-nemesis-7c4f0577c93b?gi=7318858af6c3
+    * https://blog.demir.io/advanced-rag-implementing-advanced-techniques-to-enhance-retrieval-augmented-generation-systems-0e07301e46f4
+    * https://arxiv.org/abs/2312.10997
+    * https://jxnl.co/writing/2024/05/22/systematically-improving-your-rag/
+    * https://www.arcus.co/blog/rag-at-planet-scale
+    * https://d-star.ai/embeddings-are-not-all-you-need
 
-Articles
-	https://posts.specterops.io/summoning-ragnarok-with-your-nemesis-7c4f0577c93b?gi=7318858af6c3
-	https://blog.demir.io/advanced-rag-implementing-advanced-techniques-to-enhance-retrieval-augmented-generation-systems-0e07301e46f4
-	https://arxiv.org/abs/2312.10997
-	https://jxnl.co/writing/2024/05/22/systematically-improving-your-rag/
-	https://www.arcus.co/blog/rag-at-planet-scale
-	https://d-star.ai/embeddings-are-not-all-you-need
-
-Architecture Design
+- Architecture Design
 	- https://medium.com/@yufan1602/modular-rag-and-rag-flow-part-ii-77b62bf8a5d3
 	- https://www.anyscale.com/blog/a-comprehensive-guide-for-building-rag-based-llm-applications-part-1
 		* https://github.com/ray-project/llm-applications
@@ -45,33 +45,31 @@ Papers
 		* https://arxiv.org/abs/2407.18940
 
 
-Building
-	https://techcommunity.microsoft.com/t5/microsoft-developer-community/building-the-ultimate-nerdland-podcast-chatbot-with-rag-and-llm/ba-p/4175577
-	https://medium.com/@LakshmiNarayana_U/advanced-rag-techniques-in-ai-retrieval-a-deep-dive-into-the-chroma-course-d8b06118cde3
-	https://rito.hashnode.dev/building-a-multi-hop-qa-with-dspy-and-qdrant
-	https://blog.gopenai.com/advanced-retrieval-augmented-generation-rag-techniques-5abad385ac66?gi=09e684acab4d
-	https://www.youtube.com/watch?v=bNqSRNMgwhQ
-	https://www.youtube.com/watch?v=7h6uDsfD7bg
-	https://www.youtube.com/watch?v=Balro-DxFyk&list=PLwPYSl1MQp4FpIzn48ypesKYzLvUBQpPF&index=5
-	https://github.com/jxnl/n-levels-of-rag
-	https://rito.hashnode.dev/building-a-multi-hop-qa-with-dspy-and-qdrant
+- Building
+	* https://techcommunity.microsoft.com/t5/microsoft-developer-community/building-the-ultimate-nerdland-podcast-chatbot-with-rag-and-llm/ba-p/4175577
+    * https://medium.com/@LakshmiNarayana_U/advanced-rag-techniques-in-ai-retrieval-a-deep-dive-into-the-chroma-course-d8b06118cde3
+    * https://rito.hashnode.dev/building-a-multi-hop-qa-with-dspy-and-qdrant
+    * https://blog.gopenai.com/advanced-retrieval-augmented-generation-rag-techniques-5abad385ac66?gi=09e684acab4d
+    * https://www.youtube.com/watch?v=bNqSRNMgwhQ
+    * https://www.youtube.com/watch?v=7h6uDsfD7bg
+    * https://www.youtube.com/watch?v=Balro-DxFyk&list=PLwPYSl1MQp4FpIzn48ypesKYzLvUBQpPF&index=5
+    * https://github.com/jxnl/n-levels-of-rag
+    * https://rito.hashnode.dev/building-a-multi-hop-qa-with-dspy-and-qdrant
+
+- Chunking
+	* https://archive.is/h0oBZ
+	* https://python.langchain.com/v0.1/docs/modules/data_connection/document_transformers/
 
 
-Chunking
-	https://archive.is/h0oBZ
-	https://python.langchain.com/v0.1/docs/modules/data_connection/document_transformers/
+- Multi-Modal RAG
+	* https://docs.llamaindex.ai/en/v0.10.17/examples/multi_modal/multi_modal_pdf_tables.html
+	* https://archive.is/oIhNp
+	* https://arxiv.org/html/2407.01449v2
 
+- Query Expansion
+	* https://arxiv.org/abs/2305.03653
 
-Multi-Modal RAG
-	https://docs.llamaindex.ai/en/v0.10.17/examples/multi_modal/multi_modal_pdf_tables.html
-	https://archive.is/oIhNp
-	https://arxiv.org/html/2407.01449v2
-
-
-Query Expansoin
-	https://arxiv.org/abs/2305.03653
-
-Cross-Encoder Ranking
+- Cross-Encoder Ranking
 	* Deep Neural network that processes two input sequences together as a single input. Allows the model to directly compare and contrast the inputs, understanding their relationship in a more integrated and nuanced manner.
 	* https://www.sbert.net/examples/applications/retrieve_rerank/README.html
 
