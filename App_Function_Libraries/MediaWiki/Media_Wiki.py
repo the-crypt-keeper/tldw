@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import traceback
 from typing import List, Dict, Any, Iterator, Optional
 # 3rd-Party Imports
 import mwparserfromhell
@@ -14,12 +15,19 @@ import mwxml
 import yaml
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords, check_media_exists
+from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content
 #
 #######################################################################################################################
 #
 # Functions:
+# Load configuration
+def load_mediawiki_import_config():
+    with open(os.path.join('Config_Files', 'mediawiki_import_config.yaml'), 'r') as f:
+        return yaml.safe_load(f)
+
+config = load_mediawiki_import_config()
+
 
 def setup_logger(name: str, level: int = logging.INFO, log_file: Optional[str] = None) -> logging.Logger:
     """Set up and return a logger with the given name and level."""
@@ -41,11 +49,11 @@ def setup_logger(name: str, level: int = logging.INFO, log_file: Optional[str] =
 # Usage
 logger = setup_logger('mediawiki_import', log_file='mediawiki_import.log')
 
-# Load configuration
-def load_mediawiki_import_config():
-    with open(os.path.join('Config_Files', 'mediawiki_import_config.yaml'), 'r') as f:
-        return yaml.safe_load(f)
-config = load_mediawiki_import_config()
+# End of setup
+#######################################################################################################################
+#
+# Functions:
+
 
 def parse_mediawiki_dump(file_path: str, namespaces: List[int] = None, skip_redirects: bool = False) -> Iterator[
     Dict[str, Any]]:
@@ -57,11 +65,11 @@ def parse_mediawiki_dump(file_path: str, namespaces: List[int] = None, skip_redi
             continue
 
         for revision in page:
-            code = mwparserfromhell.parse(revision.text)
-            text = code.strip_code(normalize=True, collapse=True, keep_template_params=False)
+            wikicode = mwparserfromhell.parse(revision.text)
+            plain_text = wikicode.strip_code()
             yield {
                 "title": page.title,
-                "content": text,
+                "content": plain_text,
                 "namespace": page.namespace,
                 "page_id": page.id,
                 "revision_id": revision.id,
@@ -76,6 +84,7 @@ def optimized_chunking(text: str, chunk_options: Dict[str, Any]) -> List[Dict[st
     current_chunk = ""
     current_size = 0
 
+    logging.debug(f"optimized_chunking: Processing text with {len(sections) // 2} sections")
     for i in range(0, len(sections), 2):
         section_title = sections[i] if i > 0 else "Introduction"
         section_content = sections[i + 1] if i + 1 < len(sections) else ""
@@ -95,33 +104,54 @@ def optimized_chunking(text: str, chunk_options: Dict[str, Any]) -> List[Dict[st
     return chunks
 
 
+
+
+
 def process_single_item(content: str, title: str, wiki_name: str, chunk_options: Dict[str, Any],
-                        is_combined: bool = False, item: Dict[str, Any] = None):
+                        is_combined: bool = False, item: Dict[str, Any] = None, api_name: str = None):
     try:
-        url = f"mediawiki:{wiki_name}" if is_combined else f"mediawiki:{wiki_name}:{title}"
+        logging.debug(f"process_single_item: Processing item: {title}")
 
-        if not check_media_exists(title, url):
-            media_id = add_media_with_keywords(
-                url=url,
-                title=title,
-                media_type="mediawiki_dump" if is_combined else "mediawiki_article",
-                content=content,
-                keywords=f"mediawiki,{wiki_name}" + (",full_dump" if is_combined else ",article"),
-                prompt="",
-                summary="",
-                transcription_model="",
-                author="MediaWiki",
-                ingestion_date=item['timestamp'].strftime('%Y-%m-%d') if item else None
-            )
+        # Create a unique URL using the wiki name and article title
+        encoded_title = title.replace(" ", "_")
+        url = f"mediawiki:{wiki_name}:{encoded_title}"
+        logging.debug(f"Generated URL: {url}")
 
-            chunks = optimized_chunking(content, chunk_options)
-            for chunk in chunks:
+        result = add_media_with_keywords(
+            url=url,  # Use the generated URL here
+            title=title,
+            media_type="mediawiki_dump" if is_combined else "mediawiki_article",
+            content=content,
+            keywords=f"mediawiki,{wiki_name}" + (",full_dump" if is_combined else ",article"),
+            prompt="",
+            summary="",
+            transcription_model="",
+            author="MediaWiki",
+            ingestion_date=item['timestamp'].strftime('%Y-%m-%d') if item else None
+        )
+        logging.debug(f"Result from add_media_with_keywords: {result}")
+
+        # Unpack the result
+        media_id, message = result
+        logging.info(f"Media item result: {message}")
+        logging.debug(f"Final media_id: {media_id}")
+
+        chunks = optimized_chunking(content, chunk_options)
+        for i, chunk in enumerate(chunks):
+            logging.debug(f"Processing chunk {i + 1}/{len(chunks)} for item: {title}")
+
+            # FIXME
+            # def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str,
+            #                               create_embeddings: bool = False, create_summary: bool = False,
+            #                               api_name: str = None):
+            if api_name:
+                process_and_store_content(chunk['text'], f"mediawiki_{wiki_name}", media_id, title, True, True, api_name)
+            else:
                 process_and_store_content(chunk['text'], f"mediawiki_{wiki_name}", media_id, title)
-            logger.info(f"Successfully processed item: {title}")
-        else:
-            logger.info(f"Skipping existing article: {title}")
+        logging.info(f"Successfully processed item: {title}")
     except Exception as e:
-        logger.error(f"Error processing item {title}: {str(e)}")
+        logging.error(f"Error processing item {title}: {str(e)}")
+        logging.error(f"Exception details: {traceback.format_exc()}")
 
 
 def load_checkpoint(file_path: str) -> int:
@@ -143,9 +173,12 @@ def import_mediawiki_dump(
         skip_redirects: bool = False,
         chunk_options: Dict[str, Any] = None,
         single_item: bool = False,
-        progress_callback: Any = None
+        progress_callback: Any = None,
+        api_name: str = None,
+        api_key: str = None
 ) -> Iterator[str]:
     try:
+        logging.info(f"Importing MediaWiki dump: {file_path}")
         if chunk_options is None:
             chunk_options = config['chunking']
 
@@ -160,6 +193,10 @@ def import_mediawiki_dump(
         for item in parse_mediawiki_dump(file_path, namespaces, skip_redirects):
             if item['page_id'] <= last_processed_id:
                 continue
+            # FIXME - ensure this works...
+            if api_name is not None:
+                # FIXME - add API key to the call/params
+                process_single_item(item['content'], item['title'], wiki_name, chunk_options, False, item, api_name)
             process_single_item(item['content'], item['title'], wiki_name, chunk_options, False, item)
             save_checkpoint(checkpoint_file, item['page_id'])
             processed_pages += 1

@@ -32,7 +32,7 @@ processing:
 # Embedding settings
 embeddings:
   provider: 'openai'  # or 'local' or 'huggingface'
-  model: 'text-embedding-ada-002'
+  model: 'text-embedding-3-small' # or `text-embedding-3-large` for OpenAI models ; huggingface, you can use any model from the Hugging Face model hub
   api_key: 'your_openai_api_key_here'  # Remove if using local embeddings
   local_url: 'http://localhost:8080/embeddings'  # Only for local embeddings
 
@@ -54,10 +54,3 @@ checkpoints:
 error_handling:
   max_retries: 3
   retry_delay: 5  # seconds
-
-# User interface settings
-ui:
-  default_chunk_size: 1000
-  min_chunk_size: 100
-  max_chunk_size: 2000
-  default_chunk_overlap: 100
