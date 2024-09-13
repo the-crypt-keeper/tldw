@@ -7,6 +7,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 import webbrowser
 #
@@ -677,10 +678,14 @@ def main(input_path, api_name=None, api_key=None,
 
 
 def signal_handler(sig, frame):
-    logging.info('Signal handler called with signal: %s', sig)
-    db.shutdown()
-    cleanup_process()
+    logging.info("Ctrl-C pressed, shutting down...")
+    # Check for active threads before shutdown
+    logging.debug(f"Active threads before shutdown: {threading.enumerate()}")
+    # Check for active threads after shutdown
+    logging.debug(f"Active threads after shutdown: {threading.enumerate()}")
     sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 
 ############################## MAIN ##############################
