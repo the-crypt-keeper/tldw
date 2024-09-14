@@ -132,7 +132,8 @@ def get_project_root():
     return project_root
 
 def get_database_dir():
-    db_dir = get_project_relative_path('Databases')
+    """Get the database directory (/tldw/Databases/)."""
+    db_dir = os.path.join(get_project_root(), 'Databases')
     logging.debug(f"Database directory: {db_dir}")
     return db_dir
 
