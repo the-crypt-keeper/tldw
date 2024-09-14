@@ -1,6 +1,16 @@
 # Usage
 # docker build -t tldw-nvidia_amd64_Dockerfile .
 # docker run --gpus=all -p 7860:7860 -v tldw_volume:/tldw tldw-nvidia_amd64_Dockerfile
+#
+# If the above command doesn't work and it hangs on start, use the following command:
+#
+#   sudo docker run -it -p 7860:7860 -v tldw_volume:/tdlw nvidia_tldw bash
+#
+# Once in the container, run the following command:
+#
+#   python summarize.py -gui
+#
+# And you should be good.
 
 # Use Nvidia image:
 FROM nvidia/cuda:12.6.1-cudnn-runtime-ubuntu24.04
