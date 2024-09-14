@@ -334,7 +334,8 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 # Summarize with Cohere
 def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_prompt=None):
     loaded_config_data = load_and_log_configs()
-    logging.debug(f"Cohere API Key from parameter: {api_key}")
+    if api_key is not None:
+        logging.debug(f"cohere: API Key from parameter: {api_key[:3]}...{api_key[-3:]}")
     logging.debug(f"Cohere API Key from config: {loaded_config_data['api_keys']['cohere']}")
     try:
         # API key validation
@@ -342,13 +343,13 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
             logging.info("cohere: API key not provided as parameter")
             logging.info("cohere: Attempting to use API key from config file")
             cohere_api_key = loaded_config_data['api_keys']['cohere']
-            logging.debug(f"cohere: Using API key from config file: {cohere_api_key}")
+            logging.debug(f"cohere: Using API Key from config file: {cohere_api_key[:3]}...{cohere_api_key[-3:]}")
 
         else:
             logging.error("cohere: API key not found or is empty")
             return "cohere: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"cohere: Using API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:]}")
+        logging.debug(f"cohere: Using API Key: {cohere_api_key[:3]}...{cohere_api_key[-3:]}")
 
         logging.debug(f"Cohere: Loaded data: {input_data}")
         logging.debug(f"Cohere: Type of data: {type(input_data)}")
@@ -381,12 +382,12 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
             "connectors": [{"id": "web-search"}]
         }
 
-        logging.debug("cohere: Submitting request to API endpoint")
-        print("cohere: Submitting request to API endpoint")
-        logging.debug(f"API Key being passed to chat_with_cohere: {api_key}")
+        logging.debug("cohere chat: Submitting request to API endpoint")
+        print("cohere chat: Submitting request to API endpoint")
+        logging.debug(f"cohere chat : API Key being passed to chat_with_cohere: {api_key[:3]}...{api_key[-3]}")
         response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
         response_data = response.json()
-        logging.debug(f"Full API response data: {response_data}")
+        logging.debug(f"cohere chat: Full API response data: {response_data}")
 
         if response.status_code == 200:
             if 'text' in response_data:
