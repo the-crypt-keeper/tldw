@@ -1,12 +1,18 @@
 ![License](https://img.shields.io/badge/license-apache2.0-green)
-# **tl/dw: Too Long, Didnt Watch** 
-## Download, Transcribe, Summarize & Chat with your Videos+Audio+Documents+Web Articles & Books. 
-### All automated. All local. All yours.
-## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
-- The demo is now blocked by Youtube unless you provide a session cookie for a logged in session. Additionally, there's an ongoing issue with file permissions relating to HF spaces, so the Demo is more of a 'poke around and look' vs 'use it as intended' at the moment.
-#### More: Full-Text-Search across everything ingested (RAG is wip), Local LLM inference as part of it(llamafile) for those who don't want to mess with setting up an LLM, and a WebApp(gradio as PoC) to interact with the script in a more user-friendly manner.
-#### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 
+# **tl/dw: Too Long, Didn't Watch** 
+## Summary: Your personal offline media assistant – Download, Transcribe, Summarize & Chat with Videos, Audio, Documents, Web Articles, and Books. 
+### All automated. All local. All yours.
+
+- **[Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)** _(Note: YouTube may block the demo unless you provide a session cookie. Placeholder content is included, but ingestion is limited.)
+
+#### Key Features:
+- Full-text search across all ingested content (with RAG, BM25 + Vectors support).
+- Local LLM inference for offline summarization and chat (via `llamafile`).
+- Comprehensive ingestion capabilities for video, audio, text, and web articles.
+#### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
+### Quick Links
+- [What is TL/DW?](#what) | [Quickstart](#quickstart) | [Installation](#installation) | [Using TL/DW](#usage) | [Contributing](#contributing) | [Roadmap](#roadmap)
 
 
 
@@ -25,10 +31,50 @@
 
 ----------
 **GUI Screenshot**
+- Planning to replace with several short gifs to show functionality and how it can be used.
 ![tldw-summarization-gui-demo](Docs/GUI-Front_Page.PNG)
 
+### What is TL/DW?
+**TL/DW** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
+1. **Ingesting**: Importing media from URLs or local files into an offline database.
+2. **Transcribing**: Automatically generating text transcripts from videos and audio using various supported models.
+3. **Summarizing**: Using LLMs (local or API-based) to create summaries of the ingested content.
+4. **Searching**: Full-text search across ingested content, including metadata like titles, authors, and keywords.
+5. **Chatting**: Interacting with ingested content using natural language queries through supported LLMs.
 
-### <a name="what"></a> What is this (TL/DW)?
+All features are designed to run **locally** on your device, ensuring privacy and data ownership. The tool is open-source and free to use, with the goal of supporting research, learning, and personal knowledge management.
+
+### Key Features
+
+#### Content Ingestion
+- Supports video, audio, documents (epub, PDF, txt), and web articles from URLs or local files.
+- Drag-and-drop functionality for easy local file ingestion.
+- Compatible with any site supported by yt-dlp (see [supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)).
+- Import Markdown and text files into the database, with customizable metadata (title, author, keywords).
+
+#### Transcription & Summarization
+- **Video/Audio Transcription**: Uses `faster_whisper` with customizable model selection for transcribing audio and video.
+- **Content Summarization**: Automatically summarizes content using your choice of LLM API (e.g., OpenAI, Anthropic).
+- **Chunked Summarization**: Summarize longer pieces of content by breaking them into manageable chunks.
+
+#### Database & Search
+- All content is stored in an **SQLite database**, with full-text search support via FTS5.
+- **Tagging**: Tag content with keywords for better organization.
+- **RAG Support**: Perform advanced search and retrieval using BM25 and vector embeddings with ChromaDB.
+- **Backup & Export**: Backup your database and export content as text files.
+
+#### Chat Capabilities
+- **LLM Integration**: Chat with an LLM about your ingested content.
+  - Supports APIs like OpenAI, Cohere, HuggingFace, and local models like Llama.cpp.
+- **Multi-Response Modes**: Various chat modes, including stacked responses and multiple prompts.
+- **Chat History Management**: Save, edit, search, and export chat sessions.
+
+#### Writing Tools
+- **Grammar & Style Checks**: Use LLMs to review your writing for grammar and style.
+- **Tone Analyzer**: Analyze and adjust the tone of your text.
+- **Writing Prompts**: Generate creative writing prompts based on your preferences.
+
+###  <a name="what"></a>(Much longer) What is this (TL/DW)?
 - **What it is now:**
   - A tool that can ingest: audio, videos, articles, free form text, documents, and books as text into a personal, offline database, so that you can then search and chat with it at any time on your own device/locally.
     - (+ act as a nice way of creating your personal 'media' database, a personal digital library with search!)
@@ -94,30 +140,33 @@
     - I view this as a personal tool I'll ideally continue to use for some time until something better/more suited to my needs comes along.
     - Until then, I plan to continue working on this project and improving as much as possible.
     - If I can't get a "Young Lady's Illustrated Primer" in the immediate, I'll just have to hack together some poor imitation of one....
-  - **Planned Features**
-    - Firstly, you can check all planned features on the issues page: https://github.com/rmusser01/tldw/issues
-    - Anything I come up with or hear about will either just be dropped in, or an issue will be created and then implemented.
-    - I plan to add the following in the future in no particular order:
-      - Better RAG implementation - Retrieval-Augmented Generation support. A naive/basic implementation is in. Would like to expand and build out a test suite for it. 
-      - More API support - I want to add support for more APIs, and I want to make it easier to select between private/Public endpoints in the UI
-      - Completely new UI - I want to make the UI more user-friendly and more intuitive. (This will come after migration to FastAPI)
-        - Gradio is great as PoC, but I think I've shown that this has value and is worth the continued effort.
-      - Add support for 'streaming' answers, so it feels more 'real-time'
-      - Add TTS/STT support for the UI so you can ask questions directly to the model or have it speak out the results to you.
-        - Having something like this would be pretty fucking cool I think: https://github.com/smellslikeml/dolla_llama/tree/main (Need to look more into nemesis by specterops)
-      - Add some neat writing tools, since why not have some fun?
-        - https://github.com/the-crypt-keeper/the-muse 
-        - https://github.com/the-crypt-keeper/LLooM 
-        - https://github.com/lmg-anon/mikupad 
-        - https://github.com/datacrystals/AIStoryWriter
-      - Support for multiple different Evaluations
-        - G-Eval summarization check is available in the video transcript tab, as well as under the `Benchmarks` tab.
-        - I'd like to add more benchmarks so that user can identify/measure how well their config works, so they can tweak things and have an idea if its better/worse.
-      - Evaluations for whisper transcription accuracy
-        - Following with the above, I'd like to do the same for speech transcription.
-        - Identify accuracy of used models.
-        - Set it up so users can test against their own datasets
-- **Don't care, give me code**
+
+### Planned Features
+You can view the full roadmap on our [GitHub Issues page](https://github.com/rmusser01/tldw/issues).
+
+Some planned features include:
+- Improved **RAG (Retrieval-Augmented Generation)** support with enhanced testing.
+- New, more intuitive **UI**, potentially migrating to FastAPI.
+- **Streaming responses** for real-time answers.
+- **TTS (Text-to-Speech) and STT (Speech-to-Text)** support in the chat interface.
+- Expanded **API Support** with easier integration for new endpoints.
+- Enhanced **Whisper model transcription accuracy** testing.
+- Add TTS/STT support for the UI so you can ask questions directly to the model or have it speak out the results to you.
+  - Having something like this would be pretty fucking cool I think: https://github.com/smellslikeml/dolla_llama/tree/main (Need to look more into nemesis by specterops)
+- Add some neat writing tools, since why not have some fun?
+  - https://github.com/the-crypt-keeper/the-muse 
+  - https://github.com/the-crypt-keeper/LLooM 
+  - https://github.com/lmg-anon/mikupad 
+  - https://github.com/datacrystals/AIStoryWriter
+- Support for multiple different Evaluations
+  - G-Eval summarization check is available in the video transcript tab, as well as under the `Benchmarks` tab.
+  - I'd like to add more benchmarks so that user can identify/measure how well their config works, so they can tweak things and have an idea if its better/worse.
+- Evaluations for whisper transcription accuracy
+  - Following with the above, I'd like to do the same for speech transcription.
+  - Identify accuracy of used models.
+  - Set it up so users can test against their own datasets
+
+###  **Don't care, give me code**
    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Install.sh`
    - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
    - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
