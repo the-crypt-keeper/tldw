@@ -1,10 +1,19 @@
 # Usage
 # docker build -t tldw-app_debian --build-arg GPU_SUPPORT=cpu .
 # docker run -p 7860:7860 -v tldw_volume:/tldw tldw-app_debian
+#
+# If the above command doesn't work and it hangs on start, use the following command:
+#
+#   sudo docker run -it -p 7860:7860 -v tldw_volume:/tdlw tldw-app_debian bash
+#
+# Once in the container, run the following command:
+#
+#   python summarize.py -gui
+#
+# And you should be good.
 
 # Use an official Python runtime as a parent image
 FROM python:3.10.15-slim-bookworm
-
 
 # Set build arguments
 ARG REPO_URL=https://github.com/rmusser01/tldw.git
