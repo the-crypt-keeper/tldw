@@ -485,6 +485,7 @@ def create_character_card_interaction_tab():
                 load_characters_button = gr.Button("Load Existing Characters")
                 from App_Function_Libraries.Chat import get_character_names
                 character_dropdown = gr.Dropdown(label="Select Character", choices=get_character_names())
+                user_name_input = gr.Textbox(label="Your Name", placeholder="Enter your name here")
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
                              "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace", "Custom-OpenAI-API"],
@@ -508,6 +509,7 @@ def create_character_card_interaction_tab():
                 save_status = gr.Textbox(label="Save Status", interactive=False)
 
     character_data = gr.State(None)
+    user_name = gr.State("")
 
     def import_chat_history(file, current_history, char_data):
         loaded_history, char_name = load_chat_history(file)
@@ -546,31 +548,36 @@ def create_character_card_interaction_tab():
             return char_data, [(None, first_message)] if first_message else []
         return None, []
 
-    def character_chat_wrapper(message, history, char_data, api_endpoint, api_key, temperature):
+    def character_chat_wrapper(message, history, char_data, api_endpoint, api_key, temperature, user_name):
         logging.debug("Entered character_chat_wrapper")
         if char_data is None:
             return "Please select a character first.", history
 
+        if not user_name:
+            user_name = "User"
+
+        char_name = char_data.get('name', 'AI Assistant')
+
         # Prepare the character's background information
         char_background = f"""
-        Name: {char_data.get('name', 'Unknown')}
+        Name: {char_name}
         Description: {char_data.get('description', 'N/A')}
         Personality: {char_data.get('personality', 'N/A')}
         Scenario: {char_data.get('scenario', 'N/A')}
         """
 
         # Prepare the system prompt for character impersonation
-        system_message = f"""You are roleplaying as the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI.
-
+        system_message = f"""You are roleplaying as {char_name}, the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI. Always refer to yourself as "{char_name}" and refer to the user as "{user_name}".
+    
         {char_background}
-
+    
         Additional instructions: {char_data.get('post_history_instructions', '')}
         """
 
         # Prepare media_content and selected_parts
         media_content = {
-            'id': char_data.get('name'),
-            'title': char_data.get('name', 'Unknown Character'),
+            'id': char_name,
+            'title': char_name,
             'content': char_background,
             'description': char_data.get('description', ''),
             'personality': char_data.get('personality', ''),
@@ -582,13 +589,13 @@ def create_character_card_interaction_tab():
 
         # Prepare the input for the chat function
         if not history:
-            full_message = f"{prompt}\n\n{message}" if prompt else message
+            full_message = f"{prompt}\n\n{user_name}: {message}" if prompt else f"{user_name}: {message}"
         else:
-            full_message = message
+            full_message = f"{user_name}: {message}"
 
         # Call the chat function
         bot_message = chat(
-            message,
+            full_message,
             history,
             media_content,
             selected_parts,
@@ -635,14 +642,15 @@ def create_character_card_interaction_tab():
             return result
         return f"Chat saved successfully as {result}"
 
-    def regenerate_last_message(history, char_data, api_name, api_key, temperature):
+    def regenerate_last_message(history, char_data, api_name, api_key, temperature, user_name):
         if not history:
             return history
 
         last_user_message = history[-1][0]
         new_history = history[:-1]
 
-        return character_chat_wrapper(last_user_message, new_history, char_data, api_name, api_key, temperature)
+        return character_chat_wrapper(last_user_message, new_history, char_data, api_name, api_key, temperature,
+                                      user_name)
 
     import_chat_button.click(
         fn=lambda: gr.update(visible=True),
@@ -674,14 +682,20 @@ def create_character_card_interaction_tab():
 
     send_message_button.click(
         fn=character_chat_wrapper,
-        inputs=[user_input, chat_history, character_data, api_name_input, api_key_input, temperature_slider],
+        inputs=[user_input, chat_history, character_data, api_name_input, api_key_input, temperature_slider, user_name_input],
         outputs=[chat_history]
     ).then(lambda: "", outputs=user_input)
 
     regenerate_button.click(
         fn=regenerate_last_message,
-        inputs=[chat_history, character_data, api_name_input, api_key_input, temperature_slider],
+        inputs=[chat_history, character_data, api_name_input, api_key_input, temperature_slider, user_name_input],
         outputs=[chat_history]
+    )
+
+    user_name_input.change(
+        fn=lambda name: name,
+        inputs=[user_name_input],
+        outputs=[user_name]
     )
 
     save_chat_button.click(
@@ -690,7 +704,7 @@ def create_character_card_interaction_tab():
         outputs=[save_status]
     )
 
-    return character_data, chat_history, user_input
+    return character_data, chat_history, user_input, user_name
 
 
 def create_mikupad_tab():
