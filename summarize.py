@@ -7,6 +7,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 import webbrowser
 #
@@ -21,7 +22,7 @@ from App_Function_Libraries.Summarization.Summarization_General_Lib import summa
     summarize_with_cohere, summarize_with_groq, perform_transcription, perform_summarization
 from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Local_File_Processing_Lib import read_paths_from_file, process_local_file
-from App_Function_Libraries.DB.DB_Manager import add_media_to_database
+from App_Function_Libraries.DB.DB_Manager import add_media_to_database, db
 from App_Function_Libraries.Utils.System_Checks_Lib import cuda_check, platform_check, check_ffmpeg
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, create_download_directory, extract_text_from_segments, \
     cleanup_downloads
@@ -677,9 +678,14 @@ def main(input_path, api_name=None, api_key=None,
 
 
 def signal_handler(sig, frame):
-    logging.info('Signal handler called with signal: %s', sig)
-    cleanup_process()
+    logging.info("Ctrl-C pressed, shutting down...")
+    # Check for active threads before shutdown
+    logging.debug(f"Active threads before shutdown: {threading.enumerate()}")
+    # Check for active threads after shutdown
+    logging.debug(f"Active threads after shutdown: {threading.enumerate()}")
     sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 
 ############################## MAIN ##############################
@@ -949,6 +955,7 @@ Sample commands:
 
             logging.info('Transcription process completed.')
             atexit.register(cleanup_process)
+
         except Exception as e:
             logging.error('An error occurred during the transcription process.')
             logging.error(str(e))

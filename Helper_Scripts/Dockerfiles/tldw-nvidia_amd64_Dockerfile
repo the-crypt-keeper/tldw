@@ -1,9 +1,9 @@
 # Usage
-# docker build -t tldw-app --build-arg GPU_SUPPORT=cpu .
-# docker run -p 7860:7860 -v tldw_volume:/tldw tldw-app
+# docker build -t tldw-nvidia_amd64_Dockerfile .
+# docker run --gpus=all -p 7860:7860 -v tldw_volume:/tldw tldw-nvidia_amd64_Dockerfile
 
 # Use Nvidia image:
-FROM nvidia/cuda:12.0.0-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.1-cudnn-runtime-ubuntu24.04
 
 # Use an official Python runtime as a parent image
 #FROM python:3.10.15-slim-bookworm
@@ -20,6 +20,12 @@ RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     build-essential \
     git \
+    python3 \
+    python3-pyaudio \
+    portaudio19-dev \
+    python3-pip \
+    portaudio19-dev \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
@@ -34,6 +40,13 @@ ENV PATH="/tldw/venv/bin:$PATH"
 
 # Upgrade pip and install wheel
 RUN pip install --upgrade pip wheel
+
+# Install CUDA
+RUN pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
+
+# setup PATH
+RUN export LD_LIBRARY_PATH=`python3 -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__))'`
+
 
 # Install PyTorch based on GPU support
 RUN if [ "$GPU_SUPPORT" = "cuda" ]; then \
@@ -59,4 +72,4 @@ VOLUME /tldw
 EXPOSE 7860
 
 # Run the application
-CMD ["python3", "summarize.py", "-gui"]
+CMD ["python", "summarize.py", "-gui"]

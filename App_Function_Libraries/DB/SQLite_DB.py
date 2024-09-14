@@ -53,25 +53,18 @@ import queue
 import re
 import shutil
 import sqlite3
-import threading
-import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
-
-from App_Function_Libraries.Chunk_Lib import chunk_options, chunk_text
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
     get_database_dir
+from App_Function_Libraries.Chunk_Lib import chunk_options, chunk_text
+#
 # Third-Party Libraries
 import gradio as gr
 import pandas as pd
 import yaml
-
-
-# Import Local Libraries
 #
 #######################################################################################################################
 # Function Definitions
@@ -83,8 +76,6 @@ def ensure_database_directory():
 ensure_database_directory()
 
 # Set up logging
-#logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-#logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # FIXME - Setup properly and test/add documentation for its existence...
@@ -122,6 +113,9 @@ print(f"Backup directory: {backup_dir}")
 
 #
 #
+#######################################################################################################################
+
+
 #######################################################################################################################
 #
 # Backup-related functions
@@ -186,6 +180,9 @@ def rotate_backups(backup_dir, max_backups=10):
 #
 #
 #######################################################################################################################
+
+
+#######################################################################################################################
 #
 # DB-Integrity Check Functions
 
@@ -210,188 +207,45 @@ def check_database_integrity(db_path):
 #
 # End of DB-Integrity Check functions
 #######################################################################################################################
-#
-# Media-related Functions
 
-# Custom exceptions
+
+#######################################################################################################################
+#
+# DB Setup Functions
+
 class DatabaseError(Exception):
     pass
-
 
 class InputError(Exception):
     pass
 
-
-# Database connection function with connection pooling
-class ChunkProcessor:
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(ChunkProcessor, cls).__new__(cls)
-            cls._instance.initialize()
-        return cls._instance
-
-    def initialize(self):
-        self.chunk_queue = queue.Queue()
-        self.num_workers = 5
-        self.batch_size = 100
-        self.max_retries = 3
-        self.executor = ThreadPoolExecutor(max_workers=self.num_workers)
-        self.stop_event = threading.Event()
-        self.processed_count = 0
-        self.error_count = 0
-        self.start()
-
-    def start(self):
-        for _ in range(self.num_workers):
-            self.executor.submit(self.worker)
-
-    def stop(self):
-        self.stop_event.set()
-        self.executor.shutdown(wait=True)
-
-    def worker(self):
-        while not self.stop_event.is_set():
-            batch = []
-            try:
-                while len(batch) < self.batch_size:
-                    try:
-                        item = self.chunk_queue.get(timeout=1)
-                        batch.append(item)
-                    except queue.Empty:
-                        if len(batch) > 0:
-                            break
-                        if self.stop_event.is_set():
-                            return
-
-                if batch:
-                    self.process_batch(batch)
-            except Exception as e:
-                logging.error(f"Error in worker: {str(e)}")
-                self.error_count += 1
-
-    def process_batch(self, batch):
-        retries = 0
-        while retries < self.max_retries:
-            try:
-                with Database().get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("BEGIN TRANSACTION")
-                    try:
-                        for item in batch:
-                            self.batch_insert_chunks(cursor, item['chunks'], item['media_id'])
-                        conn.commit()
-                        self.processed_count += len(batch)
-                        for _ in range(len(batch)):
-                            self.chunk_queue.task_done()
-                        return
-                    except Exception as e:
-                        conn.rollback()
-                        logging.error(f"Error in batch insert (attempt {retries + 1}): {str(e)}")
-                        retries += 1
-                        time.sleep(1)
-            except Exception as e:
-                logging.error(f"Error getting database connection (attempt {retries + 1}): {str(e)}")
-                retries += 1
-                time.sleep(1)
-
-        logging.error(f"Failed to process batch after {self.max_retries} attempts")
-        self.error_count += len(batch)
-        for _ in range(len(batch)):
-            self.chunk_queue.task_done()
-
-    def batch_insert_chunks(self, cursor, chunks, media_id):
-        chunk_data = [(
-            media_id,
-            chunk['text'],
-            chunk['metadata']['start_index'],
-            chunk['metadata']['end_index'],
-            f"{media_id}_chunk_{i}"
-        ) for i, chunk in enumerate(chunks, 1)]
-
-        cursor.executemany('''
-        INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
-        VALUES (?, ?, ?, ?, ?)
-        ''', chunk_data)
-
-    def add_task(self, chunks, media_id):
-        self.chunk_queue.put({'chunks': chunks, 'media_id': media_id})
-
-    def get_stats(self):
-        return {
-            'processed_count': self.processed_count,
-            'error_count': self.error_count,
-            'queue_size': self.chunk_queue.qsize()
-        }
-
-
 class Database:
-    def __init__(self, db_name='media_summary.db' or os.getenv('DB_NAME')):
+    def __init__(self, db_name='media_summary.db'):
         self.db_path = get_database_path(db_name)
-        self.pool = []
-        self.pool_size = 10
-        self.lock = threading.Lock()
         self.timeout = 60.0  # 60 seconds timeout
-        logging.info(f"Database initialized with path: {self.db_path}")
-        self.chunk_processor = ChunkProcessor()
 
-    @contextmanager
     def get_connection(self):
-        retry_count = 5
-        retry_delay = 1
-        while retry_count > 0:
-            try:
-                if self.pool:
-                    conn = self.pool.pop()
-                else:
-                    conn = sqlite3.connect(self.db_path, timeout=self.timeout, check_same_thread=False)
-                    conn.execute("PRAGMA journal_mode=WAL;")  # Enable WAL mode
-                yield conn
-                self.pool.append(conn)
-                return
-            except sqlite3.OperationalError as e:
-                if 'database is locked' in str(e):
-                    logging.warning(f"Database is locked, retrying in {retry_delay} seconds...")
-                    retry_count -= 1
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                else:
-                    logging.error(f"Database error: {e}")
-                    raise DatabaseError(f"Database error: {e}")
-            except Exception as e:
-                logging.error(f"Unexpected error: {e}")
-                raise DatabaseError(f"Unexpected error: {e}")
-        raise DatabaseError("Database is locked and retries have been exhausted")
+        return sqlite3.connect(self.db_path, timeout=self.timeout)
 
     def execute_query(self, query: str, params: Tuple = ()) -> None:
-        with self.lock:  # Use a global lock for write operations
-            with self.get_connection() as conn:
-                try:
-                    cursor = conn.cursor()
-                    cursor.execute(query, params)
-                    conn.commit()
-                except sqlite3.Error as e:
-                    logging.error(f"Database error: {e}, Query: {query}")
-                    raise DatabaseError(f"Database error: {e}, Query: {query}")
+        with self.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                conn.commit()
+            except sqlite3.Error as e:
+                logging.error(f"Database error: {e}, Query: {query}")
+                raise DatabaseError(f"Database error: {e}, Query: {query}")
 
     def execute_many(self, query: str, params_list: List[Tuple]) -> None:
-        with self.lock:  # Use a global lock for write operations
-            with self.get_connection() as conn:
-                try:
-                    cursor = conn.cursor()
-                    cursor.executemany(query, params_list)
-                    conn.commit()
-                except sqlite3.Error as e:
-                    logging.error(f"Database error: {e}, Query: {query}")
-                    raise DatabaseError(f"Database error: {e}, Query: {query}")
-
-    def close_all_connections(self):
-        for conn in self.pool:
-            conn.close()
-        self.pool.clear()
-        self.chunk_processor.stop()
-        logging.info("All database connections closed and chunk processor stopped")
+        with self.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                cursor.executemany(query, params_list)
+                conn.commit()
+            except sqlite3.Error as e:
+                logging.error(f"Database error: {e}, Query: {query}")
+                raise DatabaseError(f"Database error: {e}, Query: {query}")
 
 db = Database()
 
@@ -694,6 +548,9 @@ def get_next_media_id():
 #
 # End of Media-related Functions
 #######################################################################################################################
+
+
+#######################################################################################################################
 # Keyword-related Functions
 #
 
@@ -841,71 +698,6 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     except Exception as e:
         logging.error(f"Unexpected Error in add_media_with_keywords: {e}")
         raise DatabaseError(f"Unexpected error: {e}")
-    # try:
-    #     with db.get_connection() as conn:
-    #         conn.execute("BEGIN TRANSACTION")
-    #         cursor = conn.cursor()
-    #
-    #         # Check if media already exists
-    #         cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
-    #         existing_media = cursor.fetchone()
-    #
-    #         if existing_media:
-    #             media_id = existing_media[0]
-    #             logging.info(f"Updating existing media with ID: {media_id}")
-    #
-    #             cursor.execute('''
-    #             UPDATE Media
-    #             SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?
-    #             WHERE id = ?
-    #             ''', (content, transcription_model, title, media_type, author, ingestion_date, media_id))
-    #         else:
-    #             logging.info("Creating new media entry")
-    #
-    #             cursor.execute('''
-    #             INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
-    #             VALUES (?, ?, ?, ?, ?, ?, ?)
-    #             ''', (url, title, media_type, content, author, ingestion_date, transcription_model))
-    #             media_id = cursor.lastrowid
-    #
-    #         logging.info(f"Adding new modification to MediaModifications for media ID: {media_id}")
-    #         cursor.execute('''
-    #         INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-    #         VALUES (?, ?, ?, ?)
-    #         ''', (media_id, prompt, summary, ingestion_date))
-    #         logger.info("New modification added to MediaModifications")
-    #
-    #         # Insert keywords and associate with media item
-    #         logging.info("Processing keywords")
-    #         for keyword in keyword_list:
-    #             keyword = keyword.strip().lower()
-    #             cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
-    #             cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-    #             keyword_id = cursor.fetchone()[0]
-    #             cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)',
-    #                            (media_id, keyword_id))
-    #
-    #         # Update full-text search index
-    #         logging.info("Updating full-text search index")
-    #         cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
-    #                        (media_id, title, content))
-    #
-    #         logging.info("Adding new media version")
-    #         add_media_version(media_id, prompt, summary)
-    #
-    #         conn.commit()
-    #         logging.info(f"Media '{title}' successfully added/updated with ID: {media_id}")
-    #
-    #         return f"Media '{title}' added/updated successfully with keywords: {', '.join(keyword_list)}"
-    #
-    # except sqlite3.Error as e:
-    #     conn.rollback()
-    #     logging.error(f"SQL Error: {e}")
-    #     raise DatabaseError(f"Error adding media with keywords: {e}")
-    # except Exception as e:
-    #     conn.rollback()
-    #     logging.error(f"Unexpected Error: {e}")
-    #     raise DatabaseError(f"Unexpected error: {e}")
 
 
 def ingest_article_to_db(url, title, author, content, keywords, summary, ingestion_date, custom_prompt):
@@ -1057,6 +849,9 @@ def update_keywords_for_media(media_id, keyword_list):
 #
 # End of Keyword-related functions
 #######################################################################################################################
+
+
+#######################################################################################################################
 #
 # Media-related Functions
 
@@ -1112,7 +907,10 @@ def fetch_item_details(media_id: int):
         return "", "", ""
 
 #
-#
+#  End of Media-related Functions
+#######################################################################################################################
+
+
 #######################################################################################################################
 #
 # Media-related Functions
@@ -1320,88 +1118,79 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            conn.execute("BEGIN TRANSACTION")
-            try:
-                # Extract content from segments
-                if isinstance(segments, list):
-                    content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
-                elif isinstance(segments, dict):
-                    content = segments.get('text', '') or segments.get('content', '')
-                else:
-                    content = str(segments)
 
-                # Process keywords
-                if isinstance(keywords, str):
-                    keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
-                elif isinstance(keywords, (list, tuple)):
-                    keyword_list = [keyword.strip().lower() for keyword in keywords]
-                else:
-                    keyword_list = ['default']
+            # Extract content from segments
+            if isinstance(segments, list):
+                content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
+            elif isinstance(segments, dict):
+                content = segments.get('text', '') or segments.get('content', '')
+            else:
+                content = str(segments)
 
-                # Check if media already exists
-                cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
-                existing_media = cursor.fetchone()
+            # Process keywords
+            if isinstance(keywords, str):
+                keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
+            elif isinstance(keywords, (list, tuple)):
+                keyword_list = [keyword.strip().lower() for keyword in keywords]
+            else:
+                keyword_list = ['default']
 
-                if existing_media:
-                    media_id = existing_media[0]
-                    cursor.execute('''
-                    UPDATE Media 
-                    SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?
-                    WHERE id = ?
-                    ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
-                          info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
-                else:
-                    cursor.execute('''
-                    INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
-                          info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model, 'pending'))
-                    media_id = cursor.lastrowid
+            # Check if media already exists
+            cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
+            existing_media = cursor.fetchone()
 
-                # Add modification
+            if existing_media:
+                media_id = existing_media[0]
                 cursor.execute('''
-                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-                VALUES (?, ?, ?, ?)
-                ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
-
-                # Process keywords
-                for keyword in keyword_list:
-                    cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
-                    cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-                    keyword_id = cursor.fetchone()[0]
-                    cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)',
-                                   (media_id, keyword_id))
-
-                # Update full-text search index
-                cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
-                               (media_id, info_dict.get('title', 'Untitled'), content))
-
-                # Add media version
-                cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
-                current_version = cursor.fetchone()[0] or 0
+                UPDATE Media 
+                SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?
+                WHERE id = ?
+                ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
+                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
+            else:
                 cursor.execute('''
-                INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
-                VALUES (?, ?, ?, ?, ?)
-                ''', (media_id, current_version + 1, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
+                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model, 'pending'))
+                media_id = cursor.lastrowid
 
-                conn.commit()
+            # Add modification
+            cursor.execute('''
+            INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+            VALUES (?, ?, ?, ?)
+            ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
 
-                # Schedule chunking
-                schedule_chunking(media_id, content, info_dict.get('title', 'Untitled'))
+            # Process keywords
+            for keyword in keyword_list:
+                cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+                cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+                keyword_id = cursor.fetchone()[0]
+                cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)',
+                               (media_id, keyword_id))
 
-                # FIXME - Figure out how to schedule chunk embedding
-                # Schedule chunk conversion to embeddings & Ingestion into ChromaDB
-                # schedule_embedding(media_id, content, info_dict.get('title', 'Untitled'), summary)
+            # Update full-text search index
+            cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
+                           (media_id, info_dict.get('title', 'Untitled'), content))
 
-                return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}. Chunking scheduled."
+            # Add media version
+            cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
+            current_version = cursor.fetchone()[0] or 0
+            cursor.execute('''
+            INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (media_id, current_version + 1, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
 
-            except Exception as e:
-                conn.rollback()
-                raise e
+            conn.commit()
 
-    except sqlite3.Error as e:
+        # Schedule chunking
+        schedule_chunking(media_id, content, info_dict.get('title', 'Untitled'))
+
+        return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}. Chunking scheduled."
+
+    except DatabaseError as e:
         logging.error(f"Database error: {e}")
-        raise DatabaseError(f"Error adding media with keywords: {e}")
+        raise
     except Exception as e:
         logging.error(f"Unexpected error: {e}")
         raise DatabaseError(f"Unexpected error: {e}")
@@ -1433,190 +1222,11 @@ def schedule_chunking(media_id: int, content: str, media_name: str):
         logging.error(f"Error scheduling chunking for media_id {media_id}: {str(e)}")
         # You might want to update the chunking_status to 'failed' here
 
-
-#9/12
-# def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
-#     db = Database()
-#     try:
-#         with db.get_connection() as conn:
-#             cursor = conn.cursor()
-#
-#             # Extract content from segments
-#             if isinstance(segments, list):
-#                 content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
-#             elif isinstance(segments, dict):
-#                 content = segments.get('text', '') or segments.get('content', '')
-#             else:
-#                 content = str(segments)
-#
-#             # Process keywords
-#             if isinstance(keywords, str):
-#                 keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
-#             elif isinstance(keywords, (list, tuple)):
-#                 keyword_list = [keyword.strip().lower() for keyword in keywords]
-#             else:
-#                 keyword_list = ['default']
-#
-#             # Check if media already exists
-#             cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
-#             existing_media = cursor.fetchone()
-#
-#             if existing_media:
-#                 media_id = existing_media[0]
-#                 cursor.execute('''
-#                 UPDATE Media
-#                 SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?
-#                 WHERE id = ?
-#                 ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
-#                       info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), media_id))
-#             else:
-#                 cursor.execute('''
-#                 INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
-#                 VALUES (?, ?, ?, ?, ?, ?, ?)
-#                 ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
-#                       info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model))
-#                 media_id = cursor.lastrowid
-#
-#             # Add modification
-#             cursor.execute('''
-#             INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-#             VALUES (?, ?, ?, ?)
-#             ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
-#
-#             # Process keywords
-#             for keyword in keyword_list:
-#                 cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
-#                 cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-#                 keyword_id = cursor.fetchone()[0]
-#                 cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)',
-#                                (media_id, keyword_id))
-#
-#             # Update full-text search index
-#             cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
-#                            (media_id, info_dict.get('title', 'Untitled'), content))
-#
-#             # Add media version
-#             cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
-#             current_version = cursor.fetchone()[0] or 0
-#             cursor.execute('''
-#             INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
-#             VALUES (?, ?, ?, ?, ?)
-#             ''', (
-#             media_id, current_version + 1, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-#
-#         return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}"
-#
-#     except sqlite3.Error as e:
-#         logging.error(f"Database error: {e}")
-#         raise DatabaseError(f"Error adding media with keywords: {e}")
-#     except Exception as e:
-#         logging.error(f"Unexpected error: {e}")
-#         raise DatabaseError(f"Unexpected error: {e}")
-
-
-
-# Add ingested media to DB
-# def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
-#     max_retries = 5
-#     base_delay = 0.1
-#
-#     for attempt in range(max_retries):
-#         try:
-#             with db.get_connection() as conn:
-#                 cursor = conn.cursor()
-#                 conn.execute("BEGIN TRANSACTION")
-#
-#                 try:
-#                     # Extract content from segments
-#                     if isinstance(segments, list):
-#                         content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
-#                     elif isinstance(segments, dict):
-#                         content = segments.get('text', '') or segments.get('content', '')
-#                     else:
-#                         content = str(segments)
-#
-#                     # Process keywords
-#                     if isinstance(keywords, str):
-#                         keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
-#                     elif isinstance(keywords, (list, tuple)):
-#                         keyword_list = [keyword.strip().lower() for keyword in keywords]
-#                     else:
-#                         keyword_list = ['default']
-#
-#                     # Check if media already exists
-#                     cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
-#                     existing_media = cursor.fetchone()
-#
-#                     if existing_media:
-#                         media_id = existing_media[0]
-#                         cursor.execute('''
-#                         UPDATE Media
-#                         SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?
-#                         WHERE id = ?
-#                         ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
-#                               info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), media_id))
-#                     else:
-#                         cursor.execute('''
-#                         INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
-#                         VALUES (?, ?, ?, ?, ?, ?, ?)
-#                         ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
-#                               info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model))
-#                         media_id = cursor.lastrowid
-#
-#                     # Add modification
-#                     cursor.execute('''
-#                     INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-#                     VALUES (?, ?, ?, ?)
-#                     ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
-#
-#                     # Process keywords
-#                     for keyword in keyword_list:
-#                         cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
-#                         cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-#                         keyword_id = cursor.fetchone()[0]
-#                         cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)',
-#                                        (media_id, keyword_id))
-#
-#                     # Update full-text search index
-#                     cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
-#                                    (media_id, info_dict.get('title', 'Untitled'), content))
-#
-#                     # Add media version
-#                     cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
-#                     current_version = cursor.fetchone()[0] or 0
-#                     cursor.execute('''
-#                     INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
-#                     VALUES (?, ?, ?, ?, ?)
-#                     ''', (media_id, current_version + 1, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-#
-#                     # Create initial document version
-#                     create_document_version(media_id, content)
-#                     # Commit the transaction
-#                     conn.commit()
-#                     logging.info(
-#                         f"Media '{info_dict.get('title', 'Untitled')}' successfully added/updated with ID: {media_id}")
-#                     return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}"
-#
-#                 except Exception as e:
-#                     conn.rollback()
-#                     raise e
-#
-#         except sqlite3.OperationalError as e:
-#             if 'database is locked' in str(e) and attempt < max_retries - 1:
-#                 delay = base_delay * (2 ** attempt)
-#                 logging.warning(f"Database is locked, retrying in {delay:.2f} seconds...")
-#                 time.sleep(delay)
-#             else:
-#                 logging.error(f"Database error after {attempt + 1} attempts: {e}")
-#                 raise DatabaseError(f"Error adding media with keywords: {e}")
-#         except Exception as e:
-#             logging.error(f"Unexpected error: {e}")
-#             raise DatabaseError(f"Unexpected error: {e}")
-#
-#     raise DatabaseError("Failed to add media to database after multiple attempts")
-
 #
 # End of ....
+#######################################################################################################################
+
+
 #######################################################################################################################
 #
 # Functions to manage prompts DB
@@ -1879,6 +1489,9 @@ def delete_prompt(prompt_id):
 
 #
 #
+#######################################################################################################################
+
+
 #######################################################################################################################
 #
 # Function to fetch/update media content
@@ -2144,6 +1757,9 @@ def search_and_display_items(query, search_type, page, entries_per_page,char_cou
 #
 # End of Functions to manage prompts DB / Fetch and update media content
 #######################################################################################################################
+
+
+#######################################################################################################################
 #
 # Obsidian-related Functions
 
@@ -2208,6 +1824,9 @@ def import_obsidian_note_to_db(note_data):
 
 #
 # End of Obsidian-related Functions
+#######################################################################################################################
+
+
 #######################################################################################################################
 #
 # Chat-related Functions
@@ -2811,6 +2430,9 @@ def get_paginated_files(page: int = 1, results_per_page: int = 50) -> Tuple[List
 #
 # End of Functions to handle deletion of media items
 #######################################################################################################################
+
+
+#######################################################################################################################
 #
 # Functions to manage document versions
 
@@ -2884,6 +2506,48 @@ def get_document_version(media_id: int, version_number: int = None) -> Dict[str,
 #######################################################################################################################
 
 
+#######################################################################################################################
+#
+# Functions to manage media chunks
+
+def process_chunks(database, chunks: List[Dict], media_id: int, batch_size: int = 100):
+    """
+    Process chunks in batches and insert them into the database.
+
+    :param database: Database instance to use for inserting chunks
+    :param chunks: List of chunk dictionaries
+    :param media_id: ID of the media these chunks belong to
+    :param batch_size: Number of chunks to process in each batch
+    """
+    total_chunks = len(chunks)
+    processed_chunks = 0
+
+    for i in range(0, total_chunks, batch_size):
+        batch = chunks[i:i + batch_size]
+        chunk_data = [
+            (media_id, chunk['text'], chunk['start_index'], chunk['end_index'])
+            for chunk in batch
+        ]
+
+        try:
+            database.execute_many(
+                "INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index) VALUES (?, ?, ?, ?)",
+                chunk_data
+            )
+            processed_chunks += len(batch)
+            logging.info(f"Processed {processed_chunks}/{total_chunks} chunks for media_id {media_id}")
+        except Exception as e:
+            logging.error(f"Error inserting chunk batch for media_id {media_id}: {e}")
+            # Optionally, you could raise an exception here to stop processing
+            # raise
+
+    logging.info(f"Finished processing all {total_chunks} chunks for media_id {media_id}")
+
+
+# Usage example:
+# chunks = [{'text': 'chunk1', 'start_index': 0, 'end_index': 10}, ...]
+# process_chunks(db, chunks, media_id=1, batch_size=100)
+
 def batch_insert_chunks(conn, chunks, media_id):
     cursor = conn.cursor()
     chunk_data = [(
@@ -2956,20 +2620,3 @@ def update_media_chunks_table():
 update_media_chunks_table()
 # Above function is a dirty hack that should be merged into the initial DB creation statement. This is a placeholder
 # FIXME
-
-def ensure_chunking_status_column(db):
-    try:
-        db.execute_query('''
-        ALTER TABLE Media
-        ADD COLUMN chunking_status TEXT DEFAULT 'pending'
-        ''')
-        logging.info("Added chunking_status column to Media table")
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" not in str(e).lower():
-            logging.error(f"Error adding chunking_status column: {e}")
-        else:
-            logging.info("chunking_status column already exists in Media table")
-    except Exception as e:
-        logging.error(f"Unexpected error adding chunking_status column: {e}")
-
-ensure_chunking_status_column(db)
