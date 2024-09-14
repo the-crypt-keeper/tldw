@@ -23,7 +23,6 @@ import subprocess
 import tempfile
 import threading
 import time
-import configparser
 # DEBUG Imports
 #from memory_profiler import profile
 import pyaudio
@@ -54,6 +53,12 @@ def get_whisper_model(model_name, device):
     if whisper_model_instance is None:
         from faster_whisper import WhisperModel
         logging.info(f"Initializing new WhisperModel with size {model_name} on device {device}")
+
+        # FIXME - add logic to detect if the model is already downloaded
+        # want to first check if the model is already downloaded
+        # if not, download it using the existing logic in 'WhisperModel'
+        # https://github.com/SYSTRAN/faster-whisper/blob/d57c5b40b06e59ec44240d93485a95799548af50/faster_whisper/transcribe.py#L584
+        # Designated path should be `tldw/App_Function_Libraries/models/Whisper/`
         whisper_model_instance = WhisperModel(model_name, device=device)
     return whisper_model_instance
 
