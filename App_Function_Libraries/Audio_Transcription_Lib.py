@@ -101,8 +101,9 @@ class WhisperModel(OriginalWhisperModel):
             num_workers=num_workers,
             download_root=download_root,
             local_files_only=local_files_only,
-            files=files,
-            **model_kwargs
+# Maybe? idk, FIXME
+#            files=files,
+#            **model_kwargs
         )
 
 def get_whisper_model(model_name, device):
