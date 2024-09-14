@@ -333,21 +333,22 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 
 # Summarize with Cohere
 def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_prompt=None):
-    global cohere_api_key
-    cohere_api_key = api_key
     loaded_config_data = load_and_log_configs()
+    logging.debug(f"Cohere API Key from parameter: {api_key}")
+    logging.debug(f"Cohere API Key from config: {loaded_config_data['api_keys']['cohere']}")
     try:
         # API key validation
-        if not api_key:
+        if api_key is None:
             logging.info("cohere: API key not provided as parameter")
             logging.info("cohere: Attempting to use API key from config file")
             cohere_api_key = loaded_config_data['api_keys']['cohere']
+            logging.debug(f"cohere: Using API key from config file: {cohere_api_key}")
 
-        if not api_key or api_key.strip() == "":
+        else:
             logging.error("cohere: API key not found or is empty")
             return "cohere: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"cohere: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        logging.debug(f"cohere: Using API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:]}")
 
         logging.debug(f"Cohere: Loaded data: {input_data}")
         logging.debug(f"Cohere: Type of data: {type(input_data)}")
@@ -382,6 +383,7 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
 
         logging.debug("cohere: Submitting request to API endpoint")
         print("cohere: Submitting request to API endpoint")
+        logging.debug(f"API Key being passed to chat_with_cohere: {api_key}")
         response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
         response_data = response.json()
         logging.debug(f"Full API response data: {response_data}")
@@ -402,7 +404,7 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
 
     except Exception as e:
         logging.error("cohere: Error in processing: %s", str(e))
-        return f"cohere: Error occurred while processing summary with Cohere: {str(e)}"
+        return f"cohere: Error occurred while processing chat request with Cohere: {str(e)}"
 
 
 # https://console.groq.com/docs/quickstart

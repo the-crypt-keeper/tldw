@@ -3,6 +3,7 @@
 #
 # Imports
 import base64
+import io
 from datetime import datetime as datetime
 import logging
 import json
@@ -394,7 +395,14 @@ def import_character_card(file):
             json_data = extract_json_from_image(file)
             if json_data:
                 logging.info("JSON data extracted from image, attempting to parse")
-                return import_character_card_json(json_data)
+                card_data = import_character_card_json(json_data)
+                if card_data:
+                    # Save the image data
+                    with Image.open(file) as img:
+                        img_byte_arr = io.BytesIO()
+                        img.save(img_byte_arr, format='PNG')
+                        card_data['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+                return card_data
             else:
                 logging.warning("No JSON data found in the image")
         else:
@@ -480,6 +488,7 @@ def create_character_card_interaction_tab():
         gr.Markdown("# Chat with a Character Card")
         with gr.Row():
             with gr.Column(scale=1):
+                character_image = gr.Image(label="Character Image", type="filepath")
                 character_card_upload = gr.File(label="Upload Character Card")
                 import_card_button = gr.Button("Import Character Card")
                 load_characters_button = gr.Button("Load Existing Characters")
@@ -505,6 +514,7 @@ def create_character_card_interaction_tab():
                 user_input = gr.Textbox(label="Your message")
                 send_message_button = gr.Button("Send Message")
                 regenerate_button = gr.Button("Regenerate Last Message")
+                clear_chat_button = gr.Button("Clear Chat")
                 save_chat_button = gr.Button("Save This Chat")
                 save_status = gr.Textbox(label="Save Status", interactive=False)
 
@@ -545,8 +555,28 @@ def create_character_card_interaction_tab():
         char_data = characters.get(name)
         if char_data:
             first_message = char_data.get('first_mes', "Hello! I'm ready to chat.")
-            return char_data, [(None, first_message)] if first_message else []
-        return None, []
+            return char_data, [(None, first_message)] if first_message else [], None
+        return None, [], None
+
+    def load_character_image(name):
+        from App_Function_Libraries.Chat import load_characters
+        characters = load_characters()
+        char_data = characters.get(name)
+        if char_data and 'image_path' in char_data:
+            image_path = char_data['image_path']
+            if os.path.exists(image_path):
+                return image_path
+            else:
+                logging.warning(f"Image file not found: {image_path}")
+        return None
+
+    def load_character_and_image(name):
+        char_data, chat_history, _ = load_character(name)
+        image_path = load_character_image(name)
+        logging.debug(f"Character: {name}")
+        logging.debug(f"Character data: {char_data}")
+        logging.debug(f"Image path: {image_path}")
+        return char_data, chat_history, image_path
 
     def character_chat_wrapper(message, history, char_data, api_endpoint, api_key, temperature, user_name):
         logging.debug("Entered character_chat_wrapper")
@@ -663,6 +693,67 @@ def create_character_card_interaction_tab():
         outputs=[chat_history, character_data, save_status]
     )
 
+    def update_character_info(name):
+        from App_Function_Libraries.Chat import load_characters
+        characters = load_characters()
+        char_data = characters.get(name)
+
+        image_path = char_data.get('image_path') if char_data else None
+
+        logging.debug(f"Character: {name}")
+        logging.debug(f"Character data: {char_data}")
+        logging.debug(f"Image path: {image_path}")
+
+        if image_path:
+            if os.path.exists(image_path):
+                logging.debug(f"Image file exists at {image_path}")
+                if os.access(image_path, os.R_OK):
+                    logging.debug(f"Image file is readable")
+                else:
+                    logging.warning(f"Image file is not readable: {image_path}")
+                    image_path = None
+            else:
+                logging.warning(f"Image file does not exist: {image_path}")
+                image_path = None
+        else:
+            logging.warning("No image path provided for the character")
+
+        return char_data, None, image_path  # Return None for chat_history
+
+    def on_character_select(name):
+        logging.debug(f"Character selected: {name}")
+        return update_character_info_with_error_handling(name)
+
+    def clear_chat_history():
+        return [], None  # Return empty list for chat_history and None for character_data
+
+    def update_character_info_with_error_handling(name):
+        logging.debug(f"Entering update_character_info_with_error_handling for character: {name}")
+        try:
+            char_data, _, image_path = update_character_info(name)
+            logging.debug(f"Retrieved data: char_data={bool(char_data)}, image_path={image_path}")
+
+            if char_data:
+                first_message = char_data.get('first_mes', "Hello! I'm ready to chat.")
+                chat_history = [(None, first_message)] if first_message else []
+            else:
+                chat_history = []
+
+            logging.debug(f"Created chat_history with length: {len(chat_history)}")
+
+            if image_path and os.path.exists(image_path):
+                logging.debug(f"Image file exists at {image_path}")
+                return char_data, chat_history, image_path
+            else:
+                logging.warning(f"Image not found or invalid path: {image_path}")
+                return char_data, chat_history, None
+        except Exception as e:
+            logging.error(f"Error updating character info: {str(e)}", exc_info=True)
+            return None, [], None
+        finally:
+            logging.debug("Exiting update_character_info_with_error_handling")
+
+
     import_card_button.click(
         fn=import_character,
         inputs=[character_card_upload],
@@ -674,10 +765,16 @@ def create_character_card_interaction_tab():
         outputs=character_dropdown
     )
 
+    clear_chat_button.click(
+        fn=clear_chat_history,
+        inputs=[],
+        outputs=[chat_history, character_data]
+    )
+
     character_dropdown.change(
-        fn=load_character,
+        fn=on_character_select,
         inputs=[character_dropdown],
-        outputs=[character_data, chat_history]
+        outputs=[character_data, chat_history, character_image]
     )
 
     send_message_button.click(
@@ -704,8 +801,7 @@ def create_character_card_interaction_tab():
         outputs=[save_status]
     )
 
-    return character_data, chat_history, user_input, user_name
-
+    return character_data, chat_history, user_input, user_name, character_image
 
 def create_mikupad_tab():
     with gr.TabItem("Mikupad"):
