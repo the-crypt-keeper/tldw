@@ -501,7 +501,7 @@ def create_character_card_interaction_tab():
 
 
             with gr.Column(scale=2):
-                chat_history = gr.Chatbot(label="Conversation")
+                chat_history = gr.Chatbot(label="Conversation", height=800)
                 user_input = gr.Textbox(label="Your message")
                 send_message_button = gr.Button("Send Message")
                 regenerate_button = gr.Button("Regenerate Last Message")
