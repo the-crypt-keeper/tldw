@@ -1,28 +1,28 @@
 [API]
-anthropic_api_key = <anthropic_API_Key>
+anthropic_api_key = <anthropic_api_key>
 anthropic_model = claude-3-5-sonnet-20240620
-cohere_api_key = <Cohere_API_Key>
+cohere_api_key = <cohere_api_key>
 cohere_model = command-r-plus
-groq_api_key = <Groq_API_Key>
+groq_api_key = <groq_api_key>
 groq_model = llama3-70b-8192
-openai_api_key = <OpenAI_API_Key>
+openai_api_key = <openai_api_key>
 openai_model = gpt-4o
 huggingface_api_key = <huggingface_api_token>
 huggingface_model = CohereForAI/c4ai-command-r-plus
-openrouter_api_key = <OpenRouter_API_Key>
+openrouter_api_key = <openrouter_api_key>
 openrouter_model = mistralai/mistral-7b-instruct:free
-deepseek_api_key = <DeepSeek_API_Key>
+deepseek_api_key = <deepseek-api-key>
 deepseek_model = deepseek-chat
 mistral_model = mistral-large-latest
-mistral_api_key = <mistral_api_key>
-custom_openai_api = <key_here>
+mistral_api_key = <mistral_api_key>>
+custom_openai_api_key = <key_here>
 custom_openai_api_ip = <api_ip_here>
 
 [Local-API]
-kobold_api_key =
 kobold_api_IP = http://127.0.0.1:5001/api/v1/generate
-llama_api_key = <llama.cpp api key>
+kobold_api_key = <kobold api key>
 llama_api_IP = http://127.0.0.1:8080/completion
+llama_api_key = <llama.cpp api key>
 ooba_api_key = <ooba api key>
 ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
 tabby_api_IP = http://127.0.0.1:5000/v1/chat/completions
@@ -34,9 +34,6 @@ ollama_api_key = <ollama api key>
 ollama_model = <ollama model>
 aphrodite_api_IP = http://127.0.0.1:8080/completion
 aphrodite_api_key = <aphrodite_api_key>
-[Paths]
-output_path = Results
-logging_file = Logs
 
 [Processing]
 processing_choice = cuda
@@ -51,32 +48,35 @@ video_summarize_prompt = "Above is the transcript of a video. Please read throug
 
 [Database]
 type = sqlite
-sqlite_path = media_summary.db
-backup_path = /tldw_DB_Backups/
+sqlite_path = Databases/media_summary.db
+backup_path = ./tldw_DB_Backups/
 #Path to the backup location for the database. If the path does not exist, the backup will not be created.
 elasticsearch_host = localhost
 elasticsearch_port = 9200
 # Additionally you can use elasticsearch as the database type, just replace `sqlite` with `elasticsearch` for `type` and provide the `elasticsearch_host` and `elasticsearch_port` of your configured ES instance.
-chroma_db_path = chroma_db
+chroma_db_path = Databases/chroma_db
+prompts_db_path = Databases/prompts.db
 
 [Embeddings]
-provider = openai
-# Can be 'openai', 'local', or 'huggingface'
-model = text-embedding-3-small
-# Model name or path
-api_key = your_api_key_here
-api_url = http://localhost:8080/v1/embeddings
-# Only needed for 'local' provider
+embedding_provider = openai
+embedding_model = text-embedding-3-small
+embedding_api_url = http://localhost:8080/v1/embeddings
+embedding_api_key = your_api_key_here
+chunk_size = 400
+overlap = 200
+# 'embedding_provider' Can be 'openai', 'local', or 'huggingface'
+# `embedding_model` Set to the model name you want to use for embeddings. For OpenAI, this can be 'text-embedding-3-small', or 'text-embedding-3-large'.
+# huggingface: model = dunzhang/stella_en_400M_v5
 
 [Chunking]
 method = words
+# 'method' Can be 'words' / 'sentences' / 'paragraphs' / 'semantic' / 'tokens'
 max_size = 400
 overlap = 200
 adaptive = false
+# Use ntlk+punkt to split text into sentences and then ID average sentence length and set that as the chunk size
 multi_level = false
 language = english
-
-
 
 
 #[Comments]
@@ -99,5 +99,6 @@ language = english
 #    open-mixtral-8x7b
 #    open-mixtral-8x22b
 #    open-codestral-mamba
+
 
 
