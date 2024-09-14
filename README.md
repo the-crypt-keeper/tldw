@@ -151,6 +151,8 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 ### <a name="quickstart">Quickstart</a>
 
 #### Automatic Quickstart
+- Docker: Dockerfiles in the `Helper_Scripts/Dockerfiles` directory. 
+  - There's a docker build for GPU use and plain CPU use.
 1. **Download the Installer Script for your OS:**
    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
    - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
@@ -300,21 +302,6 @@ None of these companies exist to provide AI services in 2024. They’re only doi
         - Download and install from: https://pandoc.org/installing.html
 - **Converting Epub to markdown**
     - `pandoc -f epub -t markdown -o output.md input.epub`
-- **Setting up PDF to Markdown conversion with Marker** (Optional - Necessary to do PDF ingestion/conversion)
-    - **Linux**
-        1. `sudo apt install python3-venv`
-        2. `python3 -m venv ./Helper_Scripts/marker_venv`
-        3. `source ./Helper_Scripts/marker_venv/bin/activate`  
-        4. `pip install marker`
-    - **Windows**
-        1. Install python3 from https://www.python.org/downloads/
-        2. `python Helper_Scripts\marker_venv\Scripts\activate\activate.ps1`
-        3. `pip install marker`
-- **Converting PDF to markdown**
-    - Convert a Single PDF to Markdown:
-        * `marker_single /path/to/file.pdf /path/to/output/folder --batch_multiplier 2 --langs English`
-    - Convert a Folder of PDFs to Markdown:
-        * `marker /path/to/folder/with/pdfs /path/to/output/folder --batch_multiplier 2 --langs English`
 - **Ingest Converted text files en-masse**
     - `python summarize.py <path_to_text_file> --ingest_text_file --text_title "Title" --text_author "Author Name" -k additional,keywords`
 
