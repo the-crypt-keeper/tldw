@@ -272,7 +272,7 @@ def create_tables(db) -> None:
             transcription_model TEXT,
             is_trash BOOLEAN DEFAULT 0,
             trash_date DATETIME,
-            vector_embedding BLOB
+            vector_embedding BLOB,
             chunking_status TEXT DEFAULT 'pending'
         )
         ''',
@@ -2615,8 +2615,41 @@ def update_media_chunks_table():
         ''')
         cursor.execute('DROP TABLE MediaChunks')
         cursor.execute('ALTER TABLE MediaChunks_new RENAME TO MediaChunks')
+
     logger.info("Updated MediaChunks table schema")
 
 update_media_chunks_table()
 # Above function is a dirty hack that should be merged into the initial DB creation statement. This is a placeholder
 # FIXME
+
+
+# This is backwards compatibility for older setups.
+# Function to add a missing column to the Media table
+def add_missing_column_if_not_exists(db, table_name, column_name, column_definition):
+    try:
+        # Check if the column already exists in the table
+        cursor = db.cursor()
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = [column[1] for column in cursor.fetchall()]
+
+        # If the column is not found, add it
+        if column_name not in columns:
+            logging.info(f"Adding missing column '{column_name}' to table '{table_name}'")
+            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_definition}")
+            db.commit()
+            logging.info(f"Column '{column_name}' added successfully.")
+        else:
+            logging.info(f"Column '{column_name}' already exists in table '{table_name}'")
+
+    except sqlite3.Error as e:
+        logging.error(f"Error checking or adding column '{column_name}' in table '{table_name}': {e}")
+        raise
+
+# Example usage of the function
+def update_media_table(db):
+    # Add chunking_status column if it doesn't exist
+    add_missing_column_if_not_exists(db, 'Media', 'chunking_status', "TEXT DEFAULT 'pending'")
+
+#
+# End of Functions to manage media chunks
+#######################################################################################################################
