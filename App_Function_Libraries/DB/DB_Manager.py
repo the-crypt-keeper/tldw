@@ -5,18 +5,14 @@
 import configparser
 import os
 import logging
-import queue
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 from typing import Tuple, List, Union, Dict
-import sqlite3
 import time
 #
 # 3rd-Party Libraries
 from elasticsearch import Elasticsearch
 #
 # Import your existing SQLite functions
+from App_Function_Libraries.DB.SQLite_DB import DatabaseError
 from App_Function_Libraries.DB.SQLite_DB import (
     update_media_content as sqlite_update_media_content,
     list_prompts as sqlite_list_prompts,
@@ -51,21 +47,24 @@ from App_Function_Libraries.DB.SQLite_DB import (
     search_and_display_items as sqlite_search_and_display_items,
     get_conversation_name as sqlite_get_conversation_name,
     add_media_with_keywords as sqlite_add_media_with_keywords,
-    check_media_and_whisper_model as sqlite_check_media_and_whisper_model,
-    DatabaseError, create_document_version as sqlite_create_document_version,
+    check_media_and_whisper_model as sqlite_check_media_and_whisper_model, \
+    create_document_version as sqlite_create_document_version,
     get_document_version as sqlite_get_document_version, sqlite_search_db, add_media_chunk as sqlite_add_media_chunk,
     sqlite_update_fts_for_media, sqlite_get_unprocessed_media, fetch_item_details as sqlite_fetch_item_details, \
     search_media_database as sqlite_search_media_database, mark_as_trash as sqlite_mark_as_trash, \
     get_media_transcripts as sqlite_get_media_transcripts, get_specific_transcript as sqlite_get_specific_transcript, \
     get_media_summaries as sqlite_get_media_summaries, get_specific_summary as sqlite_get_specific_summary, \
     get_media_prompts as sqlite_get_media_prompts, get_specific_prompt as sqlite_get_specific_prompt, \
-    delete_specific_transcript as sqlite_delete_specific_transcript, delete_specific_summary as sqlite_delete_specific_summary, \
-    delete_specific_prompt as sqlite_delete_specific_prompt, fetch_keywords_for_media as sqlite_fetch_keywords_for_media, \
+    delete_specific_transcript as sqlite_delete_specific_transcript,
+    delete_specific_summary as sqlite_delete_specific_summary, \
+    delete_specific_prompt as sqlite_delete_specific_prompt,
+    fetch_keywords_for_media as sqlite_fetch_keywords_for_media, \
     update_keywords_for_media as sqlite_update_keywords_for_media, check_media_exists as sqlite_check_media_exists, \
     search_prompts as sqlite_search_prompts, get_media_content as sqlite_get_media_content, \
     get_paginated_files as sqlite_get_paginated_files, get_media_title as sqlite_get_media_title, \
-    get_all_content_from_database as sqlite_get_all_content_from_database, get_next_media_id as sqlite_get_next_media_id, \
-    batch_insert_chunks as sqlite_batch_insert_chunks,
+    get_all_content_from_database as sqlite_get_all_content_from_database,
+    get_next_media_id as sqlite_get_next_media_id, \
+    batch_insert_chunks as sqlite_batch_insert_chunks, Database,
 )
 #
 # Local Imports
@@ -73,245 +72,68 @@ from App_Function_Libraries.Utils.Utils import load_comprehensive_config, get_da
 #
 # End of imports
 ############################################################################################################
-#
-# Globals
 
-# Load configuration from config file
+
+############################################################################################################
+#
+# Database Config loading
+
+logger = logging.getLogger(__name__)
+
 config_path = get_project_relative_path('Config_Files/config.txt')
 config = configparser.ConfigParser()
 config.read(config_path)
 
 db_path: str = config.get('Database', 'sqlite_path', fallback='./Databases/media_summary.db')
-
 backup_path: str = config.get('Database', 'backup_path', fallback='database_backups')
-
 backup_dir: Union[str, bytes] = os.environ.get('DB_BACKUP_DIR', backup_path)
 
-#
-# End of Globals
-############################################################################################################
-#
-# Database Manager Class
+def get_db_config():
+    try:
+        config = load_comprehensive_config()
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+        if 'Database' not in config:
+            print("Warning: 'Database' section not found in config. Using default values.")
+            return default_db_config()
 
-# Chunk Processor Class
-class ChunkProcessor:
-    def __init__(self, db, num_workers=5, batch_size=100, max_retries=3):
-        self.db = db
-        self.chunk_queue = queue.Queue()
-        self.num_workers = num_workers
-        self.batch_size = batch_size
-        self.max_retries = max_retries
-        self.executor = ThreadPoolExecutor(max_workers=num_workers)
-        self.stop_event = threading.Event()
-        self.processed_count = 0
-        self.error_count = 0
-
-    def start(self):
-        for _ in range(self.num_workers):
-            self.executor.submit(self.worker)
-
-    def stop(self):
-        self.stop_event.set()
-        self.executor.shutdown(wait=True)
-
-    def worker(self):
-        while not self.stop_event.is_set():
-            batch = []
-            try:
-                while len(batch) < self.batch_size:
-                    try:
-                        item = self.chunk_queue.get(timeout=1)
-                        batch.append(item)
-                    except queue.Empty:
-                        if len(batch) > 0:
-                            break
-                        if self.stop_event.is_set():
-                            return
-
-                if batch:
-                    self.process_batch(batch)
-            except Exception as e:
-                logger.error(f"Error in worker: {str(e)}")
-                self.error_count += 1
-
-    def process_batch(self, batch):
-        retries = 0
-        while retries < self.max_retries:
-            try:
-                with self.db.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("BEGIN TRANSACTION")
-                    try:
-                        for item in batch:
-                            self.batch_insert_chunks(cursor, item['chunks'], item['media_id'])
-                        conn.commit()
-                        self.processed_count += len(batch)
-                        for _ in range(len(batch)):
-                            self.chunk_queue.task_done()
-                        return
-                    except Exception as e:
-                        conn.rollback()
-                        logger.error(f"Error in batch insert (attempt {retries + 1}): {str(e)}")
-                        retries += 1
-                        time.sleep(1)
-            except Exception as e:
-                logger.error(f"Error getting database connection (attempt {retries + 1}): {str(e)}")
-                retries += 1
-                time.sleep(1)
-
-        logger.error(f"Failed to process batch after {self.max_retries} attempts")
-        self.error_count += len(batch)
-        for _ in range(len(batch)):
-            self.chunk_queue.task_done()
-
-    def batch_insert_chunks(self, cursor, chunks, media_id):
-        chunk_data = [(
-            media_id,
-            chunk['text'],
-            chunk['metadata']['start_index'],
-            chunk['metadata']['end_index'],
-            f"{media_id}_chunk_{i}"
-        ) for i, chunk in enumerate(chunks, 1)]
-
-        cursor.executemany('''
-        INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
-        VALUES (?, ?, ?, ?, ?)
-        ''', chunk_data)
-
-    def add_task(self, chunks, media_id):
-        self.chunk_queue.put({'chunks': chunks, 'media_id': media_id})
-
-    def get_stats(self):
         return {
-            'processed_count': self.processed_count,
-            'error_count': self.error_count,
-            'queue_size': self.chunk_queue.qsize()
+            'type': config.get('Database', 'type', fallback='sqlite'),
+            'sqlite_path': config.get('Database', 'sqlite_path', fallback='Databases/media_summary.db'),
+            'elasticsearch_host': config.get('Database', 'elasticsearch_host', fallback='localhost'),
+            'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200)
         }
+    except FileNotFoundError:
+        print("Warning: Config file not found. Using default database configuration.")
+        return default_db_config()
+    except Exception as e:
+        print(f"Error reading config: {str(e)}. Using default database configuration.")
+        return default_db_config()
 
+def default_db_config():
+    return {
+        'type': 'sqlite',
+        'sqlite_path': get_database_path('media_summary.db'),
+        'elasticsearch_host': 'localhost',
+        'elasticsearch_port': 9200
+    }
 
-# Database Manager Class
-class Database:
-    def __init__(self, db_name='media_summary.db'):
-        self.db_path = get_database_path(db_name)
-        self.pool = []
-        self.pool_size = 10
-        self.lock = threading.Lock()
-        self.timeout = 60.0  # 60 seconds timeout
-        self.chunk_processor = ChunkProcessor(self)
-        self.chunk_processor.start()
+def ensure_directory_exists(file_path):
+    directory = os.path.dirname(file_path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print(f"Created directory: {directory}")
 
-    @contextmanager
-    def get_connection(self):
-        retry_count = 5
-        retry_delay = 1
-        while retry_count > 0:
-            try:
-                if self.pool:
-                    conn = self.pool.pop()
-                else:
-                    conn = sqlite3.connect(self.db_path, timeout=self.timeout, check_same_thread=False)
-                    conn.execute("PRAGMA journal_mode=WAL;")  # Enable WAL mode
-                yield conn
-                self.pool.append(conn)
-                return
-            except sqlite3.OperationalError as e:
-                if 'database is locked' in str(e):
-                    logger.warning(f"Database is locked, retrying in {retry_delay} seconds...")
-                    retry_count -= 1
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                else:
-                    raise DatabaseError(f"Database error: {e}")
-            except Exception as e:
-                raise DatabaseError(f"Unexpected error: {e}")
-        raise DatabaseError("Database is locked and retries have been exhausted")
+db_config = get_db_config()
+db_type = db_config['type']
 
-    def execute_query(self, query: str, params: Tuple = ()) -> None:
-        with self.lock:  # Use a global lock for write operations
-            with self.get_connection() as conn:
-                try:
-                    cursor = conn.cursor()
-                    cursor.execute(query, params)
-                    conn.commit()
-                except sqlite3.Error as e:
-                    logger.error(f"Database error: {e}, Query: {query}")
-                    raise DatabaseError(f"Database error: {e}, Query: {query}")
+if db_type == 'sqlite':
+    db = Database(os.path.basename(db_config['sqlite_path']))
+elif db_type == 'elasticsearch':
+    raise NotImplementedError("Elasticsearch support not yet implemented")
+else:
+    raise ValueError(f"Unsupported database type: {db_type}")
 
-    def execute_many(self, query: str, params_list: List[Tuple]) -> None:
-        with self.lock:  # Use a global lock for write operations
-            with self.get_connection() as conn:
-                try:
-                    cursor = conn.cursor()
-                    cursor.executemany(query, params_list)
-                    conn.commit()
-                except sqlite3.Error as e:
-                    logger.error(f"Database error: {e}, Query: {query}")
-                    raise DatabaseError(f"Database error: {e}, Query: {query}")
-
-    def close_all_connections(self):
-        for conn in self.pool:
-            conn.close()
-        self.pool.clear()
-        self.chunk_processor.stop()
-        logger.info("All database connections closed and chunk processor stopped")
-
-
-#
-# class Database:
-#     def __init__(self, db_name='media_summary.db'):
-#         self.db_path = get_database_path(db_name)
-#         self.pool = []
-#         self.pool_size = 10
-#
-#     @contextmanager
-#     def get_connection(self):
-#         retry_count = 5
-#         retry_delay = 1
-#         while retry_count > 0:
-#             try:
-#                 if self.pool:
-#                     conn = self.pool.pop()
-#                 else:
-#                     conn = sqlite3.connect(self.db_path, check_same_thread=False)
-#                 yield conn
-#                 self.pool.append(conn)
-#                 return
-#             except sqlite3.OperationalError as e:
-#                 if 'database is locked' in str(e):
-#                     logger.warning(f"Database is locked, retrying in {retry_delay} seconds...")
-#                     retry_count -= 1
-#                     time.sleep(retry_delay)
-#                     retry_delay *= 2  # Exponential backoff
-#                 else:
-#                     raise DatabaseError(f"Database error: {e}")
-#             except Exception as e:
-#                 raise DatabaseError(f"Unexpected error: {e}")
-#         raise DatabaseError("Database is locked and retries have been exhausted")
-#
-#     def execute_query(self, query: str, params: Tuple = ()) -> None:
-#         with self.get_connection() as conn:
-#             try:
-#                 cursor = conn.cursor()
-#                 cursor.execute(query, params)
-#                 conn.commit()
-#             except sqlite3.Error as e:
-#                 logger.error(f"Database error: {e}, Query: {query}")
-#                 raise DatabaseError(f"Database error: {e}, Query: {query}")
-#
-#     def close_all_connections(self):
-#         for conn in self.pool:
-#             conn.close()
-#         self.pool.clear()
-#
-
-#
-# End of Database Manager Class
-############################################################################################################
-#
-# Database Config loading
+print(f"Database path: {db.db_path}")
 
 def get_db_config():
     try:
@@ -968,32 +790,9 @@ def get_document_version(*args, **kwargs):
 # End of Document Versioning Functions
 ############################################################################################################
 
-
-
-############################################################################################################
-#
-# Function to close the database connection for SQLite
-
 def close_connection():
     if db_type == 'sqlite':
-        db.close_all_connections()
-    # Elasticsearch doesn't need explicit closing
-
-############################################################################################################
-
-############################################################################################################
-#
-# Chunking logging
-
-# Periodically log stats
-def log_chunk_processor_stats():
-    while True:
-        time.sleep(60)  # Log every minute
-        stats = db.chunk_processor.get_stats()
-        logger.info(f"Chunk Processor Stats: {stats}")
-
-# Start stats logging in a separate thread
-#threading.Thread(target=log_chunk_processor_stats, daemon=True).start()
+        db.get_connection().close()
 
 #
 # End of file

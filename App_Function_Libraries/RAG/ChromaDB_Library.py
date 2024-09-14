@@ -11,7 +11,9 @@ from itertools import islice
 #
 # Local Imports:
 from App_Function_Libraries.Chunk_Lib import chunk_for_embedding, chunk_options
+from App_Function_Libraries.DB.SQLite_DB import process_chunks
 from App_Function_Libraries.RAG.Embeddings_Create import create_embeddings_batch
+# FIXME - related to Chunking
 from App_Function_Libraries.DB.DB_Manager import update_fts_for_media, db
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
@@ -58,10 +60,12 @@ def batched(iterable, n):
 
 # FIXME - Fix summarization of entire document/storign in chunk issue
 # FIXME - update all uses to reflect 'api_name' parameter
-def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str,
-                              create_embeddings: bool = False, create_summary: bool = False, api_name: str = None):
+def process_and_store_content(database, content: str, collection_name: str, media_id: int, file_name: str,
+                              create_embeddings: bool = False, create_summary: bool = False, api_name: str = None,
+                              chunk_options: Dict = None, embedding_provider: str = None,
+                              embedding_model: str = None, embedding_api_url: str = None):
     try:
-        logger.debug(f"Processing content for media_id {media_id} in collection {collection_name}")
+        logger.info(f"Processing content for media_id {media_id} in collection {collection_name}")
 
         full_summary = None
         if create_summary and api_name:
@@ -69,8 +73,8 @@ def process_and_store_content(content: str, collection_name: str, media_id: int,
 
         chunks = chunk_for_embedding(content, file_name, full_summary, chunk_options)
 
-        # Add chunks to the queue
-        db.chunk_processor.add_task(chunks, media_id)
+        # Process chunks synchronously
+        process_chunks(database, chunks, media_id)
 
         if create_embeddings:
             texts = [chunk['text'] for chunk in chunks]
@@ -88,11 +92,20 @@ def process_and_store_content(content: str, collection_name: str, media_id: int,
 
             store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
 
-        update_fts_for_media(media_id)
+        # Update full-text search index
+        database.execute_query(
+            "INSERT OR REPLACE INTO media_fts (rowid, title, content) SELECT id, title, content FROM Media WHERE id = ?",
+            (media_id,)
+        )
+
+        logger.info(f"Finished processing and storing content for media_id {media_id}")
 
     except Exception as e:
-        logging.error(f"Error in process_and_store_content for media_id {media_id}: {str(e)}")
+        logger.error(f"Error in process_and_store_content for media_id {media_id}: {str(e)}")
         raise
+
+# Usage example:
+# process_and_store_content(db, content, "my_collection", 1, "example.txt", create_embeddings=True, create_summary=True, api_name="gpt-3.5-turbo")
 
 
 def check_embedding_status(selected_item, item_mapping):

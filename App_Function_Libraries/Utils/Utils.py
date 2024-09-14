@@ -124,23 +124,35 @@ def load_comprehensive_config():
 
 
 def get_project_root():
-    """Get the project root directory."""
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    # Get the directory of the current file (Utils.py)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Go up two levels to reach the project root
+    # Assuming the structure is: project_root/App_Function_Libraries/Utils/Utils.py
+    project_root = os.path.dirname(os.path.dirname(current_dir))
+    return project_root
 
 def get_database_dir():
-    return get_project_relative_path('Databases')
+    """Get the database directory (/tldw/Databases/)."""
+    db_dir = os.path.join(get_project_root(), 'Databases')
+    logging.debug(f"Database directory: {db_dir}")
+    return db_dir
 
 def get_database_path(db_name: Union[str, os.PathLike[AnyStr]]) -> str:
     """Get the full path for a database file."""
-    return os.path.join(get_database_dir(), str(db_name))
+    path = os.path.join(get_database_dir(), str(db_name))
+    logging.debug(f"Database path for {db_name}: {path}")
+    return path
 
 def get_project_relative_path(relative_path: Union[str, os.PathLike[AnyStr]]) -> str:
     """Convert a relative path to a path relative to the project root."""
-    return os.path.join(get_project_root(), str(relative_path))
+    path = os.path.join(get_project_root(), str(relative_path))
+    logging.debug(f"Project relative path for {relative_path}: {path}")
+    return path
 
 def get_chromadb_path():
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(project_root, 'Databases', 'chroma_db')
+    path = os.path.join(get_project_root(), 'Databases', 'chroma_db')
+    logging.debug(f"ChromaDB path: {path}")
+    return path
 
 def ensure_directory_exists(path):
     """Ensure that a directory exists, creating it if necessary."""
