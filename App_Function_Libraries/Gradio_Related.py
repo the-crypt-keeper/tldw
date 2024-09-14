@@ -361,6 +361,6 @@ def launch_ui(share_public=None, server_mode=False):
         iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable, )
     else:
         try:
-            iface.launch(share=False)
+            iface.launch(share=False, server_name="0.0.0.0", server_port=server_port_variable, )
         except Exception as e:
             logging.error(f"Error launching interface: {str(e)}")

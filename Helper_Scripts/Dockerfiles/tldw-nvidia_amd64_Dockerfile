@@ -71,5 +71,8 @@ VOLUME /tldw
 # Make port 7860 available to the world outside this container
 EXPOSE 7860
 
+# Set listening to all interfaces
+ENV GRADIO_SERVER_NAME="0.0.0.0"
+
 # Run the application
 CMD ["python", "summarize.py", "-gui"]

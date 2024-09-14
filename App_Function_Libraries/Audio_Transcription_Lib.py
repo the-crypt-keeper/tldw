@@ -26,10 +26,11 @@ import time
 # DEBUG Imports
 #from memory_profiler import profile
 import pyaudio
-
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config
-
+from faster_whisper import WhisperModel as OriginalWhisperModel
+from typing import Optional, Union, List, Dict, Any
+#
 # Import Local
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 #######################################################################################################################
 # Function Definitions
@@ -46,21 +47,88 @@ config = load_comprehensive_config()
 processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
 
 
-# FIXME: This is a temporary solution.
-# This doesn't clear older models, which means potentially a lot of memory is being used...
+
+class WhisperModel(OriginalWhisperModel):
+    tldw_dir = os.path.dirname(os.path.dirname(__file__))
+    default_download_root = os.path.join(tldw_dir, 'App_Function_Libraries', 'models', 'Whisper')
+
+    valid_model_sizes = [
+        "tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium",
+        "large-v1", "large-v2", "large-v3", "large", "distil-large-v2", "distil-medium.en",
+        "distil-small.en", "distil-large-v3"
+    ]
+
+    def __init__(
+        self,
+        model_size_or_path: str,
+        device: str = "auto",
+        device_index: Union[int, List[int]] = 0,
+        compute_type: str = "default",
+        cpu_threads: int = 16,
+        num_workers: int = 1,
+        download_root: Optional[str] = None,
+        local_files_only: bool = False,
+        files: Optional[Dict[str, Any]] = None,
+        **model_kwargs: Any
+    ):
+        if download_root is None:
+            download_root = self.default_download_root
+
+        os.makedirs(download_root, exist_ok=True)
+
+        # FIXME - validate....
+        # Also write an integration test...
+        # Check if model_size_or_path is a valid model size
+        if model_size_or_path in self.valid_model_sizes:
+            # It's a model size, so we'll use the download_root
+            model_path = os.path.join(download_root, model_size_or_path)
+            if not os.path.isdir(model_path):
+                # If it doesn't exist, we'll let the parent class download it
+                model_size_or_path = model_size_or_path  # Keep the original model size
+            else:
+                # If it exists, use the full path
+                model_size_or_path = model_path
+        else:
+            # It's not a valid model size, so assume it's a path
+            model_size_or_path = os.path.abspath(model_size_or_path)
+
+        super().__init__(
+            model_size_or_path,
+            device=device,
+            device_index=device_index,
+            compute_type=compute_type,
+            cpu_threads=cpu_threads,
+            num_workers=num_workers,
+            download_root=download_root,
+            local_files_only=local_files_only,
+            files=files,
+            **model_kwargs
+        )
+
 def get_whisper_model(model_name, device):
     global whisper_model_instance
     if whisper_model_instance is None:
-        from faster_whisper import WhisperModel
         logging.info(f"Initializing new WhisperModel with size {model_name} on device {device}")
-
-        # FIXME - add logic to detect if the model is already downloaded
-        # want to first check if the model is already downloaded
-        # if not, download it using the existing logic in 'WhisperModel'
-        # https://github.com/SYSTRAN/faster-whisper/blob/d57c5b40b06e59ec44240d93485a95799548af50/faster_whisper/transcribe.py#L584
-        # Designated path should be `tldw/App_Function_Libraries/models/Whisper/`
         whisper_model_instance = WhisperModel(model_name, device=device)
     return whisper_model_instance
+
+# # FIXME: This is a temporary solution.
+# # This doesn't clear older models, which means potentially a lot of memory is being used...
+# def get_whisper_model(model_name, device):
+#     global whisper_model_instance
+#     if whisper_model_instance is None:
+#         from faster_whisper import WhisperModel
+#         logging.info(f"Initializing new WhisperModel with size {model_name} on device {device}")
+#
+#         # FIXME - add logic to detect if the model is already downloaded
+#         # want to first check if the model is already downloaded
+#         # if not, download it using the existing logic in 'WhisperModel'
+#         # https://github.com/SYSTRAN/faster-whisper/blob/d57c5b40b06e59ec44240d93485a95799548af50/faster_whisper/transcribe.py#L584
+#         # Designated path should be `tldw/App_Function_Libraries/models/Whisper/`
+#         WhisperModel.download_root = os.path.join(os.path.dirname(__file__), 'models', 'Whisper')
+#         os.makedirs(WhisperModel.download_root, exist_ok=True)
+#         whisper_model_instance = WhisperModel(model_name, device=device)
+#     return whisper_model_instance
 
 
 # os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
@@ -151,6 +219,7 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         options = dict(language=selected_source_lang, beam_size=5, best_of=5, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
         # use function and config at top of file
+        logging.debug("speech-to-text: Using whisper model: %s", whisper_model)
         whisper_model_instance = get_whisper_model(whisper_model, processing_choice)
         segments_raw, info = whisper_model_instance.transcribe(audio_file_path, **transcribe_options)
 
