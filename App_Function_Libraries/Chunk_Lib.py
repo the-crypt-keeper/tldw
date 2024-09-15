@@ -7,6 +7,7 @@
 ####
 # Import necessary libraries
 import hashlib
+import json
 import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -72,42 +73,53 @@ def load_document(file_path):
 
 def improved_chunking_process(text: str, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     logging.debug("Improved chunking process started...")
+
+    # Extract JSON metadata if present
+    json_content = {}
+    try:
+        json_end = text.index("}\n") + 1
+        json_content = json.loads(text[:json_end])
+        text = text[json_end:].strip()
+        logging.debug(f"Extracted JSON metadata: {json_content}")
+    except (ValueError, json.JSONDecodeError):
+        logging.debug("No JSON metadata found at the beginning of the text")
+
+    # Extract any additional header text
+    header_match = re.match(r"(This text was transcribed using.*?)\n\n", text, re.DOTALL)
+    header_text = ""
+    if header_match:
+        header_text = header_match.group(1)
+        text = text[len(header_text):].strip()
+        logging.debug(f"Extracted header text: {header_text}")
+
     options = chunk_options.copy()
     if custom_chunk_options:
         options.update(custom_chunk_options)
 
     chunk_method = options.get('method', 'words')
-    base_size = options.get('base_size', 1000)
-    min_size = options.get('min_size', 100)
     max_size = options.get('max_size', 2000)
     overlap = options.get('overlap', 0)
     language = options.get('language', None)
-    adaptive = options.get('adaptive', False)
-    multi_level = options.get('multi_level', False)
 
     if language is None:
         language = detect_language(text)
 
-    if adaptive:
-        max_chunk_size = adaptive_chunk_size(text, base_size, min_size, max_size)
-    else:
-        max_chunk_size = base_size
-
-    if multi_level:
-        chunks = multi_level_chunking(text, chunk_method, max_chunk_size, overlap, language)
-    else:
-        chunks = chunk_text(text, chunk_method, max_chunk_size, overlap, language)
+    chunks = chunk_text(text, chunk_method, max_size, overlap, language)
 
     chunks_with_metadata = []
+    total_chunks = len(chunks)
     for i, chunk in enumerate(chunks):
-        metadata = get_chunk_metadata(
-            chunk,
-            text,
-            chunk_type=chunk_method,
-            language=language
-        )
-        metadata['chunk_index'] = i
-        metadata['total_chunks'] = len(chunks)
+        metadata = {
+            'chunk_index': i,
+            'total_chunks': total_chunks,
+            'chunk_method': chunk_method,
+            'max_size': max_size,
+            'overlap': overlap,
+            'language': language,
+            'relative_position': i / total_chunks
+        }
+        metadata.update(json_content)  # Add the extracted JSON content to metadata
+        metadata['header_text'] = header_text  # Add the header text to metadata
 
         chunks_with_metadata.append({
             'text': chunk,
@@ -115,6 +127,7 @@ def improved_chunking_process(text: str, custom_chunk_options: Dict[str, Any] = 
         })
 
     return chunks_with_metadata
+
 
 
 def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, language: str) -> List[str]:

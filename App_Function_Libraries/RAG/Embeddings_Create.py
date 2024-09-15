@@ -185,6 +185,9 @@ def create_openai_embedding(text: str, model: str) -> List[float]:
     embedding = get_openai_embeddings(text, model)
     return embedding
 
+
+
+
 #Dead
 # def create_local_embedding(text: str, model: str, api_url: str, api_key: str) -> List[float]:
 #     response = requests.post(
