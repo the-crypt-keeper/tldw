@@ -27,8 +27,9 @@ fire==0.6.0
 flatbuffers==24.3.25
 fonttools==4.51.0
 fsspec==2024.3.1
-gradio==4.29.0
-gradio_client==0.16.1
+#gradio==4.29.0
+gradio==4.44.0
+gradio_client==1.3.0
 h11==0.14.0
 httpcore==1.0.5
 httptools==0.6.1
@@ -99,7 +100,8 @@ timm==0.9.16
 tokenizers==0.15.2
 tomlkit==0.12.0
 toolz==0.12.1
-torchvision==0.17.2
+#torchvision==0.17.2
+torchvision==0.19.1
 tqdm==4.66.3
 #Inference Engine
 transformers==4.39.3
