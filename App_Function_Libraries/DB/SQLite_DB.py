@@ -50,12 +50,12 @@ import html
 import logging
 import os
 import queue
-import random
 import re
 import shutil
 import sqlite3
-import time
+import threading
 import traceback
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
 # Local Libraries
@@ -221,55 +221,52 @@ class DatabaseError(Exception):
 class InputError(Exception):
     pass
 
+
 class Database:
     def __init__(self, db_name='media_summary.db'):
         self.db_path = get_database_path(db_name)
-        self.timeout = 60.0  # 60 seconds timeout
+        self.timeout = 10.0
+        self._local = threading.local()
 
+    @contextmanager
     def get_connection(self):
-        return sqlite3.connect(self.db_path, timeout=self.timeout)
+        if not hasattr(self._local, 'connection') or self._local.connection is None:
+            self._local.connection = sqlite3.connect(self.db_path, timeout=self.timeout)
+            self._local.connection.isolation_level = None  # This enables autocommit mode
+        yield self._local.connection
 
-# Old version of execute_query - FIXME dead code?
-    # def execute_query(self, query: str, params: Tuple = ()) -> None:
-    #     with self.get_connection() as conn:
-    #         try:
-    #             cursor = conn.cursor()
-    #             cursor.execute(query, params)
-    #             conn.commit()
-    #         except sqlite3.Error as e:
-    #             logging.error(f"Database error: {e}, Query: {query}")
-    #             raise DatabaseError(f"Database error: {e}, Query: {query}")
+    def close_connection(self):
+        if hasattr(self._local, 'connection') and self._local.connection:
+            self._local.connection.close()
+            self._local.connection = None
 
-    def execute_query(self, query: str, params: Tuple = ()):
+    @contextmanager
+    def transaction(self):
         with self.get_connection() as conn:
             try:
-                cursor = conn.cursor()
-                cursor.execute(query, params)
-                if query.strip().upper().startswith("SELECT"):
-                    return cursor.fetchall()
-                else:
-                    conn.commit()
-                    return cursor.rowcount
-            except sqlite3.Error as e:
-                logging.error(f"Database error: {e}, Query: {query}")
-                raise DatabaseError(f"Database error: {e}, Query: {query}")
+                conn.execute("BEGIN")
+                yield conn
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
 
+    def execute_query(self, query: str, params: Tuple = ()) -> Any:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            if query.strip().upper().startswith("SELECT"):
+                return cursor.fetchall()
+            else:
+                return cursor.rowcount
 
     def execute_many(self, query: str, params_list: List[Tuple]) -> None:
         with self.get_connection() as conn:
-            try:
-                cursor = conn.cursor()
-                cursor.executemany(query, params_list)
-                conn.commit()
-            except sqlite3.Error as e:
-                logging.error(f"Database error: {e}, Query: {query}")
-                raise DatabaseError(f"Database error: {e}, Query: {query}")
+            cursor = conn.cursor()
+            cursor.executemany(query, params_list)
 
     def table_exists(self, table_name: str) -> bool:
-        query = '''
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name=?
-        '''
+        query = 'SELECT name FROM sqlite_master WHERE type="table" AND name=?'
         result = self.execute_query(query, (table_name,))
         return bool(result)
 
@@ -2471,69 +2468,47 @@ def get_paginated_files(page: int = 1, results_per_page: int = 50) -> Tuple[List
 #
 # Functions to manage document versions
 
-def create_document_version(media_id: int, content: str, max_retries=5, initial_delay=0.1) -> int:
+
+def create_document_version(media_id: int, content: str) -> int:
     logging.info(f"Attempting to create document version for media_id: {media_id}")
-    retry_count = 0
-    while retry_count < max_retries:
-        try:
-            with db.get_connection() as conn:
-                conn.execute("BEGIN IMMEDIATE")  # Start an immediate transaction
-                try:
-                    cursor = conn.cursor()
+    try:
+        with db.transaction() as conn:
+            cursor = conn.cursor()
 
-                    # Verify media_id exists and get the latest version in one query
-                    cursor.execute('''
-                        SELECT m.id, COALESCE(MAX(dv.version_number), 0)
-                        FROM Media m
-                        LEFT JOIN DocumentVersions dv ON m.id = dv.media_id
-                        WHERE m.id = ?
-                        GROUP BY m.id
-                    ''', (media_id,))
-                    result = cursor.fetchone()
+            # Verify media_id exists and get the latest version in one query
+            cursor.execute('''
+                SELECT m.id, COALESCE(MAX(dv.version_number), 0)
+                FROM Media m
+                LEFT JOIN DocumentVersions dv ON m.id = dv.media_id
+                WHERE m.id = ?
+                GROUP BY m.id
+            ''', (media_id,))
+            result = cursor.fetchone()
 
-                    if not result:
-                        raise ValueError(f"No Media entry found for id: {media_id}")
+            if not result:
+                raise ValueError(f"No Media entry found for id: {media_id}")
 
-                    _, latest_version = result
-                    new_version = latest_version + 1
+            _, latest_version = result
+            new_version = latest_version + 1
 
-                    logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
+            logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
 
-                    # Insert new version
-                    cursor.execute('''
-                        INSERT INTO DocumentVersions (media_id, version_number, content)
-                        VALUES (?, ?, ?)
-                    ''', (media_id, new_version, content))
+            # Insert new version
+            cursor.execute('''
+                INSERT INTO DocumentVersions (media_id, version_number, content)
+                VALUES (?, ?, ?)
+            ''', (media_id, new_version, content))
 
-                    conn.commit()
-                    logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
-                    return new_version
-                except Exception as e:
-                    conn.rollback()
-                    raise e
-        except sqlite3.OperationalError as e:
-            if "database is locked" in str(e).lower():
-                retry_count += 1
-                if retry_count < max_retries:
-                    delay = initial_delay * (2 ** retry_count) + random.uniform(0, 0.1)
-                    logging.warning(
-                        f"Database locked. Retrying in {delay:.2f} seconds (attempt {retry_count}/{max_retries})")
-                    time.sleep(delay)
-                else:
-                    logging.error(f"Max retries reached. Database error creating document version: {e}")
-                    logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
-                    raise
-            else:
-                logging.error(f"Database error creating document version: {e}")
-                logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
-                raise
-        except Exception as e:
-            logging.error(f"Unexpected error creating document version: {e}")
-            logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
-            raise
-
-    logging.error(f"Failed to create document version after {max_retries} attempts")
-    raise DatabaseError(f"Failed to create document version after {max_retries} attempts")
+            logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
+            return new_version
+    except sqlite3.Error as e:
+        logging.error(f"Database error creating document version: {e}")
+        logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
+        raise DatabaseError(f"Failed to create document version: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error creating document version: {e}")
+        logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
+        raise
 
 
 def get_document_version(media_id: int, version_number: int = None) -> Dict[str, Any]:
