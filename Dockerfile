@@ -1,11 +1,11 @@
 # This is the same dockerfile from `Helper_Files/Dockerfiles/tldw-nvidia_amd64_Dockerfile`. c/p here so people see a 'Dockerfile' in the root directory and know what to do.
 # Usage
-# docker build -t tldw-nvidia_amd64_Dockerfile .
-# docker run --gpus=all -p 7860:7860 -v tldw_volume:/tldw tldw-nvidia_amd64_Dockerfile
+# docker build -t tldw-nvidia_amd64 .
+# docker run --gpus=all -p 7860:7860 -v tldw_volume:/tldw tldw-nvidia_amd64
 #
 # If the above command doesn't work and it hangs on start, use the following command:
 #
-#   sudo docker run -it -p 7860:7860 -v tldw_volume:/tdlw nvidia_tldw bash
+#   sudo docker run -it -p 7860:7860 -v tldw_volume:/tdlw tldw-nvidia_amd64 bash
 #
 # Once in the container, run the following command:
 #

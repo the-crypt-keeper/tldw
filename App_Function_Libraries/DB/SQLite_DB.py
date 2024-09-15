@@ -53,7 +53,9 @@ import queue
 import re
 import shutil
 import sqlite3
+import threading
 import traceback
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
 # Local Libraries
@@ -219,39 +221,62 @@ class DatabaseError(Exception):
 class InputError(Exception):
     pass
 
+
 class Database:
     def __init__(self, db_name='media_summary.db'):
         self.db_path = get_database_path(db_name)
-        self.timeout = 60.0  # 60 seconds timeout
+        self.timeout = 10.0
+        self._local = threading.local()
 
+    @contextmanager
     def get_connection(self):
-        return sqlite3.connect(self.db_path, timeout=self.timeout)
+        if not hasattr(self._local, 'connection') or self._local.connection is None:
+            self._local.connection = sqlite3.connect(self.db_path, timeout=self.timeout)
+            self._local.connection.isolation_level = None  # This enables autocommit mode
+        yield self._local.connection
 
-    def execute_query(self, query: str, params: Tuple = ()) -> None:
+    def close_connection(self):
+        if hasattr(self._local, 'connection') and self._local.connection:
+            self._local.connection.close()
+            self._local.connection = None
+
+    @contextmanager
+    def transaction(self):
         with self.get_connection() as conn:
             try:
-                cursor = conn.cursor()
-                cursor.execute(query, params)
-                conn.commit()
-            except sqlite3.Error as e:
-                logging.error(f"Database error: {e}, Query: {query}")
-                raise DatabaseError(f"Database error: {e}, Query: {query}")
+                conn.execute("BEGIN")
+                yield conn
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+
+    def execute_query(self, query: str, params: Tuple = ()) -> Any:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            if query.strip().upper().startswith("SELECT"):
+                return cursor.fetchall()
+            else:
+                return cursor.rowcount
 
     def execute_many(self, query: str, params_list: List[Tuple]) -> None:
         with self.get_connection() as conn:
-            try:
-                cursor = conn.cursor()
-                cursor.executemany(query, params_list)
-                conn.commit()
-            except sqlite3.Error as e:
-                logging.error(f"Database error: {e}, Query: {query}")
-                raise DatabaseError(f"Database error: {e}, Query: {query}")
+            cursor = conn.cursor()
+            cursor.executemany(query, params_list)
+
+    def table_exists(self, table_name: str) -> bool:
+        query = 'SELECT name FROM sqlite_master WHERE type="table" AND name=?'
+        result = self.execute_query(query, (table_name,))
+        return bool(result)
 
 db = Database()
 
-def instantiate_sqlite_db():
-    global sqlite_db
-    sqlite_db = Database()
+# Usage example:
+if db.table_exists('DocumentVersions'):
+    logging.info("DocumentVersions table exists")
+else:
+    logging.error("DocumentVersions table does not exist")
 
 
 # Function to create tables with the new media schema
@@ -399,7 +424,6 @@ def create_tables(db) -> None:
         'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_media_id ON UnvectorizedMediaChunks(media_id)',
         'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_is_processed ON UnvectorizedMediaChunks(is_processed)',
         'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_chunk_type ON UnvectorizedMediaChunks(chunk_type)',
-        # CREATE UNIQUE INDEX statements
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url)',
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id)',
         'CREATE INDEX IF NOT EXISTS idx_document_versions_media_id ON DocumentVersions(media_id)',
@@ -426,6 +450,14 @@ def create_tables(db) -> None:
 
 create_tables(db)
 
+#
+# End of DB Setup Functions
+#######################################################################################################################
+
+
+#######################################################################################################################
+#
+# Media-related Functions
 
 def check_media_exists(title: str, url: str) -> Optional[int]:
     try:
@@ -2436,20 +2468,30 @@ def get_paginated_files(page: int = 1, results_per_page: int = 50) -> Tuple[List
 #
 # Functions to manage document versions
 
+
 def create_document_version(media_id: int, content: str) -> int:
+    logging.info(f"Attempting to create document version for media_id: {media_id}")
     try:
-        with db.get_connection() as conn:
+        with db.transaction() as conn:
             cursor = conn.cursor()
 
-            # Get the latest version number
+            # Verify media_id exists and get the latest version in one query
             cursor.execute('''
-                SELECT MAX(version_number) 
-                FROM DocumentVersions 
-                WHERE media_id = ?
+                SELECT m.id, COALESCE(MAX(dv.version_number), 0)
+                FROM Media m
+                LEFT JOIN DocumentVersions dv ON m.id = dv.media_id
+                WHERE m.id = ?
+                GROUP BY m.id
             ''', (media_id,))
+            result = cursor.fetchone()
 
-            latest_version = cursor.fetchone()[0] or 0
+            if not result:
+                raise ValueError(f"No Media entry found for id: {media_id}")
+
+            _, latest_version = result
             new_version = latest_version + 1
+
+            logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
 
             # Insert new version
             cursor.execute('''
@@ -2457,11 +2499,16 @@ def create_document_version(media_id: int, content: str) -> int:
                 VALUES (?, ?, ?)
             ''', (media_id, new_version, content))
 
-            conn.commit()
+            logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
             return new_version
     except sqlite3.Error as e:
-        logging.error(f"Error creating document version: {e}")
-        raise DatabaseError(f"Error creating document version: {e}")
+        logging.error(f"Database error creating document version: {e}")
+        logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
+        raise DatabaseError(f"Failed to create document version: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error creating document version: {e}")
+        logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
+        raise
 
 
 def get_document_version(media_id: int, version_number: int = None) -> Dict[str, Any]:
