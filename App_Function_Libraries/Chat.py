@@ -1,6 +1,6 @@
 # Chat.py
 # Chat functions for interacting with the LLMs as chatbots
-
+import base64
 # Imports
 import json
 import logging
@@ -283,13 +283,21 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
         print(f"Debug - Update Chat Content - No item selected or item not in mapping")
         return {}, []
 
+#
+# End of Chat functions
+##########################################################################################################################
+
+
+##########################################################################################################################
+#
+# Character Card Functions
 
 CHARACTERS_FILE = Path('.', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
 
 
 def save_character(character_data):
-    characters_file = os.path.join(os.path.dirname(__file__), '..', 'Helper_Scripts', 'Character_Cards',
-                                   'Characters.json')
+    characters_file = os.path.join(os.path.dirname(__file__), '..', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
+    characters_dir = os.path.dirname(characters_file)
 
     try:
         if os.path.exists(characters_file):
@@ -299,20 +307,36 @@ def save_character(character_data):
             characters = {}
 
         char_name = character_data['name']
+
+        # Save the image separately if it exists
+        if 'image' in character_data:
+            img_data = base64.b64decode(character_data['image'])
+            img_filename = f"{char_name.replace(' ', '_')}.png"
+            img_path = os.path.join(characters_dir, img_filename)
+            with open(img_path, 'wb') as f:
+                f.write(img_data)
+            character_data['image_path'] = os.path.abspath(img_path)
+            del character_data['image']  # Remove the base64 image data from the JSON
+
         characters[char_name] = character_data
 
         with open(characters_file, 'w') as f:
             json.dump(characters, f, indent=2)
 
-        print(f"Character '{char_name}' saved successfully.")
+        logging.info(f"Character '{char_name}' saved successfully.")
     except Exception as e:
-        print(f"Error saving character: {str(e)}")
+        logging.error(f"Error saving character: {str(e)}")
+
 
 
 def load_characters():
-    if os.path.exists(CHARACTERS_FILE):
-        with open(CHARACTERS_FILE, 'r') as f:
-            return json.load(f)
+    characters_file = os.path.join(os.path.dirname(__file__), '..', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
+    if os.path.exists(characters_file):
+        with open(characters_file, 'r') as f:
+            characters = json.load(f)
+        logging.debug(f"Loaded {len(characters)} characters from {characters_file}")
+        return characters
+    logging.warning(f"Characters file not found: {characters_file}")
     return {}
 
 
