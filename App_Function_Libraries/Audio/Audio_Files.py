@@ -26,7 +26,7 @@ from pathlib import Path
 import requests
 import yt_dlp
 
-from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 # Local Imports

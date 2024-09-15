@@ -2,6 +2,8 @@
 #########################################
 # Article Summarization Library
 # This library is used to handle summarization of articles.
+import asyncio
+# FIXME - this library should be refactored into `Article_Extractor_Lib` and then renamed to `Web_Scraping_Lib`
 
 #
 ####
@@ -22,11 +24,10 @@ import os
 import logging
 import requests
 # 3rd-Party Imports
-from tqdm import tqdm
-
-from App_Function_Libraries.Utils.Utils import sanitize_filename
+#
 # Local Imports
-from Article_Extractor_Lib import scrape_article
+from App_Function_Libraries.Utils.Utils import sanitize_filename
+from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama, summarize_with_oobabooga, summarize_with_tabbyapi, \
     summarize_with_vllm, summarize_with_kobold, save_summary_to_file, summarize_with_local_llm
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, summarize_with_cohere, \
@@ -38,7 +39,7 @@ from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
 # Function Definitions
 #
 
-def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles, system_message=None):
+async def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles, system_message=None):
     urls = [url.strip() for url in urls.split('\n') if url.strip()]
     custom_titles = custom_article_titles.split('\n') if custom_article_titles else []
 
@@ -48,10 +49,11 @@ def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, ke
     # Create a progress bar
     progress = gr.Progress()
 
-    for i, url in tqdm(enumerate(urls), total=len(urls), desc="Processing URLs"):
+    # FIXME - add progress tracking to the gradio UI
+    for i, url in enumerate(urls):
         custom_title = custom_titles[i] if i < len(custom_titles) else None
         try:
-            article = scrape_article(url)
+            article = await scrape_article(url)
             if article and article['extraction_successful']:
                 if custom_title:
                     article['title'] = custom_title
@@ -69,10 +71,11 @@ def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, ke
     return results
 
 
+
 def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_article_title, system_message=None):
     try:
         # Step 1: Scrape the article
-        article_data = scrape_article(url)
+        article_data = asyncio.run(scrape_article(url))
         print(f"Scraped Article Data: {article_data}")  # Debugging statement
         if not article_data:
             return "Failed to scrape the article."
@@ -102,7 +105,6 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
             with open(json_file_path, 'w') as json_file:
                 json.dump([{'text': content}], json_file, indent=2)
 
-            # FIXME - Swap out this if/else to use the dedicated function....
             try:
                 if api_name.lower() == 'openai':
                     # def summarize_with_openai(api_key, input_data, custom_prompt_arg)
@@ -165,6 +167,7 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
                     # def summarize_with_huggingface(api_key, input_data, custom_prompt_arg):
                     summarize_with_huggingface(api_key, json_file_path, article_custom_prompt, system_message)
                 # Add additional API handlers here...
+
             except requests.exceptions.ConnectionError as e:
                 logging.error(f"Connection error while trying to summarize with {api_name}: {str(e)}")
 
@@ -193,7 +196,7 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
 def scrape_and_no_summarize_then_ingest(url, keywords, custom_article_title):
     try:
         # Step 1: Scrape the article
-        article_data = scrape_article(url)
+        article_data = asyncio.run(scrape_article(url))
         print(f"Scraped Article Data: {article_data}")  # Debugging statement
         if not article_data:
             return "Failed to scrape the article."

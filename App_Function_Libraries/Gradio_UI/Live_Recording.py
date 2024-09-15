@@ -7,8 +7,8 @@ import os
 # External Imports
 import gradio as gr
 # Local Imports
-from App_Function_Libraries.Audio_Transcription_Lib import (record_audio, speech_to_text, save_audio_temp,
-                                                            stop_recording)
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import (record_audio, speech_to_text, save_audio_temp,
+                                                                  stop_recording)
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 #
 #######################################################################################################################

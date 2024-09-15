@@ -40,7 +40,7 @@ def create_utilities_yt_audio_tab():
                 output_file_audio = gr.File(label="Download Audio")
                 output_message_audio = gr.Textbox(label="Status")
 
-        from App_Function_Libraries.Audio_Files import download_youtube_audio
+        from App_Function_Libraries.Audio.Audio_Files import download_youtube_audio
         download_button_audio.click(
             fn=download_youtube_audio,
             inputs=youtube_url_input_audio,
