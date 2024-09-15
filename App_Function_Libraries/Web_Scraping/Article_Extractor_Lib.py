@@ -198,7 +198,7 @@ def generate_sitemap_for_url(url: str) -> List[Dict[str, str]]:
 
     return sitemap
 
-def scrape_entire_site(base_url: str) -> List[Dict]:
+async def scrape_entire_site(base_url: str) -> List[Dict]:
     """
     Scrape the entire site by generating a temporary sitemap and extracting content from each page.
 
@@ -215,9 +215,9 @@ def scrape_entire_site(base_url: str) -> List[Dict]:
     # Step 3: Scrape each URL in the sitemap
     scraped_articles = []
     try:
-        for link in links:
+        async def scrape_and_log(link):
             logging.info(f"Scraping {link} ...")
-            article_data = scrape_article(link)
+            article_data = await scrape_article(link)
 
             if article_data:
                 logging.info(f"Title: {article_data['title']}")
@@ -225,7 +225,14 @@ def scrape_entire_site(base_url: str) -> List[Dict]:
                 logging.info(f"Date: {article_data['date']}")
                 logging.info(f"Content: {article_data['content'][:500]}...")
 
-                scraped_articles.append(article_data)
+                return article_data
+            return None
+
+        # Use asyncio.gather to scrape multiple articles concurrently
+        scraped_articles = await asyncio.gather(*[scrape_and_log(link) for link in links])
+        # Remove any None values (failed scrapes)
+        scraped_articles = [article for article in scraped_articles if article is not None]
+
     finally:
         # Clean up the temporary sitemap file
         os.unlink(temp_sitemap_path)
