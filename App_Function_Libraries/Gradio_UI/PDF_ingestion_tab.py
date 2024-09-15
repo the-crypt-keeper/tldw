@@ -12,7 +12,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
-from App_Function_Libraries.PDF_Ingestion_Lib import extract_metadata_from_pdf, extract_text_and_format_from_pdf, \
+from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_metadata_from_pdf, extract_text_and_format_from_pdf, \
     process_and_cleanup_pdf
 #
 #
