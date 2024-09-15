@@ -227,15 +227,31 @@ class Database:
     def get_connection(self):
         return sqlite3.connect(self.db_path, timeout=self.timeout)
 
-    def execute_query(self, query: str, params: Tuple = ()) -> None:
+# Old version of execute_query - FIXME dead code?
+    # def execute_query(self, query: str, params: Tuple = ()) -> None:
+    #     with self.get_connection() as conn:
+    #         try:
+    #             cursor = conn.cursor()
+    #             cursor.execute(query, params)
+    #             conn.commit()
+    #         except sqlite3.Error as e:
+    #             logging.error(f"Database error: {e}, Query: {query}")
+    #             raise DatabaseError(f"Database error: {e}, Query: {query}")
+
+    def execute_query(self, query: str, params: Tuple = ()):
         with self.get_connection() as conn:
             try:
                 cursor = conn.cursor()
                 cursor.execute(query, params)
-                conn.commit()
+                if query.strip().upper().startswith("SELECT"):
+                    return cursor.fetchall()
+                else:
+                    conn.commit()
+                    return cursor.rowcount
             except sqlite3.Error as e:
                 logging.error(f"Database error: {e}, Query: {query}")
                 raise DatabaseError(f"Database error: {e}, Query: {query}")
+
 
     def execute_many(self, query: str, params_list: List[Tuple]) -> None:
         with self.get_connection() as conn:
@@ -247,11 +263,21 @@ class Database:
                 logging.error(f"Database error: {e}, Query: {query}")
                 raise DatabaseError(f"Database error: {e}, Query: {query}")
 
+    def table_exists(self, table_name: str) -> bool:
+        query = '''
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name=?
+        '''
+        result = self.execute_query(query, (table_name,))
+        return bool(result)
+
 db = Database()
 
-def instantiate_sqlite_db():
-    global sqlite_db
-    sqlite_db = Database()
+# Usage example:
+if db.table_exists('DocumentVersions'):
+    logging.info("DocumentVersions table exists")
+else:
+    logging.error("DocumentVersions table does not exist")
 
 
 # Function to create tables with the new media schema
@@ -399,7 +425,6 @@ def create_tables(db) -> None:
         'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_media_id ON UnvectorizedMediaChunks(media_id)',
         'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_is_processed ON UnvectorizedMediaChunks(is_processed)',
         'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_chunk_type ON UnvectorizedMediaChunks(chunk_type)',
-        # CREATE UNIQUE INDEX statements
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url)',
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id)',
         'CREATE INDEX IF NOT EXISTS idx_document_versions_media_id ON DocumentVersions(media_id)',
@@ -426,6 +451,14 @@ def create_tables(db) -> None:
 
 create_tables(db)
 
+#
+# End of DB Setup Functions
+#######################################################################################################################
+
+
+#######################################################################################################################
+#
+# Media-related Functions
 
 def check_media_exists(title: str, url: str) -> Optional[int]:
     try:
@@ -2436,32 +2469,69 @@ def get_paginated_files(page: int = 1, results_per_page: int = 50) -> Tuple[List
 #
 # Functions to manage document versions
 
-def create_document_version(media_id: int, content: str) -> int:
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
+def create_document_version(media_id: int, content: str, max_retries=5, initial_delay=0.1) -> int:
+    logging.info(f"Attempting to create document version for media_id: {media_id}")
+    retry_count = 0
+    while retry_count < max_retries:
+        try:
+            # Verify media_id exists
+            result = db.execute_query('SELECT id FROM Media WHERE id = ?', (media_id,))
+            if not result:
+                raise ValueError(f"No Media entry found for id: {media_id}")
 
-            # Get the latest version number
-            cursor.execute('''
+            # Check if a version exists for this media_id
+            result = db.execute_query('''
                 SELECT MAX(version_number) 
                 FROM DocumentVersions 
                 WHERE media_id = ?
             ''', (media_id,))
 
-            latest_version = cursor.fetchone()[0] or 0
-            new_version = latest_version + 1
+            logging.debug(f"Query result for MAX(version_number): {result}")
+
+            if not result or result[0][0] is None:
+                logging.info(f"No existing versions found for media_id: {media_id}. Starting with version 1.")
+                new_version = 1
+            else:
+                latest_version = result[0][0]
+                logging.debug(f"Latest version number: {latest_version}")
+                new_version = latest_version + 1
+
+            logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
 
             # Insert new version
-            cursor.execute('''
+            db.execute_query('''
                 INSERT INTO DocumentVersions (media_id, version_number, content)
                 VALUES (?, ?, ?)
             ''', (media_id, new_version, content))
 
-            conn.commit()
+            logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
             return new_version
-    except sqlite3.Error as e:
-        logging.error(f"Error creating document version: {e}")
-        raise DatabaseError(f"Error creating document version: {e}")
+
+        except DatabaseError as e:
+            if "database is locked" in str(e).lower():
+                retry_count += 1
+                if retry_count < max_retries:
+                    delay = initial_delay * (2 ** retry_count) + random.uniform(0, 0.1)
+                    logging.warning(f"Database locked. Retrying in {delay:.2f} seconds (attempt {retry_count}/{max_retries})")
+                    time.sleep(delay)
+                else:
+                    logging.error(f"Max retries reached. Database error creating document version: {e}")
+                    logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
+                    raise
+            else:
+                logging.error(f"Database error creating document version: {e}")
+                logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
+                raise
+        except ValueError as e:
+            logging.error(f"Value error creating document version: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"Unexpected error creating document version: {e}")
+            logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
+            raise
+
+    logging.error(f"Failed to create document version after {max_retries} attempts")
+    raise DatabaseError(f"Failed to create document version after {max_retries} attempts")
 
 
 def get_document_version(media_id: int, version_number: int = None) -> Dict[str, Any]:
