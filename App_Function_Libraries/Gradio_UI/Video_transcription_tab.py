@@ -156,9 +156,9 @@ def create_video_transcription_tab():
                     with gr.Column():
                         chunk_method = gr.Dropdown(choices=['words', 'sentences', 'paragraphs', 'tokens'],
                                                    label="Chunking Method")
-                        max_chunk_size = gr.Slider(minimum=100, maximum=1000, value=300, step=50,
+                        max_chunk_size = gr.Slider(minimum=100, maximum=8000, value=400, step=1,
                                                    label="Max Chunk Size")
-                        chunk_overlap = gr.Slider(minimum=0, maximum=100, value=0, step=10, label="Chunk Overlap")
+                        chunk_overlap = gr.Slider(minimum=0, maximum=5000, value=100, step=1, label="Chunk Overlap")
                         use_adaptive_chunking = gr.Checkbox(
                             label="Use Adaptive Chunking (Adjust chunking based on text complexity)")
                         use_multi_level_chunking = gr.Checkbox(label="Use Multi-level Chunking")
