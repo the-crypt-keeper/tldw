@@ -12,18 +12,13 @@
 #
 ####################
 # Import necessary libraries
-import json
 import logging
-import os
 from pathlib import Path
 from typing import Dict, List, Any
 
-
-from tqdm import tqdm
-import soundfile as sf
 #
 # Import Local Libraries
-from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
 #
 # Import 3rd Party Libraries
 from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization

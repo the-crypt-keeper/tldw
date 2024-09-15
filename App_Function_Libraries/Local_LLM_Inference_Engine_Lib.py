@@ -31,7 +31,7 @@ from App_Function_Libraries.Utils.Utils import download_file
 # Import 3rd-pary Libraries
 #
 # Import Local
-from Article_Summarization_Lib import *
+from App_Function_Libraries.Web_Scraping.Article_Summarization_Lib import *
 
 #
 #
