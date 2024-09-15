@@ -423,12 +423,12 @@ def create_website_scraping_tab():
                     result = await scrape_and_summarize_multiple(url_input, custom_prompt, api_name, api_key, keywords,
                                                                  custom_titles, system_prompt)
                 elif scrape_method == "Sitemap":
-                    result = scrape_from_sitemap(url_input)
+                    result = await asyncio.to_thread(scrape_from_sitemap, url_input)
                 elif scrape_method == "URL Level":
                     if url_level is None:
                         return convert_json_to_markdown(
                             json.dumps({"error": "URL level is required for URL Level scraping."}))
-                    result = scrape_by_url_level(url_input, url_level)
+                    result = await asyncio.to_thread(scrape_by_url_level, url_input, url_level)
                 elif scrape_method == "Recursive Scraping":
                     result = await recursive_scrape(url_input, max_pages, max_depth, progress.update, delay=1.0)
                 else:
@@ -437,16 +437,30 @@ def create_website_scraping_tab():
                 # Ensure result is always a list of dictionaries
                 if isinstance(result, dict):
                     result = [result]
-                elif not isinstance(result, list):
-                    raise TypeError(f"Unexpected result type: {type(result)}")
+                elif isinstance(result, list):
+                    if all(isinstance(item, str) for item in result):
+                        # Convert list of strings to list of dictionaries
+                        result = [{"content": item} for item in result]
+                    elif not all(isinstance(item, dict) for item in result):
+                        raise ValueError("Not all items in result are dictionaries or strings")
+                else:
+                    raise ValueError(f"Unexpected result type: {type(result)}")
+
+                # Ensure all items in result are dictionaries
+                if not all(isinstance(item, dict) for item in result):
+                    raise ValueError("Not all items in result are dictionaries")
 
                 if summarize_checkbox:
                     total_articles = len(result)
                     for i, article in enumerate(result):
                         progress.update(f"Summarizing article {i + 1}/{total_articles}")
-                        summary = summarize(article['content'], custom_prompt, api_name, api_key, temperature,
-                                            system_prompt)
-                        article['summary'] = summary
+                        content = article.get('content', '')
+                        if content:
+                            summary = await asyncio.to_thread(summarize, content, custom_prompt, api_name, api_key,
+                                                              temperature, system_prompt)
+                            article['summary'] = summary
+                        else:
+                            article['summary'] = "No content available to summarize."
 
                 # Concatenate all content
                 all_content = "\n\n".join(
@@ -473,7 +487,7 @@ def create_website_scraping_tab():
                 }
 
                 # Convert the JSON to markdown and return
-                return convert_json_to_markdown(json.dumps({"error": f"Unknown scraping method: {scrape_method}"}))
+                return convert_json_to_markdown(json.dumps(website_collection, indent=2))
             except Exception as e:
                 return convert_json_to_markdown(json.dumps({"error": f"An error occurred: {str(e)}"}))
 
