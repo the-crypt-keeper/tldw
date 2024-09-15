@@ -57,7 +57,7 @@ def create_embeddings_tab():
                     label="Max Chunk Size"
                 )
                 chunk_overlap = gr.Slider(
-                    minimum=0, maximum=1000, step=1, value=200,
+                    minimum=0, maximum=4000, step=1, value=200,
                     label="Chunk Overlap"
                 )
                 adaptive_chunking = gr.Checkbox(
@@ -174,11 +174,11 @@ def create_view_embeddings_tab():
                     value="words"
                 )
                 max_chunk_size = gr.Slider(
-                    minimum=1, maximum=5000, step=1, value=500,
+                    minimum=1, maximum=8000, step=1, value=500,
                     label="Max Chunk Size"
                 )
                 chunk_overlap = gr.Slider(
-                    minimum=0, maximum=8000, step=10, value=100,
+                    minimum=0, maximum=5000, step=1, value=200,
                     label="Chunk Overlap"
                 )
                 adaptive_chunking = gr.Checkbox(
