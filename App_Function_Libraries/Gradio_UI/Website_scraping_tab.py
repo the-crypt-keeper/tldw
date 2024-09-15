@@ -19,8 +19,8 @@ from playwright.sync_api import sync_playwright
 
 #
 # Local Imports
-from App_Function_Libraries.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, scrape_article
-from App_Function_Libraries.Article_Summarization_Lib import scrape_and_summarize_multiple
+from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, scrape_article
+from App_Function_Libraries.Web_Scraping.Article_Summarization_Lib import scrape_and_summarize_multiple
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
@@ -473,7 +473,7 @@ def create_website_scraping_tab():
                 }
 
                 # Convert the JSON to markdown and return
-                return convert_json_to_markdown(json.dumps(website_collection, indent=2))
+                return convert_json_to_markdown(json.dumps({"error": f"Unknown scraping method: {scrape_method}"}))
             except Exception as e:
                 return convert_json_to_markdown(json.dumps({"error": f"An error occurred: {str(e)}"}))
 
