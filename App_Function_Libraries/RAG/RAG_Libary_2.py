@@ -8,7 +8,7 @@ import os
 from typing import Dict, Any, List, Optional
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
-from App_Function_Libraries.Article_Extractor_Lib import scrape_article
+from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database, search_db, get_unprocessed_media, \
     fetch_keywords_for_media
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
