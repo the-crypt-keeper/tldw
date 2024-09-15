@@ -50,9 +50,11 @@ import html
 import logging
 import os
 import queue
+import random
 import re
 import shutil
 import sqlite3
+import time
 import traceback
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
@@ -2474,45 +2476,48 @@ def create_document_version(media_id: int, content: str, max_retries=5, initial_
     retry_count = 0
     while retry_count < max_retries:
         try:
-            # Verify media_id exists
-            result = db.execute_query('SELECT id FROM Media WHERE id = ?', (media_id,))
-            if not result:
-                raise ValueError(f"No Media entry found for id: {media_id}")
+            with db.get_connection() as conn:
+                conn.execute("BEGIN IMMEDIATE")  # Start an immediate transaction
+                try:
+                    cursor = conn.cursor()
 
-            # Check if a version exists for this media_id
-            result = db.execute_query('''
-                SELECT MAX(version_number) 
-                FROM DocumentVersions 
-                WHERE media_id = ?
-            ''', (media_id,))
+                    # Verify media_id exists and get the latest version in one query
+                    cursor.execute('''
+                        SELECT m.id, COALESCE(MAX(dv.version_number), 0)
+                        FROM Media m
+                        LEFT JOIN DocumentVersions dv ON m.id = dv.media_id
+                        WHERE m.id = ?
+                        GROUP BY m.id
+                    ''', (media_id,))
+                    result = cursor.fetchone()
 
-            logging.debug(f"Query result for MAX(version_number): {result}")
+                    if not result:
+                        raise ValueError(f"No Media entry found for id: {media_id}")
 
-            if not result or result[0][0] is None:
-                logging.info(f"No existing versions found for media_id: {media_id}. Starting with version 1.")
-                new_version = 1
-            else:
-                latest_version = result[0][0]
-                logging.debug(f"Latest version number: {latest_version}")
-                new_version = latest_version + 1
+                    _, latest_version = result
+                    new_version = latest_version + 1
 
-            logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
+                    logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
 
-            # Insert new version
-            db.execute_query('''
-                INSERT INTO DocumentVersions (media_id, version_number, content)
-                VALUES (?, ?, ?)
-            ''', (media_id, new_version, content))
+                    # Insert new version
+                    cursor.execute('''
+                        INSERT INTO DocumentVersions (media_id, version_number, content)
+                        VALUES (?, ?, ?)
+                    ''', (media_id, new_version, content))
 
-            logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
-            return new_version
-
-        except DatabaseError as e:
+                    conn.commit()
+                    logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
+                    return new_version
+                except Exception as e:
+                    conn.rollback()
+                    raise e
+        except sqlite3.OperationalError as e:
             if "database is locked" in str(e).lower():
                 retry_count += 1
                 if retry_count < max_retries:
                     delay = initial_delay * (2 ** retry_count) + random.uniform(0, 0.1)
-                    logging.warning(f"Database locked. Retrying in {delay:.2f} seconds (attempt {retry_count}/{max_retries})")
+                    logging.warning(
+                        f"Database locked. Retrying in {delay:.2f} seconds (attempt {retry_count}/{max_retries})")
                     time.sleep(delay)
                 else:
                     logging.error(f"Max retries reached. Database error creating document version: {e}")
@@ -2522,9 +2527,6 @@ def create_document_version(media_id: int, content: str, max_retries=5, initial_
                 logging.error(f"Database error creating document version: {e}")
                 logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
                 raise
-        except ValueError as e:
-            logging.error(f"Value error creating document version: {e}")
-            raise
         except Exception as e:
             logging.error(f"Unexpected error creating document version: {e}")
             logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
