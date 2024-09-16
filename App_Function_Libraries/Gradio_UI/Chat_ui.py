@@ -984,6 +984,7 @@ def process_with_llm(workflow, context, prompt, api_endpoint, api_key):
     api_key_snippet = api_key[:5] + "..." if api_key else "Not provided"
     return f"LLM output using {api_endpoint} (API Key: {api_key_snippet}) for {workflow} with context: {context[:30]}... and prompt: {prompt[:30]}..."
 
+
 #
 # End of Chat_ui.py
 #######################################################################################################################

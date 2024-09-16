@@ -492,8 +492,8 @@ def create_video_transcription_tab():
             # FIXME - remove dead args for process_url_with_metadata
             @error_handler
             def process_url_with_metadata(input_item, num_speakers, whisper_model, custom_prompt, offset, api_name,
-                                          api_key,
-                                          vad_filter, download_video_flag, download_audio, rolling_summarization,
+                                          api_key, vad_filter, download_video_flag, download_audio,
+                                          rolling_summarization,
                                           detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
                                           include_timestamps=True, metadata=None, use_chunking=False,
                                           chunk_options=None, keep_original_video=False, current_whisper_model="Blank"):
@@ -562,10 +562,11 @@ def create_video_transcription_tab():
                         # Download video/audio
                         logging.info("Downloading video/audio...")
                         video_file_path = download_video(input_item, download_path, full_info, download_video_flag,
-                                                         current_whisper_model="Blank")
-                        if not video_file_path:
-                            logging.error(f"Failed to download video/audio from {input_item}")
-                            return None, None, None, None, None, None
+                                                         current_whisper_model=current_whisper_model)
+                        if video_file_path is None:
+                            logging.info(
+                                f"Download skipped for {input_item}. Media might already exist or be processed.")
+                            return input_item, None, None, None, None, info_dict
 
                     logging.info(f"Processing file: {video_file_path}")
 
