@@ -133,7 +133,6 @@ def load_chat_history(file):
         return None, None
 
 
-# FIXME This should be in the chat tab....
 def create_character_card_interaction_tab():
     with gr.TabItem("Chat with a Character Card"):
         gr.Markdown("# Chat with a Character Card")
@@ -169,8 +168,8 @@ def create_character_card_interaction_tab():
                 save_chat_button = gr.Button("Save This Chat")
                 save_status = gr.Textbox(label="Save Status", interactive=False)
 
-    character_data = gr.State(None)
-    user_name = gr.State("")
+        character_data = gr.State(None)
+        user_name = gr.State("")
 
     def import_chat_history(file, current_history, char_data):
         loaded_history, char_name = load_chat_history(file)
@@ -669,3 +668,107 @@ def create_multiple_character_chat_tab():
             )
 
         return character_interaction
+
+#
+# End of Multi-Character chat tab
+########################################################################################################################
+#
+# Narrator-Controlled Conversation Tab
+
+# From `Fuzzlewumper` on Reddit.
+def create_narrator_controlled_conversation_tab():
+    with gr.TabItem("Narrator-Controlled Conversation"):
+        gr.Markdown("# Narrator-Controlled Conversation")
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                api_endpoint = gr.Dropdown(
+                    label="API Endpoint",
+                    choices=["OpenAI", "Anthropic", "Local-LLM", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter"],
+                    value="OpenAI"
+                )
+                api_key = gr.Textbox(label="API Key (if required)", type="password")
+                temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
+
+            with gr.Column(scale=2):
+                narrator_input = gr.Textbox(
+                    label="Narrator Input",
+                    placeholder="Set the scene or provide context...",
+                    lines=3
+                )
+
+        character_inputs = []
+        for i in range(4):  # Allow up to 4 characters
+            with gr.Row():
+                name = gr.Textbox(label=f"Character {i + 1} Name")
+                description = gr.Textbox(label=f"Character {i + 1} Description", lines=3)
+                character_inputs.append((name, description))
+
+        conversation_display = gr.Chatbot(label="Conversation", height=400)
+        user_input = gr.Textbox(label="Your Input (optional)", placeholder="Add your own dialogue or action...")
+
+        with gr.Row():
+            generate_btn = gr.Button("Generate Next Interaction")
+            reset_btn = gr.Button("Reset Conversation")
+
+        error_box = gr.Textbox(label="Error Messages", visible=False)
+
+        def generate_interaction(conversation, narrator_text, user_text, api_endpoint, api_key, temperature,
+                                 *character_data):
+            try:
+                characters = [{"name": name.strip(), "description": desc.strip()}
+                              for name, desc in zip(character_data[::2], character_data[1::2])
+                              if name.strip() and desc.strip()]
+
+                if not characters:
+                    raise ValueError("At least one character must be defined.")
+
+                prompt = f"Narrator: {narrator_text}\n\n"
+                for char in characters:
+                    prompt += f"Character '{char['name']}': {char['description']}\n"
+                prompt += "\nGenerate the next part of the conversation, including character dialogues and actions. "
+                prompt += "Characters should speak in first person. "
+                if user_text:
+                    prompt += f"\nIncorporate this user input: {user_text}"
+                prompt += "\nResponse:"
+
+                response = chat_wrapper(prompt, conversation, {}, [], api_endpoint, api_key, "", None, False,
+                                        temperature, "")
+                processed_response = process_character_response(response)
+
+                # Split the response into lines and format each line
+                formatted_lines = []
+                for line in processed_response.split('\n'):
+                    if ':' in line:
+                        speaker, text = line.split(':', 1)
+                        formatted_lines.append(f"**{speaker.strip()}**: {text.strip()}")
+                    else:
+                        formatted_lines.append(line)
+
+                formatted_response = '\n'.join(formatted_lines)
+                conversation.append((None, formatted_response))
+                return conversation, gr.update(value=""), gr.update(value=""), gr.update(visible=False, value="")
+            except Exception as e:
+                error_message = f"An error occurred: {str(e)}"
+                return conversation, gr.update(), gr.update(), gr.update(visible=True, value=error_message)
+
+        def reset_conversation():
+            return [], gr.update(value=""), gr.update(value=""), gr.update(visible=False, value="")
+
+        generate_btn.click(
+            generate_interaction,
+            inputs=[conversation_display, narrator_input, user_input, api_endpoint, api_key, temperature] +
+                   [input for char_input in character_inputs for input in char_input],
+            outputs=[conversation_display, narrator_input, user_input, error_box]
+        )
+
+        reset_btn.click(
+            reset_conversation,
+            outputs=[conversation_display, narrator_input, user_input, error_box]
+        )
+
+    return api_endpoint, api_key, temperature, narrator_input, conversation_display, user_input, generate_btn, reset_btn, error_box
+
+#
+# End of Multi-Character chat tab
+########################################################################################################################
