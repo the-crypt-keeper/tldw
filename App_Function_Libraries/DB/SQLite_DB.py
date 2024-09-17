@@ -2700,3 +2700,114 @@ def update_media_table(db):
 #
 # End of Functions to manage media chunks
 #######################################################################################################################
+
+
+#######################################################################################################################
+#
+# Workflow Functions
+
+
+def save_workflow_chat_to_db(chat_history, workflow_name, conversation_id=None):
+    """
+    Save or update a workflow chat in the database.
+
+    Args:
+    chat_history: List of tuples containing (user_message, ai_message)
+    workflow_name: Name of the workflow
+    conversation_id: ID of existing conversation (if updating), or None for new conversation
+
+    Returns:
+    tuple: (conversation_id, status_message)
+    """
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            if conversation_id is None:
+                # Create a new conversation
+                conversation_name = f"{workflow_name}_Workflow_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                cursor.execute('''
+                    INSERT INTO ChatConversations (media_id, media_name, conversation_name, created_at, updated_at)
+                    VALUES (NULL, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (workflow_name, conversation_name))
+                conversation_id = cursor.lastrowid
+            else:
+                # Update existing conversation
+                cursor.execute('''
+                    UPDATE ChatConversations
+                    SET updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (conversation_id,))
+
+            # Save messages
+            for user_msg, ai_msg in chat_history:
+                if user_msg:
+                    cursor.execute('''
+                        INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+                        VALUES (?, 'user', ?, CURRENT_TIMESTAMP)
+                    ''', (conversation_id, user_msg))
+                if ai_msg:
+                    cursor.execute('''
+                        INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+                        VALUES (?, 'ai', ?, CURRENT_TIMESTAMP)
+                    ''', (conversation_id, ai_msg))
+
+            conn.commit()
+
+        return conversation_id, f"Chat saved successfully! Conversation ID: {conversation_id}"
+    except Exception as e:
+        logging.error(f"Error saving workflow chat to database: {str(e)}")
+        return None, f"Error saving chat to database: {str(e)}"
+
+
+def get_workflow_chat(conversation_id):
+    """
+    Retrieve a workflow chat from the database.
+
+    Args:
+    conversation_id: ID of the conversation to retrieve
+
+    Returns:
+    tuple: (chat_history, workflow_name, status_message)
+    """
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get conversation details
+            cursor.execute('''
+                SELECT media_name, conversation_name FROM ChatConversations
+                WHERE id = ?
+            ''', (conversation_id,))
+            result = cursor.fetchone()
+            if not result:
+                return None, None, "Conversation not found"
+
+            workflow_name, conversation_name = result
+
+            # Get chat messages
+            cursor.execute('''
+                SELECT sender, message FROM ChatMessages
+                WHERE conversation_id = ?
+                ORDER BY timestamp
+            ''', (conversation_id,))
+            messages = cursor.fetchall()
+
+            chat_history = []
+            for sender, message in messages:
+                if sender == 'user':
+                    chat_history.append((message, None))
+                else:
+                    if chat_history and chat_history[-1][1] is None:
+                        chat_history[-1] = (chat_history[-1][0], message)
+                    else:
+                        chat_history.append((None, message))
+
+        return chat_history, workflow_name, f"Chat retrieved successfully"
+    except Exception as e:
+        logging.error(f"Error retrieving workflow chat from database: {str(e)}")
+        return None, None, f"Error retrieving chat from database: {str(e)}"
+
+#
+# End of Workflow Functions
+#######################################################################################################################
