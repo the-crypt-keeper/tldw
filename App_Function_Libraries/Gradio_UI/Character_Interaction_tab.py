@@ -627,10 +627,28 @@ def create_multiple_character_chat_tab():
                 current_character = char_selectors[current_index % num_chars]
                 next_index = (current_index + 1) % num_chars
 
-                new_conversation, _ = character_turn(
-                    characters, conversation, current_character, char_selectors,
-                    api_endpoint, api_key, temperature, scenario
-                )
+                prompt = f"Character speaking: {current_character}\nOther characters: {', '.join(char for char in char_selectors if char != current_character)}\n"
+                prompt += "Generate the next part of the conversation, including character dialogues and actions. Characters should speak in first person."
+
+                response, new_conversation, _ = chat_wrapper(prompt, conversation, {}, [], api_endpoint, api_key, "",
+                                                             None, False, temperature, "")
+
+                # Format the response
+                formatted_lines = []
+                for line in response.split('\n'):
+                    if ':' in line:
+                        speaker, text = line.split(':', 1)
+                        formatted_lines.append(f"**{speaker.strip()}**: {text.strip()}")
+                    else:
+                        formatted_lines.append(line)
+
+                formatted_response = '\n'.join(formatted_lines)
+
+                # Update the last message in the conversation with the formatted response
+                if new_conversation:
+                    new_conversation[-1] = (new_conversation[-1][0], formatted_response)
+                else:
+                    new_conversation.append((current_character, formatted_response))
 
                 return new_conversation, next_index
 
@@ -732,13 +750,12 @@ def create_narrator_controlled_conversation_tab():
                     prompt += f"\nIncorporate this user input: {user_text}"
                 prompt += "\nResponse:"
 
-                response = chat_wrapper(prompt, conversation, {}, [], api_endpoint, api_key, "", None, False,
-                                        temperature, "")
-                processed_response = process_character_response(response)
+                response, conversation, _ = chat_wrapper(prompt, conversation, {}, [], api_endpoint, api_key, "", None,
+                                                         False, temperature, "")
 
-                # Split the response into lines and format each line
+                # Format the response
                 formatted_lines = []
-                for line in processed_response.split('\n'):
+                for line in response.split('\n'):
                     if ':' in line:
                         speaker, text = line.split(':', 1)
                         formatted_lines.append(f"**{speaker.strip()}**: {text.strip()}")
@@ -746,7 +763,13 @@ def create_narrator_controlled_conversation_tab():
                         formatted_lines.append(line)
 
                 formatted_response = '\n'.join(formatted_lines)
-                conversation.append((None, formatted_response))
+
+                # Update the last message in the conversation with the formatted response
+                if conversation:
+                    conversation[-1] = (conversation[-1][0], formatted_response)
+                else:
+                    conversation.append((None, formatted_response))
+
                 return conversation, gr.update(value=""), gr.update(value=""), gr.update(visible=False, value="")
             except Exception as e:
                 error_message = f"An error occurred: {str(e)}"
