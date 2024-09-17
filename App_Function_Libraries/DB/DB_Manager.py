@@ -64,7 +64,8 @@ from App_Function_Libraries.DB.SQLite_DB import (
     get_paginated_files as sqlite_get_paginated_files, get_media_title as sqlite_get_media_title, \
     get_all_content_from_database as sqlite_get_all_content_from_database,
     get_next_media_id as sqlite_get_next_media_id, \
-    batch_insert_chunks as sqlite_batch_insert_chunks, Database,
+    batch_insert_chunks as sqlite_batch_insert_chunks, Database, save_workflow_chat_to_db as sqlite_save_workflow_chat_to_db, \
+    get_workflow_chat as sqlite_get_workflow_chat,
 )
 #
 # Local Imports
@@ -790,9 +791,35 @@ def get_document_version(*args, **kwargs):
 # End of Document Versioning Functions
 ############################################################################################################
 
-def close_connection():
+
+############################################################################################################
+#
+# Workflow Functions
+
+def get_workflow_chat(*args, **kwargs):
     if db_type == 'sqlite':
-        db.get_connection().close()
+        return sqlite_get_workflow_chat(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_workflow_chat not yet implemented")
+
+
+def save_workflow_chat_to_db():
+    if db_type == 'sqlite':
+        # FIXME
+        return sqlite_save_workflow_chat_to_db
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of save_workflow_chat_to_db not yet implemented")
+
+#
+# End of Workflow Functions
+############################################################################################################
+
+# Dead code FIXME
+# def close_connection():
+#     if db_type == 'sqlite':
+#         db.get_connection().close()
 
 #
 # End of file
