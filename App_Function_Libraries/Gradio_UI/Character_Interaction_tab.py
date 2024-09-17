@@ -504,14 +504,14 @@ def character_turn(characters: Dict, conversation: List[Tuple[str, str]],
                    current_character: str, other_characters: List[str],
                    api_endpoint: str, api_key: str, temperature: float,
                    scenario: str = "") -> Tuple[List[Tuple[str, str]], str]:
-    if not current_character:
+    if not current_character or current_character not in characters:
         return conversation, current_character
 
     if not conversation and scenario:
         conversation.append(("Scenario", scenario))
 
     current_char = characters[current_character]
-    other_chars = [characters[char] for char in other_characters if char != current_character]
+    other_chars = [characters[char] for char in other_characters if char in characters and char != current_character]
 
     prompt = f"{current_char['name']}'s personality: {current_char['personality']}\n"
     for char in other_chars:
@@ -558,6 +558,7 @@ def character_interaction(character1: str, character2: str, api_endpoint: str, a
 
         prompt += f"\n\nHow would {current_speaker['name']} respond?"
 
+        # FIXME - figure out why the double print is happening
         # Get response from the LLM
         response = chat_wrapper(prompt, conversation, {}, [], api_endpoint, api_key, "", None, False, temperature, "")
 
@@ -591,10 +592,12 @@ def create_multiple_character_chat_tab():
             scenario = gr.Textbox(label="Scenario (optional)", lines=3)
 
             chat_display = gr.Chatbot(label="Character Interaction")
+            current_index = gr.State(0)
 
             next_turn_btn = gr.Button("Next Turn")
             narrator_input = gr.Textbox(label="Narrator Input", placeholder="Add a narration or description...")
             add_narration_btn = gr.Button("Add Narration")
+            error_box = gr.Textbox(label="Error Messages", visible=False)
             reset_btn = gr.Button("Reset Conversation")
 
             def update_character_selectors(num):
@@ -607,21 +610,22 @@ def create_multiple_character_chat_tab():
             )
 
             def reset_conversation():
-                # Clear chat, reset current_index, other_character, and scenario
-                return [], None, None, gr.update(value="")
+                return [], 0, gr.update(value=""), gr.update(value="")
 
-            def take_turn(characters, conversation, current_index, char_selectors, api_endpoint,
-                          api_key, temperature, scenario):
-                num_chars = sum(1 for selector in char_selectors if selector)
+            def take_turn(conversation, current_index, char1, char2, char3, char4, api_endpoint, api_key, temperature,
+                          scenario):
+                char_selectors = [char for char in [char1, char2, char3, char4] if char]  # Remove None values
+                num_chars = len(char_selectors)
+
+                if num_chars == 0:
+                    return conversation, current_index  # No characters selected, return without changes
+
                 if not conversation:
                     conversation = []
                     if scenario:
                         conversation.append(("Scenario", scenario))
 
-                if current_index is None:
-                    current_index = 0
-
-                current_character = char_selectors[current_index]
+                current_character = char_selectors[current_index % num_chars]
                 next_index = (current_index + 1) % num_chars
 
                 new_conversation, _ = character_turn(
@@ -636,11 +640,21 @@ def create_multiple_character_chat_tab():
                     conversation.append(("Narrator", narration))
                 return conversation, ""
 
+            def take_turn_with_error_handling(conversation, current_index, char1, char2, char3, char4, api_endpoint,
+                                              api_key, temperature, scenario):
+                try:
+                    new_conversation, next_index = take_turn(conversation, current_index, char1, char2, char3, char4,
+                                                             api_endpoint, api_key, temperature, scenario)
+                    return new_conversation, next_index, gr.update(visible=False, value="")
+                except Exception as e:
+                    error_message = f"An error occurred: {str(e)}"
+                    return conversation, current_index, gr.update(visible=True, value=error_message)
+
             next_turn_btn.click(
-                take_turn,
-                inputs=[gr.State(characters), gr.State(conversation), gr.State(None),
-                        character_selectors[:4], api_endpoint, api_key, temperature, scenario],
-                outputs=[chat_display, gr.State(None)]
+                take_turn_with_error_handling,
+                inputs=[chat_display, current_index] + character_selectors + [api_endpoint, api_key, temperature,
+                                                                              scenario],
+                outputs=[chat_display, current_index, error_box]
             )
 
             add_narration_btn.click(
@@ -651,7 +665,7 @@ def create_multiple_character_chat_tab():
 
             reset_btn.click(
                 reset_conversation,
-                outputs=[chat_display, gr.State(None), gr.State(None), scenario]
+                outputs=[chat_display, current_index, scenario, narrator_input]
             )
 
         return character_interaction
