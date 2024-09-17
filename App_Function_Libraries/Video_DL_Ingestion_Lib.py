@@ -110,6 +110,7 @@ def download_video(video_url, download_path, info_dict, download_video_flag, cur
 
     normalized_video_title = normalize_title(info_dict['title'])
 
+    # FIXME - make sure this works/checks against hte current model
     # Check if media already exists in the database and compare whisper models
     should_download, reason = check_media_and_whisper_model(
         title=normalized_video_title,

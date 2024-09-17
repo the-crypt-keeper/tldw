@@ -88,7 +88,8 @@ rpds-py==0.18.1
 ruff==0.4.3
 semantic-version==2.10.0
 sentencepiece==0.2.0
-setuptools==69.5.1
+#setuptools==69.5.1
+setuptools==75.0.0
 shellingham==1.5.4
 six==1.16.0
 scikit-learn
