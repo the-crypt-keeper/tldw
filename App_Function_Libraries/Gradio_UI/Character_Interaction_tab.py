@@ -481,7 +481,12 @@ def extract_character_response(response: Union[str, Tuple]) -> str:
         # For any other type, return a default message
         return "I'm having trouble forming a response."
 
-
+# def process_character_response(response: str) -> str:
+#     # Remove any leading explanatory text before the first '---'
+#     parts = response.split('---')
+#     if len(parts) > 1:
+#         return '---' + '---'.join(parts[1:])
+#     return response.strip()
 def process_character_response(response: Union[str, Tuple]) -> str:
     if isinstance(response, tuple):
         response = ' '.join(str(item) for item in response if isinstance(item, str))
@@ -496,20 +501,21 @@ def process_character_response(response: Union[str, Tuple]) -> str:
         return "I'm having trouble forming a response."
 
 def character_turn(characters: Dict, conversation: List[Tuple[str, str]],
-                   current_character: str, other_character: str,
+                   current_character: str, other_characters: List[str],
                    api_endpoint: str, api_key: str, temperature: float,
-                   scenario: str = "") -> Tuple[List[Tuple[str, str]], str, str]:
-    if not current_character or not other_character:
-        return conversation, current_character, other_character
+                   scenario: str = "") -> Tuple[List[Tuple[str, str]], str]:
+    if not current_character:
+        return conversation, current_character
 
     if not conversation and scenario:
         conversation.append(("Scenario", scenario))
 
     current_char = characters[current_character]
-    other_char = characters[other_character]
+    other_chars = [characters[char] for char in other_characters if char != current_character]
 
     prompt = f"{current_char['name']}'s personality: {current_char['personality']}\n"
-    prompt += f"{other_char['name']}'s personality: {other_char['personality']}\n"
+    for char in other_chars:
+        prompt += f"{char['name']}'s personality: {char['personality']}\n"
     prompt += "Conversation so far:\n" + "\n".join([f"{sender}: {message}" for sender, message in conversation])
     prompt += f"\n\nHow would {current_char['name']} respond?"
 
@@ -521,7 +527,8 @@ def character_turn(characters: Dict, conversation: List[Tuple[str, str]],
         error_message = f"Error generating response: {str(e)}"
         conversation.append((current_char['name'], error_message))
 
-    return conversation, other_character, current_character
+    return conversation, current_character
+
 
 def character_interaction(character1: str, character2: str, api_endpoint: str, api_key: str,
                           num_turns: int, scenario: str, temperature: float,
@@ -569,11 +576,12 @@ def create_multiple_character_chat_tab():
         characters, conversation, current_character, other_character = character_interaction_setup()
 
         with gr.Blocks() as character_interaction:
-            gr.Markdown("# Character Interaction")
+            gr.Markdown("# Multi-Character Chat")
 
             with gr.Row():
-                character1 = gr.Dropdown(label="Character 1", choices=list(characters.keys()))
-                character2 = gr.Dropdown(label="Character 2", choices=list(characters.keys()))
+                num_characters = gr.Dropdown(label="Number of Characters", choices=["2", "3", "4"], value="2")
+                character_selectors = [gr.Dropdown(label=f"Character {i + 1}", choices=list(characters.keys())) for i in
+                                       range(4)]
 
             api_endpoint = gr.Dropdown(label="API Endpoint",
                                        choices=["OpenAI", "Anthropic", "Local-LLM", "Cohere", "Groq", "DeepSeek",
@@ -585,37 +593,64 @@ def create_multiple_character_chat_tab():
             chat_display = gr.Chatbot(label="Character Interaction")
 
             next_turn_btn = gr.Button("Next Turn")
+            narrator_input = gr.Textbox(label="Narrator Input", placeholder="Add a narration or description...")
+            add_narration_btn = gr.Button("Add Narration")
             reset_btn = gr.Button("Reset Conversation")
+
+            def update_character_selectors(num):
+                return [gr.update(visible=True) if i < int(num) else gr.update(visible=False) for i in range(4)]
+
+            num_characters.change(
+                update_character_selectors,
+                inputs=[num_characters],
+                outputs=character_selectors
+            )
 
             def reset_conversation():
                 return [], None, None
 
-            def take_turn(characters, conversation, current_character, other_character, char1, char2, api_endpoint,
+            def take_turn(characters, conversation, current_index, char_selectors, api_endpoint,
                           api_key, temperature, scenario):
-                if not current_character or not other_character:
-                    current_character, other_character = char1, char2
+                num_chars = sum(1 for selector in char_selectors if selector)
+                if not conversation:
+                    conversation = []
+                    if scenario:
+                        conversation.append(("Scenario", scenario))
 
-                if not current_character or not other_character:
-                    return conversation, None, None
+                if current_index is None:
+                    current_index = 0
 
-                new_conversation, new_current, new_other = character_turn(
-                    characters, conversation, current_character, other_character,
+                current_character = char_selectors[current_index]
+                next_index = (current_index + 1) % num_chars
+
+                new_conversation, _ = character_turn(
+                    characters, conversation, current_character, char_selectors,
                     api_endpoint, api_key, temperature, scenario
                 )
 
-                return new_conversation, new_current, new_other
+                return new_conversation, next_index
+
+            def add_narration(narration, conversation):
+                if narration:
+                    conversation.append(("Narrator", narration))
+                return conversation, ""
 
             next_turn_btn.click(
                 take_turn,
-                inputs=[gr.State(characters), gr.State(conversation), gr.State(current_character),
-                        gr.State(other_character), character1, character2, api_endpoint, api_key, temperature,
-                        scenario],
-                outputs=[chat_display, gr.State(current_character), gr.State(other_character)]
+                inputs=[gr.State(characters), gr.State(conversation), gr.State(None),
+                        character_selectors[:4], api_endpoint, api_key, temperature, scenario],
+                outputs=[chat_display, gr.State(None)]
+            )
+
+            add_narration_btn.click(
+                add_narration,
+                inputs=[narrator_input, chat_display],
+                outputs=[chat_display, narrator_input]
             )
 
             reset_btn.click(
                 reset_conversation,
-                outputs=[chat_display, gr.State(current_character), gr.State(other_character)]
+                outputs=[chat_display, gr.State(None)]
             )
 
         return character_interaction
