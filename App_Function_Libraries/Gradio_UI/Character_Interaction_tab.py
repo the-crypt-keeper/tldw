@@ -607,7 +607,8 @@ def create_multiple_character_chat_tab():
             )
 
             def reset_conversation():
-                return [], None, None
+                # Clear chat, reset current_index, other_character, and scenario
+                return [], None, None, gr.update(value="")
 
             def take_turn(characters, conversation, current_index, char_selectors, api_endpoint,
                           api_key, temperature, scenario):
@@ -650,7 +651,7 @@ def create_multiple_character_chat_tab():
 
             reset_btn.click(
                 reset_conversation,
-                outputs=[chat_display, gr.State(None)]
+                outputs=[chat_display, gr.State(None), gr.State(None), scenario]
             )
 
         return character_interaction
