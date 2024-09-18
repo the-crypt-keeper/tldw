@@ -1,7 +1,9 @@
 [
   {
     "name": "5 Whys Analysis",
+    "context": "A problem-solving technique that involves asking 'why' five times to get to the root cause of an issue. Start with the problem statement and ask 'why' repeatedly to uncover deeper causes. Your first message should include the problem statement, and subsequent messages should ask 'why' and provide an answer.",
     "prompts": [
+      "What is the problem?",
       "Why did this happen?",
       "Why did that happen?",
       "Why did this subsequent event happen?",
@@ -11,6 +13,7 @@
   },
   {
     "name": "Summarization",
+    "context": "A process of condensing information into a concise form while retaining the main points. Start with the text to be summarized and provide a brief summary. Subsequent messages should refine the summary to make it more concise and focused.",
     "prompts": [
       "Summarize the following text:",
       "Refine the summary to be more concise:"
@@ -18,6 +21,7 @@
   },
   {
     "name": "Question Answering",
+    "context": "A task that involves answering questions based on a given context or information. Start with the question and provide an answer based on the context. Subsequent messages should provide more detailed answers or explanations.",
     "prompts": [
       "Answer the following question based on the context:",
       "Provide a more detailed answer:"
@@ -25,6 +29,7 @@
   },
   {
     "name": "Brainstorming",
+    "context": "A creative technique for generating ideas and solutions through group discussion. Start with a topic or problem statement and generate initial ideas. Subsequent messages should expand on the ideas, refine them, and summarize the final set of ideas.",
     "prompts": [
       "Generate initial ideas based on the following topic:",
       "Expand on the generated ideas:",
@@ -34,6 +39,7 @@
   },
   {
     "name": "Code Review",
+    "context": "A process of examining code to identify issues, suggest improvements, and ensure quality. Start with the code snippet to be reviewed and identify potential issues. Subsequent messages should suggest improvements, explain their benefits, and summarize the review.",
     "prompts": [
       "Review the following code for potential issues:",
       "Suggest improvements or optimizations:",
@@ -42,6 +48,7 @@
   },
   {
     "name": "Product Description",
+    "context": "A detailed description of a product, highlighting its features, benefits, and value proposition. Start with the product details and write an initial description. Subsequent messages should enhance the description, simplify it, and optimize it for search engines.",
     "prompts": [
       "Write an initial product description based on the provided details:",
       "Enhance the description with key features and benefits:",
@@ -51,6 +58,7 @@
   },
   {
     "name": "SWOT Analysis",
+    "context": "A strategic planning tool used to identify the strengths, weaknesses, opportunities, and threats of a subject. Start with the subject of analysis and identify its strengths. Subsequent messages should cover weaknesses, opportunities, threats, and summarize the analysis.",
     "prompts": [
       "Identify the strengths of the subject:",
       "Identify the weaknesses of the subject:",
@@ -61,6 +69,7 @@
   },
   {
     "name": "User Story Creation",
+    "context": "A technique used in agile software development to capture user requirements from a user's perspective. Start with the user role and a brief description of the feature. Subsequent messages should detail user needs, acceptance criteria, and prioritize the user story.",
     "prompts": [
       "Draft an initial user story for the feature:",
       "Clarify the user needs and expected outcomes:",
@@ -70,6 +79,7 @@
   },
     {
     "name": "Content Outline Creation",
+    "context": "A structured plan that outlines the main topics and subtopics of a piece of content. Start with the content type and purpose, then list the main topics. Subsequent messages should detail subtopics, key points, and refine the outline for logical flow.",
     "prompts": [
       "Identify the main topic and subtopics to be covered:",
       "Detail the key points under each subtopic:",
@@ -79,6 +89,7 @@
   },
   {
     "name": "Risk Assessment",
+    "context": "An evaluation of potential risks associated with a project or decision. Start with the project or decision and identify risks. Subsequent messages should analyze impact, likelihood, suggest mitigation strategies, and summarize the assessment.",
     "prompts": [
       "Identify potential risks associated with the project/decision:",
       "Analyze the impact and likelihood of each risk:",
@@ -88,6 +99,7 @@
   },
   {
     "name": "Customer Feedback Analysis",
+    "context": "A process of analyzing customer feedback to identify trends, strengths, weaknesses, and recommendations. Start with the feedback data and summarize main themes. Subsequent messages should highlight positive aspects, areas of concern, and recommend actions.",
     "prompts": [
       "Summarize the main themes from the customer feedback:",
       "Identify positive aspects and strengths based on feedback:",
@@ -97,6 +109,7 @@
   },
   {
     "name": "Decision-Making",
+    "context": "A process of choosing between alternatives based on available information and analysis. Start with the decision to be made and list options. Subsequent messages should evaluate pros and cons, consider outcomes, and make a recommendation.",
     "prompts": [
       "List the available options for the decision:",
       "Evaluate the pros and cons of each option:",
@@ -106,6 +119,7 @@
   },
   {
     "name": "Goal Setting and Action Planning",
+    "context": "A process of defining goals, breaking them down into actionable steps, and creating a plan for achievement. Start with the main goal and list steps. Subsequent messages should set timelines, identify resources, and review the plan.",
     "prompts": [
       "Define the main goal you want to achieve:",
       "Break down the goal into smaller, actionable steps:",
@@ -116,6 +130,7 @@
   },
   {
     "name": "User Experience (UX) Design",
+    "context": "A process of designing products or services that provide meaningful and relevant experiences to users. Start with user needs and pain points, then brainstorm solutions. Subsequent messages should evaluate solutions, create prototypes, and plan for user testing.",
     "prompts": [
       "Describe the user needs and pain points:",
       "Brainstorm potential design solutions to address these needs:",
@@ -126,6 +141,7 @@
   },
   {
     "name": "Root Cause Analysis",
+    "context": "A methodical approach to identifying the underlying cause of a problem or issue. Start with the problem statement and list possible causes. Subsequent messages should use the '5 Whys' technique to drill down to the root cause and propose solutions.",
     "prompts": [
       "Describe the problem or issue in detail:",
       "Identify possible causes of the problem:",
@@ -136,6 +152,7 @@
   },
 {
     "name": "Literature Review",
+    "context": "A critical evaluation of existing research and literature on a specific topic. Start with the research question or topic and summarize key findings. Subsequent messages should identify gaps, compare methodologies, synthesize findings, and suggest future research directions.",
     "prompts": [
       "Summarize the key findings from the following research paper:",
       "Identify gaps or unresolved questions in the literature:",
@@ -145,6 +162,7 @@
   },
   {
     "name": "Creative Writing",
+    "context": "A process of writing fiction or poetry that involves generating ideas, drafting, revising, and editing. Start with a theme or prompt and brainstorm ideas. Subsequent messages should outline the plot, write a draft, refine characters or imagery, and polish the final version.",
     "prompts": [
       "Generate ideas for a story or poem based on the following theme:",
       "Outline the main plot or structure of the story:",
@@ -155,6 +173,7 @@
   },
   {
     "name": "Marketing Campaign Planning",
+    "context": "A strategic approach to promoting a product, service, or brand through coordinated marketing efforts. Start with defining the target audience and goals, then brainstorm creative ideas. Subsequent messages should outline channels, set timelines, assign responsibilities, and evaluate performance.",
     "prompts": [
       "Define the target audience and campaign goals:",
       "Brainstorm creative ideas for campaign messages and visuals:",
@@ -165,6 +184,7 @@
   },
   {
     "name": "Event Planning",
+    "context": "A process of organizing and coordinating an event, such as a conference, workshop, or party. Start with defining the purpose and goals of the event, then plan logistics and promotion. Subsequent messages should outline activities, develop a contingency plan, and ensure a successful event.",
     "prompts": [
       "Outline the purpose and goals of the event:",
       "List the key activities and sessions for the event:",
@@ -175,6 +195,7 @@
   },
   {
     "name": "Job Interview Preparation",
+    "context": "A process of researching, practicing, and preparing for a job interview to increase the chances of success. Start with researching the company and common interview questions. Subsequent messages should prepare answers, review the resume, and develop questions for the interviewer.",
     "prompts": [
       "Research the company and summarize key information:",
       "Identify the most common interview questions for this role:",
@@ -185,6 +206,7 @@
   },
   {
     "name": "Conflict Resolution",
+    "context": "A process of addressing and resolving conflicts between individuals or groups. Start with identifying the conflict and parties involved, then explore solutions or compromises. Subsequent messages should plan a mediation session, evaluate outcomes, and ensure satisfaction.",
     "prompts": [
       "Describe the conflict and the parties involved:",
       "Identify the underlying causes of the conflict:",
@@ -195,6 +217,7 @@
   },
   {
     "name": "Time Management",
+    "context": "A set of practices and tools to manage time effectively and prioritize tasks. Start with listing tasks and activities, then prioritize based on urgency and importance. Subsequent messages should create a daily schedule, identify time-wasters, and review progress.",
     "prompts": [
       "List all the tasks and activities you need to complete this week:",
       "Prioritize the tasks based on urgency and importance:",
@@ -205,6 +228,7 @@
   },
   {
     "name": "Product Launch",
+    "context": "A strategic process of introducing a new product or service to the market. Start with defining the unique value proposition and target market, then plan development milestones and go-to-market strategy. Subsequent messages should outline the launch event, monitor performance, and gather feedback.",
     "prompts": [
       "Define the product's unique value proposition and target market:",
       "Outline the product development milestones and key deliverables:",
@@ -215,6 +239,7 @@
   },
   {
     "name": "Personal Reflection and Growth",
+    "context": "A process of self-assessment, learning, and goal-setting to achieve personal growth and development. Start with reflecting on recent experiences and identifying key learnings. Subsequent messages should set personal goals, identify habits to change, develop an action plan, and review progress.",
     "prompts": [
       "Reflect on your recent experiences and identify key learnings:",
       "Set personal goals based on your reflections:",
@@ -225,6 +250,7 @@
   },
   {
     "name": "Sales Pitch Development",
+    "context": "A process of creating a persuasive presentation to sell a product or service to potential customers. Start with identifying key features and benefits, then understand customer pain points and objections. Subsequent messages should craft an initial pitch, refine it, and practice delivery.",
     "prompts": [
       "Identify the key features and benefits of the product or service:",
       "Understand the customer's pain points and how your product addresses them:",

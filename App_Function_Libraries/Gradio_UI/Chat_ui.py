@@ -226,6 +226,7 @@ def create_chat_interface():
                 delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
                 delete_message_button = gr.Button("Delete Message", visible=False)
 
+                chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
                 download_file = gr.File(label="Download Chat History")
@@ -348,7 +349,7 @@ def create_chat_interface():
 
         save_chat_history_to_db.click(
             save_chat_history_to_db_wrapper,
-            inputs=[chatbot, conversation_id, media_content],
+            inputs=[chatbot, conversation_id, media_content, chat_media_name],
             outputs=[conversation_id, gr.Textbox(label="Save Status")]
         )
 
@@ -416,13 +417,7 @@ def create_chat_interface_stacked():
             with gr.Column():
                 submit = gr.Button("Submit")
                 clear_chat_button = gr.Button("Clear Chat")
-
-                edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
-                edit_message_text = gr.Textbox(label="Edit Message", visible=False)
-                update_message_button = gr.Button("Update Message", visible=False)
-
-                delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
-                delete_message_button = gr.Button("Delete Message", visible=False)
+                chat_media_name = gr.Textbox(label="Custom Chat Name(optional)", visible=True)
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
             with gr.Column():
@@ -500,18 +495,6 @@ def create_chat_interface_stacked():
             outputs=[chat_history]
         )
 
-        update_message_button.click(
-            update_message_in_chat,
-            inputs=[edit_message_id, edit_message_text, chat_history],
-            outputs=[chatbot]
-        )
-
-        delete_message_button.click(
-            delete_message_from_chat,
-            inputs=[delete_message_id, chat_history],
-            outputs=[chatbot]
-        )
-
         save_chat_history_as_file.click(
             save_chat_history,
             inputs=[chatbot, conversation_id],
@@ -520,12 +503,9 @@ def create_chat_interface_stacked():
 
         save_chat_history_to_db.click(
             save_chat_history_to_db_wrapper,
-            inputs=[chatbot, conversation_id, media_content],
+            inputs=[chatbot, conversation_id, media_content, chat_media_name],
             outputs=[conversation_id, gr.Textbox(label="Save Status")]
         )
-
-        chatbot.select(show_edit_message, None, [edit_message_text, edit_message_id, update_message_button])
-        chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
 
 # FIXME - System prompts

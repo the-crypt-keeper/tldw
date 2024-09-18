@@ -11,7 +11,8 @@ import gradio as gr
 import yt_dlp
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, add_media_to_database
+from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, add_media_to_database, \
+    check_media_and_whisper_model
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models, update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import error_handler
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_transcription, perform_summarization, \
@@ -559,27 +560,47 @@ def create_video_transcription_tab():
                             logging.error("Failed to extract video information")
                             return None, None, None, None, None, None
 
+                        # FIXME - MAKE SURE THIS WORKS WITH LOCAL FILES
+                        # FIXME - Add a toggle to force processing even if media exists
+                        # Check if media already exists in the database
+                        logging.info("Checking if media already exists in the database...")
+                        media_exists, reason = check_media_and_whisper_model(
+                            title=info_dict.get('title'),
+                            url=info_dict.get('webpage_url'),
+                            current_whisper_model=current_whisper_model
+                        )
+
+                        if not media_exists:
+                            logging.info(f"process_url_with_metadata: Media does not exist in the database. Reason: {reason}")
+                        else:
+                            if "same whisper model" in reason:
+                                logging.info(
+                                    f"process_url_with_metadata: Skipping download and processing as media exists and uses the same Whisper model. Reason: {reason}")
+                                return input_item, None, None, None, None, info_dict
+                            else:
+                                logging.info(f"process_url_with_metadata: Media found, but with a different Whisper model. Reason: {reason}")
+
                         # Download video/audio
                         logging.info("Downloading video/audio...")
                         video_file_path = download_video(input_item, download_path, full_info, download_video_flag,
                                                          current_whisper_model=current_whisper_model)
                         if video_file_path is None:
                             logging.info(
-                                f"Download skipped for {input_item}. Media might already exist or be processed.")
+                                f"process_url_with_metadata: Download skipped for {input_item}. Media might already exist or be processed.")
                             return input_item, None, None, None, None, info_dict
 
-                    logging.info(f"Processing file: {video_file_path}")
+                    logging.info(f"process_url_with_metadata: Processing file: {video_file_path}")
 
                     # Perform transcription
-                    logging.info("Starting transcription...")
+                    logging.info("process_url_with_metadata: Starting transcription...")
                     audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
                                                                       vad_filter, diarize)
 
                     if audio_file_path is None or segments is None:
-                        logging.error("Transcription failed or segments not available.")
+                        logging.error("process_url_with_metadata: Transcription failed or segments not available.")
                         return None, None, None, None, None, None
 
-                    logging.info(f"Transcription completed. Number of segments: {len(segments)}")
+                    logging.info(f"process_url_with_metadata: Transcription completed. Number of segments: {len(segments)}")
 
                     # Add metadata to segments
                     segments_with_metadata = {
@@ -598,9 +619,9 @@ def create_video_transcription_tab():
                         if file_path and os.path.exists(file_path):
                             try:
                                 os.remove(file_path)
-                                logging.info(f"Successfully deleted file: {file_path}")
+                                logging.info(f"process_url_with_metadata: Successfully deleted file: {file_path}")
                             except Exception as e:
-                                logging.warning(f"Failed to delete file {file_path}: {str(e)}")
+                                logging.warning(f"process_url_with_metadata: Failed to delete file {file_path}: {str(e)}")
 
                     # Delete the mp4 file after successful transcription if not keeping original audio
                     # Modify the file deletion logic to respect keep_original_video
@@ -610,12 +631,12 @@ def create_video_transcription_tab():
                             if file_path and os.path.exists(file_path):
                                 try:
                                     os.remove(file_path)
-                                    logging.info(f"Successfully deleted file: {file_path}")
+                                    logging.info(f"process_url_with_metadata: Successfully deleted file: {file_path}")
                                 except Exception as e:
-                                    logging.warning(f"Failed to delete file {file_path}: {str(e)}")
+                                    logging.warning(f"process_url_with_metadata: Failed to delete file {file_path}: {str(e)}")
                     else:
-                        logging.info(f"Keeping original video file: {video_file_path}")
-                        logging.info(f"Keeping original audio file: {audio_file_path}")
+                        logging.info(f"process_url_with_metadata: Keeping original video file: {video_file_path}")
+                        logging.info(f"process_url_with_metadata: Keeping original audio file: {audio_file_path}")
 
                     # Process segments based on the timestamp option
                     if not include_timestamps:
@@ -627,34 +648,34 @@ def create_video_transcription_tab():
                     transcription_text = extract_text_from_segments(segments)
 
                     if transcription_text.startswith("Error:"):
-                        logging.error(f"Failed to extract transcription: {transcription_text}")
+                        logging.error(f"process_url_with_metadata: Failed to extract transcription: {transcription_text}")
                         return None, None, None, None, None, None
 
                     # Use transcription_text instead of segments for further processing
                     full_text_with_metadata = f"{json.dumps(info_dict, indent=2)}\n\n{transcription_text}"
 
-                    logging.debug(f"Full text with metadata extracted: {full_text_with_metadata[:100]}...")
+                    logging.debug(f"process_url_with_metadata: Full text with metadata extracted: {full_text_with_metadata[:100]}...")
 
                     # Perform summarization if API is provided
                     summary_text = None
                     if api_name:
                         # API key resolution handled at base of function if none provided
                         api_key = api_key if api_key else None
-                        logging.info(f"Starting summarization with {api_name}...")
+                        logging.info(f"process_url_with_metadata: Starting summarization with {api_name}...")
                         summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key)
                         if summary_text is None:
                             logging.error("Summarization failed.")
                             return None, None, None, None, None, None
-                        logging.debug(f"Summarization completed: {summary_text[:100]}...")
+                        logging.debug(f"process_url_with_metadata: Summarization completed: {summary_text[:100]}...")
 
                     # Save transcription and summary
-                    logging.info("Saving transcription and summary...")
+                    logging.info("process_url_with_metadata: Saving transcription and summary...")
                     download_path = create_download_directory("Audio_Processing")
                     json_file_path, summary_file_path = save_transcription_and_summary(full_text_with_metadata,
                                                                                        summary_text,
                                                                                        download_path, info_dict)
-                    logging.info(f"Transcription saved to: {json_file_path}")
-                    logging.info(f"Summary saved to: {summary_file_path}")
+                    logging.info(f"process_url_with_metadata: Transcription saved to: {json_file_path}")
+                    logging.info(f"process_url_with_metadata: Summary saved to: {summary_file_path}")
 
                     # Prepare keywords for database
                     if isinstance(keywords, str):
@@ -663,13 +684,13 @@ def create_video_transcription_tab():
                         keywords_list = keywords
                     else:
                         keywords_list = []
-                    logging.info(f"Keywords prepared: {keywords_list}")
+                    logging.info(f"process_url_with_metadata: Keywords prepared: {keywords_list}")
 
                     # Add to database
-                    logging.info("Adding to database...")
+                    logging.info("process_url_with_metadata: Adding to database...")
                     add_media_to_database(info_dict['webpage_url'], info_dict, full_text_with_metadata, summary_text,
                                           keywords_list, custom_prompt, whisper_model)
-                    logging.info(f"Media added to database: {info_dict['webpage_url']}")
+                    logging.info(f"process_url_with_metadata: Media added to database: {info_dict['webpage_url']}")
 
                     return info_dict[
                         'webpage_url'], full_text_with_metadata, summary_text, json_file_path, summary_file_path, info_dict
