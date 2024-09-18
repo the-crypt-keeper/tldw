@@ -124,13 +124,13 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
 
 
 
-def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
+def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content, media_name=None):
     logging.info(f"Attempting to save chat history. Media content type: {type(media_content)}")
     try:
         # Extract the media_id and media_name from the media_content
         media_id = None
-        media_name = None
         if isinstance(media_content, dict):
+            media_id = None
             logging.debug(f"Media content keys: {media_content.keys()}")
             if 'content' in media_content:
                 try:
@@ -168,7 +168,7 @@ def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content):
 
         # Generate a unique conversation name using media_id and current timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        conversation_name = f"Chat_{media_id}_{timestamp}"
+        conversation_name = f"{media_name}_{timestamp}"
 
         new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_id, media_name,
                                                             conversation_name)

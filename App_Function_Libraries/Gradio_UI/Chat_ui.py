@@ -226,6 +226,7 @@ def create_chat_interface():
                 delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
                 delete_message_button = gr.Button("Delete Message", visible=False)
 
+                chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
                 download_file = gr.File(label="Download Chat History")
@@ -348,7 +349,7 @@ def create_chat_interface():
 
         save_chat_history_to_db.click(
             save_chat_history_to_db_wrapper,
-            inputs=[chatbot, conversation_id, media_content],
+            inputs=[chatbot, conversation_id, media_content, chat_media_name],
             outputs=[conversation_id, gr.Textbox(label="Save Status")]
         )
 
@@ -423,6 +424,7 @@ def create_chat_interface_stacked():
 
                 delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
                 delete_message_button = gr.Button("Delete Message", visible=False)
+                chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
             with gr.Column():
@@ -520,7 +522,7 @@ def create_chat_interface_stacked():
 
         save_chat_history_to_db.click(
             save_chat_history_to_db_wrapper,
-            inputs=[chatbot, conversation_id, media_content],
+            inputs=[chatbot, conversation_id, media_content, chat_media_name],
             outputs=[conversation_id, gr.Textbox(label="Save Status")]
         )
 
