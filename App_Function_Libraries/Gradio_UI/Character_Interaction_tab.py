@@ -405,7 +405,8 @@ def create_character_card_interaction_tab():
         finally:
             logging.debug("Exiting update_character_info_with_error_handling")
 
-    conversation_id = uuid.uuid4()
+    # Define States for conversation_id and media_content, which are required for saving chat history
+    conversation_id = gr.State(str(uuid.uuid4()))
     media_content = gr.State({})
 
     import_card_button.click(
@@ -675,8 +676,9 @@ def create_multiple_character_chat_tab():
                     error_message = f"An error occurred: {str(e)}"
                     return conversation, current_index, gr.update(visible=True, value=error_message)
 
+            # Define States for conversation_id and media_content, which are required for saving chat history
             media_content = gr.State({})
-            conversation_id = uuid.uuid4()
+            conversation_id = gr.State(str(uuid.uuid4()))
 
             next_turn_btn.click(
                 take_turn_with_error_handling,
@@ -752,7 +754,7 @@ def create_narrator_controlled_conversation_tab():
         error_box = gr.Textbox(label="Error Messages", visible=False)
 
         # Define States for conversation_id and media_content, which are required for saving chat history
-        conversation_id = uuid.uuid4()
+        conversation_id = gr.State(str(uuid.uuid4()))
         media_content = gr.State({})
 
         def generate_interaction(conversation, narrator_text, user_text, api_endpoint, api_key, temperature,
