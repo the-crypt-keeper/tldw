@@ -34,32 +34,34 @@ def chat_workflows_tab():
         workflow_state = gr.State({"current_step": 0, "max_steps": 0, "conversation_id": None})
 
         with gr.Row():
-            workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
-            api_selector = gr.Dropdown(
-                label="Select API Endpoint",
-                choices=["OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
-                value="OpenAI"
-            )
-            api_key_input = gr.Textbox(label="API Key (optional)", type="password")
-
-        context_input = gr.Textbox(label="Initial Context", lines=5)
-
+            with gr.Column():
+                workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
+                api_selector = gr.Dropdown(
+                    label="Select API Endpoint",
+                    choices=["OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
+                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                    value="OpenAI"
+                )
+                api_key_input = gr.Textbox(label="API Key (optional)", type="password")
+                temperature = gr.Slider(label="Temperature", minimum=0.00, maximum=1.0, step=0.05, value=0.7)
+                save_conversation = gr.Checkbox(label="Save Conversation", value=False)
+            with gr.Column():
+                gr.Markdown("Placeholder")
         with gr.Row():
-            temperature = gr.Slider(label="Temperature", minimum=0.00, maximum=1.0, step=0.05, value=0.7)
-            save_conversation = gr.Checkbox(label="Save Conversation", value=False)
-
-        chatbot = gr.Chatbot(label="Workflow Chat")
-        msg = gr.Textbox(label="Your Input")
-        submit_btn = gr.Button("Submit")
-        clear_btn = gr.Button("Clear Chat")
-        save_btn = gr.Button("Save Chat to Database")
-
+            with gr.Column():
+                conversation_search = gr.Textbox(label="Search Conversations")
+                search_conversations_btn = gr.Button("Search Conversations")
+            with gr.Column():
+                previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
+                load_conversations_btn = gr.Button("Load Selected Conversation")
         with gr.Row():
-            conversation_search = gr.Textbox(label="Search Conversations")
-            search_conversations_btn = gr.Button("Search Conversations")
-        previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
-        load_conversations_btn = gr.Button("Load Selected Conversation")
+            with gr.Column():
+                context_input = gr.Textbox(label="Initial Context", lines=5)
+                chatbot = gr.Chatbot(label="Workflow Chat")
+                msg = gr.Textbox(label="Your Input")
+                submit_btn = gr.Button("Submit")
+                clear_btn = gr.Button("Clear Chat")
+                save_btn = gr.Button("Save Chat to Database")
 
         def update_workflow_ui(workflow_name):
             if not workflow_name:
