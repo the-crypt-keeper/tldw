@@ -4,6 +4,7 @@
 # Imports
 import base64
 import io
+import uuid
 from datetime import datetime as datetime
 import logging
 import json
@@ -404,6 +405,9 @@ def create_character_card_interaction_tab():
         finally:
             logging.debug("Exiting update_character_info_with_error_handling")
 
+    conversation_id = uuid.uuid4()
+    media_content = gr.State({})
+
     import_card_button.click(
         fn=import_character,
         inputs=[character_card_upload],
@@ -671,6 +675,9 @@ def create_multiple_character_chat_tab():
                     error_message = f"An error occurred: {str(e)}"
                     return conversation, current_index, gr.update(visible=True, value=error_message)
 
+            media_content = gr.State({})
+            conversation_id = uuid.uuid4()
+
             next_turn_btn.click(
                 take_turn_with_error_handling,
                 inputs=[chat_display, current_index] + character_selectors + [api_endpoint, api_key, temperature,
@@ -743,6 +750,10 @@ def create_narrator_controlled_conversation_tab():
             save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
 
         error_box = gr.Textbox(label="Error Messages", visible=False)
+
+        # Define States for conversation_id and media_content, which are required for saving chat history
+        conversation_id = uuid.uuid4()
+        media_content = gr.State({})
 
         def generate_interaction(conversation, narrator_text, user_text, api_endpoint, api_key, temperature,
                                  *character_data):
