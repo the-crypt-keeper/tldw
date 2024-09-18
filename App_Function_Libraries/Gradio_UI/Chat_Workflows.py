@@ -9,7 +9,7 @@ from pathlib import Path
 # External Imports
 import gradio as gr
 #
-from App_Function_Libraries.Gradio_UI.Chat_ui import process_with_llm, chat_wrapper, clear_chat, search_conversations, \
+from App_Function_Libraries.Gradio_UI.Chat_ui import chat_wrapper, search_conversations, \
     load_conversation
 from App_Function_Libraries.Chat import save_chat_history_to_db_wrapper
 #
@@ -61,6 +61,7 @@ def chat_workflows_tab():
                 msg = gr.Textbox(label="Your Input")
                 submit_btn = gr.Button("Submit")
                 clear_btn = gr.Button("Clear Chat")
+                chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
                 save_btn = gr.Button("Save Chat to Database")
 
         def update_workflow_ui(workflow_name):
@@ -151,7 +152,7 @@ def chat_workflows_tab():
 
         save_btn.click(
             save_chat_history_to_db_wrapper,
-            inputs=[chatbot, conversation_id, media_content],
+            inputs=[chatbot, conversation_id, media_content, chat_media_name],
             outputs=[conversation_id, gr.Textbox(label="Save Status")]
         )
 
