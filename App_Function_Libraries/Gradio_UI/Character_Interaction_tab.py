@@ -166,7 +166,7 @@ def create_character_card_interaction_tab():
                 regenerate_button = gr.Button("Regenerate Last Message")
                 clear_chat_button = gr.Button("Clear Chat")
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)", visible=True)
-                save_chat_button = gr.Button("Save This Chat")
+                save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_status = gr.Textbox(label="Save Status", interactive=False)
 
         character_data = gr.State(None)
@@ -446,16 +446,10 @@ def create_character_card_interaction_tab():
         outputs=[user_name]
     )
 
-    save_chat_button.click(
-        fn=save_current_chat,
-        inputs=[chat_history, character_data],
-        outputs=[save_status]
-    )
-
     # FIXME - Implement saving chat history to database; look at Chat_UI.py for reference
     save_chat_history_to_db.click(
         save_chat_history_to_db_wrapper,
-        inputs=[chatbot, conversation_id, media_content, chat_media_name],
+        inputs=[chat_history, conversation_id, media_content, chat_media_name],
         outputs=[conversation_id, gr.Textbox(label="Save Status")]
     )
 
@@ -812,7 +806,7 @@ def create_narrator_controlled_conversation_tab():
         # FIXME - Implement saving chat history to database; look at Chat_UI.py for reference
         save_chat_history_to_db.click(
             save_chat_history_to_db_wrapper,
-            inputs=[chat_display, conversation_id, media_content, chat_media_name],
+            inputs=[conversation_display, conversation_id, media_content, chat_media_name],
             outputs=[conversation_id, gr.Textbox(label="Save Status")]
         )
 
