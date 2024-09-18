@@ -2706,19 +2706,7 @@ def update_media_table(db):
 #
 # Workflow Functions
 
-
 def save_workflow_chat_to_db(chat_history, workflow_name, conversation_id=None):
-    """
-    Save or update a workflow chat in the database.
-
-    Args:
-    chat_history: List of tuples containing (user_message, ai_message)
-    workflow_name: Name of the workflow
-    conversation_id: ID of existing conversation (if updating), or None for new conversation
-
-    Returns:
-    tuple: (conversation_id, status_message)
-    """
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()

@@ -804,10 +804,10 @@ def get_workflow_chat(*args, **kwargs):
         raise NotImplementedError("Elasticsearch version of get_workflow_chat not yet implemented")
 
 
-def save_workflow_chat_to_db():
+def save_workflow_chat_to_db(*args, **kwargs):
     if db_type == 'sqlite':
         # FIXME
-        return sqlite_save_workflow_chat_to_db
+        return sqlite_save_workflow_chat_to_db(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of save_workflow_chat_to_db not yet implemented")
