@@ -560,9 +560,7 @@ def create_video_transcription_tab():
                             logging.error("Failed to extract video information")
                             return None, None, None, None, None, None
 
-                        # FIXME - LOGIC TO CHECK IF MEDIA ALREADY EXISTS IN DATABASE
                         # FIXME - MAKE SURE THIS WORKS WITH LOCAL FILES
-                        # FIXME - Make sure this works period.
                         # FIXME - Add a toggle to force processing even if media exists
                         # Check if media already exists in the database
                         logging.info("Checking if media already exists in the database...")
