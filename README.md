@@ -1,44 +1,80 @@
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
 # **tl/dw: Too Long, Didn't Watch** 
-## Summary: Your personal offline media assistant – Download, Transcribe, Summarize & Chat with Videos, Audio, Documents, Web Articles, and Books. 
+## Summary: Your personal offline media assistant – Download, Transcribe, Summarize & Chat with/about Videos, Audio, Documents, Web Articles, and Books. 
 ### All automated. All local. All yours.
 
-- **[Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)** _(Note: YouTube may block the demo unless you provide a session cookie. Placeholder content is included, but ingestion is limited.)
+### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
+  - (Note: YouTube may block the demo unless you provide a session cookie. Placeholder content is included, random contents of a conference and whatever videos I decided to use for testing that patch version.)
 
 #### Key Features:
 - Full-text search across all ingested content (with RAG, BM25 + Vectors support).
 - Local LLM inference for offline summarization and chat (via `llamafile`).
 - Comprehensive ingestion capabilities for video, audio, text, and web articles.
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
-### Quick Links
-- [What is TL/DW?](#what) | [Quickstart](#quickstart) | [Installation](#installation) | [Using TL/DW](#usage) | [Contributing](#contributing) | [Roadmap](#roadmap)
-
-
-
-
-**Use the Installer Script! Download and run it to install the necessary packages + launch tl/dw**
-- **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
-  - `chmod +x Linux_Install_Update.sh && ./Linux_Run_tldw.sh`
-- **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh`
-  - `bash MacOS-Run-Install-Update.sh`
-- **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
-    - Then double-click the downloaded batch file `Windows_Install_Update.bat` to install it, and `Windows_Run_tldw.bat` to run it.
 ----------
 
 ### Table of Contents
 - [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#whatbox) | [Helpful Terms and Things to Know](#helpful) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits) | [Roadmap Plans](#plans) | 
+
+#### Quickstart
+- **Bash/Batch Script:**
+  - **Use the Installer Script! Download and run it to install the necessary packages + launch tl/dw**
+    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
+      - `chmod +x Linux_Install_Update.sh && ./Linux_Run_tldw.sh`
+      - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+    - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh`
+      - `bash MacOS-Run-Install-Update.sh`
+      - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+    - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+        - Then double-click the downloaded batch file `Windows_Install_Update.bat` to install it, and `Windows_Run_tldw.bat` to run it.
+        - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+- **Docker:**
+  - There's a docker build for GPU use(Needs Nvidia CUDA Controller(?): https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw-nvidia_amd64_Dockerfile 
+  - and plain CPU use: https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw_Debian_cpu-Dockerfile
+  - the `Dockerfile` in the main directory is the Nvidia base-image-based one. So you can use your GPU if you want with it.
+#### Less Quick Start
+1. **Download the Installer Script for your OS:**
+   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
+   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
+2. **Run the Installer Script:**
+   - **Linux:** 
+     - `chmod +x Linux_Install_Update.sh && chmod +x ./Linux_Run_tldw.sh`
+     - `./Linux_Install_Update.sh` and then `./Linux_Run_tldw.sh`
+     - This will install `tldw` to the directory from where the script is ran.
+   - **Windows:** `Windows_Install_Update.bat`
+     - Double-click the downloaded batch file to install it.
+     - This will install `tldw` to the directory from where the script is ran.
+   - **MacOS:** `bash MacOS-Install_Updater.sh`
+     - `chmod +x MacOS_Install_Update.sh` and then `chmod +x ./MacOS_Run_tldw.sh`
+     - `./MacOS_Install_Update.sh` and then `./MacOS_Run_tldw.sh`
+     - This will install `tldw` to the directory from where the script is ran.
+3. **Follow the prompts to install the necessary packages and setup the program.**
+4. **You are Ready to Go! You should see `tldw` start up at the end of the script, assuming everything worked as expected**
+5. **BE SURE TO UPDATE 'config.txt' WITH YOUR API KEYS AND SETTINGS!** - You need to do this unless you want to manually input your API keys everytime you interact with a commercial LLM...
+- **Run it as a WebApp**
+  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
+    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
+    * Has an option to download the generated transcript, and summary as text files from the UI.
+    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
+    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
+      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
+      * So everything you might consume during your path of research, tracked and assimilated and tagged.
+      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
+  - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+
 
 ----------
 **GUI Screenshot**
 - Planning to replace with several short gifs to show functionality and how it can be used.
 ![tldw-summarization-gui-demo](Docs/GUI-Front_Page.PNG)
 
-### What is TL/DW?
-**TL/DW** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
+### What is tl/dw?
+**tl/dw** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
 1. **Ingesting**: Importing media from URLs or local files into an offline database.
-2. **Transcribing**: Automatically generating text transcripts from videos and audio using various supported models.
-3. **Summarizing**: Using LLMs (local or API-based) to create summaries of the ingested content.
+2. **Transcribing**: Automatically generating text transcripts from videos and audio using various whisper models using faster_whisper.
+3. **Analyzing(Not Just Summarizing)**: Using LLMs (local or API-based) to perform analyses of the ingested content.
 4. **Searching**: Full-text search across ingested content, including metadata like titles, authors, and keywords.
 5. **Chatting**: Interacting with ingested content using natural language queries through supported LLMs.
 
@@ -54,19 +90,19 @@ All features are designed to run **locally** on your device, ensuring privacy an
 
 #### Transcription & Summarization
 - **Video/Audio Transcription**: Uses `faster_whisper` with customizable model selection for transcribing audio and video.
-- **Content Summarization**: Automatically summarizes content using your choice of LLM API (e.g., OpenAI, Anthropic).
+- **Content Analysis(Not Just Summarization!)**: Analyze content using your choice of LLM API (e.g., OpenAI, Anthropic).
 - **Chunked Summarization**: Summarize longer pieces of content by breaking them into manageable chunks.
 
 #### Database & Search
 - All content is stored in an **SQLite database**, with full-text search support via FTS5.
-- **Tagging**: Tag content with keywords for better organization.
+- **Tagging**: Tag content with keywords for better organization (think of them like folders).
 - **RAG Support**: Perform advanced search and retrieval using BM25 and vector embeddings with ChromaDB.
 - **Backup & Export**: Backup your database and export content as text files.
 
 #### Chat Capabilities
 - **LLM Integration**: Chat with an LLM about your ingested content.
   - Supports APIs like OpenAI, Cohere, HuggingFace, and local models like Llama.cpp.
-- **Multi-Response Modes**: Various chat modes, including stacked responses and multiple prompts.
+- **Multi-Response Modes**: Various chat UIs, including vertical/Horizontal, Character Chat, and one prompt, multiple APIs - test multiple endpoints with one prompt and see all their responses next to each other.
 - **Chat History Management**: Save, edit, search, and export chat sessions.
 
 #### Writing Tools
@@ -146,11 +182,11 @@ You can view the full roadmap on our [GitHub Issues page](https://github.com/rmu
 
 Some planned features include:
 - Improved **RAG (Retrieval-Augmented Generation)** support with enhanced testing.
-- New, more intuitive **UI**, potentially migrating to FastAPI.
+- New, more intuitive **UI**, migrating to FastAPI with custom front-ends.
 - **Streaming responses** for real-time answers.
-- **TTS (Text-to-Speech) and STT (Speech-to-Text)** support in the chat interface.
-- Expanded **API Support** with easier integration for new endpoints.
-- Enhanced **Whisper model transcription accuracy** testing.
+- **Whisper model transcription accuracy** testing.
+    - Identify accuracy of used models.
+    - Set it up so users can test against their own datasets
 - Add TTS/STT support for the UI so you can ask questions directly to the model or have it speak out the results to you.
   - Having something like this would be pretty fucking cool I think: https://github.com/smellslikeml/dolla_llama/tree/main (Need to look more into nemesis by specterops)
 - Add some neat writing tools, since why not have some fun?
@@ -161,10 +197,6 @@ Some planned features include:
 - Support for multiple different Evaluations
   - G-Eval summarization check is available in the video transcript tab, as well as under the `Benchmarks` tab.
   - I'd like to add more benchmarks so that user can identify/measure how well their config works, so they can tweak things and have an idea if its better/worse.
-- Evaluations for whisper transcription accuracy
-  - Following with the above, I'd like to do the same for speech transcription.
-  - Identify accuracy of used models.
-  - Set it up so users can test against their own datasets
 
 ###  **Don't care, give me code**
    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Install.sh`
@@ -173,10 +205,21 @@ Some planned features include:
    - GUI usage: `python summarize.py -gui`
    - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
 
+- **Local Models I recommend**
+- Llama 3.1 
+  - 8B: https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF 
+  - 70B: https://huggingface.co/bartowski/Meta-Llama-3.1-70B-Instruct-GGUF
+- Mistral Nemo Instruct 2407 - https://huggingface.co/QuantFactory/Mistral-Nemo-Instruct-2407-GGUF
+- Qwen 2.5 Series: https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e
+  - 2.5-3B: https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF
+  - 7B: https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF
+  - 14B: https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF
+  - 32B: https://huggingface.co/Qwen/Qwen2.5-32B-Instruct-GGUF
+  - 72B: https://huggingface.co/Qwen/Qwen2.5-72B-Instruct
+- Mistral Large: https://huggingface.co/bartowski/Mistral-Large-Instruct-2407-GGUF
 
 For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek, gpt4o. 
 Flipside I would say none, honestly. The (largest players) will gaslight you and charge you money for it. Fun.
-
 That being said they obviously can provide help/be useful(helped me make this app), but it's important to remember that they're not your friend, and they're not there to help you. They are there to make money not off you, but off large institutions and your data.
 You are just a stepping stone to their goals.
 
@@ -196,42 +239,6 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 ```
 
 ----------
-
-### <a name="quickstart">Quickstart</a>
-
-#### Automatic Quickstart
-- Docker: Dockerfiles in the `Helper_Scripts/Dockerfiles` directory. 
-  - There's a docker build for GPU use: https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw-nvidia_amd64_Dockerfile 
-  - and plain CPU use: https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw_Debian_cpu-Dockerfile
-1. **Download the Installer Script for your OS:**
-   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
-   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
-   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
-2. **Run the Installer Script:**
-   - **Linux:** 
-     - `chmod +x Linux_Install_Update.sh && chmod +x ./Linux_Run_tldw.sh`
-     - `./Linux_Install_Update.sh` and then `./Linux_Run_tldw.sh`
-     - This will install tldw to the directory from where the script is ran.
-   - **Windows:** `Windows_Install_Update.bat`
-     - Double-click the downloaded batch file to install it.
-     - This will install tldw to the directory from where the script is ran.
-   - **MacOS:** `bash MacOS-Install_Updater.sh`
-     - `chmod +x MacOS_Install_Update.sh` and then `chmod +x ./MacOS_Run_tldw.sh`
-     - `./MacOS_Install_Update.sh` and then `./MacOS_Run_tldw.sh`
-     - This will install tldw to the directory from where the script is ran.
-3. **Follow the prompts to install the necessary packages and setup the program.**
-4. **You are Ready to Go! You should see tldw start up at the end of the script, assuming everything worked as expected**
-5. **BE SURE TO UPDATE 'config.txt' WITH YOUR API KEYS AND SETTINGS!** - You need to do this unless you want to manually input your API keys everytime you interact with a commercial LLM...
-
-- **Run it as a WebApp**
-  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
-    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
-    * Has an option to download the generated transcript, and summary as text files from the UI.
-    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
-    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
-      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
-      * So everything you might consume during your path of research, tracked and assimilated and tagged.
-      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
 
 #### Command Line usage:
 - **Transcribe audio from a Youtube URL:**
