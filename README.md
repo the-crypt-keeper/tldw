@@ -209,6 +209,8 @@ Some planned features include:
 - These are just the 'standard' models I recommend, there are many more out there, and you can use any of them with this project.
   - One should also be aware that people create 'fine-tunes' and 'merges' of existing models, to create new models that are more suited to their needs.
   - This can result in models that may be better at some tasks but worse at others, so it's important to test and see what works best for you.
+- MS Phi-3.1-mini-128k(32k effective context): https://huggingface.co/bartowski/Phi-3.1-mini-128k-instruct-GGUF
+- AWS MegaBeam Mistral (32k effective context): https://huggingface.co/bartowski/MegaBeam-Mistral-7B-512k-GGUF
 - Llama 3.1 
   - 8B: https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF 
   - 70B: https://huggingface.co/bartowski/Meta-Llama-3.1-70B-Instruct-GGUF
@@ -218,7 +220,7 @@ Some planned features include:
 - Cohere Command-R
   - Command-R https://huggingface.co/bartowski/c4ai-command-r-v01-GGUF / Aug2024 version: https://huggingface.co/bartowski/c4ai-command-r-08-2024-GGUF
   - Command-R+  / Aug2024 version: https://huggingface.co/bartowski/c4ai-command-r-plus-08-2024-GGUF
-- Qwen 2.5 Series: https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e
+- Qwen 2.5 Series(haven't tested these ones yet but they seem promising): https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e
   - 2.5-3B: https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF
   - 7B: https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF
   - 14B: https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF
