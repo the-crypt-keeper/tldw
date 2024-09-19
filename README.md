@@ -206,17 +206,25 @@ Some planned features include:
    - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
 
 - **Local Models I recommend**
+- These are just the 'standard' models I recommend, there are many more out there, and you can use any of them with this project.
+  - One should also be aware that people create 'fine-tunes' and 'merges' of existing models, to create new models that are more suited to their needs.
+  - This can result in models that may be better at some tasks but worse at others, so it's important to test and see what works best for you.
 - Llama 3.1 
   - 8B: https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF 
   - 70B: https://huggingface.co/bartowski/Meta-Llama-3.1-70B-Instruct-GGUF
 - Mistral Nemo Instruct 2407 - https://huggingface.co/QuantFactory/Mistral-Nemo-Instruct-2407-GGUF
+- Mistral Small: https://huggingface.co/bartowski/Mistral-Small-Instruct-2409-GGUF
+- Mistral Large: https://huggingface.co/bartowski/Mistral-Large-Instruct-2407-GGUF
+- Cohere Command-R
+  - Command-R https://huggingface.co/bartowski/c4ai-command-r-v01-GGUF / Aug2024 version: https://huggingface.co/bartowski/c4ai-command-r-08-2024-GGUF
+  - Command-R+  / Aug2024 version: https://huggingface.co/bartowski/c4ai-command-r-plus-08-2024-GGUF
 - Qwen 2.5 Series: https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e
   - 2.5-3B: https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF
   - 7B: https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF
   - 14B: https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF
   - 32B: https://huggingface.co/Qwen/Qwen2.5-32B-Instruct-GGUF
   - 72B: https://huggingface.co/Qwen/Qwen2.5-72B-Instruct
-- Mistral Large: https://huggingface.co/bartowski/Mistral-Large-Instruct-2407-GGUF
+
 
 For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek, gpt4o. 
 Flipside I would say none, honestly. The (largest players) will gaslight you and charge you money for it. Fun.
