@@ -284,22 +284,22 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 ### <a name="setup"></a>Setting it up Manually
 - **Requirements**
   - Python3
-  - ffmpeg
-  - pandoc (for epub to markdown conversion) - https://pandoc.org/installing.html
+  - ffmpeg (Script will install this for you)
+  - pandoc (Optional. For epub to markdown conversion) - https://pandoc.org/installing.html
     - `pandoc -f epub -t markdown -o output.md input.epub` -> Can then import/ingest the markdown file into the DB.
     - If done from the CLI using the `--ingest_text_file` flag, you can specify the title and author of the book, as well as any additional keywords you'd like to tag it with. (if not a regex will attempt to identify it)
     - Or just do it through the GUI, drag and drop the file into the UI, set the Title, Author, and any keywords and hit `Import Data`.
   - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
     - Apparently there is a ROCm version of PyTorch.
       - MS Pytorch: https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
-      - Use the 'AMD_requests.txt' file to install the necessary packages for AMD GPU support. Simply rename it before use.
+      - Use the 'AMD_requests.txt' file to install the necessary packages for AMD GPU support.
       - AMD Pytorch: https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/wsl/install-pytorch.html
   - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
   - System RAM (8GB minimum, realistically 12GB)
-  - Disk Space (Depends on how much you ingest, but 6GB or so should be fine for the total size of the project + DB)
+  - Disk Space (Depends on how much you ingest, 8GB or so should be fine for the total size of the project + DB)
     - This can balloon real quick. The whisper model used for transcription can be 1-2GB per.
     - Pytorch + other ML libraries will also cause the size to increase.
-    - As such, I would say you want at least 8GB of free space on your system to devote to the app.
+    - As such, I would say you want at least 12GB of free space on your system to devote to the app.
     - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
 - **Linux**
     1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg` or `dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
