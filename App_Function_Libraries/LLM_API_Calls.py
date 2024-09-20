@@ -683,7 +683,7 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
             temp = 1.0
         temp = float(temp)
         huggingface_prompt = f"{custom_prompt_arg}\n\n\n{input_data}"
-        logging.debug("HuggingFace chat: Prompt being sent is {huggingface_prompt}")
+        logging.debug(f"HuggingFace chat: Prompt being sent is {huggingface_prompt}")
         data = {
             "model": f"{huggingface_model}",
             "messages": [{"role": "user", "content": f"{huggingface_prompt}"}],
@@ -694,17 +694,24 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
 
         logging.debug("HuggingFace Chat: Submitting request...")
         response = requests.post(API_URL, headers=headers, json=data)
-        logging.debug(f"Full API response data: {response}")
+        logging.debug(f"Full API response data: {response.text}")
+
         if response.status_code == 200:
-            summary = response.json()[0]['generated_text'].strip()
-            logging.debug("HuggingFace Chat: Chat request successful")
-            print("HuggingFace Chat: Chat request successful.")
-            return summary
+            response_json = response.json()
+            if "choices" in response_json and len(response_json["choices"]) > 0:
+                generated_text = response_json["choices"][0]["message"]["content"]
+                logging.debug("HuggingFace Chat: Chat request successful")
+                print("HuggingFace Chat: Chat request successful.")
+                return generated_text.strip()
+            else:
+                logging.error("HuggingFace Chat: No generated text in the response")
+                return "HuggingFace Chat: No generated text in the response"
         else:
-            logging.error(f"HuggingFace Chat: Chat request failed with status code {response.status_code}: {response.text}")
+            logging.error(
+                f"HuggingFace Chat: Chat request failed with status code {response.status_code}: {response.text}")
             return f"HuggingFace Chat: Failed to process chat request, status code {response.status_code}: {response.text}"
     except Exception as e:
-        logging.error("HuggingFace Chat: Error in processing: %s", str(e))
+        logging.error(f"HuggingFace Chat: Error in processing: {str(e)}")
         print(f"HuggingFace Chat: Error occurred while processing chat request with huggingface: {str(e)}")
         return None
 
