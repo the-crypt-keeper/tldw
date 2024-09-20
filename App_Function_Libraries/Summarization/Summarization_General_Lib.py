@@ -710,11 +710,9 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None,
 
 def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None):
     loaded_config_data = load_and_log_configs()
-    global huggingface_api_key
     logging.debug("HuggingFace: Summarization process starting...")
     try:
         logging.debug("HuggingFace: Loading and validating configurations")
-        loaded_config_data = load_and_log_configs()
         if loaded_config_data is None:
             logging.error("Failed to load configuration data")
             huggingface_api_key = None
@@ -726,6 +724,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
             else:
                 # If no parameter is provided, use the key from the config
                 huggingface_api_key = loaded_config_data['api_keys'].get('huggingface')
+                logging.debug(f"HuggingFace: API key from config: {huggingface_api_key[:5]}...{huggingface_api_key[-5:]}")
                 if huggingface_api_key:
                     logging.info("HuggingFace: Using API key from config file")
                 else:
@@ -737,7 +736,6 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
             # You might want to raise an exception here or handle this case as appropriate for your application
             # FIXME
             # For example: raise ValueError("No valid Anthropic API key available")
-
 
         logging.debug(f"HuggingFace: Using API Key: {huggingface_api_key[:5]}...{huggingface_api_key[-5:]}")
 
@@ -775,21 +773,24 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
         if temp is None:
             temp = 0.1
         temp = float(temp)
-        huggingface_prompt = f"{text}\n\n\n\n{custom_prompt_arg}"
+        huggingface_prompt = f"{custom_prompt_arg}\n\n\n{text}"
         logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
         data = {
-            "inputs": text,
-            "parameters": {"max_length": 512, "min_length": 100}  # You can adjust max_length and min_length as needed
+            "inputs": huggingface_prompt,
+            "max_tokens": 4096,
+            "stream": False,
+            "temperature": temp
         }
 
         logging.debug("huggingface: Submitting request...")
         response = requests.post(API_URL, headers=headers, json=data)
 
         if response.status_code == 200:
-            summary = response.json()[0]['generated_text'].strip()
+            print(response.json())
+            chat_response = response.json()[0]['generated_text'].strip()
             logging.debug("huggingface: Summarization successful")
-            print("Summarization successful.")
-            return summary
+            print("Chat request successful.")
+            return chat_response
         else:
             logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
             return f"Failed to process summary, status code {response.status_code}: {response.text}"

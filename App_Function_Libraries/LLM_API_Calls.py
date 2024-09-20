@@ -335,26 +335,27 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_prompt=None):
     loaded_config_data = load_and_log_configs()
     if api_key is not None:
-        logging.debug(f"cohere: API Key from parameter: {api_key[:3]}...{api_key[-3:]}")
-    logging.debug(f"Cohere API Key from config: {loaded_config_data['api_keys']['cohere']}")
+        logging.debug(f"Cohere Chat: API Key from parameter: {api_key[:3]}...{api_key[-3:]}")
+    logging.debug(f"Cohere Chat: Cohere API Key from config: {loaded_config_data['api_keys']['cohere']}")
     try:
         # API key validation
         if api_key is None:
-            logging.info("cohere: API key not provided as parameter")
-            logging.info("cohere: Attempting to use API key from config file")
-            cohere_api_key = loaded_config_data['api_keys']['cohere']
-            logging.debug(f"cohere: Using API Key from config file: {cohere_api_key[:3]}...{cohere_api_key[-3:]}")
+            logging.info("Cohere Chat: API key not provided as parameter")
+            logging.info("Cohere Chat: Attempting to use API key from config file")
+            cohere_api_key = loaded_config_data.get('api_keys', {}).get('cohere')
+            if not cohere_api_key:
+                logging.error("Cohere Chat: API key not found or is empty")
+                return "Cohere Chat: API Key Not Provided/Found in Config file or is empty"
 
-        else:
-            logging.error("cohere: API key not found or is empty")
-            return "cohere: API Key Not Provided/Found in Config file or is empty"
+        logging.debug(f"Cohere Chat: Using API Key: {cohere_api_key[:3]}...{cohere_api_key[-3:]}")
 
-        logging.debug(f"cohere: Using API Key: {cohere_api_key[:3]}...{cohere_api_key[-3:]}")
+        logging.debug(f"Cohere Chat: Loaded data: {input_data}")
+        logging.debug(f"Cohere Chat: Type of data: {type(input_data)}")
 
-        logging.debug(f"Cohere: Loaded data: {input_data}")
-        logging.debug(f"Cohere: Type of data: {type(input_data)}")
-
-        cohere_model = loaded_config_data['models']['cohere']
+        # Ensure model is set
+        if not model:
+            model = loaded_config_data['models']['cohere']
+        logging.debug(f"Cohere Chat: Using model: {model}")
 
         headers = {
             'accept': 'application/json',
@@ -362,50 +363,65 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
             'Authorization': f'Bearer {cohere_api_key}'
         }
 
-        if system_prompt is not None:
-            logging.debug("Anthropic: Using provided system prompt")
-            pass
-        else:
+        # Ensure system_prompt is set
+        if not system_prompt:
             system_prompt = "You are a helpful assistant"
+        logging.debug(f"Cohere Chat: System Prompt being sent is: '{system_prompt}'")
 
-        cohere_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
-        logging.debug(f"cohere: User Prompt being sent is {cohere_prompt}")
-
-        logging.debug(f"cohere: System Prompt being sent is {system_prompt}")
+        cohere_prompt = input_data
+        if custom_prompt_arg:
+            cohere_prompt += f"\n\n{custom_prompt_arg}"
+        logging.debug(f"Cohere Chat: User Prompt being sent is: '{cohere_prompt}'")
 
         data = {
             "chat_history": [
-                {"role": "SYSTEM", "message": f"system_prompt"},
+                {"role": "SYSTEM", "message": system_prompt},
             ],
-            "message": f"{cohere_prompt}",
+            "message": cohere_prompt,
             "model": model,
             "connectors": [{"id": "web-search"}]
         }
+        logging.debug(f"Cohere Chat: Request data: {json.dumps(data, indent=2)}")
 
         logging.debug("cohere chat: Submitting request to API endpoint")
         print("cohere chat: Submitting request to API endpoint")
-        logging.debug(f"cohere chat : API Key being passed to chat_with_cohere: {api_key[:3]}...{api_key[-3]}")
-        response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
-        response_data = response.json()
-        logging.debug(f"cohere chat: Full API response data: {response_data}")
+
+        try:
+            response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
+            logging.debug(f"Cohere Chat: Raw API response: {response.text}")
+        except requests.RequestException as e:
+            logging.error(f"Cohere Chat: Error making API request: {str(e)}")
+            return f"Cohere Chat: Error making API request: {str(e)}"
 
         if response.status_code == 200:
+            try:
+                response_data = response.json()
+            except json.JSONDecodeError:
+                logging.error("Cohere Chat: Failed to decode JSON response")
+                return "Cohere Chat: Failed to decode JSON response"
+
+            if response_data is None:
+                logging.error("Cohere Chat: No response data received.")
+                return "Cohere Chat: No response data received."
+
+            logging.debug(f"cohere chat: Full API response data: {json.dumps(response_data, indent=2)}")
+
             if 'text' in response_data:
                 chat_response = response_data['text'].strip()
-                logging.debug("cohere: Chat request successful")
-                print("Chat request processed successfully.")
+                logging.debug("Cohere Chat: Chat request successful")
+                print("Cohere Chat request processed successfully.")
                 return chat_response
             else:
-                logging.error("Expected data not found in API response.")
-                return "Expected data not found in API response."
+                logging.error("Cohere Chat: Expected 'text' key not found in API response.")
+                return "Cohere Chat: Expected data not found in API response."
         else:
-            logging.error(f"cohere: API request failed with status code {response.status_code}: {response.text}")
-            print(f"Failed to process summary, status code {response.status_code}: {response.text}")
-            return f"cohere: API request failed: {response.text}"
+            logging.error(f"Cohere Chat: API request failed with status code {response.status_code}: {response.text}")
+            print(f"Cohere Chat: Failed to process chat response, status code {response.status_code}: {response.text}")
+            return f"Cohere Chat: API request failed: {response.text}"
 
     except Exception as e:
-        logging.error("cohere: Error in processing: %s", str(e))
-        return f"cohere: Error occurred while processing chat request with Cohere: {str(e)}"
+        logging.error(f"Cohere Chat: Error in processing: {str(e)}", exc_info=True)
+        return f"Cohere Chat: Error occurred while processing chat request with Cohere: {str(e)}"
 
 
 # https://console.groq.com/docs/quickstart
@@ -638,55 +654,57 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
 
 
 # FIXME: This function is not yet implemented properly
-def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None):
+def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None, temp=None):
     loaded_config_data = load_and_log_configs()
-    global huggingface_api_key
-    logging.debug(f"huggingface: Summarization process starting...")
+    logging.debug(f"huggingface Chat: Chat request process starting...")
     try:
         # API key validation
-        if not api_key:
-            logging.info("HuggingFace: API key not provided as parameter")
-            logging.info("HuggingFace: Attempting to use API key from config file")
-            huggingface_api_key = loaded_config_data['api_keys']['openai']
         if not api_key or api_key.strip() == "":
-            logging.error("HuggingFace: API key not found or is empty")
-            return "HuggingFace: API Key Not Provided/Found in Config file or is empty"
-        logging.debug(f"HuggingFace: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+            logging.info("HuggingFace Chat: API key not provided as parameter")
+            logging.info("HuggingFace Chat: Attempting to use API key from config file")
+
+        huggingface_api_key = loaded_config_data['api_keys'].get('huggingface')
+        logging.debug(f"HuggingFace Chat: API key from config: {huggingface_api_key[:5]}...{huggingface_api_key[-5:]}")
+
+        if huggingface_api_key is None or huggingface_api_key.strip() == "":
+            logging.error("HuggingFace Chat: API key not found or is empty")
+            return "HuggingFace Chat: API Key Not Provided/Found in Config file or is empty"
+        if huggingface_api_key:
+            logging.info("HuggingFace Chat: Using API key from config file")
         headers = {
-            "Authorization": f"Bearer {api_key}"
+            "Authorization": f"Bearer {huggingface_api_key}"
         }
 
         # Setup model
         huggingface_model = loaded_config_data['models']['huggingface']
 
         API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}"
-        if system_prompt is not None:
-            logging.debug("HuggingFace: Using provided system prompt")
-            pass
-        else:
-            system_prompt = "You are a helpful assistant"
-
-        huggingface_prompt = f"{input_data}\n\n\n\n{custom_prompt_arg}"
-        logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
+        if temp is None:
+            temp = 1.0
+        temp = float(temp)
+        huggingface_prompt = f"{custom_prompt_arg}\n\n\n{input_data}"
+        logging.debug("HuggingFace chat: Prompt being sent is {huggingface_prompt}")
         data = {
-            "inputs": f"{input_data}",
-            "parameters": {"max_length": 8192, "min_length": 100}  # You can adjust max_length and min_length as needed
+            "inputs": huggingface_prompt,
+            "max_tokens": 4096,
+            "stream": False,
+            "temperature": temp
         }
-        logging.debug("huggingface: Submitting request...")
 
+        logging.debug("HuggingFace Chat: Submitting request...")
         response = requests.post(API_URL, headers=headers, json=data)
         logging.debug(f"Full API response data: {response}")
         if response.status_code == 200:
             summary = response.json()[0]['generated_text'].strip()
-            logging.debug("huggingface: Chat request successful")
-            print("Chat request successful.")
+            logging.debug("HuggingFace Chat: Chat request successful")
+            print("HuggingFace Chat: Chat request successful.")
             return summary
         else:
-            logging.error(f"huggingface: Chat request failed with status code {response.status_code}: {response.text}")
-            return f"Failed to process chat request, status code {response.status_code}: {response.text}"
+            logging.error(f"HuggingFace Chat: Chat request failed with status code {response.status_code}: {response.text}")
+            return f"HuggingFace Chat: Failed to process chat request, status code {response.status_code}: {response.text}"
     except Exception as e:
-        logging.error("huggingface: Error in processing: %s", str(e))
-        print(f"Error occurred while processing chat request with huggingface: {str(e)}")
+        logging.error("HuggingFace Chat: Error in processing: %s", str(e))
+        print(f"HuggingFace Chat: Error occurred while processing chat request with huggingface: {str(e)}")
         return None
 
 
