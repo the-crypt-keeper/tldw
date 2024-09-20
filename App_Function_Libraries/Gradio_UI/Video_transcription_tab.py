@@ -589,6 +589,25 @@ def create_video_transcription_tab():
                                 f"process_url_with_metadata: Download skipped for {input_item}. Media might already exist or be processed.")
                             return input_item, None, None, None, None, info_dict
 
+                    # FIXME - add check for existing media with different whisper model for local files
+                    # FIXME Check to make sure this works
+                    media_exists, reason = check_media_and_whisper_model(
+                        title=info_dict.get('title'),
+                        url=info_dict.get('webpage_url'),
+                        current_whisper_model=current_whisper_model
+                    )
+                    if not media_exists:
+                        logging.info(
+                            f"process_url_with_metadata: Media does not exist in the database. Reason: {reason}")
+                    else:
+                        if "same whisper model" in reason:
+                            logging.info(
+                                f"process_url_with_metadata: Skipping download and processing as media exists and uses the same Whisper model. Reason: {reason}")
+                            return input_item, None, None, None, None, info_dict
+                        else:
+                            logging.info(
+                                f"process_url_with_metadata: Media found, but with a different Whisper model. Reason: {reason}")
+
                     logging.info(f"process_url_with_metadata: Processing file: {video_file_path}")
 
                     # Perform transcription
