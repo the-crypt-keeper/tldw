@@ -678,14 +678,15 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
         # Setup model
         huggingface_model = loaded_config_data['models']['huggingface']
 
-        API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}"
+        API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}/v1/chat/completions"
         if temp is None:
             temp = 1.0
         temp = float(temp)
         huggingface_prompt = f"{custom_prompt_arg}\n\n\n{input_data}"
         logging.debug("HuggingFace chat: Prompt being sent is {huggingface_prompt}")
         data = {
-            "inputs": huggingface_prompt,
+            "model": f"{huggingface_model}",
+            "messages": [{"role": "user", "content": f"{huggingface_prompt}"}],
             "max_tokens": 4096,
             "stream": False,
             "temperature": temp
