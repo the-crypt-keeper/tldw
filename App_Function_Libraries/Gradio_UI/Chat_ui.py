@@ -95,19 +95,20 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
         # Generate bot response
         bot_message = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
                            temperature, system_prompt)
+
         logging.debug(f"Bot message being returned: {bot_message}")
+
         if save_conversation:
             # Add assistant message to the database
             add_chat_message(conversation_id, "assistant", bot_message)
 
         # Update history
-        history.append((message, bot_message))
+        new_history = history + [(message, bot_message)]
 
-        return bot_message, history, conversation_id
+        return bot_message, new_history, conversation_id
     except Exception as e:
         logging.error(f"Error in chat wrapper: {str(e)}")
         return "An error occurred.", history, conversation_id
-
 
 def search_conversations(query):
     try:
