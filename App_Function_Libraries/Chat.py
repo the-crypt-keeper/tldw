@@ -97,12 +97,10 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         # logging.debug(f"Debug - Chat Function - Combined Content: {combined_content[:500]}...")
 
         # Prepare the input for the API
-        if not history:
-            input_data = f"{combined_content}\n\nUser: {message}\n"
-        else:
-            input_data = f"User: {message}\n"
-        # Print first 500 chars
-        # logging.info(f"Debug - Chat Function - Input Data: {input_data[:500]}...")
+        input_data = f"{combined_content}\n\n" if combined_content else ""
+        for old_message, old_response in history:
+            input_data += f"User: {old_message}\nAssistant: {old_response}\n\n"
+        input_data += f"User: {message}\n"
 
         if system_message:
             print(f"System message: {system_message}")
