@@ -210,7 +210,7 @@ Some planned features include:
   - One should also be aware that people create 'fine-tunes' and 'merges' of existing models, to create new models that are more suited to their needs.
   - This can result in models that may be better at some tasks but worse at others, so it's important to test and see what works best for you.
 - MS Phi-3.5-mini-128k(32k effective context, censored output): https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF
-  - Finetuned to be uncensored somewhat: https://huggingface.co/bartowski/Phi-3.5-mini-instruct_Uncensored-GGUF
+  - Fine-tuned to be uncensored somewhat: https://huggingface.co/bartowski/Phi-3.5-mini-instruct_Uncensored-GGUF
 - AWS MegaBeam Mistral (32k effective context): https://huggingface.co/bartowski/MegaBeam-Mistral-7B-512k-GGUF
 - Llama 3.1 - The native llamas will give you censored output by default, but you can jailbreak them, or use a finetune which has attempted to tune out their refusals. 
   - 8B: https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF 
