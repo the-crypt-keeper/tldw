@@ -10,24 +10,42 @@
 #
 #
 ####################
-
-
+#
 # Import necessary libraries
 import os
 import re
 from datetime import datetime
 import logging
 
-
+import ebooklib
+from bs4 import BeautifulSoup
+from ebooklib import epub
+#
 # Import Local
-from App_Function_Libraries.DB.SQLite_DB import add_media_with_keywords
-
+from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords
+#
 #######################################################################################################################
 # Function Definitions
 #
 
-# Ingest a text file into the database with Title/Author/Keywords
 
+
+def read_epub(file_path):
+    """Read and extract text from an EPUB file."""
+    book = epub.read_epub(file_path)
+    chapters = []
+    for item in book.get_items():
+        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+            chapters.append(item.get_content())
+
+    text = ""
+    for html_content in chapters:
+        soup = BeautifulSoup(html_content, 'html.parser')
+        text += soup.get_text() + "\n\n"
+    return text
+
+
+# Ingest a text file into the database with Title/Author/Keywords
 def extract_epub_metadata(content):
     title_match = re.search(r'Title:\s*(.*?)\n', content)
     author_match = re.search(r'Author:\s*(.*?)\n', content)
@@ -92,4 +110,61 @@ def ingest_folder(folder_path, keywords=None):
             results.append(result)
 
 
+def epub_to_markdown(epub_path):
+    book = epub.read_epub(epub_path)
+    markdown_content = "# Table of Contents\n\n"
+    chapters = []
 
+    # Extract and format the table of contents
+    toc = book.toc
+    for item in toc:
+        if isinstance(item, tuple):
+            section, children = item
+            level = 1
+            markdown_content += format_toc_item(section, level)
+            for child in children:
+                markdown_content += format_toc_item(child, level + 1)
+        else:
+            markdown_content += format_toc_item(item, 1)
+
+    markdown_content += "\n---\n\n"
+
+    # Process each chapter
+    for item in book.get_items():
+        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+            chapter_content = item.get_content().decode('utf-8')
+            soup = BeautifulSoup(chapter_content, 'html.parser')
+
+            # Extract chapter title
+            title = soup.find(['h1', 'h2', 'h3'])
+            if title:
+                chapter_title = title.get_text()
+                markdown_content += f"# {chapter_title}\n\n"
+
+            # Process chapter content
+            for elem in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol']):
+                if elem.name.startswith('h'):
+                    level = int(elem.name[1])
+                    markdown_content += f"{'#' * level} {elem.get_text()}\n\n"
+                elif elem.name == 'p':
+                    markdown_content += f"{elem.get_text()}\n\n"
+                elif elem.name in ['ul', 'ol']:
+                    for li in elem.find_all('li'):
+                        markdown_content += f"- {li.get_text()}\n"
+                    markdown_content += "\n"
+
+            markdown_content += "---\n\n"
+
+    return markdown_content
+
+
+def format_toc_item(item, level):
+    return f"{'  ' * (level - 1)}- [{item.title}](#{slugify(item.title)})\n"
+
+
+def slugify(text):
+    return re.sub(r'[\W_]+', '-', text.lower())
+
+#
+# End of Function Definitions
+#######################################################################################################################
