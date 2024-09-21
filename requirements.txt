@@ -167,6 +167,8 @@ torchaudio
 #Documents
 ebooklib
 docx2txt
+# Benchmarks
+toml
 #websockets
 #yt-dlp==2024.4.9
 #--extra-index-url https://download.pytorch.org/whl/cu113
