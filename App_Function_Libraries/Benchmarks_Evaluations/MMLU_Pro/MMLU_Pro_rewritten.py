@@ -286,6 +286,10 @@ def mmlu_pro_main():
     category_record = {}
     lock = threading.Lock()
 
+    # Set a failure threshold to cancel the benchmark if too many questions fail
+    max_failed_questions = 8
+    failed_questions = 0
+
     # Process each subject
     for subject, questions in test_data.items():
         logger.info(f"Processing subject: {subject}")
@@ -301,9 +305,22 @@ def mmlu_pro_main():
             # Process results as they complete
             for future, question in tqdm(futures, total=len(futures)):
                 prompt, response, pred, usage = future.result()
-                results, category_record = process_and_save_results(
-                    question, pred, client, config, results, category_record, output_dir, lock
-                )
+
+                # Check if the question failed and increment the failure count
+                if pred is None:
+                    failed_questions += 1
+                    logger.warning(f"Failed question count: {failed_questions}/{max_failed_questions}")
+
+                # Stop the entire process if too many questions fail
+                if failed_questions >= max_failed_questions:
+                    logger.error(f"Too many failed questions. Stopping the benchmark for {subject}.")
+                    return
+
+                # Process and save results if the question was answered
+                if pred is not None:
+                    results, category_record = process_and_save_results(
+                        question, pred, client, config, results, category_record, output_dir, lock
+                    )
 
         # Save final results for the subject
         save_results(results, os.path.join(output_dir, f"{subject}_final_result.json"), lock)
