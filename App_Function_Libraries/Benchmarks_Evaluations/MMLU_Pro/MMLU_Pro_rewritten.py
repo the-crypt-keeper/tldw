@@ -3,7 +3,6 @@
 #
 ####################################################################################################################
 # Imports
-import argparse
 import os
 import threading
 import time
@@ -25,44 +24,25 @@ import re
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def load_config():
-    parser = argparse.ArgumentParser(
-        description="Run MMLU Pro Benchmark for a local LLM via OpenAI Compatible API.",
-        epilog="Specify options to override settings from config."
-    )
-    parser.add_argument("-c", "--config", default="config.toml", help="Configuration file")
-    parser.add_argument("-u", "--url", help="Server URL")
-    parser.add_argument("-a", "--api", help="API key")
-    parser.add_argument("-m", "--model", help="Model name")
-    parser.add_argument("--timeout", type=float, help="Request timeout in seconds")
-    parser.add_argument("--category", help="Specific category to test")
-    parser.add_argument("-p", "--parallel", type=int, help="Number of parallel requests")
-    parser.add_argument("-v", "--verbosity", type=int, choices=[0, 1, 2], help="Verbosity level")
-    parser.add_argument("--log_prompt", action="store_true", help="Log prompts and responses")
-    parser.add_argument("--comment", help="Comment for the final report")
 
-    args = parser.parse_args()
-    config = toml.load(args.config)
+def load_mmlu_pro_config(**kwargs):
+    # Get the directory of the current script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Override config with command-line arguments
-    if args.url:
-        config["server"]["url"] = args.url
-    if args.api:
-        config["server"]["api_key"] = args.api
-    if args.model:
-        config["server"]["model"] = args.model
-    if args.timeout:
-        config["server"]["timeout"] = args.timeout
-    if args.category:
-        config["test"]["categories"] = [args.category]
-    if args.parallel:
-        config["test"]["parallel"] = args.parallel
-    if args.verbosity is not None:
-        config["log"]["verbosity"] = args.verbosity
-    if args.log_prompt:
-        config["log"]["log_prompt"] = args.log_prompt
-    if args.comment:
-        config["comment"] = args.comment
+    # Construct the full path to config.toml
+    config_path = os.path.join(script_dir, 'config.toml')
+
+    # Load the config
+    config = toml.load(config_path)
+
+    # Update config with provided kwargs
+    for key, value in kwargs.items():
+        if key in config["server"]:
+            config["server"][key] = value
+        elif key in config["test"]:
+            config["test"][key] = value
+        elif key in config["log"]:
+            config["log"][key] = value
 
     return config
 
@@ -286,7 +266,7 @@ def generate_final_report(category_record, output_dir):
 
 def mmlu_pro_main():
     # Load configuration
-    config = load_config()
+    config = load_mmlu_pro_config()
 
     # Initialize OpenAI client
     client = initialize_client(config)

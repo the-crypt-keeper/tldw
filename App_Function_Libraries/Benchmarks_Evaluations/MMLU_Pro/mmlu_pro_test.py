@@ -2,7 +2,7 @@
 def test_load_config():
     import sys
     original_argv = sys.argv
-    sys.argv = ["run_openai.py", "-c", "test_config.toml", "-u", "http://test.com", "-m", "test-model"]
+    #sys.argv = ["run_openai.py", "-c", "test_config.toml", "-u", "http://test.com", "-m", "test-model"]
 
     config = load_config()
 
