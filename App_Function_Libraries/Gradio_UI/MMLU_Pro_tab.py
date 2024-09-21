@@ -3,18 +3,16 @@
 #
 ##############################################################################################################
 # Imports
+import os
+
 import gradio as gr
 import logging
-import os
-import threading
-from concurrent.futures import ThreadPoolExecutor
 #
 # External Imports
 from tqdm import tqdm
 # Local Imports
 from App_Function_Libraries.Benchmarks_Evaluations.MMLU_Pro.MMLU_Pro_rewritten import (
-    load_mmlu_pro_config, initialize_client, load_mmlu_pro, run_single_question,
-    process_and_save_results, generate_final_report
+    load_mmlu_pro, run_mmlu_pro_benchmark, mmlu_pro_main, load_mmlu_pro_config
 )
 #
 ##############################################################################################################
@@ -25,101 +23,67 @@ from App_Function_Libraries.Benchmarks_Evaluations.MMLU_Pro.MMLU_Pro_rewritten i
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
 def get_categories():
+    """Fetch categories using the dataset loader from MMLU_Pro_rewritten.py"""
     try:
-        test_data, _ = load_mmlu_pro()
-        return list(test_data.keys())
+        test_data, _ = load_mmlu_pro()  # Use the function from MMLU_Pro_rewritten.py
+        return list(test_data.keys())  # Return the categories from the test dataset
     except Exception as e:
         logger.error(f"Failed to load categories: {e}")
         return ["Error loading categories"]
 
+
 def load_categories():
+    """Helper function to return the categories for the Gradio dropdown."""
+    categories = get_categories()  # Fetch categories from the dataset
+    if categories:
+        return gr.update(choices=categories, value=categories[0])  # Update dropdown with categories
+    else:
+        return gr.update(choices=["Error loading categories"], value="Error loading categories")
+
+
+def run_benchmark_from_ui(url, api_key, model, timeout, category, parallel, verbosity, log_prompt):
+    """Function to run the benchmark with parameters from the UI."""
+
+    # Override config with UI parameters
+    config = load_mmlu_pro_config(
+        url=url,
+        api_key=api_key,
+        model=model,
+        timeout=timeout,
+        categories=[category] if category else None,
+        parallel=parallel,
+        verbosity=verbosity,
+        log_prompt=log_prompt
+    )
+
+    # Run the benchmarking process
     try:
-        test_data, _ = load_mmlu_pro()
-        categories = list(test_data.keys())
-        return categories, gr.Dropdown(choices=categories, label="Category")
-    except Exception as e:
-        logger.error(f"Failed to load categories: {e}")
-        return ["Error loading categories"], gr.Dropdown(choices=["Error loading categories"], label="Category")
+        # Call the main benchmarking function
+        mmlu_pro_main()
 
-def run_benchmark(config_file, url, api_key, model, timeout, category, parallel, verbosity, log_prompt, categories):
-    if category == "Load categories...":
-        return "Please load and select a category before running the benchmark."
+        # Assume the final report is generated in "eval_results" folder
+        report_path = os.path.join("eval_results", config["server"]["model"].replace("/", "-"), "final_report.txt")
 
-    try:
-        # Load and update configuration
-        config = load_mmlu_pro_config(
-            url=url,
-            api_key=api_key,
-            model=model,
-            timeout=float(timeout),
-            categories=[category] if category else None,
-            parallel=int(parallel),
-            verbosity=int(verbosity),
-            log_prompt=log_prompt
-        )
-
-        # Initialize client
-        client = initialize_client(config)
-
-        # Load MMLU-Pro dataset
-        test_data, dev_data = load_mmlu_pro()
-        if test_data is None or dev_data is None:
-            return "Failed to load dataset. Please check the logs for more information."
-
-        output_dir = os.path.join("eval_results", config["server"]["model"].replace("/", "-"))
-        os.makedirs(output_dir, exist_ok=True)
-
-        results = []
-        category_record = {}
-        lock = threading.Lock()
-
-        # Run evaluation
-        for subject in config["test"]["categories"]:
-            logger.info(f"Processing subject: {subject}")
-            questions = test_data[subject]
-            cot_examples = dev_data[subject]
-
-            with ThreadPoolExecutor(max_workers=config["test"]["parallel"]) as executor:
-                futures = []
-                for question in questions:
-                    future = executor.submit(run_single_question, question, cot_examples, client, config)
-                    futures.append((future, question))
-
-                for future, question in futures:
-                    prompt, response, pred, usage = future.result()
-                    results, category_record = process_and_save_results(
-                        question, pred, client, config, results, category_record, output_dir, lock
-                    )
-
-        # Generate final report
-        generate_final_report(category_record, output_dir)
-
-        # Read and return the report
-        report_path = os.path.join(output_dir, "final_report.txt")
+        # Read the final report
         with open(report_path, "r") as f:
             report = f.read()
 
         return report
-
     except Exception as e:
         logger.error(f"An error occurred during benchmark execution: {e}")
         return f"An error occurred during benchmark execution. Please check the logs for more information. Error: {str(e)}"
 
-def create_mmlu_pro_tab():
-    def get_categories():
-        try:
-            test_data, _ = load_mmlu_pro()
-            return list(test_data.keys())
-        except Exception as e:
-            logger.error(f"Failed to load categories: {e}")
-            return ["Error loading categories"]
 
+def create_mmlu_pro_tab():
+    """Create the Gradio UI tab for MMLU-Pro Benchmark."""
     with gr.Tab("MMLU-Pro Benchmark"):
         gr.Markdown("## Run MMLU-Pro Benchmark")
 
         with gr.Row():
             with gr.Column():
+                # Inputs for the benchmark
                 url = gr.Textbox(label="Server URL")
                 api_key = gr.Textbox(label="API Key", type="password")
                 model = gr.Textbox(label="Model Name")
@@ -131,20 +95,19 @@ def create_mmlu_pro_tab():
                 log_prompt = gr.Checkbox(label="Log Prompt")
 
             with gr.Column():
+                # Run button and output display
                 run_button = gr.Button("Run Benchmark")
                 output = gr.Textbox(label="Benchmark Results", lines=20)
 
-        def load_categories():
-            new_categories = get_categories()
-            return gr.update(choices=new_categories)
-
+        # When "Load Categories" is clicked, load the categories into the dropdown
         load_categories_btn.click(
             load_categories,
             outputs=category
         )
 
+        # When "Run Benchmark" is clicked, trigger the run_benchmark_from_ui function
         run_button.click(
-            run_benchmark,
+            run_benchmark_from_ui,  # Use the function defined to run the benchmark
             inputs=[url, api_key, model, timeout, category, parallel, verbosity, log_prompt],
             outputs=output
         )
