@@ -118,10 +118,14 @@ def create_rag_qa_chat_tab():
                 api_choice = api_choice.value if isinstance(api_choice, gr.components.Dropdown) else api_choice
                 logging.info(f"Resolved API choice: {api_choice}")
 
-                # Rephrase the question based on conversation history
-                rephrased_question = rephrase_question(history, message, api_choice)
-                logging.info(f"Original question: {message}")
-                logging.info(f"Rephrased question: {rephrased_question}")
+                # Only rephrase the question if it's not the first query
+                if len(history) > 0:
+                    rephrased_question = rephrase_question(history, message, api_choice)
+                    logging.info(f"Original question: {message}")
+                    logging.info(f"Rephrased question: {rephrased_question}")
+                else:
+                    rephrased_question = message
+                    logging.info(f"First question, no rephrasing: {message}")
 
                 if context_source == "Existing File":
                     context = f"media_id:{existing_file.split('(ID: ')[1][:-1]}"
@@ -180,8 +184,9 @@ def create_rag_qa_chat_tab():
 
                 logging.info("Calling rag_qa_chat function")
                 new_history, response = rag_qa_chat(rephrased_question, history, context, api_choice)
+                # Log first 100 chars of response
                 logging.info(
-                    f"Response received from rag_qa_chat: {response[:100]}...")  # Log first 100 chars of response
+                    f"Response received from rag_qa_chat: {response[:100]}...")
 
                 # Add the original question to the history
                 new_history[-1] = (message, new_history[-1][1])
