@@ -5,8 +5,8 @@
 import configparser
 import os
 import logging
-from typing import Tuple, List, Union, Dict
 import time
+from typing import Tuple, List, Union, Dict
 #
 # 3rd-Party Libraries
 from elasticsearch import Elasticsearch
@@ -65,7 +65,8 @@ from App_Function_Libraries.DB.SQLite_DB import (
     get_all_content_from_database as sqlite_get_all_content_from_database,
     get_next_media_id as sqlite_get_next_media_id, \
     batch_insert_chunks as sqlite_batch_insert_chunks, Database, save_workflow_chat_to_db as sqlite_save_workflow_chat_to_db, \
-    get_workflow_chat as sqlite_get_workflow_chat,
+    get_workflow_chat as sqlite_get_workflow_chat, update_media_content_with_version as sqlite_update_media_content_with_version, \
+    check_existing_media as sqlite_check_existing_media,
 )
 #
 # Local Imports
@@ -321,6 +322,19 @@ def add_media_to_database(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_to_database not yet implemented")
 
+def check_existing_media(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_check_existing_media(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of check_existing_media not yet implemented")
+
+def update_media_content_with_version(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_update_media_content_with_version(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of update_media_content not yet implemented")
 
 def import_obsidian_note_to_db(*args, **kwargs):
     if db_type == 'sqlite':

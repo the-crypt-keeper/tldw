@@ -46,6 +46,7 @@ import configparser
 #
 # Import necessary libraries
 import csv
+import hashlib
 import html
 import logging
 import os
@@ -58,6 +59,8 @@ import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
+from urllib.parse import quote
+
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
     get_database_dir
@@ -948,7 +951,6 @@ def fetch_item_details(media_id: int):
 # Media-related Functions
 
 
-
 # Function to add a version of a prompt and summary
 def add_media_version(conn, media_id: int, prompt: str, summary: str) -> None:
     try:
@@ -1145,11 +1147,21 @@ def is_valid_date(date_string: str) -> bool:
     except ValueError:
         return False
 
-def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
+
+
+
+def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video', overwrite=False):
     db = Database()
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
+
+            # Generate URL if not provided
+            if not url:
+                title = info_dict.get('title', 'Untitled')
+                url_hash = hashlib.md5(f"{title}{media_type}".encode()).hexdigest()
+                url = f"https://No-URL-Submitted.com/{media_type}/{quote(title)}-{url_hash}"
+
 
             # Extract content from segments
             if isinstance(segments, list):
@@ -1172,13 +1184,14 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
             existing_media = cursor.fetchone()
 
             if existing_media:
-                media_id = existing_media[0]
-                cursor.execute('''
-                UPDATE Media 
-                SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?
-                WHERE id = ?
-                ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
-                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
+                if overwrite:
+                    media_id = existing_media[0]
+                    cursor.execute('''
+                    UPDATE Media 
+                    SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?
+                    WHERE id = ?
+                    ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
+                          info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
             else:
                 cursor.execute('''
                 INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status)
@@ -1218,7 +1231,8 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
         # Schedule chunking
         schedule_chunking(media_id, content, info_dict.get('title', 'Untitled'))
 
-        return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}. Chunking scheduled."
+        action = "updated" if existing_media and overwrite else "added"
+        return f"Media '{info_dict.get('title', 'Untitled')}' {action} successfully with URL: {url} and keywords: {', '.join(keyword_list)}. Chunking scheduled."
 
     except DatabaseError as e:
         logging.error(f"Database error: {e}")
@@ -1226,6 +1240,66 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
     except Exception as e:
         logging.error(f"Unexpected error: {e}")
         raise DatabaseError(f"Unexpected error: {e}")
+
+
+def check_existing_media(url):
+    db = Database()
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
+            result = cursor.fetchone()
+            return {'id': result[0]} if result else None
+    except Exception as e:
+        logging.error(f"Error checking existing media: {e}")
+        return None
+
+
+# Modified update_media_content function to create a new version
+def update_media_content_with_version(media_id, info_dict, content_input, prompt_input, summary_input, whisper_model):
+    db = Database()
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Create new document version
+            cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
+            current_version = cursor.fetchone()[0] or 0
+            new_version = current_version + 1
+
+            # Insert new version
+            cursor.execute('''
+            INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (media_id, new_version, prompt_input, summary_input, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+
+            # Update the main content in the Media table
+            cursor.execute('''
+            UPDATE Media 
+            SET content = ?, transcription_model = ?, title = ?, author = ?, ingestion_date = ?, chunking_status = ?
+            WHERE id = ?
+            ''', (content_input, whisper_model, info_dict.get('title', 'Untitled'),
+                  info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
+
+            # Update or insert into MediaModifications
+            cursor.execute('''
+            INSERT OR REPLACE INTO MediaModifications (media_id, prompt, summary, modification_date)
+            VALUES (?, ?, ?, ?)
+            ''', (media_id, prompt_input, summary_input, datetime.now().strftime('%Y-%m-%d')))
+
+            # Update full-text search index
+            cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
+                           (media_id, info_dict.get('title', 'Untitled'), content_input))
+
+            conn.commit()
+
+        # Schedule chunking
+        schedule_chunking(media_id, content_input, info_dict.get('title', 'Untitled'))
+
+        return f"Content updated successfully for media ID: {media_id}. New version: {new_version}"
+    except Exception as e:
+        logging.error(f"Error updating media content: {e}")
+        return f"Error updating content: {str(e)}"
 
 
 # FIXME: This function is not complete and needs to be implemented

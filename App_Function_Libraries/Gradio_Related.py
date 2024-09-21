@@ -16,6 +16,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_db_config
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
+from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
 from App_Function_Libraries.Gradio_UI.Character_Interaction_tab import create_character_card_interaction_tab, \
     create_multiple_character_chat_tab, create_narrator_controlled_conversation_tab
 from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
@@ -26,7 +27,7 @@ from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_
 from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
     create_restore_backup_tab
 from App_Function_Libraries.Gradio_UI.Import_Functionality import create_import_single_prompt_tab, \
-    create_import_obsidian_vault_tab, create_import_item_tab, create_import_book_tab, create_import_multiple_prompts_tab
+    create_import_obsidian_vault_tab, create_import_item_tab, create_import_multiple_prompts_tab
 from App_Function_Libraries.Gradio_UI.Introduction_tab import create_introduction_tab
 from App_Function_Libraries.Gradio_UI.Keywords import create_view_keywords_tab, create_add_keyword_tab, \
     create_delete_keyword_tab, create_export_keywords_tab
@@ -36,6 +37,7 @@ from App_Function_Libraries.Gradio_UI.Media_edit import create_prompt_clone_tab,
     create_media_edit_and_clone_tab, create_media_edit_tab
 from App_Function_Libraries.Gradio_UI.Media_wiki_tab import create_mediawiki_import_tab, create_mediawiki_config_tab
 from App_Function_Libraries.Gradio_UI.PDF_ingestion_tab import create_pdf_ingestion_tab, create_pdf_ingestion_test_tab
+from App_Function_Libraries.Gradio_UI.Plaintext_tab_import import create_plain_text_import_tab
 from App_Function_Libraries.Gradio_UI.Podcast_tab import create_podcast_tab
 from App_Function_Libraries.Gradio_UI.RAG_QA_Chat_tab import create_rag_qa_chat_tab
 from App_Function_Libraries.Gradio_UI.Re_summarize_tab import create_resummary_tab
@@ -252,6 +254,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_audio_processing_tab()
                     create_podcast_tab()
                     create_import_book_tab()
+                    create_plain_text_import_tab()
                     create_website_scraping_tab()
                     create_pdf_ingestion_tab()
                     create_pdf_ingestion_test_tab()
