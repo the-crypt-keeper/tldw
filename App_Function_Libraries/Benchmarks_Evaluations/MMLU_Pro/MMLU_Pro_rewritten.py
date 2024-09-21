@@ -287,7 +287,7 @@ def mmlu_pro_main():
     lock = threading.Lock()
 
     # Set a failure threshold to cancel the benchmark if too many questions fail
-    max_failed_questions = 8
+    max_failed_questions = 6
     failed_questions = 0
 
     # Process each subject
