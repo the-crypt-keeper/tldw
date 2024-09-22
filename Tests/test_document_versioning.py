@@ -1,18 +1,12 @@
 # test_document_versioning.py
-# # tests/test_document_versioning.py
 # Tests document versioning in SQLite database.
-#
-# Imports:
+
 import pytest
 import os
 from App_Function_Libraries.DB.SQLite_DB import Database, create_document_version, get_document_version, DatabaseError
 import sqlite3
 from datetime import datetime, timedelta
 import time
-#
-####################################################################################################
-# Test Status:
-# FIXME
 
 @pytest.fixture(scope="function")
 def db(tmp_path):
@@ -93,7 +87,7 @@ def test_get_nonexistent_version(db, sample_media):
     """Test getting a version that doesn't exist."""
     create_document_version(sample_media, "Version 1 content")
     result = get_document_version(sample_media, 999999)
-    assert result is None or 'error' in result
+    assert 'error' in result
 
 def test_create_version_for_nonexistent_media(db):
     """Test creating a version for a media that doesn't exist."""
@@ -103,7 +97,7 @@ def test_create_version_for_nonexistent_media(db):
 def test_get_version_for_nonexistent_media(db):
     """Test getting a version for a media that doesn't exist."""
     result = get_document_version(999999)
-    assert result is None or 'error' in result
+    assert 'error' in result
 
 def test_create_large_number_of_versions(db, sample_media):
     """Test creating a large number of versions."""
@@ -142,3 +136,72 @@ def test_create_version_with_large_content(db, sample_media):
 
     stored_version = get_document_version(sample_media)
     assert len(stored_version['content']) == 1000000
+
+def test_concurrent_version_creation(db, sample_media):
+    """Test creating versions concurrently."""
+    import threading
+
+    def create_version(content):
+        create_document_version(sample_media, content)
+
+    threads = []
+    for i in range(10):
+        t = threading.Thread(target=create_version, args=(f"Concurrent Version {i}",))
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    latest_version = get_document_version(sample_media)
+    assert latest_version['version_number'] == 10, "Expected 10 versions after concurrent creation"
+
+def test_version_creation_performance(db, sample_media):
+    """Test the performance of version creation."""
+    import time
+
+    start_time = time.time()
+    num_versions = 1000
+    for i in range(num_versions):
+        create_document_version(sample_media, f"Performance test version {i}")
+    end_time = time.time()
+
+    total_time = end_time - start_time
+    assert total_time < 10, f"Creating {num_versions} versions took more than 10 seconds"
+
+def test_get_all_versions(db, sample_media):
+    """Test retrieving all versions of a document."""
+    num_versions = 5
+    for i in range(num_versions):
+        create_document_version(sample_media, f"Version {i + 1}")
+
+    # Assuming we add a function to get all versions
+    all_versions = get_all_document_versions(sample_media)
+    assert len(all_versions) == num_versions, f"Expected {num_versions} versions, got {len(all_versions)}"
+    for i, version in enumerate(all_versions, start=1):
+        assert version['content'] == f"Version {i}"
+
+def test_delete_specific_version(db, sample_media):
+    """Test deleting a specific version of a document."""
+    for i in range(3):
+        create_document_version(sample_media, f"Version {i + 1}")
+
+    # Assuming we add a function to delete a specific version
+    delete_document_version(sample_media, 2)
+
+    versions = get_all_document_versions(sample_media)
+    assert len(versions) == 2, "Expected 2 versions after deletion"
+    assert versions[0]['content'] == "Version 1"
+    assert versions[1]['content'] == "Version 3"
+
+def test_rollback_to_previous_version(db, sample_media):
+    """Test rolling back to a previous version."""
+    for i in range(3):
+        create_document_version(sample_media, f"Version {i + 1}")
+
+    # Assuming we add a function to rollback to a specific version
+    rollback_to_version(sample_media, 2)
+
+    latest_version = get_document_version(sample_media)
+    assert latest_version['content'] == "Version 2"
+    assert latest_version['version_number'] == 4  # New version created during rollback
