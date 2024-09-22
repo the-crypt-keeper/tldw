@@ -1,4 +1,3 @@
-# tests/test_utils.py
 import pytest
 from App_Function_Libraries.Utils.Utils import is_valid_url, sanitize_filename, normalize_title
 
@@ -11,13 +10,6 @@ from App_Function_Libraries.Utils.Utils import is_valid_url, sanitize_filename, 
 ])
 def test_is_valid_url(url, expected):
     assert is_valid_url(url) == expected
-
-@pytest.mark.parametrize("date_string,expected", [
-    ("2023-05-01", True),
-    ("2023/05/01", False),
-    ("2023-13-01", False),
-    ("not_a_date", False),
-])
 
 @pytest.mark.parametrize("filename,expected", [
     ("normal_file.txt", "normal_file.txt"),

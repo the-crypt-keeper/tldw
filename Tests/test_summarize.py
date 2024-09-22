@@ -5,12 +5,12 @@
 #
 # Imports
 import io
+import json
 import unittest
 import os
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 import sys
-import argparse
 #
 # Local Imports
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
@@ -25,8 +25,13 @@ from summarize import main, load_and_log_configs, platform_check, cuda_check, ch
 # Add the directory containing summarize.py to the Python path
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
-class TestSummarize(unittest.TestCase):
+# Get the directory of the current file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Construct the path to the Workflows.json file
+json_path = os.path.join(current_dir, '..', '..', 'Helper_Scripts', 'Workflows', 'Workflows.json')
 
+
+class TestSummarize(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
         self.test_video_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
@@ -37,6 +42,28 @@ class TestSummarize(unittest.TestCase):
             "output_path": self.temp_dir,
             "processing_choice": "cpu"
         }
+        self.mock_workflows_json = [
+            {
+                "name": "5 Whys Analysis",
+                "context": "A problem-solving technique that involves asking 'why' five times to get to the root cause of an issue.",
+                "prompts": [
+                    "What is the problem?",
+                    "Why did this happen?",
+                    "Why did that happen?",
+                    "Why did this subsequent event happen?",
+                    "Why did this further event happen?",
+                    "Why did this final event happen?"
+                ]
+            },
+            {
+                "name": "Summarization",
+                "context": "A process of condensing information into a concise form while retaining the main points.",
+                "prompts": [
+                    "Summarize the following text:",
+                    "Refine the summary to be more concise:"
+                ]
+            }
+        ]
 
     def tearDown(self):
         for root, dirs, files in os.walk(self.temp_dir, topdown=False):
@@ -46,15 +73,18 @@ class TestSummarize(unittest.TestCase):
                 os.rmdir(os.path.join(root, name))
         os.rmdir(self.temp_dir)
 
-    @patch('summarize.load_and_log_configs')
-    def test_load_config(self, mock_load_config):
-        mock_load_config.return_value = self.test_config
-        config = load_and_log_configs()
-        self.assertEqual(config, self.test_config)
 
-    @patch('summarize.load_and_log_configs')
-    def test_load_config_file_not_found(self, mock_load_config):
-        mock_load_config.side_effect = FileNotFoundError
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('json.load')
+    def test_load_config(self, mock_json_load, mock_file):
+        mock_json_load.return_value = self.mock_workflows_json
+        config = load_and_log_configs()
+        self.assertEqual(config, self.mock_workflows_json)
+        mock_file.assert_called_once_with(json_path, 'r')
+        mock_json_load.assert_called_once_with(mock_file())
+
+    @patch('builtins.open', side_effect=FileNotFoundError)
+    def test_load_config_file_not_found(self, mock_open):
         with self.assertRaises(FileNotFoundError):
             load_and_log_configs()
 
