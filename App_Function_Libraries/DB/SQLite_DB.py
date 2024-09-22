@@ -2622,6 +2622,91 @@ def get_document_version(media_id: int, version_number: int = None) -> Dict[str,
         logging.error(error_message)
         return {'error': error_message}
 
+def get_all_document_versions(media_id: int) -> List[Dict[str, Any]]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, version_number, content, created_at
+                FROM DocumentVersions
+                WHERE media_id = ?
+                ORDER BY version_number DESC
+            ''', (media_id,))
+            results = cursor.fetchall()
+
+            if results:
+                return [
+                    {
+                        'id': row[0],
+                        'version_number': row[1],
+                        'content': row[2],
+                        'created_at': row[3]
+                    }
+                    for row in results
+                ]
+            else:
+                return []
+    except sqlite3.Error as e:
+        error_message = f"Error retrieving all document versions: {e}"
+        logging.error(error_message)
+        return [{'error': error_message}]
+
+def delete_document_version(media_id: int, version_number: int) -> Dict[str, Any]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                DELETE FROM DocumentVersions
+                WHERE media_id = ? AND version_number = ?
+            ''', (media_id, version_number))
+            conn.commit()
+
+            if cursor.rowcount > 0:
+                return {'success': f"Document version {version_number} for media_id {media_id} deleted successfully"}
+            else:
+                return {'error': f"No document version found for media_id {media_id} and version_number {version_number}"}
+    except sqlite3.Error as e:
+        error_message = f"Error deleting document version: {e}"
+        logging.error(error_message)
+        return {'error': error_message}
+
+def rollback_to_version(media_id: int, version_number: int) -> Dict[str, Any]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get the content of the version to rollback to
+            cursor.execute('''
+                SELECT content
+                FROM DocumentVersions
+                WHERE media_id = ? AND version_number = ?
+            ''', (media_id, version_number))
+            result = cursor.fetchone()
+            
+            if not result:
+                return {'error': f"No document version found for media_id {media_id} and version_number {version_number}"}
+            
+            rollback_content = result[0]
+            
+            # Create a new version with the content of the version to rollback to
+            cursor.execute('''
+                INSERT INTO DocumentVersions (media_id, version_number, content)
+                VALUES (?, (SELECT COALESCE(MAX(version_number), 0) + 1 FROM DocumentVersions WHERE media_id = ?), ?)
+            ''', (media_id, media_id, rollback_content))
+            
+            new_version_number = cursor.lastrowid
+            
+            conn.commit()
+            
+            return {
+                'success': f"Rolled back to version {version_number} for media_id {media_id}",
+                'new_version_number': new_version_number
+            }
+    except sqlite3.Error as e:
+        error_message = f"Error rolling back to document version: {e}"
+        logging.error(error_message)
+        return {'error': error_message}
+
 #
 # End of Functions to manage document versions
 #######################################################################################################################
