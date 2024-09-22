@@ -70,9 +70,42 @@ def temp_db():
 
 @pytest.fixture(scope="function")
 def empty_db():
+    # Create a temporary file to serve as the SQLite database
     _, db_path = tempfile.mkstemp(suffix='.db')
     db = Database(db_path)
+
+    # Initialize the schema (create tables like Media)
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        # Example schema for the Media table
+        cursor.execute('''
+            CREATE TABLE Media (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT UNIQUE NOT NULL,
+                title TEXT NOT NULL,
+                type TEXT NOT NULL,
+                content TEXT,
+                author TEXT,
+                ingestion_date TEXT,
+                transcription_model TEXT
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE DocumentVersions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                media_id INTEGER NOT NULL,
+                version_number INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(media_id) REFERENCES Media(id)
+            )
+        ''')
+        conn.commit()
+
+    # Yield the database for the tests
     yield db
+
+    # Clean up and remove the temporary database file after the test
     try:
         os.unlink(db_path)
     except PermissionError:

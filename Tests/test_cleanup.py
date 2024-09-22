@@ -1,6 +1,7 @@
 # tests/test_cleanup.py
 import pytest
 import os
+from unittest.mock import patch
 from App_Function_Libraries.Utils.Utils import cleanup_downloads
 
 @pytest.fixture
@@ -14,7 +15,8 @@ def temp_download_files():
         if os.path.exists(file):
             os.remove(file)
 
-def test_cleanup_downloads(temp_download_files):
+@patch('App_Function_Libraries.Utils.Utils.downloaded_files', new_callable=lambda: ['test1.mp4', 'test2.mp3', 'test3.txt'])
+def test_cleanup_downloads(mock_downloaded_files, temp_download_files):
     cleanup_downloads()
     for file in temp_download_files:
         assert not os.path.exists(file)
