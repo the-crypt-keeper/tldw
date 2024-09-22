@@ -1,7 +1,10 @@
 # tests/test_search_functions.py
 import pytest
 from App_Function_Libraries.DB.DB_Manager import search_db, search_media_database, add_media_to_database
-
+#
+####################################################################################################
+# Test Status:
+# FIXME
 
 @pytest.fixture
 def sample_data(empty_db):

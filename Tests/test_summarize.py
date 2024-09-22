@@ -20,7 +20,9 @@ from summarize import main, load_and_log_configs, platform_check, cuda_check, ch
 ####################################################################################################
 #
 # Unit Tests
-
+#
+# Test Status:
+# FIXME
 ### IMPORTANT: This is a workaround to allow the test to run from the Tests directory
 # Add the directory containing summarize.py to the Python path
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))

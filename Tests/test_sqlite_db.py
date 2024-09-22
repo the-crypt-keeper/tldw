@@ -1,7 +1,10 @@
 # tests/test_sqlite_db.py
 import pytest
 from App_Function_Libraries.DB.SQLite_DB import DatabaseError
-
+#
+####################################################################################################
+# Test Status:
+# FIXME
 
 def test_database_connection(empty_db):
     with empty_db.get_connection() as conn:
