@@ -2,7 +2,10 @@
 import pytest
 import logging
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
-
+#
+####################################################################################################
+# Test Status:
+# FIXME
 
 def test_logging(caplog):
     caplog.set_level(logging.INFO)

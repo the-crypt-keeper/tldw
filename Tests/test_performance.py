@@ -2,7 +2,10 @@
 import pytest
 import time
 from App_Function_Libraries.DB.DB_Manager import search_media_database, add_media_to_database
-
+#
+####################################################################################################
+# Test Status:
+# FIXME
 
 @pytest.mark.parametrize("num_records", [10, 100, 1000])
 def test_search_performance(empty_db, num_records):

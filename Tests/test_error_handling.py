@@ -1,7 +1,14 @@
 # tests/test_error_handling.py
+# Tests error handling in SQLite database.
+#
+# Imports:
 import pytest
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database, get_media_content
 from App_Function_Libraries.DB.SQLite_DB import DatabaseError
+#
+####################################################################################################
+# Test Status:
+# FIXME
 
 
 def test_add_media_with_invalid_data(empty_db):
