@@ -1,7 +1,16 @@
 # tests/test_llm_api_calls.py
 import pytest
 from unittest.mock import patch, MagicMock
+import os
+import sys
+
+# Add the tldw directory (one level up from Tests) to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tldw')))
 from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic
+
+
+# Print the sys.path to debug
+print("Current sys.path:", sys.path)
 
 @pytest.fixture
 def mock_openai_response():
