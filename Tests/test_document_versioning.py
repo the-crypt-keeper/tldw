@@ -140,9 +140,13 @@ def test_create_version_with_large_content(db, sample_media):
 def test_concurrent_version_creation(db, sample_media):
     """Test creating versions concurrently."""
     import threading
+    import queue
+
+    version_queue = queue.Queue()
 
     def create_version(content):
-        create_document_version(sample_media, content)
+        version = create_document_version(sample_media, content)
+        version_queue.put(version)
 
     threads = []
     for i in range(10):
@@ -153,8 +157,19 @@ def test_concurrent_version_creation(db, sample_media):
     for t in threads:
         t.join()
 
+    versions = []
+    while not version_queue.empty():
+        versions.append(version_queue.get())
+
+    assert len(versions) == 10, f"Expected 10 versions, but got {len(versions)}"
+    assert len(set(versions)) == 10, f"Expected 10 unique versions, but got {len(set(versions))} unique versions"
+    
     latest_version = get_document_version(sample_media)
-    assert latest_version['version_number'] == 10, "Expected 10 versions after concurrent creation"
+    assert latest_version['version_number'] == max(versions), f"Latest version {latest_version['version_number']} doesn't match highest created version {max(versions)}"
+
+    # Add a small delay to ensure all database operations are completed
+    import time
+    time.sleep(0.1)
 
 def test_version_creation_performance(db, sample_media):
     """Test the performance of version creation."""
