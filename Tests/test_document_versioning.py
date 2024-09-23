@@ -148,9 +148,11 @@ def test_concurrent_version_creation(db, sample_media):
     import queue
 
     version_queue = queue.Queue()
+    lock = threading.Lock()
 
     def create_version(content):
-        version = create_document_version(sample_media, content)
+        with lock:
+            version = create_document_version(sample_media, content)
         version_queue.put(version)
 
     threads = []

@@ -2548,34 +2548,43 @@ def create_document_version(media_id: int, content: str) -> int:
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
+            
+            # Start a transaction
+            cursor.execute("BEGIN EXCLUSIVE TRANSACTION")
 
-            # Verify media_id exists and get the latest version in one query
-            cursor.execute('''
-                SELECT m.id, COALESCE(MAX(dv.version_number), 0)
-                FROM Media m
-                LEFT JOIN DocumentVersions dv ON m.id = dv.media_id
-                WHERE m.id = ?
-                GROUP BY m.id
-            ''', (media_id,))
-            result = cursor.fetchone()
+            try:
+                # Verify media_id exists and get the latest version in one query
+                cursor.execute('''
+                    SELECT m.id, COALESCE(MAX(dv.version_number), 0)
+                    FROM Media m
+                    LEFT JOIN DocumentVersions dv ON m.id = dv.media_id
+                    WHERE m.id = ?
+                    GROUP BY m.id
+                ''', (media_id,))
+                result = cursor.fetchone()
 
-            if not result:
-                raise ValueError(f"No Media entry found for id: {media_id}")
+                if not result:
+                    raise ValueError(f"No Media entry found for id: {media_id}")
 
-            _, latest_version = result
-            new_version = latest_version + 1
+                _, latest_version = result
+                new_version = latest_version + 1
 
-            logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
+                logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
 
-            # Insert new version
-            cursor.execute('''
-                INSERT INTO DocumentVersions (media_id, version_number, content)
-                VALUES (?, ?, ?)
-            ''', (media_id, new_version, content))
+                # Insert new version
+                cursor.execute('''
+                    INSERT INTO DocumentVersions (media_id, version_number, content)
+                    VALUES (?, ?, ?)
+                ''', (media_id, new_version, content))
 
-            conn.commit()
-            logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
-            return new_version
+                # Commit the transaction
+                conn.commit()
+                logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
+                return new_version
+            except Exception as e:
+                # If any error occurs, roll back the transaction
+                conn.rollback()
+                raise e
     except sqlite3.Error as e:
         logging.error(f"Database error creating document version: {e}")
         logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
