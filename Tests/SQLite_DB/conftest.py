@@ -9,7 +9,7 @@ import os
 
 
 # Add the tldw directory (one level up from Tests) to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tldw')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'tldw')))
 print("Current sys.path:", sys.path)
 
 from App_Function_Libraries.DB.SQLite_DB import Database
