@@ -2546,7 +2546,7 @@ def get_paginated_files(page: int = 1, results_per_page: int = 50) -> Tuple[List
 def create_document_version(media_id: int, content: str) -> int:
     logging.info(f"Attempting to create document version for media_id: {media_id}")
     try:
-        with db.transaction() as conn:
+        with db.get_connection() as conn:
             cursor = conn.cursor()
 
             # Verify media_id exists and get the latest version in one query
@@ -2573,6 +2573,7 @@ def create_document_version(media_id: int, content: str) -> int:
                 VALUES (?, ?, ?)
             ''', (media_id, new_version, content))
 
+            conn.commit()
             logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
             return new_version
     except sqlite3.Error as e:
