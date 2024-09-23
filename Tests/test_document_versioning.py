@@ -7,6 +7,10 @@ from App_Function_Libraries.DB.SQLite_DB import Database, create_document_versio
 import sqlite3
 from datetime import datetime, timedelta
 import time
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
 
 @pytest.fixture(scope="function")
 def db(tmp_path):
@@ -35,6 +39,7 @@ def db(tmp_path):
                 FOREIGN KEY (media_id) REFERENCES Media(id)
             );
         ''')
+        conn.commit()
     yield database
     database.close_connection()
     time.sleep(0.1)
