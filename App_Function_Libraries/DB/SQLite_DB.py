@@ -595,11 +595,20 @@ def add_keyword(keyword: str) -> int:
     with db.get_connection() as conn:
         cursor = conn.cursor()
         try:
+            # Insert into Keywords table
             cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+
+            # Get the keyword_id (whether it was just inserted or already existed)
             cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
             keyword_id = cursor.fetchone()[0]
-            cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
-            logging.info(f"Keyword '{keyword}' added to keyword_fts with ID: {keyword_id}")
+
+            # Check if the keyword exists in keyword_fts
+            cursor.execute('SELECT rowid FROM keyword_fts WHERE rowid = ?', (keyword_id,))
+            if not cursor.fetchone():
+                # If it doesn't exist in keyword_fts, insert it
+                cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
+
+            logging.info(f"Keyword '{keyword}' added or updated with ID: {keyword_id}")
             conn.commit()
             return keyword_id
         except sqlite3.IntegrityError as e:
@@ -608,6 +617,7 @@ def add_keyword(keyword: str) -> int:
         except sqlite3.Error as e:
             logging.error(f"Error adding keyword: {e}")
             raise DatabaseError(f"Error adding keyword: {e}")
+
 
 
 # Function to delete a keyword
