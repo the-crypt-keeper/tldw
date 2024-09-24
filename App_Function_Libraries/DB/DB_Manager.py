@@ -67,7 +67,7 @@ from App_Function_Libraries.DB.SQLite_DB import (
     batch_insert_chunks as sqlite_batch_insert_chunks, Database, save_workflow_chat_to_db as sqlite_save_workflow_chat_to_db, \
     get_workflow_chat as sqlite_get_workflow_chat, update_media_content_with_version as sqlite_update_media_content_with_version, \
     check_existing_media as sqlite_check_existing_media, get_all_document_versions as sqlite_get_all_document_versions, \
-
+    fetch_paginated_data as sqlite_fetch_paginated_data,
 )
 #
 # Local Imports
@@ -574,6 +574,16 @@ def get_all_document_versions(*args, **kwargs):
         raise NotImplementedError("Elasticsearch version of get_all_document_versions not yet implemented")
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
+
+def fetch_paginated_data(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_fetch_paginated_data(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of fetch_paginated_data not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
 #
 #
 ############################################################################################################
