@@ -1738,13 +1738,14 @@ def fetch_item_details_single(media_id: int):
             cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
             content_result = cursor.fetchone()
 
-            prompt = prompt_summary_result[0] if prompt_summary_result else ""
-            summary = prompt_summary_result[1] if prompt_summary_result else ""
-            content = content_result[0] if content_result else ""
+            prompt = prompt_summary_result[0] if prompt_summary_result else "No prompt available."
+            summary = prompt_summary_result[1] if prompt_summary_result else "No summary available."
+            content = content_result[0] if content_result else "No content available."
 
             return prompt, summary, content
     except sqlite3.Error as e:
-        raise Exception(f"Error fetching item details: {e}")
+        logging.error(f"Error fetching item details: {e}")
+        return "Error fetching prompt.", "Error fetching summary.", "Error fetching content."
 
 
 
