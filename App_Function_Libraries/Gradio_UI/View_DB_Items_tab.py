@@ -29,9 +29,9 @@ def create_prompt_view_tab():
                 view_button = gr.Button("View Page")
                 next_page_button = gr.Button("Next Page")
                 previous_page_button = gr.Button("Previous Page")
-            with gr.Column():
                 pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
-        results_display = gr.HTML()
+            with gr.Column():
+                results_display = gr.HTML()
 
         # FIXME - SQL functions to be moved to DB_Manager
         def view_database(page, entries_per_page):
