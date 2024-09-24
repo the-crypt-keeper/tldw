@@ -11,7 +11,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items, get_all_document_versions, \
-    fetch_item_details_single, fetch_paginated_data
+    fetch_item_details_single, fetch_paginated_data, fetch_item_details, get_latest_transcription
 from App_Function_Libraries.DB.SQLite_DB import search_prompts, get_document_version
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
 from App_Function_Libraries.Utils.Utils import get_database_path, format_text_with_line_breaks
@@ -27,16 +27,26 @@ logger = logging.getLogger()
 def update_detailed_view_with_versions(selected_item, item_mapping):
     if selected_item and item_mapping and selected_item in item_mapping:
         media_id = item_mapping[selected_item]
-        prompt, summary, content = fetch_item_details_single(media_id)
+        prompt, summary, transcription = fetch_item_details(media_id)
 
         # Fetch all versions for the media item
         versions = get_all_document_versions(media_id)
         version_choices = [f"Version {v['version_number']} ({v['created_at']})" for v in versions]
 
-        prompt_summary_html = f"<strong>Prompt:</strong><br>{prompt}<br><br><strong>Summary:</strong><br>{summary}"
+        summary_html = format_as_html(summary, "Summary")
+        transcription_html = format_as_html(transcription, "Transcription")
 
-        return prompt_summary_html, content, gr.update(choices=version_choices, visible=True)
-    return "", "", gr.update(choices=[], visible=False)
+        return prompt, summary_html, transcription_html, gr.update(choices=version_choices, visible=True)
+    return "", "", "", gr.update(choices=[], visible=False)
+
+
+def extract_prompt_and_summary(content: str):
+    # Implement this function based on how prompt and summary are stored in your DocumentVersions content
+    # This is a placeholder implementation
+    parts = content.split('\n\n', 2)
+    prompt = parts[0] if len(parts) > 0 else "No prompt available."
+    summary = parts[1] if len(parts) > 1 else "No summary available."
+    return prompt, summary
 
 
 def update_content_for_version(selected_item, item_mapping, selected_version):
@@ -47,41 +57,62 @@ def update_content_for_version(selected_item, item_mapping, selected_version):
         version_data = get_document_version(media_id, version_number)
         if 'error' not in version_data:
             content = version_data['content']
-            prompt_summary_html = f"<strong>Version:</strong> {version_number}<br><strong>Created at:</strong> {version_data['created_at']}"
-            return prompt_summary_html, content
-    return "", ""
+            prompt, summary = extract_prompt_and_summary(content)
+            transcription = get_latest_transcription(media_id)
 
+            summary_html = format_as_html(summary, "Summary")
+            transcription_html = format_as_html(transcription, "Transcription")
+
+            return prompt, summary_html, transcription_html
+    return "", "", ""
+
+def format_as_html(content, title):
+    escaped_content = html.escape(content)
+    formatted_content = escaped_content.replace('\n', '<br>')
+    return f"""
+    <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;">
+        <h3>{title}</h3>
+        <div style="max-height: 300px; overflow-y: auto;">
+            {formatted_content}
+        </div>
+    </div>
+    """
 
 def create_search_tab():
     with gr.TabItem("Search / Detailed View"):
         with gr.Row():
-            with gr.Column():
+            with gr.Column(scale=1):
                 gr.Markdown("# Search across all ingested items in the Database")
-                gr.Markdown(" by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
+                gr.Markdown("by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
                 search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title", label="Search By")
+                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
+                                             label="Search By")
                 search_button = gr.Button("Search")
                 items_output = gr.Dropdown(label="Select Item", choices=[])
                 item_mapping = gr.State({})
                 version_dropdown = gr.Dropdown(label="Select Version", choices=[], visible=False)
-                prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
 
                 search_button.click(
                     fn=update_dropdown,
                     inputs=[search_query_input, search_type_input],
                     outputs=[items_output, item_mapping]
                 )
-            with gr.Column():
-                content_output = gr.Markdown(label="Content", visible=True)
+
+            with gr.Column(scale=2):
+                prompt_output = gr.Markdown(label="Prompt Used", visible=True)
+                summary_output = gr.Markdown(label="Summary", visible=True)
+                transcription_output = gr.Markdown(label="Transcription", visible=True)
+
                 items_output.change(
                     fn=update_detailed_view_with_versions,
                     inputs=[items_output, item_mapping],
-                    outputs=[prompt_summary_output, content_output, version_dropdown]
+                    outputs=[prompt_output, summary_output, transcription_output, version_dropdown]
                 )
+
                 version_dropdown.change(
                     fn=update_content_for_version,
                     inputs=[items_output, item_mapping, version_dropdown],
-                    outputs=[prompt_summary_output, content_output]
+                    outputs=[prompt_output, summary_output, transcription_output]
                 )
 
 
