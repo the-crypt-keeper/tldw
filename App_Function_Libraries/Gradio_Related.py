@@ -55,7 +55,8 @@ from App_Function_Libraries.Gradio_UI.Video_transcription_tab import create_vide
 from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
 from App_Function_Libraries.Gradio_UI.Chat_Workflows import chat_workflows_tab
-from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_view_tab, create_viewing_tab, create_view_all_with_versions_tab
+from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_view_tab, create_viewing_tab, \
+    create_view_all_with_versions_tab, create_viewing_tab_two
 #
 # Gradio UI Imports
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
