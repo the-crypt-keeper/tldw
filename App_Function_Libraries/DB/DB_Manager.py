@@ -67,7 +67,8 @@ from App_Function_Libraries.DB.SQLite_DB import (
     batch_insert_chunks as sqlite_batch_insert_chunks, Database, save_workflow_chat_to_db as sqlite_save_workflow_chat_to_db, \
     get_workflow_chat as sqlite_get_workflow_chat, update_media_content_with_version as sqlite_update_media_content_with_version, \
     check_existing_media as sqlite_check_existing_media, get_all_document_versions as sqlite_get_all_document_versions, \
-    fetch_paginated_data as sqlite_fetch_paginated_data,
+    fetch_paginated_data as sqlite_fetch_paginated_data, get_latest_transcription as sqlite_get_latest_transcription, \
+
 )
 #
 # Local Imports
@@ -517,6 +518,13 @@ def mark_as_trash(media_id: int) -> None:
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 
+
+def get_latest_transcription(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_latest_transcription(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_latest_transcription not yet implemented")
 
 def fetch_paginated_data(*args, **kwargs):
     if db_type == 'sqlite':
