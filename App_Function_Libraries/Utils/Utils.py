@@ -18,6 +18,7 @@
 #
 #
 ####################
+#
 # Import necessary libraries
 import configparser
 import hashlib
@@ -29,14 +30,15 @@ import time
 from datetime import timedelta
 from typing import Union, AnyStr
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
-
+#
+# Non-Local Imports
 import requests
 import unicodedata
 from tqdm import tqdm
-
-#######################################################################################################################
-# Function Definitions
 #
+#######################################################################################################################
+#
+# Function Definitions
 
 def extract_text_from_segments(segments):
     logging.debug(f"Segments received: {segments}")
@@ -62,10 +64,6 @@ def extract_text_from_segments(segments):
     else:
         logging.error(f"Unable to extract text from segments: {segments}")
         return "Error: Unable to extract transcription"
-
-def import_data(file):
-    # Implement this function to import data from a file
-    pass
 
 #
 #
@@ -687,4 +685,19 @@ def get_db_config():
 
 #
 # End of DB Config Loading
+#######################################################################################################################
+
+def format_text_with_line_breaks(text):
+    # Split the text into sentences and add line breaks
+    sentences = text.replace('. ', '.<br>').replace('? ', '?<br>').replace('! ', '!<br>')
+    return sentences
+
+#######################################################################################################################
+#
+# File Handling Functions
+
+
+
+#
+# End of File Handling Functions
 #######################################################################################################################

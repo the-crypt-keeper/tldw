@@ -5,6 +5,8 @@
 import json
 import logging
 import os
+from typing import Dict, Any
+
 #
 # External Imports
 import gradio as gr
@@ -12,7 +14,7 @@ import yt_dlp
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, add_media_to_database, \
-    check_media_and_whisper_model
+    check_media_and_whisper_model, check_existing_media, update_media_content_with_version
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models, update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import error_handler
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_transcription, perform_summarization, \
@@ -27,7 +29,7 @@ from App_Function_Libraries.Benchmarks_Evaluations.ms_g_eval import run_geval
 # Functions:
 
 def create_video_transcription_tab():
-    with (gr.TabItem("Video Transcription + Summarization")):
+    with ((gr.TabItem("Video Transcription + Summarization"))):
         gr.Markdown("# Transcribe & Summarize Videos from URLs")
         with gr.Row():
             gr.Markdown("""Follow this project at [tldw - GitHub](https://github.com/rmusser01/tldw)""")
@@ -125,6 +127,7 @@ def create_video_transcription_tab():
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
                 use_time_input = gr.Checkbox(label="Use Start and End Time", value=False)
                 confab_checkbox = gr.Checkbox(label="Perform Confabulation Check of Summary", value=False)
+                overwrite_checkbox = gr.Checkbox(label="Overwrite Existing Media", value=False)
                 with gr.Row(visible=False) as time_input_box:
                     gr.Markdown("### Start and End time")
                     with gr.Column():
@@ -188,9 +191,10 @@ def create_video_transcription_tab():
                                                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                                    use_multi_level_chunking, chunk_language, api_name,
                                                    api_key, keywords, use_cookies, cookies, batch_size,
-                                                   timestamp_option, keep_original_video, summarize_recursively,
+                                                   timestamp_option, keep_original_video, summarize_recursively, overwrite_existing=False,
                                                    progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
+                    # FIXME - summarize_recursively is not being used...
                     logging.info("Entering process_videos_with_error_handling")
                     logging.info(f"Received inputs: {inputs}")
 
@@ -293,6 +297,7 @@ def create_video_transcription_tab():
                                     """)
 
                                 logging.debug("Gradio_Related.py: process_url_with_metadata being called")
+                                # FIXME - Would assume this is where the multi-processing for recursive summarization would occur
                                 result = process_url_with_metadata(
                                     input_item, 2, whisper_model,
                                     custom_prompt,
@@ -305,6 +310,7 @@ def create_video_transcription_tab():
                                     chunk_options=chunk_options,
                                     keep_original_video=keep_original_video,
                                     current_whisper_model=whisper_model,
+                                    overwrite_existing=overwrite_existing
                                 )
 
                                 if result[0] is None:
@@ -425,7 +431,7 @@ def create_video_transcription_tab():
                                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                        use_multi_level_chunking, chunk_language, summarize_recursively, api_name,
                                        api_key, keywords, use_cookies, cookies, batch_size,
-                                       timestamp_option, keep_original_video, confab_checkbox):
+                                       timestamp_option, keep_original_video, confab_checkbox, overwrite_existing=False):
                 global result
                 try:
                     logging.info("process_videos_wrapper(): process_videos_wrapper called")
@@ -460,7 +466,7 @@ def create_video_transcription_tab():
                         chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                         use_multi_level_chunking, chunk_language, api_name,
                         api_key, keywords, use_cookies, cookies, batch_size,
-                        timestamp_option, keep_original_video, summarize_recursively
+                        timestamp_option, keep_original_video, summarize_recursively, overwrite_existing
                     )
 
                     confabulation_result = None
@@ -497,7 +503,7 @@ def create_video_transcription_tab():
                                           rolling_summarization,
                                           detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
                                           include_timestamps=True, metadata=None, use_chunking=False,
-                                          chunk_options=None, keep_original_video=False, current_whisper_model="Blank"):
+                                          chunk_options=None, keep_original_video=False, current_whisper_model="Blank", overwrite_existing=False):
 
                 try:
                     logging.info(f"Starting process_url_metadata for URL: {input_item}")
@@ -571,14 +577,16 @@ def create_video_transcription_tab():
                         )
 
                         if not media_exists:
-                            logging.info(f"process_url_with_metadata: Media does not exist in the database. Reason: {reason}")
+                            logging.info(
+                                f"process_url_with_metadata: Media does not exist in the database. Reason: {reason}")
                         else:
                             if "same whisper model" in reason:
                                 logging.info(
                                     f"process_url_with_metadata: Skipping download and processing as media exists and uses the same Whisper model. Reason: {reason}")
                                 return input_item, None, None, None, None, info_dict
                             else:
-                                logging.info(f"process_url_with_metadata: Media found, but with a different Whisper model. Reason: {reason}")
+                                logging.info(
+                                    f"process_url_with_metadata: Media found, but with a different Whisper model. Reason: {reason}")
 
                         # Download video/audio
                         logging.info("Downloading video/audio...")
@@ -605,6 +613,7 @@ def create_video_transcription_tab():
                                 f"process_url_with_metadata: Skipping download and processing as media exists and uses the same Whisper model. Reason: {reason}")
                             return input_item, None, None, None, None, info_dict
                         else:
+                            same_whisper_model = True
                             logging.info(
                                 f"process_url_with_metadata: Media found, but with a different Whisper model. Reason: {reason}")
 
@@ -705,11 +714,20 @@ def create_video_transcription_tab():
                         keywords_list = []
                     logging.info(f"process_url_with_metadata: Keywords prepared: {keywords_list}")
 
-                    # Add to database
-                    logging.info("process_url_with_metadata: Adding to database...")
-                    add_media_to_database(info_dict['webpage_url'], info_dict, full_text_with_metadata, summary_text,
-                                          keywords_list, custom_prompt, whisper_model)
-                    logging.info(f"process_url_with_metadata: Media added to database: {info_dict['webpage_url']}")
+                    existing_media = check_existing_media(info_dict['webpage_url'])
+
+                    if existing_media:
+                        # Update existing media with new version
+                        media_id = existing_media['id']
+                        update_result = update_media_content_with_version(media_id, info_dict, full_text_with_metadata,
+                                                                          custom_prompt, summary_text, whisper_model)
+                        logging.info(f"process_url_with_metadata: {update_result}")
+                    else:
+                        # Add new media to database
+                        add_result = add_media_to_database(info_dict['webpage_url'], info_dict, full_text_with_metadata,
+                                                           summary_text,
+                                                           keywords_list, custom_prompt, whisper_model)
+                        logging.info(f"process_url_with_metadata: {add_result}")
 
                     return info_dict[
                         'webpage_url'], full_text_with_metadata, summary_text, json_file_path, summary_file_path, info_dict
@@ -734,7 +752,7 @@ def create_video_transcription_tab():
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                     use_multi_level_chunking, chunk_language, summarize_recursively, api_name_input, api_key_input,
                     keywords_input, use_cookies_input, cookies_input, batch_size_input,
-                    timestamp_option, keep_original_video, confab_checkbox
+                    timestamp_option, keep_original_video, confab_checkbox, overwrite_checkbox
                 ],
                 outputs=[progress_output, error_output, results_output, download_transcription, download_summary, confabulation_output]
             )

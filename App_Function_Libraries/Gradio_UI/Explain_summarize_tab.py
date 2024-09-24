@@ -24,8 +24,8 @@ from App_Function_Libraries.Summarization.Summarization_General_Lib import summa
 # Functions:
 
 def create_summarize_explain_tab():
-    with gr.TabItem("Explain/Summarize Text"):
-        gr.Markdown("# Explain or Summarize Text without ingesting it into the DB")
+    with gr.TabItem("Analyze Text"):
+        gr.Markdown("# Analyze / Explain / Summarize Text without ingesting it into the DB")
         with gr.Row():
             with gr.Column():
                 with gr.Row():

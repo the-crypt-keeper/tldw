@@ -46,6 +46,7 @@ import configparser
 #
 # Import necessary libraries
 import csv
+import hashlib
 import html
 import logging
 import os
@@ -58,6 +59,8 @@ import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
+from urllib.parse import quote
+
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
     get_database_dir
@@ -592,11 +595,20 @@ def add_keyword(keyword: str) -> int:
     with db.get_connection() as conn:
         cursor = conn.cursor()
         try:
+            # Insert into Keywords table
             cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+
+            # Get the keyword_id (whether it was just inserted or already existed)
             cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
             keyword_id = cursor.fetchone()[0]
-            cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
-            logging.info(f"Keyword '{keyword}' added to keyword_fts with ID: {keyword_id}")
+
+            # Check if the keyword exists in keyword_fts
+            cursor.execute('SELECT rowid FROM keyword_fts WHERE rowid = ?', (keyword_id,))
+            if not cursor.fetchone():
+                # If it doesn't exist in keyword_fts, insert it
+                cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
+
+            logging.info(f"Keyword '{keyword}' added or updated with ID: {keyword_id}")
             conn.commit()
             return keyword_id
         except sqlite3.IntegrityError as e:
@@ -605,6 +617,7 @@ def add_keyword(keyword: str) -> int:
         except sqlite3.Error as e:
             logging.error(f"Error adding keyword: {e}")
             raise DatabaseError(f"Error adding keyword: {e}")
+
 
 
 # Function to delete a keyword
@@ -948,7 +961,6 @@ def fetch_item_details(media_id: int):
 # Media-related Functions
 
 
-
 # Function to add a version of a prompt and summary
 def add_media_version(conn, media_id: int, prompt: str, summary: str) -> None:
     try:
@@ -1145,11 +1157,21 @@ def is_valid_date(date_string: str) -> bool:
     except ValueError:
         return False
 
-def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video'):
+
+
+
+def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video', overwrite=False):
     db = Database()
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
+
+            # Generate URL if not provided
+            if not url:
+                title = info_dict.get('title', 'Untitled')
+                url_hash = hashlib.md5(f"{title}{media_type}".encode()).hexdigest()
+                url = f"https://No-URL-Submitted.com/{media_type}/{quote(title)}-{url_hash}"
+
 
             # Extract content from segments
             if isinstance(segments, list):
@@ -1172,13 +1194,14 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
             existing_media = cursor.fetchone()
 
             if existing_media:
-                media_id = existing_media[0]
-                cursor.execute('''
-                UPDATE Media 
-                SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?
-                WHERE id = ?
-                ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
-                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
+                if overwrite:
+                    media_id = existing_media[0]
+                    cursor.execute('''
+                    UPDATE Media 
+                    SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?
+                    WHERE id = ?
+                    ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
+                          info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
             else:
                 cursor.execute('''
                 INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status)
@@ -1218,7 +1241,8 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
         # Schedule chunking
         schedule_chunking(media_id, content, info_dict.get('title', 'Untitled'))
 
-        return f"Media '{info_dict.get('title', 'Untitled')}' added/updated successfully with keywords: {', '.join(keyword_list)}. Chunking scheduled."
+        action = "updated" if existing_media and overwrite else "added"
+        return f"Media '{info_dict.get('title', 'Untitled')}' {action} successfully with URL: {url} and keywords: {', '.join(keyword_list)}. Chunking scheduled."
 
     except DatabaseError as e:
         logging.error(f"Database error: {e}")
@@ -1226,6 +1250,66 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
     except Exception as e:
         logging.error(f"Unexpected error: {e}")
         raise DatabaseError(f"Unexpected error: {e}")
+
+
+def check_existing_media(url):
+    db = Database()
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
+            result = cursor.fetchone()
+            return {'id': result[0]} if result else None
+    except Exception as e:
+        logging.error(f"Error checking existing media: {e}")
+        return None
+
+
+# Modified update_media_content function to create a new version
+def update_media_content_with_version(media_id, info_dict, content_input, prompt_input, summary_input, whisper_model):
+    db = Database()
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Create new document version
+            cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
+            current_version = cursor.fetchone()[0] or 0
+            new_version = current_version + 1
+
+            # Insert new version
+            cursor.execute('''
+            INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (media_id, new_version, prompt_input, summary_input, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+
+            # Update the main content in the Media table
+            cursor.execute('''
+            UPDATE Media 
+            SET content = ?, transcription_model = ?, title = ?, author = ?, ingestion_date = ?, chunking_status = ?
+            WHERE id = ?
+            ''', (content_input, whisper_model, info_dict.get('title', 'Untitled'),
+                  info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
+
+            # Update or insert into MediaModifications
+            cursor.execute('''
+            INSERT OR REPLACE INTO MediaModifications (media_id, prompt, summary, modification_date)
+            VALUES (?, ?, ?, ?)
+            ''', (media_id, prompt_input, summary_input, datetime.now().strftime('%Y-%m-%d')))
+
+            # Update full-text search index
+            cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
+                           (media_id, info_dict.get('title', 'Untitled'), content_input))
+
+            conn.commit()
+
+        # Schedule chunking
+        schedule_chunking(media_id, content_input, info_dict.get('title', 'Untitled'))
+
+        return f"Content updated successfully for media ID: {media_id}. New version: {new_version}"
+    except Exception as e:
+        logging.error(f"Error updating media content: {e}")
+        return f"Error updating content: {str(e)}"
 
 
 # FIXME: This function is not complete and needs to be implemented
@@ -2472,35 +2556,45 @@ def get_paginated_files(page: int = 1, results_per_page: int = 50) -> Tuple[List
 def create_document_version(media_id: int, content: str) -> int:
     logging.info(f"Attempting to create document version for media_id: {media_id}")
     try:
-        with db.transaction() as conn:
+        with db.get_connection() as conn:
             cursor = conn.cursor()
+            
+            # Start a transaction
+            cursor.execute("BEGIN EXCLUSIVE TRANSACTION")
 
-            # Verify media_id exists and get the latest version in one query
-            cursor.execute('''
-                SELECT m.id, COALESCE(MAX(dv.version_number), 0)
-                FROM Media m
-                LEFT JOIN DocumentVersions dv ON m.id = dv.media_id
-                WHERE m.id = ?
-                GROUP BY m.id
-            ''', (media_id,))
-            result = cursor.fetchone()
+            try:
+                # Verify media_id exists and get the latest version in one query
+                cursor.execute('''
+                    SELECT m.id, COALESCE(MAX(dv.version_number), 0)
+                    FROM Media m
+                    LEFT JOIN DocumentVersions dv ON m.id = dv.media_id
+                    WHERE m.id = ?
+                    GROUP BY m.id
+                ''', (media_id,))
+                result = cursor.fetchone()
 
-            if not result:
-                raise ValueError(f"No Media entry found for id: {media_id}")
+                if not result:
+                    raise ValueError(f"No Media entry found for id: {media_id}")
 
-            _, latest_version = result
-            new_version = latest_version + 1
+                _, latest_version = result
+                new_version = latest_version + 1
 
-            logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
+                logging.debug(f"Inserting new version {new_version} for media_id: {media_id}")
 
-            # Insert new version
-            cursor.execute('''
-                INSERT INTO DocumentVersions (media_id, version_number, content)
-                VALUES (?, ?, ?)
-            ''', (media_id, new_version, content))
+                # Insert new version
+                cursor.execute('''
+                    INSERT INTO DocumentVersions (media_id, version_number, content)
+                    VALUES (?, ?, ?)
+                ''', (media_id, new_version, content))
 
-            logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
-            return new_version
+                # Commit the transaction
+                conn.commit()
+                logging.info(f"Successfully created document version {new_version} for media_id: {media_id}")
+                return new_version
+            except Exception as e:
+                # If any error occurs, roll back the transaction
+                conn.rollback()
+                raise e
     except sqlite3.Error as e:
         logging.error(f"Database error creating document version: {e}")
         logging.error(f"Error details - media_id: {media_id}, content length: {len(content)}")
@@ -2545,6 +2639,91 @@ def get_document_version(media_id: int, version_number: int = None) -> Dict[str,
                 return {'error': f"No document version found for media_id {media_id}" + (f" and version_number {version_number}" if version_number is not None else "")}
     except sqlite3.Error as e:
         error_message = f"Error retrieving document version: {e}"
+        logging.error(error_message)
+        return {'error': error_message}
+
+def get_all_document_versions(media_id: int) -> List[Dict[str, Any]]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, version_number, content, created_at
+                FROM DocumentVersions
+                WHERE media_id = ?
+                ORDER BY version_number DESC
+            ''', (media_id,))
+            results = cursor.fetchall()
+
+            if results:
+                return [
+                    {
+                        'id': row[0],
+                        'version_number': row[1],
+                        'content': row[2],
+                        'created_at': row[3]
+                    }
+                    for row in results
+                ]
+            else:
+                return []
+    except sqlite3.Error as e:
+        error_message = f"Error retrieving all document versions: {e}"
+        logging.error(error_message)
+        return [{'error': error_message}]
+
+def delete_document_version(media_id: int, version_number: int) -> Dict[str, Any]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                DELETE FROM DocumentVersions
+                WHERE media_id = ? AND version_number = ?
+            ''', (media_id, version_number))
+            conn.commit()
+
+            if cursor.rowcount > 0:
+                return {'success': f"Document version {version_number} for media_id {media_id} deleted successfully"}
+            else:
+                return {'error': f"No document version found for media_id {media_id} and version_number {version_number}"}
+    except sqlite3.Error as e:
+        error_message = f"Error deleting document version: {e}"
+        logging.error(error_message)
+        return {'error': error_message}
+
+def rollback_to_version(media_id: int, version_number: int) -> Dict[str, Any]:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get the content of the version to rollback to
+            cursor.execute('''
+                SELECT content
+                FROM DocumentVersions
+                WHERE media_id = ? AND version_number = ?
+            ''', (media_id, version_number))
+            result = cursor.fetchone()
+            
+            if not result:
+                return {'error': f"No document version found for media_id {media_id} and version_number {version_number}"}
+            
+            rollback_content = result[0]
+            
+            # Create a new version with the content of the version to rollback to
+            cursor.execute('''
+                INSERT INTO DocumentVersions (media_id, version_number, content)
+                VALUES (?, (SELECT COALESCE(MAX(version_number), 0) + 1 FROM DocumentVersions WHERE media_id = ?), ?)
+            ''', (media_id, media_id, rollback_content))
+            
+            new_version_number = cursor.lastrowid
+            
+            conn.commit()
+            
+            return {
+                'success': f"Rolled back to version {version_number} for media_id {media_id}",
+                'new_version_number': new_version_number
+            }
+    except sqlite3.Error as e:
+        error_message = f"Error rolling back to document version: {e}"
         logging.error(error_message)
         return {'error': error_message}
 
