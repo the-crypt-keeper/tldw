@@ -43,7 +43,7 @@ from App_Function_Libraries.Gradio_UI.Podcast_tab import create_podcast_tab
 from App_Function_Libraries.Gradio_UI.RAG_QA_Chat_tab import create_rag_qa_chat_tab
 from App_Function_Libraries.Gradio_UI.Re_summarize_tab import create_resummary_tab
 from App_Function_Libraries.Gradio_UI.Search_Tab import create_prompt_view_tab, create_prompt_search_tab, \
-    create_search_summaries_tab, create_viewing_tab,  create_search_tab
+    create_search_summaries_tab, create_viewing_tab, create_search_tab, create_view_all_with_versions_tab
 from App_Function_Libraries.Gradio_UI.RAG_Chat_tab import create_rag_tab
 from App_Function_Libraries.Gradio_UI.Embeddings_tab import create_embeddings_tab, create_view_embeddings_tab, \
     create_purge_embeddings_tab
@@ -286,6 +286,7 @@ def launch_ui(share_public=None, server_mode=False):
 
 
             with gr.TabItem("View DB Items"):
+                create_view_all_with_versions_tab()
                 create_viewing_tab()
                 create_prompt_view_tab()
 
