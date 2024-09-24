@@ -687,9 +687,16 @@ def get_db_config():
 # End of DB Config Loading
 #######################################################################################################################
 
+
+def format_text_with_line_breaks(text):
+    # Split the text into sentences and add line breaks
+    sentences = text.replace('. ', '.<br>').replace('? ', '?<br>').replace('! ', '!<br>')
+    return sentences
+
 #######################################################################################################################
 #
 # File Handling Functions
+
 
 
 
