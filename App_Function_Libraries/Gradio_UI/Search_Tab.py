@@ -99,7 +99,7 @@ def create_search_tab():
                 )
 
             with gr.Column(scale=2):
-                prompt_output = gr.Markdown(label="Prompt Used", visible=True)
+                prompt_output = gr.Textbox(label="Prompt Used", visible=True)
                 summary_output = gr.Markdown(label="Summary", visible=True)
                 transcription_output = gr.Markdown(label="Transcription", visible=True)
 
