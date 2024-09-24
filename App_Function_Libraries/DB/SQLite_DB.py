@@ -926,10 +926,12 @@ def browse_items(search_query, search_type):
 
 
 # Function to fetch item details
+
 def fetch_item_details(media_id: int):
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
+            # Fetch the latest prompt and summary from MediaModifications
             cursor.execute("""
                 SELECT prompt, summary 
                 FROM MediaModifications 
@@ -938,18 +940,19 @@ def fetch_item_details(media_id: int):
                 LIMIT 1
             """, (media_id,))
             prompt_summary_result = cursor.fetchone()
+
+            # Fetch the latest transcription
             cursor.execute("SELECT content FROM Media WHERE id = ?", (media_id,))
             content_result = cursor.fetchone()
 
-            prompt = prompt_summary_result[0] if prompt_summary_result else ""
-            summary = prompt_summary_result[1] if prompt_summary_result else ""
-            content = content_result[0] if content_result else ""
+            prompt = prompt_summary_result[0] if prompt_summary_result else "No prompt available."
+            summary = prompt_summary_result[1] if prompt_summary_result else "No summary available."
+            content = content_result[0] if content_result else "No content available."
 
-            return content, prompt, summary
+            return prompt, summary, content
     except sqlite3.Error as e:
         logging.error(f"Error fetching item details: {e}")
-        # Return empty strings if there's an error
-        return "", "", ""
+        return "Error fetching prompt.", "Error fetching summary.", "Error fetching media."
 
 #
 #  End of Media-related Functions
@@ -2162,6 +2165,22 @@ def get_transcripts(media_id):
         logging.error(f"Error in get_transcripts: {str(e)}")
         return []
 
+def get_latest_transcription(media_id: int):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT transcription
+                FROM Transcripts
+                WHERE media_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (media_id,))
+            result = cursor.fetchone()
+            return result[0] if result else "No transcription available."
+    except sqlite3.Error as e:
+        logging.error(f"Error fetching latest transcription: {e}")
+        return "Error fetching transcription."
 
 #
 # End of Functions to Compare Transcripts
