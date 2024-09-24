@@ -10,8 +10,9 @@ import sqlite3
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items
-from App_Function_Libraries.DB.SQLite_DB import search_prompts
+from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items, get_all_document_versions, \
+    fetch_item_details_single
+from App_Function_Libraries.DB.SQLite_DB import search_prompts, get_document_version
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
 from App_Function_Libraries.Utils.Utils import get_database_path
 #
@@ -20,6 +21,34 @@ from App_Function_Libraries.Utils.Utils import get_database_path
 # Functions:
 
 logger = logging.getLogger()
+
+
+def update_detailed_view_with_versions(selected_item, item_mapping):
+    if selected_item and item_mapping and selected_item in item_mapping:
+        media_id = item_mapping[selected_item]
+        prompt, summary, content = fetch_item_details_single(media_id)
+
+        # Fetch all versions for the media item
+        versions = get_all_document_versions(media_id)
+        version_choices = [f"Version {v['version_number']} ({v['created_at']})" for v in versions]
+
+        prompt_summary_html = f"<strong>Prompt:</strong><br>{prompt}<br><br><strong>Summary:</strong><br>{summary}"
+
+        return prompt_summary_html, content, gr.update(choices=version_choices, visible=True)
+    return "", "", gr.update(choices=[], visible=False)
+
+
+def update_content_for_version(selected_item, item_mapping, selected_version):
+    if selected_item and item_mapping and selected_item in item_mapping:
+        media_id = item_mapping[selected_item]
+        version_number = int(selected_version.split()[1].split('(')[0])
+
+        version_data = get_document_version(media_id, version_number)
+        if 'error' not in version_data:
+            content = version_data['content']
+            prompt_summary_html = f"<strong>Version:</strong> {version_number}<br><strong>Created at:</strong> {version_data['created_at']}"
+            return prompt_summary_html, content
+    return "", ""
 
 
 def create_search_tab():
@@ -33,6 +62,7 @@ def create_search_tab():
                 search_button = gr.Button("Search")
                 items_output = gr.Dropdown(label="Select Item", choices=[])
                 item_mapping = gr.State({})
+                version_dropdown = gr.Dropdown(label="Select Version", choices=[], visible=False)
                 prompt_summary_output = gr.HTML(label="Prompt & Summary", visible=True)
 
                 search_button.click(
@@ -43,8 +73,13 @@ def create_search_tab():
             with gr.Column():
                 content_output = gr.Markdown(label="Content", visible=True)
                 items_output.change(
-                    fn=update_detailed_view,
+                    fn=update_detailed_view_with_versions,
                     inputs=[items_output, item_mapping],
+                    outputs=[prompt_summary_output, content_output, version_dropdown]
+                )
+                version_dropdown.change(
+                    fn=update_content_for_version,
+                    inputs=[items_output, item_mapping, version_dropdown],
                     outputs=[prompt_summary_output, content_output]
                 )
 

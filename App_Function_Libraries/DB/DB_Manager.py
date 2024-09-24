@@ -66,7 +66,8 @@ from App_Function_Libraries.DB.SQLite_DB import (
     get_next_media_id as sqlite_get_next_media_id, \
     batch_insert_chunks as sqlite_batch_insert_chunks, Database, save_workflow_chat_to_db as sqlite_save_workflow_chat_to_db, \
     get_workflow_chat as sqlite_get_workflow_chat, update_media_content_with_version as sqlite_update_media_content_with_version, \
-    check_existing_media as sqlite_check_existing_media,
+    check_existing_media as sqlite_check_existing_media, get_all_document_versions as sqlite_get_all_document_versions, \
+
 )
 #
 # Local Imports
@@ -555,6 +556,29 @@ def get_specific_summary(summary_id: int) -> Dict:
         raise NotImplementedError("Elasticsearch version of get_specific_summary not yet implemented")
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
+
+def fetch_item_details_single(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_fetch_item_details(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of fetch_item_details not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+def get_all_document_versions(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_all_document_versions(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_all_document_versions not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+#
+#
+############################################################################################################
+#
+# Prompt Functions:
 
 def get_media_prompts(media_id: int) -> List[Dict]:
     if db_type == 'sqlite':
