@@ -34,7 +34,7 @@ def create_prompt_view_tab():
                 results_display = gr.HTML()
 
         # FIXME - SQL functions to be moved to DB_Manager
-        
+
         def view_database(page, entries_per_page):
             offset = (page - 1) * entries_per_page
             try:
