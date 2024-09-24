@@ -79,9 +79,9 @@ def format_as_html(content, title):
 
 def create_search_tab():
     with gr.TabItem("Search / Detailed View"):
+        gr.Markdown("# Search across all ingested items in the Database")
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("# Search across all ingested items in the Database")
                 gr.Markdown("by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
                 search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
                 search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",

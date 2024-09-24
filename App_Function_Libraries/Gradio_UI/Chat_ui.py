@@ -214,7 +214,7 @@ def create_chat_interface():
                                                  value="You are a helpful AI assitant",
                                                  lines=3,
                                                  visible=False)
-            with gr.Column():
+            with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
