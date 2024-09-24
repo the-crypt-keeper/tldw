@@ -11,10 +11,11 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items, get_all_document_versions, \
-    fetch_item_details_single
+    fetch_item_details_single, fetch_paginated_data
 from App_Function_Libraries.DB.SQLite_DB import search_prompts, get_document_version
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
-from App_Function_Libraries.Utils.Utils import get_database_path
+from App_Function_Libraries.Utils.Utils import get_database_path, format_text_with_line_breaks
+
 #
 ###################################################################################################
 #
@@ -437,3 +438,119 @@ def create_prompt_search_tab():
             inputs=[search_query_input, page_number, entries_per_page],
             outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
         )
+
+
+def create_view_all_with_versions_tab():
+    with gr.TabItem("View All Items"):
+        gr.Markdown("# View All Database Entries with Version Selection")
+        with gr.Row():
+            with gr.Column(scale=1):
+                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
+                page_number = gr.Number(value=1, label="Page Number", precision=0)
+                view_button = gr.Button("View Page")
+                next_page_button = gr.Button("Next Page")
+                previous_page_button = gr.Button("Previous Page")
+            with gr.Column(scale=2):
+                items_output = gr.Dropdown(label="Select Item to View Details", choices=[])
+                version_dropdown = gr.Dropdown(label="Select Version", choices=[], visible=False)
+        with gr.Row():
+            with gr.Column(scale=1):
+                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
+            with gr.Column(scale=2):
+                details_display = gr.HTML(label="Item Details")
+
+        item_mapping = gr.State({})
+
+        def update_page(page, entries_per_page):
+            results, total_entries = fetch_paginated_data(page, entries_per_page)
+            total_pages = (total_entries + entries_per_page - 1) // entries_per_page
+            pagination = f"Page {page} of {total_pages} (Total items: {total_entries})"
+
+            choices = [f"{item[1]} (ID: {item[0]})" for item in results]
+            new_item_mapping = {f"{item[1]} (ID: {item[0]})": item[0] for item in results}
+
+            next_disabled = page >= total_pages
+            prev_disabled = page <= 1
+
+            return (gr.update(choices=choices, value=None),
+                    pagination,
+                    page,
+                    gr.update(interactive=not next_disabled),
+                    gr.update(interactive=not prev_disabled),
+                    gr.update(visible=False, choices=[]),
+                    "",
+                    new_item_mapping)
+
+        def display_item_details(selected_item, item_mapping):
+            if selected_item and item_mapping:
+                media_id = item_mapping[selected_item]
+                prompt, summary, content = fetch_item_details_single(media_id)
+                versions = get_all_document_versions(media_id)
+                version_choices = [f"Version {v['version_number']} ({v['created_at']})" for v in versions]
+
+                formatted_prompt = format_text_with_line_breaks(prompt)
+                formatted_summary = format_text_with_line_breaks(summary)
+                formatted_content = format_text_with_line_breaks(content[:500])
+
+                details_html = f"""
+                <h3>{selected_item}</h3>
+                <strong>Prompt:</strong><br>{formatted_prompt}<br><br>
+                <strong>Summary:</strong><br>{formatted_summary}<br><br>
+                <strong>Content (first 500 characters):</strong><br>{formatted_content}...
+                """
+
+                return (
+                gr.update(visible=True, choices=version_choices, value=version_choices[0] if version_choices else None),
+                details_html)
+            return gr.update(visible=False, choices=[]), ""
+
+        def update_version_content(selected_item, item_mapping, selected_version):
+            if selected_item and item_mapping and selected_version:
+                media_id = item_mapping[selected_item]
+                version_number = int(selected_version.split()[1].split('(')[0])
+                version_data = get_document_version(media_id, version_number)
+
+                if 'error' not in version_data:
+                    formatted_content = format_text_with_line_breaks(version_data['content'])
+                    details_html = f"""
+                    <h3>{selected_item}</h3>
+                    <strong>Version:</strong> {version_number}<br>
+                    <strong>Created at:</strong> {version_data['created_at']}<br><br>
+                    <strong>Content:</strong><br>{formatted_content}
+                    """
+                    return details_html
+            return ""
+
+        view_button.click(
+            fn=update_page,
+            inputs=[page_number, entries_per_page],
+            outputs=[items_output, pagination_info, page_number, next_page_button, previous_page_button,
+                     version_dropdown, details_display, item_mapping]
+        )
+
+        next_page_button.click(
+            fn=lambda page, entries: update_page(page + 1, entries),
+            inputs=[page_number, entries_per_page],
+            outputs=[items_output, pagination_info, page_number, next_page_button, previous_page_button,
+                     version_dropdown, details_display, item_mapping]
+        )
+
+        previous_page_button.click(
+            fn=lambda page, entries: update_page(max(1, page - 1), entries),
+            inputs=[page_number, entries_per_page],
+            outputs=[items_output, pagination_info, page_number, next_page_button, previous_page_button,
+                     version_dropdown, details_display, item_mapping]
+        )
+
+        items_output.change(
+            fn=display_item_details,
+            inputs=[items_output, item_mapping],
+            outputs=[version_dropdown, details_display]
+        )
+
+        version_dropdown.change(
+            fn=update_version_content,
+            inputs=[items_output, item_mapping, version_dropdown],
+            outputs=[details_display]
+        )
+
