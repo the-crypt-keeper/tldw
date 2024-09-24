@@ -147,10 +147,10 @@ def create_character_card_interaction_tab():
                 character_dropdown = gr.Dropdown(label="Select Character", choices=get_character_names())
                 user_name_input = gr.Textbox(label="Your Name", placeholder="Enter your name here")
                 api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
+                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
                              "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace",
                              "Custom-OpenAI-API"],
-                    value=None,
+                    value="HuggingFace",
                     # FIXME - make it so the user cant' click `Send Message` without first setting an API + Chatbot
                     label="API for Interaction(Mandatory)"
                 )
@@ -591,8 +591,12 @@ def create_multiple_character_chat_tab():
                                        range(4)]
 
             api_endpoint = gr.Dropdown(label="API Endpoint",
-                                       choices=["OpenAI", "Anthropic", "Local-LLM", "Cohere", "Groq", "DeepSeek",
-                                                "Mistral", "OpenRouter"])
+                                       choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek",
+                                                "Mistral",
+                                                "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM",
+                                                "ollama", "HuggingFace",
+                                                "Custom-OpenAI-API"],
+                                        value="HuggingFace")
             api_key = gr.Textbox(label="API Key (if required)", type="password")
             temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
             scenario = gr.Textbox(label="Scenario (optional)", lines=3)
@@ -722,8 +726,10 @@ def create_narrator_controlled_conversation_tab():
             with gr.Column(scale=1):
                 api_endpoint = gr.Dropdown(
                     label="API Endpoint",
-                    choices=["OpenAI", "Anthropic", "Local-LLM", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter"],
-                    value="OpenAI"
+                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
+                             "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace",
+                             "Custom-OpenAI-API"],
+                    value="HuggingFace"
                 )
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
                 temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
@@ -827,5 +833,5 @@ def create_narrator_controlled_conversation_tab():
     return api_endpoint, api_key, temperature, narrator_input, conversation_display, user_input, generate_btn, reset_btn, error_box
 
 #
-# End of Multi-Character chat tab
+# End of Narrator-Controlled Conversation tab
 ########################################################################################################################
