@@ -195,7 +195,7 @@ Some planned features include:
   - https://github.com/lmg-anon/mikupad 
   - https://github.com/datacrystals/AIStoryWriter
 - Support for multiple different Evaluations
-  - G-Eval summarization check is available in the video transcript tab, as well as under the `Benchmarks` tab.
+  - G-Eval summarization check is available in the video transcript tab, as well as under the `Benchmarks` tab (along with InfiniteBench[WIP] and [MMLU-Pro](https://github.com/TIGER-AI-Lab/MMLU-Pro).
   - I'd like to add more benchmarks so that user can identify/measure how well their config works, so they can tweak things and have an idea if its better/worse.
 
 ###  **Don't care, give me code**

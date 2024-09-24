@@ -23,7 +23,8 @@ from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_conten
 # Functions:
 # Load configuration
 def load_mediawiki_import_config():
-    with open(os.path.join('Config_Files', 'mediawiki_import_config.yaml'), 'r') as f:
+    config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'Config_Files', 'mediawiki_import_config.yaml')
+    with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
 config = load_mediawiki_import_config()
