@@ -56,7 +56,7 @@ from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
 from App_Function_Libraries.Gradio_UI.Chat_Workflows import chat_workflows_tab
 from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_view_tab, create_viewing_tab, \
-    create_view_all_with_versions_tab, create_viewing_tab_two
+    create_view_all_with_versions_tab, create_viewing_tab
 #
 # Gradio UI Imports
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
@@ -285,10 +285,10 @@ def launch_ui(share_public=None, server_mode=False):
                 create_narrator_controlled_conversation_tab()
                 create_character_card_interaction_tab()
 
-
-
             with gr.TabItem("View DB Items"):
+                # This one works
                 create_view_all_with_versions_tab()
+                # This one is WIP
                 create_viewing_tab()
                 create_prompt_view_tab()
 
