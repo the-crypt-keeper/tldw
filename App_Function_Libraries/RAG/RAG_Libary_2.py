@@ -144,7 +144,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
             logging.info(f"No results found. Query: {query}, Keywords: {keywords}")
             return {
                 "answer": "No relevant information based on your query and keywords were found in the database. Your query has been directly passed to the LLM, and here is its answer: \n\n" + answer,
-                "context": "" + context
+                "context": "No relevant information based on your query and keywords were found in the database." + context
             }
 
         return {
