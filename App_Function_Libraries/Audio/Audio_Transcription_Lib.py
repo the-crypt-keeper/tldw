@@ -50,7 +50,7 @@ processing_choice = config.get('Processing', 'processing_choice', fallback='cpu'
 
 class WhisperModel(OriginalWhisperModel):
     tldw_dir = os.path.dirname(os.path.dirname(__file__))
-    default_download_root = os.path.join(tldw_dir, 'App_Function_Libraries', 'models', 'Whisper')
+    default_download_root = os.path.join(tldw_dir, 'models', 'Whisper')
 
     valid_model_sizes = [
         "tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium",
