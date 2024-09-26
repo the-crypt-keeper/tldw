@@ -127,13 +127,6 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
 
         # Combine results
         all_results = vector_results + fts_results
-        # FIXME
-        if not all_results:
-            logging.info(f"No results found. Query: {query}, Keywords: {keywords}")
-            return {
-                "answer": "I couldn't find any relevant information based on your query and keywords.",
-                "context": ""
-            }
 
         # FIXME - Apply Re-Ranking of results here
         apply_re_ranking = False
@@ -147,10 +140,18 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
         # Generate answer using the selected API
         answer = generate_answer(api_choice, context, query)
 
+        if not all_results:
+            logging.info(f"No results found. Query: {query}, Keywords: {keywords}")
+            return {
+                "answer": "No relevant information based on your query and keywords were found in the database. Your query has been directly passed to the LLM, and here is its answer: \n\n" + answer,
+                "context": "" + context
+            }
+
         return {
             "answer": answer,
             "context": context
         }
+
     except Exception as e:
         logging.error(f"Error in enhanced_rag_pipeline: {str(e)}")
         return {

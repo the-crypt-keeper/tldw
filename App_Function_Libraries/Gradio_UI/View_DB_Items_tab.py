@@ -10,7 +10,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import view_database, get_all_document_versions, \
-    fetch_item_details_single, fetch_paginated_data
+    fetch_paginated_data, fetch_item_details, get_latest_transcription
 from App_Function_Libraries.DB.SQLite_DB import get_document_version
 from App_Function_Libraries.Utils.Utils import get_database_path, format_text_with_line_breaks
 #
@@ -124,6 +124,27 @@ def create_prompt_view_tab():
         )
 
 
+def format_as_html(content, title):
+    escaped_content = html.escape(content)
+    formatted_content = escaped_content.replace('\n', '<br>')
+    return f"""
+    <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;">
+        <h3>{title}</h3>
+        <div style="max-height: 300px; overflow-y: auto;">
+            {formatted_content}
+        </div>
+    </div>
+    """
+
+def extract_prompt_and_summary(content: str):
+    # Implement this function based on how prompt and summary are stored in your DocumentVersions content
+    # This is a placeholder implementation
+    parts = content.split('\n\n', 2)
+    prompt = parts[0] if len(parts) > 0 else "No prompt available."
+    summary = parts[1] if len(parts) > 1 else "No summary available."
+    return prompt, summary
+
+
 def create_view_all_with_versions_tab():
     with gr.TabItem("View All Items"):
         gr.Markdown("# View All Database Entries with Version Selection")
@@ -141,7 +162,9 @@ def create_view_all_with_versions_tab():
             with gr.Column(scale=1):
                 pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
             with gr.Column(scale=2):
-                details_display = gr.HTML(label="Item Details")
+                prompt_output = gr.Textbox(label="Prompt Used", visible=True)
+                summary_output = gr.HTML(label="Summary", visible=True)
+                transcription_output = gr.HTML(label="Transcription", visible=True)
 
         item_mapping = gr.State({})
 
@@ -162,80 +185,94 @@ def create_view_all_with_versions_tab():
                     gr.update(interactive=not next_disabled),
                     gr.update(interactive=not prev_disabled),
                     gr.update(visible=False, choices=[]),
-                    "",
+                    "", "", "",
                     new_item_mapping)
 
+        def format_as_html(content, title):
+            if content is None:
+                content = "No content available."
+            escaped_content = html.escape(str(content))
+            formatted_content = escaped_content.replace('\n', '<br>')
+            return f"""
+            <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;">
+                <h3>{title}</h3>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    {formatted_content}
+                </div>
+            </div>
+            """
+
         def display_item_details(selected_item, item_mapping):
-            if selected_item and item_mapping:
+            if selected_item and item_mapping and selected_item in item_mapping:
                 media_id = item_mapping[selected_item]
-                prompt, summary, content = fetch_item_details_single(media_id)
+                prompt, summary, transcription = fetch_item_details(media_id)
                 versions = get_all_document_versions(media_id)
-                version_choices = [f"Version {v['version_number']} ({v['created_at']})" for v in versions]
 
-                formatted_prompt = format_text_with_line_breaks(prompt)
-                formatted_summary = format_text_with_line_breaks(summary)
-                formatted_content = format_text_with_line_breaks(content[:500])
+                # Filter out duplicate versions and sort them
+                unique_versions = list(set((v['version_number'], v['created_at']) for v in versions))
+                unique_versions.sort(key=lambda x: x[0], reverse=True)
+                version_choices = [f"Version {v[0]} ({v[1]})" for v in unique_versions]
 
-                details_html = f"""
-                <h3>{selected_item}</h3>
-                <strong>Prompt:</strong><br>{formatted_prompt}<br><br>
-                <strong>Summary:</strong><br>{formatted_summary}<br><br>
-                <strong>Content (first 500 characters):</strong><br>{formatted_content}...
-                """
+                summary_html = format_as_html(summary, "Summary")
+                transcription_html = format_as_html(transcription, "Transcription")
 
                 return (
-                gr.update(visible=True, choices=version_choices, value=version_choices[0] if version_choices else None),
-                details_html)
-            return gr.update(visible=False, choices=[]), ""
+                    gr.update(visible=True, choices=version_choices,
+                              value=version_choices[0] if version_choices else None),
+                    prompt if prompt is not None else "",
+                    summary_html,
+                    transcription_html
+                )
+            return gr.update(visible=False, choices=[]), "", "", ""
 
         def update_version_content(selected_item, item_mapping, selected_version):
-            if selected_item and item_mapping and selected_version:
+            if selected_item and item_mapping and selected_item in item_mapping and selected_version:
                 media_id = item_mapping[selected_item]
                 version_number = int(selected_version.split()[1].split('(')[0])
                 version_data = get_document_version(media_id, version_number)
 
                 if 'error' not in version_data:
-                    formatted_content = format_text_with_line_breaks(version_data['content'])
-                    details_html = f"""
-                    <h3>{selected_item}</h3>
-                    <strong>Version:</strong> {version_number}<br>
-                    <strong>Created at:</strong> {version_data['created_at']}<br><br>
-                    <strong>Content:</strong><br>{formatted_content}
-                    """
-                    return details_html
-            return ""
+                    content = version_data['content']
+                    prompt, summary = extract_prompt_and_summary(content)
+                    transcription = get_latest_transcription(media_id)
+
+                    summary_html = format_as_html(summary, "Summary")
+                    transcription_html = format_as_html(transcription, "Transcription")
+
+                    return prompt if prompt is not None else "", summary_html, transcription_html
+            return gr.update(value=selected_item), gr.update(), gr.update()
 
         view_button.click(
             fn=update_page,
             inputs=[page_number, entries_per_page],
             outputs=[items_output, pagination_info, page_number, next_page_button, previous_page_button,
-                     version_dropdown, details_display, item_mapping]
+                     version_dropdown, prompt_output, summary_output, transcription_output, item_mapping]
         )
 
         next_page_button.click(
             fn=lambda page, entries: update_page(page + 1, entries),
             inputs=[page_number, entries_per_page],
             outputs=[items_output, pagination_info, page_number, next_page_button, previous_page_button,
-                     version_dropdown, details_display, item_mapping]
+                     version_dropdown, prompt_output, summary_output, transcription_output, item_mapping]
         )
 
         previous_page_button.click(
             fn=lambda page, entries: update_page(max(1, page - 1), entries),
             inputs=[page_number, entries_per_page],
             outputs=[items_output, pagination_info, page_number, next_page_button, previous_page_button,
-                     version_dropdown, details_display, item_mapping]
+                     version_dropdown, prompt_output, summary_output, transcription_output, item_mapping]
         )
 
         items_output.change(
             fn=display_item_details,
             inputs=[items_output, item_mapping],
-            outputs=[version_dropdown, details_display]
+            outputs=[version_dropdown, prompt_output, summary_output, transcription_output]
         )
 
         version_dropdown.change(
             fn=update_version_content,
             inputs=[items_output, item_mapping, version_dropdown],
-            outputs=[details_display]
+            outputs=[prompt_output, summary_output, transcription_output]
         )
 
 
