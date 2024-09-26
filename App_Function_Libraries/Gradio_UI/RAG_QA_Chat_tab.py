@@ -33,7 +33,7 @@ def create_rag_qa_chat_tab():
                 context_source = gr.Radio(
                     ["All Files in the Database", "Search Database", "Upload File"],
                     label="Context Source",
-                    value="Existing File"
+                    value="All Files in the Database"
                 )
                 existing_file = gr.Dropdown(label="Select Existing File", choices=[], interactive=True)
                 file_page = gr.State(value=1)
@@ -104,7 +104,7 @@ def create_rag_qa_chat_tab():
 
         loading_indicator = gr.HTML(visible=False)
 
-        def rag_qa_chat_wrapper(message, history, context_source, search_results, file_upload,
+        def rag_qa_chat_wrapper(message, history, context_source, existing_file, search_results, file_upload,
                                 convert_to_text, keywords, api_choice):
             try:
                 logging.info(f"Starting rag_qa_chat_wrapper with message: {message}")
@@ -127,7 +127,7 @@ def create_rag_qa_chat_tab():
                     rephrased_question = message
                     logging.info(f"First question, no rephrasing: {message}")
 
-                if context_source == "Existing File":
+                if context_source == "All Files in the Database":
                     # Use the enhanced_rag_pipeline to search the entire database
                     context = enhanced_rag_pipeline(rephrased_question, api_choice)
                     logging.info(f"Using enhanced_rag_pipeline for database search")
