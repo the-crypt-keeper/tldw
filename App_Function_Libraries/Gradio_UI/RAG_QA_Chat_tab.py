@@ -104,7 +104,7 @@ def create_rag_qa_chat_tab():
 
         loading_indicator = gr.HTML(visible=False)
 
-        def rag_qa_chat_wrapper(message, history, context_source, existing_file, search_results, file_upload,
+        def rag_qa_chat_wrapper(message, history, context_source, search_results, file_upload,
                                 convert_to_text, keywords, api_choice):
             try:
                 logging.info(f"Starting rag_qa_chat_wrapper with message: {message}")
