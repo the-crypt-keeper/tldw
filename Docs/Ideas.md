@@ -1,3 +1,6 @@
+
+https://wafris.org/blog/rearchitecting-for-sqlite
+
 Multi-modal support
 Collaborative features: Consider adding features that allow multiple users to collaborate on content analysis, annotation, or editing. This could include shared workspaces or real-time collaborative editing.
 Data visualization: Implement more advanced data visualization tools to represent the relationships between different pieces of content, keywords, or concepts extracted from your media.

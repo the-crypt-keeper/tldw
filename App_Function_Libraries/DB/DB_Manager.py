@@ -50,7 +50,7 @@ from App_Function_Libraries.DB.SQLite_DB import (
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model, \
     create_document_version as sqlite_create_document_version,
     get_document_version as sqlite_get_document_version, sqlite_search_db, add_media_chunk as sqlite_add_media_chunk,
-    sqlite_update_fts_for_media, sqlite_get_unprocessed_media, fetch_item_details as sqlite_fetch_item_details, \
+    sqlite_update_fts_for_media, get_unprocessed_media as sqlite_get_unprocessed_media, fetch_item_details as sqlite_fetch_item_details, \
     search_media_database as sqlite_search_media_database, mark_as_trash as sqlite_mark_as_trash, \
     get_media_transcripts as sqlite_get_media_transcripts, get_specific_transcript as sqlite_get_specific_transcript, \
     get_media_summaries as sqlite_get_media_summaries, get_specific_summary as sqlite_get_specific_summary, \
@@ -68,7 +68,7 @@ from App_Function_Libraries.DB.SQLite_DB import (
     get_workflow_chat as sqlite_get_workflow_chat, update_media_content_with_version as sqlite_update_media_content_with_version, \
     check_existing_media as sqlite_check_existing_media, get_all_document_versions as sqlite_get_all_document_versions, \
     fetch_paginated_data as sqlite_fetch_paginated_data, get_latest_transcription as sqlite_get_latest_transcription, \
-
+    mark_media_as_processed as sqlite_mark_media_as_processed,
 )
 #
 # Local Imports
@@ -417,12 +417,22 @@ def update_fts_for_media(media_id: int):
         raise ValueError(f"Unsupported database type: {db_type}")
 
 
-def get_unprocessed_media():
+def get_unprocessed_media(*args, **kwargs):
     if db_type == 'sqlite':
         return sqlite_get_unprocessed_media(db)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of get_unprocessed_media not yet implemented")
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+
+
+def mark_media_as_processed(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_mark_media_as_processed(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of mark_media_as_processed not yet implemented")
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 
