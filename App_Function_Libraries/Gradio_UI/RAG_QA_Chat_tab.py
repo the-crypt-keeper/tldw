@@ -15,7 +15,7 @@ import gradio as gr
 from App_Function_Libraries.Books.Book_Ingestion_Lib import read_epub
 from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_files, add_media_with_keywords
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
-from App_Function_Libraries.RAG.RAG_Libary_2 import generate_answer
+from App_Function_Libraries.RAG.RAG_Libary_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, rag_qa_chat
 # Eventually... FIXME
 from App_Function_Libraries.RAG.RAG_QA_Chat import load_chat_history, save_chat_history
@@ -31,9 +31,9 @@ def create_rag_qa_chat_tab():
         with gr.Row():
             with gr.Column(scale=1):
                 context_source = gr.Radio(
-                    ["Existing File", "Search Database", "Upload File"],
+                    ["All Files in the Database", "Search Database", "Upload File"],
                     label="Context Source",
-                    value="Existing File"
+                    value="All Files in the Database"
                 )
                 existing_file = gr.Dropdown(label="Select Existing File", choices=[], interactive=True)
                 file_page = gr.State(value=1)
@@ -127,9 +127,10 @@ def create_rag_qa_chat_tab():
                     rephrased_question = message
                     logging.info(f"First question, no rephrasing: {message}")
 
-                if context_source == "Existing File":
-                    context = f"media_id:{existing_file.split('(ID: ')[1][:-1]}"
-                    logging.info(f"Using existing file with context: {context}")
+                if context_source == "All Files in the Database":
+                    # Use the enhanced_rag_pipeline to search the entire database
+                    context = enhanced_rag_pipeline(rephrased_question, api_choice)
+                    logging.info(f"Using enhanced_rag_pipeline for database search")
                 elif context_source == "Search Database":
                     context = f"media_id:{search_results.split('(ID: ')[1][:-1]}"
                     logging.info(f"Using search result with context: {context}")

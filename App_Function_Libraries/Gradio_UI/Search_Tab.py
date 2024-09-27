@@ -66,6 +66,8 @@ def update_content_for_version(selected_item, item_mapping, selected_version):
     return "", "", ""
 
 def format_as_html(content, title):
+    if content is None:
+        content = "No content available"
     escaped_content = html.escape(content)
     formatted_content = escaped_content.replace('\n', '<br>')
     return f"""
@@ -79,9 +81,9 @@ def format_as_html(content, title):
 
 def create_search_tab():
     with gr.TabItem("Search / Detailed View"):
+        gr.Markdown("# Search across all ingested items in the Database")
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("# Search across all ingested items in the Database")
                 gr.Markdown("by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
                 search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
                 search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
