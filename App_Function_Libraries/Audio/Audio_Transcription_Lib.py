@@ -207,8 +207,8 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
 
     try:
         _, file_ending = os.path.splitext(audio_file_path)
-        out_file = audio_file_path.replace(file_ending, ".segments.json")
-        prettified_out_file = audio_file_path.replace(file_ending, ".segments_pretty.json")
+        out_file = audio_file_path.replace(file_ending, "-whisper_model-"+whisper_model+".segments.json")
+        prettified_out_file = audio_file_path.replace(file_ending, "-whisper_model-"+whisper_model+".segments_pretty.json")
         if os.path.exists(out_file):
             logging.info("speech-to-text: Segments file already exists: %s", out_file)
             with open(out_file) as f:

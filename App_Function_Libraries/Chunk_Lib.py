@@ -476,22 +476,22 @@ def semantic_chunk_long_file(file_path, max_chunk_size=1000, overlap=100, unit='
 #
 #  Embedding Chunking
 
-def chunk_for_embedding(text: str, file_name: str, full_summary: str, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+def chunk_for_embedding(text: str, file_name: str, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     options = chunk_options.copy()
     if custom_chunk_options:
         options.update(custom_chunk_options)
 
+    logging.info(f"Chunking options: {options}")
     chunks = improved_chunking_process(text, options)
     total_chunks = len(chunks)
+    logging.info(f"Total chunks created: {total_chunks}")
 
     chunked_text_with_headers = []
     for i, chunk in enumerate(chunks, 1):
         chunk_text = chunk['text']
         chunk_position = determine_chunk_position(chunk['metadata']['relative_position'])
-
         chunk_header = f"""
         Original Document: {file_name}
-        Full Document Summary: {full_summary or "Full document summary not available."}
         Chunk: {i} of {total_chunks}
         Position: {chunk_position}
 

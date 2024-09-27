@@ -66,6 +66,8 @@ def update_content_for_version(selected_item, item_mapping, selected_version):
     return "", "", ""
 
 def format_as_html(content, title):
+    if content is None:
+        content = "No content available"
     escaped_content = html.escape(content)
     formatted_content = escaped_content.replace('\n', '<br>')
     return f"""

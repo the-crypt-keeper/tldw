@@ -7,14 +7,17 @@ import logging
 #
 # External Imports
 import gradio as gr
+from tqdm import tqdm
 
-from App_Function_Libraries.Chunk_Lib import improved_chunking_process, determine_chunk_position
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process, chunk_for_embedding
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_all_content_from_database
 from App_Function_Libraries.RAG.ChromaDB_Library import chroma_client, \
-    store_in_chroma
-from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
+    store_in_chroma, situate_context
+from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, create_embeddings_batch
+
+
 #
 ########################################################################################################################
 #
@@ -174,17 +177,23 @@ def create_view_embeddings_tab():
                     value="words"
                 )
                 max_chunk_size = gr.Slider(
-                    minimum=1, maximum=8000, step=1, value=500,
+                    minimum=1, maximum=8000, step=5, value=500,
                     label="Max Chunk Size"
                 )
                 chunk_overlap = gr.Slider(
-                    minimum=0, maximum=5000, step=1, value=200,
+                    minimum=0, maximum=5000, step=5, value=200,
                     label="Chunk Overlap"
                 )
                 adaptive_chunking = gr.Checkbox(
                     label="Use Adaptive Chunking",
                     value=False
                 )
+                contextual_api_choice = gr.Dropdown(
+                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
+                    label="Select API for Contextualized Embeddings",
+                    value="OpenAI"
+                )
+                contextual_api_key = gr.Textbox(label="API Key", lines=1)
 
         def get_items_with_embedding_status():
             try:
@@ -242,7 +251,7 @@ def create_view_embeddings_tab():
                 logging.error(f"Error in check_embedding_status: {str(e)}")
                 return f"Error processing item: {selected_item}. Details: {str(e)}", "", ""
 
-        def create_new_embedding_for_item(selected_item, provider, model, api_url, method, max_size, overlap, adaptive, item_mapping):
+        def create_new_embedding_for_item(selected_item, provider, model, api_url, method, max_size, overlap, adaptive, item_mapping, contextual_api_choice=None):
             if not selected_item:
                 return "Please select an item", "", ""
 
@@ -263,31 +272,30 @@ def create_view_embeddings_tab():
                     'adaptive': adaptive
                 }
 
-                chunks = improved_chunking_process(item['content'], chunk_options)
+                logging.info(f"Chunking content for item: {item['title']} (ID: {item_id})")
+                chunks = chunk_for_embedding(item['content'], item['title'], chunk_options)
                 collection_name = "all_content_embeddings"
                 collection = chroma_client.get_or_create_collection(name=collection_name)
 
                 # Delete existing embeddings for this item
                 existing_ids = [f"doc_{item_id}_chunk_{i}" for i in range(len(chunks))]
                 collection.delete(ids=existing_ids)
+                logging.info(f"Deleted {len(existing_ids)} existing embeddings for item {item_id}")
 
-                for i, chunk in enumerate(chunks):
+                texts, ids, metadatas = [], [], []
+                chunk_count = 0
+                logging.info("Generating contextual summaries and preparing chunks for embedding")
+                for i, chunk in tqdm(enumerate(chunks), total=len(chunks), desc="Processing chunks"):
                     chunk_text = chunk['text']
                     chunk_metadata = chunk['metadata']
-                    chunk_position = determine_chunk_position(chunk_metadata['relative_position'])
+                    if chunk_count == 0:
+                        chunk_count = 1
+                    # Generate contextual summary
+                    logging.debug(f"Generating contextual summary for chunk {chunk_count}")
+                    context = situate_context(contextual_api_choice, item['content'], chunk_text)
+                    contextualized_text = f"{chunk_text}\n\nContextual Summary: {context}"
 
-                    chunk_header = f"""
-                    Original Document: {item['title']}
-                    Chunk: {i + 1} of {len(chunks)}
-                    Position: {chunk_position}
-                    Header: {chunk_metadata.get('header_text', 'N/A')}
-        
-                    --- Chunk Content ---
-                    """
-
-                    full_chunk_text = chunk_header + chunk_text
                     chunk_id = f"doc_{item_id}_chunk_{i}"
-                    embedding = create_embedding(full_chunk_text, provider, model, api_url)
                     metadata = {
                         "media_id": str(item_id),
                         "chunk_index": i,
@@ -298,13 +306,26 @@ def create_view_embeddings_tab():
                         "adaptive_chunking": adaptive,
                         "embedding_model": model,
                         "embedding_provider": provider,
+                        "original_text": chunk_text,
+                        "contextual_summary": context,
                         **chunk_metadata
                     }
-                    store_in_chroma(collection_name, [full_chunk_text], [embedding], [chunk_id], [metadata])
 
-                embedding_preview = str(embedding[:50])
-                status = f"New embeddings created and stored for item: {item['title']} (ID: {item_id})"
-                return status, f"First 50 elements of new embedding:\n{embedding_preview}", json.dumps(metadata, indent=2)
+                    texts.append(contextualized_text)
+                    ids.append(chunk_id)
+                    metadatas.append(metadata)
+                    chunk_count = chunk_count+1
+
+                # Create embeddings in batch
+                logging.info(f"Creating embeddings for {len(texts)} chunks")
+                embeddings = create_embeddings_batch(texts, provider, model, api_url)
+
+                # Store in Chroma
+                store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
+
+                embedding_preview = str(embeddings[0][:50]) if embeddings else "No embeddings created"
+                status = f"New contextual embeddings created and stored for item: {item['title']} (ID: {item_id})"
+                return status, f"First 50 elements of new embedding:\n{embedding_preview}", json.dumps(metadatas[0], indent=2)
             except Exception as e:
                 logging.error(f"Error in create_new_embedding_for_item: {str(e)}")
                 return f"Error creating embedding: {str(e)}", "", ""
@@ -321,7 +342,7 @@ def create_view_embeddings_tab():
         create_new_embedding_button.click(
             create_new_embedding_for_item,
             inputs=[item_dropdown, embedding_provider, embedding_model, embedding_api_url,
-                    chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking, item_mapping],
+                    chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking, item_mapping, contextual_api_choice],
             outputs=[embedding_status, embedding_preview, embedding_metadata]
         )
         embedding_provider.change(
