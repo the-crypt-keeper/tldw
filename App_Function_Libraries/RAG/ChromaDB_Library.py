@@ -11,6 +11,7 @@ from itertools import islice
 #
 # Local Imports:
 from App_Function_Libraries.Chunk_Lib import chunk_for_embedding, chunk_options
+from App_Function_Libraries.DB.DB_Manager import get_unprocessed_media, mark_media_as_processed
 from App_Function_Libraries.DB.SQLite_DB import process_chunks
 from App_Function_Libraries.RAG.Embeddings_Create import create_embeddings_batch
 # FIXME - related to Chunking
@@ -47,6 +48,40 @@ embedding_api_url = config.get('Embeddings', 'api_url', fallback='')
 #
 # Functions:
 
+
+# Function to preprocess and store all existing content in the database
+def preprocess_all_content(database, create_contextualized=True, api_name="gpt-3.5-turbo"):
+    unprocessed_media = get_unprocessed_media(db=database)
+    total_media = len(unprocessed_media)
+
+    for index, row in enumerate(unprocessed_media, 1):
+        media_id, content, media_type, file_name = row
+        collection_name = f"{media_type}_{media_id}"
+
+        logger.info(f"Processing media {index} of {total_media}: ID {media_id}, Type {media_type}")
+
+        try:
+            process_and_store_content(
+                database=database,
+                content=content,
+                collection_name=collection_name,
+                media_id=media_id,
+                file_name=file_name or f"{media_type}_{media_id}",
+                create_embeddings=True,
+                create_contextualized=create_contextualized,
+                api_name=api_name
+            )
+
+            # Mark the media as processed in the database
+            mark_media_as_processed(database, media_id)
+
+            logger.info(f"Successfully processed media ID {media_id}")
+        except Exception as e:
+            logger.error(f"Error processing media ID {media_id}: {str(e)}")
+
+    logger.info("Finished preprocessing all unprocessed content")
+
+
 def batched(iterable, n):
     "Batch data into lists of length n. The last batch may be shorter."
     it = iter(iterable)
@@ -57,27 +92,55 @@ def batched(iterable, n):
         yield batch
 
 
-# FIXME - Fix summarization of entire document/storign in chunk issue
+def situate_context(api_name, doc_content: str, chunk_content: str) -> str:
+    doc_content_prompt = f"""
+    <document>
+    {doc_content}
+    </document>
+    """
+
+    chunk_context_prompt = f"""
+    \n\n\n\n\n
+    Here is the chunk we want to situate within the whole document
+    <chunk>
+    {chunk_content}
+    </chunk>
+
+    Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk.
+    Answer only with the succinct context and nothing else.
+    """
+
+    response = summarize(chunk_context_prompt, doc_content_prompt, api_name, api_key=None, temp=0, system_message=None)
+    return response
+
+
 # FIXME - update all uses to reflect 'api_name' parameter
 def process_and_store_content(database, content: str, collection_name: str, media_id: int, file_name: str,
-                              create_embeddings: bool = False, create_summary: bool = False, api_name: str = None,
-                              chunk_options: Dict = None, embedding_provider: str = None,
+                              create_embeddings: bool = True, create_contextualized: bool = True, api_name: str = "gpt-3.5-turbo",
+                              chunk_options = None, embedding_provider: str = None,
                               embedding_model: str = None, embedding_api_url: str = None):
     try:
         logger.info(f"Processing content for media_id {media_id} in collection {collection_name}")
 
-        full_summary = None
-        if create_summary and api_name:
-            full_summary = summarize(content, None, api_name, None, None, None)
-
-        chunks = chunk_for_embedding(content, file_name, full_summary, chunk_options)
+        chunks = chunk_for_embedding(content, file_name, chunk_options)
 
         # Process chunks synchronously
         process_chunks(database, chunks, media_id)
 
         if create_embeddings:
-            texts = [chunk['text'] for chunk in chunks]
-            embeddings = create_embeddings_batch(texts, embedding_provider, embedding_model, embedding_api_url)
+            texts = []
+            contextualized_chunks = []
+            for chunk in chunks:
+                chunk_text = chunk['text']
+                if create_contextualized:
+                    context = situate_context(api_name, content, chunk_text)
+                    contextualized_text = f"{chunk_text}\n\nContextual Summary: {context}"
+                    contextualized_chunks.append(contextualized_text)
+                else:
+                    contextualized_chunks.append(chunk_text)
+                texts.append(chunk_text)  # Store original text for database
+
+            embeddings = create_embeddings_batch(contextualized_chunks, embedding_provider, embedding_model, embedding_api_url)
             ids = [f"{media_id}_chunk_{i}" for i in range(1, len(chunks) + 1)]
             metadatas = [{
                 "media_id": str(media_id),
@@ -85,11 +148,17 @@ def process_and_store_content(database, content: str, collection_name: str, medi
                 "total_chunks": len(chunks),
                 "start_index": int(chunk['metadata']['start_index']),
                 "end_index": int(chunk['metadata']['end_index']),
-                "file_name": str(file_name),
-                "relative_position": float(chunk['metadata']['relative_position'])
+                "file_name": str(chunk['metadata']['file_name']),
+                "relative_position": float(chunk['metadata']['relative_position']),
+                "contextualized": create_contextualized,
+                "original_text": chunk['text'],
+                "contextual_summary": contextualized_chunks[i-1].split("\n\nContextual Summary: ")[-1] if create_contextualized else ""
             } for i, chunk in enumerate(chunks, 1)]
 
-            store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
+            store_in_chroma(collection_name, contextualized_chunks, embeddings, ids, metadatas)
+
+            # Mark the media as processed
+            mark_media_as_processed(database, media_id)
 
         # Update full-text search index
         database.execute_query(
@@ -168,11 +237,13 @@ def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[Lis
 
         # Verify storage
         for doc_id in ids:
-            result = collection.get(ids=[doc_id], include=["embeddings"])
+            result = collection.get(ids=[doc_id], include=["documents", "embeddings", "metadatas"])
             if not result['embeddings'] or result['embeddings'][0] is None:
                 logging.error(f"Failed to store embedding for {doc_id}")
             else:
                 logging.info(f"Embedding stored successfully for {doc_id}")
+                logging.debug(f"Stored document: {result['documents'][0][:100]}...")
+                logging.debug(f"Stored metadata: {result['metadatas'][0]}")
 
     except Exception as e:
         logging.error(f"Error storing embeddings in ChromaDB: {str(e)}")
@@ -194,9 +265,9 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
         logging.error(f"Error in vector_search: {str(e)}")
         raise
 
-def schedule_embedding(media_id: int, content: str, media_name: str, summary: str):
+def schedule_embedding(media_id: int, content: str, media_name: str):
     try:
-        chunks = chunk_for_embedding(content, media_name, summary, chunk_options)
+        chunks = chunk_for_embedding(content, media_name, chunk_options)
         texts = [chunk['text'] for chunk in chunks]
         embeddings = create_embeddings_batch(texts, embedding_provider, embedding_model, embedding_api_url)
         ids = [f"{media_id}_chunk_{i}" for i in range(len(chunks))]

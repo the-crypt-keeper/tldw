@@ -9,8 +9,7 @@ from typing import Dict, Any, List, Optional
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
-from App_Function_Libraries.DB.DB_Manager import add_media_to_database, search_db, get_unprocessed_media, \
-    fetch_keywords_for_media
+from App_Function_Libraries.DB.DB_Manager import search_db, fetch_keywords_for_media
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 # 3rd-Party Imports
@@ -32,71 +31,79 @@ config = configparser.ConfigParser()
 # Read the configuration file
 config.read('config.txt')
 
-# Main RAG pipeline function
-def rag_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
-    try:
-        # Extract content
-        try:
-            article_data = scrape_article(url)
-            content = article_data['content']
-            title = article_data['title']
-        except Exception as e:
-            logging.error(f"Error scraping article: {str(e)}")
-            return {"error": "Failed to scrape article", "details": str(e)}
-
-        # Store the article in the database and get the media_id
-        try:
-            media_id = add_media_to_database(url, title, 'article', content)
-        except Exception as e:
-            logging.error(f"Error adding article to database: {str(e)}")
-            return {"error": "Failed to store article in database", "details": str(e)}
-
-        # Process and store content
-        collection_name = f"article_{media_id}"
-        try:
-            # FIXME
-            # def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str,
-            #                               create_embeddings: bool = False, create_summary: bool = False,
-            #                               api_name: str = None):
-            process_and_store_content(content, collection_name, media_id, title)
-        except Exception as e:
-            logging.error(f"Error processing and storing content: {str(e)}")
-            return {"error": "Failed to process and store content", "details": str(e)}
-
-        # Perform searches
-        try:
-            vector_results = vector_search(collection_name, query, k=5)
-            fts_results = search_db(query, ["content"], "", page=1, results_per_page=5)
-        except Exception as e:
-            logging.error(f"Error performing searches: {str(e)}")
-            return {"error": "Failed to perform searches", "details": str(e)}
-
-        # Combine results with error handling for missing 'content' key
-        all_results = []
-        for result in vector_results + fts_results:
-            if isinstance(result, dict) and 'content' in result:
-                all_results.append(result['content'])
-            else:
-                logging.warning(f"Unexpected result format: {result}")
-                all_results.append(str(result))
-
-        context = "\n".join(all_results)
-
-        # Generate answer using the selected API
-        try:
-            answer = generate_answer(api_choice, context, query)
-        except Exception as e:
-            logging.error(f"Error generating answer: {str(e)}")
-            return {"error": "Failed to generate answer", "details": str(e)}
-
-        return {
-            "answer": answer,
-            "context": context
-        }
-
-    except Exception as e:
-        logging.error(f"Unexpected error in rag_pipeline: {str(e)}")
-        return {"error": "An unexpected error occurred", "details": str(e)}
+# RAG pipeline function for web scraping
+# def rag_web_scraping_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
+#     try:
+#         # Extract content
+#         try:
+#             article_data = scrape_article(url)
+#             content = article_data['content']
+#             title = article_data['title']
+#         except Exception as e:
+#             logging.error(f"Error scraping article: {str(e)}")
+#             return {"error": "Failed to scrape article", "details": str(e)}
+#
+#         # Store the article in the database and get the media_id
+#         try:
+#             media_id = add_media_to_database(url, title, 'article', content)
+#         except Exception as e:
+#             logging.error(f"Error adding article to database: {str(e)}")
+#             return {"error": "Failed to store article in database", "details": str(e)}
+#
+#         # Process and store content
+#         collection_name = f"article_{media_id}"
+#         try:
+#             # Assuming you have a database object available, let's call it 'db'
+#             db = get_database_connection()
+#
+#             process_and_store_content(
+#                 database=db,
+#                 content=content,
+#                 collection_name=collection_name,
+#                 media_id=media_id,
+#                 file_name=title,
+#                 create_embeddings=True,
+#                 create_contextualized=True,
+#                 api_name=api_choice
+#             )
+#         except Exception as e:
+#             logging.error(f"Error processing and storing content: {str(e)}")
+#             return {"error": "Failed to process and store content", "details": str(e)}
+#
+#         # Perform searches
+#         try:
+#             vector_results = vector_search(collection_name, query, k=5)
+#             fts_results = search_db(query, ["content"], "", page=1, results_per_page=5)
+#         except Exception as e:
+#             logging.error(f"Error performing searches: {str(e)}")
+#             return {"error": "Failed to perform searches", "details": str(e)}
+#
+#         # Combine results with error handling for missing 'content' key
+#         all_results = []
+#         for result in vector_results + fts_results:
+#             if isinstance(result, dict) and 'content' in result:
+#                 all_results.append(result['content'])
+#             else:
+#                 logging.warning(f"Unexpected result format: {result}")
+#                 all_results.append(str(result))
+#
+#         context = "\n".join(all_results)
+#
+#         # Generate answer using the selected API
+#         try:
+#             answer = generate_answer(api_choice, context, query)
+#         except Exception as e:
+#             logging.error(f"Error generating answer: {str(e)}")
+#             return {"error": "Failed to generate answer", "details": str(e)}
+#
+#         return {
+#             "answer": answer,
+#             "context": context
+#         }
+#
+#     except Exception as e:
+#         logging.error(f"Unexpected error in rag_pipeline: {str(e)}")
+#         return {"error": "An unexpected error occurred", "details": str(e)}
 
 
 
@@ -213,21 +220,6 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
     else:
         raise ValueError(f"Unsupported API choice: {api_choice}")
 
-# Function to preprocess and store all existing content in the database
-def preprocess_all_content():
-    unprocessed_media = get_unprocessed_media()
-    for row in unprocessed_media:
-        media_id = row[0]
-        content = row[1]
-        media_type = row[2]
-        collection_name = f"{media_type}_{media_id}"
-        # FIXME
-        # def process_and_store_content(content: str, collection_name: str, media_id: int, file_name: str,
-        #                               create_embeddings: bool = False, create_summary: bool = False,
-        #                               api_name: str = None):
-        process_and_store_content(content, collection_name, media_id, "")
-
-
 def perform_vector_search(query: str, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
     all_collections = chroma_client.list_collections()
     vector_results = []
@@ -303,30 +295,42 @@ def extract_media_id_from_result(result: str) -> Optional[int]:
         logging.error(f"Failed to extract media_id from result: {result}")
         return None
 
-
-
-
-# Example usage:
-# 1. Initialize the system:
-# create_tables(db)  # Ensure FTS tables are set up
 #
-# 2. Create ChromaDB
-# chroma_client = ChromaDBClient()
-#
-# 3. Create Embeddings
-# Store embeddings in ChromaDB
-# preprocess_all_content() or create_embeddings()
-#
-# 4. Perform RAG search across all content:
-# result = rag_search("What are the key points about climate change?")
-# print(result['answer'])
-#
-# (Extra)5. Perform RAG on a specific URL:
-# result = rag_pipeline("https://example.com/article", "What is the main topic of this article?")
-# print(result['answer'])
 #
 ########################################################################################################################
 
+
+# Function to preprocess and store all existing content in the database
+# def preprocess_all_content(database, create_contextualized=True, api_name="gpt-3.5-turbo"):
+#     unprocessed_media = get_unprocessed_media()
+#     total_media = len(unprocessed_media)
+#
+#     for index, row in enumerate(unprocessed_media, 1):
+#         media_id, content, media_type, file_name = row
+#         collection_name = f"{media_type}_{media_id}"
+#
+#         logger.info(f"Processing media {index} of {total_media}: ID {media_id}, Type {media_type}")
+#
+#         try:
+#             process_and_store_content(
+#                 database=database,
+#                 content=content,
+#                 collection_name=collection_name,
+#                 media_id=media_id,
+#                 file_name=file_name or f"{media_type}_{media_id}",
+#                 create_embeddings=True,
+#                 create_contextualized=create_contextualized,
+#                 api_name=api_name
+#             )
+#
+#             # Mark the media as processed in the database
+#             mark_media_as_processed(database, media_id)
+#
+#             logger.info(f"Successfully processed media ID {media_id}")
+#         except Exception as e:
+#             logger.error(f"Error processing media ID {media_id}: {str(e)}")
+#
+#     logger.info("Finished preprocessing all unprocessed content")
 
 ############################################################################################################
 #

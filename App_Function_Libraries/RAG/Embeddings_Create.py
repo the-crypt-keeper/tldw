@@ -35,7 +35,6 @@ overlap = loaded_config['Embeddings']['overlap']
 
 # FIXME - Add logging
 
-
 class HuggingFaceEmbedder:
     def __init__(self, model_name, timeout_seconds=120):  # Default timeout of 2 minutes
         self.model_name = model_name
@@ -154,6 +153,7 @@ List[List[float]]:
     else:
         raise ValueError(f"Unsupported embedding provider: {provider}")
 
+
 def create_embedding(text: str, provider: str, model: str, api_url: str) -> List[float]:
     return create_embeddings_batch([text], provider, model, api_url)[0]
 
@@ -184,40 +184,6 @@ def create_stella_embeddings(text: str) -> List[float]:
 def create_openai_embedding(text: str, model: str) -> List[float]:
     embedding = get_openai_embeddings(text, model)
     return embedding
-
-
-
-
-#Dead
-# def create_local_embedding(text: str, model: str, api_url: str, api_key: str) -> List[float]:
-#     response = requests.post(
-#         api_url,
-#         json={"text": text, "model": model},
-#         headers={"Authorization": f"Bearer {api_key}"}
-#     )
-#     response.raise_for_status()
-#     return response.json().get('embedding', None)
-
-# Dead
-# def create_llamacpp_embedding(text: str, api_url: str) -> List[float]:
-#     response = requests.post(
-#         api_url,
-#         json={"input": text}
-#     )
-#     response.raise_for_status()
-#     return response.json()['embedding']
-
-# dead
-# def create_huggingface_embedding(text: str, model: str) -> List[float]:
-#     tokenizer = AutoTokenizer.from_pretrained(model)
-#     model = AutoModel.from_pretrained(model)
-#
-#     inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-#     with torch.no_grad():
-#         outputs = model(**inputs)
-#
-#     embeddings = outputs.last_hidden_state.mean(dim=1)
-#     return embeddings[0].tolist()
 
 #
 # End of File.

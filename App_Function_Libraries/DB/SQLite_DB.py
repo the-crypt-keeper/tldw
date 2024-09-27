@@ -301,7 +301,8 @@ def create_tables(db) -> None:
             is_trash BOOLEAN DEFAULT 0,
             trash_date DATETIME,
             vector_embedding BLOB,
-            chunking_status TEXT DEFAULT 'pending'
+            chunking_status TEXT DEFAULT 'pending',
+            vector_processing INTEGER DEFAULT 0
         )
         ''',
         '''
@@ -564,11 +565,14 @@ def sqlite_update_fts_for_media(db, media_id: int):
         conn.commit()
 
 
-def sqlite_get_unprocessed_media(db):
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, content, type FROM Media WHERE id NOT IN (SELECT DISTINCT media_id FROM MediaChunks)")
-        return cursor.fetchall()
+def get_unprocessed_media(db):
+    query = """
+    SELECT id, content, type, COALESCE(title, '') as file_name
+    FROM Media 
+    WHERE vector_processing = 0
+    ORDER BY id
+    """
+    return db.execute_query(query)
 
 def get_next_media_id():
     try:
@@ -580,8 +584,18 @@ def get_next_media_id():
     finally:
         conn.close()
 
+
+def mark_media_as_processed(database, media_id):
+    try:
+        query = "UPDATE Media SET vector_processing = 1 WHERE id = ?"
+        database.execute_query(query, (media_id,))
+        logger.info(f"Marked media_id {media_id} as processed")
+    except Exception as e:
+        logger.error(f"Error marking media_id {media_id} as processed: {str(e)}")
+        raise
+
 #
-# End of Media-related Functions
+# End of Vector-chunk-related Functions
 #######################################################################################################################
 
 
@@ -2895,6 +2909,23 @@ def add_missing_column_if_not_exists(db, table_name, column_name, column_definit
 def update_media_table(db):
     # Add chunking_status column if it doesn't exist
     add_missing_column_if_not_exists(db, 'Media', 'chunking_status', "TEXT DEFAULT 'pending'")
+
+# Vector check FIXME/Delete later
+def alter_media_table(db):
+    alter_query = '''
+    ALTER TABLE Media ADD COLUMN vector_processing INTEGER DEFAULT 0
+    '''
+    try:
+        db.execute_query(alter_query)
+        logging.info("Media table altered successfully to include vector_processing column.")
+    except Exception as e:
+        logging.error(f"Error altering Media table: {str(e)}")
+        # If the column already exists, SQLite will throw an error, which we can safely ignore
+        if "duplicate column name" not in str(e).lower():
+            raise
+
+# Vector check FIXME/Delete later
+alter_media_table(db)
 
 #
 # End of Functions to manage media chunks
