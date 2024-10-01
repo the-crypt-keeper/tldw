@@ -72,6 +72,7 @@ whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large",
                   "distil-large-v2", "distil-medium.en", "distil-small.en"]
 server_mode = False
 share_public = False
+
 #
 #
 #######################
