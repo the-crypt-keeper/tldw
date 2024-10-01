@@ -212,6 +212,7 @@ def create_rag_qa_chat_tab():
 
         def rephrase_question(history, latest_question, api_choice):
             # Thank you https://www.reddit.com/r/LocalLLaMA/comments/1fi1kex/multi_turn_conversation_and_rag/
+            logging.info("RAG QnA: Rephrasing question")
             conversation_history = "\n".join([f"User: {h[0]}\nAssistant: {h[1]}" for h in history[:-1]])
             prompt = f"""You are a helpful assistant. Given the conversation history and the latest question, resolve any ambiguous references in the latest question.
 
@@ -225,6 +226,7 @@ def create_rag_qa_chat_tab():
 
             # Use the selected API to generate the rephrased question
             rephrased_question = generate_answer(api_choice, prompt, "")
+            logging.info(f"Rephrased question: {rephrased_question}")
             return rephrased_question.strip()
 
         def perform_search(query):
