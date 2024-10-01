@@ -26,7 +26,9 @@ import json
 import logging
 import os
 import re
+import tempfile
 import time
+import uuid
 from datetime import timedelta
 from typing import Union, AnyStr
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -40,24 +42,27 @@ from tqdm import tqdm
 #
 # Function Definitions
 
-def extract_text_from_segments(segments):
+def extract_text_from_segments(segments, include_timestamps=True):
     logging.debug(f"Segments received: {segments}")
     logging.debug(f"Type of segments: {type(segments)}")
 
-    def extract_text_recursive(data):
+    def extract_text_recursive(data, include_timestamps):
         if isinstance(data, dict):
+            text = data.get('Text', '')
+            if include_timestamps and 'Time_Start' in data and 'Time_End' in data:
+                return f"{data['Time_Start']:.2f}s - {data['Time_End']:.2f}s | {text}"
             for key, value in data.items():
                 if key == 'Text':
                     return value
                 elif isinstance(value, (dict, list)):
-                    result = extract_text_recursive(value)
+                    result = extract_text_recursive(value, include_timestamps)
                     if result:
                         return result
         elif isinstance(data, list):
-            return ' '.join(filter(None, [extract_text_recursive(item) for item in data]))
+            return '\n'.join(filter(None, [extract_text_recursive(item, include_timestamps) for item in data]))
         return None
 
-    text = extract_text_recursive(segments)
+    text = extract_text_recursive(segments, include_timestamps)
 
     if text:
         return text.strip()
@@ -696,7 +701,32 @@ def format_text_with_line_breaks(text):
 #
 # File Handling Functions
 
+# Track temp files for cleanup
+temp_files = []
+temp_file_paths = []
 
+def save_temp_file(file):
+    global temp_files
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, file.name)
+    with open(temp_path, 'wb') as f:
+        f.write(file.read())
+    temp_files.append(temp_path)
+    return temp_path
+
+def cleanup_temp_files():
+    global temp_files
+    for file_path in temp_files:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logging.info(f"Removed temporary file: {file_path}")
+            except Exception as e:
+                logging.error(f"Failed to remove temporary file {file_path}: {e}")
+    temp_files.clear()
+
+def generate_unique_id():
+    return f"uploaded_file_{uuid.uuid4()}"
 
 #
 # End of File Handling Functions

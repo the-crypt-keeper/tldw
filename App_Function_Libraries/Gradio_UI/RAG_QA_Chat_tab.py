@@ -58,6 +58,7 @@ def create_rag_qa_chat_tab():
                     label="Select API for RAG",
                     value="OpenAI"
                 )
+                use_query_rewriting = gr.Checkbox(label="Use Query Rewriting", value=True)
 
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=500)
@@ -105,11 +106,12 @@ def create_rag_qa_chat_tab():
         loading_indicator = gr.HTML(visible=False)
 
         def rag_qa_chat_wrapper(message, history, context_source, existing_file, search_results, file_upload,
-                                convert_to_text, keywords, api_choice):
+                                convert_to_text, keywords, api_choice, use_query_rewriting):
             try:
                 logging.info(f"Starting rag_qa_chat_wrapper with message: {message}")
                 logging.info(f"Context source: {context_source}")
                 logging.info(f"API choice: {api_choice}")
+                logging.info(f"Query rewriting: {'enabled' if use_query_rewriting else 'disabled'}")
 
                 # Show loading indicator
                 yield history, "", gr.update(visible=True)
@@ -118,14 +120,14 @@ def create_rag_qa_chat_tab():
                 api_choice = api_choice.value if isinstance(api_choice, gr.components.Dropdown) else api_choice
                 logging.info(f"Resolved API choice: {api_choice}")
 
-                # Only rephrase the question if it's not the first query
-                if len(history) > 0:
+                # Only rephrase the question if it's not the first query and query rewriting is enabled
+                if len(history) > 0 and use_query_rewriting:
                     rephrased_question = rephrase_question(history, message, api_choice)
                     logging.info(f"Original question: {message}")
                     logging.info(f"Rephrased question: {rephrased_question}")
                 else:
                     rephrased_question = message
-                    logging.info(f"First question, no rephrasing: {message}")
+                    logging.info(f"Using original question: {message}")
 
                 if context_source == "All Files in the Database":
                     # Use the enhanced_rag_pipeline to search the entire database
@@ -210,6 +212,7 @@ def create_rag_qa_chat_tab():
 
         def rephrase_question(history, latest_question, api_choice):
             # Thank you https://www.reddit.com/r/LocalLLaMA/comments/1fi1kex/multi_turn_conversation_and_rag/
+            logging.info("RAG QnA: Rephrasing question")
             conversation_history = "\n".join([f"User: {h[0]}\nAssistant: {h[1]}" for h in history[:-1]])
             prompt = f"""You are a helpful assistant. Given the conversation history and the latest question, resolve any ambiguous references in the latest question.
 
@@ -223,6 +226,7 @@ def create_rag_qa_chat_tab():
 
             # Use the selected API to generate the rephrased question
             rephrased_question = generate_answer(api_choice, prompt, "")
+            logging.info(f"Rephrased question: {rephrased_question}")
             return rephrased_question.strip()
 
         def perform_search(query):
@@ -241,14 +245,14 @@ def create_rag_qa_chat_tab():
         submit.click(
             rag_qa_chat_wrapper,
             inputs=[msg, chatbot, context_source, existing_file, search_results, file_upload,
-                    convert_to_text, keywords, api_choice],
+                    convert_to_text, keywords, api_choice, use_query_rewriting],
             outputs=[chatbot, msg, loading_indicator]
         )
 
         clear_chat.click(clear_chat_history, outputs=[chatbot, msg])
 
     return (context_source, existing_file, search_query, search_button, search_results, file_upload,
-            convert_to_text, keywords, api_choice, chatbot, msg, submit, clear_chat)
+            convert_to_text, keywords, api_choice, use_query_rewriting, chatbot, msg, submit, clear_chat)
 
 def convert_file_to_text(file_path):
     """Convert various file types to plain text."""

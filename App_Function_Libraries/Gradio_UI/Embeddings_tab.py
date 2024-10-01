@@ -193,6 +193,10 @@ def create_view_embeddings_tab():
                     label="Select API for Contextualized Embeddings",
                     value="OpenAI"
                 )
+                use_contextual_embeddings = gr.Checkbox(
+                    label="Use Contextual Embeddings",
+                    value=True
+                )
                 contextual_api_key = gr.Textbox(label="API Key", lines=1)
 
         def get_items_with_embedding_status():
@@ -251,7 +255,8 @@ def create_view_embeddings_tab():
                 logging.error(f"Error in check_embedding_status: {str(e)}")
                 return f"Error processing item: {selected_item}. Details: {str(e)}", "", ""
 
-        def create_new_embedding_for_item(selected_item, provider, model, api_url, method, max_size, overlap, adaptive, item_mapping, contextual_api_choice=None):
+        def create_new_embedding_for_item(selected_item, provider, model, api_url, method, max_size, overlap, adaptive,
+                                          item_mapping, use_contextual, contextual_api_choice=None):
             if not selected_item:
                 return "Please select an item", "", ""
 
@@ -290,10 +295,14 @@ def create_view_embeddings_tab():
                     chunk_metadata = chunk['metadata']
                     if chunk_count == 0:
                         chunk_count = 1
-                    # Generate contextual summary
-                    logging.debug(f"Generating contextual summary for chunk {chunk_count}")
-                    context = situate_context(contextual_api_choice, item['content'], chunk_text)
-                    contextualized_text = f"{chunk_text}\n\nContextual Summary: {context}"
+                    if use_contextual:
+                        # Generate contextual summary
+                        logging.debug(f"Generating contextual summary for chunk {chunk_count}")
+                        context = situate_context(contextual_api_choice, item['content'], chunk_text)
+                        contextualized_text = f"{chunk_text}\n\nContextual Summary: {context}"
+                    else:
+                        contextualized_text = chunk_text
+                        context = None
 
                     chunk_id = f"doc_{item_id}_chunk_{i}"
                     metadata = {
@@ -307,6 +316,7 @@ def create_view_embeddings_tab():
                         "embedding_model": model,
                         "embedding_provider": provider,
                         "original_text": chunk_text,
+                        "use_contextual_embeddings": use_contextual,
                         "contextual_summary": context,
                         **chunk_metadata
                     }
@@ -323,8 +333,17 @@ def create_view_embeddings_tab():
                 # Store in Chroma
                 store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
 
+                # Create a preview of the first embedding
                 embedding_preview = str(embeddings[0][:50]) if embeddings else "No embeddings created"
-                status = f"New contextual embeddings created and stored for item: {item['title']} (ID: {item_id})"
+
+                # Return status message
+                status = f"New embeddings created and stored for item: {item['title']} (ID: {item_id})"
+
+                # Add contextual summaries to status message if enabled
+                if use_contextual:
+                    status += " (with contextual summaries)"
+
+                # Return status message, embedding preview, and metadata
                 return status, f"First 50 elements of new embedding:\n{embedding_preview}", json.dumps(metadatas[0], indent=2)
             except Exception as e:
                 logging.error(f"Error in create_new_embedding_for_item: {str(e)}")
@@ -342,7 +361,8 @@ def create_view_embeddings_tab():
         create_new_embedding_button.click(
             create_new_embedding_for_item,
             inputs=[item_dropdown, embedding_provider, embedding_model, embedding_api_url,
-                    chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking, item_mapping, contextual_api_choice],
+                    chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking, item_mapping,
+                    use_contextual_embeddings, contextual_api_choice],
             outputs=[embedding_status, embedding_preview, embedding_metadata]
         )
         embedding_provider.change(
@@ -351,7 +371,10 @@ def create_view_embeddings_tab():
             outputs=[embedding_api_url]
         )
 
-    return item_dropdown, refresh_button, embedding_status, embedding_preview, embedding_metadata, create_new_embedding_button, embedding_provider, embedding_model, embedding_api_url, chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking
+    return (item_dropdown, refresh_button, embedding_status, embedding_preview, embedding_metadata,
+            create_new_embedding_button, embedding_provider, embedding_model, embedding_api_url,
+            chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking,
+            use_contextual_embeddings, contextual_api_choice, contextual_api_key)
 
 
 def create_purge_embeddings_tab():

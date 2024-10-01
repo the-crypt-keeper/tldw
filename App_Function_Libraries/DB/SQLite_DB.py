@@ -467,7 +467,7 @@ def check_media_exists(title: str, url: str) -> Optional[int]:
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            query = 'SELECT id FROM Media WHERE title = ? AND url = ?'
+            query = 'SELECT id FROM Media WHERE title = ? OR url = ?'
             cursor.execute(query, (title, url))
             result = cursor.fetchone()
             logging.debug(f"check_media_exists query: {query}")
@@ -2910,22 +2910,23 @@ def update_media_table(db):
     # Add chunking_status column if it doesn't exist
     add_missing_column_if_not_exists(db, 'Media', 'chunking_status', "TEXT DEFAULT 'pending'")
 
-# Vector check FIXME/Delete later
-def alter_media_table(db):
-    alter_query = '''
-    ALTER TABLE Media ADD COLUMN vector_processing INTEGER DEFAULT 0
-    '''
-    try:
-        db.execute_query(alter_query)
-        logging.info("Media table altered successfully to include vector_processing column.")
-    except Exception as e:
-        logging.error(f"Error altering Media table: {str(e)}")
-        # If the column already exists, SQLite will throw an error, which we can safely ignore
-        if "duplicate column name" not in str(e).lower():
-            raise
-
-# Vector check FIXME/Delete later
-alter_media_table(db)
+# DEADCODE
+# # Vector check FIXME/Delete later
+# def alter_media_table(db):
+#     alter_query = '''
+#     ALTER TABLE Media ADD COLUMN vector_processing INTEGER DEFAULT 0
+#     '''
+#     try:
+#         db.execute_query(alter_query)
+#         logging.info("Media table altered successfully to include vector_processing column.")
+#     except Exception as e:
+#         logging.error(f"Error altering Media table: {str(e)}")
+#         # If the column already exists, SQLite will throw an error, which we can safely ignore
+#         if "duplicate column name" not in str(e).lower():
+#             raise
+#
+# # Vector check FIXME/Delete later
+# alter_media_table(db)
 
 #
 # End of Functions to manage media chunks

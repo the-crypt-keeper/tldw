@@ -35,6 +35,8 @@ def create_podcast_tab():
                     elem_id="podcast-keywords-input"
                 )
 
+                keep_timestamps_input = gr.Checkbox(label="Keep Timestamps", value=True)
+
                 with gr.Row():
                     podcast_custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
                                                      value=False,
@@ -157,7 +159,7 @@ def create_podcast_tab():
                     podcast_api_key_input, podcast_whisper_model_input, keep_original_input,
                     enable_diarization_input, use_cookies_input, cookies_input,
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                    use_multi_level_chunking, chunk_language],
+                    use_multi_level_chunking, chunk_language, keep_timestamps_input],
             outputs=[podcast_progress_output, podcast_transcription_output, podcast_summary_output,
                      podcast_title_input, podcast_author_input, podcast_keywords_input, podcast_error_output,
                      download_transcription, download_summary]

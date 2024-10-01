@@ -22,12 +22,10 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-
+#
+# External Imports
 import requests
 import yt_dlp
-
-from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
-from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database, add_media_with_keywords, \
@@ -35,9 +33,10 @@ from App_Function_Libraries.DB.DB_Manager import add_media_to_database, add_medi
 from App_Function_Libraries.Summarization.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
 from App_Function_Libraries.Utils.Utils import create_download_directory, save_segments_to_json, downloaded_files, \
-    sanitize_filename
+    sanitize_filename, cleanup_temp_files, generate_unique_id, temp_files
 from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
-
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 #######################################################################################################################
 # Function Definitions
@@ -107,167 +106,180 @@ def download_audio_file(url, current_whisper_model="", use_cookies=False, cookie
         raise
 
 
-def process_audio(
-        audio_file_path,
-        num_speakers=2,
-        whisper_model="small.en",
-        custom_prompt_input=None,
-        offset=0,
-        api_name=None,
-        api_key=None,
-        vad_filter=False,
-        rolling_summarization=False,
-        detail_level=0.01,
-        keywords="default,no_keyword_set",
-        chunk_text_by_words=False,
-        max_words=0,
-        chunk_text_by_sentences=False,
-        max_sentences=0,
-        chunk_text_by_paragraphs=False,
-        max_paragraphs=0,
-        chunk_text_by_tokens=False,
-        max_tokens=0
-):
-    try:
-
-        # Perform transcription
-        audio_file_path, segments = perform_transcription(audio_file_path, offset, whisper_model, vad_filter)
-
-        if audio_file_path is None or segments is None:
-            logging.error("Process_Audio: Transcription failed or segments not available.")
-            return "Process_Audio: Transcription failed.", None, None, None, None, None
-
-        logging.debug(f"Process_Audio: Transcription audio_file: {audio_file_path}")
-        logging.debug(f"Process_Audio: Transcription segments: {segments}")
-
-        transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
-        logging.debug(f"Process_Audio: Transcription text: {transcription_text}")
-
-        # Save segments to JSON
-        segments_json_path = save_segments_to_json(segments)
-
-        # Perform summarization
-        summary_text = None
-        if api_name:
-            if rolling_summarization is not None:
-                pass
-                # FIXME rolling summarization
-                # summary_text = rolling_summarize_function(
-                #     transcription_text,
-                #     detail=detail_level,
-                #     api_name=api_name,
-                #     api_key=api_key,
-                #     custom_prompt=custom_prompt_input,
-                #     chunk_by_words=chunk_text_by_words,
-                #     max_words=max_words,
-                #     chunk_by_sentences=chunk_text_by_sentences,
-                #     max_sentences=max_sentences,
-                #     chunk_by_paragraphs=chunk_text_by_paragraphs,
-                #     max_paragraphs=max_paragraphs,
-                #     chunk_by_tokens=chunk_text_by_tokens,
-                #     max_tokens=max_tokens
-                # )
-            else:
-                summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key)
-
-            if summary_text is None:
-                logging.error("Summary text is None. Check summarization function.")
-                summary_file_path = None
-        else:
-            summary_text = 'Summary not available'
-            summary_file_path = None
-
-        # Save transcription and summary
-        download_path = create_download_directory("Audio_Processing")
-        json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text,
-                                                                           download_path)
-
-        # Update function call to add_media_to_database so that it properly applies the title, author and file type
-        # Add to database
-        add_media_to_database(None, {'title': 'Audio File', 'author': 'Unknown'}, segments, summary_text, keywords,
-                              custom_prompt_input, whisper_model)
-
-        return transcription_text, summary_text, json_file_path, summary_file_path, None, None
-
-    except Exception as e:
-        logging.error(f"Error in process_audio: {str(e)}")
-        return str(e), None, None, None, None, None
-
-
-def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original,custom_keywords, source,
-                         custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                         use_multi_level_chunking, chunk_language):
-    progress = []
-    transcription = ""
-    summary = ""
-
-    def update_progress(message):
-        progress.append(message)
-        return "\n".join(progress)
-
-    try:
-        # Check file size before processing
-        file_size = os.path.getsize(audio_file_path)
-        if file_size > MAX_FILE_SIZE:
-            update_progress(f"File size ({file_size / (1024 * 1024):.2f} MB) exceeds the maximum limit of {MAX_FILE_SIZE / (1024 * 1024):.2f} MB. Skipping this file.")
-            return "\n".join(progress), "", ""
-
-        # Perform transcription
-        update_progress("Starting transcription...")
-        segments = speech_to_text(audio_file_path, whisper_model=whisper_model)
-        transcription = " ".join([segment['Text'] for segment in segments])
-        update_progress("Audio transcribed successfully.")
-
-        # Perform summarization if API is provided
-        if api_name and api_key:
-            update_progress("Starting summarization...")
-            summary = perform_summarization(api_name, transcription, "Summarize the following audio transcript",
-                                            api_key)
-            update_progress("Audio summarized successfully.")
-        else:
-            summary = "No summary available"
-
-        # Prepare keywords
-        keywords = "audio,transcription"
-        if custom_keywords:
-            keywords += f",{custom_keywords}"
-
-        # Add to database
-        add_media_with_keywords(
-            url=source,
-            title=os.path.basename(audio_file_path),
-            media_type='audio',
-            content=transcription,
-            keywords=keywords,
-            prompt="Summarize the following audio transcript",
-            summary=summary,
-            transcription_model=whisper_model,
-            author="Unknown",
-            ingestion_date=None  # This will use the current date
-        )
-        update_progress("Audio file added to database successfully.")
-
-        if not keep_original and source != "Uploaded File":
-            os.remove(audio_file_path)
-            update_progress(f"Temporary file {audio_file_path} removed.")
-        elif keep_original and source != "Uploaded File":
-            update_progress(f"Original audio file kept at: {audio_file_path}")
-
-    except Exception as e:
-        update_progress(f"Error processing {source}: {str(e)}")
-        transcription = f"Error: {str(e)}"
-        summary = "No summary due to error"
-
-    return "\n".join(progress), transcription, summary
-
+# DEAD CODE - FIXME
+# def process_audio(
+#         audio_file_path,
+#         num_speakers=2,
+#         whisper_model="small.en",
+#         custom_prompt_input=None,
+#         offset=0,
+#         api_name=None,
+#         api_key=None,
+#         vad_filter=False,
+#         rolling_summarization=False,
+#         detail_level=0.01,
+#         keywords="default,no_keyword_set",
+#         chunk_text_by_words=False,
+#         max_words=0,
+#         chunk_text_by_sentences=False,
+#         max_sentences=0,
+#         chunk_text_by_paragraphs=False,
+#         max_paragraphs=0,
+#         chunk_text_by_tokens=False,
+#         max_tokens=0
+# ):
+#     try:
+#
+#         # Perform transcription
+#         audio_file_path, segments = perform_transcription(audio_file_path, offset, whisper_model, vad_filter)
+#
+#         if audio_file_path is None or segments is None:
+#             logging.error("Process_Audio: Transcription failed or segments not available.")
+#             return "Process_Audio: Transcription failed.", None, None, None, None, None
+#
+#         logging.debug(f"Process_Audio: Transcription audio_file: {audio_file_path}")
+#         logging.debug(f"Process_Audio: Transcription segments: {segments}")
+#
+#         transcription_text = {'audio_file': audio_file_path, 'transcription': segments}
+#         logging.debug(f"Process_Audio: Transcription text: {transcription_text}")
+#
+#         # Save segments to JSON
+#         segments_json_path = save_segments_to_json(segments)
+#
+#         # Perform summarization
+#         summary_text = None
+#         if api_name:
+#             if rolling_summarization is not None:
+#                 pass
+#                 # FIXME rolling summarization
+#                 # summary_text = rolling_summarize_function(
+#                 #     transcription_text,
+#                 #     detail=detail_level,
+#                 #     api_name=api_name,
+#                 #     api_key=api_key,
+#                 #     custom_prompt=custom_prompt_input,
+#                 #     chunk_by_words=chunk_text_by_words,
+#                 #     max_words=max_words,
+#                 #     chunk_by_sentences=chunk_text_by_sentences,
+#                 #     max_sentences=max_sentences,
+#                 #     chunk_by_paragraphs=chunk_text_by_paragraphs,
+#                 #     max_paragraphs=max_paragraphs,
+#                 #     chunk_by_tokens=chunk_text_by_tokens,
+#                 #     max_tokens=max_tokens
+#                 # )
+#             else:
+#                 summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key)
+#
+#             if summary_text is None:
+#                 logging.error("Summary text is None. Check summarization function.")
+#                 summary_file_path = None
+#         else:
+#             summary_text = 'Summary not available'
+#             summary_file_path = None
+#
+#         # Save transcription and summary
+#         download_path = create_download_directory("Audio_Processing")
+#         json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text,
+#                                                                            download_path)
+#
+#         # Update function call to add_media_to_database so that it properly applies the title, author and file type
+#         # Add to database
+#         add_media_to_database(None, {'title': 'Audio File', 'author': 'Unknown'}, segments, summary_text, keywords,
+#                               custom_prompt_input, whisper_model)
+#
+#         return transcription_text, summary_text, json_file_path, summary_file_path, None, None
+#
+#     except Exception as e:
+#         logging.error(f"Error in process_audio: {str(e)}")
+#         return str(e), None, None, None, None, None
+#     finally:
+#         cleanup_temp_files()
+#
+# def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original,custom_keywords, source,
+#                          custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
+#                          use_multi_level_chunking, chunk_language):
+#     progress = []
+#     transcription = ""
+#     summary = ""
+#
+#     def update_progress(message):
+#         progress.append(message)
+#         return "\n".join(progress)
+#
+#     try:
+#         # Check file size before processing
+#         file_size = os.path.getsize(audio_file_path)
+#         if file_size > MAX_FILE_SIZE:
+#             update_progress(f"File size ({file_size / (1024 * 1024):.2f} MB) exceeds the maximum limit of {MAX_FILE_SIZE / (1024 * 1024):.2f} MB. Skipping this file.")
+#             return "\n".join(progress), "", ""
+#
+#         # Perform transcription
+#         update_progress("Starting transcription...")
+#         segments = speech_to_text(audio_file_path, whisper_model=whisper_model)
+#         transcription = " ".join([segment['Text'] for segment in segments])
+#         update_progress("Audio transcribed successfully.")
+#
+#         # Perform summarization if API is provided
+#         if api_name and api_key:
+#             update_progress("Starting summarization...")
+#             summary = perform_summarization(api_name, transcription, "Summarize the following audio transcript",
+#                                             api_key)
+#             update_progress("Audio summarized successfully.")
+#         else:
+#             summary = "No summary available"
+#
+#         # Prepare keywords
+#         keywords = "audio,transcription"
+#         if custom_keywords:
+#             keywords += f",{custom_keywords}"
+#
+#         # Add to database
+#         add_media_with_keywords(
+#             url=source,
+#             title=os.path.basename(audio_file_path),
+#             media_type='audio',
+#             content=transcription,
+#             keywords=keywords,
+#             prompt="Summarize the following audio transcript",
+#             summary=summary,
+#             transcription_model=whisper_model,
+#             author="Unknown",
+#             ingestion_date=None  # This will use the current date
+#         )
+#         update_progress("Audio file added to database successfully.")
+#
+#         if not keep_original and source != "Uploaded File":
+#             os.remove(audio_file_path)
+#             update_progress(f"Temporary file {audio_file_path} removed.")
+#         elif keep_original and source != "Uploaded File":
+#             update_progress(f"Original audio file kept at: {audio_file_path}")
+#
+#     except Exception as e:
+#         update_progress(f"Error processing {source}: {str(e)}")
+#         transcription = f"Error: {str(e)}"
+#         summary = "No summary due to error"
+#
+#     return "\n".join(progress), transcription, summary
 
 def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key, use_cookies, cookies, keep_original,
                         custom_keywords, custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap,
-                        use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize):
+                        use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize,
+                        keep_timestamps, custom_title):
     progress = []
-    temp_files = []
     all_transcriptions = []
     all_summaries = []
+
+    def format_transcription_with_timestamps(segments):
+        if keep_timestamps:
+            formatted_segments = []
+            for segment in segments:
+                start = segment.get('Time_Start', 0)
+                end = segment.get('Time_End', 0)
+                text = segment.get('Text', '')
+                formatted_segments.append(f"[{start:.2f}-{end:.2f}] {text}")
+            return " ".join(formatted_segments)
+        else:
+            return " ".join([segment.get('Text', '') for segment in segments])
 
     def update_progress(message):
         progress.append(message)
@@ -370,7 +382,10 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 segments = segments['segments']
 
             if isinstance(segments, list):
-                transcription = " ".join([segment.get('Text', '') for segment in segments])
+                # Log first 5 segments for debugging
+                logging.debug(f"Segments before formatting: {segments[:5]}")
+                transcription = format_transcription_with_timestamps(segments)
+                logging.debug(f"Formatted transcription (first 500 chars): {transcription[:500]}")
                 update_progress("Audio transcribed successfully.")
             else:
                 update_progress("Unexpected segments format received from speech_to_text.")
@@ -384,6 +399,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 chunked_text = improved_chunking_process(transcription, chunk_options)
 
                 # Summarize
+                logging.debug(f"Audio Transcription API Name: {api_name}")
                 if api_name:
                     try:
                         summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
@@ -397,10 +413,13 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 all_transcriptions.append(transcription)
                 all_summaries.append(summary)
 
+                # Use custom_title if provided, otherwise use the original filename
+                title = custom_title if custom_title else os.path.basename(wav_file_path)
+
                 # Add to database
                 add_media_with_keywords(
                     url=url,
-                    title=os.path.basename(wav_file_path),
+                    title=title,
                     media_type='audio',
                     content=transcription,
                     keywords=custom_keywords,
@@ -414,6 +433,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
 
         # Process uploaded file if provided
         if audio_file:
+            url = generate_unique_id()
             if os.path.getsize(audio_file.name) > MAX_FILE_SIZE:
                 update_progress(
                     f"Uploaded file size exceeds the maximum limit of {MAX_FILE_SIZE / (1024 * 1024):.2f}MB. Skipping this file.")
@@ -447,14 +467,15 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                     segments = segments['segments']
 
                 if isinstance(segments, list):
-                    transcription = " ".join([segment.get('Text', '') for segment in segments])
+                    transcription = format_transcription_with_timestamps(segments)
                 else:
                     update_progress("Unexpected segments format received from speech_to_text.")
                     logging.error(f"Unexpected segments format: {segments}")
 
                 chunked_text = improved_chunking_process(transcription, chunk_options)
 
-                if api_name and api_key:
+                logging.debug(f"Audio Transcription API Name: {api_name}")
+                if api_name:
                     try:
                         summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
                         update_progress("Audio summarized successfully.")
@@ -467,9 +488,12 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 all_transcriptions.append(transcription)
                 all_summaries.append(summary)
 
+                # Use custom_title if provided, otherwise use the original filename
+                title = custom_title if custom_title else os.path.basename(wav_file_path)
+
                 add_media_with_keywords(
                     url="Uploaded File",
-                    title=os.path.basename(wav_file_path),
+                    title=title,
                     media_type='audio',
                     content=transcription,
                     keywords=custom_keywords,
@@ -564,7 +588,7 @@ def download_youtube_audio(url):
 def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model,
                     keep_original=False, enable_diarization=False, use_cookies=False, cookies=None,
                     chunk_method=None, max_chunk_size=300, chunk_overlap=0, use_adaptive_chunking=False,
-                    use_multi_level_chunking=False, chunk_language='english'):
+                    use_multi_level_chunking=False, chunk_language='english', keep_timestamps=True):
     progress = []
     error_message = ""
     temp_files = []
@@ -584,8 +608,9 @@ def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_k
                     update_progress(f"Failed to remove temporary file {file}: {str(e)}")
 
     try:
-        # Download podcast
-        audio_file = download_audio_file(url, use_cookies, cookies)
+        if use_cookies:
+            cookies = json.loads(cookies)
+        audio_file = download_audio_file(url, whisper_model, use_cookies, cookies)
         temp_files.append(audio_file)
         update_progress("Podcast downloaded successfully.")
 
@@ -622,11 +647,32 @@ Description: {metadata.get('description', 'N/A')}
 
         # Transcribe the podcast
         try:
+            # Perform Diarization if enabled
             if enable_diarization:
                 segments = speech_to_text(audio_file, whisper_model=whisper_model, diarize=True)
             else:
                 segments = speech_to_text(audio_file, whisper_model=whisper_model)
-            transcription = " ".join([segment['Text'] for segment in segments])
+            # SEems like this could be optimized... FIXME
+            def format_segment(segment):
+                start = segment.get('start', 0)
+                end = segment.get('end', 0)
+                text = segment.get('Text', '')
+
+                try:
+                    start = float(start)
+                    end = float(end)
+                except (ValueError, TypeError):
+                    start = 0
+                    end = 0
+
+                return f"[{start:.2f}-{end:.2f}] {text}"
+
+            # Format transcription with or without timestamps
+            if keep_timestamps:
+                transcription = " ".join([format_segment(segment) for segment in segments])
+            else:
+                transcription = " ".join([segment.get('Text', '') for segment in segments])
+
             update_progress("Podcast transcribed successfully.")
         except Exception as e:
             error_message = f"Transcription failed: {str(e)}"
@@ -643,12 +689,13 @@ Description: {metadata.get('description', 'N/A')}
         }
         chunked_text = improved_chunking_process(transcription, chunk_options)
 
-        # Combine metadata and transcription
+        # Modify the full_content to include or exclude timestamps based on the keep_timestamps parameter
         full_content = metadata_text + "\n\nTranscription:\n" + transcription
 
         # Summarize if API is provided
+        logging.debug(f"Podcast Summarization API Name: {api_name}")
         summary = None
-        if api_name and api_key:
+        if api_name:
             try:
                 summary = perform_summarization(api_name, chunked_text, custom_prompt, api_key)
                 update_progress("Podcast summarized successfully.")
