@@ -35,7 +35,7 @@ from App_Function_Libraries.DB.DB_Manager import add_media_to_database, add_medi
 from App_Function_Libraries.Summarization.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
 from App_Function_Libraries.Utils.Utils import create_download_directory, save_segments_to_json, downloaded_files, \
-    sanitize_filename
+    sanitize_filename, cleanup_temp_files
 from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
 
 #
@@ -192,7 +192,8 @@ def process_audio(
     except Exception as e:
         logging.error(f"Error in process_audio: {str(e)}")
         return str(e), None, None, None, None, None
-
+    finally:
+        cleanup_temp_files()
 
 def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep_original,custom_keywords, source,
                          custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
@@ -584,8 +585,9 @@ def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_k
                     update_progress(f"Failed to remove temporary file {file}: {str(e)}")
 
     try:
-        # Download podcast
-        audio_file = download_audio_file(url, use_cookies, cookies)
+        if use_cookies:
+            cookies = json.loads(cookies)
+        audio_file = download_audio_file(url, whisper_model, use_cookies, cookies)
         temp_files.append(audio_file)
         update_progress("Podcast downloaded successfully.")
 

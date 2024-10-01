@@ -11,6 +11,7 @@ from App_Function_Libraries.Audio.Audio_Files import process_audio_files
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models
+from App_Function_Libraries.Utils.Utils import cleanup_temp_files
 #
 #######################################################################################################################
 # Functions:
@@ -145,6 +146,16 @@ def create_audio_processing_tab():
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking, use_multi_level_chunking,
                     chunk_language, diarize_input],
             outputs=[audio_progress_output, audio_transcription_output, audio_summary_output]
+        )
+
+        def on_file_clear(file):
+            if file is None:
+                cleanup_temp_files()
+
+        audio_file_input.clear(
+            fn=on_file_clear,
+            inputs=[audio_file_input],
+            outputs=[]
         )
 
 #

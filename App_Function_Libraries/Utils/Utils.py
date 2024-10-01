@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 import time
 from datetime import timedelta
 from typing import Union, AnyStr
@@ -696,6 +697,26 @@ def format_text_with_line_breaks(text):
 #
 # File Handling Functions
 
+temp_file_paths = []
+
+def save_temp_file(file):
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, file.name)
+    with open(temp_path, 'wb') as f:
+        f.write(file.read())
+    temp_file_paths.append(temp_path)
+    return temp_path
+
+def cleanup_temp_files():
+    global temp_files
+    for file_path in temp_files:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logging.info(f"Removed temporary file: {file_path}")
+            except Exception as e:
+                logging.error(f"Failed to remove temporary file {file_path}: {e}")
+    temp_files.clear()
 
 
 #
