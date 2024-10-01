@@ -1,16 +1,18 @@
 # Introduction_tab.py
 # Gradio UI functions for the Introduction tab
-
+#
 # Imports
 #
 # External Imports
 import gradio as gr
-
-from App_Function_Libraries.DB.DB_Manager import get_db_config
-
-
 #
 # Local Imports
+from App_Function_Libraries.DB.DB_Manager import get_db_config
+#
+####################################################################################################
+#
+# Functions:
+
 
 
 def create_introduction_tab():
@@ -36,7 +38,7 @@ def create_introduction_tab():
                 - Writing Tools: Grammar & Style check, Tone Analyzer & Editor, more planned...
                 - RAG (Retrieval-Augmented Generation) support for content generation(think about asking questions about your entire library of items)
                 - More features planned...
-                - All powered by your choice of LLM. 
+                - All powered by your choice of LLM.
                     - Currently supports: Local-LLM(llamafile-server), OpenAI, Anthropic, Cohere, Groq, DeepSeek, OpenRouter, Llama.cpp, Kobold, Ooba, Tabbyapi, VLLM and more to come...
                 - All data is stored locally in a SQLite database for easy access and management.
                 - No trackers (Gradio has some analytics but it's disabled here...)
@@ -85,7 +87,7 @@ def create_introduction_tab():
         with gr.Row():
             gr.Markdown("""### HELP! I don't know what any of this this shit is!
             ### DON'T PANIC
-            #### Its ok, you're not alone, most people have no clue what any of this stuff is. 
+            #### Its ok, you're not alone, most people have no clue what any of this stuff is.
             - So let's try and fix that.
 
             #### Introduction to LLMs:
@@ -96,7 +98,7 @@ def create_introduction_tab():
 
             #### Various Phrases & Terms to know
             - **LLM** - Large Language Model - A type of neural network that can generate human-like text.
-            - **API** - Application Programming Interface - A set of rules and protocols that allows one software application to communicate with another. 
+            - **API** - Application Programming Interface - A set of rules and protocols that allows one software application to communicate with another.
                 * Think of it like a post address for a piece of software. You can send messages to and from it.
             - **API Key** - A unique identifier that is used to authenticate a user, developer, or calling program to an API.
                 * Like the key to a post office box. You need it to access the contents.
@@ -143,10 +145,10 @@ def create_introduction_tab():
                     - **Llama.cpp Inference Engine:**
                         * Download the latest release for your platform here: https://github.com/ggerganov/llama.cpp/releases
                         * Windows: `llama-<release_number>-bin-win-cuda-cu<11.7.1 or 12.2.0 - version depends on installed cuda>-x64.zip`
-                            * Run it: `llama-server.exe --model <path_to_model> -ctx 8192 -ngl 999` 
+                            * Run it: `llama-server.exe --model <path_to_model> -ctx 8192 -ngl 999`
                                 - `-ctx 8192` sets the context size to 8192 tokens, `-ngl 999` sets the number of layers to offload to the GPU to 999. (essentially ensuring we only use our GPU and not CPU for processing)
                         * Macos: `llama-<release_number>-bin-macos-arm64.zip - for Apple Silicon / `llama-<release_number>-bin-macos-x64.zip` - for Intel Macs
-                            * Run it: `llama-server --model <path_to_model> -ctx 8192 -ngl 999` 
+                            * Run it: `llama-server --model <path_to_model> -ctx 8192 -ngl 999`
                                 - `-ctx 8192` sets the context size to 8192 tokens, `-ngl 999` sets the number of layers to offload to the GPU to 999. (essentially ensuring we only use our GPU and not CPU for processing)
                         * Linux: You can probably figure it out.
                     - **Kobold.cpp Server:**
@@ -159,3 +161,7 @@ def create_introduction_tab():
                             * Alternatively, you can also install koboldcpp to the current directory by running the following terminal command: `curl -fLo koboldcpp https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-linux-x64 && chmod +x koboldcpp`
                         2. When you can't use the precompiled binary directly, we provide an automated build script which uses conda to obtain all dependencies, and generates (from source) a ready-to-use a pyinstaller binary for linux users. Simply execute the build script with `./koboldcpp.sh dist` and run the generated binary.
             """)
+
+#
+# End of Introduction_tab.py
+####################################################################################################
