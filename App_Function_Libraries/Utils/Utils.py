@@ -28,6 +28,7 @@ import os
 import re
 import tempfile
 import time
+import uuid
 from datetime import timedelta
 from typing import Union, AnyStr
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -718,6 +719,8 @@ def cleanup_temp_files():
                 logging.error(f"Failed to remove temporary file {file_path}: {e}")
     temp_files.clear()
 
+def generate_unique_id():
+    return f"uploaded_file_{uuid.uuid4()}"
 
 #
 # End of File Handling Functions

@@ -467,7 +467,7 @@ def check_media_exists(title: str, url: str) -> Optional[int]:
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            query = 'SELECT id FROM Media WHERE title = ? AND url = ?'
+            query = 'SELECT id FROM Media WHERE title = ? OR url = ?'
             cursor.execute(query, (title, url))
             result = cursor.fetchone()
             logging.debug(f"check_media_exists query: {query}")
