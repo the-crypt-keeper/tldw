@@ -198,14 +198,7 @@ Some planned features include:
   - G-Eval summarization check is available in the video transcript tab, as well as under the `Benchmarks` tab (along with InfiniteBench[WIP] and [MMLU-Pro](https://github.com/TIGER-AI-Lab/MMLU-Pro).
   - I'd like to add more benchmarks so that user can identify/measure how well their config works, so they can tweak things and have an idea if its better/worse.
 
-###  **Don't care, give me code**
-   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Install.sh`
-   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
-   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
-   - GUI usage: `python summarize.py -gui`
-   - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
-
-- **Local Models I recommend**
+### Local Models I recommend
 - These are just the 'standard smaller' models I recommend, there are many more out there, and you can use any of them with this project.
   - One should also be aware that people create 'fine-tunes' and 'merges' of existing models, to create new models that are more suited to their needs.
   - This can result in models that may be better at some tasks but worse at others, so it's important to test and see what works best for you.
