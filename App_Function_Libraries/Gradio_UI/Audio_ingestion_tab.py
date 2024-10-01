@@ -23,7 +23,7 @@ def create_audio_processing_tab():
             with gr.Column():
                 audio_url_input = gr.Textbox(label="Audio File URL(s)", placeholder="Enter the URL(s) of the audio file(s), one per line")
                 audio_file_input = gr.File(label="Upload Audio File", file_types=["audio/*"])
-
+                custom_title_input = gr.Textbox(label="Custom Title/Name", placeholder="Enter a custom title or name for the audio file")
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
                 cookies_input = gr.Textbox(
                     label="Audio Download Cookies",
@@ -40,6 +40,7 @@ def create_audio_processing_tab():
 
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+                keep_timestamps_input = gr.Checkbox(label="Keep Timestamps", value=True)
 
                 with gr.Row():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
@@ -144,7 +145,7 @@ def create_audio_processing_tab():
             inputs=[audio_url_input, audio_file_input, whisper_model_input, api_name_input, api_key_input,
                     use_cookies_input, cookies_input, keep_original_input, custom_keywords_input, custom_prompt_input,
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking, use_multi_level_chunking,
-                    chunk_language, diarize_input],
+                    chunk_language, diarize_input, keep_timestamps_input, custom_title_input],
             outputs=[audio_progress_output, audio_transcription_output, audio_summary_output]
         )
 
