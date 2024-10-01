@@ -42,24 +42,27 @@ from tqdm import tqdm
 #
 # Function Definitions
 
-def extract_text_from_segments(segments):
+def extract_text_from_segments(segments, include_timestamps=True):
     logging.debug(f"Segments received: {segments}")
     logging.debug(f"Type of segments: {type(segments)}")
 
-    def extract_text_recursive(data):
+    def extract_text_recursive(data, include_timestamps):
         if isinstance(data, dict):
+            text = data.get('Text', '')
+            if include_timestamps and 'Time_Start' in data and 'Time_End' in data:
+                return f"{data['Time_Start']:.2f}s - {data['Time_End']:.2f}s | {text}"
             for key, value in data.items():
                 if key == 'Text':
                     return value
                 elif isinstance(value, (dict, list)):
-                    result = extract_text_recursive(value)
+                    result = extract_text_recursive(value, include_timestamps)
                     if result:
                         return result
         elif isinstance(data, list):
-            return ' '.join(filter(None, [extract_text_recursive(item) for item in data]))
+            return '\n'.join(filter(None, [extract_text_recursive(item, include_timestamps) for item in data]))
         return None
 
-    text = extract_text_recursive(segments)
+    text = extract_text_recursive(segments, include_timestamps)
 
     if text:
         return text.strip()
