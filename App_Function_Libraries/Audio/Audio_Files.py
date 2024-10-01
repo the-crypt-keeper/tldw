@@ -264,11 +264,18 @@ def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep
 
 def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key, use_cookies, cookies, keep_original,
                         custom_keywords, custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap,
-                        use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize):
+                        use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize,
+                        keep_timestamps, custom_title):
     progress = []
     temp_files = []
     all_transcriptions = []
     all_summaries = []
+
+    def format_transcription_with_timestamps(segments):
+        if keep_timestamps:
+            return " ".join([f"[{segment.get('start', ''):0.2f}-{segment.get('end', ''):0.2f}] {segment.get('Text', '')}" for segment in segments])
+        else:
+            return " ".join([segment.get('Text', '') for segment in segments])
 
     def update_progress(message):
         progress.append(message)
@@ -371,7 +378,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 segments = segments['segments']
 
             if isinstance(segments, list):
-                transcription = " ".join([segment.get('Text', '') for segment in segments])
+                transcription = format_transcription_with_timestamps(segments)
                 update_progress("Audio transcribed successfully.")
             else:
                 update_progress("Unexpected segments format received from speech_to_text.")
@@ -398,10 +405,13 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 all_transcriptions.append(transcription)
                 all_summaries.append(summary)
 
+                # Use custom_title if provided, otherwise use the original filename
+                title = custom_title if custom_title else os.path.basename(wav_file_path)
+
                 # Add to database
                 add_media_with_keywords(
                     url=url,
-                    title=os.path.basename(wav_file_path),
+                    title=title,
                     media_type='audio',
                     content=transcription,
                     keywords=custom_keywords,
@@ -448,7 +458,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                     segments = segments['segments']
 
                 if isinstance(segments, list):
-                    transcription = " ".join([segment.get('Text', '') for segment in segments])
+                    transcription = format_transcription_with_timestamps(segments)
                 else:
                     update_progress("Unexpected segments format received from speech_to_text.")
                     logging.error(f"Unexpected segments format: {segments}")
@@ -468,9 +478,12 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 all_transcriptions.append(transcription)
                 all_summaries.append(summary)
 
+                # Use custom_title if provided, otherwise use the original filename
+                title = custom_title if custom_title else os.path.basename(wav_file_path)
+
                 add_media_with_keywords(
                     url="Uploaded File",
-                    title=os.path.basename(wav_file_path),
+                    title=title,
                     media_type='audio',
                     content=transcription,
                     keywords=custom_keywords,

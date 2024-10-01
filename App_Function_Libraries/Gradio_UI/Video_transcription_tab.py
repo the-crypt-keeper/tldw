@@ -297,6 +297,10 @@ def create_video_transcription_tab():
                                     """)
 
                                 logging.debug("Gradio_Related.py: process_url_with_metadata being called")
+                                if timestamp_option == "Include Timestamps":
+                                    include_timestamps = True
+                                else:
+                                    include_timestamps = False
                                 # FIXME - Would assume this is where the multi-processing for recursive summarization would occur
                                 result = process_url_with_metadata(
                                     input_item, 2, whisper_model,
@@ -304,7 +308,7 @@ def create_video_transcription_tab():
                                     start_seconds, api_name, api_key,
                                     False, False, False, False, 0.01, None, keywords, None, diarize,
                                     end_time=end_seconds,
-                                    include_timestamps=(timestamp_option == "Include Timestamps"),
+                                    include_timestamps=include_timestamps,
                                     metadata=video_metadata,
                                     use_chunking=chunking_options_checkbox,
                                     chunk_options=chunk_options,
