@@ -693,8 +693,9 @@ Description: {metadata.get('description', 'N/A')}
         full_content = metadata_text + "\n\nTranscription:\n" + transcription
 
         # Summarize if API is provided
+        logging.debug(f"Podcast Summarization API Name: {api_name}")
         summary = None
-        if api_name and api_key:
+        if api_name:
             try:
                 summary = perform_summarization(api_name, chunked_text, custom_prompt, api_key)
                 update_progress("Podcast summarized successfully.")
