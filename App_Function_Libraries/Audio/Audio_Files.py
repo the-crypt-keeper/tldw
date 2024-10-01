@@ -22,12 +22,10 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-
+#
+# External Imports
 import requests
 import yt_dlp
-
-from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
-from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database, add_media_with_keywords, \
@@ -35,9 +33,10 @@ from App_Function_Libraries.DB.DB_Manager import add_media_to_database, add_medi
 from App_Function_Libraries.Summarization.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
 from App_Function_Libraries.Utils.Utils import create_download_directory, save_segments_to_json, downloaded_files, \
-    sanitize_filename, cleanup_temp_files, generate_unique_id
+    sanitize_filename, cleanup_temp_files, generate_unique_id, temp_files
 from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
-
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 #######################################################################################################################
 # Function Definitions
@@ -261,13 +260,11 @@ def process_single_audio(audio_file_path, whisper_model, api_name, api_key, keep
 
     return "\n".join(progress), transcription, summary
 
-
 def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key, use_cookies, cookies, keep_original,
                         custom_keywords, custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap,
                         use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize,
                         keep_timestamps, custom_title):
     progress = []
-    temp_files = []
     all_transcriptions = []
     all_summaries = []
 
@@ -307,7 +304,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
     def reencode_mp3(mp3_file_path):
         try:
             reencoded_mp3_path = mp3_file_path.replace(".mp3", "_reencoded.mp3")
-            subprocess.run([ffmpeg_cmd, '-y', '-i', mp3_file_path, '-codec:a', 'libmp3lame', reencoded_mp3_path], check=True)
+            subprocess.run([ffmpeg_cmd, '-i', mp3_file_path, '-codec:a', 'libmp3lame', reencoded_mp3_path], check=True)
             update_progress(f"Re-encoded {mp3_file_path} to {reencoded_mp3_path}.")
             return reencoded_mp3_path
         except subprocess.CalledProcessError as e:
@@ -317,7 +314,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
     def convert_mp3_to_wav(mp3_file_path):
         try:
             wav_file_path = mp3_file_path.replace(".mp3", ".wav")
-            subprocess.run([ffmpeg_cmd, '-y', '-i', mp3_file_path, wav_file_path], check=True)
+            subprocess.run([ffmpeg_cmd, '-i', mp3_file_path, wav_file_path], check=True)
             update_progress(f"Converted {mp3_file_path} to {wav_file_path}.")
             return wav_file_path
         except subprocess.CalledProcessError as e:

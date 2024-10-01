@@ -698,14 +698,17 @@ def format_text_with_line_breaks(text):
 #
 # File Handling Functions
 
+# Track temp files for cleanup
+temp_files = []
 temp_file_paths = []
 
 def save_temp_file(file):
+    global temp_files
     temp_dir = tempfile.gettempdir()
     temp_path = os.path.join(temp_dir, file.name)
     with open(temp_path, 'wb') as f:
         f.write(file.read())
-    temp_file_paths.append(temp_path)
+    temp_files.append(temp_path)
     return temp_path
 
 def cleanup_temp_files():
