@@ -35,7 +35,7 @@ from App_Function_Libraries.DB.DB_Manager import add_media_to_database, add_medi
 from App_Function_Libraries.Summarization.Summarization_General_Lib import save_transcription_and_summary, perform_transcription, \
     perform_summarization
 from App_Function_Libraries.Utils.Utils import create_download_directory, save_segments_to_json, downloaded_files, \
-    sanitize_filename, cleanup_temp_files
+    sanitize_filename, cleanup_temp_files, generate_unique_id
 from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
 
 #
@@ -272,8 +272,22 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
     all_summaries = []
 
     def format_transcription_with_timestamps(segments):
+        def format_segment(segment):
+            start = segment.get('start', 0)
+            end = segment.get('end', 0)
+            text = segment.get('Text', '')
+
+            try:
+                start = float(start)
+                end = float(end)
+            except (ValueError, TypeError):
+                start = 0
+                end = 0
+
+            return f"[{start:.2f}-{end:.2f}] {text}"
+
         if keep_timestamps:
-            return " ".join([f"[{segment.get('start', ''):0.2f}-{segment.get('end', ''):0.2f}] {segment.get('Text', '')}" for segment in segments])
+            return " ".join([format_segment(segment) for segment in segments])
         else:
             return " ".join([segment.get('Text', '') for segment in segments])
 
@@ -293,7 +307,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
     def reencode_mp3(mp3_file_path):
         try:
             reencoded_mp3_path = mp3_file_path.replace(".mp3", "_reencoded.mp3")
-            subprocess.run([ffmpeg_cmd, '-i', mp3_file_path, '-codec:a', 'libmp3lame', reencoded_mp3_path], check=True)
+            subprocess.run([ffmpeg_cmd, '-y', '-i', mp3_file_path, '-codec:a', 'libmp3lame', reencoded_mp3_path], check=True)
             update_progress(f"Re-encoded {mp3_file_path} to {reencoded_mp3_path}.")
             return reencoded_mp3_path
         except subprocess.CalledProcessError as e:
@@ -303,7 +317,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
     def convert_mp3_to_wav(mp3_file_path):
         try:
             wav_file_path = mp3_file_path.replace(".mp3", ".wav")
-            subprocess.run([ffmpeg_cmd, '-i', mp3_file_path, wav_file_path], check=True)
+            subprocess.run([ffmpeg_cmd, '-y', '-i', mp3_file_path, wav_file_path], check=True)
             update_progress(f"Converted {mp3_file_path} to {wav_file_path}.")
             return wav_file_path
         except subprocess.CalledProcessError as e:
@@ -425,6 +439,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
 
         # Process uploaded file if provided
         if audio_file:
+            url = generate_unique_id()
             if os.path.getsize(audio_file.name) > MAX_FILE_SIZE:
                 update_progress(
                     f"Uploaded file size exceeds the maximum limit of {MAX_FILE_SIZE / (1024 * 1024):.2f}MB. Skipping this file.")
@@ -578,7 +593,7 @@ def download_youtube_audio(url):
 def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model,
                     keep_original=False, enable_diarization=False, use_cookies=False, cookies=None,
                     chunk_method=None, max_chunk_size=300, chunk_overlap=0, use_adaptive_chunking=False,
-                    use_multi_level_chunking=False, chunk_language='english'):
+                    use_multi_level_chunking=False, chunk_language='english', keep_timestamps=True):
     progress = []
     error_message = ""
     temp_files = []
@@ -637,11 +652,32 @@ Description: {metadata.get('description', 'N/A')}
 
         # Transcribe the podcast
         try:
+            # Perform Diarization if enabled
             if enable_diarization:
                 segments = speech_to_text(audio_file, whisper_model=whisper_model, diarize=True)
             else:
                 segments = speech_to_text(audio_file, whisper_model=whisper_model)
-            transcription = " ".join([segment['Text'] for segment in segments])
+            # SEems like this could be optimized... FIXME
+            def format_segment(segment):
+                start = segment.get('start', 0)
+                end = segment.get('end', 0)
+                text = segment.get('Text', '')
+
+                try:
+                    start = float(start)
+                    end = float(end)
+                except (ValueError, TypeError):
+                    start = 0
+                    end = 0
+
+                return f"[{start:.2f}-{end:.2f}] {text}"
+
+            # Format transcription with or without timestamps
+            if keep_timestamps:
+                transcription = " ".join([format_segment(segment) for segment in segments])
+            else:
+                transcription = " ".join([segment.get('Text', '') for segment in segments])
+
             update_progress("Podcast transcribed successfully.")
         except Exception as e:
             error_message = f"Transcription failed: {str(e)}"
@@ -658,7 +694,7 @@ Description: {metadata.get('description', 'N/A')}
         }
         chunked_text = improved_chunking_process(transcription, chunk_options)
 
-        # Combine metadata and transcription
+        # Modify the full_content to include or exclude timestamps based on the keep_timestamps parameter
         full_content = metadata_text + "\n\nTranscription:\n" + transcription
 
         # Summarize if API is provided
