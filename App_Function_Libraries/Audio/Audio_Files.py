@@ -399,6 +399,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                 chunked_text = improved_chunking_process(transcription, chunk_options)
 
                 # Summarize
+                logging.debug(f"Audio Transcription API Name: {api_name}")
                 if api_name:
                     try:
                         summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
@@ -473,6 +474,7 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
 
                 chunked_text = improved_chunking_process(transcription, chunk_options)
 
+                logging.debug(f"Audio Transcription API Name: {api_name}")
                 if api_name:
                     try:
                         summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
