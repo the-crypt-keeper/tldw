@@ -2,6 +2,7 @@
 import os
 import sqlite3
 import tempfile
+import time
 
 import pytest
 from App_Function_Libraries.DB.SQLite_DB import DatabaseError, create_tables, Database
@@ -20,8 +21,15 @@ def db():
 
     # Clean up the database file after all tests
     db_path = Utils.get_database_path('test.db')
-    if os.path.exists(db_path):
-        os.remove(db_path)
+    for _ in range(5):  # Try up to 5 times
+        try:
+            if os.path.exists(db_path):
+                os.remove(db_path)
+            break
+        except PermissionError:
+            time.sleep(0.1)  # Wait a bit before trying again
+    else:
+        print(f"Warning: Unable to delete the database file: {db_path}")
 
 
 @pytest.fixture(autouse=True)
@@ -37,6 +45,7 @@ def reset_db(db):
             if table[0] != 'sqlite_sequence':
                 cursor.execute(f"DROP TABLE IF EXISTS {table[0]}")
         conn.commit()
+    db.close_connection()  # Ensure connection is closed after each test
 
 
 def test_database_connection(db):
@@ -122,3 +131,12 @@ def test_multiple_connections(db):
     for t in threads:
         t.join()
     # If this test completes without errors, it means multiple threads could use the database simultaneously
+
+# Add this new test to ensure connections are properly closed
+def test_connection_closure(db):
+    with db.get_connection() as conn:
+        assert conn is not None
+    # Explicitly close the connection
+    db.close_connection()
+    # Verify that the connection is closed
+    assert not hasattr(db._local, 'connection') or db._local.connection is None
