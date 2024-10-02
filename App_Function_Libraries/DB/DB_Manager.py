@@ -510,9 +510,9 @@ def delete_prompt(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def search_media_database(query: str) -> List[Tuple[int, str, str]]:
+def search_media_database(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_search_media_database(query)
+        return sqlite_search_media_database(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version when available
         raise NotImplementedError("Elasticsearch version of search_media_database not yet implemented")
