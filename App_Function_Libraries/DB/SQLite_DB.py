@@ -603,57 +603,6 @@ def mark_media_as_processed(database, media_id):
 # Keyword-related Functions
 #
 
-# Function to add a keyword
-def add_keyword(keyword: str) -> int:
-    keyword = keyword.strip().lower()
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        try:
-            # Insert into Keywords table
-            cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
-
-            # Get the keyword_id (whether it was just inserted or already existed)
-            cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-            keyword_id = cursor.fetchone()[0]
-
-            # Check if the keyword exists in keyword_fts
-            cursor.execute('SELECT rowid FROM keyword_fts WHERE rowid = ?', (keyword_id,))
-            if not cursor.fetchone():
-                # If it doesn't exist in keyword_fts, insert it
-                cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
-
-            logging.info(f"Keyword '{keyword}' added or updated with ID: {keyword_id}")
-            conn.commit()
-            return keyword_id
-        except sqlite3.IntegrityError as e:
-            logging.error(f"Integrity error adding keyword: {e}")
-            raise DatabaseError(f"Integrity error adding keyword: {e}")
-        except sqlite3.Error as e:
-            logging.error(f"Error adding keyword: {e}")
-            raise DatabaseError(f"Error adding keyword: {e}")
-
-
-
-# Function to delete a keyword
-def delete_keyword(keyword: str) -> str:
-    keyword = keyword.strip().lower()
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        try:
-            cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-            keyword_id = cursor.fetchone()
-            if keyword_id:
-                cursor.execute('DELETE FROM Keywords WHERE keyword = ?', (keyword,))
-                cursor.execute('DELETE FROM keyword_fts WHERE rowid = ?', (keyword_id[0],))
-                conn.commit()
-                return f"Keyword '{keyword}' deleted successfully."
-            else:
-                return f"Keyword '{keyword}' not found."
-        except sqlite3.Error as e:
-            raise DatabaseError(f"Error deleting keyword: {e}")
-
-
-
 # Function to add media with keywords
 def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author,
                             ingestion_date):
@@ -828,6 +777,59 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
         return str(e)
 
 
+# Function to add a keyword
+def add_keyword(keyword: str) -> int:
+    if not keyword.strip():
+        raise DatabaseError("Keyword cannot be empty")
+
+    keyword = keyword.strip().lower()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            # Insert into Keywords table
+            cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
+
+            # Get the keyword_id (whether it was just inserted or already existed)
+            cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+            keyword_id = cursor.fetchone()[0]
+
+            # Check if the keyword exists in keyword_fts
+            cursor.execute('SELECT rowid FROM keyword_fts WHERE rowid = ?', (keyword_id,))
+            if not cursor.fetchone():
+                # If it doesn't exist in keyword_fts, insert it
+                cursor.execute('INSERT OR IGNORE INTO keyword_fts (rowid, keyword) VALUES (?, ?)', (keyword_id, keyword))
+
+            logging.info(f"Keyword '{keyword}' added or updated with ID: {keyword_id}")
+            conn.commit()
+            return keyword_id
+        except sqlite3.IntegrityError as e:
+            logging.error(f"Integrity error adding keyword: {e}")
+            raise DatabaseError(f"Integrity error adding keyword: {e}")
+        except sqlite3.Error as e:
+            logging.error(f"Error adding keyword: {e}")
+            raise DatabaseError(f"Error adding keyword: {e}")
+
+
+
+# Function to delete a keyword
+def delete_keyword(keyword: str) -> str:
+    keyword = keyword.strip().lower()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
+            keyword_id = cursor.fetchone()
+            if keyword_id:
+                cursor.execute('DELETE FROM Keywords WHERE keyword = ?', (keyword,))
+                cursor.execute('DELETE FROM keyword_fts WHERE rowid = ?', (keyword_id[0],))
+                conn.commit()
+                return f"Keyword '{keyword}' deleted successfully."
+            else:
+                return f"Keyword '{keyword}' not found."
+        except sqlite3.Error as e:
+            raise DatabaseError(f"Error deleting keyword: {e}")
+
+
 def fetch_all_keywords() -> List[str]:
     try:
         with db.get_connection() as conn:
@@ -998,14 +1000,15 @@ def add_media_version(conn, media_id: int, prompt: str, summary: str) -> None:
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
-def sqlite_search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
+
+def sqlite_search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10, connection=None):
     if page < 1:
         raise ValueError("Page number must be 1 or greater.")
 
     # Prepare keywords by splitting and trimming
     keywords = [keyword.strip().lower() for keyword in keywords.split(',') if keyword.strip()]
 
-    with db.get_connection() as conn:
+    def execute_query(conn):
         cursor = conn.cursor()
         offset = (page - 1) * results_per_page
 
@@ -1042,10 +1045,13 @@ def sqlite_search_db(search_query: str, search_fields: List[str], keywords: str,
         params.extend([results_per_page, offset])
 
         cursor.execute(query, params)
-        results = cursor.fetchall()
+        return cursor.fetchall()
 
-        return results
-
+    if connection:
+        return execute_query(connection)
+    else:
+        with db.get_connection() as conn:
+            return execute_query(conn)
 
 # Gradio function to handle user input and display results with pagination, with better feedback
 def search_and_display(search_query, search_fields, keywords, page):
@@ -1671,15 +1677,22 @@ def update_media_content(selected_item, item_mapping, content_input, prompt_inpu
         return f"Error updating content: {str(e)}"
 
 
-def search_media_database(query: str) -> List[Tuple[int, str, str]]:
-    try:
-        with db.get_connection() as conn:
+def search_media_database(query: str, connection=None) -> List[Tuple[int, str, str]]:
+    def execute_query(conn):
+        try:
             cursor = conn.cursor()
             cursor.execute("SELECT id, title, url FROM Media WHERE title LIKE ?", (f'%{query}%',))
-            results = cursor.fetchall()
-        return results
-    except sqlite3.Error as e:
-        raise Exception(f"Error searching media database: {e}")
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            raise Exception(f"Error searching media database: {e}")
+
+    if connection:
+        return execute_query(connection)
+    else:
+        with db.get_connection() as conn:
+            return execute_query(conn)
+
+
 
 def load_media_content(media_id: int) -> dict:
     try:
