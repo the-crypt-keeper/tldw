@@ -9,6 +9,8 @@ from threading import Lock, Timer
 from typing import List
 #
 # 3rd-Party Imports:
+import numpy as np
+import onnxruntime as ort
 import requests
 from transformers import AutoTokenizer, AutoModel
 import torch
@@ -180,6 +182,43 @@ def create_stella_embeddings(text: str) -> List[float]:
     else:
         raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
 
+
+def create_onnx_embeddings(text: str) -> List[float]:
+    if embedding_provider == 'local':
+        # Load the tokenizer (same as before)
+        tokenizer = AutoTokenizer.from_pretrained("dunzhang/stella_en_400M_v5")
+
+        # Load the ONNX model
+        onnx_model_path = "path_to_your_stella_model.onnx"
+        session = ort.InferenceSession(onnx_model_path)
+
+        # Tokenize and encode the text
+        inputs = tokenizer(text, return_tensors="np", padding=True, truncation=True, max_length=512)
+
+        # Prepare the ONNX model input in int64 format
+        input_ids = inputs["input_ids"].astype(np.int64)  # Ensure int64 data type for ONNX
+        attention_mask = inputs["attention_mask"].astype(np.int64)
+
+        # Create the input dictionary for ONNX Runtime
+        ort_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask
+        }
+
+        # Perform inference with ONNX Runtime
+        ort_outputs = session.run(None, ort_inputs)
+
+        # Extract the last hidden state (typically the first output of the model)
+        last_hidden_state = ort_outputs[0]  # Confirm this matches your model structure
+
+        # Use the mean of the last hidden state along the sequence dimension (axis=1)
+        embeddings = np.mean(last_hidden_state, axis=1)
+
+        return embeddings[0].tolist()  # Convert to list for consistency
+    elif embedding_provider == 'openai':
+        return get_openai_embeddings(text, embedding_model)
+    else:
+        raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
 
 def create_openai_embedding(text: str, model: str) -> List[float]:
     embedding = get_openai_embeddings(text, model)

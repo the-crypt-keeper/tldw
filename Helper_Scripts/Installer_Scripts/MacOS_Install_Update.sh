@@ -104,14 +104,15 @@ fresh_install() {
         gpu_choice="cpu"
     fi
 
+    # Clone the repository
+    git clone https://github.com/rmusser01/tldw "$install_dir"
+
     # Save GPU choice
     mkdir -p "$install_dir"
     echo "$gpu_choice" > "$install_dir/gpu_choice.txt"
 
-    # Clone the repository
-    git clone https://github.com/rmusser01/tldw "$install_dir"
+    # Move into the installation directory and set up the environment
     cd "$install_dir" || exit
-
     setup_environment
 }
 
