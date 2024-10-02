@@ -1183,8 +1183,9 @@ def is_valid_date(date_string: str) -> bool:
 
 
 
-def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video', overwrite=False):
-    db = Database()
+def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video', overwrite=False, db=None):
+    if db is None:
+        db = Database()
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
