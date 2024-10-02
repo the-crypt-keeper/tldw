@@ -11,57 +11,52 @@ from App_Function_Libraries.Utils import Utils
 # Test Status:
 # FIXME
 
-@pytest.fixture
-def db_factory():
-    temp_files = []
+@pytest.fixture(scope="module")
+def db():
+    # This fixture creates a single database for all tests
+    database = Database('test.db')
+    yield database
+    database.close_connection()
 
-    def create_db():
-        # Create a temporary file
-        temp_db = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
-        temp_db.close()
-        temp_files.append(temp_db.name)
-
-        # Mock the get_database_path function
-        def mock_get_database_path(db_name):
-            return temp_db.name
-
-        # Create and return the database
-        with pytest.MonkeyPatch.context() as m:
-            m.setattr(Utils, 'get_database_path', mock_get_database_path)
-            return Database('test.db')
-
-    yield create_db
-
-    # Cleanup: close connections and delete temporary files
-    for file in temp_files:
-        try:
-            os.unlink(file)
-        except Exception as e:
-            print(f"Error deleting {file}: {e}")
+    # Clean up the database file after all tests
+    db_path = Utils.get_database_path('test.db')
+    if os.path.exists(db_path):
+        os.remove(db_path)
 
 
-def test_database_connection(db_factory):
-    db = db_factory()
+@pytest.fixture(autouse=True)
+def reset_db(db):
+    # This fixture runs automatically before each test
+    yield
+    # After each test, drop all tables to reset the database state
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        for table in tables:
+            if table[0] != 'sqlite_sequence':
+                cursor.execute(f"DROP TABLE IF EXISTS {table[0]}")
+        conn.commit()
+
+
+def test_database_connection(db):
     with db.get_connection() as conn:
         assert conn is not None
 
 
-def test_execute_query(db_factory):
-    db = db_factory()
+def test_execute_query(db):
     db.execute_query("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
     db.execute_query("INSERT INTO test (name) VALUES (?)", ('Test Name',))
     result = db.execute_query("SELECT name FROM test WHERE id = 1")
     assert result[0][0] == 'Test Name'
 
 
-def test_database_error(db_factory):
-    db = db_factory()
+def test_database_error(db):
     with pytest.raises(sqlite3.OperationalError):
         db.execute_query("SELECT * FROM non_existent_table")
 
 
-def test_transaction(db_factory):
-    db = db_factory()
+def test_transaction(db):
     with db.transaction() as conn:
         conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
         conn.execute("INSERT INTO test (name) VALUES (?)", ('Test Name',))
@@ -70,8 +65,7 @@ def test_transaction(db_factory):
     assert result[0][0] == 'Test Name'
 
 
-def test_transaction_rollback(db_factory):
-    db = db_factory()
+def test_transaction_rollback(db):
     try:
         with db.transaction() as conn:
             conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
@@ -85,8 +79,7 @@ def test_transaction_rollback(db_factory):
         db.execute_query("SELECT * FROM test")
 
 
-def test_execute_many(db_factory):
-    db = db_factory()
+def test_execute_many(db):
     db.execute_query("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
     data = [('Name1',), ('Name2',), ('Name3',)]
     db.execute_many("INSERT INTO test (name) VALUES (?)", data)
@@ -94,23 +87,20 @@ def test_execute_many(db_factory):
     assert result[0][0] == 3
 
 
-def test_table_exists(db_factory):
-    db = db_factory()
+def test_table_exists(db):
     db.execute_query("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
     assert db.table_exists('test') == True
     assert db.table_exists('non_existent_table') == False
 
 
-def test_close_connection(db_factory):
-    db = db_factory()
+def test_close_connection(db):
     with db.get_connection() as conn:
         assert conn is not None
     db.close_connection()
     assert not hasattr(db._local, 'connection') or db._local.connection is None
 
 
-def test_create_tables(db_factory):
-    db = db_factory()
+def test_create_tables(db):
     create_tables(db)
 
     # Check if some of the tables were created
@@ -120,9 +110,7 @@ def test_create_tables(db_factory):
     assert db.table_exists('ChatConversations')
 
 
-def test_multiple_connections(db_factory):
-    db = db_factory()
-
+def test_multiple_connections(db):
     def worker():
         with db.get_connection() as conn:
             conn.execute("SELECT 1")
@@ -134,5 +122,3 @@ def test_multiple_connections(db_factory):
     for t in threads:
         t.join()
     # If this test completes without errors, it means multiple threads could use the database simultaneously
-
-
