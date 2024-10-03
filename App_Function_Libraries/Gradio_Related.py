@@ -33,7 +33,7 @@ from App_Function_Libraries.Gradio_UI.Keywords import create_view_keywords_tab, 
     create_delete_keyword_tab, create_export_keywords_tab
 from App_Function_Libraries.Gradio_UI.Live_Recording import create_live_recording_tab
 from App_Function_Libraries.Gradio_UI.Llamafile_tab import create_chat_with_llamafile_tab
-from App_Function_Libraries.Gradio_UI.MMLU_Pro_tab import create_mmlu_pro_tab
+#from App_Function_Libraries.Gradio_UI.MMLU_Pro_tab import create_mmlu_pro_tab
 from App_Function_Libraries.Gradio_UI.Media_edit import create_prompt_clone_tab, create_prompt_edit_tab, \
     create_media_edit_and_clone_tab, create_media_edit_tab
 from App_Function_Libraries.Gradio_UI.Media_wiki_tab import create_mediawiki_import_tab, create_mediawiki_config_tab
@@ -361,7 +361,8 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Evaluations"):
                 create_geval_tab()
                 create_infinite_bench_tab()
-                create_mmlu_pro_tab()
+                # FIXME
+                #create_mmlu_pro_tab()
 
             with gr.TabItem("Introduction/Help"):
                 create_introduction_tab()
