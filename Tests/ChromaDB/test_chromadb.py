@@ -225,3 +225,4 @@ def test_schedule_embedding(mock_chunk_for_embedding, mock_create_embeddings_bat
 #
 # End of File
 ####################################################################################################
+# Force git to recognize this file.
