@@ -33,7 +33,7 @@ from App_Function_Libraries.RAG.ChromaDB_Library import (
 @pytest.fixture
 def mock_chroma_client(mocker):
     """Fixture to mock the ChromaDB client."""
-    mock_client = mocker.patch('ChromaDB_Library.chroma_client')
+    mock_client = mocker.patch('App_Function_Libraries.RAG.ChromaDB_Library.chroma_client')
     return mock_client
 
 @pytest.fixture
