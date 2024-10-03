@@ -30,6 +30,18 @@ jobs:
         sudo apt install portaudio19-dev python3-all-dev
         
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Test with pytest
+    - name: Test ChromaDB lib functions with pytest
       run: |
-        pytest ./Tests 
+        pytest ./Tests/ChromaDB
+
+    - name: Test RAG lib functions with pytest
+      run: |
+        pytest ./Tests/RAG
+    
+    - name: Test SQLite lib functions with pytest
+      run: |
+        pytest ./Tests/SQLite_DB
+
+    - name: Test Utils lib functions with pytest
+      run: |
+        pytest ./Tests/Utils
