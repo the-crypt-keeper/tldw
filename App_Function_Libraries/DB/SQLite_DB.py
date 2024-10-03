@@ -277,9 +277,9 @@ db = Database()
 
 # Usage example:
 if db.table_exists('DocumentVersions'):
-    logging.info("DocumentVersions table exists")
+    logging.debug("DocumentVersions table exists")
 else:
-    logging.error("DocumentVersions table does not exist")
+    logging.debug("DocumentVersions table does not exist")
 
 
 # Function to create tables with the new media schema
@@ -2599,7 +2599,6 @@ def get_paginated_files(page: int = 1, results_per_page: int = 50) -> Tuple[List
 #######################################################################################################################
 #
 # Functions to manage document versions
-
 
 def create_document_version(media_id: int, content: str) -> int:
     logging.info(f"Attempting to create document version for media_id: {media_id}")
