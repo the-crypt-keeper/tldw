@@ -104,25 +104,33 @@ def improved_chunking_process(text: str, custom_chunk_options: Dict[str, Any] = 
     if language is None:
         language = detect_language(text)
 
-    chunks = chunk_text(text, chunk_method, max_size, overlap, language)
+    if chunk_method == 'json':
+        chunks = chunk_text_by_json(text, max_size=max_size, overlap=overlap)
+    else:
+        chunks = chunk_text(text, chunk_method, max_size, overlap, language)
 
     chunks_with_metadata = []
     total_chunks = len(chunks)
     for i, chunk in enumerate(chunks):
         metadata = {
-            'chunk_index': i,
+            'chunk_index': i + 1,
             'total_chunks': total_chunks,
             'chunk_method': chunk_method,
             'max_size': max_size,
             'overlap': overlap,
             'language': language,
-            'relative_position': i / total_chunks
+            'relative_position': (i + 1) / total_chunks
         }
         metadata.update(json_content)  # Add the extracted JSON content to metadata
         metadata['header_text'] = header_text  # Add the header text to metadata
 
+        if chunk_method == 'json':
+            chunk_text_content = json.dumps(chunk['json'], ensure_ascii=False)
+        else:
+            chunk_text_content = chunk
+
         chunks_with_metadata.append({
-            'text': chunk,
+            'text': chunk_text_content,
             'metadata': metadata
         })
 
@@ -515,6 +523,109 @@ def chunk_for_embedding(text: str, file_name: str, custom_chunk_options: Dict[st
 # JSON Chunking
 
 # FIXME
+def chunk_text_by_json(text: str, max_size: int = 1000, overlap: int = 0) -> List[Dict[str, Any]]:
+    """
+    Chunk JSON-formatted text into smaller JSON chunks while preserving structure.
+
+    Parameters:
+        - text (str): The JSON-formatted text to be chunked.
+        - max_size (int): Maximum number of items or characters per chunk.
+        - overlap (int): Number of items or characters to overlap between chunks.
+
+    Returns:
+        - List[Dict[str, Any]]: A list of chunks with their metadata.
+    """
+    logging.debug("chunk_text_by_json started...")
+    try:
+        json_data = json.loads(text)
+    except json.JSONDecodeError as e:
+        logging.error(f"Invalid JSON data: {e}")
+        raise ValueError(f"Invalid JSON data: {e}")
+
+    # Determine if JSON data is a list or a dict
+    if isinstance(json_data, list):
+        return chunk_json_list(json_data, max_size, overlap)
+    elif isinstance(json_data, dict):
+        return chunk_json_dict(json_data, max_size, overlap)
+    else:
+        logging.error("Unsupported JSON structure. Only JSON objects and arrays are supported.")
+        raise ValueError("Unsupported JSON structure. Only JSON objects and arrays are supported.")
+
+def chunk_json_list(json_list: List[Any], max_size: int, overlap: int) -> List[Dict[str, Any]]:
+    """
+    Chunk a JSON array into smaller chunks.
+
+    Parameters:
+        - json_list (List[Any]): The JSON array to be chunked.
+        - max_size (int): Maximum number of items per chunk.
+        - overlap (int): Number of items to overlap between chunks.
+
+    Returns:
+        - List[Dict[str, Any]]: A list of JSON chunks with metadata.
+    """
+    logging.debug("chunk_json_list started...")
+    chunks = []
+    total_items = len(json_list)
+    step = max_size - overlap
+    if step <= 0:
+        raise ValueError("max_size must be greater than overlap.")
+
+    for i in range(0, total_items, step):
+        chunk = json_list[i:i + max_size]
+        metadata = {
+            'chunk_index': i // step + 1,
+            'total_chunks': (total_items + step - 1) // step,
+            'chunk_method': 'json_list',
+            'max_size': max_size,
+            'overlap': overlap,
+            'relative_position': i / total_items
+        }
+        chunks.append({
+            'json': chunk,
+            'metadata': metadata
+        })
+
+    logging.debug(f"chunk_json_list created {len(chunks)} chunks.")
+    return chunks
+
+def chunk_json_dict(json_dict: Dict[str, Any], max_size: int, overlap: int) -> List[Dict[str, Any]]:
+    """
+    Chunk a JSON object into smaller chunks based on its keys.
+
+    Parameters:
+        - json_dict (Dict[str, Any]): The JSON object to be chunked.
+        - max_size (int): Maximum number of key-value pairs per chunk.
+        - overlap (int): Number of key-value pairs to overlap between chunks.
+
+    Returns:
+        - List[Dict[str, Any]]: A list of JSON chunks with metadata.
+    """
+    logging.debug("chunk_json_dict started...")
+    keys = list(json_dict.keys())
+    total_keys = len(keys)
+    chunks = []
+    step = max_size - overlap
+    if step <= 0:
+        raise ValueError("max_size must be greater than overlap.")
+
+    for i in range(0, total_keys, step):
+        chunk_keys = keys[i:i + max_size]
+        chunk = {key: json_dict[key] for key in chunk_keys}
+        metadata = {
+            'chunk_index': i // step + 1,
+            'total_chunks': (total_keys + step - 1) // step,
+            'chunk_method': 'json_dict',
+            'max_size': max_size,
+            'overlap': overlap,
+            'relative_position': i / total_keys
+        }
+        chunks.append({
+            'json': chunk,
+            'metadata': metadata
+        })
+
+    logging.debug(f"chunk_json_dict created {len(chunks)} chunks.")
+    return chunks
 
 #
 # End of JSON Chunking
