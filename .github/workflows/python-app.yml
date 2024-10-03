@@ -32,7 +32,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Test ChromaDB lib functions with pytest
       run: |
-        pwd && ls && pytest ./Tests/ChromaDB/test_chromadb.py
+        pwd && ls ./Tests && ls ./Tests/ChromaDB && pytest ./Tests/ChromaDB/test_chromadb.py
 
     - name: Test RAG lib functions with pytest
       run: |
