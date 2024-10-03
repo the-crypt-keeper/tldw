@@ -166,7 +166,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
             "context": ""
         }
 
-
+# Need to write a test for this function FIXME
 def generate_answer(api_choice: str, context: str, query: str) -> str:
     logging.debug("Entering generate_answer function")
     config = load_comprehensive_config()
