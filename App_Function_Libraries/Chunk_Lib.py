@@ -588,37 +588,77 @@ def chunk_json_list(json_list: List[Any], max_size: int, overlap: int) -> List[D
     logging.debug(f"chunk_json_list created {len(chunks)} chunks.")
     return chunks
 
+
 def chunk_json_dict(json_dict: Dict[str, Any], max_size: int, overlap: int) -> List[Dict[str, Any]]:
     """
-    Chunk a JSON object into smaller chunks based on its keys.
+    Chunk a JSON object into smaller chunks based on its 'data' key while preserving other keys like 'metadata'.
 
     Parameters:
         - json_dict (Dict[str, Any]): The JSON object to be chunked.
-        - max_size (int): Maximum number of key-value pairs per chunk.
+        - max_size (int): Maximum number of key-value pairs per chunk in the 'data' section.
         - overlap (int): Number of key-value pairs to overlap between chunks.
 
     Returns:
         - List[Dict[str, Any]]: A list of JSON chunks with metadata.
     """
     logging.debug("chunk_json_dict started...")
-    keys = list(json_dict.keys())
-    total_keys = len(keys)
+
+    # Preserve non-chunked sections
+    preserved_keys = ['metadata']
+    preserved_data = {key: value for key, value in json_dict.items() if key in preserved_keys}
+
+    # Identify the chunkable section
+    chunkable_key = 'data'
+    if chunkable_key not in json_dict or not isinstance(json_dict[chunkable_key], dict):
+        logging.error("No chunkable 'data' section found in JSON dictionary.")
+        raise ValueError("No chunkable 'data' section found in JSON dictionary.")
+
+    chunkable_data = json_dict[chunkable_key]
+    data_keys = list(chunkable_data.keys())
+    total_keys = len(data_keys)
     chunks = []
     step = max_size - overlap
     if step <= 0:
         raise ValueError("max_size must be greater than overlap.")
 
-    for i in range(0, total_keys, step):
-        chunk_keys = keys[i:i + max_size]
-        chunk = {key: json_dict[key] for key in chunk_keys}
+    # Adjust the loop to prevent creating an extra chunk
+    for i in range(0, total_keys - max_size + 1, step):
+        chunk_keys = data_keys[i:i + max_size]
+
+        # Handle overlap
+        if i != 0 and overlap > 0:
+            overlap_keys = data_keys[i - overlap:i]
+            chunk_keys = overlap_keys + chunk_keys
+
+        # Remove duplicate keys caused by overlap
+        unique_chunk_keys = []
+        seen_keys = set()
+        for key in chunk_keys:
+            if key not in seen_keys:
+                unique_chunk_keys.append(key)
+                seen_keys.add(key)
+
+        chunk_data = {key: chunkable_data[key] for key in unique_chunk_keys}
+
         metadata = {
-            'chunk_index': i // step + 1,
+            'chunk_index': (i // step) + 1,
             'total_chunks': (total_keys + step - 1) // step,
             'chunk_method': 'json_dict',
             'max_size': max_size,
             'overlap': overlap,
-            'relative_position': i / total_keys
+            'language': 'english',  # Assuming English; modify as needed
+            'relative_position': (i // step + 1) / ((total_keys + step - 1) // step)
         }
+
+        # Merge preserved data into metadata
+        metadata.update(preserved_data.get('metadata', {}))
+
+        # Create the chunk with preserved data
+        chunk = {
+            'metadata': preserved_data,
+            'data': chunk_data
+        }
+
         chunks.append({
             'json': chunk,
             'metadata': metadata
@@ -626,6 +666,7 @@ def chunk_json_dict(json_dict: Dict[str, Any], max_size: int, overlap: int) -> L
 
     logging.debug(f"chunk_json_dict created {len(chunks)} chunks.")
     return chunks
+
 
 #
 # End of JSON Chunking

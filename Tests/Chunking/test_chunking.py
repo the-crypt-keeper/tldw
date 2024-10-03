@@ -60,6 +60,7 @@ def test_chunk_json_list():
         {"id": 5, "content": "Item 5"}
     ]
 
+
 def test_chunk_json_dict():
     json_text = '''
     {
@@ -82,47 +83,56 @@ def test_chunk_json_dict():
         'overlap': 1
     }
     chunks = improved_chunking_process(json_text, chunk_options)
-    assert len(chunks) == 4  # Updated expectation
-    assert json.loads(chunks[0]['text']) == {
-        "metadata": {
-            "title": "Test Document",
-            "author": "Author Name"
+
+    # Expected Chunks: 4
+    expected_chunks = [
+        {
+            "metadata": {
+                "title": "Test Document",
+                "author": "Author Name"
+            },
+            "data": {
+                "section1": "Content 1",
+                "section2": "Content 2"
+            }
         },
-        "data": {
-            "section1": "Content 1",
-            "section2": "Content 2"
-        }
-    }
-    assert json.loads(chunks[1]['text']) == {
-        "metadata": {
-            "title": "Test Document",
-            "author": "Author Name"
+        {
+            "metadata": {
+                "title": "Test Document",
+                "author": "Author Name"
+            },
+            "data": {
+                "section2": "Content 2",
+                "section3": "Content 3"
+            }
         },
-        "data": {
-            "section2": "Content 2",
-            "section3": "Content 3"
-        }
-    }
-    assert json.loads(chunks[2]['text']) == {
-        "metadata": {
-            "title": "Test Document",
-            "author": "Author Name"
+        {
+            "metadata": {
+                "title": "Test Document",
+                "author": "Author Name"
+            },
+            "data": {
+                "section3": "Content 3",
+                "section4": "Content 4"
+            }
         },
-        "data": {
-            "section3": "Content 3",
-            "section4": "Content 4"
+        {
+            "metadata": {
+                "title": "Test Document",
+                "author": "Author Name"
+            },
+            "data": {
+                "section4": "Content 4",
+                "section5": "Content 5"
+            }
         }
-    }
-    assert json.loads(chunks[3]['text']) == {
-        "metadata": {
-            "title": "Test Document",
-            "author": "Author Name"
-        },
-        "data": {
-            "section4": "Content 4",
-            "section5": "Content 5"
-        }
-    }
+    ]
+
+    assert len(chunks) == len(expected_chunks), f"Expected {len(expected_chunks)} chunks, got {len(chunks)}"
+
+    for i, expected in enumerate(expected_chunks):
+        actual = json.loads(chunks[i]['text'])
+        assert actual == expected, f"Chunk {i + 1} does not match expected."
 
 def test_invalid_json():
     invalid_json_text = '''
