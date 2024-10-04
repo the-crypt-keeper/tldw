@@ -112,7 +112,7 @@ def create_video_transcription_tab():
                              "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace", "Custom-OpenAI-API"],
                     value=None, label="API Name (Mandatory)")
-                api_key_input = gr.Textbox(label="API Key (Mandatory)", placeholder="Enter your API key here",
+                api_key_input = gr.Textbox(label="API Key (Optional - Set in Config.txt)", placeholder="Enter your API key here",
                                            type="password")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set")

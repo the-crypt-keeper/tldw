@@ -191,8 +191,11 @@ def create_rag_qa_chat_tab():
                 logging.info(
                     f"Response received from rag_qa_chat: {response[:100]}...")
 
-                # Add the original question to the history
-                new_history[-1] = (message, new_history[-1][1])
+                # Safely update history
+                if new_history:
+                    new_history[-1] = (message, new_history[-1][1])
+                else:
+                    new_history = [(message, response)]
 
                 gr.Info("Response generated successfully")
                 logging.info("rag_qa_chat_wrapper completed successfully")

@@ -30,7 +30,8 @@ from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summariz
     improved_chunking_process
 from App_Function_Libraries.Audio.Diarization_Lib import combine_transcription_and_diarization
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
-    summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm
+    summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm, \
+    summarize_with_ollama, summarize_with_custom_openai
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 # Import Local
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, load_comprehensive_config, sanitize_filename, \
@@ -1525,16 +1526,22 @@ def process_url(
                     summary = summarize_with_deepseek(api_key, chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "OpenRouter":
                     summary = summarize_with_openrouter(api_key, chunk, custom_prompt_input, temp, system_message)
+                # Local LLM APIs
                 elif api_name == "Llama.cpp":
-                    summary = summarize_with_llama(chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_llama(chunk, custom_prompt_input, api_key, temp, system_message)
                 elif api_name == "Kobold":
-                    summary = summarize_with_kobold(chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_kobold(chunk, None, custom_prompt_input, system_message, temp)
                 elif api_name == "Ooba":
-                    summary = summarize_with_oobabooga(chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_oobabooga(chunk, None, custom_prompt_input, system_message, temp)
                 elif api_name == "Tabbyapi":
-                    summary = summarize_with_tabbyapi(chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_tabbyapi(chunk, custom_prompt_input, system_message, None, temp)
                 elif api_name == "VLLM":
-                    summary = summarize_with_vllm(chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_vllm(chunk, custom_prompt_input, None, None, system_message)
+                elif api_name == "Ollama":
+                    summary = summarize_with_ollama(chunk, custom_prompt_input, api_key, temp, system_message, None)
+                elif api_name == "custom_openai_api":
+                    summary = summarize_with_custom_openai(chunk, custom_prompt_input, api_key, temp=None, system_message=None)
+
                 summarized_chunk_transcriptions.append(summary)
 
         # Combine chunked transcriptions into a single file

@@ -26,10 +26,12 @@ import requests
 # 3rd-Party Imports
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import sanitize_filename
+from App_Function_Libraries.Utils.Utils import sanitize_filename, load_comprehensive_config
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
-from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama, summarize_with_oobabooga, summarize_with_tabbyapi, \
-    summarize_with_vllm, summarize_with_kobold, save_summary_to_file, summarize_with_local_llm
+from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama, summarize_with_oobabooga, \
+    summarize_with_tabbyapi, \
+    summarize_with_vllm, summarize_with_kobold, save_summary_to_file, summarize_with_local_llm, summarize_with_ollama, \
+    summarize_with_custom_openai
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, summarize_with_cohere, \
     summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, summarize_with_huggingface, \
     summarize_with_mistral
@@ -104,7 +106,7 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
 
             with open(json_file_path, 'w') as json_file:
                 json.dump([{'text': content}], json_file, indent=2)
-
+            config = load_comprehensive_config()
             try:
                 if api_name.lower() == 'openai':
                     # def summarize_with_openai(api_key, input_data, custom_prompt_arg)
@@ -138,8 +140,7 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
                 elif api_name.lower() == "llama.cpp":
                     logging.debug(f"MAIN: Trying to summarize with Llama.cpp")
                     # def summarize_with_llama(api_url, file_path, token, custom_prompt)
-                    summary = summarize_with_llama(json_file_path, article_custom_prompt, system_message)
-
+                    summary = summarize_with_llama(json_file_path, article_custom_prompt, config['Local-API']['llama_api_key'], None, system_message)
                 elif api_name.lower() == "kobold":
                     logging.debug(f"MAIN: Trying to summarize with Kobold.cpp")
                     # def summarize_with_kobold(input_data, kobold_api_token, custom_prompt_input, api_url):
@@ -156,11 +157,20 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
                 elif api_name.lower() == "vllm":
                     logging.debug(f"MAIN: Trying to summarize with VLLM")
                     # def summarize_with_vllm(api_key, input_data, custom_prompt_input):
-                    summary = summarize_with_vllm(json_file_path, article_custom_prompt, system_message)
-
+                    summary = summarize_with_vllm(json_file_path, article_custom_prompt, None, None, system_message)
                 elif api_name.lower() == "local-llm":
                     logging.debug(f"MAIN: Trying to summarize with Local LLM")
                     summary = summarize_with_local_llm(json_file_path, article_custom_prompt, system_message)
+
+                elif api_name.lower() == "ollama":
+                    logging.debug(f"MAIN: Trying to summarize with OLLAMA")
+                    # def summarize_with_ollama(input_data, api_key, custom_prompt, api_url):
+                    summary = summarize_with_ollama(json_file_path, article_custom_prompt, api_key, None, system_message, None)
+
+                elif api_name == "custom_openai_api":
+                    logging.debug(f"MAIN: Trying to summarize with Custom_OpenAI API")
+                    summary = summarize_with_custom_openai(json_file_path, article_custom_prompt, api_key, temp=None, system_message=None)
+
 
                 elif api_name.lower() == "huggingface":
                     logging.debug(f"MAIN: Trying to summarize with huggingface")
