@@ -108,7 +108,7 @@ def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message
         return "Local LLM: Error occurred while processing summary"
 
 
-def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/completion", api_key=None, temp=None, system_message=None):
+def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, system_message=None, api_url="http://127.0.0.1:8080/completion",):
     try:
         logging.debug("Llama.cpp: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -201,7 +201,7 @@ def summarize_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:80
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None):
+def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_message=None, temp=None, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate"):
     logging.debug("Kobold: Summarization process starting...")
     try:
         logging.debug("Kobold: Loading and validating configurations")
@@ -303,7 +303,7 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_i
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions", temp=None, system_message=None):
+def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=None, temp=None, api_url="http://127.0.0.1:5000/v1/chat/completions"):
     logging.debug("Oobabooga: Summarization process starting...")
     try:
         logging.debug("Oobabooga: Loading and validating configurations")
@@ -392,8 +392,7 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, api_url="http:/
         return f"ooba: Error occurred while processing summary with oobabooga: {str(e)}"
 
 
-
-def summarize_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:5000/v1/chat/completions", temp=None, system_message=None):
+def summarize_with_tabbyapi(input_data, custom_prompt_input, system_message=None, api_key=None, temp=None, api_IP="http://127.0.0.1:5000/v1/chat/completions"):
     logging.debug("TabbyAPI: Summarization process starting...")
     try:
         logging.debug("TabbyAPI: Loading and validating configurations")
@@ -501,10 +500,10 @@ def summarize_with_vllm(
         input_data: Union[str, dict, list],
         custom_prompt_input: str,
         api_key: str = None,
-        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions",
         model: str = None,
         system_prompt: str = None,
-        temp: float = 0.7
+        temp: float = 0.7,
+        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions"
 ) -> str:
     logging.debug("vLLM: Summarization process starting...")
     try:
@@ -602,7 +601,7 @@ def summarize_with_vllm(
 
 
 # FIXME - update to be a summarize request
-def summarize_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/api/generate", api_key=None, temp=None, system_message=None, model=None):
+def summarize_with_ollama(input_data, custom_prompt, api_key=None, temp=None, system_message=None, model=None, api_url="http://127.0.0.1:11434/api/generate",):
     try:
         logging.debug("ollama: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()

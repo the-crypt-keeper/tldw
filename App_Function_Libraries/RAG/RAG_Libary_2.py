@@ -8,6 +8,7 @@ import os
 from typing import Dict, Any, List, Optional
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
+from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_custom_openai
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.DB.DB_Manager import search_db, fetch_keywords_for_media
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
@@ -175,50 +176,72 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
     if api_choice == "OpenAI":
         from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai
         return summarize_with_openai(config['API']['openai_api_key'], prompt, "")
+
     elif api_choice == "Anthropic":
         from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_anthropic
         return summarize_with_anthropic(config['API']['anthropic_api_key'], prompt, "")
+
     elif api_choice == "Cohere":
         from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_cohere
         return summarize_with_cohere(config['API']['cohere_api_key'], prompt, "")
+
     elif api_choice == "Groq":
         from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_groq
         return summarize_with_groq(config['API']['groq_api_key'], prompt, "")
+
     elif api_choice == "OpenRouter":
         from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openrouter
         return summarize_with_openrouter(config['API']['openrouter_api_key'], prompt, "")
+
     elif api_choice == "HuggingFace":
         from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_huggingface
         return summarize_with_huggingface(config['API']['huggingface_api_key'], prompt, "")
+
     elif api_choice == "DeepSeek":
         from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_deepseek
         return summarize_with_deepseek(config['API']['deepseek_api_key'], prompt, "")
+
     elif api_choice == "Mistral":
         from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_mistral
         return summarize_with_mistral(config['API']['mistral_api_key'], prompt, "")
+
+    # Local LLM APIs
     elif api_choice == "Local-LLM":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_local_llm
-        return summarize_with_local_llm(config['API']['local_llm_path'], prompt, "")
+        return summarize_with_local_llm(config['Local-API']['local_llm_path'], prompt, "")
+
     elif api_choice == "Llama.cpp":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama
-        return summarize_with_llama(config['API']['llama_api_key'], prompt, "")
+        return summarize_with_llama(prompt, "", config['Local-API']['llama_api_key'], None, None)
+
     elif api_choice == "Kobold":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_kobold
-        return summarize_with_kobold(config['API']['kobold_api_key'], prompt, "")
+        return summarize_with_kobold(prompt, config['Local-API']['kobold_api_key'], "", system_message=None, temp=None)
+
     elif api_choice == "Ooba":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_oobabooga
-        return summarize_with_oobabooga(config['API']['ooba_api_key'], prompt, "")
+        return summarize_with_oobabooga(prompt, config['Local-API']['ooba_api_key'], custom_prompt="", system_message=None, temp=None)
+
     elif api_choice == "TabbyAPI":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_tabbyapi
-        return summarize_with_tabbyapi(config['API']['tabby_api_key'], prompt, "")
+        return summarize_with_tabbyapi(prompt, None, None, None, None, )
+
     elif api_choice == "vLLM":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_vllm
-        return summarize_with_vllm(config['API']['vllm_api_key'], prompt, "")
-    elif api_choice == "ollama":
+        return summarize_with_vllm(prompt, "", config['Local-API']['vllm_api_key'], None, None)
+
+    elif api_choice.lower() == "ollama":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_ollama
-        return summarize_with_ollama(config['API']['ollama_api_key'], prompt, "")
+        return summarize_with_ollama(prompt, "", config['Local-API']['ollama_api_key'], None, None, None)
+
+    elif api_choice.lower() == "custom_openai_api":
+        logging.debug(f"RAG Answer Gen: Trying with Custom_OpenAI API")
+        summary = summarize_with_custom_openai(prompt, "", config['API']['custom_openai_api_key'], None,
+                                               None)
+
     else:
         raise ValueError(f"Unsupported API choice: {api_choice}")
+
 
 def perform_vector_search(query: str, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
     all_collections = chroma_client.list_collections()
