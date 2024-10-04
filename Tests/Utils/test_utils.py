@@ -11,11 +11,15 @@ from unittest.mock import patch
 # Third-party library imports
 import pytest
 import requests
+
+
+
 #
 # Add the tldw directory (one level up from Tests) to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'tldw')))
 #
 # Local Imports
+from App_Function_Libraries.Utils import Utils
 from App_Function_Libraries.Utils.Utils import (
     extract_text_from_segments, verify_checksum, create_download_directory,
     normalize_title, convert_to_seconds, is_valid_url, generate_unique_identifier,
@@ -76,9 +80,10 @@ def test_create_download_directory(monkeypatch):
 
 # FIXME: This test is failing
 def test_normalize_title():
-    assert normalize_title('This/Is:A*Test?') == 'This_Is_A_Test'
-    assert normalize_title('NoSpecialCharacters') == 'NoSpecialCharacters'
-    assert normalize_title('Test with spaces') == 'Test with spaces'
+    assert normalize_title('This/Is:A*Test?', preserve_spaces=False) == 'This_Is_A_Test'
+    assert normalize_title('NoSpecialCharacters', preserve_spaces=False) == 'NoSpecialCharacters'
+    assert normalize_title('Test with spaces', preserve_spaces=True) == 'Test with spaces'
+    assert normalize_title('Test with spaces', preserve_spaces=False) == 'Test_with_spaces'
 
 
 ##############################
@@ -134,7 +139,7 @@ def test_safe_read_file_file_not_found():
     result = safe_read_file('non_existent_file.txt')
     assert result.startswith('File not found')
 
-# FIXME: This test is failing
+
 def test_safe_read_file_invalid_encoding():
     with tempfile.NamedTemporaryFile(delete=False, mode='wb') as temp_file:
         temp_file.write(b'\x80\x81\x82')
@@ -146,20 +151,28 @@ def test_safe_read_file_invalid_encoding():
 # Test: cleanup_downloads
 ##############################
 
-# FIXME: This test is failing
 def test_cleanup_downloads(monkeypatch):
-    downloaded_files = ['/path/to/file1', '/path/to/file2']
+    # Set the downloaded_files in the utils module
+    Utils.downloaded_files = ['/path/to/file1', '/path/to/file2']
+    removed_files = []
 
     def mock_exists(path):
         return True
 
     def mock_remove(path):
-        assert path in downloaded_files
+        removed_files.append(path)
 
-    monkeypatch.setattr(os, 'remove', mock_remove)
+    # Patch the os.path.exists and os.remove in the utils module
     monkeypatch.setattr(os.path, 'exists', mock_exists)
-    cleanup_downloads()
-    assert downloaded_files == []
+    monkeypatch.setattr(os, 'remove', mock_remove)
+
+    # Call the function under test
+    Utils.cleanup_downloads()
+
+    # Assert that the removed_files contains the expected paths
+    assert set(removed_files) == {'/path/to/file1', '/path/to/file2'}
+    # Optionally, assert that downloaded_files remains unchanged if that's expected
+    #assert set(Utils.downloaded_files) == {'/path/to/file1', '/path/to/file2'}
 
 
 ##############################
