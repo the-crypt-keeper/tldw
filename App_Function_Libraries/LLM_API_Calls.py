@@ -318,7 +318,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
                     logging.debug(
                         f"anthropic: Failed to process chat request, status code {response.status_code}: {response.text}")
                     print(f"Failed to process chat request, status code {response.status_code}: {response.text}")
-                    return None
+                    return f"anthropic: Failed to process chat request, status code {response.status_code}: {response.text}"
 
             except RequestException as e:
                 logging.error(f"anthropic: Network error during attempt {attempt + 1}/{max_retries}: {str(e)}")
@@ -334,20 +334,23 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 # Summarize with Cohere
 def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_prompt=None):
     loaded_config_data = load_and_log_configs()
-    if api_key is not None:
-        logging.debug(f"Cohere Chat: API Key from parameter: {api_key[:3]}...{api_key[-3:]}")
-    logging.debug(f"Cohere Chat: Cohere API Key from config: {loaded_config_data['api_keys']['cohere']}")
+    cohere_api_key = None
+
     try:
         # API key validation
-        if api_key is None:
+        if api_key:
+            logging.info(f"Cohere Chat: API Key from parameter: {api_key[:3]}...{api_key[-3:]}")
+            cohere_api_key = api_key
+        else:
             logging.info("Cohere Chat: API key not provided as parameter")
             logging.info("Cohere Chat: Attempting to use API key from config file")
-            cohere_api_key = loaded_config_data.get('api_keys', {}).get('cohere')
-            if not cohere_api_key:
+            logging.debug(f"Cohere Chat: Cohere API Key from config: {loaded_config_data['api_keys']['cohere']}")
+            cohere_api_key = loaded_config_data['api_keys']['cohere']
+            if cohere_api_key:
+                logging.debug(f"Cohere Chat: Cohere API Key from config: {cohere_api_key[:3]}...{cohere_api_key[-3:]}")
+            else:
                 logging.error("Cohere Chat: API key not found or is empty")
                 return "Cohere Chat: API Key Not Provided/Found in Config file or is empty"
-
-        logging.debug(f"Cohere Chat: Using API Key: {cohere_api_key[:3]}...{cohere_api_key[-3:]}")
 
         logging.debug(f"Cohere Chat: Loaded data: {input_data}")
         logging.debug(f"Cohere Chat: Type of data: {type(input_data)}")
@@ -414,6 +417,13 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
             else:
                 logging.error("Cohere Chat: Expected 'text' key not found in API response.")
                 return "Cohere Chat: Expected data not found in API response."
+
+        elif response.status_code == 401:
+            error_message = "Cohere Chat: Unauthorized - Invalid API key"
+            logging.warning(error_message)
+            print(error_message)
+            return error_message
+
         else:
             logging.error(f"Cohere Chat: API request failed with status code {response.status_code}: {response.text}")
             print(f"Cohere Chat: Failed to process chat response, status code {response.status_code}: {response.text}")
