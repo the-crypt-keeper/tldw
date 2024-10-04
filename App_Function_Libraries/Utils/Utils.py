@@ -20,6 +20,7 @@
 ####################
 #
 # Import necessary libraries
+import chardet
 import configparser
 import hashlib
 import json
@@ -372,7 +373,9 @@ def format_metadata_as_text(metadata):
             else:
                 formatted_value = str(value)
 
-            formatted_text += f"{key.capitalize()}: {formatted_value}\n"
+            # Replace underscores with spaces in the key name
+            formatted_key = key.replace('_', ' ').capitalize()
+            formatted_text += f"{formatted_key}: {formatted_value}\n"
     return formatted_text.strip()
 
 # # Example usage:
@@ -499,7 +502,7 @@ def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5
 def create_download_directory(title):
     base_dir = "Results"
     # Remove characters that are illegal in Windows filenames and normalize
-    safe_title = normalize_title(title)
+    safe_title = normalize_title(title, preserve_spaces=False)
     logging.debug(f"{title} successfully normalized")
     session_path = os.path.join(base_dir, safe_title)
     if not os.path.exists(session_path):
@@ -512,16 +515,28 @@ def create_download_directory(title):
 
 def safe_read_file(file_path):
     encodings = ['utf-8', 'utf-16', 'ascii', 'latin-1', 'iso-8859-1', 'cp1252']
+
+    try:
+        with open(file_path, 'rb') as file:
+            raw_data = file.read()
+    except FileNotFoundError:
+        return f"File not found: {file_path}"
+    except Exception as e:
+        return f"An error occurred while reading the file: {e}"
+
+    # Use chardet to detect the encoding
+    detected = chardet.detect(raw_data)
+    if detected['encoding'] is not None:
+        encodings.insert(0, detected['encoding'])
+
     for encoding in encodings:
         try:
-            with open(file_path, 'r', encoding=encoding) as file:
-                return file.read()
+            decoded_content = raw_data.decode(encoding)
+            if decoded_content.isprintable():
+                return decoded_content
         except UnicodeDecodeError:
             continue
-        except FileNotFoundError:
-            return f"File not found: {file_path}"
-        except Exception as e:
-            return f"An error occurred: {e}"
+
     return f"Unable to decode the file {file_path} with any of the attempted encodings: {encodings}"
 
 #
@@ -596,13 +611,27 @@ def verify_checksum(file_path, expected_checksum):
     return sha256_hash.hexdigest() == expected_checksum
 
 
-def normalize_title(title):
+def normalize_title(title, preserve_spaces=False):
     # Normalize the string to 'NFKD' form and encode to 'ascii' ignoring non-ascii characters
     title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('ascii')
-    title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '').replace('*', '').replace('?',
-                                                                                                                   '').replace(
-        '<', '').replace('>', '').replace('|', '')
-    return title
+
+    if preserve_spaces:
+        # Replace special characters with underscores, but keep spaces
+        title = re.sub(r'[^\w\s\-.]', '_', title)
+    else:
+        # Replace special characters and spaces with underscores
+        title = re.sub(r'[^\w\-.]', '_', title)
+
+    # Replace multiple consecutive underscores with a single underscore
+    title = re.sub(r'_+', '_', title)
+
+    # Replace specific characters with underscores
+    title = title.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '_').replace('*', '_').replace(
+        '?', '_').replace(
+        '<', '_').replace('>', '_').replace('|', '_')
+
+    return title.strip('_')
+
 
 
 def clean_youtube_url(url):
