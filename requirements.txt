@@ -116,6 +116,8 @@ urllib3==2.2.2
 uvicorn==0.29.0
 watchfiles==0.21.0
 websockets==11.0.3
+# File Handling
+chardet
 #Video download support
 yt-dlp
 #
