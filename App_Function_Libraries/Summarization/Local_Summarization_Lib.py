@@ -35,6 +35,25 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs, extract_tex
 logger = logging.getLogger()
 
 
+summarizer_prompt = """
+                    <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                        **Bulleted Note Creation Guidelines**
+
+                        **Headings**:
+                        - Based on referenced topics, not categories like quotes or terms
+                        - Surrounded by **bold** formatting
+                        - Not listed as bullet points
+                        - No space between headings and list items underneath
+
+                        **Emphasis**:
+                        - **Important terms** set in bold font
+                        - **Text ending in a colon**: also bolded
+
+                        **Review**:
+                        - Ensure adherence to specified format
+                        - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                    """
+
 # FIXME - temp is not used
 def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None):
     try:
@@ -138,12 +157,12 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
             logging.debug("Llama.cpp: Using provided string data for summarization")
             data = input_data
 
-        logging.debug(f"Llama.cpp: Loaded data: {data}")
-        logging.debug(f"Llama.cpp: Type of data: {type(data)}")
+        logging.debug(f"Llama Summarize: Loaded data: {data}")
+        logging.debug(f"Llama Summarize: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
             # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("Llama.cpp: Summary already exists in the loaded data")
+            logging.debug("Llama Summarize: Summary already exists in the loaded data")
             return data['summary']
 
         # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
@@ -153,7 +172,7 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
         elif isinstance(data, str):
             text = data
         else:
-            raise ValueError("Llama.cpp: Invalid input data format")
+            raise ValueError("Llama Summarize: Invalid input data format")
 
         headers = {
             'accept': 'application/json',
@@ -162,12 +181,16 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
         if len(api_key) > 5:
             headers['Authorization'] = f'Bearer {api_key}'
 
-        llama_prompt = f"{custom_prompt} \n\n\n\n{text}"
         if system_message is None:
             system_message = "You are a helpful AI assistant."
-        logging.debug("llama: Prompt being sent is {llama_prompt}")
+        logging.debug(f":Llama Summarize: System Prompt being sent is {system_message}")
         if system_message is None:
             system_message = "You are a helpful AI assistant."
+
+        if custom_prompt is None:
+            llama_prompt = f"{summarizer_prompt}\n\n\n\n{text}"
+        else:
+            llama_prompt = f"{custom_prompt}\n\n\n\n{text}"
 
         data = {
             "messages": [
@@ -253,9 +276,12 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_mess
             'accept': 'application/json',
             'content-type': 'application/json',
         }
+        if custom_prompt_input is None:
+            kobold_prompt = f"{summarizer_prompt}\n\n\n\n{text}"
+        else:
+            kobold_prompt = f"{custom_prompt_input}\n\n\n\n{text}"
 
-        kobold_prompt = f"{custom_prompt_input}\n\n\n\n{text}"
-        logging.debug("kobold: Prompt being sent is {kobold_prompt}")
+        logging.debug("Kobold summarization: Prompt being sent is {kobold_prompt}")
 
         # FIXME
         # Values literally c/p from the api docs....
@@ -269,12 +295,12 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_mess
             #"rep_penalty": 1.0,
         }
 
-        logging.debug("kobold: Submitting request to API endpoint")
-        print("kobold: Submitting request to API endpoint")
+        logging.debug("Kobold Summarization: Submitting request to API endpoint")
+        print("Kobold Summarization: Submitting request to API endpoint")
         kobold_api_ip = loaded_config_data['local_api_ip']['kobold']
         try:
             response = requests.post(kobold_api_ip, headers=headers, json=data)
-            logging.debug("kobold: API Response Status Code: %d", response.status_code)
+            logging.debug("Kobold Summarization: API Response Status Code: %d", response.status_code)
 
             if response.status_code == 200:
                 try:
@@ -356,9 +382,13 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=
             'content-type': 'application/json',
         }
 
-        # prompt_text = "I like to eat cake and bake cakes. I am a baker. I work in a French bakery baking cakes. It
-        # is a fun job. I have been baking cakes for ten years. I also bake lots of other baked goods, but cakes are
-        # my favorite." prompt_text += f"\n\n{text}"  # Uncomment this line if you want to include the text variable
+        if custom_prompt is None:
+            custom_prompt = f"{summarizer_prompt}\n\n\n\n{text}"
+        else:
+            custom_prompt = f"{custom_prompt}\n\n\n\n{text}"
+
+        logging.debug("Ooba Summarize: Prompt being sent is {kobold_prompt}")
+
         ooba_prompt = f"{text}" + f"\n\n\n\n{custom_prompt}"
         logging.debug("ooba: Prompt being sent is {ooba_prompt}")
 
@@ -446,6 +476,11 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, system_message=None
             raise ValueError("Invalid input data format")
         if system_message is None:
             system_message = "You are a helpful AI assistant."
+
+        if custom_prompt_input is None:
+            custom_prompt_input = f"{summarizer_prompt}\n\n\n\n{text}"
+        else:
+            custom_prompt_input = f"{custom_prompt_input}\n\n\n\n{text}"
 
         headers = {
             'Authorization': f'Bearer {api_key}',
@@ -555,6 +590,11 @@ def summarize_with_vllm(
         if system_prompt is None:
             system_prompt = "You are a helpful AI assistant."
 
+        if custom_prompt_input is None:
+            custom_prompt_input = f"{summarizer_prompt}\n\n\n\n{text}"
+        else:
+            custom_prompt_input = f"{custom_prompt_input}\n\n\n\n{text}"
+
         model = model or loaded_config_data['models']['vllm']
         if system_prompt is None:
             system_prompt = "You are a helpful AI assistant."
@@ -649,6 +689,11 @@ def summarize_with_ollama(input_data, custom_prompt, api_key=None, temp=None, sy
             text = data
         else:
             raise ValueError("Ollama: Invalid input data format")
+
+        if custom_prompt is None:
+            custom_prompt = f"{summarizer_prompt}\n\n\n\n{text}"
+        else:
+            custom_prompt = f"{custom_prompt}\n\n\n\n{text}"
 
         headers = {
             'accept': 'application/json',
@@ -759,6 +804,11 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
 
         logging.debug(f"Custom OpenAI API: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"v: Custom prompt: {custom_prompt_arg}")
+
+        if input_data is None:
+            input_data = f"{summarizer_prompt}\n\n\n\n{text}"
+        else:
+            input_data = f"{input_data}\n\n\n\n{text}"
 
         openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
         logging.debug(f"Custom OpenAI API: Using model: {openai_model}")
