@@ -1110,10 +1110,12 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
 
 def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False):
     temp_files = []
-
+    logging.info(f"Processing media: {video_path}")
     global segments_json_path
     audio_file_path = convert_to_wav(video_path, offset)
+    logging.debug(f"Converted audio file: {audio_file_path}")
     temp_files.append(audio_file_path)
+    logging.debug("Replacing audio file with segments.json file")
     segments_json_path = audio_file_path.replace('.wav', '.segments.json')
     temp_files.append(segments_json_path)
 

@@ -61,7 +61,7 @@ class WhisperModel(OriginalWhisperModel):
     def __init__(
         self,
         model_size_or_path: str,
-        device: str = "auto",
+        device: str = processing_choice,
         device_index: Union[int, List[int]] = 0,
         compute_type: str = "default",
         cpu_threads: int = 16,
