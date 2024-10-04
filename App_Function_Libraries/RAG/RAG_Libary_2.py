@@ -208,6 +208,7 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
     # Local LLM APIs
     elif api_choice == "Local-LLM":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_local_llm
+        # FIXME
         return summarize_with_local_llm(config['Local-API']['local_llm_path'], prompt, "")
 
     elif api_choice == "Llama.cpp":
