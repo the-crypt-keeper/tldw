@@ -1694,7 +1694,6 @@ def search_media_database(query: str, connection=None) -> List[Tuple[int, str, s
             return execute_query(conn)
 
 
-
 def load_media_content(media_id: int) -> dict:
     try:
         with db.get_connection() as conn:

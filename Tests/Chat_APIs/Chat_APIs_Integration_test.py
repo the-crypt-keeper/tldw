@@ -8,10 +8,15 @@
 #   ... set other API keys similarly
 # then run it:
 #   python -m unittest test_llm_api_calls_integration.py
-
+import sys
 import unittest
 import os
 from dotenv import load_dotenv
+# Add the project root (parent directory of App_Function_Libraries) to sys.path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, project_root)
+
+print(f"Project root added to sys.path: {project_root}")
 from App_Function_Libraries.LLM_API_Calls import (
     chat_with_openai,
     chat_with_anthropic,

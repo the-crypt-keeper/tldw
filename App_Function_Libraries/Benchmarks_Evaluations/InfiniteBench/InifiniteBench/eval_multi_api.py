@@ -87,6 +87,7 @@ class MultiAPILLMClient:
 
         # Access the API key directly from the appropriate section
         if api_name in self.api_functions:
+            # FIXME - This only works for Commercial APIs... need to handle Local APIs
             api_key = self.config['API'].get(f'{api_name}_api_key')
         elif api_name in ['llamacpp', 'kobold', 'oobabooga', 'vllm', 'tabbyapi']:
             api_key = self.config['Local-API'].get(f'{api_name}_api_key')
