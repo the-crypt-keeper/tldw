@@ -15,6 +15,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_db_config
+from App_Function_Libraries.Gradio_UI.Arxiv_tab import create_arxiv_tab
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
 from App_Function_Libraries.Gradio_UI.Character_Interaction_tab import create_character_card_interaction_tab, \
@@ -264,6 +265,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_resummary_tab()
                     create_summarize_explain_tab()
                     create_live_recording_tab()
+                    create_arxiv_tab()
 
             with gr.TabItem("Text Search "):
                 create_search_tab()
