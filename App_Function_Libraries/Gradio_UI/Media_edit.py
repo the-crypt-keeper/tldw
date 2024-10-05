@@ -211,6 +211,7 @@ def create_prompt_edit_tab():
 
             with gr.Column():
                 title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the prompt's author", lines=3)
                 description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
                 system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
                 user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
@@ -225,7 +226,7 @@ def create_prompt_edit_tab():
 
         add_prompt_button.click(
             fn=add_or_update_prompt,
-            inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
+            inputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input],
             outputs=add_prompt_output
         )
 
@@ -233,7 +234,7 @@ def create_prompt_edit_tab():
         prompt_dropdown.change(
             fn=load_prompt_details,
             inputs=[prompt_dropdown],
-            outputs=[title_input, description_input, system_prompt_input, user_prompt_input]
+            outputs=[title_input, author_input, system_prompt_input, user_prompt_input]
         )
 
 
@@ -251,6 +252,7 @@ def create_prompt_clone_tab():
 
             with gr.Column():
                 title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the prompt's author", lines=3)
                 description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
                 system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
                 user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
@@ -268,7 +270,7 @@ def create_prompt_clone_tab():
         prompt_dropdown.change(
             fn=load_prompt_details,
             inputs=[prompt_dropdown],
-            outputs=[title_input, description_input, system_prompt_input, user_prompt_input]
+            outputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input]
         )
 
         def prepare_for_cloning(selected_prompt):
