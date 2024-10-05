@@ -19,46 +19,43 @@ from App_Function_Libraries.Third_Party.Arxiv import search_arxiv, process_and_i
 # Number of results per page
 PAGE_SIZE = 10
 
+
 def create_arxiv_tab():
     with gr.TabItem("Arxiv Search & Ingest"):
         gr.Markdown("# arXiv Search, Browse, Download, and Ingest")
-
-        # Search Inputs
         with gr.Row():
-            search_query = gr.Textbox(label="Search Query", placeholder="e.g., machine learning")
-            author_filter = gr.Textbox(label="Author", placeholder="e.g., John Doe")
-            year_filter = gr.Number(label="Year", precision=0)
-            search_button = gr.Button("Search")
+            with gr.Column(scale=1):
+                # Search Inputs
+                with gr.Row():
+                    with gr.Column():
+                        search_query = gr.Textbox(label="Search Query", placeholder="e.g., machine learning")
+                        author_filter = gr.Textbox(label="Author", placeholder="e.g., John Doe")
+                        year_filter = gr.Number(label="Year", precision=0)
+                        search_button = gr.Button("Search")
 
-        # Pagination Controls
-        with gr.Row():
-            prev_button = gr.Button("Previous")
-            next_button = gr.Button("Next")
-            page_info = gr.Textbox(label="Page", value="1", interactive=False)
-
-        # Results Dataframe (removed max_rows)
-        results_df = gr.Dataframe(
-            headers=["Select", "Title", "Authors", "Published"],
-            datatype=["bool", "str", "str", "str"],
-            col_count=(4, "fixed"),
-            interactive=True
-        )
-
-        # Paper Details View
-        paper_view = gr.Markdown(label="Paper Details")
+            with gr.Column(scale=2):
+                # Pagination Controls
+                    paper_selector = gr.Radio(label="Select a Paper", choices=[], interactive=True)
+                    prev_button = gr.Button("Previous")
+                    next_button = gr.Button("Next")
+                    page_info = gr.Textbox(label="Page", value="1", interactive=False)
 
         # Ingestion Section
         with gr.Row():
-            ingest_button = gr.Button("Ingest Selected Paper")
-            arxiv_keywords = gr.Textbox(label="Additional Keywords (comma-separated)", placeholder="e.g., AI, Deep Learning")
-
-        ingest_result = gr.Textbox(label="Ingestion Result", interactive=False)
+            with gr.Column():
+                # Paper Details View
+                paper_view = gr.Markdown(label="Paper Details")
+                arxiv_keywords = gr.Textbox(label="Additional Keywords (comma-separated)",
+                                            placeholder="e.g., AI, Deep Learning")
+                ingest_button = gr.Button("Ingest Selected Paper")
+                ingest_result = gr.Textbox(label="Ingestion Result", interactive=False)
 
         # Define States for Pagination and Selection
-        state = gr.State(value={"start": 0, "current_page": 1, "last_query": None})
+        state = gr.State(value={"start": 0, "current_page": 1, "last_query": None, "entries": []})
         selected_paper_id = gr.State(value=None)
 
         def build_query_url(query, author, year, start):
+            # HTTP? FIXME....
             base_url = "http://export.arxiv.org/api/query?"
             search_params = []
 
@@ -100,24 +97,16 @@ def create_arxiv_tab():
                 response = requests.get(url)
                 response.raise_for_status()
             except requests.exceptions.RequestException as e:
-                return gr.update(value=[["", f"**Error:** {str(e)}"]]), "1", state.value
+                return gr.update(value=[]), gr.update(value=f"**Error:** {str(e)}"), state.value
 
             entries = parse_arxiv_feed(response.text)
-            state.value = {"start": start, "current_page": 1, "last_query": (query, author, year)}
+            state.value = {"start": start, "current_page": 1, "last_query": (query, author, year), "entries": entries}
             if not entries:
-                return gr.update(value=[["", "No results found."]]), "1", state.value
+                return gr.update(value=[]), "No results found.", state.value
 
-            # Prepare data for Dataframe
-            data = []
-            for entry in entries:
-                data.append([
-                    False,  # For selection checkbox
-                    entry['title'],
-                    entry['authors'],
-                    entry['published']
-                ])
-
-            return gr.update(value=data), "1", state.value
+            # Update the dropdown with paper titles for selection
+            titles = [entry['title'] for entry in entries]
+            return gr.update(choices=titles), "1", state.value
 
         def handle_pagination(direction):
             current_state = state.value
@@ -137,66 +126,68 @@ def create_arxiv_tab():
             if entries:
                 current_state["start"] = start
                 current_state["current_page"] = new_page
+                current_state["entries"] = entries
                 state.value = current_state
 
-                # Prepare data for Dataframe
-                data = []
-                for entry in entries:
-                    data.append([
-                        False,  # For selection checkbox
-                        entry['title'],
-                        entry['authors'],
-                        entry['published']
-                    ])
-
-                return gr.update(value=data), str(new_page)
+                # Update the dropdown with paper titles for the new page
+                titles = [entry['title'] for entry in entries]
+                return gr.update(choices=titles), str(new_page)
             else:
                 # If no entries, do not change the page
                 return gr.update(), gr.update()
 
-        def select_paper(data):
-            selected_rows = [row for row in data if row[0]]  # Check if 'Select' is True
-            if not selected_rows:
-                return "Please select a paper to view.", None
-            selected_paper = selected_rows[0]
-            # Find the paper ID based on the title (assuming titles are unique in the page)
-            for entry in state.value.get('entries', []):
-                if entry['title'] == selected_paper[1]:
+        def load_selected_paper(selected_title):
+            if not selected_title:
+                return "Please select a paper to view."
+            for entry in state.value["entries"]:
+                if entry['title'] == selected_title:
                     paper_id = entry['id']
                     break
             else:
-                return "Paper not found.", None
+                return "Paper not found."
+
             xml_content = fetch_arxiv_xml(paper_id)
             markdown, _, _, _ = convert_xml_to_markdown(xml_content)
             selected_paper_id.value = paper_id
-            return markdown, selected_paper_id.value
+            return markdown
 
         def process_and_ingest_arxiv_paper(paper_id, additional_keywords):
             try:
                 if not paper_id:
                     return "Please select a paper to ingest."
+
+                # Fetch the XML content of the selected paper
                 xml_content = fetch_arxiv_xml(paper_id)
+
+                # Parse the paper details from the XML
                 markdown, title, authors, categories = convert_xml_to_markdown(xml_content)
 
+                # Construct the arXiv paper URL for access/download
+                paper_url = f"https://arxiv.org/abs/{paper_id}"
+
+                # Prepare the keywords for ingestion, including additional ones if provided
                 keywords = f"arxiv,{','.join(categories)}"
                 if additional_keywords:
                     keywords += f",{additional_keywords}"
 
+                # Simulate ingestion by passing the required fields to the ingestion function
                 add_media_with_keywords(
-                    url=f"https://arxiv.org/abs/{paper_id}",
-                    title=title,
+                    url=paper_url,  # URL to the paper
+                    title=title,  # Correct Paper title
                     media_type='document',
-                    content=markdown,
-                    keywords=keywords,
+                    content=markdown,  # Paper content in markdown format
+                    keywords=keywords,  # Keywords, including additional ones
                     prompt='No prompt for arXiv papers',
                     summary='arXiv paper ingested from XML',
                     transcription_model='None',
-                    author=', '.join(authors),
-                    ingestion_date=datetime.now().strftime('%Y-%m-%d')
+                    author=', '.join(authors),  # Authors of the paper
+                    ingestion_date=datetime.now().strftime('%Y-%m-%d')  # Current ingestion date
                 )
 
-                return f"arXiv paper '{title}' ingested successfully."
+                # Return success message with paper title and authors
+                return f"arXiv paper '{title}' by {', '.join(authors)} ingested successfully."
             except Exception as e:
+                # Return error message if anything goes wrong
                 return f"Error processing arXiv paper: {str(e)}"
 
         def fetch_arxiv_xml(paper_id):
@@ -208,14 +199,16 @@ def create_arxiv_tab():
         def convert_xml_to_markdown(xml_content):
             soup = BeautifulSoup(xml_content, 'xml')
 
-            title = soup.find('title').text.strip()
-            authors = [author.text.strip() for author in soup.find_all('name')]
-            abstract = soup.find('summary').text.strip()
-            published = soup.find('published').text.strip()
-            updated = soup.find('updated').text.strip()
+            # Extract title, authors, abstract, and other relevant information from the specific paper entry
+            entry = soup.find('entry')
+            title = entry.find('title').text.strip()
+            authors = [author.find('name').text.strip() for author in entry.find_all('author')]
+            abstract = entry.find('summary').text.strip()
+            published = entry.find('published').text.strip()
 
-            categories = [category['term'] for category in soup.find_all('category')]
+            categories = [category['term'] for category in entry.find_all('category')]
 
+            # Constructing a markdown representation for the paper
             markdown = f"# {title}\n\n"
             markdown += f"**Authors:** {', '.join(authors)}\n\n"
             markdown += f"**Published Date:** {published}\n\n"
@@ -224,22 +217,12 @@ def create_arxiv_tab():
 
             return markdown, title, authors, categories
 
-        def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author, ingestion_date):
-            """
-            Placeholder function for ingesting media with keywords.
-            Implement this function based on your ingestion system.
-            """
-            # Example implementation (to be replaced with actual ingestion logic)
-            print(f"Ingesting '{title}' with keywords: {keywords}")
-            # Add your ingestion code here
-
         # Event Handlers
-
         # Connect Search Button
         search_button.click(
             fn=search_arxiv,
             inputs=[search_query, author_filter, year_filter],
-            outputs=[results_df, page_info, state],
+            outputs=[paper_selector, page_info, state],
             queue=True
         )
 
@@ -247,7 +230,7 @@ def create_arxiv_tab():
         next_button.click(
             fn=lambda: handle_pagination(1),
             inputs=None,
-            outputs=[results_df, page_info],
+            outputs=[paper_selector, page_info],
             queue=True
         )
 
@@ -255,15 +238,15 @@ def create_arxiv_tab():
         prev_button.click(
             fn=lambda: handle_pagination(-1),
             inputs=None,
-            outputs=[results_df, page_info],
+            outputs=[paper_selector, page_info],
             queue=True
         )
 
-        # When the user selects a paper in the Dataframe
-        results_df.select(
-            fn=select_paper,
-            inputs=results_df,
-            outputs=[paper_view, selected_paper_id],
+        # When the user selects a paper in the Dropdown
+        paper_selector.change(
+            fn=load_selected_paper,
+            inputs=paper_selector,
+            outputs=paper_view,
             queue=True
         )
 
