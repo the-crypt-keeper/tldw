@@ -153,11 +153,12 @@ def update_user_prompt(preset_name):
         # Return a dictionary with all details
         return {
             "title": details[0],
-            "details": details[1],
-            "system_prompt": details[2],
-            "user_prompt": details[3] if len(details) > 3 else ""
+            "author": details[1],
+            "details": details[2],
+            "system_prompt": details[3],
+            "user_prompt": details[4] if len(details) > 3 else "",
         }
-    return {"title": "", "details": "", "system_prompt": "", "user_prompt": ""}
+    return {"title": "", "details": "", "system_prompt": "", "user_prompt": "", "author": ""}
 
 def browse_items(search_query, search_type):
     if search_type == 'Keyword':
