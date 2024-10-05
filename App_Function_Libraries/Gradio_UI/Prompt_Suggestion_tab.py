@@ -120,7 +120,7 @@ def create_prompt_suggestion_tab():
         # Connect the save button to the function that saves the prompt to the database
         save_prompt_button.click(
             fn=on_save_prompt,
-            inputs=[prompt_title_input, prompt_description_input, generated_prompt_output],
+            inputs=[prompt_title_input, prompt_author_input, prompt_description_input, generated_prompt_output],
             outputs=[save_prompt_output]
         )
 
