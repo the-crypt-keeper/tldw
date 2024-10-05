@@ -1372,12 +1372,14 @@ def schedule_chunking(media_id: int, content: str, media_name: str):
 # Functions to manage prompts DB
 
 def create_prompts_db():
+    logging.debug("create_prompts_db: Creating prompts database.")
     with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
         cursor.executescript('''
             CREATE TABLE IF NOT EXISTS Prompts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
+                author TEXT,
                 details TEXT,
                 system TEXT,
                 user TEXT
@@ -1398,22 +1400,42 @@ def create_prompts_db():
             CREATE INDEX IF NOT EXISTS idx_promptkeywords_keyword_id ON PromptKeywords(keyword_id);
         ''')
 
+# FIXME - dirty hack that should be removed later...
+# Migration function to add the 'author' column to the Prompts table
+def add_author_column_to_prompts():
+    with sqlite3.connect(get_database_path('prompts.db')) as conn:
+        cursor = conn.cursor()
+        # Check if 'author' column already exists
+        cursor.execute("PRAGMA table_info(Prompts)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'author' not in columns:
+            # Add the 'author' column
+            cursor.execute('ALTER TABLE Prompts ADD COLUMN author TEXT')
+            print("Author column added to Prompts table.")
+        else:
+            print("Author column already exists in Prompts table.")
+
+add_author_column_to_prompts()
 
 def normalize_keyword(keyword):
     return re.sub(r'\s+', ' ', keyword.strip().lower())
 
 
-def add_prompt(name, details, system, user=None, keywords=None):
-    if not name or not system:
-        return "Name and system prompt are required."
+# FIXME - update calls to this function to use the new args
+def add_prompt(name, author, details, system=None, user=None, keywords=None):
+    logging.debug(f"add_prompt: Adding prompt with name: {name}, author: {author}, system: {system}, user: {user}, keywords: {keywords}")
+    if not name:
+        logging.error("add_prompt: A name is required.")
+        return "A name is required."
 
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO Prompts (name, details, system, user)
-                VALUES (?, ?, ?, ?)
-            ''', (name, details, system, user))
+                INSERT INTO Prompts (name, author, details, system, user)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (name, author, details, system, user))
             prompt_id = cursor.lastrowid
 
             if keywords:
@@ -1435,10 +1457,11 @@ def add_prompt(name, details, system, user=None, keywords=None):
 
 
 def fetch_prompt_details(name):
+    logging.debug(f"fetch_prompt_details: Fetching details for prompt: {name}")
     with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+            SELECT p.name, p.author, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
             FROM Prompts p
             LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
             LEFT JOIN Keywords k ON pk.keyword_id = k.id
@@ -1449,6 +1472,7 @@ def fetch_prompt_details(name):
 
 
 def list_prompts(page=1, per_page=10):
+    logging.debug(f"list_prompts: Listing prompts for page {page} with {per_page} prompts per page.")
     offset = (page - 1) * per_page
     with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
@@ -1465,6 +1489,7 @@ def list_prompts(page=1, per_page=10):
 # This will not scale. For a large number of prompts, use a more efficient method.
 # FIXME - see above statement.
 def load_preset_prompts():
+    logging.debug("load_preset_prompts: Loading preset prompts.")
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
@@ -1476,8 +1501,8 @@ def load_preset_prompts():
         return []
 
 
-def insert_prompt_to_db(title, description, system_prompt, user_prompt, keywords=None):
-    return add_prompt(title, description, system_prompt, user_prompt, keywords)
+def insert_prompt_to_db(title, author, description, system_prompt, user_prompt, keywords=None):
+    return add_prompt(title, author, description, system_prompt, user_prompt, keywords)
 
 
 def get_prompt_db_connection():
@@ -1486,6 +1511,7 @@ def get_prompt_db_connection():
 
 
 def search_prompts(query):
+    logging.debug(f"search_prompts: Searching prompts with query: {query}")
     try:
         with get_prompt_db_connection() as conn:
             cursor = conn.cursor()
@@ -1505,6 +1531,7 @@ def search_prompts(query):
 
 
 def search_prompts_by_keyword(keyword, page=1, per_page=10):
+    logging.debug(f"search_prompts_by_keyword: Searching prompts by keyword: {keyword}")
     normalized_keyword = normalize_keyword(keyword)
     offset = (page - 1) * per_page
     with sqlite3.connect(get_database_path('prompts.db')) as conn:
@@ -1534,6 +1561,7 @@ def search_prompts_by_keyword(keyword, page=1, per_page=10):
 
 
 def update_prompt_keywords(prompt_name, new_keywords):
+    logging.debug(f"update_prompt_keywords: Updating keywords for prompt: {prompt_name}")
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
@@ -1564,40 +1592,43 @@ def update_prompt_keywords(prompt_name, new_keywords):
         return f"Database error: {e}"
 
 
-def add_or_update_prompt(title, description, system_prompt, user_prompt, keywords=None):
+def add_or_update_prompt(title, author, description, system_prompt, user_prompt, keywords=None):
+    logging.debug(f"add_or_update_prompt: Adding or updating prompt: {title}")
     if not title:
         return "Error: Title is required."
 
     existing_prompt = fetch_prompt_details(title)
     if existing_prompt:
         # Update existing prompt
-        result = update_prompt_in_db(title, description, system_prompt, user_prompt)
+        result = update_prompt_in_db(title, author, description, system_prompt, user_prompt)
         if "successfully" in result:
             # Update keywords if the prompt update was successful
             keyword_result = update_prompt_keywords(title, keywords or [])
             result += f" {keyword_result}"
     else:
         # Insert new prompt
-        result = insert_prompt_to_db(title, description, system_prompt, user_prompt, keywords)
+        result = insert_prompt_to_db(title, author, description, system_prompt, user_prompt, keywords)
 
     return result
 
 
 def load_prompt_details(selected_prompt):
+    logging.debug(f"load_prompt_details: Loading prompt details for {selected_prompt}")
     if selected_prompt:
         details = fetch_prompt_details(selected_prompt)
         if details:
-            return details[0], details[1], details[2], details[3], details[4]  # Include keywords
-    return "", "", "", "", ""
+            return details[0], details[1], details[2], details[3], details[4], details[5]
+    return "", "", "", "", "", ""
 
 
-def update_prompt_in_db(title, description, system_prompt, user_prompt):
+def update_prompt_in_db(title, author, description, system_prompt, user_prompt):
+    logging.debug(f"update_prompt_in_db: Updating prompt: {title}")
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE Prompts SET details = ?, system = ?, user = ? WHERE name = ?",
-                (description, system_prompt, user_prompt, title)
+                "UPDATE Prompts SET author = ?, details = ?, system = ?, user = ? WHERE name = ?",
+                (author, description, system_prompt, user_prompt, title)
             )
             if cursor.rowcount == 0:
                 return "No prompt found with the given title."
@@ -1609,6 +1640,7 @@ def update_prompt_in_db(title, description, system_prompt, user_prompt):
 create_prompts_db()
 
 def delete_prompt(prompt_id):
+    logging.debug(f"delete_prompt: Deleting prompt with ID: {prompt_id}")
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()

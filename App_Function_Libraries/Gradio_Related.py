@@ -15,6 +15,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_db_config
+from App_Function_Libraries.Gradio_UI.Arxiv_tab import create_arxiv_tab
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
 from App_Function_Libraries.Gradio_UI.Character_Interaction_tab import create_character_card_interaction_tab, \
@@ -40,6 +41,7 @@ from App_Function_Libraries.Gradio_UI.Media_wiki_tab import create_mediawiki_imp
 from App_Function_Libraries.Gradio_UI.PDF_ingestion_tab import create_pdf_ingestion_tab, create_pdf_ingestion_test_tab
 from App_Function_Libraries.Gradio_UI.Plaintext_tab_import import create_plain_text_import_tab
 from App_Function_Libraries.Gradio_UI.Podcast_tab import create_podcast_tab
+from App_Function_Libraries.Gradio_UI.Prompt_Suggestion_tab import create_prompt_suggestion_tab
 from App_Function_Libraries.Gradio_UI.RAG_QA_Chat_tab import create_rag_qa_chat_tab
 from App_Function_Libraries.Gradio_UI.Re_summarize_tab import create_resummary_tab
 from App_Function_Libraries.Gradio_UI.Search_Tab import create_prompt_search_tab, \
@@ -264,6 +266,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_resummary_tab()
                     create_summarize_explain_tab()
                     create_live_recording_tab()
+                    create_arxiv_tab()
 
             with gr.TabItem("Text Search "):
                 create_search_tab()
@@ -297,6 +300,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_prompt_search_tab()
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
+                create_prompt_suggestion_tab()
 
 
             with gr.TabItem("Manage / Edit Existing Items"):
