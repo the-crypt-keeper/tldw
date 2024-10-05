@@ -1399,6 +1399,23 @@ def create_prompts_db():
             CREATE INDEX IF NOT EXISTS idx_promptkeywords_keyword_id ON PromptKeywords(keyword_id);
         ''')
 
+# FIXME - dirty hack that should be removed later...
+# Migration function to add the 'author' column to the Prompts table
+def add_author_column_to_prompts():
+    with sqlite3.connect(get_database_path('prompts.db')) as conn:
+        cursor = conn.cursor()
+        # Check if 'author' column already exists
+        cursor.execute("PRAGMA table_info(Prompts)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'author' not in columns:
+            # Add the 'author' column
+            cursor.execute('ALTER TABLE Prompts ADD COLUMN author TEXT')
+            print("Author column added to Prompts table.")
+        else:
+            print("Author column already exists in Prompts table.")
+
+add_author_column_to_prompts()
 
 def normalize_keyword(keyword):
     return re.sub(r'\s+', ' ', keyword.strip().lower())
