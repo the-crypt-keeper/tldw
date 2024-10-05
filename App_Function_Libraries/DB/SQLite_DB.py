@@ -1378,6 +1378,7 @@ def create_prompts_db():
             CREATE TABLE IF NOT EXISTS Prompts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
+                author TEXT,
                 details TEXT,
                 system TEXT,
                 user TEXT
@@ -1403,7 +1404,8 @@ def normalize_keyword(keyword):
     return re.sub(r'\s+', ' ', keyword.strip().lower())
 
 
-def add_prompt(name, details, system, user=None, keywords=None):
+# FIXME - update calls to this function to use the new args
+def add_prompt(name, author, details, system, user=None, keywords=None):
     if not name or not system:
         return "Name and system prompt are required."
 
@@ -1411,9 +1413,9 @@ def add_prompt(name, details, system, user=None, keywords=None):
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO Prompts (name, details, system, user)
-                VALUES (?, ?, ?, ?)
-            ''', (name, details, system, user))
+                INSERT INTO Prompts (name, author, details, system, user)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (name, author, details, system, user))
             prompt_id = cursor.lastrowid
 
             if keywords:
@@ -1438,7 +1440,7 @@ def fetch_prompt_details(name):
     with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+            SELECT p.name, p.author, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
             FROM Prompts p
             LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
             LEFT JOIN Keywords k ON pk.keyword_id = k.id
@@ -1476,8 +1478,8 @@ def load_preset_prompts():
         return []
 
 
-def insert_prompt_to_db(title, description, system_prompt, user_prompt, keywords=None):
-    return add_prompt(title, description, system_prompt, user_prompt, keywords)
+def insert_prompt_to_db(title, author, description, system_prompt, user_prompt, keywords=None):
+    return add_prompt(title, author, description, system_prompt, user_prompt, keywords)
 
 
 def get_prompt_db_connection():
@@ -1564,21 +1566,21 @@ def update_prompt_keywords(prompt_name, new_keywords):
         return f"Database error: {e}"
 
 
-def add_or_update_prompt(title, description, system_prompt, user_prompt, keywords=None):
+def add_or_update_prompt(title, author, description, system_prompt, user_prompt, keywords=None):
     if not title:
         return "Error: Title is required."
 
     existing_prompt = fetch_prompt_details(title)
     if existing_prompt:
         # Update existing prompt
-        result = update_prompt_in_db(title, description, system_prompt, user_prompt)
+        result = update_prompt_in_db(title, author, description, system_prompt, user_prompt)
         if "successfully" in result:
             # Update keywords if the prompt update was successful
             keyword_result = update_prompt_keywords(title, keywords or [])
             result += f" {keyword_result}"
     else:
         # Insert new prompt
-        result = insert_prompt_to_db(title, description, system_prompt, user_prompt, keywords)
+        result = insert_prompt_to_db(title, author, description, system_prompt, user_prompt, keywords)
 
     return result
 
@@ -1587,17 +1589,17 @@ def load_prompt_details(selected_prompt):
     if selected_prompt:
         details = fetch_prompt_details(selected_prompt)
         if details:
-            return details[0], details[1], details[2], details[3], details[4]  # Include keywords
-    return "", "", "", "", ""
+            return details[0], details[1], details[2], details[3], details[4], details[5]
+    return "", "", "", "", "", ""
 
 
-def update_prompt_in_db(title, description, system_prompt, user_prompt):
+def update_prompt_in_db(title, author, description, system_prompt, user_prompt):
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE Prompts SET details = ?, system = ?, user = ? WHERE name = ?",
-                (description, system_prompt, user_prompt, title)
+                "UPDATE Prompts SET author = ?, details = ?, system = ?, user = ? WHERE name = ?",
+                (author, description, system_prompt, user_prompt, title)
             )
             if cursor.rowcount == 0:
                 return "No prompt found with the given title."
