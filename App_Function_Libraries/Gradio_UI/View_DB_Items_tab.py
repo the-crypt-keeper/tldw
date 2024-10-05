@@ -3,7 +3,6 @@
 #
 # Imports
 import html
-import sqlite3
 #
 # External Imports
 import gradio as gr
@@ -13,8 +12,6 @@ from App_Function_Libraries.DB.DB_Manager import view_database, get_all_document
     fetch_paginated_data, fetch_item_details, get_latest_transcription, list_prompts, fetch_prompt_details, \
     load_preset_prompts
 from App_Function_Libraries.DB.SQLite_DB import get_document_version
-from App_Function_Libraries.Utils.Utils import get_database_path, format_text_with_line_breaks
-#
 #
 ####################################################################################################
 #
@@ -46,7 +43,7 @@ def create_prompt_view_tab():
                 for prompt_name in prompts:
                     details = fetch_prompt_details(prompt_name)
                     if details:
-                        title, _, _, _, _ = details
+                        title, _, _, _, _, _ = details
                         author = "Unknown"  # Assuming author is not stored in the current schema
                         table_html += f"<tr><td style='border: 1px solid black; padding: 8px;'>{html.escape(title)}</td><td style='border: 1px solid black; padding: 8px;'>{html.escape(author)}</td></tr>"
                         prompt_choices.append((title, title))  # Using title as both label and value
@@ -77,20 +74,27 @@ def create_prompt_view_tab():
         def display_selected_prompt(prompt_name):
             details = fetch_prompt_details(prompt_name)
             if details:
-                title, description, system_prompt, user_prompt, keywords = details
+                title, author, description, system_prompt, user_prompt, keywords = details
+                # Handle None values by converting them to empty strings
+                description = description or ""
+                system_prompt = system_prompt or ""
+                user_prompt = user_prompt or ""
+                author = author or "Unknown"
+                keywords = keywords or ""
+
                 html_content = f"""
                 <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
-                    <h3>{html.escape(title)}</h3>
-                    <p><strong>Description:</strong> {html.escape(description or '')}</p>
+                    <h3>{html.escape(title)}</h3> <h4>by {html.escape(author)}</h4>
+                    <p><strong>Description:</strong> {html.escape(description)}</p>
                     <div style="margin-top: 10px;">
                         <strong>System Prompt:</strong>
-                        <pre style="white-space: pre-wrap; word-wrap: break-word;">{html.escape(system_prompt or '')}</pre>
+                        <pre style="white-space: pre-wrap; word-wrap: break-word;">{html.escape(system_prompt)}</pre>
                     </div>
                     <div style="margin-top: 10px;">
                         <strong>User Prompt:</strong>
-                        <pre style="white-space: pre-wrap; word-wrap: break-word;">{html.escape(user_prompt or '')}</pre>
+                        <pre style="white-space: pre-wrap; word-wrap: break-word;">{html.escape(user_prompt)}</pre>
                     </div>
-                    <p><strong>Keywords:</strong> {html.escape(keywords or '')}</p>
+                    <p><strong>Keywords:</strong> {html.escape(keywords)}</p>
                 </div>
                 """
                 return html_content
@@ -123,110 +127,6 @@ def create_prompt_view_tab():
             inputs=[prompt_selector],
             outputs=[selected_prompt_display]
         )
-# def create_prompt_view_tab():
-#     with gr.TabItem("View Prompt Database"):
-#         gr.Markdown("# View Prompt Database Entries")
-#         with gr.Row():
-#             with gr.Column():
-#                 entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
-#                 page_number = gr.Number(value=1, label="Page Number", precision=0)
-#                 view_button = gr.Button("View Page")
-#                 next_page_button = gr.Button("Next Page")
-#                 previous_page_button = gr.Button("Previous Page")
-#                 pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
-#             with gr.Column():
-#                 results_display = gr.HTML()
-#
-#         # FIXME - SQL functions to be moved to DB_Manager
-#
-#         def view_database(page, entries_per_page):
-#             offset = (page - 1) * entries_per_page
-#             try:
-#                 with sqlite3.connect(get_database_path('prompts.db')) as conn:
-#                     cursor = conn.cursor()
-#                     cursor.execute('''
-#                         SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
-#                         FROM Prompts p
-#                         LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
-#                         LEFT JOIN Keywords k ON pk.keyword_id = k.id
-#                         GROUP BY p.id
-#                         ORDER BY p.name
-#                         LIMIT ? OFFSET ?
-#                     ''', (entries_per_page, offset))
-#                     prompts = cursor.fetchall()
-#
-#                     cursor.execute('SELECT COUNT(*) FROM Prompts')
-#                     total_prompts = cursor.fetchone()[0]
-#
-#                 results = ""
-#                 for prompt in prompts:
-#                     # Escape HTML special characters and replace newlines with <br> tags
-#                     title = html.escape(prompt[0]).replace('\n', '<br>')
-#                     details = html.escape(prompt[1] or '').replace('\n', '<br>')
-#                     system_prompt = html.escape(prompt[2] or '')
-#                     user_prompt = html.escape(prompt[3] or '')
-#                     keywords = html.escape(prompt[4] or '').replace('\n', '<br>')
-#
-#                     results += f"""
-#                     <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
-#                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-#                             <div><strong>Title:</strong> {title}</div>
-#                             <div><strong>Details:</strong> {details}</div>
-#                         </div>
-#                         <div style="margin-top: 10px;">
-#                             <strong>User Prompt:</strong>
-#                             <pre style="white-space: pre-wrap; word-wrap: break-word;">{user_prompt}</pre>
-#                         </div>
-#                         <div style="margin-top: 10px;">
-#                             <strong>System Prompt:</strong>
-#                             <pre style="white-space: pre-wrap; word-wrap: break-word;">{system_prompt}</pre>
-#                         </div>
-#                         <div style="margin-top: 10px;">
-#                             <strong>Keywords:</strong> {keywords}
-#                         </div>
-#                     </div>
-#                     """
-#
-#                 total_pages = (total_prompts + entries_per_page - 1) // entries_per_page
-#                 pagination = f"Page {page} of {total_pages} (Total prompts: {total_prompts})"
-#
-#                 return results, pagination, total_pages
-#             except sqlite3.Error as e:
-#                 return f"<p>Error fetching prompts: {e}</p>", "Error", 0
-#
-#         def update_page(page, entries_per_page):
-#             results, pagination, total_pages = view_database(page, entries_per_page)
-#             next_disabled = page >= total_pages
-#             prev_disabled = page <= 1
-#             return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(
-#                 interactive=not prev_disabled)
-#
-#         def go_to_next_page(current_page, entries_per_page):
-#             next_page = current_page + 1
-#             return update_page(next_page, entries_per_page)
-#
-#         def go_to_previous_page(current_page, entries_per_page):
-#             previous_page = max(1, current_page - 1)
-#             return update_page(previous_page, entries_per_page)
-#
-#         view_button.click(
-#             fn=update_page,
-#             inputs=[page_number, entries_per_page],
-#             outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
-#         )
-#
-#         next_page_button.click(
-#             fn=go_to_next_page,
-#             inputs=[page_number, entries_per_page],
-#             outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
-#         )
-#
-#         previous_page_button.click(
-#             fn=go_to_previous_page,
-#             inputs=[page_number, entries_per_page],
-#             outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
-#         )
-
 
 def format_as_html(content, title):
     escaped_content = html.escape(content)
