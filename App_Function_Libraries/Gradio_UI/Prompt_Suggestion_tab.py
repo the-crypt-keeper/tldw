@@ -100,7 +100,7 @@ def create_prompt_suggestion_tab():
                 return "Error: Title and generated prompt are required."
 
             # Add the generated prompt to the database
-            result = add_or_update_prompt(title, author, description, system_prompt="", user_prompt=generated_prompt)
+            result = add_or_update_prompt(title, author, description, system_prompt="", user_prompt=generated_prompt, keywords=None)
             return result
 
         # Connect the button to the function that generates the prompt

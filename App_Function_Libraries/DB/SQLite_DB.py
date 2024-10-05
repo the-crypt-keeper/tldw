@@ -1372,6 +1372,7 @@ def schedule_chunking(media_id: int, content: str, media_name: str):
 # Functions to manage prompts DB
 
 def create_prompts_db():
+    logging.debug("create_prompts_db: Creating prompts database.")
     with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
         cursor.executescript('''
@@ -1422,9 +1423,11 @@ def normalize_keyword(keyword):
 
 
 # FIXME - update calls to this function to use the new args
-def add_prompt(name, author, details, system, user=None, keywords=None):
-    if not name or not system:
-        return "Name and system prompt are required."
+def add_prompt(name, author, details, system=None, user=None, keywords=None):
+    logging.debug(f"add_prompt: Adding prompt with name: {name}, author: {author}, system: {system}, user: {user}, keywords: {keywords}")
+    if not name:
+        logging.error("add_prompt: A name is required.")
+        return "A name is required."
 
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
@@ -1454,6 +1457,7 @@ def add_prompt(name, author, details, system, user=None, keywords=None):
 
 
 def fetch_prompt_details(name):
+    logging.debug(f"fetch_prompt_details: Fetching details for prompt: {name}")
     with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
         cursor.execute('''
@@ -1468,6 +1472,7 @@ def fetch_prompt_details(name):
 
 
 def list_prompts(page=1, per_page=10):
+    logging.debug(f"list_prompts: Listing prompts for page {page} with {per_page} prompts per page.")
     offset = (page - 1) * per_page
     with sqlite3.connect(get_database_path('prompts.db')) as conn:
         cursor = conn.cursor()
@@ -1484,6 +1489,7 @@ def list_prompts(page=1, per_page=10):
 # This will not scale. For a large number of prompts, use a more efficient method.
 # FIXME - see above statement.
 def load_preset_prompts():
+    logging.debug("load_preset_prompts: Loading preset prompts.")
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
@@ -1505,6 +1511,7 @@ def get_prompt_db_connection():
 
 
 def search_prompts(query):
+    logging.debug(f"search_prompts: Searching prompts with query: {query}")
     try:
         with get_prompt_db_connection() as conn:
             cursor = conn.cursor()
@@ -1524,6 +1531,7 @@ def search_prompts(query):
 
 
 def search_prompts_by_keyword(keyword, page=1, per_page=10):
+    logging.debug(f"search_prompts_by_keyword: Searching prompts by keyword: {keyword}")
     normalized_keyword = normalize_keyword(keyword)
     offset = (page - 1) * per_page
     with sqlite3.connect(get_database_path('prompts.db')) as conn:
@@ -1553,6 +1561,7 @@ def search_prompts_by_keyword(keyword, page=1, per_page=10):
 
 
 def update_prompt_keywords(prompt_name, new_keywords):
+    logging.debug(f"update_prompt_keywords: Updating keywords for prompt: {prompt_name}")
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
@@ -1584,6 +1593,7 @@ def update_prompt_keywords(prompt_name, new_keywords):
 
 
 def add_or_update_prompt(title, author, description, system_prompt, user_prompt, keywords=None):
+    logging.debug(f"add_or_update_prompt: Adding or updating prompt: {title}")
     if not title:
         return "Error: Title is required."
 
@@ -1603,6 +1613,7 @@ def add_or_update_prompt(title, author, description, system_prompt, user_prompt,
 
 
 def load_prompt_details(selected_prompt):
+    logging.debug(f"load_prompt_details: Loading prompt details for {selected_prompt}")
     if selected_prompt:
         details = fetch_prompt_details(selected_prompt)
         if details:
@@ -1611,6 +1622,7 @@ def load_prompt_details(selected_prompt):
 
 
 def update_prompt_in_db(title, author, description, system_prompt, user_prompt):
+    logging.debug(f"update_prompt_in_db: Updating prompt: {title}")
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
@@ -1628,6 +1640,7 @@ def update_prompt_in_db(title, author, description, system_prompt, user_prompt):
 create_prompts_db()
 
 def delete_prompt(prompt_id):
+    logging.debug(f"delete_prompt: Deleting prompt with ID: {prompt_id}")
     try:
         with sqlite3.connect(get_database_path('prompts.db')) as conn:
             cursor = conn.cursor()
