@@ -6,6 +6,7 @@ import configparser
 import logging
 import os
 from typing import Dict, Any, List, Optional
+#
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_custom_openai
@@ -15,6 +16,7 @@ from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 # 3rd-Party Imports
 import openai
+from flashrank import Ranker, RerankRequest
 #
 ########################################################################################################################
 #
@@ -139,12 +141,33 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
         # FIXME - Apply Re-Ranking of results here
         apply_re_ranking = False
         if apply_re_ranking:
-            # Implement re-ranking logic here
-            pass
-        # Extract content from results
+            # FIXME - add option to use re-ranking at call time
+            # FIXME - specify model + add param to modify at call time
+            # FIXME - add option to set a custom top X results
+            # You can specify a model if necessary, e.g., model_name="ms-marco-MiniLM-L-12-v2"
+            ranker = Ranker()
+
+            # Prepare passages for re-ranking
+            passages = [{"id": i, "text": result['content']} for i, result in enumerate(all_results)]
+            rerank_request = RerankRequest(query=query, passages=passages)
+
+            # Rerank the results
+            reranked_results = ranker.rerank(rerank_request)
+
+            # Sort results based on the re-ranking score
+            reranked_results = sorted(reranked_results, key=lambda x: x['score'], reverse=True)
+
+            # Log reranked results
+            logging.debug(f"enhanced_rag_pipeline - Reranked results: {reranked_results}")
+
+            # Update all_results based on reranking
+            all_results = [all_results[result['id']] for result in reranked_results]
+
+        # Extract content from results (top 10)
         context = "\n".join([result['content'] for result in all_results[:10]])  # Limit to top 10 results
         logging.debug(f"Context length: {len(context)}")
         logging.debug(f"Context: {context[:200]}")
+
         # Generate answer using the selected API
         answer = generate_answer(api_choice, context, query)
 
