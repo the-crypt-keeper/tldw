@@ -121,26 +121,30 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
 
         # Process keywords if provided
         keyword_list = [k.strip().lower() for k in keywords.split(',')] if keywords else []
-        logging.debug(f"enhanced_rag_pipeline - Keywords: {keyword_list}")
+        logging.debug(f"\n\nenhanced_rag_pipeline - Keywords: {keyword_list}")
 
         # Fetch relevant media IDs based on keywords if keywords are provided
         relevant_media_ids = fetch_relevant_media_ids(keyword_list) if keyword_list else None
-        logging.debug(f"enhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
+        logging.debug(f"\n\nenhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
 
         # Perform vector search
         vector_results = perform_vector_search(query, relevant_media_ids)
-        logging.debug(f"enhanced_rag_pipeline - Vector search results: {vector_results}")
+        logging.debug(f"\n\nenhanced_rag_pipeline - Vector search results: {vector_results}")
 
         # Perform full-text search
         fts_results = perform_full_text_search(query, relevant_media_ids)
-        logging.debug(f"enhanced_rag_pipeline - Full-text search results: {fts_results}")
+        logging.debug("\n\nenhanced_rag_pipeline - Full-text search results:")
+        logging.debug(
+            "\n\nenhanced_rag_pipeline - Full-text search results:\n" + "\n".join(
+                [str(item) for item in fts_results]) + "\n"
+        )
 
         # Combine results
         all_results = vector_results + fts_results
 
-        # FIXME - Apply Re-Ranking of results here
-        apply_re_ranking = False
+        apply_re_ranking = True
         if apply_re_ranking:
+            logging.debug(f"\nenhanced_rag_pipeline - Applying Re-Ranking")
             # FIXME - add option to use re-ranking at call time
             # FIXME - specify model + add param to modify at call time
             # FIXME - add option to set a custom top X results
@@ -158,7 +162,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
             reranked_results = sorted(reranked_results, key=lambda x: x['score'], reverse=True)
 
             # Log reranked results
-            logging.debug(f"enhanced_rag_pipeline - Reranked results: {reranked_results}")
+            logging.debug(f"\n\nenhanced_rag_pipeline - Reranked results: {reranked_results}")
 
             # Update all_results based on reranking
             all_results = [all_results[result['id']] for result in reranked_results]
