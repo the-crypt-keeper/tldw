@@ -247,7 +247,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             logging.info("Anthropic: Attempting to use API key from config file")
             anthropic_api_key = loaded_config_data['api_keys']['anthropic']
 
-        if not api_key or api_key.strip() == "":
+        if not anthropic_api_key or api_key.strip() == "":
             logging.error("Anthropic: API key not found or is empty")
             return "Anthropic: API Key Not Provided/Found in Config file or is empty"
 
@@ -332,7 +332,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 
 
 # Summarize with Cohere
-def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_prompt=None):
+def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, system_prompt=None, temp=None):
     loaded_config_data = load_and_log_configs()
     cohere_api_key = None
 
@@ -360,6 +360,15 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
             model = loaded_config_data['models']['cohere']
         logging.debug(f"Cohere Chat: Using model: {model}")
 
+        if temp is None:
+            temp = 0.3
+        else:
+            try:
+                temp = float(temp)
+            except ValueError:
+                logging.warning(f"Cohere Chat: Invalid temperature value '{temp}', defaulting to 0.3")
+                temp = 0.3
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
@@ -377,12 +386,18 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
         logging.debug(f"Cohere Chat: User Prompt being sent is: '{cohere_prompt}'")
 
         data = {
-            "chat_history": [
-                {"role": "SYSTEM", "message": system_prompt},
+            "model" : model,
+            "temperature": temp,
+            "messages": [
+                {
+                    "role": "system",
+                    "content":  system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": cohere_prompt,
+                }
             ],
-            "message": cohere_prompt,
-            "model": model,
-            "connectors": [{"id": "web-search"}]
         }
         logging.debug(f"Cohere Chat: Request data: {json.dumps(data, indent=2)}")
 
@@ -390,7 +405,7 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
         print("cohere chat: Submitting request to API endpoint")
 
         try:
-            response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
+            response = requests.post('https://api.cohere.ai/v2/chat', headers=headers, json=data)
             logging.debug(f"Cohere Chat: Raw API response: {response.text}")
         except requests.RequestException as e:
             logging.error(f"Cohere Chat: Error making API request: {str(e)}")
@@ -409,14 +424,24 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
 
             logging.debug(f"cohere chat: Full API response data: {json.dumps(response_data, indent=2)}")
 
-            if 'text' in response_data:
-                chat_response = response_data['text'].strip()
-                logging.debug("Cohere Chat: Chat request successful")
-                print("Cohere Chat request processed successfully.")
-                return chat_response
+            if 'message' in response_data and 'content' in response_data['message']:
+                content = response_data['message']['content']
+                if isinstance(content, list) and len(content) > 0:
+                    # Extract text from the first content block
+                    text = content[0].get('text', '').strip()
+                    if text:
+                        logging.debug("Cohere Chat: Chat request successful")
+                        print("Cohere Chat request processed successfully.")
+                        return text
+                    else:
+                        logging.error("Cohere Chat: 'text' field is empty in response content.")
+                        return "Cohere Chat: 'text' field is empty in response content."
+                else:
+                    logging.error("Cohere Chat: 'content' field is not a list or is empty.")
+                    return "Cohere Chat: 'content' field is not a list or is empty."
             else:
-                logging.error("Cohere Chat: Expected 'text' key not found in API response.")
-                return "Cohere Chat: Expected data not found in API response."
+                logging.error("Cohere Chat: 'message' or 'content' field not found in API response.")
+                return "Cohere Chat: 'message' or 'content' field not found in API response."
 
         elif response.status_code == 401:
             error_message = "Cohere Chat: Unauthorized - Invalid API key"

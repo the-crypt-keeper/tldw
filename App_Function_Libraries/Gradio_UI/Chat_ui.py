@@ -64,9 +64,19 @@ def get_system_prompt(preset_name):
     return prompts["system_prompt"]
 
 def clear_chat():
-    # Return empty list for chatbot and None for conversation_id
+    """
+    Return empty list for chatbot and None for conversation_id
+    @return:
+    """
     return gr.update(value=[]), None
 
+def clear_chat_single():
+    """
+    This clears the chat history for one chatbot instance
+    @return:
+    """
+    # Return empty list for chatbot and chat history
+    return gr.update(value=[]), []
 
 # FIXME - add additional features....
 def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, conversation_id,
@@ -659,10 +669,12 @@ def create_chat_interface_four():
         with gr.Row():
             with gr.Column():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(label="Modify Prompt", lines=3, value=".")
+                user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
             with gr.Column():
                 gr.Markdown("Scroll down for the chat windows...")
+
         chat_interfaces = []
+
         for row in range(2):
             with gr.Row():
                 for col in range(2):
@@ -680,6 +692,7 @@ def create_chat_interface_four():
                         chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
                         msg = gr.Textbox(label=f"Enter your message for Chat {i + 1}")
                         submit = gr.Button(f"Submit to Chat {i + 1}")
+                        clear_chat_button = gr.Button(f"Clear Chat {i + 1}")
 
                         chat_interfaces.append({
                             'api_endpoint': api_endpoint,
@@ -688,6 +701,8 @@ def create_chat_interface_four():
                             'chatbot': chatbot,
                             'msg': msg,
                             'submit': submit,
+                            'clear_chat_button': clear_chat_button,
+                            # Maintain chat history for each chat independently
                             'chat_history': gr.State([])
                         })
 
@@ -695,15 +710,35 @@ def create_chat_interface_four():
 
         def chat_wrapper_single(message, chat_history, api_endpoint, api_key, temperature, user_prompt):
             logging.debug(f"Chat Wrapper Single - Message: {message}, Chat History: {chat_history}")
+
+            # Call chat_wrapper with the new signature and the additional parameters
             new_msg, new_history, _ = chat_wrapper(
-                message, chat_history, {}, [],  # Empty media_content and selected_parts
-                api_endpoint, api_key, user_prompt, None,  # No conversation_id
-                False,  # Not saving conversation
-                temperature=temperature, system_prompt=""
+                message,
+                chat_history,
+                {},  # Empty media_content
+                [],  # Empty selected_parts
+                api_endpoint,
+                api_key,
+                user_prompt,  # custom_prompt
+                None,  # conversation_id
+                False,  # save_conversation
+                temperature,  # temperature
+                system_prompt="",  # system_prompt
+                max_tokens=None,  # Additional parameters with default None values
+                top_p=None,
+                frequency_penalty=None,
+                presence_penalty=None,
+                stop_sequence=None
             )
-            chat_history.append((message, new_msg))
+            # Only append to history if the new message was successful (i.e., no error in API response)
+            if "API request failed" not in new_msg:
+                chat_history.append((message, new_msg))
+            else:
+                logging.error(f"API request failed: {new_msg}")
+
             return "", chat_history, chat_history
 
+        # Attach click event for each chat interface
         for interface in chat_interfaces:
             logging.debug(f"Chat Interface - Clicked Submit for Chat {interface['chatbot']}"),
             interface['submit'].click(
@@ -722,6 +757,13 @@ def create_chat_interface_four():
                     interface['chat_history']
                 ]
             )
+
+        # Attach the clear button event for each chat window
+        interface['clear_chat_button'].click(
+            # Calls clear function to reset chatbot and chat history
+            clear_chat_single,
+            outputs=[interface['chatbot'], interface['chat_history']]
+        )
 
 
 def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, temperature, media_content,
