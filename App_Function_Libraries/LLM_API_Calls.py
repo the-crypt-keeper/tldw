@@ -30,7 +30,6 @@ from typing import List
 import requests
 #
 # Import 3rd-Party Libraries
-from requests import RequestException
 #
 # Import Local libraries
 from App_Function_Libraries.Utils.Utils import load_and_log_configs
@@ -236,33 +235,64 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_m
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None):
+def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None, temp=None):
     try:
         loaded_config_data = load_and_log_configs()
-        global anthropic_api_key
+
+        # Check if config was loaded successfully
+        if loaded_config_data is None:
+            logging.error("Anthropic: Failed to load configuration data.")
+            return "Anthropic: Failed to load configuration data."
+
+        # Initialize the API key
         anthropic_api_key = api_key
+
         # API key validation
         if not api_key:
             logging.info("Anthropic: API key not provided as parameter")
             logging.info("Anthropic: Attempting to use API key from config file")
-            anthropic_api_key = loaded_config_data['api_keys']['anthropic']
+            # Ensure 'api_keys' and 'anthropic' keys exist
+            try:
+                anthropic_api_key = loaded_config_data['api_keys']['anthropic']
+                logging.debug(f"Anthropic: Loaded API Key from config: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
+            except (KeyError, TypeError) as e:
+                logging.error(f"Anthropic: Error accessing API key from config: {str(e)}")
+                return "Anthropic: API Key Not Provided/Found in Config file or is empty"
 
-        if not api_key or api_key.strip() == "":
+        if not anthropic_api_key or anthropic_api_key == "":
             logging.error("Anthropic: API key not found or is empty")
             return "Anthropic: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"Anthropic: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        if anthropic_api_key:
+            logging.debug(f"Anthropic: Using API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
+        else:
+            logging.debug(f"Anthropic: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
         if system_prompt is not None:
             logging.debug("Anthropic: Using provided system prompt")
             pass
         else:
             system_prompt = "You are a helpful assistant"
+            logging.debug("Anthropic: Using default system prompt")
 
         logging.debug(f"AnthropicAI: Loaded data: {input_data}")
         logging.debug(f"AnthropicAI: Type of data: {type(input_data)}")
 
-        anthropic_model = loaded_config_data['models']['anthropic']
+        # Retrieve the model from config if not provided
+        if not model:
+            try:
+                anthropic_model = loaded_config_data['models']['anthropic']
+                logging.debug(f"Anthropic: Loaded model from config: {anthropic_model}")
+            except (KeyError, TypeError) as e:
+                logging.error(f"Anthropic: Error accessing model from config: {str(e)}")
+                return "Anthropic: Model configuration not found."
+        else:
+            anthropic_model = model
+            logging.debug(f"Anthropic: Using provided model: {anthropic_model}")
+
+        if temp is None:
+            temp = 1.0
+            logging.debug(f"Anthropic: Using default temperature: {temp}")
 
         headers = {
             'x-api-key': anthropic_api_key,
@@ -270,69 +300,74 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             'Content-Type': 'application/json'
         }
 
-        anthropic_user_prompt = custom_prompt_arg
-        logging.debug(f"Anthropic: User Prompt is {anthropic_user_prompt}")
+        anthropic_user_prompt = custom_prompt_arg if custom_prompt_arg else ""
+        logging.debug(f"Anthropic: User Prompt is '{anthropic_user_prompt}'")
         user_message = {
             "role": "user",
             "content": f"{input_data} \n\n\n\n{anthropic_user_prompt}"
         }
 
         data = {
-            "model": model,
-            "max_tokens": 4096,  # max _possible_ tokens to return
+            "model": anthropic_model,
+            "max_tokens": 4096,  # max possible tokens to return
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
-            "temperature": 0.1,
+            "temperature": temp,
             "top_k": 0,
             "top_p": 1.0,
             "metadata": {
                 "user_id": "example_user_id",
             },
             "stream": False,
-            "system": f"{system_prompt}"
+            "system": system_prompt
         }
 
         for attempt in range(max_retries):
             try:
-                logging.debug("anthropic: Posting request to API")
+                logging.debug("Anthropic: Posting request to API")
                 response = requests.post('https://api.anthropic.com/v1/messages', headers=headers, json=data)
-                logging.debug(f"Full API response data: {response}")
+                logging.debug(f"Anthropic: Full API response data: {response}")
+
                 # Check if the status code indicates success
                 if response.status_code == 200:
-                    logging.debug("anthropic: Post submittal successful")
+                    logging.debug("Anthropic: Post submittal successful")
                     response_data = response.json()
-                    try:
+
+                    # Corrected path to access the assistant's reply
+                    if 'content' in response_data and isinstance(response_data['content'], list) and len(response_data['content']) > 0:
                         chat_response = response_data['content'][0]['text'].strip()
-                        logging.debug("anthropic: Chat request successful")
+                        logging.debug("Anthropic: Chat request successful")
                         print("Chat request processed successfully.")
                         return chat_response
-                    except (IndexError, KeyError) as e:
-                        logging.debug("anthropic: Unexpected data in response")
+                    else:
+                        logging.error("Anthropic: Unexpected data structure in response.")
                         print("Unexpected response format from Anthropic API:", response.text)
-                        return None
+                        return "Anthropic: Unexpected response format from API."
                 elif response.status_code == 500:  # Handle internal server error specifically
-                    logging.debug("anthropic: Internal server error")
+                    logging.debug("Anthropic: Internal server error")
                     print("Internal server error from API. Retrying may be necessary.")
                     time.sleep(retry_delay)
                 else:
                     logging.debug(
-                        f"anthropic: Failed to process chat request, status code {response.status_code}: {response.text}")
+                        f"Anthropic: Failed to process chat request, status code {response.status_code}: {response.text}")
                     print(f"Failed to process chat request, status code {response.status_code}: {response.text}")
-                    return f"anthropic: Failed to process chat request, status code {response.status_code}: {response.text}"
+                    return f"Anthropic: Failed to process chat request, status code {response.status_code}: {response.text}"
 
-            except RequestException as e:
-                logging.error(f"anthropic: Network error during attempt {attempt + 1}/{max_retries}: {str(e)}")
+            except requests.RequestException as e:
+                logging.error(f"Anthropic: Network error during attempt {attempt + 1}/{max_retries}: {str(e)}")
                 if attempt < max_retries - 1:
+                    logging.debug(f"Anthropic: Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                 else:
-                    return f"anthropic: Network error: {str(e)}"
+                    return f"Anthropic: Network error: {str(e)}"
+
     except Exception as e:
-        logging.error(f"anthropic: Error in processing: {str(e)}")
-        return f"anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
+        logging.error(f"Anthropic: Error in processing: {str(e)}")
+        return f"Anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
 
 
 # Summarize with Cohere
-def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_prompt=None):
+def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, system_prompt=None, temp=None):
     loaded_config_data = load_and_log_configs()
     cohere_api_key = None
 
@@ -360,6 +395,15 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
             model = loaded_config_data['models']['cohere']
         logging.debug(f"Cohere Chat: Using model: {model}")
 
+        if temp is None:
+            temp = 0.3
+        else:
+            try:
+                temp = float(temp)
+            except ValueError:
+                logging.warning(f"Cohere Chat: Invalid temperature value '{temp}', defaulting to 0.3")
+                temp = 0.3
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
@@ -377,12 +421,18 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
         logging.debug(f"Cohere Chat: User Prompt being sent is: '{cohere_prompt}'")
 
         data = {
-            "chat_history": [
-                {"role": "SYSTEM", "message": system_prompt},
+            "model" : model,
+            "temperature": temp,
+            "messages": [
+                {
+                    "role": "system",
+                    "content":  system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": cohere_prompt,
+                }
             ],
-            "message": cohere_prompt,
-            "model": model,
-            "connectors": [{"id": "web-search"}]
         }
         logging.debug(f"Cohere Chat: Request data: {json.dumps(data, indent=2)}")
 
@@ -390,7 +440,7 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
         print("cohere chat: Submitting request to API endpoint")
 
         try:
-            response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
+            response = requests.post('https://api.cohere.ai/v2/chat', headers=headers, json=data)
             logging.debug(f"Cohere Chat: Raw API response: {response.text}")
         except requests.RequestException as e:
             logging.error(f"Cohere Chat: Error making API request: {str(e)}")
@@ -409,14 +459,24 @@ def chat_with_cohere(api_key, input_data, model, custom_prompt_arg, system_promp
 
             logging.debug(f"cohere chat: Full API response data: {json.dumps(response_data, indent=2)}")
 
-            if 'text' in response_data:
-                chat_response = response_data['text'].strip()
-                logging.debug("Cohere Chat: Chat request successful")
-                print("Cohere Chat request processed successfully.")
-                return chat_response
+            if 'message' in response_data and 'content' in response_data['message']:
+                content = response_data['message']['content']
+                if isinstance(content, list) and len(content) > 0:
+                    # Extract text from the first content block
+                    text = content[0].get('text', '').strip()
+                    if text:
+                        logging.debug("Cohere Chat: Chat request successful")
+                        print("Cohere Chat request processed successfully.")
+                        return text
+                    else:
+                        logging.error("Cohere Chat: 'text' field is empty in response content.")
+                        return "Cohere Chat: 'text' field is empty in response content."
+                else:
+                    logging.error("Cohere Chat: 'content' field is not a list or is empty.")
+                    return "Cohere Chat: 'content' field is not a list or is empty."
             else:
-                logging.error("Cohere Chat: Expected 'text' key not found in API response.")
-                return "Cohere Chat: Expected data not found in API response."
+                logging.error("Cohere Chat: 'message' or 'content' field not found in API response.")
+                return "Cohere Chat: 'message' or 'content' field not found in API response."
 
         elif response.status_code == 401:
             error_message = "Cohere Chat: Unauthorized - Invalid API key"
@@ -726,47 +786,69 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
         return None
 
 
-def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_message="You are a helpful AI assistant who does whatever the user requests.", max_retries=3, retry_delay=5):
+    """
+    Interacts with the DeepSeek API to generate summaries based on input data.
+
+    Parameters:
+        api_key (str): DeepSeek API key. If not provided, the key from the config is used.
+        input_data (str or list): The data to summarize. Can be a string or a list of segments.
+        custom_prompt_arg (str): Custom prompt to append to the input data.
+        temp (float, optional): Temperature setting for the model. Defaults to 0.1.
+        system_message (str, optional): System prompt for the assistant. Defaults to a helpful assistant message.
+        max_retries (int, optional): Maximum number of retries for failed API calls. Defaults to 3.
+        retry_delay (int, optional): Delay between retries in seconds. Defaults to 5.
+
+    Returns:
+        str: The summary generated by DeepSeek or an error message.
+    """
     logging.debug("DeepSeek: Summarization process starting...")
     try:
         logging.debug("DeepSeek: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
         if loaded_config_data is None:
-            logging.error("Failed to load configuration data")
-            deepseek_api_key = None
+            logging.error("DeepSeek: Failed to load configuration data")
+            return "DeepSeek: Failed to load configuration data."
+
+        # Prioritize the API key passed as a parameter
+        if api_key and api_key.strip():
+            deepseek_api_key = api_key.strip()
+            logging.info("DeepSeek: Using API key provided as parameter")
         else:
-            # Prioritize the API key passed as a parameter
-            if api_key and api_key.strip():
-                deepseek_api_key = api_key
-                logging.info("DeepSeek: Using API key provided as parameter")
+            # If no parameter is provided, use the key from the config
+            deepseek_api_key = loaded_config_data['api_keys'].get('deepseek')
+            if deepseek_api_key and deepseek_api_key.strip():
+                deepseek_api_key = deepseek_api_key.strip()
+                logging.info("DeepSeek: Using API key from config file")
             else:
-                # If no parameter is provided, use the key from the config
-                deepseek_api_key = loaded_config_data['api_keys'].get('deepseek')
-                if deepseek_api_key:
-                    logging.info("DeepSeek: Using API key from config file")
-                else:
-                    logging.warning("DeepSeek: No API key found in config file")
+                logging.error("DeepSeek: No valid API key available")
+                return "DeepSeek: API Key Not Provided/Found in Config file or is empty"
 
-        # Final check to ensure we have a valid API key
-        if not deepseek_api_key or not deepseek_api_key.strip():
-            logging.error("DeepSeek: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # For example: raise ValueError("No valid deepseek API key available")
-
-
-        logging.debug(f"DeepSeek: Using API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:]}")
+        logging.debug("DeepSeek: Using API Key")
 
         # Input data handling
         if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("DeepSeek: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
+            logging.debug("DeepSeek: Loading JSON data for summarization")
+            with open(input_data, 'r', encoding='utf-8') as file:
+                try:
+                    data = json.load(file)
+                except json.JSONDecodeError as e:
+                    logging.error(f"DeepSeek: JSON decoding failed: {str(e)}")
+                    return f"DeepSeek: Invalid JSON file. Error: {str(e)}"
         else:
             logging.debug("DeepSeek: Using provided string data for summarization")
             data = input_data
 
         # DEBUG - Debug logging to identify sent data
-        logging.debug(f"DeepSeek: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        if isinstance(data, str):
+            snipped_data = data[:500] + "..." if len(data) > 500 else data
+            logging.debug(f"DeepSeek: Loaded data (snipped to first 500 chars): {snipped_data}")
+        elif isinstance(data, list):
+            snipped_data = json.dumps(data[:2], indent=2) + "..." if len(data) > 2 else json.dumps(data, indent=2)
+            logging.debug(f"DeepSeek: Loaded data (snipped to first 2 segments): {snipped_data}")
+        else:
+            logging.debug(f"DeepSeek: Loaded data: {data}")
+
         logging.debug(f"DeepSeek: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -777,30 +859,47 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system
         # Text extraction
         if isinstance(data, list):
             segments = data
-            text = extract_text_from_segments(segments)
+            try:
+                text = extract_text_from_segments(segments)
+                logging.debug("DeepSeek: Extracted text from segments")
+            except Exception as e:
+                logging.error(f"DeepSeek: Error extracting text from segments: {str(e)}")
+                return f"DeepSeek: Error extracting text from segments: {str(e)}"
         elif isinstance(data, str):
             text = data
+            logging.debug("DeepSeek: Using string data directly")
         else:
             raise ValueError("DeepSeek: Invalid input data format")
 
-        deepseek_model = loaded_config_data['models']['deepseek'] or "deepseek-chat"
+        # Retrieve the model from config if not provided
+        deepseek_model = loaded_config_data['models'].get('deepseek', "deepseek-chat")
+        logging.debug(f"DeepSeek: Using model: {deepseek_model}")
 
-        if temp is None:
+        # Ensure temperature is a float within acceptable range
+        try:
+            temp = float(temp)
+            if not (0.0 <= temp <= 1.0):
+                logging.warning("DeepSeek: Temperature out of bounds (0.0 - 1.0). Setting to default 0.1")
+                temp = 0.1
+        except (ValueError, TypeError):
+            logging.warning("DeepSeek: Invalid temperature value. Setting to default 0.1")
             temp = 0.1
-        temp = float(temp)
-        if system_message is None:
+
+        # Set default system prompt if not provided
+        if system_message is not None:
+            logging.debug("DeepSeek: Using provided system prompt")
+        else:
             system_message = "You are a helpful AI assistant who does whatever the user requests."
+            logging.debug("DeepSeek: Using default system prompt")
 
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'Authorization': f'Bearer {deepseek_api_key}',
             'Content-Type': 'application/json'
         }
 
-        logging.debug(
-            f"Deepseek API Key: {api_key[:5]}...{api_key[-5:] if api_key else None}")
-        logging.debug("DeepSeek: Preparing data + prompt for submittal")
-        deepseek_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
-        data = {
+        logging.debug("DeepSeek: Preparing data and prompt for submittal")
+        deepseek_prompt = f"{text}\n\n\n\n{custom_prompt_arg}"
+        payload = {
             "model": deepseek_model,
             "messages": [
                 {"role": "system", "content": system_message},
@@ -810,26 +909,49 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system
             "temperature": temp
         }
 
-        logging.debug("DeepSeek: Posting request")
-        response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=data)
-        logging.debug(f"Full API response data: {response}")
-        if response.status_code == 200:
-            response_data = response.json()
-            logging.debug(response_data)
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("DeepSeek: Chat request successful")
-                return summary
+        logging.debug("DeepSeek: Posting request to API")
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=payload, timeout=30)
+                logging.debug(f"DeepSeek: Full API response: {response.status_code} - {response.text}")
+
+                if response.status_code == 200:
+                    response_data = response.json()
+                    logging.debug(f"DeepSeek: Response JSON: {json.dumps(response_data, indent=2)}")
+
+                    # Adjust parsing based on actual API response structure
+                    if 'choices' in response_data:
+                        if len(response_data['choices']) > 0:
+                            summary = response_data['choices'][0]['message']['content'].strip()
+                            logging.debug("DeepSeek: Chat request successful")
+                            return summary
+                        else:
+                            logging.error("DeepSeek: 'choices' key is empty in response")
+                    else:
+                        logging.error("DeepSeek: 'choices' key missing in response")
+                    return "DeepSeek: Unexpected response format from API."
+                elif 500 <= response.status_code < 600:
+                    logging.error(f"DeepSeek: Server error (status code {response.status_code}). Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
+                else:
+                    logging.error(f"DeepSeek: Request failed with status code {response.status_code}. Response: {response.text}")
+                    return f"DeepSeek: Failed to process chat request. Status code: {response.status_code}"
+
+            except requests.Timeout:
+                logging.error(f"DeepSeek: Request timed out. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
+            except requests.RequestException as e:
+                logging.error(f"DeepSeek: Request exception occurred: {str(e)}. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
+
+            if attempt < max_retries:
+                time.sleep(retry_delay)
             else:
-                logging.warning("DeepSeek: Chat response not found in the response data")
-                return "DeepSeek: Chat response not available"
-        else:
-            logging.error(f"DeepSeek: Chat request failed with status code {response.status_code}")
-            logging.error(f"DeepSeek: Error response: {response.text}")
-            return f"DeepSeek: Failed to chat request summary. Status code: {response.status_code}"
+                logging.error("DeepSeek: Max retries reached. Failed to get a successful response.")
+                return "DeepSeek: Failed to get a successful response from API after multiple attempts."
+
     except Exception as e:
-        logging.error(f"DeepSeek: Error in processing: {str(e)}", exc_info=True)
+        logging.error(f"DeepSeek: Unexpected error in processing: {str(e)}", exc_info=True)
         return f"DeepSeek: Error occurred while processing chat request: {str(e)}"
+
+
 
 
 def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):

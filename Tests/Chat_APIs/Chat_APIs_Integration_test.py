@@ -18,6 +18,9 @@ from dotenv import load_dotenv
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, project_root)
 
+logging.basicConfig(level=logging.DEBUG)
+logging = logging.getLogger()
+
 print(f"Project root added to sys.path: {project_root}")
 
 
@@ -73,11 +76,11 @@ class TestLLMAPICallsIntegration(unittest.TestCase):
         self.check_api_response("OpenAI", response)
 
     def test_chat_with_anthropic(self):
-        response = chat_with_anthropic(self.anthropic_api_key, "Hello, how are you?", "claude-2", "Respond briefly")
+        response = chat_with_anthropic(self.anthropic_api_key, "Hello, how are you?", None, "Respond briefly")
         self.check_api_response("Anthropic", response)
 
     def test_chat_with_cohere(self):
-        response = chat_with_cohere(self.cohere_api_key, "Hello, how are you?", "command", "Respond briefly")
+        response = chat_with_cohere(self.cohere_api_key, "Hello, how are you?", None, "Respond briefly")
 
         self.assertIsInstance(response, str)
         self.assertTrue(len(response) > 0)
