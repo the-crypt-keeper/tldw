@@ -39,7 +39,7 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
         if api_endpoint.lower() == 'openai':
             response = chat_with_openai(api_key, input_data, prompt, temp, system_message)
 
-        if api_endpoint.lower() == 'anthropic':
+        elif api_endpoint.lower() == 'anthropic':
             # Retrieve the model from config
             loaded_config_data = load_and_log_configs()
             model = loaded_config_data['models']['anthropic'] if loaded_config_data else None
