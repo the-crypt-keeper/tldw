@@ -70,13 +70,16 @@ def clear_chat():
     """
     return gr.update(value=[]), None
 
+
 def clear_chat_single():
     """
-    This clears the chat history for one chatbot instance
-    @return:
+    Clears the chatbot and chat history.
+
+    Returns:
+        list: Empty list for chatbot messages.
+        list: Empty list for chat history.
     """
-    # Return empty list for chatbot and chat history
-    return gr.update(value=[]), []
+    return [], []
 
 # FIXME - add additional features....
 def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, conversation_id,
@@ -663,50 +666,88 @@ def create_chat_interface_four():
         overflow-y: auto;
     }
     """
+
     with gr.TabItem("Four Independent API Chats"):
         gr.Markdown("# Four Independent API Chat Interfaces")
 
         with gr.Row():
             with gr.Column():
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                user_prompt = gr.Textbox(label="Modify Prompt", lines=3)
+                preset_prompt = gr.Dropdown(
+                    label="Select Preset Prompt",
+                    choices=load_preset_prompts(),
+                    visible=True
+                )
+                user_prompt = gr.Textbox(
+                    label="Modify Prompt",
+                    lines=3
+                )
             with gr.Column():
                 gr.Markdown("Scroll down for the chat windows...")
 
         chat_interfaces = []
 
-        for row in range(2):
-            with gr.Row():
-                for col in range(2):
-                    i = row * 2 + col
-                    with gr.Column():
-                        gr.Markdown(f"### Chat Window {i + 1}")
-                        api_endpoint = gr.Dropdown(label=f"API Endpoint {i + 1}",
-                                                   choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
-                                                            "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold",
-                                                            "Ooba",
-                                                            "Tabbyapi", "VLLM", "ollama", "HuggingFace"])
-                        api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
-                        temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.05,
-                                                value=0.7)
-                        chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
-                        msg = gr.Textbox(label=f"Enter your message for Chat {i + 1}")
-                        submit = gr.Button(f"Submit to Chat {i + 1}")
-                        clear_chat_button = gr.Button(f"Clear Chat {i + 1}")
+        def create_single_chat_interface(index, user_prompt_component):
+            """
+            Creates a single chat interface with its own set of components and event bindings.
 
-                        chat_interfaces.append({
-                            'api_endpoint': api_endpoint,
-                            'api_key': api_key,
-                            'temperature': temperature,
-                            'chatbot': chatbot,
-                            'msg': msg,
-                            'submit': submit,
-                            'clear_chat_button': clear_chat_button,
-                            # Maintain chat history for each chat independently
-                            'chat_history': gr.State([])
-                        })
+            Parameters:
+                index (int): The index of the chat interface.
+                user_prompt_component (gr.Textbox): The user prompt textbox component.
 
-        preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+            Returns:
+                dict: A dictionary containing all components of the chat interface.
+            """
+            with gr.Column():
+                gr.Markdown(f"### Chat Window {index + 1}")
+                api_endpoint = gr.Dropdown(
+                    label=f"API Endpoint {index + 1}",
+                    choices=[
+                        "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
+                        "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold",
+                        "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"
+                    ]
+                )
+                api_key = gr.Textbox(
+                    label=f"API Key {index + 1} (if required)",
+                    type="password"
+                )
+                temperature = gr.Slider(
+                    label=f"Temperature {index + 1}",
+                    minimum=0.0,
+                    maximum=1.0,
+                    step=0.05,
+                    value=0.7
+                )
+                chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
+                msg = gr.Textbox(label=f"Enter your message for Chat {index + 1}")
+                submit = gr.Button(f"Submit to Chat {index + 1}")
+                clear_chat_button = gr.Button(f"Clear Chat {index + 1}")
+
+                # State to maintain chat history
+                chat_history = gr.State([])
+
+                # Append to chat_interfaces list
+                chat_interfaces.append({
+                    'api_endpoint': api_endpoint,
+                    'api_key': api_key,
+                    'temperature': temperature,
+                    'chatbot': chatbot,
+                    'msg': msg,
+                    'submit': submit,
+                    'clear_chat_button': clear_chat_button,
+                    'chat_history': chat_history
+                })
+
+        # Create four chat interfaces
+        for i in range(4):
+            create_single_chat_interface(i, user_prompt)
+
+        # Update user_prompt based on preset_prompt selection
+        preset_prompt.change(
+            fn=update_user_prompt,
+            inputs=preset_prompt,
+            outputs=user_prompt
+        )
 
         def chat_wrapper_single(message, chat_history, api_endpoint, api_key, temperature, user_prompt):
             logging.debug(f"Chat Wrapper Single - Message: {message}, Chat History: {chat_history}")
@@ -738,7 +779,7 @@ def create_chat_interface_four():
 
             return "", chat_history, chat_history
 
-        # Attach click event for each chat interface
+        # Attach click events for each chat interface
         for interface in chat_interfaces:
             logging.debug(f"Chat Interface - Clicked Submit for Chat {interface['chatbot']}"),
             interface['submit'].click(
@@ -758,12 +799,12 @@ def create_chat_interface_four():
                 ]
             )
 
-        # Attach the clear button event for each chat window
-        interface['clear_chat_button'].click(
-            # Calls clear function to reset chatbot and chat history
-            clear_chat_single,
-            outputs=[interface['chatbot'], interface['chat_history']]
-        )
+            # Bind the clear chat button
+            interface['clear_chat_button'].click(
+                clear_chat_single,
+                inputs=[],
+                outputs=[interface['chatbot'], interface['chat_history']]
+            )
 
 
 def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, temperature, media_content,
