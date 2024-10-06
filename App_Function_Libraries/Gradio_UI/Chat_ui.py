@@ -738,9 +738,17 @@ def create_chat_interface_four():
                     'chat_history': chat_history
                 })
 
-        # Create four chat interfaces
-        for i in range(4):
-            create_single_chat_interface(i, user_prompt)
+        # # Create four chat interfaces
+        # for i in range(4):
+        #     create_single_chat_interface(i, user_prompt)
+
+        # Create four chat interfaces arranged in a 2x2 grid
+        with gr.Row():
+            for i in range(2):
+                with gr.Column():
+                    for j in range(2):
+                        create_single_chat_interface(i * 2 + j, user_prompt)
+
 
         # Update user_prompt based on preset_prompt selection
         preset_prompt.change(
