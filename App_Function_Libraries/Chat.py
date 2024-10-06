@@ -19,11 +19,14 @@ from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_ant
 from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
     chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi, chat_with_vllm, chat_with_custom_openai
 from App_Function_Libraries.DB.SQLite_DB import load_media_content
-from App_Function_Libraries.Utils.Utils import generate_unique_filename
+from App_Function_Libraries.Utils.Utils import generate_unique_filename, load_and_log_configs
+
+
 #
 ####################################################################################################
 #
 # Functions:
+
 
 def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message=None):
     if not api_key:
@@ -36,8 +39,17 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
         if api_endpoint.lower() == 'openai':
             response = chat_with_openai(api_key, input_data, prompt, temp, system_message)
 
-        elif api_endpoint.lower() == "anthropic":
-            response = chat_with_anthropic(api_key, input_data, prompt, temp, system_message)
+        if api_endpoint.lower() == 'anthropic':
+            # Retrieve the model from config
+            loaded_config_data = load_and_log_configs()
+            model = loaded_config_data['models']['anthropic'] if loaded_config_data else None
+            response = chat_with_anthropic(
+                api_key=api_key,
+                input_data=input_data,
+                model=model,
+                custom_prompt_arg=prompt,
+                system_prompt=system_message
+            )
 
         elif api_endpoint.lower() == "cohere":
             response = chat_with_cohere(
