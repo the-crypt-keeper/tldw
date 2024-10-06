@@ -19,53 +19,90 @@ from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_ant
 from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
     chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi, chat_with_vllm, chat_with_custom_openai
 from App_Function_Libraries.DB.SQLite_DB import load_media_content
-from App_Function_Libraries.Utils.Utils import generate_unique_filename
+from App_Function_Libraries.Utils.Utils import generate_unique_filename, load_and_log_configs
+
+
 #
 ####################################################################################################
 #
 # Functions:
 
+
 def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message=None):
     if not api_key:
         api_key = None
+    model = None
     try:
         logging.info(f"Debug - Chat API Call - API Endpoint: {api_endpoint}")
         logging.info(f"Debug - Chat API Call - API Key: {api_key}")
         logging.info(f"Debug - Chat chat_api_call - API Endpoint: {api_endpoint}")
         if api_endpoint.lower() == 'openai':
             response = chat_with_openai(api_key, input_data, prompt, temp, system_message)
-        elif api_endpoint.lower() == "anthropic":
-            response = chat_with_anthropic(api_key, input_data, prompt, temp, system_message)
+
+        elif api_endpoint.lower() == 'anthropic':
+            # Retrieve the model from config
+            loaded_config_data = load_and_log_configs()
+            model = loaded_config_data['models']['anthropic'] if loaded_config_data else None
+            response = chat_with_anthropic(
+                api_key=api_key,
+                input_data=input_data,
+                model=model,
+                custom_prompt_arg=prompt,
+                system_prompt=system_message
+            )
+
         elif api_endpoint.lower() == "cohere":
-            response = chat_with_cohere(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_cohere(
+                api_key,
+                input_data,
+                model=model,
+                custom_prompt_arg=prompt,
+                system_prompt=system_message,
+                temp=temp
+            )
+
         elif api_endpoint.lower() == "groq":
             response = chat_with_groq(api_key, input_data, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "openrouter":
             response = chat_with_openrouter(api_key, input_data, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "deepseek":
             response = chat_with_deepseek(api_key, input_data, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "mistral":
             response = chat_with_mistral(api_key, input_data, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "llama.cpp":
             response = chat_with_llama(input_data, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "kobold":
             response = chat_with_kobold(input_data, api_key, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "ooba":
             response = chat_with_oobabooga(input_data, api_key, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "tabbyapi":
             response = chat_with_tabbyapi(input_data, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "vllm":
             response = chat_with_vllm(input_data, prompt, system_message)
+
         elif api_endpoint.lower() == "local-llm":
             response = chat_with_local_llm(input_data, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "huggingface":
             response = chat_with_huggingface(api_key, input_data, prompt, temp)  # , system_message)
+
         elif api_endpoint.lower() == "ollama":
             response = chat_with_ollama(input_data, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "aphrodite":
             response = chat_with_aphrodite(input_data, prompt, temp, system_message)
+
         elif api_endpoint.lower() == "custom-openai-api":
             response = chat_with_custom_openai(api_key, input_data, prompt, temp, system_message)
+
         else:
             raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
 
@@ -99,8 +136,8 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         # Prepare the input for the API
         input_data = f"{combined_content}\n\n" if combined_content else ""
         for old_message, old_response in history:
-            input_data += f"User: {old_message}\nAssistant: {old_response}\n\n"
-        input_data += f"User: {message}\n"
+            input_data += f"{old_message}\nAssistant: {old_response}\n\n"
+        input_data += f"{message}\n"
 
         if system_message:
             print(f"System message: {system_message}")
@@ -108,7 +145,7 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         temperature = float(temperature) if temperature else 0.7
         temp = temperature
 
-        logging.debug("Debug - Chat Function - Temperature: {temperature}")
+        logging.debug(f"Debug - Chat Function - Temperature: {temperature}")
         logging.debug(f"Debug - Chat Function - API Key: {api_key[:10]}")
         logging.debug(f"Debug - Chat Function - Prompt: {prompt}")
 
