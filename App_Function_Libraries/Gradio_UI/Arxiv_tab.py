@@ -22,6 +22,7 @@ import gradio as gr
 def create_arxiv_tab():
     with gr.TabItem("Arxiv Search & Ingest"):
         gr.Markdown("# arXiv Search, Browse, Download, and Ingest")
+        gr.Markdown("#### Thank you to arXiv for use of its open access interoperability.")
         with gr.Row():
             with gr.Column(scale=1):
                 # Search Inputs
