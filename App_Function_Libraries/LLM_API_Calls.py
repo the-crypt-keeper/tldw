@@ -30,7 +30,6 @@ from typing import List
 import requests
 #
 # Import 3rd-Party Libraries
-from requests import RequestException
 #
 # Import Local libraries
 from App_Function_Libraries.Utils.Utils import load_and_log_configs
@@ -236,33 +235,64 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_m
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None):
+def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None, temp=None):
     try:
         loaded_config_data = load_and_log_configs()
-        global anthropic_api_key
+
+        # Check if config was loaded successfully
+        if loaded_config_data is None:
+            logging.error("Anthropic: Failed to load configuration data.")
+            return "Anthropic: Failed to load configuration data."
+
+        # Initialize the API key
         anthropic_api_key = api_key
+
         # API key validation
         if not api_key:
             logging.info("Anthropic: API key not provided as parameter")
             logging.info("Anthropic: Attempting to use API key from config file")
-            anthropic_api_key = loaded_config_data['api_keys']['anthropic']
+            # Ensure 'api_keys' and 'anthropic' keys exist
+            try:
+                anthropic_api_key = loaded_config_data['api_keys']['anthropic']
+                logging.debug(f"Anthropic: Loaded API Key from config: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
+            except (KeyError, TypeError) as e:
+                logging.error(f"Anthropic: Error accessing API key from config: {str(e)}")
+                return "Anthropic: API Key Not Provided/Found in Config file or is empty"
 
-        if not anthropic_api_key or api_key.strip() == "":
+        if not anthropic_api_key or anthropic_api_key == "":
             logging.error("Anthropic: API key not found or is empty")
             return "Anthropic: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"Anthropic: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        if anthropic_api_key:
+            logging.debug(f"Anthropic: Using API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
+        else:
+            logging.debug(f"Anthropic: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
         if system_prompt is not None:
             logging.debug("Anthropic: Using provided system prompt")
             pass
         else:
             system_prompt = "You are a helpful assistant"
+            logging.debug("Anthropic: Using default system prompt")
 
         logging.debug(f"AnthropicAI: Loaded data: {input_data}")
         logging.debug(f"AnthropicAI: Type of data: {type(input_data)}")
 
-        anthropic_model = loaded_config_data['models']['anthropic']
+        # Retrieve the model from config if not provided
+        if not model:
+            try:
+                anthropic_model = loaded_config_data['models']['anthropic']
+                logging.debug(f"Anthropic: Loaded model from config: {anthropic_model}")
+            except (KeyError, TypeError) as e:
+                logging.error(f"Anthropic: Error accessing model from config: {str(e)}")
+                return "Anthropic: Model configuration not found."
+        else:
+            anthropic_model = model
+            logging.debug(f"Anthropic: Using provided model: {anthropic_model}")
+
+        if temp is None:
+            temp = 1.0
+            logging.debug(f"Anthropic: Using default temperature: {temp}")
 
         headers = {
             'x-api-key': anthropic_api_key,
@@ -270,65 +300,70 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             'Content-Type': 'application/json'
         }
 
-        anthropic_user_prompt = custom_prompt_arg
-        logging.debug(f"Anthropic: User Prompt is {anthropic_user_prompt}")
+        anthropic_user_prompt = custom_prompt_arg if custom_prompt_arg else ""
+        logging.debug(f"Anthropic: User Prompt is '{anthropic_user_prompt}'")
         user_message = {
             "role": "user",
             "content": f"{input_data} \n\n\n\n{anthropic_user_prompt}"
         }
 
         data = {
-            "model": model,
-            "max_tokens": 4096,  # max _possible_ tokens to return
+            "model": anthropic_model,
+            "max_tokens": 4096,  # max possible tokens to return
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
-            "temperature": 0.1,
+            "temperature": temp,
             "top_k": 0,
             "top_p": 1.0,
             "metadata": {
                 "user_id": "example_user_id",
             },
             "stream": False,
-            "system": f"{system_prompt}"
+            "system": system_prompt
         }
 
         for attempt in range(max_retries):
             try:
-                logging.debug("anthropic: Posting request to API")
+                logging.debug("Anthropic: Posting request to API")
                 response = requests.post('https://api.anthropic.com/v1/messages', headers=headers, json=data)
-                logging.debug(f"Full API response data: {response}")
+                logging.debug(f"Anthropic: Full API response data: {response}")
+
                 # Check if the status code indicates success
                 if response.status_code == 200:
-                    logging.debug("anthropic: Post submittal successful")
+                    logging.debug("Anthropic: Post submittal successful")
                     response_data = response.json()
-                    try:
+
+                    # Corrected path to access the assistant's reply
+                    if 'content' in response_data and isinstance(response_data['content'], list) and len(response_data['content']) > 0:
                         chat_response = response_data['content'][0]['text'].strip()
-                        logging.debug("anthropic: Chat request successful")
+                        logging.debug("Anthropic: Chat request successful")
                         print("Chat request processed successfully.")
                         return chat_response
-                    except (IndexError, KeyError) as e:
-                        logging.debug("anthropic: Unexpected data in response")
+                    else:
+                        logging.error("Anthropic: Unexpected data structure in response.")
                         print("Unexpected response format from Anthropic API:", response.text)
-                        return None
+                        return "Anthropic: Unexpected response format from API."
                 elif response.status_code == 500:  # Handle internal server error specifically
-                    logging.debug("anthropic: Internal server error")
+                    logging.debug("Anthropic: Internal server error")
                     print("Internal server error from API. Retrying may be necessary.")
                     time.sleep(retry_delay)
                 else:
                     logging.debug(
-                        f"anthropic: Failed to process chat request, status code {response.status_code}: {response.text}")
+                        f"Anthropic: Failed to process chat request, status code {response.status_code}: {response.text}")
                     print(f"Failed to process chat request, status code {response.status_code}: {response.text}")
-                    return f"anthropic: Failed to process chat request, status code {response.status_code}: {response.text}"
+                    return f"Anthropic: Failed to process chat request, status code {response.status_code}: {response.text}"
 
-            except RequestException as e:
-                logging.error(f"anthropic: Network error during attempt {attempt + 1}/{max_retries}: {str(e)}")
+            except requests.RequestException as e:
+                logging.error(f"Anthropic: Network error during attempt {attempt + 1}/{max_retries}: {str(e)}")
                 if attempt < max_retries - 1:
+                    logging.debug(f"Anthropic: Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                 else:
-                    return f"anthropic: Network error: {str(e)}"
+                    return f"Anthropic: Network error: {str(e)}"
+
     except Exception as e:
-        logging.error(f"anthropic: Error in processing: {str(e)}")
-        return f"anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
+        logging.error(f"Anthropic: Error in processing: {str(e)}")
+        return f"Anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
 
 
 # Summarize with Cohere
