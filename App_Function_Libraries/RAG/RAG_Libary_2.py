@@ -471,10 +471,8 @@ def fetch_relevant_chat_ids(character_id: int, keywords: List[str]) -> List[int]
     """
     relevant_ids = set()
     try:
-        for keyword in keywords:
-            # Implement a function to fetch chat IDs containing the keyword
-            media_ids = fetch_keywords_for_chats(keyword)
-            relevant_ids.update(media_ids)
+        media_ids = fetch_keywords_for_chats(keywords)
+        relevant_ids.update(media_ids)
     except Exception as e:
         logging.error(f"Error fetching relevant chat IDs: {str(e)}")
     return list(relevant_ids)
