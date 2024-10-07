@@ -394,9 +394,9 @@ def create_character_card_interaction_tab_two():
                 regenerate_button = gr.Button("Regenerate Last Message")
                 clear_chat_button = gr.Button("Clear Chat")
                 save_snapshot_button = gr.Button("Save Chat Snapshot")
-                update_chat_dropdown = gr.Dropdown(label="Select Chat to Update", choices=[])
-                load_selected_chat_button = gr.Button("Load Selected Chat")
-                update_chat_button = gr.Button("Update Selected Chat")
+                update_chat_dropdown = gr.Dropdown(label="Select Chat to Update", choices=[], visible=False)
+                load_selected_chat_button = gr.Button("Load Selected Chat", visible=False)
+                update_chat_button = gr.Button("Update Selected Chat", visible=False)
 
         # States
         character_data = gr.State(None)
