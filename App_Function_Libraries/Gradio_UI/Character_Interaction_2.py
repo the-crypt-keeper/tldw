@@ -3,6 +3,7 @@
 # Imports
 import base64
 import io
+import re
 import uuid
 from datetime import datetime
 import logging
@@ -51,6 +52,21 @@ def validate_user_name(name):
         return "User"  # Default name if input is empty
     return name.strip()
 
+def sanitize_user_input(message):
+    """
+    Removes or escapes '{{' and '}}' to prevent placeholder injection.
+
+    Args:
+        message (str): The user's message.
+
+    Returns:
+        str: Sanitized message.
+    """
+    # Replace '{{' and '}}' with their escaped versions
+    message = re.sub(r'\{\{', '{ {', message)
+    message = re.sub(r'\}\}', '} }', message)
+    return message
+
 def replace_placeholders(text, replacements):
     """
     Replaces placeholders in the text with corresponding values.
@@ -75,6 +91,31 @@ def replace_placeholders(text, replacements):
 #     '{{date}}': datetime.now().strftime('%Y-%m-%d')
 # }
 # post_history_instructions = replace_placeholders(char_data.get('post_history_instructions', ''), placeholders)
+
+def replace_user_placeholder(history, user_name):
+    """
+    Replaces all instances of '{{user}}' in the chat history with the actual user name.
+
+    Args:
+        history (list): The current chat history as a list of tuples (user_message, bot_message).
+        user_name (str): The name entered by the user.
+
+    Returns:
+        list: Updated chat history with placeholders replaced.
+    """
+    if not user_name:
+        user_name = "User"  # Default name if none provided
+
+    updated_history = []
+    for user_msg, bot_msg in history:
+        # Replace in user message
+        if user_msg:
+            user_msg = user_msg.replace("{{user}}", user_name)
+        # Replace in bot message
+        if bot_msg:
+            bot_msg = bot_msg.replace("{{user}}", user_name)
+        updated_history.append((user_msg, bot_msg))
+    return updated_history
 
 def import_character_card(file):
     if file is None:
@@ -354,10 +395,25 @@ def create_character_card_interaction_tab_two():
 
         # Callback Functions
 
-        def import_chat_history(file, current_history, char_data):
+        def import_chat_history(file, current_history, char_data, user_name_val):
+            """
+            Imports chat history from a file, replacing '{{user}}' with the actual user name.
+
+            Args:
+                file (file): The uploaded chat history file.
+                current_history (list): The current chat history.
+                char_data (dict): The current character data.
+                user_name_val (str): The user's name.
+
+            Returns:
+                tuple: Updated chat history, updated character data, and a status message.
+            """
             loaded_history, char_name = load_chat_history(file)
             if loaded_history is None:
                 return current_history, char_data, "Failed to load chat history."
+
+            # Replace '{{user}}' in the loaded chat history
+            loaded_history = replace_user_placeholder(loaded_history, user_name_val)
 
             # Check if the loaded chat is for the current character
             if char_data and char_data.get('name') != char_name:
@@ -372,6 +428,10 @@ def create_character_card_interaction_tab_two():
                 character = next((char for char in characters if char['name'] == char_name), None)
                 if character:
                     char_data = character
+                    # Replace '{{user}}' in the first_message if necessary
+                    if character.get('first_message'):
+                        character['first_message'] = character['first_message'].replace("{{user}}",
+                                                                                        user_name_val if user_name_val else "User")
                 else:
                     return current_history, char_data, (
                         f"Warning: Character '{char_name}' not found. Please select the character manually."
@@ -402,6 +462,16 @@ def create_character_card_interaction_tab_two():
             return None
 
         def load_character_and_image(name, user_name_val):
+            """
+            Loads character data and image, replacing '{{user}}' in the first_message.
+
+            Args:
+                name (str): The name of the character to load.
+                user_name_val (str): The user's name.
+
+            Returns:
+                tuple: Character data, updated chat history, and PIL Image object.
+            """
             char_data, chat_history, _ = load_character(name)
             if char_data and 'image' in char_data and char_data['image']:
                 try:
@@ -409,20 +479,14 @@ def create_character_card_interaction_tab_two():
                     image_data = base64.b64decode(char_data['image'])
                     # Load the image as a PIL Image and convert to RGBA
                     img = Image.open(io.BytesIO(image_data)).convert("RGBA")
-                    # Replace {{user}} in first_message if present
-                    if char_data.get('first_message'):
-                        first_message = char_data['first_message'].replace('{{user}}', user_name_val)
-                        chat_history = [(None, first_message)] if first_message else []
                     return char_data, chat_history, img
                 except Exception as e:
                     logging.error(f"Error processing image for character '{name}': {e}")
                     return char_data, chat_history, None
             else:
-                # If no image, still handle first_message
-                if char_data and 'first_message' in char_data and char_data['first_message']:
-                    first_message = char_data['first_message'].replace('{{user}}', user_name_val)
-                    chat_history = [(None, first_message)] if first_message else []
-                return char_data, chat_history, None
+                # Replace '{{user}}' in chat_history if necessary
+                updated_chat_history = replace_user_placeholder(chat_history, user_name_val)
+                return char_data, updated_chat_history, None
 
         def character_chat_wrapper(
                 message, history, char_data, api_endpoint, api_key,
@@ -445,16 +509,12 @@ def create_character_card_interaction_tab_two():
             Scenario: {char_data.get('scenario', 'N/A')}
             """
 
-            # Replace {{user}} in post_history_instructions
-            post_history_instructions = char_data.get('post_history_instructions', '').replace('{{user}}',
-                                                                                               user_name_val)
-
             # Prepare the system prompt for character impersonation
             system_message = f"""You are roleplaying as {char_name}, the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI. Always refer to yourself as "{char_name}" and refer to the user as "{user_name_val}".
 
             {char_background}
 
-            Additional instructions: {post_history_instructions}
+            Additional instructions: {char_data.get('post_history_instructions', '')}
             """
 
             # Prepare media_content and selected_parts
@@ -468,16 +528,11 @@ def create_character_card_interaction_tab_two():
             }
             selected_parts = ['description', 'personality', 'scenario']
 
-            prompt = post_history_instructions  # Already has {{user}} replaced
+            prompt = char_data.get('post_history_instructions', '')
 
-            # Prepare the input for the chat function
-            if not history:
-                full_message = (
-                    f"{prompt}\n\n{user_name_val}: {message}"
-                    if prompt else f"{user_name_val}: {message}"
-                )
-            else:
-                full_message = f"{user_name_val}: {message}"
+            # Replace '{{user}}' in the user message before sending
+            user_message = sanitize_user_input(message).replace("{{user}}", user_name_val if user_name_val else "User")
+            full_message = f"{user_name_val}: {user_message}" if user_message else f"{user_name_val}: "
 
             # Call the chat function
             bot_message = chat(
@@ -492,8 +547,11 @@ def create_character_card_interaction_tab_two():
                 system_message
             )
 
+            # Replace '{{user}}' in the bot message before appending
+            bot_message = bot_message.replace("{{user}}", user_name_val if user_name_val else "User")
+
             # Update history
-            history.append((message, bot_message))
+            history.append((user_message, bot_message))
 
             # Auto-save if enabled
             if auto_save:
@@ -528,7 +586,7 @@ def create_character_card_interaction_tab_two():
                 return "Failed to save chat.", ""
 
         def update_character_info(name):
-            return load_character_and_image(name)
+            return load_character_and_image(name, user_name.value)
 
         def on_character_select(name, user_name_val):
             logging.debug(f"Character selected: {name}")
@@ -537,19 +595,22 @@ def create_character_card_interaction_tab_two():
 
         def clear_chat_history(char_data, user_name_val):
             """
-            Clears the chat history and initializes it with the character's first message, replacing {{user}}.
+            Clears the chat history and initializes it with the character's first message,
+            replacing the '{{user}}' placeholder with the actual user name.
 
             Args:
                 char_data (dict): The current character data.
                 user_name_val (str): The user's name.
 
             Returns:
-                tuple: A list containing the first_message with {{user}} replaced and the unchanged char_data.
+                tuple: Updated chat history and the unchanged char_data.
             """
             if char_data and 'first_message' in char_data and char_data['first_message']:
-                # Replace {{user}} with user_name_val in first_message
-                first_msg = char_data['first_message'].replace('{{user}}', user_name_val)
-                return [(None, first_msg)], char_data
+                # Replace '{{user}}' in the first_message
+                first_message = char_data['first_message'].replace("{{user}}",
+                                                                   user_name_val if user_name_val else "User")
+                # Initialize chat history with the updated first_message
+                return [(None, first_message)], char_data
             else:
                 # If no first_message is defined, simply clear the chat
                 return [], char_data
