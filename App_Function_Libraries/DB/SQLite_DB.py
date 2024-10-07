@@ -102,8 +102,8 @@ backup_path = get_project_relative_path(backup_path)
 db_path = sqlite_path
 backup_dir = backup_path
 
-print(f"Database path: {db_path}")
-print(f"Backup directory: {backup_dir}")
+print(f"Media Database path: {db_path}")
+print(f"Media Backup directory: {backup_dir}")
 #create_automated_backup(db_path, backup_dir)
 
 # FIXME - Setup properly and test/add documentation for its existence...

@@ -2,24 +2,42 @@
 # Database functions for managing character cards and chat histories.
 # #
 # Imports
+import configparser
 import sqlite3
 import json
 import os
 from typing import List, Dict, Optional, Tuple
 
+from App_Function_Libraries.Utils.Utils import get_database_dir, get_project_relative_path, get_database_path
 from Tests.Chat_APIs.Chat_APIs_Integration_test import logging
 
 #
 #######################################################################################################################
 #
-# Constants
-DB_PATH = "character_chat.db"
 #
+
+def ensure_database_directory():
+    os.makedirs(get_database_dir(), exist_ok=True)
+
+ensure_database_directory()
+
+# FIXME - Setup properly and test/add documentation for its existence...
+# Construct the path to the config file
+config_path = get_project_relative_path('Config_Files/config.txt')
+
+# Read the config file
+config = configparser.ConfigParser()
+config.read(config_path)
+
+# Get the chat db path from the config, or use the default if not specified
+chat_DB_PATH = config.get('Database', 'chatDB_path', fallback=get_database_path('chatDB.db'))
+print(f"Chat Database path: {chat_DB_PATH}")
+
 # Functions
 
 def initialize_database():
     """Initialize the SQLite database with required tables."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
 
     # Create CharacterCards table with image as BLOB
@@ -53,15 +71,14 @@ def initialize_database():
     conn.commit()
     conn.close()
 
-# Migrate to main/make a flaggable feature for character chat usage(outside of an overarching persona) - FIXME
 initialize_database()
 
 def add_character_card(card_data: Dict) -> Optional[int]:
-    """Add a new character card to the database.
+    """Add or update a character card in the database.
 
     Returns the ID of the inserted character or None if failed.
     """
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     try:
         # Ensure all required fields are present
@@ -70,18 +87,42 @@ def add_character_card(card_data: Dict) -> Optional[int]:
             if field not in card_data:
                 card_data[field] = ''  # Assign empty string if field is missing
 
-        cursor.execute("""
-            INSERT INTO CharacterCards (name, description, personality, scenario, image, post_history_instructions, first_message)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            card_data['name'],
-            card_data['description'],
-            card_data['personality'],
-            card_data['scenario'],
-            card_data['image'],
-            card_data['post_history_instructions'],
-            card_data['first_message']
-        ))
+        # Check if character already exists
+        cursor.execute("SELECT id FROM CharacterCards WHERE name = ?", (card_data['name'],))
+        row = cursor.fetchone()
+
+        if row:
+            # Update existing character
+            character_id = row[0]
+            cursor.execute("""
+                UPDATE CharacterCards
+                SET description = ?, personality = ?, scenario = ?, image = ?, post_history_instructions = ?, first_message = ?
+                WHERE id = ?
+            """, (
+                card_data['description'],
+                card_data['personality'],
+                card_data['scenario'],
+                card_data['image'],
+                card_data['post_history_instructions'],
+                card_data['first_message'],
+                character_id
+            ))
+        else:
+            # Insert new character
+            cursor.execute("""
+                INSERT INTO CharacterCards (name, description, personality, scenario, image, post_history_instructions, first_message)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                card_data['name'],
+                card_data['description'],
+                card_data['personality'],
+                card_data['scenario'],
+                card_data['image'],
+                card_data['post_history_instructions'],
+                card_data['first_message']
+            ))
+            character_id = cursor.lastrowid
+
         conn.commit()
         return cursor.lastrowid
     except sqlite3.IntegrityError as e:
@@ -96,18 +137,20 @@ def add_character_card(card_data: Dict) -> Optional[int]:
 
 def get_character_cards() -> List[Dict]:
     """Retrieve all character cards from the database."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM CharacterCards")
     rows = cursor.fetchall()
-    conn.close()
     columns = [description[0] for description in cursor.description]
-    return [dict(zip(columns, row)) for row in rows]
+    conn.close()
+    characters = [dict(zip(columns, row)) for row in rows]
+    logging.debug(f"Characters fetched from DB: {characters}")
+    return characters
 
 
 def get_character_card_by_id(character_id: int) -> Optional[Dict]:
     """Retrieve a single character card by its ID."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM CharacterCards WHERE id = ?", (character_id,))
     row = cursor.fetchone()
@@ -120,7 +163,7 @@ def get_character_card_by_id(character_id: int) -> Optional[Dict]:
 
 def update_character_card(character_id: int, card_data: Dict) -> bool:
     """Update an existing character card."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute("""
@@ -140,7 +183,7 @@ def update_character_card(character_id: int, card_data: Dict) -> bool:
         conn.commit()
         return cursor.rowcount > 0
     except sqlite3.IntegrityError as e:
-        print(f"Error updating character card: {e}")
+        logging.error(f"Error updating character card: {e}")
         return False
     finally:
         conn.close()
@@ -148,7 +191,7 @@ def update_character_card(character_id: int, card_data: Dict) -> bool:
 
 def delete_character_card(character_id: int) -> bool:
     """Delete a character card and its associated chats."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     try:
         # Delete associated chats first due to foreign key constraint
@@ -157,7 +200,7 @@ def delete_character_card(character_id: int) -> bool:
         conn.commit()
         return cursor.rowcount > 0
     except sqlite3.Error as e:
-        print(f"Error deleting character card: {e}")
+        logging.error(f"Error deleting character card: {e}")
         return False
     finally:
         conn.close()
@@ -169,7 +212,7 @@ def add_character_chat(character_id: int, conversation_name: str, chat_history: 
 
     Returns the ID of the inserted chat or None if failed.
     """
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     try:
         chat_history_json = json.dumps(chat_history)
@@ -185,7 +228,7 @@ def add_character_chat(character_id: int, conversation_name: str, chat_history: 
         conn.commit()
         return cursor.lastrowid
     except sqlite3.Error as e:
-        print(f"Error adding character chat: {e}")
+        logging.error(f"Error adding character chat: {e}")
         return None
     finally:
         conn.close()
@@ -193,7 +236,7 @@ def add_character_chat(character_id: int, conversation_name: str, chat_history: 
 
 def get_character_chats(character_id: Optional[int] = None) -> List[Dict]:
     """Retrieve all chats, or chats for a specific character if character_id is provided."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     if character_id is not None:
         cursor.execute("SELECT * FROM CharacterChats WHERE character_id = ?", (character_id,))
@@ -207,7 +250,7 @@ def get_character_chats(character_id: Optional[int] = None) -> List[Dict]:
 
 def get_character_chat_by_id(chat_id: int) -> Optional[Dict]:
     """Retrieve a single chat by its ID."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM CharacterChats WHERE id = ?", (chat_id,))
     row = cursor.fetchone()
@@ -222,7 +265,7 @@ def get_character_chat_by_id(chat_id: int) -> Optional[Dict]:
 
 def update_character_chat(chat_id: int, chat_history: List[Tuple[str, str]]) -> bool:
     """Update an existing chat history."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     try:
         chat_history_json = json.dumps(chat_history)
@@ -237,7 +280,7 @@ def update_character_chat(chat_id: int, chat_history: List[Tuple[str, str]]) -> 
         conn.commit()
         return cursor.rowcount > 0
     except sqlite3.Error as e:
-        print(f"Error updating character chat: {e}")
+        logging.error(f"Error updating character chat: {e}")
         return False
     finally:
         conn.close()
@@ -245,108 +288,27 @@ def update_character_chat(chat_id: int, chat_history: List[Tuple[str, str]]) -> 
 
 def delete_character_chat(chat_id: int) -> bool:
     """Delete a specific chat."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM CharacterChats WHERE id = ?", (chat_id,))
         conn.commit()
         return cursor.rowcount > 0
     except sqlite3.Error as e:
-        print(f"Error deleting character chat: {e}")
+        logging.error(f"Error deleting character chat: {e}")
         return False
     finally:
         conn.close()
 
+def save_chat_history_to_character_db(character_id: int, conversation_name: str, chat_history: List[Tuple[str, str]]) -> Optional[int]:
+    """Save chat history to the CharacterChats table.
 
-def migrate_chat_to_media_db(chat_id: int, media_db_path: str = "media_db.db") -> bool:
-    """Migrate a chat from CharacterChats to Media DB."""
-    # This function assumes that the Media DB has a similar schema for storing chats.
-    # You'll need to adjust the schema and fields accordingly.
-    character_chat = get_character_chat_by_id(chat_id)
-    if not character_chat:
-        print(f"No chat found with ID {chat_id}")
-        return False
+    Returns the ID of the inserted chat or None if failed.
+    """
+    return add_character_chat(character_id, conversation_name, chat_history)
 
-    try:
-        conn_media = sqlite3.connect(media_db_path)
-        cursor_media = conn_media.cursor()
-
-        # Example: Assuming MediaChats table exists with similar fields
-        cursor_media.execute("""
-            INSERT INTO MediaChats (character_id, conversation_name, chat_history, is_snapshot, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        """, (
-            character_chat['character_id'],
-            character_chat['conversation_name'],
-            character_chat['chat_history'],
-            character_chat['is_snapshot'],
-            character_chat['created_at']
-        ))
-        conn_media.commit()
-        conn_media.close()
-
-        # Optionally, delete the chat from CharacterChats after migration
-        delete_character_chat(chat_id)
-        return True
-    except sqlite3.Error as e:
-        print(f"Error migrating chat to Media DB: {e}")
-        return False
-
-
-def save_chat_history_to_character_db(character_name, chat_history):
-    try:
-        with sqlite3.connect('character_chat.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-            INSERT INTO CharacterChats (character_name, chat_history)
-            VALUES (?, ?)
-            ''', (character_name, json.dumps(chat_history)))
-            conn.commit()
-        return "Chat saved successfully to Character Chat DB."
-    except Exception as e:
-        logging.error(f"Error saving chat to Character Chat DB: {e}")
-        return f"Error saving chat: {e}"
-
-
-# Update existing chat
-def update_chat(chat_id, updated_history):
-    try:
-        with sqlite3.connect('character_chat.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-            UPDATE CharacterChats
-            SET chat_history = ?
-            WHERE id = ?
-            ''', (json.dumps(updated_history), chat_id))
-            conn.commit()
-        return "Chat updated successfully."
-    except Exception as e:
-        logging.error(f"Error updating chat: {e}")
-        return f"Error: {e}"
-
-# Save Character Card to DB
-def save_character_card_to_db(card_data):
-    try:
-        with sqlite3.connect('character_chat.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-            INSERT INTO CharacterCards (character_name, card_data)
-            VALUES (?, ?)
-            ''', (card_data['name'], json.dumps(card_data)))
-            conn.commit()
-    except Exception as e:
-        logging.error(f"Error saving character card: {e}")
-
-# Load Character Cards for Management
-def load_character_cards():
-    try:
-        with sqlite3.connect('character_chat.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT character_name FROM CharacterCards')
-            return [row[0] for row in cursor.fetchall()]
-    except Exception as e:
-        logging.error(f"Error loading character cards: {e}")
-        return []
+def migrate_chat_to_media_db():
+    pass
 
 #
 # End of Character_Chat_DB.py
