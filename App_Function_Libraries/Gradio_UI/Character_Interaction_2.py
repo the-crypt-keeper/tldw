@@ -369,7 +369,17 @@ def create_character_card_interaction_tab_two():
                     minimum=0.0, maximum=2.0, value=0.7, step=0.05, label="Temperature"
                 )
                 import_chat_button = gr.Button("Import Chat History")
-                chat_file_upload = gr.File(label="Upload Chat History JSON", visible=False)
+                chat_file_upload = gr.File(label="Upload Chat History JSON", visible=True)
+
+                # Chat History Import and Search
+                gr.Markdown("## Search and Load Existing Chats")
+                chat_search_query = gr.Textbox(
+                    label="Search Chats",
+                    placeholder="Enter chat name or keywords to search"
+                )
+                chat_search_button = gr.Button("Search Chats")
+                chat_search_dropdown = gr.Dropdown(label="Search Results", choices=[], visible=False)
+                load_chat_button = gr.Button("Load Selected Chat", visible=False)
 
                 # Checkbox to Decide Whether to Save Chats by Default
                 auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=True)
@@ -395,6 +405,78 @@ def create_character_card_interaction_tab_two():
 
         # Callback Functions
 
+        def search_existing_chats(query):
+            """
+            Searches for existing chats based on the query.
+
+            Args:
+                query (str): The search query input by the user.
+
+            Returns:
+                tuple: A list of formatted chat options and a status message.
+            """
+            if not query.strip():
+                return [], "Please enter a search query."
+
+            try:
+                # Fetch all chats
+                chats = get_character_chats()
+
+                # Filter chats based on query (case-insensitive)
+                filtered_chats = [
+                    chat for chat in chats
+                    if query.lower() in chat['conversation_name'].lower()
+                ]
+
+                if not filtered_chats:
+                    return [], f"No chats found matching '{query}'."
+
+                # Format choices as "Chat Name (ID: chat_id)"
+                chat_choices = [
+                    f"{chat['conversation_name']} (ID: {chat['id']})" for chat in filtered_chats
+                ]
+
+                return chat_choices, f"Found {len(chat_choices)} chat(s) matching '{query}'."
+            except Exception as e:
+                logging.error(f"Error searching chats: {e}")
+                return [], f"Error occurred during search: {e}"
+
+        def load_selected_chat_from_search(selected_chat):
+            if not selected_chat:
+                return None, [], None, "No chat selected."
+
+            try:
+                # Extract chat ID from the selected option
+                chat_id_match = re.search(r'\(ID:\s*(\d+)\)', selected_chat)
+                if not chat_id_match:
+                    return None, [], None, "Invalid chat selection format."
+
+                chat_id = int(chat_id_match.group(1))
+
+                # Fetch chat details
+                chat = get_character_chat_by_id(chat_id)
+                if not chat:
+                    return None, [], None, "Selected chat not found."
+
+                # Fetch associated character
+                character_id = chat['character_id']
+                character = get_character_card_by_id(character_id)
+                if not character:
+                    return None, [], None, "Associated character for the chat not found."
+
+                # Load character data and image
+                char_data, _, img = load_character_and_image(character['name'], user_name.value)
+
+                # Overwrite chat_history with the loaded chat
+                chat_history_updated = chat['chat_history']
+
+                # Update selected_chat_id state
+                selected_chat_id.value = chat_id
+
+                return char_data, chat_history_updated, img, f"Chat '{chat['conversation_name']}' loaded successfully."
+            except Exception as e:
+                logging.error(f"Error loading selected chat: {e}")
+                return None, [], None, f"Error loading chat: {e}"
         def import_chat_history(file, current_history, char_data, user_name_val):
             """
             Imports chat history from a file, replacing '{{user}}' with the actual user name.
@@ -875,6 +957,32 @@ def create_character_card_interaction_tab_two():
             inputs=[selected_chat_id, chat_history],
             outputs=save_status
         )
+
+        # Search Chats
+        chat_search_button.click(
+            fn=search_existing_chats,
+            inputs=[chat_search_query],
+            outputs=[chat_search_dropdown, save_status]
+        ).then(
+            fn=lambda choices, msg: gr.update(choices=choices, visible=True) if choices else gr.update(visible=False),
+            inputs=[chat_search_dropdown, save_status],
+            outputs=[chat_search_dropdown]
+        )
+
+        # Load Selected Chat from Search
+        load_chat_button.click(
+            fn=load_selected_chat_from_search,
+            inputs=[chat_search_dropdown],
+            outputs=[character_data, chat_history, character_image, save_status]
+        )
+
+        # Show Load Chat Button when a chat is selected
+        chat_search_dropdown.change(
+            fn=lambda selected: gr.update(visible=True) if selected else gr.update(visible=False),
+            inputs=[chat_search_dropdown],
+            outputs=[load_chat_button]
+        )
+
 
         return character_data, chat_history, user_input, user_name, character_image
 
