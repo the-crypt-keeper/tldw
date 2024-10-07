@@ -26,7 +26,7 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     update_character_chat,
     delete_character_chat,
     delete_character_card,
-    update_character_card,
+    update_character_card, search_character_chats,
 )
 from App_Function_Libraries.Gradio_UI.Writing_tab import generate_writing_feedback
 #
@@ -406,40 +406,15 @@ def create_character_card_interaction_tab_two():
         # Callback Functions
 
         def search_existing_chats(query):
-            """
-            Searches for existing chats based on the query.
-
-            Args:
-                query (str): The search query input by the user.
-
-            Returns:
-                tuple: A list of formatted chat options and a status message.
-            """
-            if not query.strip():
-                return [], "Please enter a search query."
-
-            try:
-                # Fetch all chats
-                chats = get_character_chats()
-
-                # Filter chats based on query (case-insensitive)
-                filtered_chats = [
-                    chat for chat in chats
-                    if query.lower() in chat['conversation_name'].lower()
+            results, message = search_character_chats(query)
+            if results:
+                # Format search results for dropdown
+                formatted_results = [
+                    f"{chat['conversation_name']} (ID: {chat['id']})" for chat in results
                 ]
-
-                if not filtered_chats:
-                    return [], f"No chats found matching '{query}'."
-
-                # Format choices as "Chat Name (ID: chat_id)"
-                chat_choices = [
-                    f"{chat['conversation_name']} (ID: {chat['id']})" for chat in filtered_chats
-                ]
-
-                return chat_choices, f"Found {len(chat_choices)} chat(s) matching '{query}'."
-            except Exception as e:
-                logging.error(f"Error searching chats: {e}")
-                return [], f"Error occurred during search: {e}"
+            else:
+                formatted_results = []
+            return formatted_results, message
 
         def load_selected_chat_from_search(selected_chat):
             if not selected_chat:
@@ -477,6 +452,8 @@ def create_character_card_interaction_tab_two():
             except Exception as e:
                 logging.error(f"Error loading selected chat: {e}")
                 return None, [], None, f"Error loading chat: {e}"
+
+
         def import_chat_history(file, current_history, char_data, user_name_val):
             """
             Imports chat history from a file, replacing '{{user}}' with the actual user name.
@@ -987,7 +964,7 @@ def create_character_card_interaction_tab_two():
         return character_data, chat_history, user_input, user_name, character_image
 
 
-def create_chat_management_tab_two():
+def create_character_chat_mgmt_tab():
     with gr.TabItem("Chat Management"):
         gr.Markdown("# Chat Management")
 
