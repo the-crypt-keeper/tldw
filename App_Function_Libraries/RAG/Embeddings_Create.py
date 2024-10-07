@@ -14,9 +14,12 @@ import onnxruntime as ort
 import requests
 from transformers import AutoTokenizer, AutoModel
 import torch
+
+from App_Function_Libraries.DB.Character_Chat_DB import fetch_all_chats
 #
 # Local Imports:
 from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
+from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 #######################################################################################################################
@@ -223,6 +226,41 @@ def create_onnx_embeddings(text: str) -> List[float]:
 def create_openai_embedding(text: str, model: str) -> List[float]:
     embedding = get_openai_embeddings(text, model)
     return embedding
+
+
+def embed_and_store_chats():
+    """
+    Fetch all chat messages, create embeddings, and store them in ChromaDB.
+    """
+    chats = fetch_all_chats()
+    total_chats = len(chats)
+
+    for index, chat in enumerate(chats, 1):
+        media_id = chat['id']  # Assuming 'id' is the primary key
+        content = chat['chat_history']  # Assuming 'chat_history' contains the message content
+        file_name = f"chat_{media_id}"
+
+        collection_name = "all_chat_embeddings"
+
+        logging.info(f"Processing chat {index} of {total_chats}: ID {media_id}")
+
+        try:
+            # Process and store content
+            process_and_store_content(
+                database=None,  # Assuming no additional database interaction needed
+                content=content,
+                collection_name=collection_name,
+                media_id=media_id,
+                file_name=file_name,
+                create_embeddings=True,
+                create_contextualized=False,  # Contextualization may not be needed for chats
+                api_name="gpt-3.5-turbo"  # Or any other relevant model
+            )
+
+            logging.info(f"Successfully processed chat ID {media_id}")
+        except Exception as e:
+            logging.error(f"Error processing chat ID {media_id}: {str(e)}")
+
 
 #
 # End of File.

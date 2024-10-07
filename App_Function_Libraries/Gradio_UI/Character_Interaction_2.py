@@ -29,10 +29,57 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     update_character_card, search_character_chats,
 )
 from App_Function_Libraries.Gradio_UI.Writing_tab import generate_writing_feedback
+from App_Function_Libraries.RAG.RAG_Libary_2 import enhanced_rag_pipeline
+
+
 #
 #######################################################################################################################
 #
 # Functions:
+
+####################################################
+#
+# RAG
+
+def handle_message(user_message, history, api_choice, keywords):
+    """
+    Handles user messages by integrating the RAG pipeline.
+    """
+    try:
+        # Retrieve context using RAG
+        rag_response = enhanced_rag_pipeline(query=user_message, api_choice=api_choice, keywords=keywords)
+        answer = rag_response.get("answer", "I'm sorry, I couldn't process that.")
+        context = rag_response.get("context", "")
+
+        # Update chat history
+        history = history + [(user_message, answer)]
+
+        # Optionally, log or display the context
+        logging.debug(f"Context used for response: {context}")
+
+        return history, ""
+
+    except Exception as e:
+        logging.error(f"Error handling message: {e}")
+        return history + [(user_message, "An error occurred while processing your request.")], f"Error: {e}"
+
+def fetch_relevant_chat_ids(keywords: List[str]) -> List[int]:
+    relevant_ids = set()
+    try:
+        for keyword in keywords:
+            # Assuming you have a function to fetch chat IDs based on a keyword
+            media_ids = fetch_keywords_for_chat(keyword)
+            relevant_ids.update(media_ids)
+    except Exception as e:
+        logging.error(f"Error fetching relevant chat IDs: {str(e)}")
+    return list(relevant_ids)
+
+
+
+#
+#
+#######################################################
+
 
 ####################################################
 #

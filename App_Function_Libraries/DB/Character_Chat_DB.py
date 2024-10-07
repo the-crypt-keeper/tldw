@@ -6,7 +6,7 @@ import configparser
 import sqlite3
 import json
 import os
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 
 from App_Function_Libraries.Utils.Utils import get_database_dir, get_project_relative_path, get_database_path
 from Tests.Chat_APIs.Chat_APIs_Integration_test import logging
@@ -374,6 +374,58 @@ def save_chat_history_to_character_db(character_id: int, conversation_name: str,
 
 def migrate_chat_to_media_db():
     pass
+
+
+def perform_full_text_search_chat(query: str, relevant_chat_ids: List[int], page: int = 1, results_per_page: int = 5) -> \
+List[Dict[str, Any]]:
+    """
+    Perform a full-text search within the specified chat IDs using FTS5.
+
+    Args:
+        query (str): The user's query.
+        relevant_chat_ids (List[int]): List of chat IDs to search within.
+        page (int): Pagination page number.
+        results_per_page (int): Number of results per page.
+
+    Returns:
+        List[Dict[str, Any]]: List of search results with content and metadata.
+    """
+    try:
+        # Construct a WHERE clause to limit the search to relevant chat IDs
+        where_clause = " OR ".join([f"media_id = {chat_id}" for chat_id in relevant_chat_ids])
+        if not where_clause:
+            where_clause = "1"  # No restriction if no chat IDs
+
+        # Perform full-text search using FTS5
+        fts_results = search_db(query, ["content"], where_clause, page=page, results_per_page=results_per_page)
+
+        filtered_fts_results = [
+            {
+                "content": result['content'],
+                "metadata": {"media_id": result['id']}
+            }
+            for result in fts_results
+            if result['id'] in relevant_chat_ids
+        ]
+        return filtered_fts_results
+    except Exception as e:
+        logging.error(f"Error in perform_full_text_search_chat: {str(e)}")
+        return []
+
+
+def fetch_all_chats() -> List[Dict[str, Any]]:
+    """
+    Fetch all chat messages from the database.
+
+    Returns:
+        List[Dict[str, Any]]: List of chat messages with relevant metadata.
+    """
+    try:
+        chats = get_character_chats()  # Modify this function to retrieve all chats
+        return chats
+    except Exception as e:
+        logging.error(f"Error fetching all chats: {str(e)}")
+        return []
 
 #
 # End of Character_Chat_DB.py
