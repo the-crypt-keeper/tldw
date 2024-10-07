@@ -20,8 +20,8 @@ from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_pr
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
 from App_Function_Libraries.Gradio_UI.Character_Interaction_2 import create_character_card_interaction_tab_two, \
     create_character_chat_mgmt_tab
-from App_Function_Libraries.Gradio_UI.Character_Interaction_tab import create_character_card_interaction_tab, \
-    create_multiple_character_chat_tab, create_narrator_controlled_conversation_tab
+from App_Function_Libraries.Gradio_UI.Character_Interaction_tab import  \
+    create_multiple_character_chat_tab, create_narrator_controlled_conversation_tab # create_character_card_interaction_tab
 from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
     create_chat_interface_four, create_chat_interface_multi_api, create_chat_interface_stacked, create_chat_interface
 from App_Function_Libraries.Gradio_UI.Config_tab import create_config_editor_tab
