@@ -36,9 +36,12 @@ print(f"Chat Database path: {chat_DB_PATH}")
 # Functions
 
 def initialize_database():
-    """Initialize the SQLite database with required tables."""
+    """Initialize the SQLite database with required tables and FTS5 virtual tables."""
     conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
+
+    # Enable foreign key constraints
+    cursor.execute("PRAGMA foreign_keys = ON;")
 
     # Create CharacterCards table with image as BLOB
     cursor.execute("""
@@ -64,8 +67,35 @@ def initialize_database():
         chat_history TEXT,
         is_snapshot BOOLEAN DEFAULT FALSE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (character_id) REFERENCES CharacterCards(id)
+        FOREIGN KEY (character_id) REFERENCES CharacterCards(id) ON DELETE CASCADE
     );
+    """)
+
+    # Create FTS5 virtual table for CharacterChats
+    cursor.execute("""
+    CREATE VIRTUAL TABLE IF NOT EXISTS CharacterChats_fts USING fts5(
+        conversation_name,
+        chat_history,
+        content='CharacterChats',
+        content_rowid='id'
+    );
+    """)
+
+    # Create triggers to keep FTS5 table in sync with CharacterChats
+    cursor.executescript("""
+    CREATE TRIGGER IF NOT EXISTS CharacterChats_ai AFTER INSERT ON CharacterChats BEGIN
+        INSERT INTO CharacterChats_fts(rowid, conversation_name, chat_history)
+        VALUES (new.id, new.conversation_name, new.chat_history);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS CharacterChats_ad AFTER DELETE ON CharacterChats BEGIN
+        DELETE FROM CharacterChats_fts WHERE rowid = old.id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS CharacterChats_au AFTER UPDATE ON CharacterChats BEGIN
+        UPDATE CharacterChats_fts SET conversation_name = new.conversation_name, chat_history = new.chat_history
+        WHERE rowid = new.id;
+    END;
     """)
 
     conn.commit()
@@ -262,6 +292,41 @@ def get_character_chat_by_id(chat_id: int) -> Optional[Dict]:
         return chat
     return None
 
+
+def search_character_chats(query: str) -> Tuple[List[Dict], str]:
+    """
+    Search for character chats using FTS5.
+
+    Args:
+        query (str): The search query.
+
+    Returns:
+        Tuple[List[Dict], str]: A list of matching chats and a status message.
+    """
+    if not query.strip():
+        return [], "Please enter a search query."
+
+    conn = sqlite3.connect(chat_DB_PATH)
+    cursor = conn.cursor()
+    try:
+        # Use parameterized queries to prevent SQL injection
+        cursor.execute("""
+            SELECT CharacterChats.id, CharacterChats.conversation_name, CharacterChats.chat_history
+            FROM CharacterChats_fts
+            JOIN CharacterChats ON CharacterChats_fts.rowid = CharacterChats.id
+            WHERE CharacterChats_fts MATCH ?
+            ORDER BY rank
+        """, (query,))
+        rows = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        results = [dict(zip(columns, row)) for row in rows]
+        status_message = f"Found {len(results)} chat(s) matching '{query}'."
+        return results, status_message
+    except Exception as e:
+        logging.error(f"Error searching chats with FTS5: {e}")
+        return [], f"Error occurred during search: {e}"
+    finally:
+        conn.close()
 
 def update_character_chat(chat_id: int, chat_history: List[Tuple[str, str]]) -> bool:
     """Update an existing chat history."""
