@@ -290,7 +290,7 @@ def create_character_card_interaction_tab_two():
                 chat_file_upload = gr.File(label="Upload Chat History JSON", visible=False)
 
                 # Checkbox to Decide Whether to Save Chats by Default
-                auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=False)
+                auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=True)
                 chat_media_name = gr.Textbox(label="Custom Chat Name (optional)", visible=True)
                 save_chat_history_to_db = gr.Button("Save Chat History to Database")
                 save_status = gr.Textbox(label="Save Status", interactive=False)
@@ -476,8 +476,22 @@ def create_character_card_interaction_tab_two():
             logging.debug(f"Character selected: {name}")
             return update_character_info(name)
 
-        def clear_chat_history():
-            return [], None  # Return empty list for chat_history and None for character_data
+        def clear_chat_history(char_data):
+            """
+            Clears the chat history and initializes it with the character's first message.
+
+            Args:
+                char_data (dict): The current character data.
+
+            Returns:
+                tuple: A list containing the first_message and the unchanged char_data.
+            """
+            if char_data and 'first_message' in char_data and char_data['first_message']:
+                # Initialize chat history with the character's first message
+                return [(None, char_data['first_message'])], char_data
+            else:
+                # If no first_message is defined, simply clear the chat
+                return [], char_data
 
         def regenerate_last_message(
             history, char_data, api_endpoint, api_key,
@@ -585,7 +599,7 @@ def create_character_card_interaction_tab_two():
 
         clear_chat_button.click(
             fn=clear_chat_history,
-            inputs=[],
+            inputs=[character_data],
             outputs=[chat_history, character_data]
         )
 
