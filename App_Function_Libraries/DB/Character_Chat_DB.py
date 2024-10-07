@@ -98,6 +98,23 @@ def initialize_database():
     END;
     """)
 
+    # Create ChatKeywords table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ChatKeywords (
+        chat_id INTEGER NOT NULL,
+        keyword TEXT NOT NULL,
+        FOREIGN KEY (chat_id) REFERENCES CharacterChats(id) ON DELETE CASCADE
+    );
+    """)
+
+    # Create indexes for faster searches
+    cursor.execute("""
+    CREATE INDEX IF NOT EXISTS idx_chatkeywords_keyword ON ChatKeywords(keyword);
+    """)
+    cursor.execute("""
+    CREATE INDEX IF NOT EXISTS idx_chatkeywords_chat_id ON ChatKeywords(chat_id);
+    """)
+
     conn.commit()
     conn.close()
 
@@ -236,11 +253,19 @@ def delete_character_card(character_id: int) -> bool:
         conn.close()
 
 
-def add_character_chat(character_id: int, conversation_name: str, chat_history: List[Tuple[str, str]],
-                       is_snapshot: bool = False) -> Optional[int]:
-    """Add a new chat history for a character.
+def add_character_chat(character_id: int, conversation_name: str, chat_history: List[Tuple[str, str]], keywords: Optional[List[str]] = None, is_snapshot: bool = False) -> Optional[int]:
+    """
+    Add a new chat history for a character, optionally associating keywords.
 
-    Returns the ID of the inserted chat or None if failed.
+    Args:
+        character_id (int): The ID of the character.
+        conversation_name (str): Name of the conversation.
+        chat_history (List[Tuple[str, str]]): List of (user, bot) message tuples.
+        keywords (Optional[List[str]]): List of keywords to associate with this chat.
+        is_snapshot (bool, optional): Whether this chat is a snapshot.
+
+    Returns:
+        Optional[int]: The ID of the inserted chat or None if failed.
     """
     conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
@@ -255,8 +280,18 @@ def add_character_chat(character_id: int, conversation_name: str, chat_history: 
             chat_history_json,
             is_snapshot
         ))
+        chat_id = cursor.lastrowid
+
+        if keywords:
+            # Insert keywords into ChatKeywords table
+            keyword_records = [(chat_id, keyword.strip().lower()) for keyword in keywords]
+            cursor.executemany("""
+                INSERT INTO ChatKeywords (chat_id, keyword)
+                VALUES (?, ?)
+            """, keyword_records)
+
         conn.commit()
-        return cursor.lastrowid
+        return chat_id
     except sqlite3.Error as e:
         logging.error(f"Error adding character chat: {e}")
         return None
@@ -365,6 +400,35 @@ def delete_character_chat(chat_id: int) -> bool:
     finally:
         conn.close()
 
+def fetch_keywords_for_chats(keywords: List[str]) -> List[int]:
+    """
+    Fetch chat IDs associated with any of the specified keywords.
+
+    Args:
+        keywords (List[str]): List of keywords to search for.
+
+    Returns:
+        List[int]: List of chat IDs associated with the keywords.
+    """
+    if not keywords:
+        return []
+
+    conn = sqlite3.connect(chat_DB_PATH)
+    cursor = conn.cursor()
+    try:
+        # Construct the WHERE clause to search for each keyword
+        keyword_clauses = " OR ".join(["keyword = ?"] * len(keywords))
+        sql_query = f"SELECT DISTINCT chat_id FROM ChatKeywords WHERE {keyword_clauses}"
+        cursor.execute(sql_query, keywords)
+        rows = cursor.fetchall()
+        chat_ids = [row[0] for row in rows]
+        return chat_ids
+    except Exception as e:
+        logging.error(f"Error in fetch_keywords_for_chats: {e}")
+        return []
+    finally:
+        conn.close()
+
 def save_chat_history_to_character_db(character_id: int, conversation_name: str, chat_history: List[Tuple[str, str]]) -> Optional[int]:
     """Save chat history to the CharacterChats table.
 
@@ -374,6 +438,51 @@ def save_chat_history_to_character_db(character_id: int, conversation_name: str,
 
 def migrate_chat_to_media_db():
     pass
+
+
+def search_db(query: str, fields: List[str], where_clause: str = "", page: int = 1, results_per_page: int = 5) -> List[Dict[str, Any]]:
+    """
+    Perform a full-text search on specified fields with optional filtering and pagination.
+
+    Args:
+        query (str): The search query.
+        fields (List[str]): List of fields to search in.
+        where_clause (str, optional): Additional SQL WHERE clause to filter results.
+        page (int, optional): Page number for pagination.
+        results_per_page (int, optional): Number of results per page.
+
+    Returns:
+        List[Dict[str, Any]]: List of matching chat records with content and metadata.
+    """
+    if not query.strip():
+        return []
+
+    conn = sqlite3.connect(chat_DB_PATH)
+    cursor = conn.cursor()
+    try:
+        # Construct the MATCH query for FTS5
+        match_query = " AND ".join(fields) + f" MATCH ?"
+        # Adjust the query with the fields
+        fts_query = f"""
+            SELECT CharacterChats.id, CharacterChats.conversation_name, CharacterChats.chat_history
+            FROM CharacterChats_fts
+            JOIN CharacterChats ON CharacterChats_fts.rowid = CharacterChats.id
+            WHERE {match_query}
+        """
+        if where_clause:
+            fts_query += f" AND ({where_clause})"
+        fts_query += " ORDER BY rank LIMIT ? OFFSET ?"
+        offset = (page - 1) * results_per_page
+        cursor.execute(fts_query, (query, results_per_page, offset))
+        rows = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        results = [dict(zip(columns, row)) for row in rows]
+        return results
+    except Exception as e:
+        logging.error(f"Error in search_db: {e}")
+        return []
+    finally:
+        conn.close()
 
 
 def perform_full_text_search_chat(query: str, relevant_chat_ids: List[int], page: int = 1, results_per_page: int = 5) -> \

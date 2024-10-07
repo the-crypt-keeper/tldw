@@ -7,10 +7,12 @@ import logging
 import os
 from typing import Dict, Any, List, Optional
 
-from App_Function_Libraries.DB.Character_Chat_DB import get_character_chats, perform_full_text_search_chat
+from App_Function_Libraries.DB.Character_Chat_DB import get_character_chats, perform_full_text_search_chat, \
+    fetch_keywords_for_chats
 #
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
+from App_Function_Libraries.RAG.Embeddings_Create import perform_vector_search_chat
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_custom_openai
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.DB.DB_Manager import search_db, fetch_keywords_for_media
@@ -357,8 +359,7 @@ def extract_media_id_from_result(result: str) -> Optional[int]:
 #
 # Chat RAG
 
-def enhanced_rag_pipeline_chat(query: str, api_choice: str, character_id: int, keywords: Optional[str] = None) -> Dict[
-    str, Any]:
+def enhanced_rag_pipeline_chat(query: str, api_choice: str, character_id: int, keywords: Optional[str] = None) -> Dict[str, Any]:
     """
     Enhanced RAG pipeline tailored for the Character Chat tab.
 
@@ -381,9 +382,20 @@ def enhanced_rag_pipeline_chat(query: str, api_choice: str, character_id: int, k
         logging.debug(f"enhanced_rag_pipeline_chat - Keywords: {keyword_list}")
 
         # Fetch relevant chat IDs based on character_id and keywords
-        relevant_chat_ids = fetch_relevant_chat_ids(character_id, keyword_list) if keyword_list else fetch_all_chat_ids(
-            character_id)
+        if keyword_list:
+            relevant_chat_ids = fetch_keywords_for_chats(keyword_list)
+        else:
+            relevant_chat_ids = fetch_all_chat_ids(character_id)
         logging.debug(f"enhanced_rag_pipeline_chat - Relevant chat IDs: {relevant_chat_ids}")
+
+        if not relevant_chat_ids:
+            logging.info(f"No chats found for the given keywords and character ID: {character_id}")
+            # Fallback to generating answer without context
+            answer = generate_answer(api_choice, "", query)
+            return {
+                "answer": answer,
+                "context": ""
+            }
 
         # Perform vector search within the relevant chats
         vector_results = perform_vector_search_chat(query, relevant_chat_ids)

@@ -6,7 +6,7 @@ import logging
 import time
 from functools import wraps
 from threading import Lock, Timer
-from typing import List
+from typing import List, Dict, Any, Tuple
 #
 # 3rd-Party Imports:
 import numpy as np
@@ -19,7 +19,7 @@ from App_Function_Libraries.DB.Character_Chat_DB import fetch_all_chats
 #
 # Local Imports:
 from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
-from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content
+from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, chroma_client, store_in_chroma
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 #######################################################################################################################
@@ -228,38 +228,91 @@ def create_openai_embedding(text: str, model: str) -> List[float]:
     return embedding
 
 
-def embed_and_store_chats():
+#############################################################
+#
+# RAG Chat Embeddings
+
+def perform_vector_search_chat(query: str, relevant_chat_ids: List[int], k: int = 10) -> List[Dict[str, Any]]:
     """
-    Fetch all chat messages, create embeddings, and store them in ChromaDB.
+    Perform a vector search within the specified chat IDs.
+
+    Args:
+        query (str): The user's query.
+        relevant_chat_ids (List[int]): List of chat IDs to search within.
+        k (int): Number of top results to retrieve.
+
+    Returns:
+        List[Dict[str, Any]]: List of search results with content and metadata.
     """
-    chats = fetch_all_chats()
-    total_chats = len(chats)
+    try:
+        # Convert chat IDs to unique identifiers used in ChromaDB
+        chat_ids = [f"chat_{chat_id}" for chat_id in relevant_chat_ids]
 
-    for index, chat in enumerate(chats, 1):
-        media_id = chat['id']  # Assuming 'id' is the primary key
-        content = chat['chat_history']  # Assuming 'chat_history' contains the message content
-        file_name = f"chat_{media_id}"
+        # Define the collection name for chat embeddings
+        collection_name = "all_chat_embeddings"  # Ensure this collection exists and contains chat embeddings
 
-        collection_name = "all_chat_embeddings"
+        # Generate the query embedding
+        query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
 
-        logging.info(f"Processing chat {index} of {total_chats}: ID {media_id}")
+        # Get the collection
+        collection = chroma_client.get_collection(name=collection_name)
 
-        try:
-            # Process and store content
-            process_and_store_content(
-                database=None,  # Assuming no additional database interaction needed
-                content=content,
-                collection_name=collection_name,
-                media_id=media_id,
-                file_name=file_name,
-                create_embeddings=True,
-                create_contextualized=False,  # Contextualization may not be needed for chats
-                api_name="gpt-3.5-turbo"  # Or any other relevant model
+        # Perform the vector search
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            where={"id": {"$in": chat_ids}},  # Assuming 'id' is stored as document IDs
+            n_results=k,
+            include=["documents", "metadatas"]
+        )
+
+        # Process results
+        search_results = []
+        for doc, meta in zip(results['documents'][0], results['metadatas'][0]):
+            search_results.append({
+                "content": doc,
+                "metadata": meta
+            })
+
+        return search_results
+    except Exception as e:
+        logging.error(f"Error in perform_vector_search_chat: {e}")
+        return []
+
+
+def embed_and_store_chat(chat_id: int, chat_history: List[Tuple[str, str]], conversation_name: str):
+    """
+    Embed and store chat messages in ChromaDB.
+
+    Args:
+        chat_id (int): The ID of the chat.
+        chat_history (List[Tuple[str, str]]): List of (user_message, bot_response) tuples.
+        conversation_name (str): The name of the conversation.
+    """
+    try:
+        for idx, (user_msg, bot_msg) in enumerate(chat_history, 1):
+            # Combine user and bot messages for context
+            combined_content = f"User: {user_msg}\nBot: {bot_msg}"
+
+            # Create embedding
+            embedding = create_embedding(combined_content, embedding_provider, embedding_model, embedding_api_url)
+
+            # Unique identifier for ChromaDB
+            document_id = f"chat_{chat_id}_msg_{idx}"
+
+            # Metadata with chat_id
+            metadata = {"chat_id": chat_id, "message_index": idx, "conversation_name": conversation_name}
+
+            # Store in ChromaDB
+            store_in_chroma(
+                collection_name="all_chat_embeddings",
+                texts=[combined_content],
+                embeddings=[embedding],
+                ids=[document_id],
+                metadatas=[metadata]
             )
-
-            logging.info(f"Successfully processed chat ID {media_id}")
-        except Exception as e:
-            logging.error(f"Error processing chat ID {media_id}: {str(e)}")
+            logging.debug(f"Stored chat message {idx} of chat ID {chat_id} in ChromaDB.")
+    except Exception as e:
+        logging.error(f"Error embedding and storing chat ID {chat_id}: {e}")
 
 
 #
