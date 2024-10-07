@@ -26,7 +26,6 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     delete_character_chat,
     delete_character_card,
     update_character_card,
-    save_chat_history_to_character_db
 )
 from App_Function_Libraries.Gradio_UI.Writing_tab import generate_writing_feedback
 #
@@ -40,16 +39,16 @@ from App_Function_Libraries.Gradio_UI.Writing_tab import generate_writing_feedba
 def import_character_card(file):
     if file is None:
         logging.warning("No file provided for character card import")
-        return None
+        return None, gr.update(), "No file provided for character card import"
 
     try:
-        # Determine if the file is an image or a JSON file
+        # Determine if the file is an image or a JSON file based on the file extension
         if file.name.lower().endswith(('.png', '.webp')):
             logging.info(f"Attempting to import character card from image: {file.name}")
             json_data = extract_json_from_image(file)
             if json_data:
                 logging.info("JSON data extracted from image, attempting to parse")
-                # Parse the JSON data (assuming import_character_card_json function exists)
+                # Parse the JSON data
                 card_data = import_character_card_json(json_data)
                 if card_data:
                     # Save the image data
@@ -57,54 +56,57 @@ def import_character_card(file):
                         img_byte_arr = io.BytesIO()
                         img.save(img_byte_arr, format='PNG')
                         card_data['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-
-                    # Ensure all necessary fields are present
-                    if 'post_history_instructions' not in card_data:
-                        card_data['post_history_instructions'] = ''
-                    if 'first_message' not in card_data:
-                        card_data['first_message'] = card_data.get('first_mes', "Hello! I'm ready to chat.")
-
-                    # Save character card using the database function
-                    character_id = add_character_card(card_data)
-                    if character_id:
-                        logging.info(f"Character card '{card_data['name']}' saved with ID {character_id}")
-                        # Optionally, update the card_data with the assigned ID
-                        card_data['id'] = character_id
-                    else:
-                        logging.error("Failed to save character card to database.")
-                    return card_data
                 else:
                     logging.warning("Failed to parse character card JSON.")
+                    return None, gr.update(), "Failed to parse character card JSON."
             else:
                 logging.warning("No JSON data found in the image")
-        else:
+                return None, gr.update(), "No JSON data found in the image."
+        elif file.name.lower().endswith('.json'):
             logging.info(f"Attempting to import character card from JSON file: {file.name}")
-            content = file.read().decode('utf-8')
-            # Parse the JSON content (assuming import_character_card_json function exists)
+            # Open and read the JSON file
+            with open(file.name, 'r', encoding='utf-8') as f:
+                content = f.read()
+            # Parse the JSON content
             card_data = import_character_card_json(content)
             if card_data:
                 # Ensure all necessary fields are present
-                if 'image' not in card_data:
+                if 'image' not in card_data or not card_data['image']:
                     card_data['image'] = ''
-                if 'post_history_instructions' not in card_data:
-                    card_data['post_history_instructions'] = ''
-                if 'first_message' not in card_data:
-                    card_data['first_message'] = card_data.get('first_mes', "Hello! I'm ready to chat.")
-
-                # Save character card using the database function
-                character_id = add_character_card(card_data)
-                if character_id:
-                    logging.info(f"Character card '{card_data['name']}' saved with ID {character_id}")
-                    # Optionally, update the card_data with the assigned ID
-                    card_data['id'] = character_id
-                else:
-                    logging.error("Failed to save character card to database.")
-                return card_data
+                upload_status_message = "JSON file uploaded successfully."
             else:
                 logging.warning("Failed to parse character card JSON.")
+                return None, gr.update(), "Failed to parse character card JSON."
+        else:
+            logging.warning("Unsupported file type for character card import.")
+            return None, gr.update(), "Unsupported file type. Please upload a PNG/WebP image or a JSON file."
+
+        # Ensure all necessary fields are present
+        if 'post_history_instructions' not in card_data:
+            card_data['post_history_instructions'] = ''
+        if 'first_message' not in card_data:
+            card_data['first_message'] = card_data.get('first_mes', "Hello! I'm ready to chat.")
+
+        # Save character card using the database function
+        character_id = add_character_card(card_data)
+        if character_id:
+            logging.info(f"Character card '{card_data['name']}' saved with ID {character_id}")
+            # Update the card_data with the assigned ID
+            card_data['id'] = character_id
+            # Update the character dropdown choices
+            characters = get_character_cards()
+            character_names = [char['name'] for char in characters]
+            if file.name.lower().endswith('.json'):
+                upload_status_message = "Character card JSON imported successfully."
+            else:
+                upload_status_message = f"Character card '{card_data['name']}' imported successfully from image."
+            return card_data, gr.update(choices=character_names), f"Character card '{card_data['name']}' imported successfully.", upload_status_message
+        else:
+            logging.error("Failed to save character card to database.")
+            return None, gr.update(), f"Failed to save character card '{card_data.get('name', 'Unknown')}'. It may already exist.", "Failed to save character card."
     except Exception as e:
         logging.error(f"Error importing character card: {e}")
-    return None
+        return None, gr.update(), f"Error importing character card: {e}", f"Error importing character card: {e}"
 
 
 def import_character_card_json(json_content):
@@ -260,7 +262,10 @@ def create_character_card_interaction_tab_two():
         with gr.Row():
             with gr.Column(scale=1):
                 character_image = gr.Image(label="Character Image", type="filepath")
-                character_card_upload = gr.File(label="Upload Character Card")
+                character_card_upload = gr.File(
+                    label="Upload Character Card (PNG, WEBP, JSON)",
+                    file_types=[".png", ".webp", ".json"]
+                )
                 import_card_button = gr.Button("Import Character Card")
                 load_characters_button = gr.Button("Load Existing Characters")
                 character_dropdown = gr.Dropdown(label="Select Character", choices=[])
@@ -349,12 +354,16 @@ def create_character_card_interaction_tab_two():
             char_data, chat_history, _ = load_character(name)
             if char_data and 'image' in char_data and char_data['image']:
                 # Convert base64 image to bytes
-                image_data = base64.b64decode(char_data['image'])
-                # Save to a temporary file
-                img = Image.open(io.BytesIO(image_data))
-                img_path = f"temp_{uuid.uuid4()}.png"
-                img.save(img_path)
-                return char_data, chat_history, img_path
+                try:
+                    image_data = base64.b64decode(char_data['image'])
+                    # Save to a temporary file
+                    img = Image.open(io.BytesIO(image_data))
+                    img_path = f"temp_{uuid.uuid4()}.png"
+                    img.save(img_path)
+                    return char_data, chat_history, img_path
+                except Exception as e:
+                    logging.error(f"Error processing image for character '{name}': {e}")
+                    return char_data, chat_history, None
             return char_data, chat_history, None
 
         def character_chat_wrapper(
@@ -566,7 +575,7 @@ def create_character_card_interaction_tab_two():
         )
 
         load_characters_button.click(
-            fn=lambda: [char['name'] for char in get_character_cards()],
+            fn=lambda: gr.update(choices=[char['name'] for char in get_character_cards()]),
             outputs=character_dropdown
         )
 
@@ -635,6 +644,7 @@ def create_character_card_interaction_tab_two():
             outputs=[conversation_id, save_status]
         )
 
+        # FIXME
         # Additional Buttons for Saving Snapshots and Updating Chats
         with gr.Row():
             save_snapshot_button = gr.Button("Save Chat Snapshot")
