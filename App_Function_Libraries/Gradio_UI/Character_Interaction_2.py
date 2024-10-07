@@ -290,7 +290,10 @@ def create_character_card_interaction_tab_two():
                 chat_file_upload = gr.File(label="Upload Chat History JSON", visible=False)
 
                 # Checkbox to Decide Whether to Save Chats by Default
-                auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=True)
+                auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=False)
+                chat_media_name = gr.Textbox(label="Custom Chat Name (optional)", visible=True)
+                save_chat_history_to_db = gr.Button("Save Chat History to Database")
+                save_status = gr.Textbox(label="Save Status", interactive=False)
 
             with gr.Column(scale=2):
                 chat_history = gr.Chatbot(label="Conversation", height=800)
@@ -298,9 +301,10 @@ def create_character_card_interaction_tab_two():
                 send_message_button = gr.Button("Send Message")
                 regenerate_button = gr.Button("Regenerate Last Message")
                 clear_chat_button = gr.Button("Clear Chat")
-                chat_media_name = gr.Textbox(label="Custom Chat Name (optional)", visible=True)
-                save_chat_history_to_db = gr.Button("Save Chat History to Database")
-                save_status = gr.Textbox(label="Save Status", interactive=False)
+                save_snapshot_button = gr.Button("Save Chat Snapshot")
+                update_chat_dropdown = gr.Dropdown(label="Select Chat to Update", choices=[])
+                load_selected_chat_button = gr.Button("Load Selected Chat")
+                update_chat_button = gr.Button("Update Selected Chat")
 
         # States
         character_data = gr.State(None)
@@ -643,14 +647,6 @@ def create_character_card_interaction_tab_two():
             ],
             outputs=[conversation_id, save_status]
         )
-
-        # FIXME
-        # Additional Buttons for Saving Snapshots and Updating Chats
-        with gr.Row():
-            save_snapshot_button = gr.Button("Save Chat Snapshot")
-            update_chat_dropdown = gr.Dropdown(label="Select Chat to Update", choices=[])
-            load_selected_chat_button = gr.Button("Load Selected Chat")
-            update_chat_button = gr.Button("Update Selected Chat")
 
         # Populate the update_chat_dropdown based on selected character
         character_dropdown.change(
