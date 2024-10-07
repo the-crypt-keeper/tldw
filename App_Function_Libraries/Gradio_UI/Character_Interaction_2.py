@@ -36,6 +36,46 @@ from App_Function_Libraries.Gradio_UI.Writing_tab import generate_writing_feedba
 ####################################################
 #
 # Utility Functions
+
+def validate_user_name(name):
+    """
+    Validates the user's name input.
+
+    Args:
+        name (str): The user's name.
+
+    Returns:
+        str: Validated user name or a default value.
+    """
+    if not name.strip():
+        return "User"  # Default name if input is empty
+    return name.strip()
+
+def replace_placeholders(text, replacements):
+    """
+    Replaces placeholders in the text with corresponding values.
+
+    Args:
+        text (str): The text containing placeholders.
+        replacements (dict): A dictionary of placeholder-value pairs.
+
+    Returns:
+        str: The text with placeholders replaced.
+    """
+    for placeholder, value in replacements.items():
+        if placeholder in text:
+            logging.debug(f"Replacing {placeholder} with {value}")
+            text = text.replace(placeholder, value)
+        else:
+            logging.debug(f"No occurrence of {placeholder} found in text.")
+    return text
+
+# placeholders = {
+#     '{{user}}': user_name_val,
+#     '{{date}}': datetime.now().strftime('%Y-%m-%d')
+# }
+# post_history_instructions = replace_placeholders(char_data.get('post_history_instructions', ''), placeholders)
+
 def import_character_card(file):
     if file is None:
         logging.warning("No file provided for character card import")
@@ -247,6 +287,7 @@ def update_chat(chat_id, updated_history):
     else:
         return "Failed to update chat."
 
+
 #
 # End of Utility Functions
 ####################################################
@@ -261,7 +302,7 @@ def create_character_card_interaction_tab_two():
         gr.Markdown("# Chat with a Character Card")
         with gr.Row():
             with gr.Column(scale=1):
-                character_image = gr.Image(label="Character Image", type="filepath")
+                character_image = gr.Image(label="Character Image", type="pil")
                 character_card_upload = gr.File(
                     label="Upload Character Card (PNG, WEBP, JSON)",
                     file_types=[".png", ".webp", ".json"]
@@ -349,30 +390,43 @@ def create_character_card_interaction_tab_two():
         def load_character_image(name):
             character = next((char for char in get_character_cards() if char['name'] == name), None)
             if character and 'image' in character and character['image']:
-                # Decode the base64 image
-                image_data = base64.b64decode(character['image'])
-                return image_data
+                try:
+                    # Decode the base64 image
+                    image_data = base64.b64decode(character['image'])
+                    # Load as PIL Image
+                    img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+                    return img
+                except Exception as e:
+                    logging.error(f"Error loading image for character '{name}': {e}")
+                    return None
             return None
 
-        def load_character_and_image(name):
+        def load_character_and_image(name, user_name_val):
             char_data, chat_history, _ = load_character(name)
             if char_data and 'image' in char_data and char_data['image']:
-                # Convert base64 image to bytes
                 try:
+                    # Decode the base64 image data
                     image_data = base64.b64decode(char_data['image'])
-                    # Save to a temporary file
-                    img = Image.open(io.BytesIO(image_data))
-                    img_path = f"temp_{uuid.uuid4()}.png"
-                    img.save(img_path)
-                    return char_data, chat_history, img_path
+                    # Load the image as a PIL Image and convert to RGBA
+                    img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+                    # Replace {{user}} in first_message if present
+                    if char_data.get('first_message'):
+                        first_message = char_data['first_message'].replace('{{user}}', user_name_val)
+                        chat_history = [(None, first_message)] if first_message else []
+                    return char_data, chat_history, img
                 except Exception as e:
                     logging.error(f"Error processing image for character '{name}': {e}")
                     return char_data, chat_history, None
-            return char_data, chat_history, None
+            else:
+                # If no image, still handle first_message
+                if char_data and 'first_message' in char_data and char_data['first_message']:
+                    first_message = char_data['first_message'].replace('{{user}}', user_name_val)
+                    chat_history = [(None, first_message)] if first_message else []
+                return char_data, chat_history, None
 
         def character_chat_wrapper(
-            message, history, char_data, api_endpoint, api_key,
-            temperature, user_name_val, auto_save
+                message, history, char_data, api_endpoint, api_key,
+                temperature, user_name_val, auto_save
         ):
             logging.debug("Entered character_chat_wrapper")
             if char_data is None:
@@ -391,12 +445,16 @@ def create_character_card_interaction_tab_two():
             Scenario: {char_data.get('scenario', 'N/A')}
             """
 
+            # Replace {{user}} in post_history_instructions
+            post_history_instructions = char_data.get('post_history_instructions', '').replace('{{user}}',
+                                                                                               user_name_val)
+
             # Prepare the system prompt for character impersonation
             system_message = f"""You are roleplaying as {char_name}, the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI. Always refer to yourself as "{char_name}" and refer to the user as "{user_name_val}".
 
             {char_background}
 
-            Additional instructions: {char_data.get('post_history_instructions', '')}
+            Additional instructions: {post_history_instructions}
             """
 
             # Prepare media_content and selected_parts
@@ -410,7 +468,7 @@ def create_character_card_interaction_tab_two():
             }
             selected_parts = ['description', 'personality', 'scenario']
 
-            prompt = char_data.get('post_history_instructions', '')
+            prompt = post_history_instructions  # Already has {{user}} replaced
 
             # Prepare the input for the chat function
             if not history:
@@ -472,59 +530,128 @@ def create_character_card_interaction_tab_two():
         def update_character_info(name):
             return load_character_and_image(name)
 
-        def on_character_select(name):
+        def on_character_select(name, user_name_val):
             logging.debug(f"Character selected: {name}")
-            return update_character_info(name)
+            char_data, chat_history, img = load_character_and_image(name, user_name_val)
+            return char_data, chat_history, img
 
-        def clear_chat_history(char_data):
+        def clear_chat_history(char_data, user_name_val):
             """
-            Clears the chat history and initializes it with the character's first message.
+            Clears the chat history and initializes it with the character's first message, replacing {{user}}.
 
             Args:
                 char_data (dict): The current character data.
+                user_name_val (str): The user's name.
 
             Returns:
-                tuple: A list containing the first_message and the unchanged char_data.
+                tuple: A list containing the first_message with {{user}} replaced and the unchanged char_data.
             """
             if char_data and 'first_message' in char_data and char_data['first_message']:
-                # Initialize chat history with the character's first message
-                return [(None, char_data['first_message'])], char_data
+                # Replace {{user}} with user_name_val in first_message
+                first_msg = char_data['first_message'].replace('{{user}}', user_name_val)
+                return [(None, first_msg)], char_data
             else:
                 # If no first_message is defined, simply clear the chat
                 return [], char_data
 
         def regenerate_last_message(
-            history, char_data, api_endpoint, api_key,
-            temperature, user_name_val, auto_save
+                history, char_data, api_endpoint, api_key,
+                temperature, user_name_val, auto_save
         ):
-            if not history:
-                return history, ""
+            """
+            Regenerates the last bot message by removing it and resending the corresponding user message.
 
-            last_user_message = history[-1][0]
+            Args:
+                history (list): The current chat history as a list of tuples (user_message, bot_message).
+                char_data (dict): The current character data.
+                api_endpoint (str): The API endpoint to use for the LLM.
+                api_key (str): The API key for authentication.
+                temperature (float): The temperature setting for the LLM.
+                user_name_val (str): The user's name.
+                auto_save (bool): Flag indicating whether to auto-save the chat.
+
+            Returns:
+                tuple: Updated chat history and a save status message.
+            """
+            if not history:
+                return history, "No messages to regenerate."
+
+            last_entry = history[-1]
+            last_user_message, last_bot_message = last_entry
+
+            # Check if the last bot message exists
+            if last_bot_message is None:
+                return history, "The last message is not from the bot."
+
+            # Remove the last bot message
             new_history = history[:-1]
 
-            # Re-generate the last message
-            bot_message = generate_writing_feedback(
-                last_user_message, char_data['name'], "Overall", api_endpoint, api_key
-            )
-            new_history.append((last_user_message, bot_message))
+            # Resend the last user message to generate a new bot response
+            if not last_user_message:
+                return new_history, "No user message to regenerate the bot response."
 
-            # Update history
-            history = new_history.copy()
+            # Prepare the character's background information
+            char_name = char_data.get('name', 'AI Assistant')
+            char_background = f"""
+            Name: {char_name}
+            Description: {char_data.get('description', 'N/A')}
+            Personality: {char_data.get('personality', 'N/A')}
+            Scenario: {char_data.get('scenario', 'N/A')}
+            """
+
+            # Prepare the system prompt for character impersonation
+            system_message = f"""You are roleplaying as {char_name}, the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI. Always refer to yourself as "{char_name}" and refer to the user as "{user_name_val}".
+
+            {char_background}
+
+            Additional instructions: {char_data.get('post_history_instructions', '')}
+            """
+
+            # Prepare media_content and selected_parts
+            media_content = {
+                'id': char_name,
+                'title': char_name,
+                'content': char_background,
+                'description': char_data.get('description', ''),
+                'personality': char_data.get('personality', ''),
+                'scenario': char_data.get('scenario', '')
+            }
+            selected_parts = ['description', 'personality', 'scenario']
+
+            prompt = char_data.get('post_history_instructions', '')
+
+            # Prepare the input for the chat function
+            full_message = f"{user_name_val}: {last_user_message}" if last_user_message else f"{user_name_val}: "
+
+            # Call the chat function to get a new bot message
+            bot_message = chat(
+                full_message,
+                new_history,
+                media_content,
+                selected_parts,
+                api_endpoint,
+                api_key,
+                prompt,
+                temperature,
+                system_message
+            )
+
+            # Append the new bot message to the history
+            new_history.append((last_user_message, bot_message))
 
             # Auto-save if enabled
             if auto_save:
                 character_id = char_data.get('id')
                 if character_id:
                     conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                    add_character_chat(character_id, conversation_name, history)
+                    add_character_chat(character_id, conversation_name, new_history)
                     save_status = "Chat auto-saved."
                 else:
                     save_status = "Character ID not found; chat not saved."
             else:
                 save_status = ""
 
-            return history, save_status
+            return new_history, save_status
 
         def toggle_chat_file_upload():
             return gr.update(visible=True)
@@ -597,9 +724,10 @@ def create_character_card_interaction_tab_two():
             outputs=character_dropdown
         )
 
+        # FIXME user_name_val = validate_user_name(user_name_val)
         clear_chat_button.click(
             fn=clear_chat_history,
-            inputs=[character_data],
+            inputs=[character_data, user_name_input],
             outputs=[chat_history, character_data]
         )
 
