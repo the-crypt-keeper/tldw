@@ -13,9 +13,7 @@ from itertools import islice
 from App_Function_Libraries.Chunk_Lib import chunk_for_embedding, chunk_options
 from App_Function_Libraries.DB.DB_Manager import get_unprocessed_media, mark_media_as_processed
 from App_Function_Libraries.DB.SQLite_DB import process_chunks
-from App_Function_Libraries.RAG.Embeddings_Create import create_embeddings_batch
-# FIXME - related to Chunking
-from App_Function_Libraries.RAG.Embeddings_Create import create_embedding
+from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, create_embeddings_batch
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
 from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, \
     load_comprehensive_config

@@ -20,6 +20,7 @@ from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_pr
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
 from App_Function_Libraries.Gradio_UI.Character_Interaction_2 import create_character_card_interaction_tab_two, \
     create_character_chat_mgmt_tab
+from App_Function_Libraries.Gradio_UI.Character_Interaction_3 import create_character_card_interaction_tab_three
 from App_Function_Libraries.Gradio_UI.Character_Interaction_tab import  \
     create_multiple_character_chat_tab, create_narrator_controlled_conversation_tab # create_character_card_interaction_tab
 from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
@@ -294,6 +295,7 @@ def launch_ui(share_public=None, server_mode=False):
                 with gr.Tabs():
                     #create_character_card_interaction_tab()
                     create_character_card_interaction_tab_two()
+                    create_character_card_interaction_tab_three()
                     create_character_chat_mgmt_tab()
 
             with gr.TabItem("View DB Items"):

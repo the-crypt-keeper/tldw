@@ -6,6 +6,7 @@ import configparser
 import sqlite3
 import json
 import os
+import sys
 from typing import List, Dict, Optional, Tuple, Any
 
 from App_Function_Libraries.Utils.Utils import get_database_dir, get_project_relative_path, get_database_path
@@ -21,7 +22,7 @@ def ensure_database_directory():
 
 ensure_database_directory()
 
-# FIXME - Setup properly and test/add documentation for its existence...
+
 # Construct the path to the config file
 config_path = get_project_relative_path('Config_Files/config.txt')
 
@@ -33,145 +34,205 @@ config.read(config_path)
 chat_DB_PATH = config.get('Database', 'chatDB_path', fallback=get_database_path('chatDB.db'))
 print(f"Chat Database path: {chat_DB_PATH}")
 
+########################################################################################################
+#
 # Functions
 
+# FIXME - Setup properly and test/add documentation for its existence...
 def initialize_database():
     """Initialize the SQLite database with required tables and FTS5 virtual tables."""
-    conn = sqlite3.connect(chat_DB_PATH)
-    cursor = conn.cursor()
+    conn = None
+    try:
+        conn = sqlite3.connect(chat_DB_PATH)
+        cursor = conn.cursor()
 
-    # Enable foreign key constraints
-    cursor.execute("PRAGMA foreign_keys = ON;")
+        # Enable foreign key constraints
+        cursor.execute("PRAGMA foreign_keys = ON;")
 
-    # Create CharacterCards table with image as BLOB
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS CharacterCards (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL,
-        description TEXT,
-        personality TEXT,
-        scenario TEXT,
-        image BLOB,
-        post_history_instructions TEXT,
-        first_message TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
+        # Create CharacterCards table with V2 fields
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS CharacterCards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            personality TEXT,
+            scenario TEXT,
+            image BLOB,
+            post_history_instructions TEXT,
+            first_mes TEXT,
+            mes_example TEXT,
+            creator_notes TEXT,
+            system_prompt TEXT,
+            alternate_greetings TEXT,
+            tags TEXT,
+            creator TEXT,
+            character_version TEXT,
+            extensions TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
 
-    # Create CharacterChats table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS CharacterChats (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        character_id INTEGER NOT NULL,
-        conversation_name TEXT,
-        chat_history TEXT,
-        is_snapshot BOOLEAN DEFAULT FALSE,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (character_id) REFERENCES CharacterCards(id) ON DELETE CASCADE
-    );
-    """)
+        # Create CharacterChats table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS CharacterChats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            character_id INTEGER NOT NULL,
+            conversation_name TEXT,
+            chat_history TEXT,
+            is_snapshot BOOLEAN DEFAULT FALSE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (character_id) REFERENCES CharacterCards(id) ON DELETE CASCADE
+        );
+        """)
 
-    # Create FTS5 virtual table for CharacterChats
-    cursor.execute("""
-    CREATE VIRTUAL TABLE IF NOT EXISTS CharacterChats_fts USING fts5(
-        conversation_name,
-        chat_history,
-        content='CharacterChats',
-        content_rowid='id'
-    );
-    """)
+        # Create FTS5 virtual table for CharacterChats
+        cursor.execute("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS CharacterChats_fts USING fts5(
+            conversation_name,
+            chat_history,
+            content='CharacterChats',
+            content_rowid='id'
+        );
+        """)
 
-    # Create triggers to keep FTS5 table in sync with CharacterChats
-    cursor.executescript("""
-    CREATE TRIGGER IF NOT EXISTS CharacterChats_ai AFTER INSERT ON CharacterChats BEGIN
-        INSERT INTO CharacterChats_fts(rowid, conversation_name, chat_history)
-        VALUES (new.id, new.conversation_name, new.chat_history);
-    END;
+        # Create triggers to keep FTS5 table in sync with CharacterChats
+        cursor.executescript("""
+        CREATE TRIGGER IF NOT EXISTS CharacterChats_ai AFTER INSERT ON CharacterChats BEGIN
+            INSERT INTO CharacterChats_fts(rowid, conversation_name, chat_history)
+            VALUES (new.id, new.conversation_name, new.chat_history);
+        END;
 
-    CREATE TRIGGER IF NOT EXISTS CharacterChats_ad AFTER DELETE ON CharacterChats BEGIN
-        DELETE FROM CharacterChats_fts WHERE rowid = old.id;
-    END;
+        CREATE TRIGGER IF NOT EXISTS CharacterChats_ad AFTER DELETE ON CharacterChats BEGIN
+            DELETE FROM CharacterChats_fts WHERE rowid = old.id;
+        END;
 
-    CREATE TRIGGER IF NOT EXISTS CharacterChats_au AFTER UPDATE ON CharacterChats BEGIN
-        UPDATE CharacterChats_fts SET conversation_name = new.conversation_name, chat_history = new.chat_history
-        WHERE rowid = new.id;
-    END;
-    """)
+        CREATE TRIGGER IF NOT EXISTS CharacterChats_au AFTER UPDATE ON CharacterChats BEGIN
+            UPDATE CharacterChats_fts SET conversation_name = new.conversation_name, chat_history = new.chat_history
+            WHERE rowid = new.id;
+        END;
+        """)
 
-    # Create ChatKeywords table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS ChatKeywords (
-        chat_id INTEGER NOT NULL,
-        keyword TEXT NOT NULL,
-        FOREIGN KEY (chat_id) REFERENCES CharacterChats(id) ON DELETE CASCADE
-    );
-    """)
+        # Create ChatKeywords table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ChatKeywords (
+            chat_id INTEGER NOT NULL,
+            keyword TEXT NOT NULL,
+            FOREIGN KEY (chat_id) REFERENCES CharacterChats(id) ON DELETE CASCADE
+        );
+        """)
 
-    # Create indexes for faster searches
-    cursor.execute("""
-    CREATE INDEX IF NOT EXISTS idx_chatkeywords_keyword ON ChatKeywords(keyword);
-    """)
-    cursor.execute("""
-    CREATE INDEX IF NOT EXISTS idx_chatkeywords_chat_id ON ChatKeywords(chat_id);
-    """)
+        # Create indexes for faster searches
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_chatkeywords_keyword ON ChatKeywords(keyword);
+        """)
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_chatkeywords_chat_id ON ChatKeywords(chat_id);
+        """)
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        logging.info("Database initialized successfully.")
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error occurred during database initialization: {e}")
+        if conn:
+            conn.rollback()
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error occurred during database initialization: {e}")
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if conn:
+            conn.close()
 
-initialize_database()
+# Call initialize_database() at the start of your application
+def setup_chat_database():
+    try:
+        initialize_database()
+    except Exception as e:
+        logging.critical(f"Failed to initialize database: {e}")
+        sys.exit(1)
 
-def add_character_card(card_data: Dict) -> Optional[int]:
-    """Add or update a character card in the database.
+setup_chat_database()
 
-    Returns the ID of the inserted character or None if failed.
-    """
+########################################################################################################
+#
+# Character Card handling
+
+def parse_character_card(card_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse and validate a character card according to V2 specification."""
+    v2_data = {
+        'name': card_data.get('name', ''),
+        'description': card_data.get('description', ''),
+        'personality': card_data.get('personality', ''),
+        'scenario': card_data.get('scenario', ''),
+        'first_mes': card_data.get('first_mes', ''),
+        'mes_example': card_data.get('mes_example', ''),
+        'creator_notes': card_data.get('creator_notes', ''),
+        'system_prompt': card_data.get('system_prompt', ''),
+        'post_history_instructions': card_data.get('post_history_instructions', ''),
+        'alternate_greetings': json.dumps(card_data.get('alternate_greetings', [])),
+        'tags': json.dumps(card_data.get('tags', [])),
+        'creator': card_data.get('creator', ''),
+        'character_version': card_data.get('character_version', ''),
+        'extensions': json.dumps(card_data.get('extensions', {}))
+    }
+
+    # Handle 'image' separately as it might be binary data
+    if 'image' in card_data:
+        v2_data['image'] = card_data['image']
+
+    return v2_data
+
+
+def add_character_card(card_data: Dict[str, Any]) -> Optional[int]:
+    """Add or update a character card in the database."""
     conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     try:
-        # Ensure all required fields are present
-        required_fields = ['name', 'description', 'personality', 'scenario', 'image', 'post_history_instructions', 'first_message']
-        for field in required_fields:
-            if field not in card_data:
-                card_data[field] = ''  # Assign empty string if field is missing
+        parsed_card = parse_character_card(card_data)
 
         # Check if character already exists
-        cursor.execute("SELECT id FROM CharacterCards WHERE name = ?", (card_data['name'],))
+        cursor.execute("SELECT id FROM CharacterCards WHERE name = ?", (parsed_card['name'],))
         row = cursor.fetchone()
 
         if row:
             # Update existing character
             character_id = row[0]
-            cursor.execute("""
+            update_query = """
                 UPDATE CharacterCards
-                SET description = ?, personality = ?, scenario = ?, image = ?, post_history_instructions = ?, first_message = ?
+                SET description = ?, personality = ?, scenario = ?, image = ?, 
+                    post_history_instructions = ?, first_mes = ?, mes_example = ?,
+                    creator_notes = ?, system_prompt = ?, alternate_greetings = ?,
+                    tags = ?, creator = ?, character_version = ?, extensions = ?
                 WHERE id = ?
-            """, (
-                card_data['description'],
-                card_data['personality'],
-                card_data['scenario'],
-                card_data['image'],
-                card_data['post_history_instructions'],
-                card_data['first_message'],
-                character_id
+            """
+            cursor.execute(update_query, (
+                parsed_card['description'], parsed_card['personality'], parsed_card['scenario'],
+                parsed_card['image'], parsed_card['post_history_instructions'], parsed_card['first_mes'],
+                parsed_card['mes_example'], parsed_card['creator_notes'], parsed_card['system_prompt'],
+                parsed_card['alternate_greetings'], parsed_card['tags'], parsed_card['creator'],
+                parsed_card['character_version'], parsed_card['extensions'], character_id
             ))
         else:
             # Insert new character
-            cursor.execute("""
-                INSERT INTO CharacterCards (name, description, personality, scenario, image, post_history_instructions, first_message)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                card_data['name'],
-                card_data['description'],
-                card_data['personality'],
-                card_data['scenario'],
-                card_data['image'],
-                card_data['post_history_instructions'],
-                card_data['first_message']
+            insert_query = """
+                INSERT INTO CharacterCards (name, description, personality, scenario, image, 
+                post_history_instructions, first_mes, mes_example, creator_notes, system_prompt, 
+                alternate_greetings, tags, creator, character_version, extensions)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            cursor.execute(insert_query, (
+                parsed_card['name'], parsed_card['description'], parsed_card['personality'],
+                parsed_card['scenario'], parsed_card['image'], parsed_card['post_history_instructions'],
+                parsed_card['first_mes'], parsed_card['mes_example'], parsed_card['creator_notes'],
+                parsed_card['system_prompt'], parsed_card['alternate_greetings'], parsed_card['tags'],
+                parsed_card['creator'], parsed_card['character_version'], parsed_card['extensions']
             ))
             character_id = cursor.lastrowid
 
         conn.commit()
-        return cursor.lastrowid
+        return character_id
     except sqlite3.IntegrityError as e:
         logging.error(f"Error adding character card: {e}")
         return None
@@ -181,9 +242,71 @@ def add_character_card(card_data: Dict) -> Optional[int]:
     finally:
         conn.close()
 
+# def add_character_card(card_data: Dict) -> Optional[int]:
+#     """Add or update a character card in the database.
+#
+#     Returns the ID of the inserted character or None if failed.
+#     """
+#     conn = sqlite3.connect(chat_DB_PATH)
+#     cursor = conn.cursor()
+#     try:
+#         # Ensure all required fields are present
+#         required_fields = ['name', 'description', 'personality', 'scenario', 'image', 'post_history_instructions', 'first_message']
+#         for field in required_fields:
+#             if field not in card_data:
+#                 card_data[field] = ''  # Assign empty string if field is missing
+#
+#         # Check if character already exists
+#         cursor.execute("SELECT id FROM CharacterCards WHERE name = ?", (card_data['name'],))
+#         row = cursor.fetchone()
+#
+#         if row:
+#             # Update existing character
+#             character_id = row[0]
+#             cursor.execute("""
+#                 UPDATE CharacterCards
+#                 SET description = ?, personality = ?, scenario = ?, image = ?, post_history_instructions = ?, first_message = ?
+#                 WHERE id = ?
+#             """, (
+#                 card_data['description'],
+#                 card_data['personality'],
+#                 card_data['scenario'],
+#                 card_data['image'],
+#                 card_data['post_history_instructions'],
+#                 card_data['first_message'],
+#                 character_id
+#             ))
+#         else:
+#             # Insert new character
+#             cursor.execute("""
+#                 INSERT INTO CharacterCards (name, description, personality, scenario, image, post_history_instructions, first_message)
+#                 VALUES (?, ?, ?, ?, ?, ?, ?)
+#             """, (
+#                 card_data['name'],
+#                 card_data['description'],
+#                 card_data['personality'],
+#                 card_data['scenario'],
+#                 card_data['image'],
+#                 card_data['post_history_instructions'],
+#                 card_data['first_message']
+#             ))
+#             character_id = cursor.lastrowid
+#
+#         conn.commit()
+#         return cursor.lastrowid
+#     except sqlite3.IntegrityError as e:
+#         logging.error(f"Error adding character card: {e}")
+#         return None
+#     except Exception as e:
+#         logging.error(f"Unexpected error adding character card: {e}")
+#         return None
+#     finally:
+#         conn.close()
+
 
 def get_character_cards() -> List[Dict]:
     """Retrieve all character cards from the database."""
+    logging.debug(f"Fetching characters from DB: {chat_DB_PATH}")
     conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM CharacterCards")
@@ -191,7 +314,7 @@ def get_character_cards() -> List[Dict]:
     columns = [description[0] for description in cursor.description]
     conn.close()
     characters = [dict(zip(columns, row)) for row in rows]
-    logging.debug(f"Characters fetched from DB: {characters}")
+    #logging.debug(f"Characters fetched from DB: {characters}")
     return characters
 
 

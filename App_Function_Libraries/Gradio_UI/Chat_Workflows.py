@@ -23,7 +23,6 @@ with json_path.open('r') as f:
     workflows = json.load(f)
 
 
-# FIXME - broken Completely. Doesn't work.
 def chat_workflows_tab():
     with gr.TabItem("Chat Workflows"):
         gr.Markdown("# Workflows using LLMs")
