@@ -1045,7 +1045,7 @@ def create_character_chat_mgmt_tab():
         gr.Markdown("# Character and Chat Management")
 
         with gr.Row():
-            # Character Import Section
+            # Left Column: Character Import and Chat Management
             with gr.Column(scale=1):
                 gr.Markdown("## Import Characters")
                 character_files = gr.File(
@@ -1056,27 +1056,26 @@ def create_character_chat_mgmt_tab():
                 import_characters_button = gr.Button("Import Characters")
                 import_status = gr.Markdown("")
 
-            # Search Section
-            with gr.Column(scale=1):
-                gr.Markdown("## Search Conversations or Characters")
-                search_query = gr.Textbox(label="Search Conversations or Characters", placeholder="Enter search keywords")
+            # Right Column: Character Selection and Image Display
+            with gr.Column(scale=2):
+                gr.Markdown("## Select Character")
+                characters = get_character_cards()
+                character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
+                select_character = gr.Dropdown(label="Select Character", choices=character_choices, interactive=True)
+                character_image = gr.Image(label="Character Image", type="pil", interactive=False)
+
+                gr.Markdown("## Search Conversations")
+                search_query = gr.Textbox(label="Search Conversations", placeholder="Enter search keywords")
                 search_button = gr.Button("Search")
                 search_results = gr.Dropdown(label="Search Results", choices=[], visible=False)
                 search_status = gr.Markdown("", visible=True)
 
         with gr.Row():
-            # Select Character and Chat Section
-            with gr.Column(scale=1):
-                gr.Markdown("## Select Character and Associated Chats")
-                characters = get_character_cards()
-                character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
-                select_character = gr.Dropdown(label="Select Character", choices=character_choices, interactive=True)
-                select_chat = gr.Dropdown(label="Select Chat", choices=[], visible=False, interactive=True)
-                load_chat_button = gr.Button("Load Selected Chat", visible=False)
-
-            with gr.Column(scale=1):
-                conversation_list = gr.Dropdown(label="Select Conversation or Character", choices=[])
-                conversation_mapping = gr.State({})
+            gr.Markdown("## Chat Management")
+            select_chat = gr.Dropdown(label="Select Chat", choices=[], visible=False, interactive=True)
+            load_chat_button = gr.Button("Load Selected Chat", visible=False)
+            conversation_list = gr.Dropdown(label="Select Conversation or Character", choices=[])
+            conversation_mapping = gr.State({})
 
         with gr.Tabs():
             with gr.TabItem("Edit"):
@@ -1090,36 +1089,58 @@ def create_character_chat_mgmt_tab():
 
         # Callback Functions
 
-        def search_conversations_or_characters(query):
+        def load_character_image(character_selection):
+            if not character_selection:
+                return None
+
+            try:
+                character_id = int(character_selection.split('(ID: ')[1].rstrip(')'))
+                character = get_character_card_by_id(character_id)
+                if character and 'image' in character:
+                    image_data = base64.b64decode(character['image'])
+                    img = Image.open(io.BytesIO(image_data))
+                    return img
+            except Exception as e:
+                logging.error(f"Error loading character image: {e}")
+
+            return None
+
+        def search_conversations_or_characters(query, selected_character):
             if not query.strip():
                 return gr.update(choices=[], visible=False), "Please enter a search query."
 
             try:
-                # Search Chats using FTS5
-                chat_results, chat_message = search_character_chats(query)
+                # Extract character ID from the selected character
+                character_id = None
+                if selected_character:
+                    character_id = int(selected_character.split('(ID: ')[1].rstrip(')'))
+
+                # Search Chats using FTS5, filtered by character_id if provided
+                chat_results, chat_message = search_character_chats(query, character_id)
 
                 # Format chat results
                 formatted_chat_results = [
                     f"Chat: {chat['conversation_name']} (ID: {chat['id']})" for chat in chat_results
                 ]
 
-                # Search Characters using substring match
-                characters = get_character_cards()
-                filtered_characters = [
-                    char for char in characters
-                    if query.lower() in char['name'].lower()
-                ]
-                formatted_character_results = [
-                    f"Character: {char['name']} (ID: {char['id']})" for char in filtered_characters
-                ]
+                # If no character is selected, also search for characters
+                if not character_id:
+                    characters = get_character_cards()
+                    filtered_characters = [
+                        char for char in characters
+                        if query.lower() in char['name'].lower()
+                    ]
+                    formatted_character_results = [
+                        f"Character: {char['name']} (ID: {char['id']})" for char in filtered_characters
+                    ]
+                else:
+                    formatted_character_results = []
 
                 # Combine results
                 all_choices = formatted_chat_results + formatted_character_results
-                mapping = {choice: conv['id'] for choice, conv in zip(formatted_chat_results, chat_results)}
-                mapping.update({choice: char['id'] for choice, char in zip(formatted_character_results, filtered_characters)})
 
                 if all_choices:
-                    return gr.update(choices=all_choices, visible=True), f"Found {len(all_choices)} result(s) matching '{query}'."
+                    return gr.update(choices=all_choices, visible=True), chat_message
                 else:
                     return gr.update(choices=[], visible=False), f"No results found for '{query}'."
 
@@ -1315,7 +1336,7 @@ def create_character_chat_mgmt_tab():
         # Register Callback Functions with Gradio Components
         search_button.click(
             fn=search_conversations_or_characters,
-            inputs=[search_query],
+            inputs=[search_query, select_character],
             outputs=[search_results, search_status]
         )
 
@@ -1338,6 +1359,10 @@ def create_character_chat_mgmt_tab():
         )
 
         select_character.change(
+            fn=load_character_image,
+            inputs=[select_character],
+            outputs=[character_image]
+        ).then(
             fn=populate_chats,
             inputs=[select_character],
             outputs=[select_chat, search_status]
@@ -1361,7 +1386,7 @@ def create_character_chat_mgmt_tab():
             select_character, select_chat, load_chat_button,
             conversation_list, conversation_mapping,
             chat_content, save_button, delete_button,
-            chat_preview, result_message
+            chat_preview, result_message, character_image
         )
 
 # def create_character_chat_mgmt_tab():
