@@ -9,7 +9,7 @@ import json
 import logging
 import io
 import base64
-from typing import Dict, Any, Optional, Union, List
+from typing import Dict, Any, Optional, Union, List, Tuple
 #
 # External Imports
 from PIL import Image
@@ -206,6 +206,49 @@ def parse_character_book(book_data: Dict[str, Any]) -> Dict[str, Any]:
     return parsed_book
 
 
+def load_character_and_image(character_id: int, user_name: str) -> Tuple[
+    Optional[Dict[str, Any]], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
+    """
+    Load a character and its associated image based on the character ID.
+
+    Args:
+        character_id (int): The ID of the character to load.
+        user_name (str): The name of the user, used for placeholder replacement.
+
+    Returns:
+        Tuple[Optional[Dict[str, Any]], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
+        A tuple containing the character data, chat history, and character image (if available).
+    """
+    try:
+        char_data = get_character_card_by_id(character_id)
+        if not char_data:
+            logging.warning(f"No character data found for ID: {character_id}")
+            return None, [], None
+
+        # Replace placeholders in character data
+        for field in ['first_mes', 'mes_example', 'scenario', 'description', 'personality']:
+            if field in char_data:
+                char_data[field] = replace_placeholders(char_data[field], char_data['name'], user_name)
+
+        # Replace placeholders in first_mes
+        first_mes = char_data.get('first_mes', "Hello! I'm ready to chat.")
+        first_mes = replace_placeholders(first_mes, char_data['name'], user_name)
+
+        chat_history = [(None, first_mes)] if first_mes else []
+
+        img = None
+        if char_data.get('image'):
+            try:
+                image_data = base64.b64decode(char_data['image'])
+                img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+            except Exception as e:
+                logging.error(f"Error processing image for character '{char_data['name']}': {e}")
+
+        return char_data, chat_history, img
+
+    except Exception as e:
+        logging.error(f"Error in load_character_and_image: {e}")
+        return None, [], None
 
 
 
@@ -242,23 +285,28 @@ def sanitize_user_input(message):
     message = re.sub(r'\}\}', '} }', message)
     return message
 
-def replace_placeholders(text, replacements):
+
+def replace_placeholders(text: str, char_name: str, user_name: str) -> str:
     """
-    Replaces placeholders in the text with corresponding values.
+    Replace placeholders in the given text with appropriate values.
 
     Args:
         text (str): The text containing placeholders.
-        replacements (dict): A dictionary of placeholder-value pairs.
+        char_name (str): The name of the character.
+        user_name (str): The name of the user.
 
     Returns:
         str: The text with placeholders replaced.
     """
+    replacements = {
+        '{{char}}': char_name,
+        '{{user}}': user_name,
+        '{{random_user}}': user_name  # Assuming random_user is the same as user for simplicity
+    }
+
     for placeholder, value in replacements.items():
-        if placeholder in text:
-            logging.debug(f"Replacing {placeholder} with {value}")
-            text = text.replace(placeholder, value)
-        else:
-            logging.debug(f"No occurrence of {placeholder} found in text.")
+        text = text.replace(placeholder, value)
+
     return text
 
 # placeholders = {
@@ -266,6 +314,27 @@ def replace_placeholders(text, replacements):
 #     '{{date}}': datetime.now().strftime('%Y-%m-%d')
 # }
 # post_history_instructions = replace_placeholders(char_data.get('post_history_instructions', ''), placeholders)
+
+def process_chat_history(chat_history: List[Tuple[str, str]], char_name: str, user_name: str) -> List[Tuple[str, str]]:
+    """
+    Process the chat history to replace placeholders in both user and character messages.
+
+    Args:
+        chat_history (List[Tuple[str, str]]): The chat history.
+        char_name (str): The name of the character.
+        user_name (str): The name of the user.
+
+    Returns:
+        List[Tuple[str, str]]: The processed chat history.
+    """
+    processed_history = []
+    for user_msg, char_msg in chat_history:
+        if user_msg:
+            user_msg = replace_placeholders(user_msg, char_name, user_name)
+        if char_msg:
+            char_msg = replace_placeholders(char_msg, char_name, user_name)
+        processed_history.append((user_msg, char_msg))
+    return processed_history
 
 def replace_user_placeholder(history, user_name):
     """
@@ -292,6 +361,15 @@ def replace_user_placeholder(history, user_name):
         updated_history.append((user_msg, bot_msg))
     return updated_history
 
+
+def extract_character_id(choice: str) -> int:
+    """Extract the character ID from the dropdown selection string."""
+    return int(choice.split('(ID: ')[1].rstrip(')'))
+
+def load_character_wrapper(character_id: int, user_name: str) -> Tuple[Dict[str, Any], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
+    """Wrapper function to load character and image using the extracted ID."""
+    char_data, chat_history, img = load_character_and_image(character_id, user_name)
+    return char_data, chat_history, img
 
 
 def extract_json_from_image(image_file):
@@ -410,6 +488,54 @@ def update_chat(chat_id, updated_history):
     else:
         return "Failed to update chat."
 
+def load_chat_and_character(chat_id: int, user_name: str) -> Tuple[Optional[Dict[str, Any]], List[Tuple[str, str]], Optional[Image.Image]]:
+    """
+    Load a chat and its associated character, including the character image and process templates.
+
+    Args:
+        chat_id (int): The ID of the chat to load.
+        user_name (str): The name of the user.
+
+    Returns:
+        Tuple[Optional[Dict[str, Any]], List[Tuple[str, str]], Optional[Image.Image]]:
+        A tuple containing the character data, processed chat history, and character image (if available).
+    """
+    try:
+        # Load the chat
+        chat = get_character_chat_by_id(chat_id)
+        if not chat:
+            logging.warning(f"No chat found with ID: {chat_id}")
+            return None, [], None
+
+        # Load the associated character
+        character_id = chat['character_id']
+        char_data = get_character_card_by_id(character_id)
+        if not char_data:
+            logging.warning(f"No character found for chat ID: {chat_id}")
+            return None, chat['chat_history'], None
+
+        # Process the chat history
+        processed_history = process_chat_history(chat['chat_history'], char_data['name'], user_name)
+
+        # Load the character image
+        img = None
+        if char_data.get('image'):
+            try:
+                image_data = base64.b64decode(char_data['image'])
+                img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+            except Exception as e:
+                logging.error(f"Error processing image for character '{char_data['name']}': {e}")
+
+        # Process character data templates
+        for field in ['first_mes', 'mes_example', 'scenario', 'description', 'personality']:
+            if field in char_data:
+                char_data[field] = replace_placeholders(char_data[field], char_data['name'], user_name)
+
+        return char_data, processed_history, img
+
+    except Exception as e:
+        logging.error(f"Error in load_chat_and_character: {e}")
+        return None, [], None
 
 #
 # End of Utility Functions
@@ -499,39 +625,24 @@ def create_character_card_interaction_tab_three():
                 formatted_results = []
             return formatted_results, message
 
-        def load_selected_chat_from_search(selected_chat):
+        def load_selected_chat_from_search(selected_chat, user_name):
             if not selected_chat:
                 return None, [], None, "No chat selected."
 
             try:
-                # Extract chat ID from the selected option
                 chat_id_match = re.search(r'\(ID:\s*(\d+)\)', selected_chat)
                 if not chat_id_match:
                     return None, [], None, "Invalid chat selection format."
 
                 chat_id = int(chat_id_match.group(1))
 
-                # Fetch chat details
-                chat = get_character_chat_by_id(chat_id)
-                if not chat:
-                    return None, [], None, "Selected chat not found."
+                # Use the new function to load chat and character data
+                char_data, chat_history, img = load_chat_and_character(chat_id, user_name)
 
-                # Fetch associated character
-                character_id = chat['character_id']
-                character = get_character_card_by_id(character_id)
-                if not character:
-                    return None, [], None, "Associated character for the chat not found."
+                if not char_data:
+                    return None, [], None, "Failed to load character data for the selected chat."
 
-                # Load character data and image
-                char_data, _, img = load_character_and_image(character['name'], user_name.value)
-
-                # Overwrite chat_history with the loaded chat
-                chat_history_updated = chat['chat_history']
-
-                # Update selected_chat_id state
-                selected_chat_id.value = chat_id
-
-                return char_data, chat_history_updated, img, f"Chat '{chat['conversation_name']}' loaded successfully."
+                return char_data, chat_history, img, f"Chat '{selected_chat}' loaded successfully."
             except Exception as e:
                 logging.error(f"Error loading selected chat: {e}")
                 return None, [], None, f"Error loading chat: {e}"
@@ -603,27 +714,6 @@ def create_character_card_interaction_tab_three():
                     return None
             return None
 
-        def load_character_and_image(name, user_name_val):
-            char_data = get_character_card_by_id(name)  # Assuming 'name' is actually the character ID
-            if not char_data:
-                return None, [], None
-
-            # Replace placeholders in first_mes
-            first_mes = char_data.get('first_mes', "Hello! I'm ready to chat.")
-            first_mes = replace_placeholders(first_mes, {'{{user}}': user_name_val or "User"})
-
-            chat_history = [(None, first_mes)] if first_mes else []
-
-            img = None
-            if char_data.get('image'):
-                try:
-                    image_data = base64.b64decode(char_data['image'])
-                    img = Image.open(io.BytesIO(image_data)).convert("RGBA")
-                except Exception as e:
-                    logging.error(f"Error processing image for character '{name}': {e}")
-
-            return char_data, chat_history, img
-
         def character_chat_wrapper(
                 message, history, char_data, api_endpoint, api_key,
                 temperature, user_name_val, auto_save
@@ -659,7 +749,8 @@ def create_character_card_interaction_tab_three():
             prompt = char_data.get('post_history_instructions', '')
 
             # Sanitize and format user message
-            user_message = sanitize_user_input(message).replace("{{user}}", user_name_val)
+            user_message = sanitize_user_input(message)
+            user_message = replace_placeholders(user_message, char_name, user_name_val)
             full_message = f"{user_name_val}: {user_message}"
 
             # Generate bot response
@@ -676,7 +767,7 @@ def create_character_card_interaction_tab_three():
             )
 
             # Replace placeholders in bot message
-            bot_message = replace_placeholders(bot_message, {'{{user}}': user_name_val})
+            bot_message = replace_placeholders(bot_message, char_name, user_name_val)
 
             # Update history
             history.append((user_message, bot_message))
@@ -920,11 +1011,11 @@ def create_character_card_interaction_tab_three():
         )
 
         character_dropdown.change(
-            fn=lambda choice: int(choice.split('(ID: ')[1].rstrip(')')),
+            fn=extract_character_id,
             inputs=[character_dropdown],
             outputs=character_data
         ).then(
-            fn=load_character_and_image,
+            fn=load_character_wrapper,
             inputs=[character_data, user_name_input],
             outputs=[character_data, chat_history, character_image]
         )
@@ -1021,7 +1112,7 @@ def create_character_card_interaction_tab_three():
         # Load Selected Chat from Search
         load_chat_button.click(
             fn=load_selected_chat_from_search,
-            inputs=[chat_search_dropdown],
+            inputs=[chat_search_dropdown, user_name_input],
             outputs=[character_data, chat_history, character_image, save_status]
         )
 

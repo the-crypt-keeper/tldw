@@ -7,7 +7,7 @@ import sqlite3
 import json
 import os
 import sys
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple, Any, Union
 
 from App_Function_Libraries.Utils.Utils import get_database_dir, get_project_relative_path, get_database_path
 from Tests.Chat_APIs.Chat_APIs_Integration_test import logging
@@ -318,17 +318,37 @@ def get_character_cards() -> List[Dict]:
     return characters
 
 
-def get_character_card_by_id(character_id: int) -> Optional[Dict]:
-    """Retrieve a single character card by its ID."""
+def get_character_card_by_id(character_id: Union[int, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve a single character card by its ID.
+
+    Args:
+        character_id: Can be either an integer ID or a dictionary containing character data.
+
+    Returns:
+        A dictionary containing the character card data, or None if not found.
+    """
     conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM CharacterCards WHERE id = ?", (character_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        columns = [description[0] for description in cursor.description]
-        return dict(zip(columns, row))
-    return None
+    try:
+        if isinstance(character_id, dict):
+            # If a dictionary is passed, assume it's already a character card
+            return character_id
+        elif isinstance(character_id, int):
+            # If an integer is passed, fetch the character from the database
+            cursor.execute("SELECT * FROM CharacterCards WHERE id = ?", (character_id,))
+            row = cursor.fetchone()
+            if row:
+                columns = [description[0] for description in cursor.description]
+                return dict(zip(columns, row))
+        else:
+            logging.warning(f"Invalid type for character_id: {type(character_id)}")
+        return None
+    except Exception as e:
+        logging.error(f"Error in get_character_card_by_id: {e}")
+        return None
+    finally:
+        conn.close()
 
 
 def update_character_card(character_id: int, card_data: Dict) -> bool:
