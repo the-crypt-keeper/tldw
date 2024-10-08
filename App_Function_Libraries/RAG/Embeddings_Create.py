@@ -3,6 +3,7 @@
 #
 # Imports:
 import logging
+import os
 import time
 from functools import wraps
 from threading import Lock, Timer
@@ -156,10 +157,16 @@ List[List[float]]:
         raise ValueError(f"Unsupported embedding provider: {provider}")
 
 
+def create_openai_embedding(text: str, model: str) -> List[float]:
+    embedding = get_openai_embeddings(text, model)
+    return embedding
+
+
 def create_embedding(text: str, provider: str, model: str, api_url: str) -> List[float]:
     return create_embeddings_batch([text], provider, model, api_url)[0]
 
-# FIXME
+
+# FIXME - refactor to use onnx embeddings callout
 def create_stella_embeddings(text: str) -> List[float]:
     if embedding_provider == 'local':
         # Load the model and tokenizer
@@ -181,48 +188,103 @@ def create_stella_embeddings(text: str) -> List[float]:
         return get_openai_embeddings(text, embedding_model)
     else:
         raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
+#
+# End of F
+##############################################################
 
 
-def create_onnx_embeddings(text: str) -> List[float]:
-    if embedding_provider == 'local':
-        # Load the tokenizer (same as before)
-        tokenizer = AutoTokenizer.from_pretrained("dunzhang/stella_en_400M_v5")
+##############################################################
+#
+# ONNX Embeddings Functions
 
-        # Load the ONNX model
-        onnx_model_path = "path_to_your_stella_model.onnx"
-        session = ort.InferenceSession(onnx_model_path)
+# FIXME - UPDATE
+# Define the model path
+model_dir = "/tldw/App_Function_Libraries/models/embedding_models/"
+model_name = "your-huggingface-model-name"
+onnx_model_path = os.path.join(model_dir, model_name, "model.onnx")
 
-        # Tokenize and encode the text
-        inputs = tokenizer(text, return_tensors="np", padding=True, truncation=True, max_length=512)
+# Tokenizer download (if applicable)
+#tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        # Prepare the ONNX model input in int64 format
-        input_ids = inputs["input_ids"].astype(np.int64)  # Ensure int64 data type for ONNX
+# Ensure the model directory exists
+#if not os.path.exists(onnx_model_path):
+    # You can add logic to download the ONNX model from a remote source
+    # if it's not already available in the folder.
+    # Example: huggingface_hub.download (if model is hosted on Hugging Face Hub)
+#    raise Exception(f"ONNX model not found at {onnx_model_path}")
+
+class ONNXEmbedder:
+    def __init__(self, model_name, model_dir, timeout_seconds=120):
+        self.model_name = model_name
+        self.model_path = os.path.join(model_dir, model_name, "model.onnx")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.session = None
+        self.timeout_seconds = timeout_seconds
+        self.last_used_time = 0
+        self.unload_timer = None
+        self.device = "cpu"  # ONNX Runtime will default to CPU unless GPU is configured
+
+    def load_model(self):
+        if self.session is None:
+            print(f"Loading ONNX model from {self.model_path}")
+            self.session = ort.InferenceSession(self.model_path)
+        self.last_used_time = time.time()
+        self.reset_timer()
+
+    def unload_model(self):
+        if self.session is not None:
+            print("Unloading ONNX model to free resources.")
+            self.session = None
+        if self.unload_timer:
+            self.unload_timer.cancel()
+
+    def reset_timer(self):
+        if self.unload_timer:
+            self.unload_timer.cancel()
+        self.unload_timer = Timer(self.timeout_seconds, self.unload_model)
+        self.unload_timer.start()
+
+    def create_embeddings(self, texts: List[str]) -> List[List[float]]:
+        self.load_model()
+
+        # Tokenize and prepare inputs
+        inputs = self.tokenizer(texts, return_tensors="np", padding=True, truncation=True, max_length=512)
+        input_ids = inputs["input_ids"].astype(np.int64)  # ONNX expects int64 data type
         attention_mask = inputs["attention_mask"].astype(np.int64)
 
-        # Create the input dictionary for ONNX Runtime
+        # Prepare ONNX inputs
         ort_inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask
         }
 
-        # Perform inference with ONNX Runtime
-        ort_outputs = session.run(None, ort_inputs)
+        # Run inference with ONNX Runtime
+        ort_outputs = self.session.run(None, ort_inputs)
 
-        # Extract the last hidden state (typically the first output of the model)
-        last_hidden_state = ort_outputs[0]  # Confirm this matches your model structure
+        # Extract embeddings from the last hidden state
+        last_hidden_state = ort_outputs[0]  # Typically, the first output is the last hidden state
+        embeddings = np.mean(last_hidden_state, axis=1)  # Take the mean across sequence length
 
-        # Use the mean of the last hidden state along the sequence dimension (axis=1)
-        embeddings = np.mean(last_hidden_state, axis=1)
+        return embeddings.tolist()  # Return as list of lists
 
-        return embeddings[0].tolist()  # Convert to list for consistency
-    elif embedding_provider == 'openai':
-        return get_openai_embeddings(text, embedding_model)
-    else:
-        raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
+# Global cache for the ONNX embedder instance
+onnx_embedder = None
 
-def create_openai_embedding(text: str, model: str) -> List[float]:
-    embedding = get_openai_embeddings(text, model)
-    return embedding
+def create_onnx_embeddings(texts: List[str]) -> List[List[float]]:
+    global onnx_embedder
+    model_dir = "/tldw/App_Function_Libraries/models/embedding_models/"
+    model_name = "your-huggingface-model-name"  # This can be pulled from config
+
+    if onnx_embedder is None:
+        onnx_embedder = ONNXEmbedder(model_name=model_name, model_dir=model_dir)
+
+    # Generate embeddings
+    embeddings = onnx_embedder.create_embeddings(texts)
+    return embeddings
+
+#
+# End of ONNX Embeddings Functions
+##############################################################
 
 #
 # End of File.
