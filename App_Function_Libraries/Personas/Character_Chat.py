@@ -11,7 +11,7 @@
 #
 # Functions:
 
-
+# FIXME - migrate functions from character_chat_tab to here
 
 #
 # End of Character_Chat.py

@@ -454,7 +454,7 @@ def load_chat_history(file):
 #
 # Gradio tabs
 
-def create_character_card_interaction_tab_three():
+def create_character_card_interaction_tab():
     with gr.TabItem("Chat with a Character Card"):
         gr.Markdown("# Chat with a Character Card")
         with gr.Row():
