@@ -55,6 +55,7 @@ yt_dlp
 datasets
 tqdm
 --index-url https://download.pytorch.org/whl/cu124
+--extra-index-url https://pypi.org/simple
 torch
 torchaudio
 torchvision
