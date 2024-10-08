@@ -1,20 +1,19 @@
-# Character_Interaction_2.py
-# Description: Functions for character interaction in Gradio UI
+# Character_Interaction_Library_3.py
+# Description: Library for character card import functions
+#
 # Imports
-import base64
-import io
 import re
 import uuid
 from datetime import datetime
-import logging
 import json
-import os
-from typing import List
-
-import gradio as gr
+import logging
+import io
+import base64
+from typing import Dict, Any, Optional, List, Tuple, Union, cast
+#
+# External Imports
 from PIL import Image
-import sqlite3
-
+import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Chat import chat
@@ -30,103 +29,39 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     delete_character_card,
     update_character_card, search_character_chats,
 )
-from App_Function_Libraries.Gradio_UI.Writing_tab import generate_writing_feedback
-from App_Function_Libraries.RAG.RAG_Libary_2 import enhanced_rag_pipeline
-
-
+from App_Function_Libraries.Utils.Utils import sanitize_user_input
 #
-#######################################################################################################################
+############################################################################################################
 #
 # Functions:
 
-####################################################
+
+#################################################################################
 #
-# RAG
+# Placeholder functions:
 
-def handle_message(user_message, history, api_choice, keywords):
+def replace_placeholders(text: str, char_name: str, user_name: str) -> str:
     """
-    Handles user messages by integrating the RAG pipeline.
-    """
-    try:
-        # Retrieve context using RAG
-        rag_response = enhanced_rag_pipeline(query=user_message, api_choice=api_choice, keywords=keywords)
-        answer = rag_response.get("answer", "I'm sorry, I couldn't process that.")
-        context = rag_response.get("context", "")
-
-        # Update chat history
-        history = history + [(user_message, answer)]
-
-        # Optionally, log or display the context
-        logging.debug(f"Context used for response: {context}")
-
-        return history, ""
-
-    except Exception as e:
-        logging.error(f"Error handling message: {e}")
-        return history + [(user_message, "An error occurred while processing your request.")], f"Error: {e}"
-
-#
-#
-#######################################################
-
-
-####################################################
-#
-# Utility Functions
-
-def validate_user_name(name):
-    """
-    Validates the user's name input.
-
-    Args:
-        name (str): The user's name.
-
-    Returns:
-        str: Validated user name or a default value.
-    """
-    if not name.strip():
-        return "User"  # Default name if input is empty
-    return name.strip()
-
-def sanitize_user_input(message):
-    """
-    Removes or escapes '{{' and '}}' to prevent placeholder injection.
-
-    Args:
-        message (str): The user's message.
-
-    Returns:
-        str: Sanitized message.
-    """
-    # Replace '{{' and '}}' with their escaped versions
-    message = re.sub(r'\{\{', '{ {', message)
-    message = re.sub(r'\}\}', '} }', message)
-    return message
-
-def replace_placeholders(text, replacements):
-    """
-    Replaces placeholders in the text with corresponding values.
+    Replace placeholders in the given text with appropriate values.
 
     Args:
         text (str): The text containing placeholders.
-        replacements (dict): A dictionary of placeholder-value pairs.
+        char_name (str): The name of the character.
+        user_name (str): The name of the user.
 
     Returns:
         str: The text with placeholders replaced.
     """
-    for placeholder, value in replacements.items():
-        if placeholder in text:
-            logging.debug(f"Replacing {placeholder} with {value}")
-            text = text.replace(placeholder, value)
-        else:
-            logging.debug(f"No occurrence of {placeholder} found in text.")
-    return text
+    replacements = {
+        '{{char}}': char_name,
+        '{{user}}': user_name,
+        '{{random_user}}': user_name  # Assuming random_user is the same as user for simplicity
+    }
 
-# placeholders = {
-#     '{{user}}': user_name_val,
-#     '{{date}}': datetime.now().strftime('%Y-%m-%d')
-# }
-# post_history_instructions = replace_placeholders(char_data.get('post_history_instructions', ''), placeholders)
+    for placeholder, value in replacements.items():
+        text = text.replace(placeholder, value)
+
+    return text
 
 def replace_user_placeholder(history, user_name):
     """
@@ -153,99 +88,62 @@ def replace_user_placeholder(history, user_name):
         updated_history.append((user_msg, bot_msg))
     return updated_history
 
+#
+# End of Placeholder functions
+#################################################################################
+
 def import_character_card(file):
     if file is None:
-        logging.warning("No file provided for character card import")
         return None, gr.update(), "No file provided for character card import"
 
     try:
-        # Determine if the file is an image or a JSON file based on the file extension
         if file.name.lower().endswith(('.png', '.webp')):
-            logging.info(f"Attempting to import character card from image: {file.name}")
             json_data = extract_json_from_image(file)
-            if json_data:
-                logging.info("JSON data extracted from image, attempting to parse")
-                # Parse the JSON data
-                card_data = import_character_card_json(json_data)
-                if card_data:
-                    # Save the image data
-                    with Image.open(file) as img:
-                        img_byte_arr = io.BytesIO()
-                        img.save(img_byte_arr, format='PNG')
-                        card_data['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-                else:
-                    logging.warning("Failed to parse character card JSON.")
-                    return None, gr.update(), "Failed to parse character card JSON."
-            else:
-                logging.warning("No JSON data found in the image")
+            if not json_data:
                 return None, gr.update(), "No JSON data found in the image."
         elif file.name.lower().endswith('.json'):
-            logging.info(f"Attempting to import character card from JSON file: {file.name}")
-            # Open and read the JSON file
             with open(file.name, 'r', encoding='utf-8') as f:
-                content = f.read()
-            # Parse the JSON content
-            card_data = import_character_card_json(content)
-            if card_data:
-                # Ensure all necessary fields are present
-                if 'image' not in card_data or not card_data['image']:
-                    card_data['image'] = ''
-                upload_status_message = "JSON file uploaded successfully."
-            else:
-                logging.warning("Failed to parse character card JSON.")
-                return None, gr.update(), "Failed to parse character card JSON."
+                json_data = f.read()
         else:
-            logging.warning("Unsupported file type for character card import.")
             return None, gr.update(), "Unsupported file type. Please upload a PNG/WebP image or a JSON file."
 
-        # Ensure all necessary fields are present
-        if 'post_history_instructions' not in card_data:
-            card_data['post_history_instructions'] = ''
-        if 'first_message' not in card_data:
-            card_data['first_message'] = card_data.get('first_mes', "Hello! I'm ready to chat.")
+        card_data = import_character_card_json(json_data)
+        if not card_data:
+            return None, gr.update(), "Failed to parse character card JSON."
 
-        # Save character card using the database function
+        # Save image data for PNG/WebP files
+        if file.name.lower().endswith(('.png', '.webp')):
+            with Image.open(file) as img:
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format='PNG')
+                card_data['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+
+        # Save character card to database
         character_id = add_character_card(card_data)
         if character_id:
-            logging.info(f"Character card '{card_data['name']}' saved with ID {character_id}")
-            # Update the card_data with the assigned ID
-            card_data['id'] = character_id
-            # Update the character dropdown choices
             characters = get_character_cards()
             character_names = [char['name'] for char in characters]
-            if file.name.lower().endswith('.json'):
-                upload_status_message = "Character card JSON imported successfully."
-            else:
-                upload_status_message = f"Character card '{card_data['name']}' imported successfully from image."
-            return card_data, gr.update(choices=character_names), f"Character card '{card_data['name']}' imported successfully.", upload_status_message
+            return card_data, gr.update(
+                choices=character_names), f"Character card '{card_data['name']}' imported successfully."
         else:
-            logging.error("Failed to save character card to database.")
-            return None, gr.update(), f"Failed to save character card '{card_data.get('name', 'Unknown')}'. It may already exist.", "Failed to save character card."
+            return None, gr.update(), f"Failed to save character card '{card_data.get('name', 'Unknown')}'. It may already exist."
     except Exception as e:
         logging.error(f"Error importing character card: {e}")
-        return None, gr.update(), f"Error importing character card: {e}", f"Error importing character card: {e}"
+        return None, gr.update(), f"Error importing character card: {e}"
 
-
-def import_character_card_json(json_content):
+def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
     try:
-        # Remove any leading/trailing whitespace
         json_content = json_content.strip()
-
-        # Log the first 100 characters of the content
-        logging.debug(f"JSON content (first 100 chars): {json_content[:100]}...")
-
         card_data = json.loads(json_content)
-        logging.debug(f"Parsed JSON data keys: {list(card_data.keys())}")
 
         if 'spec' in card_data and card_data['spec'] == 'chara_card_v2':
             logging.info("Detected V2 character card")
-            return card_data['data']
+            return parse_v2_card(card_data)
         else:
             logging.info("Assuming V1 character card")
-            return card_data
+            return parse_v1_card(card_data)
     except json.JSONDecodeError as e:
         logging.error(f"JSON decode error: {e}")
-        logging.error(f"Problematic JSON content: {json_content[:500]}...")
     except Exception as e:
         logging.error(f"Unexpected error parsing JSON: {e}")
     return None
@@ -291,6 +189,249 @@ def extract_json_from_image(image_file):
         logging.error(f"Error extracting JSON from image: {e}")
     return None
 
+
+def process_chat_history(chat_history: List[Tuple[str, str]], char_name: str, user_name: str) -> List[Tuple[str, str]]:
+    """
+    Process the chat history to replace placeholders in both user and character messages.
+
+    Args:
+        chat_history (List[Tuple[str, str]]): The chat history.
+        char_name (str): The name of the character.
+        user_name (str): The name of the user.
+
+    Returns:
+        List[Tuple[str, str]]: The processed chat history.
+    """
+    processed_history = []
+    for user_msg, char_msg in chat_history:
+        if user_msg:
+            user_msg = replace_placeholders(user_msg, char_name, user_name)
+        if char_msg:
+            char_msg = replace_placeholders(char_msg, char_name, user_name)
+        processed_history.append((user_msg, char_msg))
+    return processed_history
+
+def parse_v2_card(card_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    try:
+        # Validate spec_version
+        if card_data.get('spec_version') != '2.0':
+            logging.warning(f"Unsupported V2 spec version: {card_data.get('spec_version')}")
+            return None
+
+        data = card_data['data']
+
+        # Ensure all required fields are present
+        required_fields = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example']
+        for field in required_fields:
+            if field not in data:
+                logging.error(f"Missing required field in V2 card: {field}")
+                return None
+
+        # Handle new V2 fields
+        parsed_data = {
+            'name': data['name'],
+            'description': data['description'],
+            'personality': data['personality'],
+            'scenario': data['scenario'],
+            'first_mes': data['first_mes'],
+            'mes_example': data['mes_example'],
+            'creator_notes': data.get('creator_notes', ''),
+            'system_prompt': data.get('system_prompt', ''),
+            'post_history_instructions': data.get('post_history_instructions', ''),
+            'alternate_greetings': data.get('alternate_greetings', []),
+            'tags': data.get('tags', []),
+            'creator': data.get('creator', ''),
+            'character_version': data.get('character_version', ''),
+            'extensions': data.get('extensions', {})
+        }
+
+        # Handle character_book if present
+        if 'character_book' in data:
+            parsed_data['character_book'] = parse_character_book(data['character_book'])
+
+        return parsed_data
+    except KeyError as e:
+        logging.error(f"Missing key in V2 card structure: {e}")
+    except Exception as e:
+        logging.error(f"Error parsing V2 card: {e}")
+    return None
+
+def parse_v1_card(card_data: Dict[str, Any]) -> Dict[str, Any]:
+    # Ensure all required V1 fields are present
+    required_fields = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example']
+    for field in required_fields:
+        if field not in card_data:
+            logging.error(f"Missing required field in V1 card: {field}")
+            raise ValueError(f"Missing required field in V1 card: {field}")
+
+    # Convert V1 to V2 format
+    v2_data: Dict[str, Union[str, List[str], Dict[str, Any]]] = {
+        'name': card_data['name'],
+        'description': card_data['description'],
+        'personality': card_data['personality'],
+        'scenario': card_data['scenario'],
+        'first_mes': card_data['first_mes'],
+        'mes_example': card_data['mes_example'],
+        'creator_notes': cast(str, card_data.get('creator_notes', '')),
+        'system_prompt': cast(str, card_data.get('system_prompt', '')),
+        'post_history_instructions': cast(str, card_data.get('post_history_instructions', '')),
+        'alternate_greetings': cast(List[str], card_data.get('alternate_greetings', [])),
+        'tags': cast(List[str], card_data.get('tags', [])),
+        'creator': cast(str, card_data.get('creator', '')),
+        'character_version': cast(str, card_data.get('character_version', '')),
+        'extensions': {}
+    }
+
+    # Move any non-standard V1 fields to extensions
+    for key, value in card_data.items():
+        if key not in v2_data:
+            v2_data['extensions'][key] = value
+
+    return v2_data
+
+def extract_character_id(choice: str) -> int:
+    """Extract the character ID from the dropdown selection string."""
+    return int(choice.split('(ID: ')[1].rstrip(')'))
+
+def load_character_wrapper(character_id: int, user_name: str) -> Tuple[Dict[str, Any], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
+    """Wrapper function to load character and image using the extracted ID."""
+    char_data, chat_history, img = load_character_and_image(character_id, user_name)
+    return char_data, chat_history, img
+
+def parse_character_book(book_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Parse the character book data from a V2 character card.
+
+    Args:
+        book_data (Dict[str, Any]): The raw character book data from the character card.
+
+    Returns:
+        Dict[str, Any]: The parsed and structured character book data.
+    """
+    parsed_book = {
+        'name': book_data.get('name', ''),
+        'description': book_data.get('description', ''),
+        'scan_depth': book_data.get('scan_depth'),
+        'token_budget': book_data.get('token_budget'),
+        'recursive_scanning': book_data.get('recursive_scanning', False),
+        'extensions': book_data.get('extensions', {}),
+        'entries': []
+    }
+
+    for entry in book_data.get('entries', []):
+        parsed_entry = {
+            'keys': entry['keys'],
+            'content': entry['content'],
+            'extensions': entry.get('extensions', {}),
+            'enabled': entry['enabled'],
+            'insertion_order': entry['insertion_order'],
+            'case_sensitive': entry.get('case_sensitive', False),
+            'name': entry.get('name', ''),
+            'priority': entry.get('priority'),
+            'id': entry.get('id'),
+            'comment': entry.get('comment', ''),
+            'selective': entry.get('selective', False),
+            'secondary_keys': entry.get('secondary_keys', []),
+            'constant': entry.get('constant', False),
+            'position': entry.get('position')
+        }
+        parsed_book['entries'].append(parsed_entry)
+
+    return parsed_book
+
+def load_character_and_image(character_id: int, user_name: str) -> Tuple[Optional[Dict[str, Any]], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
+    """
+    Load a character and its associated image based on the character ID.
+
+    Args:
+        character_id (int): The ID of the character to load.
+        user_name (str): The name of the user, used for placeholder replacement.
+
+    Returns:
+        Tuple[Optional[Dict[str, Any]], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
+        A tuple containing the character data, chat history, and character image (if available).
+    """
+    try:
+        char_data = get_character_card_by_id(character_id)
+        if not char_data:
+            logging.warning(f"No character data found for ID: {character_id}")
+            return None, [], None
+
+        # Replace placeholders in character data
+        for field in ['first_mes', 'mes_example', 'scenario', 'description', 'personality']:
+            if field in char_data:
+                char_data[field] = replace_placeholders(char_data[field], char_data['name'], user_name)
+
+        # Replace placeholders in first_mes
+        first_mes = char_data.get('first_mes', "Hello! I'm ready to chat.")
+        first_mes = replace_placeholders(first_mes, char_data['name'], user_name)
+
+        chat_history = [(None, first_mes)] if first_mes else []
+
+        img = None
+        if char_data.get('image'):
+            try:
+                image_data = base64.b64decode(char_data['image'])
+                img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+            except Exception as e:
+                logging.error(f"Error processing image for character '{char_data['name']}': {e}")
+
+        return char_data, chat_history, img
+
+    except Exception as e:
+        logging.error(f"Error in load_character_and_image: {e}")
+        return None, [], None
+
+def load_chat_and_character(chat_id: int, user_name: str) -> Tuple[Optional[Dict[str, Any]], List[Tuple[str, str]], Optional[Image.Image]]:
+    """
+    Load a chat and its associated character, including the character image and process templates.
+
+    Args:
+        chat_id (int): The ID of the chat to load.
+        user_name (str): The name of the user.
+
+    Returns:
+        Tuple[Optional[Dict[str, Any]], List[Tuple[str, str]], Optional[Image.Image]]:
+        A tuple containing the character data, processed chat history, and character image (if available).
+    """
+    try:
+        # Load the chat
+        chat = get_character_chat_by_id(chat_id)
+        if not chat:
+            logging.warning(f"No chat found with ID: {chat_id}")
+            return None, [], None
+
+        # Load the associated character
+        character_id = chat['character_id']
+        char_data = get_character_card_by_id(character_id)
+        if not char_data:
+            logging.warning(f"No character found for chat ID: {chat_id}")
+            return None, chat['chat_history'], None
+
+        # Process the chat history
+        processed_history = process_chat_history(chat['chat_history'], char_data['name'], user_name)
+
+        # Load the character image
+        img = None
+        if char_data.get('image'):
+            try:
+                image_data = base64.b64decode(char_data['image'])
+                img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+            except Exception as e:
+                logging.error(f"Error processing image for character '{char_data['name']}': {e}")
+
+        # Process character data templates
+        for field in ['first_mes', 'mes_example', 'scenario', 'description', 'personality']:
+            if field in char_data:
+                char_data[field] = replace_placeholders(char_data[field], char_data['name'], user_name)
+
+        return char_data, processed_history, img
+
+    except Exception as e:
+        logging.error(f"Error in load_chat_and_character: {e}")
+        return None, [], None
+
+
 def load_chat_history(file):
     try:
         content = file.read().decode('utf-8')
@@ -309,72 +450,11 @@ def load_chat_history(file):
         logging.error(f"Error loading chat history: {e}")
         return None, None
 
-def save_untracked_chat(history, char_data):
-    if not char_data or not history:
-        return "No chat to save or character not selected."
-
-    character_id = char_data.get('id')
-    if not character_id:
-        return "Character ID not found."
-
-    conversation_name = f"Snapshot {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    chat_id = add_character_chat(character_id, conversation_name, history, is_snapshot=True)
-    if chat_id:
-        return f"Chat snapshot saved successfully with ID {chat_id}."
-    else:
-        return "Failed to save chat snapshot."
-
-def regenerate_last_message(
-    history, char_data, api_endpoint, api_key,
-    temperature, user_name_val, auto_save
-):
-    if not history:
-        return history, ""
-
-    last_user_message = history[-1][0]
-    new_history = history[:-1]
-
-    # Re-generate the last message
-    bot_message = generate_writing_feedback(
-        last_user_message, char_data['name'], "Overall", api_endpoint, api_key
-    )
-    new_history.append((last_user_message, bot_message))
-
-    # Update history
-    history = new_history.copy()
-
-    # Auto-save if enabled
-    if auto_save:
-        character_id = char_data.get('id')
-        if character_id:
-            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            add_character_chat(character_id, conversation_name, history)
-            save_status = "Chat auto-saved."
-        else:
-            save_status = "Character ID not found; chat not saved."
-    else:
-        save_status = ""
-
-    return history, save_status
-
-def update_chat(chat_id, updated_history):
-    success = update_character_chat(chat_id, updated_history)
-    if success:
-        return "Chat updated successfully."
-    else:
-        return "Failed to update chat."
-
-
-#
-# End of Utility Functions
-####################################################
-
-
 ####################################################
 #
 # Gradio tabs
 
-def create_character_card_interaction_tab_two():
+def create_character_card_interaction_tab_three():
     with gr.TabItem("Chat with a Character Card"):
         gr.Markdown("# Chat with a Character Card")
         with gr.Row():
@@ -452,39 +532,24 @@ def create_character_card_interaction_tab_two():
                 formatted_results = []
             return formatted_results, message
 
-        def load_selected_chat_from_search(selected_chat):
+        def load_selected_chat_from_search(selected_chat, user_name):
             if not selected_chat:
                 return None, [], None, "No chat selected."
 
             try:
-                # Extract chat ID from the selected option
                 chat_id_match = re.search(r'\(ID:\s*(\d+)\)', selected_chat)
                 if not chat_id_match:
                     return None, [], None, "Invalid chat selection format."
 
                 chat_id = int(chat_id_match.group(1))
 
-                # Fetch chat details
-                chat = get_character_chat_by_id(chat_id)
-                if not chat:
-                    return None, [], None, "Selected chat not found."
+                # Use the new function to load chat and character data
+                char_data, chat_history, img = load_chat_and_character(chat_id, user_name)
 
-                # Fetch associated character
-                character_id = chat['character_id']
-                character = get_character_card_by_id(character_id)
-                if not character:
-                    return None, [], None, "Associated character for the chat not found."
+                if not char_data:
+                    return None, [], None, "Failed to load character data for the selected chat."
 
-                # Load character data and image
-                char_data, _, img = load_character_and_image(character['name'], user_name.value)
-
-                # Overwrite chat_history with the loaded chat
-                chat_history_updated = chat['chat_history']
-
-                # Update selected_chat_id state
-                selected_chat_id.value = chat_id
-
-                return char_data, chat_history_updated, img, f"Chat '{chat['conversation_name']}' loaded successfully."
+                return char_data, chat_history, img, f"Chat '{selected_chat}' loaded successfully."
             except Exception as e:
                 logging.error(f"Error loading selected chat: {e}")
                 return None, [], None, f"Error loading chat: {e}"
@@ -556,44 +621,14 @@ def create_character_card_interaction_tab_two():
                     return None
             return None
 
-        def load_character_and_image(name, user_name_val):
-            """
-            Loads character data and image, replacing '{{user}}' in the first_message.
-
-            Args:
-                name (str): The name of the character to load.
-                user_name_val (str): The user's name.
-
-            Returns:
-                tuple: Character data, updated chat history, and PIL Image object.
-            """
-            char_data, chat_history, _ = load_character(name)
-            if char_data and 'image' in char_data and char_data['image']:
-                try:
-                    # Decode the base64 image data
-                    image_data = base64.b64decode(char_data['image'])
-                    # Load the image as a PIL Image and convert to RGBA
-                    img = Image.open(io.BytesIO(image_data)).convert("RGBA")
-                    return char_data, chat_history, img
-                except Exception as e:
-                    logging.error(f"Error processing image for character '{name}': {e}")
-                    return char_data, chat_history, None
-            else:
-                # Replace '{{user}}' in chat_history if necessary
-                updated_chat_history = replace_user_placeholder(chat_history, user_name_val)
-                return char_data, updated_chat_history, None
-
         def character_chat_wrapper(
                 message, history, char_data, api_endpoint, api_key,
                 temperature, user_name_val, auto_save
         ):
-            logging.debug("Entered character_chat_wrapper")
-            if char_data is None:
+            if not char_data:
                 return history, "Please select a character first."
 
-            if not user_name_val:
-                user_name_val = "User"
-
+            user_name_val = user_name_val or "User"
             char_name = char_data.get('name', 'AI Assistant')
 
             # Prepare the character's background information
@@ -604,15 +639,10 @@ def create_character_card_interaction_tab_two():
             Scenario: {char_data.get('scenario', 'N/A')}
             """
 
-            # Prepare the system prompt for character impersonation
-            system_message = f"""You are roleplaying as {char_name}, the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI. Always refer to yourself as "{char_name}" and refer to the user as "{user_name_val}".
+            # Prepare the system prompt
+            system_message = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}"""
 
-            {char_background}
-
-            Additional instructions: {char_data.get('post_history_instructions', '')}
-            """
-
-            # Prepare media_content and selected_parts
+            # Prepare chat context
             media_content = {
                 'id': char_name,
                 'title': char_name,
@@ -625,11 +655,12 @@ def create_character_card_interaction_tab_two():
 
             prompt = char_data.get('post_history_instructions', '')
 
-            # Replace '{{user}}' in the user message before sending
-            user_message = sanitize_user_input(message).replace("{{user}}", user_name_val if user_name_val else "User")
-            full_message = f"{user_name_val}: {user_message}" if user_message else f"{user_name_val}: "
+            # Sanitize and format user message
+            user_message = sanitize_user_input(message)
+            user_message = replace_placeholders(user_message, char_name, user_name_val)
+            full_message = f"{user_name_val}: {user_message}"
 
-            # Call the chat function
+            # Generate bot response
             bot_message = chat(
                 full_message,
                 history,
@@ -642,13 +673,14 @@ def create_character_card_interaction_tab_two():
                 system_message
             )
 
-            # Replace '{{user}}' in the bot message before appending
-            bot_message = bot_message.replace("{{user}}", user_name_val if user_name_val else "User")
+            # Replace placeholders in bot message
+            bot_message = replace_placeholders(bot_message, char_name, user_name_val)
 
             # Update history
             history.append((user_message, bot_message))
 
             # Auto-save if enabled
+            save_status = ""
             if auto_save:
                 character_id = char_data.get('id')
                 if character_id:
@@ -657,8 +689,6 @@ def create_character_card_interaction_tab_two():
                     save_status = "Chat auto-saved."
                 else:
                     save_status = "Character ID not found; chat not saved."
-            else:
-                save_status = ""
 
             return history, save_status
 
@@ -876,7 +906,7 @@ def create_character_card_interaction_tab_two():
         )
 
         load_characters_button.click(
-            fn=lambda: gr.update(choices=[char['name'] for char in get_character_cards()]),
+            fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
             outputs=character_dropdown
         )
 
@@ -888,8 +918,12 @@ def create_character_card_interaction_tab_two():
         )
 
         character_dropdown.change(
-            fn=on_character_select,
+            fn=extract_character_id,
             inputs=[character_dropdown],
+            outputs=character_data
+        ).then(
+            fn=load_character_wrapper,
+            inputs=[character_data, user_name_input],
             outputs=[character_data, chat_history, character_image]
         )
 
@@ -903,7 +937,7 @@ def create_character_card_interaction_tab_two():
                 api_key_input,
                 temperature_slider,
                 user_name_input,
-                auto_save_checkbox  # Pass the auto_save state
+                auto_save_checkbox
             ],
             outputs=[chat_history, save_status]
         ).then(lambda: "", outputs=user_input)
@@ -985,7 +1019,7 @@ def create_character_card_interaction_tab_two():
         # Load Selected Chat from Search
         load_chat_button.click(
             fn=load_selected_chat_from_search,
-            inputs=[chat_search_dropdown],
+            inputs=[chat_search_dropdown, user_name_input],
             outputs=[character_data, chat_history, character_image, save_status]
         )
 
@@ -1016,10 +1050,9 @@ def create_character_chat_mgmt_tab():
             # Select Character and Chat Section
             with gr.Column(scale=1):
                 gr.Markdown("## Select Character and Associated Chats")
-                # Fetch characters from the database
                 characters = get_character_cards()
-                character_names = [char['name'] for char in characters]
-                select_character = gr.Dropdown(label="Select Character", choices=character_names, interactive=True)
+                character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
+                select_character = gr.Dropdown(label="Select Character", choices=character_choices, interactive=True)
                 select_chat = gr.Dropdown(label="Select Chat", choices=[], visible=False, interactive=True)
                 load_chat_button = gr.Button("Load Selected Chat", visible=False)
 
@@ -1039,12 +1072,7 @@ def create_character_chat_mgmt_tab():
 
         # Callback Functions
 
-        # 1. Search Functionality with FTS5 Integration
         def search_conversations_or_characters(query):
-            """
-            Search for conversations using FTS5 and characters using substring match.
-            Returns combined results.
-            """
             if not query.strip():
                 return gr.update(choices=[], visible=False), "Please enter a search query."
 
@@ -1081,14 +1109,12 @@ def create_character_chat_mgmt_tab():
                 logging.error(f"Error during search: {e}")
                 return gr.update(choices=[], visible=False), f"Error occurred during search: {e}"
 
-        # 2. Load Conversation or Character from Search Results
         def load_conversation_or_character(selected, conversation_mapping):
             if not selected or selected not in conversation_mapping:
                 return "", "<p>No selection made.</p>"
 
             selected_id = conversation_mapping[selected]
             if selected.startswith("Chat:"):
-                # Load Chat
                 chat = get_character_chat_by_id(selected_id)
                 if chat:
                     json_content = json.dumps({
@@ -1097,21 +1123,9 @@ def create_character_chat_mgmt_tab():
                         "messages": chat['chat_history']
                     }, indent=2)
 
-                    # Create HTML preview
-                    html_preview = "<div style='max-height: 500px; overflow-y: auto;'>"
-                    for idx, (user_msg, bot_msg) in enumerate(chat['chat_history']):
-                        user_style = "background-color: #e6f3ff; padding: 10px; border-radius: 5px;"
-                        bot_style = "background-color: #f0f0f0; padding: 10px; border-radius: 5px;"
-
-                        html_preview += f"<div style='margin-bottom: 10px;'>"
-                        html_preview += f"<div style='{user_style}'><strong>User:</strong> {user_msg}</div>"
-                        html_preview += f"<div style='{bot_style}'><strong>Bot:</strong> {bot_msg}</div>"
-                        html_preview += "</div>"
-                    html_preview += "</div>"
-
+                    html_preview = create_chat_preview_html(chat['chat_history'])
                     return json_content, html_preview
             elif selected.startswith("Character:"):
-                # Load Character
                 character = get_character_card_by_id(selected_id)
                 if character:
                     json_content = json.dumps({
@@ -1121,46 +1135,32 @@ def create_character_chat_mgmt_tab():
                         "personality": character['personality'],
                         "scenario": character['scenario'],
                         "post_history_instructions": character['post_history_instructions'],
-                        "first_message": character['first_message'],
-                        "image": character['image']  # Include image data if necessary
+                        "first_mes": character['first_mes'],
+                        "mes_example": character['mes_example'],
+                        "creator_notes": character.get('creator_notes', ''),
+                        "system_prompt": character.get('system_prompt', ''),
+                        "tags": character.get('tags', []),
+                        "creator": character.get('creator', ''),
+                        "character_version": character.get('character_version', ''),
+                        "extensions": character.get('extensions', {})
                     }, indent=2)
 
-                    # Create HTML preview
-                    html_preview = f"""
-                    <div>
-                        <h2>{character['name']}</h2>
-                        <p><strong>Description:</strong> {character['description']}</p>
-                        <p><strong>Personality:</strong> {character['personality']}</p>
-                        <p><strong>Scenario:</strong> {character['scenario']}</p>
-                        <p><strong>First Message:</strong> {character['first_message']}</p>
-                    </div>
-                    """
-
+                    html_preview = create_character_preview_html(character)
                     return json_content, html_preview
 
             return "", "<p>Unable to load the selected item.</p>"
 
-        # 3. Validate JSON Content
         def validate_content(selected, content):
-            if selected.startswith("Chat:"):
-                # Validate Chat JSON
-                try:
-                    data = json.loads(content)
+            try:
+                data = json.loads(content)
+                if selected.startswith("Chat:"):
                     assert "conversation_id" in data and "messages" in data
-                    return True, data
-                except Exception as e:
-                    return False, f"Invalid Chat JSON: {e}"
-            elif selected.startswith("Character:"):
-                # Validate Character JSON
-                try:
-                    data = json.loads(content)
+                elif selected.startswith("Character:"):
                     assert "id" in data and "name" in data
-                    return True, data
-                except Exception as e:
-                    return False, f"Invalid Character JSON: {e}"
-            return False, "Unknown selection type."
+                return True, data
+            except Exception as e:
+                return False, f"Invalid JSON: {e}"
 
-        # 4. Save Changes to Chat or Character
         def save_conversation_or_character(selected, conversation_mapping, content):
             if not selected or selected not in conversation_mapping:
                 return "Please select an item to save.", "<p>No changes made.</p>"
@@ -1172,35 +1172,14 @@ def create_character_chat_mgmt_tab():
             selected_id = conversation_mapping[selected]
 
             if selected.startswith("Chat:"):
-                # Update Chat
-                chat_data = result
-                success = update_character_chat(selected_id, chat_data['messages'])
-                if success:
-                    return "Chat updated successfully.", "<p>Chat updated.</p>"
-                else:
-                    return "Failed to update chat.", "<p>Failed to update chat.</p>"
+                success = update_character_chat(selected_id, result['messages'])
+                return ("Chat updated successfully." if success else "Failed to update chat."), ("<p>Chat updated.</p>" if success else "<p>Failed to update chat.</p>")
             elif selected.startswith("Character:"):
-                # Update Character
-                character_data = result
-                # Ensure the JSON aligns with the expected fields
-                card_data = {
-                    'name': character_data.get('name'),
-                    'description': character_data.get('description'),
-                    'personality': character_data.get('personality'),
-                    'scenario': character_data.get('scenario'),
-                    'post_history_instructions': character_data.get('post_history_instructions'),
-                    'first_message': character_data.get('first_message'),
-                    'image': character_data.get('image', '')  # Handle image data appropriately
-                }
-                success = update_character_card(selected_id, card_data)
-                if success:
-                    return "Character updated successfully.", "<p>Character updated.</p>"
-                else:
-                    return "Failed to update character.", "<p>Failed to update character.</p>"
+                success = update_character_card(selected_id, result)
+                return ("Character updated successfully." if success else "Failed to update character."), ("<p>Character updated.</p>" if success else "<p>Failed to update character.</p>")
 
             return "Unknown item type.", "<p>No changes made.</p>"
 
-        # 5. Delete Conversation or Character
         def delete_conversation_or_character(selected, conversation_mapping):
             if not selected or selected not in conversation_mapping:
                 return "Please select an item to delete.", "<p>No changes made.</p>", gr.update(choices=[])
@@ -1209,147 +1188,121 @@ def create_character_chat_mgmt_tab():
 
             if selected.startswith("Chat:"):
                 success = delete_character_chat(selected_id)
-                if success:
-                    # Remove the deleted item from the conversation list
-                    updated_choices = [choice for choice in conversation_mapping.keys() if choice != selected]
-                    # Remove the item from the mapping
-                    conversation_mapping.value.pop(selected, None)
-                    return "Chat deleted successfully.", "<p>Chat deleted.</p>", gr.update(choices=updated_choices)
-                else:
-                    return "Failed to delete chat.", "<p>Failed to delete chat.</p>", gr.update()
             elif selected.startswith("Character:"):
                 success = delete_character_card(selected_id)
-                if success:
-                    # Remove the deleted item from the conversation list
-                    updated_choices = [choice for choice in conversation_mapping.keys() if choice != selected]
-                    # Remove the item from the mapping
-                    conversation_mapping.value.pop(selected, None)
-                    return "Character deleted successfully.", "<p>Character deleted.</p>", gr.update(choices=updated_choices)
-                else:
-                    return "Failed to delete character.", "<p>Failed to delete character.</p>", gr.update()
+            else:
+                return "Unknown item type.", "<p>No changes made.</p>", gr.update()
 
-            return "Unknown item type.", "<p>No changes made.</p>", gr.update()
+            if success:
+                updated_choices = [choice for choice in conversation_mapping.keys() if choice != selected]
+                conversation_mapping.value.pop(selected, None)
+                return f"{selected.split(':')[0]} deleted successfully.", f"<p>{selected.split(':')[0]} deleted.</p>", gr.update(choices=updated_choices)
+            else:
+                return f"Failed to delete {selected.split(':')[0].lower()}.", f"<p>Failed to delete {selected.split(':')[0].lower()}.</p>", gr.update()
 
-        # 6. Populate Select Chat Dropdown Based on Selected Character
-        def populate_chats(character_name):
-            """
-            Retrieves all chats associated with the selected character.
-            """
-            if not character_name:
+        def populate_chats(character_selection):
+            if not character_selection:
                 return gr.update(choices=[], visible=False), "Please select a character first."
 
             try:
-                # Fetch character by name to get character_id
-                characters = get_character_cards()
-                character = next((char for char in characters if char['name'] == character_name), None)
-                if not character:
-                    return gr.update(choices=[], visible=False), f"Character '{character_name}' not found."
-
-                character_id = character['id']
+                character_id = int(character_selection.split('(ID: ')[1].rstrip(')'))
                 chats = get_character_chats(character_id=character_id)
 
                 if not chats:
-                    return gr.update(choices=[], visible=False), f"No chats found for character '{character_name}'."
+                    return gr.update(choices=[], visible=False), f"No chats found for the selected character."
 
-                # Format chat choices
                 formatted_chats = [f"{chat['conversation_name']} (ID: {chat['id']})" for chat in chats]
-
-                return gr.update(choices=formatted_chats, visible=True), f"Found {len(formatted_chats)} chat(s) for '{character_name}'."
+                return gr.update(choices=formatted_chats, visible=True), f"Found {len(formatted_chats)} chat(s)."
             except Exception as e:
                 logging.error(f"Error populating chats: {e}")
                 return gr.update(choices=[], visible=False), f"Error occurred: {e}"
 
-        # 7. Load Selected Chat from Character's Chats
         def load_chat_from_character(selected_chat):
             if not selected_chat:
                 return "", "<p>No chat selected.</p>"
 
             try:
-                # Extract chat ID from the selected option
-                chat_id_match = re.search(r'\(ID:\s*(\d+)\)', selected_chat)
-                if not chat_id_match:
-                    return "", "<p>Invalid chat selection format.</p>"
-
-                chat_id = int(chat_id_match.group(1))
-
-                # Fetch chat details
+                chat_id = int(selected_chat.split('(ID: ')[1].rstrip(')'))
                 chat = get_character_chat_by_id(chat_id)
                 if not chat:
                     return "", "<p>Selected chat not found.</p>"
 
-                # Load chat content
                 json_content = json.dumps({
                     "conversation_id": chat['id'],
                     "conversation_name": chat['conversation_name'],
                     "messages": chat['chat_history']
                 }, indent=2)
 
-                # Create HTML preview
-                html_preview = "<div style='max-height: 500px; overflow-y: auto;'>"
-                for idx, (user_msg, bot_msg) in enumerate(chat['chat_history']):
-                    user_style = "background-color: #e6f3ff; padding: 10px; border-radius: 5px;"
-                    bot_style = "background-color: #f0f0f0; padding: 10px; border-radius: 5px;"
-
-                    html_preview += f"<div style='margin-bottom: 10px;'>"
-                    html_preview += f"<div style='{user_style}'><strong>User:</strong> {user_msg}</div>"
-                    html_preview += f"<div style='{bot_style}'><strong>Bot:</strong> {bot_msg}</div>"
-                    html_preview += "</div>"
-                html_preview += "</div>"
-
+                html_preview = create_chat_preview_html(chat['chat_history'])
                 return json_content, html_preview
             except Exception as e:
                 logging.error(f"Error loading chat: {e}")
                 return "", f"<p>Error loading chat: {e}</p>"
 
-        # Initialize Select Character Dropdown on Page Load
-        # Instead of using gr.on_load, we populate the dropdown when the tab is created
-        # Already done by fetching characters above
+        def create_chat_preview_html(chat_history):
+            html_preview = "<div style='max-height: 500px; overflow-y: auto;'>"
+            for user_msg, bot_msg in chat_history:
+                user_style = "background-color: #e6f3ff; padding: 10px; border-radius: 5px; margin-bottom: 5px;"
+                bot_style = "background-color: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 10px;"
+                html_preview += f"<div style='{user_style}'><strong>User:</strong> {user_msg}</div>"
+                html_preview += f"<div style='{bot_style}'><strong>Bot:</strong> {bot_msg}</div>"
+            html_preview += "</div>"
+            return html_preview
+
+        def create_character_preview_html(character):
+            return f"""
+            <div>
+                <h2>{character['name']}</h2>
+                <p><strong>Description:</strong> {character['description']}</p>
+                <p><strong>Personality:</strong> {character['personality']}</p>
+                <p><strong>Scenario:</strong> {character['scenario']}</p>
+                <p><strong>First Message:</strong> {character['first_mes']}</p>
+                <p><strong>Example Message:</strong> {character['mes_example']}</p>
+                <p><strong>Post History Instructions:</strong> {character['post_history_instructions']}</p>
+                <p><strong>System Prompt:</strong> {character.get('system_prompt', 'N/A')}</p>
+                <p><strong>Tags:</strong> {', '.join(character.get('tags', []))}</p>
+                <p><strong>Creator:</strong> {character.get('creator', 'N/A')}</p>
+                <p><strong>Version:</strong> {character.get('character_version', 'N/A')}</p>
+            </div>
+            """
 
         # Register Callback Functions with Gradio Components
-
-        # 1. Search Button Click
         search_button.click(
             fn=search_conversations_or_characters,
             inputs=[search_query],
             outputs=[search_results, search_status]
         )
 
-        # 2. Search Results Dropdown Change
         search_results.change(
             fn=load_conversation_or_character,
             inputs=[search_results, conversation_mapping],
             outputs=[chat_content, chat_preview]
         )
 
-        # 3. Save Button Click
         save_button.click(
             fn=save_conversation_or_character,
             inputs=[conversation_list, conversation_mapping, chat_content],
             outputs=[result_message, chat_preview]
         )
 
-        # 4. Delete Button Click
         delete_button.click(
             fn=delete_conversation_or_character,
             inputs=[conversation_list, conversation_mapping],
             outputs=[result_message, chat_preview, conversation_list]
         )
 
-        # 5. Select Character Dropdown Change
         select_character.change(
             fn=populate_chats,
             inputs=[select_character],
             outputs=[select_chat, search_status]
         )
 
-        # 6. Select Chat Dropdown Change
         select_chat.change(
             fn=load_chat_from_character,
             inputs=[select_chat],
             outputs=[chat_content, chat_preview]
         )
 
-        # 7. Load Chat Button Click (Optional: Can be used if you prefer loading via button)
         load_chat_button.click(
             fn=load_chat_from_character,
             inputs=[select_chat],
@@ -1363,7 +1316,3 @@ def create_character_chat_mgmt_tab():
             chat_content, save_button, delete_button,
             chat_preview, result_message
         )
-
-#
-# End of Character_Interaction_2.py
-#######################################################################################################################
