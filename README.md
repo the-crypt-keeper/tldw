@@ -1,7 +1,7 @@
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
 # **tl/dw: Too Long, Didn't Watch** 
-## Summary: Your personal offline media assistant – Download, Transcribe, Summarize & Chat with/about Videos, Audio, Documents, Web Articles, and Books. 
+## Summary: Your personal offline research assistant – Download, Transcribe, Summarize & Chat with/about Videos, Audio, Documents, Web Articles, and Books. 
 ### All automated. All local. All yours.
 
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
