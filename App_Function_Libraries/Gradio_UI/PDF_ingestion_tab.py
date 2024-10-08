@@ -26,7 +26,7 @@ def create_pdf_ingestion_tab():
         gr.Markdown("# Ingest PDF Files and Extract Metadata")
         with gr.Row():
             with gr.Column():
-                pdf_file_input = gr.File(label="Uploaded PDF File", file_types=[".pdf"], visible=False)
+                pdf_file_input = gr.File(label="Uploaded PDF File", file_types=[".pdf"], visible=True)
                 pdf_upload_button = gr.UploadButton("Click to Upload PDF", file_types=[".pdf"])
                 pdf_title_input = gr.Textbox(label="Title (Optional)")
                 pdf_author_input = gr.Textbox(label="Author (Optional)")

@@ -6,8 +6,13 @@ import configparser
 import logging
 import os
 from typing import Dict, Any, List, Optional
+
+from App_Function_Libraries.DB.Character_Chat_DB import get_character_chats, perform_full_text_search_chat, \
+    fetch_keywords_for_chats
+#
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
+from App_Function_Libraries.RAG.RAG_Persona_Chat import perform_vector_search_chat
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_custom_openai
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.DB.DB_Manager import search_db, fetch_keywords_for_media
@@ -15,6 +20,7 @@ from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 # 3rd-Party Imports
 import openai
+from flashrank import Ranker, RerankRequest
 #
 ########################################################################################################################
 #
@@ -119,32 +125,57 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
 
         # Process keywords if provided
         keyword_list = [k.strip().lower() for k in keywords.split(',')] if keywords else []
-        logging.debug(f"enhanced_rag_pipeline - Keywords: {keyword_list}")
+        logging.debug(f"\n\nenhanced_rag_pipeline - Keywords: {keyword_list}")
 
         # Fetch relevant media IDs based on keywords if keywords are provided
         relevant_media_ids = fetch_relevant_media_ids(keyword_list) if keyword_list else None
-        logging.debug(f"enhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
+        logging.debug(f"\n\nenhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
 
         # Perform vector search
         vector_results = perform_vector_search(query, relevant_media_ids)
-        logging.debug(f"enhanced_rag_pipeline - Vector search results: {vector_results}")
+        logging.debug(f"\n\nenhanced_rag_pipeline - Vector search results: {vector_results}")
 
         # Perform full-text search
         fts_results = perform_full_text_search(query, relevant_media_ids)
-        logging.debug(f"enhanced_rag_pipeline - Full-text search results: {fts_results}")
+        logging.debug("\n\nenhanced_rag_pipeline - Full-text search results:")
+        logging.debug(
+            "\n\nenhanced_rag_pipeline - Full-text search results:\n" + "\n".join(
+                [str(item) for item in fts_results]) + "\n"
+        )
 
         # Combine results
         all_results = vector_results + fts_results
 
-        # FIXME - Apply Re-Ranking of results here
-        apply_re_ranking = False
+        apply_re_ranking = True
         if apply_re_ranking:
-            # Implement re-ranking logic here
-            pass
-        # Extract content from results
+            logging.debug(f"\nenhanced_rag_pipeline - Applying Re-Ranking")
+            # FIXME - add option to use re-ranking at call time
+            # FIXME - specify model + add param to modify at call time
+            # FIXME - add option to set a custom top X results
+            # You can specify a model if necessary, e.g., model_name="ms-marco-MiniLM-L-12-v2"
+            ranker = Ranker()
+
+            # Prepare passages for re-ranking
+            passages = [{"id": i, "text": result['content']} for i, result in enumerate(all_results)]
+            rerank_request = RerankRequest(query=query, passages=passages)
+
+            # Rerank the results
+            reranked_results = ranker.rerank(rerank_request)
+
+            # Sort results based on the re-ranking score
+            reranked_results = sorted(reranked_results, key=lambda x: x['score'], reverse=True)
+
+            # Log reranked results
+            logging.debug(f"\n\nenhanced_rag_pipeline - Reranked results: {reranked_results}")
+
+            # Update all_results based on reranking
+            all_results = [all_results[result['id']] for result in reranked_results]
+
+        # Extract content from results (top 10)
         context = "\n".join([result['content'] for result in all_results[:10]])  # Limit to top 10 results
         logging.debug(f"Context length: {len(context)}")
         logging.debug(f"Context: {context[:200]}")
+
         # Generate answer using the selected API
         answer = generate_answer(api_choice, context, query)
 
@@ -323,6 +354,150 @@ def extract_media_id_from_result(result: str) -> Optional[int]:
 #
 ########################################################################################################################
 
+
+############################################################################################################
+#
+# Chat RAG
+
+def enhanced_rag_pipeline_chat(query: str, api_choice: str, character_id: int, keywords: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Enhanced RAG pipeline tailored for the Character Chat tab.
+
+    Args:
+        query (str): The user's input query.
+        api_choice (str): The API to use for generating the response.
+        character_id (int): The ID of the character being interacted with.
+        keywords (Optional[str]): Comma-separated keywords to filter search results.
+
+    Returns:
+        Dict[str, Any]: Contains the generated answer and the context used.
+    """
+    try:
+        # Load embedding provider from config, or fallback to 'openai'
+        embedding_provider = config.get('Embeddings', 'provider', fallback='openai')
+        logging.debug(f"Using embedding provider: {embedding_provider}")
+
+        # Process keywords if provided
+        keyword_list = [k.strip().lower() for k in keywords.split(',')] if keywords else []
+        logging.debug(f"enhanced_rag_pipeline_chat - Keywords: {keyword_list}")
+
+        # Fetch relevant chat IDs based on character_id and keywords
+        if keyword_list:
+            relevant_chat_ids = fetch_keywords_for_chats(keyword_list)
+        else:
+            relevant_chat_ids = fetch_all_chat_ids(character_id)
+        logging.debug(f"enhanced_rag_pipeline_chat - Relevant chat IDs: {relevant_chat_ids}")
+
+        if not relevant_chat_ids:
+            logging.info(f"No chats found for the given keywords and character ID: {character_id}")
+            # Fallback to generating answer without context
+            answer = generate_answer(api_choice, "", query)
+            return {
+                "answer": answer,
+                "context": ""
+            }
+
+        # Perform vector search within the relevant chats
+        vector_results = perform_vector_search_chat(query, relevant_chat_ids)
+        logging.debug(f"enhanced_rag_pipeline_chat - Vector search results: {vector_results}")
+
+        # Perform full-text search within the relevant chats
+        fts_results = perform_full_text_search_chat(query, relevant_chat_ids)
+        logging.debug("enhanced_rag_pipeline_chat - Full-text search results:")
+        logging.debug("\n".join([str(item) for item in fts_results]))
+
+        # Combine results
+        all_results = vector_results + fts_results
+
+        apply_re_ranking = True
+        if apply_re_ranking:
+            logging.debug("enhanced_rag_pipeline_chat - Applying Re-Ranking")
+            ranker = Ranker()
+
+            # Prepare passages for re-ranking
+            passages = [{"id": i, "text": result['content']} for i, result in enumerate(all_results)]
+            rerank_request = RerankRequest(query=query, passages=passages)
+
+            # Rerank the results
+            reranked_results = ranker.rerank(rerank_request)
+
+            # Sort results based on the re-ranking score
+            reranked_results = sorted(reranked_results, key=lambda x: x['score'], reverse=True)
+
+            # Log reranked results
+            logging.debug(f"enhanced_rag_pipeline_chat - Reranked results: {reranked_results}")
+
+            # Update all_results based on reranking
+            all_results = [all_results[result['id']] for result in reranked_results]
+
+        # Extract context from top results (limit to top 10)
+        context = "\n".join([result['content'] for result in all_results[:10]])
+        logging.debug(f"Context length: {len(context)}")
+        logging.debug(f"Context: {context[:200]}")  # Log only the first 200 characters for brevity
+
+        # Generate answer using the selected API
+        answer = generate_answer(api_choice, context, query)
+
+        if not all_results:
+            logging.info(f"No results found. Query: {query}, Keywords: {keywords}")
+            return {
+                "answer": "No relevant information based on your query and keywords were found in the database. Your query has been directly passed to the LLM, and here is its answer: \n\n" + answer,
+                "context": "No relevant information based on your query and keywords were found in the database. The only context used was your query: \n\n" + query
+            }
+
+        return {
+            "answer": answer,
+            "context": context
+        }
+
+    except Exception as e:
+        logging.error(f"Error in enhanced_rag_pipeline_chat: {str(e)}")
+        return {
+            "answer": "An error occurred while processing your request.",
+            "context": ""
+        }
+
+
+def fetch_relevant_chat_ids(character_id: int, keywords: List[str]) -> List[int]:
+    """
+    Fetch chat IDs associated with a character and filtered by keywords.
+
+    Args:
+        character_id (int): The ID of the character.
+        keywords (List[str]): List of keywords to filter chats.
+
+    Returns:
+        List[int]: List of relevant chat IDs.
+    """
+    relevant_ids = set()
+    try:
+        media_ids = fetch_keywords_for_chats(keywords)
+        relevant_ids.update(media_ids)
+    except Exception as e:
+        logging.error(f"Error fetching relevant chat IDs: {str(e)}")
+    return list(relevant_ids)
+
+
+def fetch_all_chat_ids(character_id: int) -> List[int]:
+    """
+    Fetch all chat IDs associated with a specific character.
+
+    Args:
+        character_id (int): The ID of the character.
+
+    Returns:
+        List[int]: List of all chat IDs for the character.
+    """
+    try:
+        chats = get_character_chats(character_id=character_id)
+        return [chat['id'] for chat in chats]
+    except Exception as e:
+        logging.error(f"Error fetching all chat IDs for character {character_id}: {str(e)}")
+        return []
+
+#
+# End of Chat RAG
+############################################################################################################
 
 # Function to preprocess and store all existing content in the database
 # def preprocess_all_content(database, create_contextualized=True, api_name="gpt-3.5-turbo"):
