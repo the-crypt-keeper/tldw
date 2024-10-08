@@ -204,14 +204,14 @@ model_name = "your-huggingface-model-name"
 onnx_model_path = os.path.join(model_dir, model_name, "model.onnx")
 
 # Tokenizer download (if applicable)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+#tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 # Ensure the model directory exists
-if not os.path.exists(onnx_model_path):
+#if not os.path.exists(onnx_model_path):
     # You can add logic to download the ONNX model from a remote source
     # if it's not already available in the folder.
     # Example: huggingface_hub.download (if model is hosted on Hugging Face Hub)
-    raise Exception(f"ONNX model not found at {onnx_model_path}")
+#    raise Exception(f"ONNX model not found at {onnx_model_path}")
 
 class ONNXEmbedder:
     def __init__(self, model_name, model_dir, timeout_seconds=120):
@@ -267,7 +267,8 @@ class ONNXEmbedder:
 
         return embeddings.tolist()  # Return as list of lists
 
-onnx_embedder = None  # Global cache for the ONNX embedder instance
+# Global cache for the ONNX embedder instance
+onnx_embedder = None
 
 def create_onnx_embeddings(texts: List[str]) -> List[List[float]]:
     global onnx_embedder
