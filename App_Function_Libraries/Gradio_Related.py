@@ -2,7 +2,6 @@
 #########################################
 # Gradio UI Functions Library
 # I fucking hate Gradio.
-# Yea, fuck Gradio. https://github.com/gradio-app/gradio/pull/8263 & https://github.com/gradio-app/gradio/issues/7968
 #
 #########################################
 #
