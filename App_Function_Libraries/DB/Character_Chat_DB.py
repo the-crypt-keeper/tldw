@@ -471,12 +471,13 @@ def get_character_chat_by_id(chat_id: int) -> Optional[Dict]:
     return None
 
 
-def search_character_chats(query: str) -> Tuple[List[Dict], str]:
+def search_character_chats(query: str, character_id: Optional[int] = None) -> Tuple[List[Dict], str]:
     """
-    Search for character chats using FTS5.
+    Search for character chats using FTS5, optionally filtered by character_id.
 
     Args:
         query (str): The search query.
+        character_id (Optional[int]): The ID of the character to filter chats by.
 
     Returns:
         Tuple[List[Dict], str]: A list of matching chats and a status message.
@@ -487,18 +488,34 @@ def search_character_chats(query: str) -> Tuple[List[Dict], str]:
     conn = sqlite3.connect(chat_DB_PATH)
     cursor = conn.cursor()
     try:
-        # Use parameterized queries to prevent SQL injection
-        cursor.execute("""
-            SELECT CharacterChats.id, CharacterChats.conversation_name, CharacterChats.chat_history
-            FROM CharacterChats_fts
-            JOIN CharacterChats ON CharacterChats_fts.rowid = CharacterChats.id
-            WHERE CharacterChats_fts MATCH ?
-            ORDER BY rank
-        """, (query,))
+        if character_id is not None:
+            # Search with character_id filter
+            cursor.execute("""
+                SELECT CharacterChats.id, CharacterChats.conversation_name, CharacterChats.chat_history
+                FROM CharacterChats_fts
+                JOIN CharacterChats ON CharacterChats_fts.rowid = CharacterChats.id
+                WHERE CharacterChats_fts MATCH ? AND CharacterChats.character_id = ?
+                ORDER BY rank
+            """, (query, character_id))
+        else:
+            # Search without character_id filter
+            cursor.execute("""
+                SELECT CharacterChats.id, CharacterChats.conversation_name, CharacterChats.chat_history
+                FROM CharacterChats_fts
+                JOIN CharacterChats ON CharacterChats_fts.rowid = CharacterChats.id
+                WHERE CharacterChats_fts MATCH ?
+                ORDER BY rank
+            """, (query,))
+
         rows = cursor.fetchall()
         columns = [description[0] for description in cursor.description]
         results = [dict(zip(columns, row)) for row in rows]
-        status_message = f"Found {len(results)} chat(s) matching '{query}'."
+
+        if character_id is not None:
+            status_message = f"Found {len(results)} chat(s) matching '{query}' for the selected character."
+        else:
+            status_message = f"Found {len(results)} chat(s) matching '{query}' across all characters."
+
         return results, status_message
     except Exception as e:
         logging.error(f"Error searching chats with FTS5: {e}")

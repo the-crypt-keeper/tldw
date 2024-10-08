@@ -92,6 +92,11 @@ def replace_user_placeholder(history, user_name):
 # End of Placeholder functions
 #################################################################################
 
+
+#################################################################################
+#
+# Character card import functions:
+
 def import_character_card(file):
     if file is None:
         return None, gr.update(), "No file provided for character card import"
@@ -100,7 +105,7 @@ def import_character_card(file):
         if file.name.lower().endswith(('.png', '.webp')):
             json_data = extract_json_from_image(file)
             if not json_data:
-                return None, gr.update(), "No JSON data found in the image."
+                return None, gr.update(), "No character card data found in the image. This might not be a valid character card image."
         elif file.name.lower().endswith('.json'):
             with open(file.name, 'r', encoding='utf-8') as f:
                 json_data = f.read()
@@ -109,7 +114,7 @@ def import_character_card(file):
 
         card_data = import_character_card_json(json_data)
         if not card_data:
-            return None, gr.update(), "Failed to parse character card JSON."
+            return None, gr.update(), "Failed to parse character card data. The file might not contain valid character information."
 
         # Save image data for PNG/WebP files
         if file.name.lower().endswith(('.png', '.webp')):
@@ -130,6 +135,7 @@ def import_character_card(file):
     except Exception as e:
         logging.error(f"Error importing character card: {e}")
         return None, gr.update(), f"Error importing character card: {e}"
+
 
 def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
     try:
@@ -1035,28 +1041,39 @@ def create_character_card_interaction_tab():
 
 
 def create_character_chat_mgmt_tab():
-    with gr.TabItem("Chat Management"):
-        gr.Markdown("# Chat Management")
+    with gr.TabItem("Character and Chat Management"):
+        gr.Markdown("# Character and Chat Management")
 
         with gr.Row():
-            # Search Section
+            # Left Column: Character Import and Chat Management
             with gr.Column(scale=1):
-                gr.Markdown("## Search Conversations or Characters")
-                search_query = gr.Textbox(label="Search Conversations or Characters", placeholder="Enter search keywords")
+                gr.Markdown("## Import Characters")
+                character_files = gr.File(
+                    label="Upload Character Files (PNG, WEBP, JSON)",
+                    file_types=[".png", ".webp", ".json"],
+                    file_count="multiple"
+                )
+                import_characters_button = gr.Button("Import Characters")
+                import_status = gr.Markdown("")
+
+            # Right Column: Character Selection and Image Display
+            with gr.Column(scale=2):
+                gr.Markdown("## Select Character")
+                characters = get_character_cards()
+                character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
+                select_character = gr.Dropdown(label="Select Character", choices=character_choices, interactive=True)
+                character_image = gr.Image(label="Character Image", type="pil", interactive=False)
+
+                gr.Markdown("## Search Conversations")
+                search_query = gr.Textbox(label="Search Conversations", placeholder="Enter search keywords")
                 search_button = gr.Button("Search")
                 search_results = gr.Dropdown(label="Search Results", choices=[], visible=False)
                 search_status = gr.Markdown("", visible=True)
 
-            # Select Character and Chat Section
-            with gr.Column(scale=1):
-                gr.Markdown("## Select Character and Associated Chats")
-                characters = get_character_cards()
-                character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
-                select_character = gr.Dropdown(label="Select Character", choices=character_choices, interactive=True)
-                select_chat = gr.Dropdown(label="Select Chat", choices=[], visible=False, interactive=True)
-                load_chat_button = gr.Button("Load Selected Chat", visible=False)
-
         with gr.Row():
+            gr.Markdown("## Chat Management")
+            select_chat = gr.Dropdown(label="Select Chat", choices=[], visible=False, interactive=True)
+            load_chat_button = gr.Button("Load Selected Chat", visible=False)
             conversation_list = gr.Dropdown(label="Select Conversation or Character", choices=[])
             conversation_mapping = gr.State({})
 
@@ -1072,36 +1089,58 @@ def create_character_chat_mgmt_tab():
 
         # Callback Functions
 
-        def search_conversations_or_characters(query):
+        def load_character_image(character_selection):
+            if not character_selection:
+                return None
+
+            try:
+                character_id = int(character_selection.split('(ID: ')[1].rstrip(')'))
+                character = get_character_card_by_id(character_id)
+                if character and 'image' in character:
+                    image_data = base64.b64decode(character['image'])
+                    img = Image.open(io.BytesIO(image_data))
+                    return img
+            except Exception as e:
+                logging.error(f"Error loading character image: {e}")
+
+            return None
+
+        def search_conversations_or_characters(query, selected_character):
             if not query.strip():
                 return gr.update(choices=[], visible=False), "Please enter a search query."
 
             try:
-                # Search Chats using FTS5
-                chat_results, chat_message = search_character_chats(query)
+                # Extract character ID from the selected character
+                character_id = None
+                if selected_character:
+                    character_id = int(selected_character.split('(ID: ')[1].rstrip(')'))
+
+                # Search Chats using FTS5, filtered by character_id if provided
+                chat_results, chat_message = search_character_chats(query, character_id)
 
                 # Format chat results
                 formatted_chat_results = [
                     f"Chat: {chat['conversation_name']} (ID: {chat['id']})" for chat in chat_results
                 ]
 
-                # Search Characters using substring match
-                characters = get_character_cards()
-                filtered_characters = [
-                    char for char in characters
-                    if query.lower() in char['name'].lower()
-                ]
-                formatted_character_results = [
-                    f"Character: {char['name']} (ID: {char['id']})" for char in filtered_characters
-                ]
+                # If no character is selected, also search for characters
+                if not character_id:
+                    characters = get_character_cards()
+                    filtered_characters = [
+                        char for char in characters
+                        if query.lower() in char['name'].lower()
+                    ]
+                    formatted_character_results = [
+                        f"Character: {char['name']} (ID: {char['id']})" for char in filtered_characters
+                    ]
+                else:
+                    formatted_character_results = []
 
                 # Combine results
                 all_choices = formatted_chat_results + formatted_character_results
-                mapping = {choice: conv['id'] for choice, conv in zip(formatted_chat_results, chat_results)}
-                mapping.update({choice: char['id'] for choice, char in zip(formatted_character_results, filtered_characters)})
 
                 if all_choices:
-                    return gr.update(choices=all_choices, visible=True), f"Found {len(all_choices)} result(s) matching '{query}'."
+                    return gr.update(choices=all_choices, visible=True), chat_message
                 else:
                     return gr.update(choices=[], visible=False), f"No results found for '{query}'."
 
@@ -1265,11 +1304,39 @@ def create_character_chat_mgmt_tab():
                 <p><strong>Version:</strong> {character.get('character_version', 'N/A')}</p>
             </div>
             """
+        def import_multiple_characters(files):
+            if not files:
+                return "No files provided for character import."
+
+            results = []
+            for file in files:
+                result, _, message = import_character_card(file)
+                if result:
+                    results.append(f"Imported: {result['name']}")
+                else:
+                    results.append(f"Failed: {file.name} - {message}")
+
+            # Refresh character choices
+            characters = get_character_cards()
+            character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
+            select_character.choices = character_choices
+
+            return "Import results:\n" + "\n".join(results)
+
+        # Register new callback for character import
+        import_characters_button.click(
+            fn=import_multiple_characters,
+            inputs=[character_files],
+            outputs=[import_status]
+        ).then(
+            fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
+            outputs=select_character
+        )
 
         # Register Callback Functions with Gradio Components
         search_button.click(
             fn=search_conversations_or_characters,
-            inputs=[search_query],
+            inputs=[search_query, select_character],
             outputs=[search_results, search_status]
         )
 
@@ -1292,6 +1359,10 @@ def create_character_chat_mgmt_tab():
         )
 
         select_character.change(
+            fn=load_character_image,
+            inputs=[select_character],
+            outputs=[character_image]
+        ).then(
             fn=populate_chats,
             inputs=[select_character],
             outputs=[select_chat, search_status]
@@ -1310,9 +1381,297 @@ def create_character_chat_mgmt_tab():
         )
 
         return (
+            character_files, import_characters_button, import_status,
             search_query, search_button, search_results, search_status,
             select_character, select_chat, load_chat_button,
             conversation_list, conversation_mapping,
             chat_content, save_button, delete_button,
-            chat_preview, result_message
+            chat_preview, result_message, character_image
         )
+
+# def create_character_chat_mgmt_tab():
+#     with gr.TabItem("Chat Management"):
+#         gr.Markdown("# Chat Management")
+#
+#         with gr.Row():
+#             # Search Section
+#             with gr.Column(scale=1):
+#                 gr.Markdown("## Search Conversations or Characters")
+#                 search_query = gr.Textbox(label="Search Conversations or Characters", placeholder="Enter search keywords")
+#                 search_button = gr.Button("Search")
+#                 search_results = gr.Dropdown(label="Search Results", choices=[], visible=False)
+#                 search_status = gr.Markdown("", visible=True)
+#
+#             # Select Character and Chat Section
+#             with gr.Column(scale=1):
+#                 gr.Markdown("## Select Character and Associated Chats")
+#                 characters = get_character_cards()
+#                 character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
+#                 select_character = gr.Dropdown(label="Select Character", choices=character_choices, interactive=True)
+#                 select_chat = gr.Dropdown(label="Select Chat", choices=[], visible=False, interactive=True)
+#                 load_chat_button = gr.Button("Load Selected Chat", visible=False)
+#
+#         with gr.Row():
+#             conversation_list = gr.Dropdown(label="Select Conversation or Character", choices=[])
+#             conversation_mapping = gr.State({})
+#
+#         with gr.Tabs():
+#             with gr.TabItem("Edit"):
+#                 chat_content = gr.TextArea(label="Chat/Character Content (JSON)", lines=20, max_lines=50)
+#                 save_button = gr.Button("Save Changes")
+#                 delete_button = gr.Button("Delete Conversation/Character", variant="stop")
+#
+#             with gr.TabItem("Preview"):
+#                 chat_preview = gr.HTML(label="Chat/Character Preview")
+#         result_message = gr.Markdown("")
+#
+#         # Callback Functions
+#
+#         def search_conversations_or_characters(query):
+#             if not query.strip():
+#                 return gr.update(choices=[], visible=False), "Please enter a search query."
+#
+#             try:
+#                 # Search Chats using FTS5
+#                 chat_results, chat_message = search_character_chats(query)
+#
+#                 # Format chat results
+#                 formatted_chat_results = [
+#                     f"Chat: {chat['conversation_name']} (ID: {chat['id']})" for chat in chat_results
+#                 ]
+#
+#                 # Search Characters using substring match
+#                 characters = get_character_cards()
+#                 filtered_characters = [
+#                     char for char in characters
+#                     if query.lower() in char['name'].lower()
+#                 ]
+#                 formatted_character_results = [
+#                     f"Character: {char['name']} (ID: {char['id']})" for char in filtered_characters
+#                 ]
+#
+#                 # Combine results
+#                 all_choices = formatted_chat_results + formatted_character_results
+#                 mapping = {choice: conv['id'] for choice, conv in zip(formatted_chat_results, chat_results)}
+#                 mapping.update({choice: char['id'] for choice, char in zip(formatted_character_results, filtered_characters)})
+#
+#                 if all_choices:
+#                     return gr.update(choices=all_choices, visible=True), f"Found {len(all_choices)} result(s) matching '{query}'."
+#                 else:
+#                     return gr.update(choices=[], visible=False), f"No results found for '{query}'."
+#
+#             except Exception as e:
+#                 logging.error(f"Error during search: {e}")
+#                 return gr.update(choices=[], visible=False), f"Error occurred during search: {e}"
+#
+#         def load_conversation_or_character(selected, conversation_mapping):
+#             if not selected or selected not in conversation_mapping:
+#                 return "", "<p>No selection made.</p>"
+#
+#             selected_id = conversation_mapping[selected]
+#             if selected.startswith("Chat:"):
+#                 chat = get_character_chat_by_id(selected_id)
+#                 if chat:
+#                     json_content = json.dumps({
+#                         "conversation_id": chat['id'],
+#                         "conversation_name": chat['conversation_name'],
+#                         "messages": chat['chat_history']
+#                     }, indent=2)
+#
+#                     html_preview = create_chat_preview_html(chat['chat_history'])
+#                     return json_content, html_preview
+#             elif selected.startswith("Character:"):
+#                 character = get_character_card_by_id(selected_id)
+#                 if character:
+#                     json_content = json.dumps({
+#                         "id": character['id'],
+#                         "name": character['name'],
+#                         "description": character['description'],
+#                         "personality": character['personality'],
+#                         "scenario": character['scenario'],
+#                         "post_history_instructions": character['post_history_instructions'],
+#                         "first_mes": character['first_mes'],
+#                         "mes_example": character['mes_example'],
+#                         "creator_notes": character.get('creator_notes', ''),
+#                         "system_prompt": character.get('system_prompt', ''),
+#                         "tags": character.get('tags', []),
+#                         "creator": character.get('creator', ''),
+#                         "character_version": character.get('character_version', ''),
+#                         "extensions": character.get('extensions', {})
+#                     }, indent=2)
+#
+#                     html_preview = create_character_preview_html(character)
+#                     return json_content, html_preview
+#
+#             return "", "<p>Unable to load the selected item.</p>"
+#
+#         def validate_content(selected, content):
+#             try:
+#                 data = json.loads(content)
+#                 if selected.startswith("Chat:"):
+#                     assert "conversation_id" in data and "messages" in data
+#                 elif selected.startswith("Character:"):
+#                     assert "id" in data and "name" in data
+#                 return True, data
+#             except Exception as e:
+#                 return False, f"Invalid JSON: {e}"
+#
+#         def save_conversation_or_character(selected, conversation_mapping, content):
+#             if not selected or selected not in conversation_mapping:
+#                 return "Please select an item to save.", "<p>No changes made.</p>"
+#
+#             is_valid, result = validate_content(selected, content)
+#             if not is_valid:
+#                 return f"Error: {result}", "<p>No changes made due to validation error.</p>"
+#
+#             selected_id = conversation_mapping[selected]
+#
+#             if selected.startswith("Chat:"):
+#                 success = update_character_chat(selected_id, result['messages'])
+#                 return ("Chat updated successfully." if success else "Failed to update chat."), ("<p>Chat updated.</p>" if success else "<p>Failed to update chat.</p>")
+#             elif selected.startswith("Character:"):
+#                 success = update_character_card(selected_id, result)
+#                 return ("Character updated successfully." if success else "Failed to update character."), ("<p>Character updated.</p>" if success else "<p>Failed to update character.</p>")
+#
+#             return "Unknown item type.", "<p>No changes made.</p>"
+#
+#         def delete_conversation_or_character(selected, conversation_mapping):
+#             if not selected or selected not in conversation_mapping:
+#                 return "Please select an item to delete.", "<p>No changes made.</p>", gr.update(choices=[])
+#
+#             selected_id = conversation_mapping[selected]
+#
+#             if selected.startswith("Chat:"):
+#                 success = delete_character_chat(selected_id)
+#             elif selected.startswith("Character:"):
+#                 success = delete_character_card(selected_id)
+#             else:
+#                 return "Unknown item type.", "<p>No changes made.</p>", gr.update()
+#
+#             if success:
+#                 updated_choices = [choice for choice in conversation_mapping.keys() if choice != selected]
+#                 conversation_mapping.value.pop(selected, None)
+#                 return f"{selected.split(':')[0]} deleted successfully.", f"<p>{selected.split(':')[0]} deleted.</p>", gr.update(choices=updated_choices)
+#             else:
+#                 return f"Failed to delete {selected.split(':')[0].lower()}.", f"<p>Failed to delete {selected.split(':')[0].lower()}.</p>", gr.update()
+#
+#         def populate_chats(character_selection):
+#             if not character_selection:
+#                 return gr.update(choices=[], visible=False), "Please select a character first."
+#
+#             try:
+#                 character_id = int(character_selection.split('(ID: ')[1].rstrip(')'))
+#                 chats = get_character_chats(character_id=character_id)
+#
+#                 if not chats:
+#                     return gr.update(choices=[], visible=False), f"No chats found for the selected character."
+#
+#                 formatted_chats = [f"{chat['conversation_name']} (ID: {chat['id']})" for chat in chats]
+#                 return gr.update(choices=formatted_chats, visible=True), f"Found {len(formatted_chats)} chat(s)."
+#             except Exception as e:
+#                 logging.error(f"Error populating chats: {e}")
+#                 return gr.update(choices=[], visible=False), f"Error occurred: {e}"
+#
+#         def load_chat_from_character(selected_chat):
+#             if not selected_chat:
+#                 return "", "<p>No chat selected.</p>"
+#
+#             try:
+#                 chat_id = int(selected_chat.split('(ID: ')[1].rstrip(')'))
+#                 chat = get_character_chat_by_id(chat_id)
+#                 if not chat:
+#                     return "", "<p>Selected chat not found.</p>"
+#
+#                 json_content = json.dumps({
+#                     "conversation_id": chat['id'],
+#                     "conversation_name": chat['conversation_name'],
+#                     "messages": chat['chat_history']
+#                 }, indent=2)
+#
+#                 html_preview = create_chat_preview_html(chat['chat_history'])
+#                 return json_content, html_preview
+#             except Exception as e:
+#                 logging.error(f"Error loading chat: {e}")
+#                 return "", f"<p>Error loading chat: {e}</p>"
+#
+#         def create_chat_preview_html(chat_history):
+#             html_preview = "<div style='max-height: 500px; overflow-y: auto;'>"
+#             for user_msg, bot_msg in chat_history:
+#                 user_style = "background-color: #e6f3ff; padding: 10px; border-radius: 5px; margin-bottom: 5px;"
+#                 bot_style = "background-color: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 10px;"
+#                 html_preview += f"<div style='{user_style}'><strong>User:</strong> {user_msg}</div>"
+#                 html_preview += f"<div style='{bot_style}'><strong>Bot:</strong> {bot_msg}</div>"
+#             html_preview += "</div>"
+#             return html_preview
+#
+#         def create_character_preview_html(character):
+#             return f"""
+#             <div>
+#                 <h2>{character['name']}</h2>
+#                 <p><strong>Description:</strong> {character['description']}</p>
+#                 <p><strong>Personality:</strong> {character['personality']}</p>
+#                 <p><strong>Scenario:</strong> {character['scenario']}</p>
+#                 <p><strong>First Message:</strong> {character['first_mes']}</p>
+#                 <p><strong>Example Message:</strong> {character['mes_example']}</p>
+#                 <p><strong>Post History Instructions:</strong> {character['post_history_instructions']}</p>
+#                 <p><strong>System Prompt:</strong> {character.get('system_prompt', 'N/A')}</p>
+#                 <p><strong>Tags:</strong> {', '.join(character.get('tags', []))}</p>
+#                 <p><strong>Creator:</strong> {character.get('creator', 'N/A')}</p>
+#                 <p><strong>Version:</strong> {character.get('character_version', 'N/A')}</p>
+#             </div>
+#             """
+#
+#         # Register Callback Functions with Gradio Components
+#         search_button.click(
+#             fn=search_conversations_or_characters,
+#             inputs=[search_query],
+#             outputs=[search_results, search_status]
+#         )
+#
+#         search_results.change(
+#             fn=load_conversation_or_character,
+#             inputs=[search_results, conversation_mapping],
+#             outputs=[chat_content, chat_preview]
+#         )
+#
+#         save_button.click(
+#             fn=save_conversation_or_character,
+#             inputs=[conversation_list, conversation_mapping, chat_content],
+#             outputs=[result_message, chat_preview]
+#         )
+#
+#         delete_button.click(
+#             fn=delete_conversation_or_character,
+#             inputs=[conversation_list, conversation_mapping],
+#             outputs=[result_message, chat_preview, conversation_list]
+#         )
+#
+#         select_character.change(
+#             fn=populate_chats,
+#             inputs=[select_character],
+#             outputs=[select_chat, search_status]
+#         )
+#
+#         select_chat.change(
+#             fn=load_chat_from_character,
+#             inputs=[select_chat],
+#             outputs=[chat_content, chat_preview]
+#         )
+#
+#         load_chat_button.click(
+#             fn=load_chat_from_character,
+#             inputs=[select_chat],
+#             outputs=[chat_content, chat_preview]
+#         )
+#
+#         return (
+#             search_query, search_button, search_results, search_status,
+#             select_character, select_chat, load_chat_button,
+#             conversation_list, conversation_mapping,
+#             chat_content, save_button, delete_button,
+#             chat_preview, result_message
+#         )
+
+#
+# End of Character_Chat_tab.py
+#######################################################################################################################
