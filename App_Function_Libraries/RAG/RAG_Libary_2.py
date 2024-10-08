@@ -12,7 +12,7 @@ from App_Function_Libraries.DB.Character_Chat_DB import get_character_chats, per
 #
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
-from App_Function_Libraries.RAG.Embeddings_Create import perform_vector_search_chat
+from App_Function_Libraries.RAG.RAG_Persona_Chat import perform_vector_search_chat
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_custom_openai
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.DB.DB_Manager import search_db, fetch_keywords_for_media
