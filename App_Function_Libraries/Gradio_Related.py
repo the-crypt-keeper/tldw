@@ -18,8 +18,10 @@ from App_Function_Libraries.DB.DB_Manager import get_db_config
 from App_Function_Libraries.Gradio_UI.Arxiv_tab import create_arxiv_tab
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
-from App_Function_Libraries.Gradio_UI.Character_Interaction_tab import create_character_card_interaction_tab, \
-    create_multiple_character_chat_tab, create_narrator_controlled_conversation_tab
+from App_Function_Libraries.Gradio_UI.Character_Chat_tab import create_character_card_interaction_tab, \
+    create_character_card_interaction_tab, create_character_chat_mgmt_tab
+from App_Function_Libraries.Gradio_UI.Character_interaction_tab import create_narrator_controlled_conversation_tab, \
+    create_multiple_character_chat_tab
 from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
     create_chat_interface_four, create_chat_interface_multi_api, create_chat_interface_stacked, create_chat_interface
 from App_Function_Libraries.Gradio_UI.Config_tab import create_config_editor_tab
@@ -57,7 +59,7 @@ from App_Function_Libraries.Gradio_UI.Video_transcription_tab import create_vide
 from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
 from App_Function_Libraries.Gradio_UI.Chat_Workflows import chat_workflows_tab
-from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_view_tab, create_viewing_tab, \
+from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_view_tab, \
     create_view_all_with_versions_tab, create_viewing_tab
 #
 # Gradio UI Imports
@@ -286,7 +288,12 @@ def launch_ui(share_public=None, server_mode=False):
                 chat_workflows_tab()
                 create_multiple_character_chat_tab()
                 create_narrator_controlled_conversation_tab()
-                create_character_card_interaction_tab()
+
+
+            with gr.TabItem("Character Chat"):
+                with gr.Tabs():
+                    create_character_card_interaction_tab()
+                    create_character_chat_mgmt_tab()
 
             with gr.TabItem("View DB Items"):
                 # This one works

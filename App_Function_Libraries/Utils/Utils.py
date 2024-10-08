@@ -674,6 +674,20 @@ def format_transcription(content):
 
     return formatted_content
 
+def sanitize_user_input(message):
+    """
+    Removes or escapes '{{' and '}}' to prevent placeholder injection.
+
+    Args:
+        message (str): The user's message.
+
+    Returns:
+        str: Sanitized message.
+    """
+    # Replace '{{' and '}}' with their escaped versions
+    message = re.sub(r'\{\{', '{ {', message)
+    message = re.sub(r'\}\}', '} }', message)
+    return message
 
 def format_file_path(file_path, fallback_path=None):
     if file_path and os.path.exists(file_path):

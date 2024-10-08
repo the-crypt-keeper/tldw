@@ -177,6 +177,7 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 # Transcribe .wav into .segments.json
 #DEBUG
 #@profile
+# FIXME - I feel like the `vad_filter` shoudl be enabled by default....
 def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, diarize=False):
     global whisper_model_instance, processing_choice
     logging.info('speech-to-text: Loading faster_whisper model: %s', whisper_model)

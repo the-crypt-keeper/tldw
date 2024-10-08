@@ -70,6 +70,14 @@ from App_Function_Libraries.DB.SQLite_DB import (
     fetch_paginated_data as sqlite_fetch_paginated_data, get_latest_transcription as sqlite_get_latest_transcription, \
     mark_media_as_processed as sqlite_mark_media_as_processed,
 )
+from App_Function_Libraries.DB.Character_Chat_DB import (
+    add_character_card as sqlite_add_character_card, get_character_cards as sqlite_get_character_cards, \
+    get_character_card_by_id as sqlite_get_character_card_by_id, update_character_card as sqlite_update_character_card, \
+    delete_character_card as sqlite_delete_character_card, add_character_chat as sqlite_add_character_chat, \
+    get_character_chats as sqlite_get_character_chats, get_character_chat_by_id as sqlite_get_character_chat_by_id, \
+    update_character_chat as sqlite_update_character_chat, delete_character_chat as sqlite_delete_character_chat, \
+    migrate_chat_to_media_db as sqlite_migrate_chat_to_media_db,
+)
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config, get_database_path, get_project_relative_path
@@ -769,6 +777,93 @@ def get_conversation_name(*args, **kwargs):
 #
 # End of Chat-related Functions
 ############################################################################################################
+
+
+############################################################################################################
+#
+# Character Chat-related Functions
+
+def add_character_card(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_add_character_card(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_character_card not yet implemented")
+
+def get_character_cards():
+    if db_type == 'sqlite':
+        return sqlite_get_character_cards()
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_character_cards not yet implemented")
+
+def get_character_card_by_id(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_character_card_by_id(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_character_card_by_id not yet implemented")
+
+def update_character_card(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_update_character_card(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of update_character_card not yet implemented")
+
+def delete_character_card(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_delete_character_card(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of delete_character_card not yet implemented")
+
+def add_character_chat(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_add_character_chat(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_character_chat not yet implemented")
+
+def get_character_chats(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_character_chats(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_character_chats not yet implemented")
+
+def get_character_chat_by_id(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_character_chat_by_id(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_character_chat_by_id not yet implemented")
+
+def update_character_chat(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_update_character_chat(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of update_character_chat not yet implemented")
+
+def delete_character_chat(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_delete_character_chat(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of delete_character_chat not yet implemented")
+
+def migrate_chat_to_media_db(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_migrate_chat_to_media_db(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of migrate_chat_to_media_db not yet implemented")
+
+#
+# End of Character Chat-related Functions
+############################################################################################################
+
 
 ############################################################################################################
 #

@@ -136,7 +136,8 @@ tiktoken~=0.6.0
 #
 #PDF Ingestion
 pymupdf
-#
+#RAG
+flashrank
 #ChromaDB/RAG DB
 chromadb
 protobuf==4.25.4
