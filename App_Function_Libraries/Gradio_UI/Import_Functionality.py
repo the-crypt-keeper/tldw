@@ -13,7 +13,6 @@ import zipfile
 #
 # External Imports
 import gradio as gr
-import pypandoc
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import insert_prompt_to_db, load_preset_prompts, import_obsidian_note_to_db, \
@@ -29,6 +28,7 @@ logger = logging.getLogger()
 
 
 def import_data(file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
+    logging.debug(f"Starting import_data with file: {file} / Title: {title} / Author: {author} / Keywords: {keywords}")
     if file is None:
         return "No file uploaded. Please upload a file."
 
@@ -73,7 +73,7 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
         segments = [{'Text': file_content}]
 
         # Process keywords
-        keyword_list = [kw.strip() for kw in keywords.split(',') if kw.strip()]
+        keyword_list = [kw.strip() for kw in keywords.split(',') if kw.strip()] if keywords else []
 
         # Handle summarization
         if auto_summarize and api_name and api_key:
@@ -81,28 +81,26 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
         elif not summary:
             summary = "No summary provided"
 
-        # Add to database
-        add_media_to_database(
-            url=file_name,  # Using filename as URL
-            info_dict=info_dict,
-            segments=segments,
-            summary=summary,
-            keywords=keyword_list,
-            custom_prompt_input=custom_prompt,
-            whisper_model="Imported",  # Indicating this was an imported file
-            media_type="document"
-        )
+            # Add to database
+            result = add_media_to_database(
+                url=file_name,  # Using filename as URL
+                info_dict=info_dict,
+                segments=segments,
+                summary=summary,
+                keywords=keyword_list,
+                custom_prompt_input=custom_prompt,
+                whisper_model="Imported",  # Indicating this was an imported file
+                media_type="document",
+                overwrite=False  # Set this to True if you want to overwrite existing entries
+            )
 
-        # Clean up the temporary file
-        os.unlink(temp_file.name)
+            # Clean up the temporary file
+            os.unlink(temp_file.name)
 
-        return f"File '{file_name}' successfully imported with title '{title}' and author '{author}'."
+            return f"File '{file_name}' import attempt complete. Database result: {result}"
     except Exception as e:
-        logging.error(f"Error importing file: {str(e)}")
+        logging.exception(f"Error importing file: {str(e)}")
         return f"Error importing file: {str(e)}"
-
-
-
 
 
 def process_obsidian_zip(zip_file):
@@ -357,13 +355,11 @@ def create_import_obsidian_vault_tab():
         fn=import_vault,
         inputs=[vault_path_input, vault_zip_input],
         outputs=[import_status],
-        show_progress=True
     )
 
 
 def import_obsidian_vault(vault_path, progress=gr.Progress()):
     try:
-        from App_Function_Libraries.Gradio_UI.Export_Functionality import scan_obsidian_vault
         markdown_files = scan_obsidian_vault(vault_path)
         total_files = len(markdown_files)
         imported_files = 0

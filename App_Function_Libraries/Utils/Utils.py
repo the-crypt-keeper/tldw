@@ -513,29 +513,52 @@ def create_download_directory(title):
     return session_path
 
 
+import chardet
+import logging
+
 def safe_read_file(file_path):
-    encodings = ['utf-8', 'utf-16', 'ascii', 'latin-1', 'iso-8859-1', 'cp1252']
+    encodings = ['utf-8', 'utf-16', 'ascii', 'latin-1', 'iso-8859-1', 'cp1252', 'utf-8-sig']
+
+    logging.info(f"Attempting to read file: {file_path}")
 
     try:
         with open(file_path, 'rb') as file:
             raw_data = file.read()
     except FileNotFoundError:
+        logging.error(f"File not found: {file_path}")
         return f"File not found: {file_path}"
     except Exception as e:
+        logging.error(f"An error occurred while reading the file: {e}")
         return f"An error occurred while reading the file: {e}"
+
+    if not raw_data:
+        logging.warning(f"File is empty: {file_path}")
+        return ""
 
     # Use chardet to detect the encoding
     detected = chardet.detect(raw_data)
     if detected['encoding'] is not None:
         encodings.insert(0, detected['encoding'])
+        logging.info(f"Detected encoding: {detected['encoding']}")
 
     for encoding in encodings:
         try:
             decoded_content = raw_data.decode(encoding)
-            if decoded_content.isprintable():
+            # Check if the content is mostly printable
+            if sum(c.isprintable() for c in decoded_content) / len(decoded_content) > 0.95:
+                logging.info(f"Successfully decoded file with encoding: {encoding}")
                 return decoded_content
         except UnicodeDecodeError:
+            logging.debug(f"Failed to decode with {encoding}")
             continue
+
+    # If all else fails, try to decode ignoring errors
+    try:
+        decoded_content = raw_data.decode('utf-8', errors='ignore')
+        logging.warning(f"Decoded file {file_path} ignoring errors")
+        return decoded_content
+    except Exception as e:
+        logging.error(f"Failed to decode file even when ignoring errors: {e}")
 
     return f"Unable to decode the file {file_path} with any of the attempted encodings: {encodings}"
 

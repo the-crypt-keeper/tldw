@@ -8,77 +8,21 @@
 #
 ####################
 # Imports
-import tempfile
-import os
-import zipfile
 #
 # External Imports
+import logging
+import os
+
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.Gradio_UI.Import_Functionality import import_data
-from App_Function_Libraries.Books.Book_Ingestion_Lib import epub_to_markdown
+from App_Function_Libraries.Books.Book_Ingestion_Lib import process_zip_file, import_epub
+
+
 #
 ########################################################################################################################
 #
 # Functions:
-
-def import_epub(epub_file, title, author, keywords, system_prompt, user_prompt, auto_summarize, api_name, api_key):
-    try:
-        # Create a temporary directory to store the converted file
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Handle different types of file objects
-            if isinstance(epub_file, (str, os.PathLike)):
-                epub_path = epub_file
-            elif hasattr(epub_file, 'name'):
-                epub_path = epub_file.name
-            elif hasattr(epub_file, 'path'):
-                epub_path = epub_file.path
-            else:
-                raise ValueError("Unsupported file object type")
-
-            md_path = os.path.join(temp_dir, "converted.md")
-
-            # Convert EPUB to Markdown
-            markdown_content = epub_to_markdown(epub_path)
-
-            # Write the markdown content to a file
-            with open(md_path, "w", encoding="utf-8") as md_file:
-                md_file.write(markdown_content)
-
-            # Read the converted markdown content
-            with open(md_path, "r", encoding="utf-8") as md_file:
-                content = md_file.read()
-
-            # Now process the content as you would with a text file
-            return import_data(content, title, author, keywords, system_prompt,
-                               user_prompt, auto_summarize, api_name, api_key)
-    except Exception as e:
-        return f"Error processing EPUB: {str(e)}"
-
-
-def process_zip_file(zip_file, title, author, keywords, system_prompt, user_prompt, auto_summarize, api_name, api_key):
-    results = []
-    with tempfile.TemporaryDirectory() as temp_dir:
-        if hasattr(zip_file, 'name'):
-            zip_path = zip_file.name
-        elif hasattr(zip_file, 'path'):
-            zip_path = zip_file.path
-        else:
-            raise ValueError("Unsupported zip file object type")
-
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(temp_dir)
-
-        for filename in os.listdir(temp_dir):
-            if filename.lower().endswith('.epub'):
-                file_path = os.path.join(temp_dir, filename)
-                result = import_epub(file_path, title, author, keywords, system_prompt,
-                                     user_prompt, auto_summarize, api_name, api_key)
-                results.append(f"File: {filename} - {result}")
-
-    return "\n".join(results)
-
 
 def create_import_book_tab():
     with gr.TabItem("Ebook(epub) Files"):
@@ -87,7 +31,7 @@ def create_import_book_tab():
                 gr.Markdown("# Import .epub files")
                 gr.Markdown("Upload a single .epub file or a .zip file containing multiple .epub files")
                 gr.Markdown(
-                    "How to remove DRM from your ebooks: https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/")
+                    "🔗 **How to remove DRM from your ebooks:** [Reddit Guide](https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/)")
                 import_file = gr.File(label="Upload file for import", file_types=[".epub", ".zip"])
                 title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content (for single files)")
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name (for single files)")
@@ -121,23 +65,107 @@ def create_import_book_tab():
                     label="API for Auto-summarization"
                 )
                 api_key_input = gr.Textbox(label="API Key", type="password")
+
+                # Chunking options
+                max_chunk_size = gr.Slider(minimum=100, maximum=2000, value=500, step=50, label="Max Chunk Size")
+                chunk_overlap = gr.Slider(minimum=0, maximum=500, value=200, step=10, label="Chunk Overlap")
+                custom_chapter_pattern = gr.Textbox(label="Custom Chapter Pattern (optional)",
+                                                    placeholder="Enter a custom regex pattern for chapter detection")
+
+
                 import_button = gr.Button("Import eBook(s)")
             with gr.Column():
                 with gr.Row():
-                    import_output = gr.Textbox(label="Import Status")
+                    import_output = gr.Textbox(label="Import Status", lines=10, interactive=False)
 
-        def import_file_handler(file, title, author, keywords, system_prompt, user_prompt, auto_summarize, api_name, api_key):
-            if file.name.lower().endswith('.epub'):
-                return import_epub(file, title, author, keywords, system_prompt, user_prompt, auto_summarize, api_name, api_key)
-            elif file.name.lower().endswith('.zip'):
-                return process_zip_file(file, title, author, keywords, system_prompt, user_prompt, auto_summarize, api_name, api_key)
-            else:
-                return "Unsupported file type. Please upload an .epub file or a .zip file containing .epub files."
+        def import_file_handler(file, title, author, keywords, system_prompt, custom_prompt, auto_summarize, api_name,
+                                api_key, max_chunk_size, chunk_overlap, custom_chapter_pattern):
+            try:
+                # Handle max_chunk_size
+                if isinstance(max_chunk_size, str):
+                    max_chunk_size = int(max_chunk_size) if max_chunk_size.strip() else 4000
+                elif not isinstance(max_chunk_size, int):
+                    max_chunk_size = 4000  # Default value if not a string or int
+
+                # Handle chunk_overlap
+                if isinstance(chunk_overlap, str):
+                    chunk_overlap = int(chunk_overlap) if chunk_overlap.strip() else 0
+                elif not isinstance(chunk_overlap, int):
+                    chunk_overlap = 0  # Default value if not a string or int
+
+                chunk_options = {
+                    'method': 'chapter',
+                    'max_size': max_chunk_size,
+                    'overlap': chunk_overlap,
+                    'custom_chapter_pattern': custom_chapter_pattern if custom_chapter_pattern else None
+                }
+
+                if file is None:
+                    return "No file uploaded."
+
+                file_path = file.name
+                if not os.path.exists(file_path):
+                    return "Uploaded file not found."
+
+                if file_path.lower().endswith('.epub'):
+                    status = import_epub(
+                        file_path,
+                        title,
+                        author,
+                        keywords,
+                        custom_prompt=custom_prompt,
+                        system_prompt=system_prompt,
+                        summary=None,
+                        auto_summarize=auto_summarize,
+                        api_name=api_name,
+                        api_key=api_key,
+                        chunk_options=chunk_options,
+                        custom_chapter_pattern=custom_chapter_pattern
+                    )
+                    return f"📚 EPUB Imported Successfully:\n{status}"
+                elif file.name.lower().endswith('.zip'):
+                    status = process_zip_file(
+                        zip_file=file,
+                        title=title,
+                        author=author,
+                        keywords=keywords,
+                        custom_prompt=custom_prompt,
+                        system_prompt=system_prompt,
+                        summary=None,  # Let the library handle summarization
+                        auto_summarize=auto_summarize,
+                        api_name=api_name,
+                        api_key=api_key,
+                        chunk_options=chunk_options
+                    )
+                    return f"📦 ZIP Processed Successfully:\n{status}"
+                elif file.name.lower().endswith(('.chm', '.html', '.pdf', '.xml', '.opml')):
+                    file_type = file.name.split('.')[-1].upper()
+                    return f"{file_type} file import is not yet supported."
+                else:
+                    return "❌ Unsupported file type. Please upload an `.epub` file or a `.zip` file containing `.epub` files."
+
+            except ValueError as ve:
+                logging.exception(f"Error parsing input values: {str(ve)}")
+                return f"❌ Error: Invalid input for chunk size or overlap. Please enter valid numbers."
+            except Exception as e:
+                logging.exception(f"Error during file import: {str(e)}")
+                return f"❌ Error during import: {str(e)}"
 
         import_button.click(
             fn=import_file_handler,
-            inputs=[import_file, title_input, author_input, keywords_input, system_prompt_input,
-                    custom_prompt_input, auto_summarize_checkbox, api_name_input, api_key_input],
+            inputs=[
+                import_file,
+                title_input,
+                author_input,
+                keywords_input,
+                custom_prompt_input,
+                auto_summarize_checkbox,
+                api_name_input,
+                api_key_input,
+                max_chunk_size,
+                chunk_overlap,
+                custom_chapter_pattern
+            ],
             outputs=import_output
         )
 

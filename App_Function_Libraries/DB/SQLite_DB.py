@@ -1181,8 +1181,6 @@ def is_valid_date(date_string: str) -> bool:
         return False
 
 
-
-
 def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video', overwrite=False, db=None):
     if db is None:
         db = Database()
@@ -1196,6 +1194,7 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
                 url_hash = hashlib.md5(f"{title}{media_type}".encode()).hexdigest()
                 url = f"https://No-URL-Submitted.com/{media_type}/{quote(title)}-{url_hash}"
 
+            logging.debug(f"Checking for existing media with URL: {url}")
 
             # Extract content from segments
             if isinstance(segments, list):
@@ -1217,15 +1216,24 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
             cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
             existing_media = cursor.fetchone()
 
+            logging.debug(f"Existing media: {existing_media}")
+            logging.debug(f"Overwrite flag: {overwrite}")
+
             if existing_media:
+                media_id = existing_media[0]
+                logging.debug(f"Existing media_id: {media_id}")
                 if overwrite:
-                    media_id = existing_media[0]
+                    logging.debug("Updating existing media")
                     cursor.execute('''
                     UPDATE Media 
                     SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?
                     WHERE id = ?
                     ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
                           info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
+                    action = "updated"
+                else:
+                    logging.debug("Media exists but not updating (overwrite=False)")
+                    action = "already exists (not updated)"
             else:
                 cursor.execute('''
                 INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status)
@@ -1233,12 +1241,17 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
                 ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
                       info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model, 'pending'))
                 media_id = cursor.lastrowid
+                action = "added"
+                logging.debug(f"New media_id: {media_id}")
 
-            # Add modification
-            cursor.execute('''
-            INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-            VALUES (?, ?, ?, ?)
-            ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
+            logging.debug(f"Before MediaModifications insert, media_id: {media_id}")
+
+            # Only proceed with modifications if the media was added or updated
+            if action in ["updated", "added"]:
+                cursor.execute('''
+                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+                VALUES (?, ?, ?, ?)
+                ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
 
             # Process keywords
             for keyword in keyword_list:
@@ -1266,7 +1279,8 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
         schedule_chunking(media_id, content, info_dict.get('title', 'Untitled'))
 
         action = "updated" if existing_media and overwrite else "added"
-        return f"Media '{info_dict.get('title', 'Untitled')}' {action} successfully with URL: {url} and keywords: {', '.join(keyword_list)}. Chunking scheduled."
+        return f"Media '{info_dict.get('title', 'Untitled')}' {action} with URL: {url}" + \
+            (f" and keywords: {', '.join(keyword_list)}. Chunking scheduled." if action in ["updated", "added"] else "")
 
     except DatabaseError as e:
         logging.error(f"Database error: {e}")
