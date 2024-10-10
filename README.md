@@ -1,66 +1,229 @@
-# **TL/DW: Too Long, Didnt Watch**
-## Download, Transcribe, Summarize & Chat with Video+Audio+Documents+Articles & Books(WIP). All automated 
-#### More: Full-Text-Search across everything ingested (RAG is wip), Local LLM inference as part of it(llamafile) for those who don't want to mess with setting up an LLM, and a WebApp(gradio as PoC) to interact with the script in a more user-friendly manner (GUI is now the main/intended method of interaction).
-#### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
-## [Public Demo](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
-
-
 ![License](https://img.shields.io/badge/license-apache2.0-green)
 
-**Install me with the Installer Script! Download and double click (Make sure to read it over first!)**
-- **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Run-Install-Update.sh`
-- **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS-Run-Install-Update.sh`
-- **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/WindowsRun-Install-Update.bat`
+# **tl/dw: Too Long, Didn't Watch** 
+## Summary: Your personal offline research assistant – Download, Transcribe, Summarize & Chat with/about Videos, Audio, Documents, Web Articles, and Books. 
+### All automated. All local. All yours.
+
+### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
+  - (Note: YouTube may block the demo unless you provide a session cookie. Placeholder content is included, random contents of a conference and whatever videos I decided to use for testing that patch version.)
+
+#### Key Features:
+- Full-text search across all ingested content (with RAG, BM25 + Vectors support).
+- Local LLM inference for offline summarization and chat (via `llamafile`).
+- Comprehensive ingestion capabilities for video, audio, text, and web articles.
+#### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 ----------
 
 ### Table of Contents
 - [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#whatbox) | [Helpful Terms and Things to Know](#helpful) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits) | [Roadmap Plans](#plans) | 
 
+#### Quickstart
+- **Bash/Batch Script:**
+  - **Use the Installer Script! Download and run it to install the necessary packages + launch tl/dw**
+    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
+      - `chmod +x Linux_Install_Update.sh && ./Linux_Run_tldw.sh`
+      - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+    - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh`
+      - `bash MacOS-Run-Install-Update.sh`
+      - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+    - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+        - Then double-click the downloaded batch file `Windows_Install_Update.bat` to install it, and `Windows_Run_tldw.bat` to run it.
+        - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+- **Docker:**
+  - There's a docker build for GPU use(Needs Nvidia CUDA Controller(?): https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw-nvidia_amd64_Dockerfile 
+  - and plain CPU use: https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw_Debian_cpu-Dockerfile
+  - the `Dockerfile` in the main directory is the Nvidia base-image-based one. So you can use your GPU if you want with it.
+#### Less Quick Start
+1. **Download the Installer Script for your OS:**
+   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
+   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
+2. **Run the Installer Script:**
+   - **Linux:** 
+     - `chmod +x Linux_Install_Update.sh && chmod +x ./Linux_Run_tldw.sh`
+     - `./Linux_Install_Update.sh` and then `./Linux_Run_tldw.sh`
+     - This will install `tldw` to the directory from where the script is ran.
+   - **Windows:** `Windows_Install_Update.bat`
+     - Double-click the downloaded batch file to install it.
+     - This will install `tldw` to the directory from where the script is ran.
+   - **MacOS:** `bash MacOS-Install_Updater.sh`
+     - `chmod +x MacOS_Install_Update.sh` and then `chmod +x ./MacOS_Run_tldw.sh`
+     - `./MacOS_Install_Update.sh` and then `./MacOS_Run_tldw.sh`
+     - This will install `tldw` to the directory from where the script is ran.
+3. **Follow the prompts to install the necessary packages and setup the program.**
+4. **You are Ready to Go! You should see `tldw` start up at the end of the script, assuming everything worked as expected**
+5. **BE SURE TO UPDATE 'config.txt' WITH YOUR API KEYS AND SETTINGS!** - You need to do this unless you want to manually input your API keys everytime you interact with a commercial LLM...
+- **Run it as a WebApp**
+  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
+    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
+    * Has an option to download the generated transcript, and summary as text files from the UI.
+    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
+    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
+      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
+      * So everything you might consume during your path of research, tracked and assimilated and tagged.
+      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
+  - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+
+
 ----------
 **GUI Screenshot**
+- Planning to replace with several short gifs to show functionality and how it can be used.
 ![tldw-summarization-gui-demo](Docs/GUI-Front_Page.PNG)
 
+### What is tl/dw?
+**tl/dw** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
+1. **Ingesting**: Importing media from URLs or local files into an offline database.
+2. **Transcribing**: Automatically generating text transcripts from videos and audio using various whisper models using faster_whisper.
+3. **Analyzing(Not Just Summarizing)**: Using LLMs (local or API-based) to perform analyses of the ingested content.
+4. **Searching**: Full-text search across ingested content, including metadata like titles, authors, and keywords.
+5. **Chatting**: Interacting with ingested content using natural language queries through supported LLMs.
 
-### <a name="what"></a> What is this (TL/DW)?
-- **101**
-  - The end goal of this project, is to be a personal research multi-tool/data assistant/young lady's illustrated primer.
+All features are designed to run **locally** on your device, ensuring privacy and data ownership. The tool is open-source and free to use, with the goal of supporting research, learning, and personal knowledge management.
+
+### Key Features
+
+#### Content Ingestion
+- Supports video, audio, documents (epub, PDF, txt), and web articles from URLs or local files.
+- Drag-and-drop functionality for easy local file ingestion.
+- Compatible with any site supported by yt-dlp (see [supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)).
+- Import Markdown and text files into the database, with customizable metadata (title, author, keywords).
+
+#### Transcription & Summarization
+- **Video/Audio Transcription**: Uses `faster_whisper` with customizable model selection for transcribing audio and video.
+- **Content Analysis(Not Just Summarization!)**: Analyze content using your choice of LLM API (e.g., OpenAI, Anthropic).
+- **Chunked Summarization**: Summarize longer pieces of content by breaking them into manageable chunks.
+
+#### Database & Search
+- All content is stored in an **SQLite database**, with full-text search support via FTS5.
+- **Tagging**: Tag content with keywords for better organization (think of them like folders).
+- **RAG Support**: Perform advanced search and retrieval using BM25 and vector embeddings with ChromaDB.
+- **Backup & Export**: Backup your database and export content as text files.
+
+#### Chat Capabilities
+- **LLM Integration**: Chat with an LLM about your ingested content.
+  - Supports APIs like OpenAI, Cohere, HuggingFace, and local models like Llama.cpp.
+- **Multi-Response Modes**: Various chat UIs, including vertical/Horizontal, Character Chat, and one prompt, multiple APIs - test multiple endpoints with one prompt and see all their responses next to each other.
+- **Chat History Management**: Save, edit, search, and export chat sessions.
+
+#### Writing Tools
+- **Grammar & Style Checks**: Use LLMs to review your writing for grammar and style.
+- **Tone Analyzer**: Analyze and adjust the tone of your text.
+- **Writing Prompts**: Generate creative writing prompts based on your preferences.
+
+###  <a name="what"></a>(Much longer) What is this (TL/DW)?
+- **What it is now:**
   - A tool that can ingest: audio, videos, articles, free form text, documents, and books as text into a personal, offline database, so that you can then search and chat with it at any time on your own device/locally.
     - (+ act as a nice way of creating your personal 'media' database, a personal digital library with search!)
   - And of course, this is all open-source/free, with the idea being that this can massively help people in their efforts of research and learning.
     - I don't plan to pivot and turn this into a commercial project. I do plan to make a server version of it, with the potential for offering a hosted version of it, but that's a ways off, and I don't see it as more worthwhile than some other endeavors.
     - If anything, I'd like to see this project be used in schools, universities, and research institutions, or anyone who wants to keep a record of what they've consumed and be able to search and ask questions about it.
     - I believe that this project can be a great tool for learning and research, and I'd like to see it develop to a point where it could be reasonably used as such.
-    - In the meantime, if you don't care about data ownership or privacy, https://notebooklm.google/ is a good alternative that works, is free, and has a working RAG setup (unlike mine :cry:).
-- **Don't care, give me code**
-  * Install git for your style of OS, then run the following commands in a terminal:
-    * Install git on windows - On your keyboard: press WINDOWS + R to open Run dialog box. Then, run the following command to install git:
-      * `cmd /c winget install -e --id Git.Git`
-    * `git clone https://github.com/rmusser01/tldw` -> `cd tldw/Helper_Scripts/Installer_Scripts` -> `Linux: ./Linux-Install.sh` / `Windows: Windows-installer.bat` / `MacOS: MacOS-Install_Updater.sh`
-      * CLI usage: `python summarize.py <video_url> -api <LLM AP> -k tag_one tag_two tag_three`
-        * Works but is not going to receive functionality updates, so I recommend using the GUI.
-      - GUI usage: `python summarize.py -gui`
-      - GUI with local LLM: `python summarize.py -gui --local_llm` (will ask you questions about which model to download and whether to use CPU/GPU)
-  - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
-    - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
-- **(not so)Short Summary**
-  - Ingest content(video/audio/ebook/website/markdown) from a URL or a local file. Can be done in batches with a text file containing a list of URLs or paths to local files(CLI only) as well as from the GUI.
-    - GUI can handle local file uploads, but not batched file uploads. Can handle multiple URLs though.
-  - Transcriptions can then be shuffled off to an LLM API endpoint of your choice, whether that be local or remote. 
-    - (Local LLMs are supported through llama.cpp, oobabooga/text-gen-webui, kobold.cpp, with TabbyAPI, vLLM, ollama, and Triton support planned) - Tabby/vLLM are in, but untested. Aphrodite you can use llama.cpp or kobold.cpp API and it should work...
-  - Recursive/'Rolling' summaries (i.e. chunking up input and doing a chain of summaries) are supported. 
-    - The original scripts that this repo was originally based off of is here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts) which to my understanding was the purpose of this project originally.
-  - Everything is stored in a SQLite DB, so you can search across all the content you've ingested, and review or modify it.
-  - Additionally, you can use it as context for chatting with an LLM, or for asking questions about the content you've ingested.
-    - Think about asking questions about a video you've watched, or a book you've read, and being able to get answers from an LLM about it.
-- **Project Goal**
+    - In the meantime, if you don't care about data ownership or privacy, https://notebooklm.google/ is a good alternative that works and is free.
+  - **Current features:** 
+    - **Ingest content(Video/Audio/epub/PDF/txt/websites) from a URL(single or multiple at once) or a local file(drag+drop).**
+    - **Transcription of Video/Audio content using faster_whisper, with the ability to select the model to use.**
+      - Any site supported by yt-dl is supported, so you can use this with sites besides just youtube. 
+      - **List of supported sites:** https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
+    - **Automatic summarization of content using an LLM API endpoint of your choice. A default prompt is used but you can set your own.**
+      - Various chunking options for summarization, as well as the ability to chain summaries together.
+      - Ability to download the generated transcript, and summary as text files from the UI.
+      - Ability to download the video/audio as files from the UI.
+      - Can also _just_ download the video/audio from a URL. (Utilities tab)
+    - **Storage of all the above into a SQLite DB, with search(name/content/author/URL/keyword), tagging, and export functionality.**
+    - **Search across all the content you've ingested, and review or modify it using SQLite FTS5 Search.**
+      - Ability to tag content with keywords, and search across those tags.
+      - Now also RAG support for search, so you can ask questions about the content you've ingested. (BM25+Vector Embeddings using FTS5 and ChromaDB)
+    - **Chat with an LLM about the content you've ingested, or ask questions about it. (Multiple APIs Supported, 15 total)**
+      - **APIs Supported:** 
+        - **Commercial:** OpenAI / Anthropic / Cohere / DeepSeek / Groq / Mistral / OpenRouter / HuggingFace; 
+        - **Local:** Llama.cpp / Kobold.cpp / Oobabooga / TabbyAPI / vLLM / Ollama / ;
+    - **Prompt storage and retrieval, as well as the ability to select prompts from the DB to use with your questions.**
+    - **General Chat front-end**
+      - Regular chat UI;
+      - 'Stacked' Chat UI;
+      - One prompt, multiple responses UI;
+      - Four independent prompts/conversations UI;
+      - Local LLM inference as part of it(llamafile) for those who don't want to mess with setting up an LLM.
+      - Chat management, with the ability to save, delete, edit, search and export chats. (WIP)
+      - Chat 'Workflows' - A way to string together multiple questions and responses into a single chat. (WIP)
+      - Chat 'Sessions' - A way to save a chat and come back to it later.
+      - Support for SillyTavern character cards, and the ability to store/select from them in the chat UI. (saves as a JSON file, not to the SQLite DB)
+    - **Ability to edit any of the content you've ingested, as well as the ability to delete it. (Including prompts)**
+    - **Writing Tools**
+      - Writing Feedback - A way to get feedback on your writing from an LLM, impersonating a variety of different authors.
+      - Grammar and Style checking - A way to check your writing for grammar and style issues.
+      - Tone analyzer + Editor - A way to check and modify the tone or style of your writing.
+      - Writing Prompts - A way to get writing prompts from an LLM from a desired author.
+    - **Import Functionality:**
+      - Existing Markdown/text files into the DB, with the ability to set the title, author, and tags for the content.
+      - List of URLs(web scraping), and ingest them all at once.
+      - List of local files(video/audio) from a text file, and ingest them all at once.
+      - Obsidian Vaults into the DB. (Imported notes are automatically parsed for tags and titles)
+      - Prompts.
+        - Single or multiple at once, in a zip file.
+    - **Export functionality for all content, as well as the ability to export the entire DB(It's SQLite...).**
+    - **Backup Management - A way to back up the DB, view backups, and restore from a backup. (WIP)**
+    - **'Trashcan' Support - A way to 'soft' delete content, and restore it if needed. (Helps with accidental deletions)**
+    - **Ability to set various configurations via the `config.txt` file.**
+- **Where its headed:**
   - Act as a Multi-Purpose Research tool. The idea being that there is so much data one comes across, and we can store it all as text. (with tagging!)
   - Imagine, if you were able to keep a copy of every talk, research paper or article you've ever read, and have it at your fingertips at a moments notice.
   - Now, imagine if you could ask questions about that data/information(LLM), and be able to string it together with other pieces of data, to try and create sense of it all (RAG)
   - Basically a [cheap foreign knockoff](https://tvtropes.org/pmwiki/pmwiki.php/Main/ShoddyKnockoffProduct) [`Young Lady's Illustrated Primer`](https://en.wikipedia.org/wiki/The_Diamond_Age) that you'd buy from some [shady dude in a van at a swap meet](https://tvtropes.org/pmwiki/pmwiki.php/Main/TheLittleShopThatWasntThereYesterday).
     * Some food for thought: https://notes.andymatuschak.org/z9R3ho4NmDFScAohj3J8J3Y
     * I say this recognizing the inherent difficulties in replicating such a device and acknowledging the current limitations of technology.
+  - This is a free-time project, so I'm not going to be able to work on it all the time, but I do have some ideas for where I'd like to take it.
+    - I view this as a personal tool I'll ideally continue to use for some time until something better/more suited to my needs comes along.
+    - Until then, I plan to continue working on this project and improving as much as possible.
+    - If I can't get a "Young Lady's Illustrated Primer" in the immediate, I'll just have to hack together some poor imitation of one....
 
-For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek. Flipside I would say none honestly. The (largest players) will gaslight you and charge you money for it. Fun.
+### Planned Features
+You can view the full roadmap on our [GitHub Issues page](https://github.com/rmusser01/tldw/issues).
+
+Some planned features include:
+- Improved **RAG (Retrieval-Augmented Generation)** support with enhanced testing.
+- New, more intuitive **UI**, migrating to FastAPI with custom front-ends.
+- **Streaming responses** for real-time answers.
+- **Whisper model transcription accuracy** testing.
+    - Identify accuracy of used models.
+    - Set it up so users can test against their own datasets
+- Add TTS/STT support for the UI so you can ask questions directly to the model or have it speak out the results to you.
+  - Having something like this would be pretty fucking cool I think: https://github.com/smellslikeml/dolla_llama/tree/main (Need to look more into nemesis by specterops)
+- Add some neat writing tools, since why not have some fun?
+  - https://github.com/the-crypt-keeper/the-muse 
+  - https://github.com/the-crypt-keeper/LLooM 
+  - https://github.com/lmg-anon/mikupad 
+  - https://github.com/datacrystals/AIStoryWriter
+- Support for multiple different Evaluations
+  - G-Eval summarization check is available in the video transcript tab, as well as under the `Benchmarks` tab (along with InfiniteBench[WIP] and [MMLU-Pro](https://github.com/TIGER-AI-Lab/MMLU-Pro).
+  - I'd like to add more benchmarks so that user can identify/measure how well their config works, so they can tweak things and have an idea if its better/worse.
+
+### Local Models I recommend
+- These are just the 'standard smaller' models I recommend, there are many more out there, and you can use any of them with this project.
+  - One should also be aware that people create 'fine-tunes' and 'merges' of existing models, to create new models that are more suited to their needs.
+  - This can result in models that may be better at some tasks but worse at others, so it's important to test and see what works best for you.
+- MS Phi-3.5-mini-128k(32k effective context, censored output): https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF
+  - Fine-tuned to be uncensored somewhat: https://huggingface.co/bartowski/Phi-3.5-mini-instruct_Uncensored-GGUF
+- AWS MegaBeam Mistral (32k effective context): https://huggingface.co/bartowski/MegaBeam-Mistral-7B-512k-GGUF
+- Mistral Nemo Instruct 2407 - https://huggingface.co/QuantFactory/Mistral-Nemo-Instruct-2407-GGUF
+- Llama 3.1 - The native llamas will give you censored output by default, but you can jailbreak them, or use a finetune which has attempted to tune out their refusals. 
+  - 8B: https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF 
+- Mistral Small: https://huggingface.co/bartowski/Mistral-Small-Instruct-2409-GGUF
+- Cohere Command-R
+  - Command-R https://huggingface.co/bartowski/c4ai-command-r-v01-GGUF / Aug2024 version: https://huggingface.co/bartowski/c4ai-command-r-08-2024-GGUF
+- Qwen 2.5 Series(haven't tested these ones yet but they seem promising, almost certainly censored): https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e
+  - 2.5-3B: https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF
+  - 7B: https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF
+  - 14B: https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF
+  - 32B: https://huggingface.co/Qwen/Qwen2.5-32B-Instruct-GGUF
+  - 72B: https://huggingface.co/Qwen/Qwen2.5-72B-Instruct
+
+
+For commercial API usage for use with this project: Claude Sonnet 3.5, Cohere Command R+, DeepSeek, gpt4o. 
+Flipside I would say none, honestly. The (largest players) will gaslight you and charge you money for it. Fun.
+That being said they obviously can provide help/be useful(helped me make this app), but it's important to remember that they're not your friend, and they're not there to help you. They are there to make money not off you, but off large institutions and your data.
+You are just a stepping stone to their goals.
+
 From @nrose 05/08/2024 on Threads:
 ```
 No, it’s a design. First they train it, then they optimize it. Optimize it for what- better answers?
@@ -77,32 +240,6 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 ```
 
 ----------
-
-### <a name="quickstart">Quickstart</a>Quickstart
-
-#### Automatic Quickstart
-1. **Download the Installer Script for your OS:**
-   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux-Install.sh`
-   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows-Installer.bat`
-     - This will install tldw to the directory from where the script is ran. It will also create shortcut on your desktop to the script to make it easy to launch.
-   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS-Install_Updater.sh`
-2. **Run the Installer Script:**
-   - **Linux:** `bash Linux-Install.sh`
-   - **Windows:** `Windows-Installer.bat`
-   - **MacOS:** `bash MacOS-Install_Updater.sh`
-3. **Follow the prompts to install the necessary packages and setup the program.**
-4. **You are Ready to Go! You should see tldw start up at the end of the script, assuming everything worked as expected**
-5. **BE SURE TO UPDATE 'config.txt' WITH YOUR API KEYS AND SETTINGS!** - You need to do this unless you want to manually input your API keys everytime you interact with a commercial LLM...
-
-- **Run it as a WebApp**
-  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
-    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
-    * Has an option to download the generated transcript, and summary as text files from the UI.
-    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
-    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
-      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
-      * So everything you might consume during your path of research, tracked and assimilated and tagged.
-      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
 
 #### Command Line usage:
 - **Transcribe audio from a Youtube URL:**
@@ -138,22 +275,22 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 ### <a name="setup"></a>Setting it up Manually
 - **Requirements**
   - Python3
-  - ffmpeg
-  - pandoc (for epub to markdown conversion) - https://pandoc.org/installing.html
+  - ffmpeg (Script will install this for you)
+  - pandoc (Optional. For epub to markdown conversion) - https://pandoc.org/installing.html
     - `pandoc -f epub -t markdown -o output.md input.epub` -> Can then import/ingest the markdown file into the DB.
     - If done from the CLI using the `--ingest_text_file` flag, you can specify the title and author of the book, as well as any additional keywords you'd like to tag it with. (if not a regex will attempt to identify it)
     - Or just do it through the GUI, drag and drop the file into the UI, set the Title, Author, and any keywords and hit `Import Data`.
   - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
     - Apparently there is a ROCm version of PyTorch.
       - MS Pytorch: https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
-      - Use the 'AMD_requests.txt' file to install the necessary packages for AMD GPU support. Simply rename it before use.
+      - Use the 'AMD_requests.txt' file to install the necessary packages for AMD GPU support.
       - AMD Pytorch: https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/wsl/install-pytorch.html
   - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
   - System RAM (8GB minimum, realistically 12GB)
-  - Disk Space (Depends on how much you ingest, but 6GB or so should be fine for the total size of the project + DB)
+  - Disk Space (Depends on how much you ingest, 8GB or so should be fine for the total size of the project + DB)
     - This can balloon real quick. The whisper model used for transcription can be 1-2GB per.
     - Pytorch + other ML libraries will also cause the size to increase.
-    - As such, I would say you want at least 8GB of free space on your system to devote to the app.
+    - As such, I would say you want at least 12GB of free space on your system to devote to the app.
     - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
 - **Linux**
     1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg` or `dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
@@ -206,53 +343,27 @@ None of these companies exist to provide AI services in 2024. They’re only doi
        - Then, after downloading and selecting a model, it'll launch the model using llamafile, so you'll have a browser window/tab opened with a frontend to the model/llama.cpp server.
        - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
        - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
-
+- **Setting up Backups**
+  - Manual backups are possible through the GUI. These use the `VACUUM` command to create a new DB file at your backup folder location. (default is `./tldw_DB_Backups/`
+  - If you'd like something more automated + don't have to think about it: https://litestream.io/getting-started/
+    - This will allow you to have a backup of your DB that is always up-to-date, and can be restored with a single command. + It's free.
+- **Encrypting your Database at rest using 7zip**
+  - 7zip since its cross-platform and easy to use.
+  - https://superuser.com/questions/1377414/how-to-encrypt-txt-files-with-aes256-via-windows-7z-command-line
+  - `7za u -mx -mhe -pPASSWORD ARCHIVE-FILE-NAME.7Z SOURCE-FILE`
+    - `-pPASSWORD` - sets the password to `PASSWORD`
+    - `u` - updates the archive
+    - `-mx` - sets the compression level to default (-mx1 == fastest, -mx9 == best)
+    - `-mhe` - encrypts the file headers - No unencrypted filenames in the archive
 - **Setting up Epub to Markdown conversion with Pandoc**
     - **Linux / MacOS / Windows**
         - Download and install from: https://pandoc.org/installing.html
 - **Converting Epub to markdown**
     - `pandoc -f epub -t markdown -o output.md input.epub`
-- **Setting up PDF to Markdown conversion with Marker** (Optional - Necessary to do PDF ingestion/conversion)
-    - **Linux**
-        1. `sudo apt install python3-venv`
-        2. `python3 -m venv ./Helper_Scripts/marker_venv`
-        3. `source ./Helper_Scripts/marker_venv/bin/activate`  
-        4. `pip install marker`
-    - **Windows**
-        1. Install python3 from https://www.python.org/downloads/
-        2. `python Helper_Scripts\marker_venv\Scripts\activate\activate.ps1`
-        3. `pip install marker`
-- **Converting PDF to markdown**
-    - Convert a Single PDF to Markdown:
-        * `marker_single /path/to/file.pdf /path/to/output/folder --batch_multiplier 2 --langs English`
-    - Convert a Folder of PDFs to Markdown:
-        * `marker /path/to/folder/with/pdfs /path/to/output/folder --batch_multiplier 2 --langs English`
 - **Ingest Converted text files en-masse**
     - `python summarize.py <path_to_text_file> --ingest_text_file --text_title "Title" --text_author "Author Name" -k additional,keywords`
 
-- **LLMs for Offline/Private Use**
-    - For offline LLM usage, I recommend the following models in no particular order past the first 
-      - All these models minus Command-R/+ can be ran on a single 12GB VRAM GPU, or 12GB of system RAM at a much slower speed.
-      - Either way, I recommend using the Q4 GGUF versions of the models, as they are the most efficient and fastest to load, while still maintaining their accuracy. 
-      - So for Mistral-Nemo-Instruct-2407, you'd want to download `Mistral-Nemo-Instruct-2407-Q4_K_M.gguf` - notice the `Q4` in the name.
-    1. Samantha-Mistral-instruct-7B-Bulleted-Notes - https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b_bulleted-notes_GGUF
-       * Reason being is that its 'good enough', otherwise would recommend Mistral-Nemo-Instruct2407. Very likely Nemo will prove to be better. Time will tell.
-    2. Mistral-Nemo-Instruct-2407
-       *  https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407 / GGUF: https://huggingface.co/bartowski/Mistral-Nemo-Instruct-2407-GGUF
-    3. Microsoft Phi-3-mini-4k-Instruct
-       * https://huggingface.co/microsoft/Phi-3-mini-4k-instruct / GGUF: https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf
-       * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-mini-128k-instruct / Abliterated GGUF: https://huggingface.co/failspy/Phi-3-mini-128k-instruct-abliterated-v3-GGUF
-    4. Cohere Command-R+
-       * https://huggingface.co/cohere-ai/Command-R-plus / GGUF: https://huggingface.co/XelotX/c4ai-command-r-plus-XelotX-XelotX-iQuants
-    5. Cohere Command-R (non-plus version)
-       * https://huggingface.co/CohereForAI/c4ai-command-r-v01 / GGUF: https://huggingface.co/dranger003/c4ai-command-r-v01-iMat.GGUF
-    6. Phi-3-Medium-4k-Instruct
-       * https://huggingface.co/microsoft/Phi-3-medium-4k-instruct / Abliterated GGUF:https://huggingface.co/failspy/Phi-3-medium-4k-instruct-abliterated-v3
-         * Also the 128k Context version: https://huggingface.co/microsoft/Phi-3-medium-128k-instruct / GGUF: https://huggingface.co/bartowski/Phi-3-medium-128k-instruct-GGUF
-    6. Hermes-2-Theta-Llama-3-8B
-       * https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B / GGUF: https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-8B-GGUF
-    7. Yi-1.5-34B-Chat-16k
-       * https://huggingface.co/01-ai/Yi-1.5-34B-Chat-16K / GGUF: https://huggingface.co/mradermacher/Yi-1.5-34B-Chat-16K-GGUF
+
 
 
 
@@ -268,75 +379,8 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   * List of Files(can be URLs and local files mixed): `python summarize.py ./path/to/your/text_file.txt"`
 - Download and run an LLM using only your system RAM! (Need at least 8GB Ram, realistically 12GB)
   * `python summarize.py -gui --local_llm`
-
-Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
-```
-usage: summarize.py [-h] [-v] [-api API_NAME] [-key API_KEY] [-ns NUM_SPEAKERS] [-wm WHISPER_MODEL] [-off OFFSET] [-vad] [-log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-gui] [-demo] [-prompt CUSTOM_PROMPT] [-overwrite] [-roll] [-detail DETAIL_LEVEL] [-model LLM_MODEL]
-                    [-k KEYWORDS [KEYWORDS ...]] [--log_file LOG_FILE] [--local_llm] [--server_mode] [--share_public SHARE_PUBLIC] [--port PORT] [--ingest_text_file] [--text_title TEXT_TITLE] [--text_author TEXT_AUTHOR] [--diarize]
-                    [input_path]
-
-positional arguments:
-  input_path            Path or URL of the video
-
-options:
-  -h, --help            show this help message and exit
-  -v, --video           Download the video instead of just the audio
-  -api API_NAME, --api_name API_NAME
-                        API name for summarization (optional)
-  -key API_KEY, --api_key API_KEY
-                        API key for summarization (optional)
-  -ns NUM_SPEAKERS, --num_speakers NUM_SPEAKERS
-                        Number of speakers (default: 2)
-  -wm WHISPER_MODEL, --whisper_model WHISPER_MODEL
-                        Whisper model (default: small)| Options: tiny.en, tiny, base.en, base, small.en, small, medium.en, medium, large-v1, large-v2, large-v3, large, distil-large-v2, distil-medium.en, distil-small.en
-  -off OFFSET, --offset OFFSET
-                        Offset in seconds (default: 0)
-  -vad, --vad_filter    Enable VAD filter
-  -log {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
-                        Log level (default: INFO)
-  -gui, --user_interface
-                        Launch the Gradio user interface
-  -demo, --demo_mode    Enable demo mode
-  -prompt CUSTOM_PROMPT, --custom_prompt CUSTOM_PROMPT
-                        Pass in a custom prompt to be used in place of the existing one.
-                         (Probably should just modify the script itself...)
-  -overwrite, --overwrite
-                        Overwrite existing files
-  -roll, --rolling_summarization
-                        Enable rolling summarization
-  -detail DETAIL_LEVEL, --detail_level DETAIL_LEVEL
-                        Mandatory if rolling summarization is enabled, defines the chunk  size.
-                         Default is 0.01(lots of chunks) -> 1.00 (few chunks)
-                         Currently only OpenAI works.
-  -k KEYWORDS [KEYWORDS ...], --keywords KEYWORDS [KEYWORDS ...]
-                        Keywords for tagging the media, can use multiple separated by spaces (default: cli_ingest_no_tag)
-  --log_file LOG_FILE   Where to save logfile (non-default)
-  --local_llm           Use a local LLM from the script(Downloads llamafile from github and 'mistral-7b-instruct-v0.2.Q8' - 8GB model from Huggingface)
-  --server_mode         Run in server mode (This exposes the GUI/Server to the network)
-  --share_public SHARE_PUBLIC
-                        This will use Gradio's built-in ngrok tunneling to share the server publicly on the internet. Specify the port to use (default: 7860)
-  --port PORT           Port to run the server on
-  --ingest_text_file    Ingest .txt files as content instead of treating them as URL lists
-  --text_title TEXT_TITLE
-                        Title for the text file being ingested
-  --text_author TEXT_AUTHOR
-                        Author of the text file being ingested
-  --diarize             Enable speaker diarization
-
-
-Sample commands:
-    1. Simple Sample command structure:
-        summarize.py <path_to_video> -api openai -k tag_one tag_two tag_three
-
-    2. Rolling Summary Sample command structure:
-        summarize.py <path_to_video> -api openai -prompt "custom_prompt_goes_here-is-appended-after-transcription" -roll -detail 0.01 -k tag_one tag_two tag_three
-
-    3. FULL Sample command structure:
-        summarize.py <path_to_video> -api openai -ns 2 -wm small.en -off 0 -vad -log INFO -prompt "custom_prompt" -overwrite -roll -detail 0.01 -k tag_one tag_two tag_three
-
-    4. Sample command structure for UI debug logging printed to console:
-        summarize.py -gui -log DEBUG
-```
+- Save time and use the `config.txt` file, it allows you to set these settings and have them used when ran.
+- **See `CLI_Reference.md` for a full list of CLI options and how to use them in the `Docs` folder**'
 - Download Audio only from URL -> Transcribe audio:
   >python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s
 
@@ -418,86 +462,49 @@ Sample commands:
 
 ------------
 
-### <a name="localllm"></a>Setting up a Local LLM Inference Engine
-- **Setting up Local LLM Runner**
-  - **Llama.cpp**
-    - **Linux & Mac**
-      1. `git clone https://github.com/ggerganov/llama.cpp`
-      2. `make` in the `llama.cpp` folder 
-      3. `./server -m ../path/to/model -c <context_size> -ngl <layers-to-offload-to-gpu>`
-        * Example: `./server -m ../path/to/model -c 8192 -ngl 999` - This will run the model with a context size of 8192 tokens and offload all layers to the GPU.
-    - **Windows**
-      1. `git clone https://github.com/ggerganov/llama.cpp`
-      2. Download + Run: https://github.com/skeeto/w64devkit/releases
-      3. cd to `llama.cpp` folder make` in the `llama.cpp` folder
-      4. `server.exe -m ..\path\to\model -c <context_size>`
-        * Example: `./server -m ../path/to/model -c 8192 -ngl 999` - This will run the model with a context size of 8192 tokens and offload all layers to the GPU.
-  - **Kobold.cpp** - c/p'd from: https://github.com/LostRuins/koboldcpp/wiki
-    - **Windows**
-      1. Download from here: https://github.com/LostRuins/koboldcpp/releases/latest
-      2. `Double click KoboldCPP.exe and select model OR run "KoboldCPP.exe --help" in CMD prompt to get command line arguments for more control.`
-      3. `Generally you don't have to change much besides the Presets and GPU Layers. Run with CuBLAS or CLBlast for GPU acceleration.`
-      4. `Select your GGUF or GGML model you downloaded earlier, and connect to the displayed URL once it finishes loading.`
-    - **Linux**
-      1. `On Linux, we provide a koboldcpp-linux-x64 PyInstaller prebuilt binary on the releases page for modern systems. Simply download and run the binary.`
-        * Alternatively, you can also install koboldcpp to the current directory by running the following terminal command: `curl -fLo koboldcpp https://github.com/LostRuins/koboldcpp/releases/latest/download/koboldcpp-linux-x64 && chmod +x koboldcpp`
-      2. When you can't use the precompiled binary directly, we provide an automated build script which uses conda to obtain all dependencies, and generates (from source) a ready-to-use a pyinstaller binary for linux users. Simply execute the build script with `./koboldcpp.sh dist` and run the generated binary.
-  - **oobabooga - text-generation-webui** - https://github.com/oobabooga/text-generation-webui
-    1. Clone or download the repository.
-      * Clone: `git clone https://github.com/oobabooga/text-generation-webui`
-      * Download: https://github.com/oobabooga/text-generation-webui/releases/latest -> Download the `Soruce code (zip)` file -> Extract -> Continue below.
-    2. Run the `start_linux.sh`, `start_windows.bat`, `start_macos.sh`, or `start_wsl.bat` script depending on your OS.
-    3. Select your GPU vendor when asked.
-    4. Once the installation ends, browse to http://localhost:7860/?__theme=dark.
-  - **Exvllama2**
-- **Setting up a Local LLM Model**
-  1. microsoft/Phi-3-mini-128k-instruct - 3.8B Model/7GB base, 4GB Q8 - https://huggingface.co/microsoft/Phi-3-mini-128k-instruct
-    * GGUF Quants: https://huggingface.co/pjh64/Phi-3-mini-128K-Instruct.gguf
-  2. Meta Llama3-8B - 8B Model/16GB base, 8.5GB Q8  - https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
-    * GGUF Quants: https://huggingface.co/lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF
+### Potential Issues
+```
+#   1. Something about cuda nn library missing, even though cuda is installed...
+#       https://github.com/tensorflow/tensorflow/issues/54784 - Basically, installing zlib made it go away. idk.
+#       Or https://github.com/SYSTRAN/faster-whisper/issues/85
+```
+From the thread, 
+for ubuntu: 
+
+    For me installing the cuDNN 8 libraries using sudo apt install libcudnn8 on Ubuntu 22.04 fixed the issue!
+
+Alternatively include the in your PATH the path to torch:
+```
+export LD_LIBRARY_PATH=`python3 -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; import torch; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__) + ":" + os.path.dirname(torch.__file__) +"/lib")'`
+```
+
+For Windows:
+In order of attempts:
+1. https://github.com/SYSTRAN/faster-whisper/issues/85
+2. Install specific cuda version: `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 --force-reinstall --no-cache`
+3. Download/copy the already installed DLLs: https://forums.developer.nvidia.com/t/could-not-load-library-cudnn-cnn-infer64-8-dll-error-code-193/218437/16
+4. Just install outside of a venv. That is what I had to do on my windows machine.
+
 
 
 ----------
 
 
+### <a name="localllm"></a>Setting up a Local LLM Inference Engine
+- **See 'Setting up a Local LLM' in the `Docs` folder for more information.**
+
+----------
+
+
 ### <a name="pieces"></a>Pieces & What's in the original repo?
-- **What's in the Repo currently?**
-  1. `summarize.py` - Main script for downloading, transcribing, and summarizing videos, audio files, books and documents.
-  2. `config.txt` - Config file used for settings for main app.
-  3. `requirements.txt` - Packages to install for Nvidia GPUs
-  4. `AMD_requirements.txt` - Packages to install for AMD GPUs
-  5. `llamafile` - Llama.cpp wrapper for local LLM inference, is multi-platform and multi-LLM compatible.
-  6. `media_summary.db` - SQLite DB that stores all the data ingested, transcribed, and summarized.
-  7. `prompts.db` - SQLite DB that stores all the prompts.
-  8. `App_Function_Libraries` Folder - Folder containing the applications function libraries
-  9. `Docs` - Folder containing documentation for the application
-  10. `Tests` Folder - Folder containing tests for the application (ha.)
-  11. `Helper_Scripts` - Folder containing helper scripts for the application
-        * `DB-Related` folder
-        * `Installer_Scripts` folder
-        * `Parsing_Files` folder
-        * `Prompts` folder
-  12. `models` - Folder containing the models for the speaker diarization LLMs
-  13. `tldw-original-scripts` - Original scripts from the original repo
-- **What's in the original repo?**
-  - `summarize.py` - download, transcribe and summarize audio
-    1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
-    2. Next, it uses [ffmpeg](https://github.com/FFmpeg/FFmpeg) to convert the resulting `.m4a` file to `.wav`
-    3. Then it uses [faster_whisper](https://github.com/SYSTRAN/faster-whisper) to transcribe the `.wav` file to `.txt`
-    4. After that, it uses [pyannote](https://github.com/pyannote/pyannote-audio) to perform 'diarization'
-    5. Finally, it'll send the resulting txt to an LLM endpoint of your choice for summarization of the text.
-  - `chunker.py` - break text into parts and prepare each part for LLM summarization
-  - `roller-*.py` - rolling summarization
-    - [can-ai-code](https://github.com/the-crypt-keeper/can-ai-code) - interview executors to run LLM inference
-  - `compare.py` - prepare LLM outputs for webapp
-  - `compare-app.py` - summary viewer webapp
+- **See 'Pieces' in the `Docs` folder for more information.**
 
 ------------
 ### Similar/Other projects:
 - https://github.com/Dicklesworthstone/bulk_transcribe_youtube_videos_from_playlist/tree/main
 - https://github.com/akashe/YoutubeSummarizer
 - https://github.com/fmeyer/tldw
-- https://github.com/pashpashpash/vault-ai <-- Closest I've found open source to what I'm looking to build, though I'm not looking to add RAG for a while, and I'm focused on just accumulation, I figure at some point in the future can tackle chunking of hte longer form items in a manner that makes sense/is effective, but until then, data storage is cheap and text is small. And SQLite is easy to share with people. Also, no commercial aspects, this project's goal is to be able to be ran completely offline/free from outside influence.
+- https://github.com/pashpashpash/vault-ai <-- Closest I've found open source to what I'm looking to build
 - https://github.com/bugbakery/transcribee
 - https://github.com/fedirz/faster-whisper-server
 - https://github.com/transcriptionstream/transcriptionstream
@@ -516,7 +523,7 @@ Sample commands:
 - [ffmpeg](https://github.com/FFmpeg/FFmpeg)
 - [faster_whisper](https://github.com/SYSTRAN/faster-whisper)
 - [pyannote](https://github.com/pyannote/pyannote-audio)
-- Thank you cognitivetech for the system prompt: https://github.com/cognitivetech/llm-long-text-summarization/tree/main?tab=readme-ov-file#one-shot-prompting
+- Thank you cognitivetech for the summarization system prompt: https://github.com/cognitivetech/llm-long-text-summarization/tree/main?tab=readme-ov-file#one-shot-prompting
 - [Fabric](https://github.com/danielmiessler/fabric)
 - [Llamafile](https://github.com/Mozilla-Ocho/llamafile) - For the local LLM inference engine
 - [Mikupad](https://github.com/lmg-anon/mikupad) - Because I'm not going to write a whole new frontend for non-chat writing.
@@ -524,43 +531,7 @@ Sample commands:
 
 ------------
 
-### <a name="roadmap"></a>Roadmap / Future Features
-- This is a free-time project, so I'm not going to be able to work on it all the time, but I do have some ideas for where I'd like to take it.
-  - I view this as a personal tool I'll ideally continue to use for some time until something better/more suited to my needs comes along.
-  - Until then, I plan to continue working on this project and improving as much as possible.
-  - If I can't get a "Young Lady's Illustrated Primer" in the immediate, I'll just have to hack together some poor imitation of one....
-- **Planned Features**
-  - Firstly, you can check all planned features on the issues page: https://github.com/rmusser01/tldw/issues
-  - Anything I come up with or hear about will either just be dropped in, or an issue will be created and then implemented.
-  - With that out of the way, I plan to add the following in the future in no particular order:
-    - RAG - Retrieval-Augmented Generation support. Do not want to use any existing libraries. Would prefer to do it all from scratch. 
-      - I plan to spend a few days diving deep and making it my sole focus and coming up with a more solid plan after that.
-    - More API support - I want to add support for more APIs, and I want to make it easier to select between private/Public endpoints in the UI
-    - Completely new UI - I want to make the UI more user-friendly and more intuitive. 
-      - Gradio is great as PoC, but I think I've shown that this has value and is worth the continued effort.
-    - Add support for 'streaming' answers, so it feels more 'real-time'
-    - Add TTS/STT support for the UI so you can ask questions directly to the model or have it speak out the results to you.
-      - Having something like this would be pretty fucking cool I think: https://github.com/smellslikeml/dolla_llama/tree/main (Need to look more into nemesis by specterops)
-    - Add some neat writing tools, since why not have some fun?
-      - https://github.com/the-crypt-keeper/the-muse 
-      - https://github.com/the-crypt-keeper/LLooM 
-      - https://github.com/lmg-anon/mikupad 
-      - https://github.com/datacrystals/AIStoryWriter
-    - Evaluations for Summarization process
-      - Setup eval for user-ran testing
-      - Do some prompt engineering
-    - Evaluations for whisper transcription accuracy
-      - Identify accuracy of used models.
-      - Set it up so users can test against their own datasets
-    - Offline diarization of speakers - Code is in, but there was some issue that was a headache so I said screw it.
-      - Should work if you give it an HF api key in the code though...
-- **Next items of focus**
-  - Bugfixes for stability and file handling(Making sure files are removed when they should be)
-  - Add support for more APIs
-  - Live audio recording + transcription
-  - RAG support
-
-#### And because Who doesn't love a good quote? (Particularly relevant to this material/LLMs)
+#### And because Who doesn't love a good quote or two? (Particularly relevant to this material/LLMs)
 - `I like the lies-to-children motif, because it underlies the way we run our society and resonates nicely with Discworld. Like the reason for Unseen being a storehouse of knowledge - you arrive knowing everything and leave realising that you know practically nothing, therefore all the knowledge you had must be stored in the university. But it's like that in "real Science", too. You arrive with your sparkling A-levels all agleam, and the first job of the tutors is to reveal that what you thought was true is only true for a given value of "truth". Most of us need just "enough" knowledge of the sciences, and it's delivered to us in metaphors and analogies that bite us in the bum if we think they're the same as the truth.`
     * Terry Pratchett
 - `The first principle is that you must not fool yourself - and you are the easiest person to fool.`

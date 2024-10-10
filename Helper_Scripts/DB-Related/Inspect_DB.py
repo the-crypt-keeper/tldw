@@ -1,13 +1,28 @@
+# Inspect_DB.py
+# Description: This script inspects the database and prints the contents of the DB tables
+# Usage: python Inspect_DB.py
+# Imports
 import sqlite3
 import os
-
+#
+# ############################################################################################################
+#
+# Functions:
 
 def inspect_database():
     # Specify the path to your database file
-    db_name = os.getenv('DB_NAME', 'media_summary.db')
+    # Define the default path for the database
+    default_db_path = './Databases/media_summary.db'
+
+    # Get the database name from environment variable or use default
+    db_name = os.getenv('DB_NAME', default_db_path)
+
+    # Check if the database file exists
     if not os.path.exists(db_name):
         print(f"Database file {db_name} does not exist.")
         return
+    else:
+        print(f"Database file {db_name} exists.")
 
     try:
         conn = sqlite3.connect(db_name)
@@ -60,3 +75,6 @@ if __name__ == "__main__":
 
 
 inspect_database()
+#
+# End of script
+####################################################################################################
