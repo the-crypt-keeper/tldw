@@ -32,8 +32,13 @@ from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 # FIXME - Make sure it only downloads if it already exists, and does a check first.
 # Ensure NLTK data is downloaded
-def ntlk_prep():
-    nltk.download('punkt')
+def ensure_nltk_data():
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        nltk.download('punkt')
+ensure_nltk_data()
+
 #
 # Load GPT2 tokenizer
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -57,6 +62,34 @@ openai_api_key = config.get('API', 'openai_api_key')
 #
 # Functions:
 
+# Create a chunking class for refactoring FIXME
+# class Chunker:
+#     def __init__(self, tokenizer: GPT2Tokenizer):
+#         self.tokenizer = tokenizer
+#
+#     def detect_language(self, text: str) -> str:
+#         try:
+#             return detect(text)
+#         except:
+#             return 'en'
+#
+#     def chunk_text(self, text: str, method: str, max_size: int, overlap: int, language: str = None) -> List[str]:
+#         if language is None:
+#             language = self.detect_language(text)
+#
+#         if method == 'words':
+#             return self.chunk_text_by_words(text, max_size, overlap, language)
+#         elif method == 'sentences':
+#             return self.chunk_text_by_sentences(text, max_size, overlap, language)
+#         elif method == 'paragraphs':
+#             return self.chunk_text_by_paragraphs(text, max_size, overlap)
+#         elif method == 'tokens':
+#             return self.chunk_text_by_tokens(text, max_size, overlap, language)
+#         elif method == 'semantic':
+#             return self.semantic_chunking(text, max_size)
+#         else:
+#             return [text]
+
 def detect_language(text: str) -> str:
     try:
         return detect(text)
@@ -65,13 +98,13 @@ def detect_language(text: str) -> str:
         return 'en'
 
 
-def load_document(file_path):
-    with open(file_path, 'r') as file:
+def load_document(file_path: str) -> str:
+    with open(file_path, 'r', encoding='utf-8') as file:
         text = file.read()
-    return re.sub('\\s+', ' ', text).strip()
+    return re.sub(r'\s+', ' ', text).strip()
 
 
-def improved_chunking_process(text: str, custom_chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+def improved_chunking_process(text: str, chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     logging.debug("Improved chunking process started...")
 
     # Extract JSON metadata if present
@@ -92,9 +125,9 @@ def improved_chunking_process(text: str, custom_chunk_options: Dict[str, Any] = 
         text = text[len(header_text):].strip()
         logging.debug(f"Extracted header text: {header_text}")
 
-    options = chunk_options.copy()
-    if custom_chunk_options:
-        options.update(custom_chunk_options)
+    options = chunk_options.copy() if chunk_options else {}
+    if chunk_options:
+        options.update(chunk_options)
 
     chunk_method = options.get('method', 'words')
     max_size = options.get('max_size', 2000)
@@ -137,7 +170,6 @@ def improved_chunking_process(text: str, custom_chunk_options: Dict[str, Any] = 
     return chunks_with_metadata
 
 
-
 def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, language: str) -> List[str]:
     logging.debug("Multi-level chunking process started...")
     # First level: chunk by paragraphs
@@ -147,35 +179,34 @@ def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, la
     chunks = []
     for para in paragraphs:
         if method == 'words':
-            chunks.extend(chunk_text_by_words(para, max_size, overlap, language))
+            chunks.extend(chunk_text_by_words(para, max_words=max_size, overlap=overlap, language=language))
         elif method == 'sentences':
-            chunks.extend(chunk_text_by_sentences(para, max_size, overlap, language))
+            chunks.extend(chunk_text_by_sentences(para, max_sentences=max_size, overlap=overlap, language=language))
         else:
             chunks.append(para)
 
     return chunks
 
 
-
 # FIXME - ensure language detection occurs in each chunk function
-def chunk_text(text: str, method: str, max_size: int, overlap: int, language: str=None) -> List[str]:
-
+def chunk_text(text: str, method: str, max_size: int, overlap: int, language: str = None) -> List[str]:
     if method == 'words':
         logging.debug("Chunking by words...")
-        return chunk_text_by_words(text, max_size, overlap, language)
+        return chunk_text_by_words(text, max_words=max_size, overlap=overlap, language=language)
     elif method == 'sentences':
         logging.debug("Chunking by sentences...")
-        return chunk_text_by_sentences(text, max_size, overlap, language)
+        return chunk_text_by_sentences(text, max_sentences=max_size, overlap=overlap, language=language)
     elif method == 'paragraphs':
         logging.debug("Chunking by paragraphs...")
-        return chunk_text_by_paragraphs(text, max_size, overlap)
+        return chunk_text_by_paragraphs(text, max_paragraphs=max_size, overlap=overlap)
     elif method == 'tokens':
         logging.debug("Chunking by tokens...")
-        return chunk_text_by_tokens(text, max_size, overlap)
+        return chunk_text_by_tokens(text, max_tokens=max_size, overlap=overlap)
     elif method == 'semantic':
         logging.debug("Chunking by semantic similarity...")
-        return semantic_chunking(text, max_size)
+        return semantic_chunking(text, max_chunk_size=max_size)
     else:
+        logging.warning(f"Unknown chunking method '{method}'. Returning full text as a single chunk.")
         return [text]
 
 def determine_chunk_position(relative_position: float) -> str:
@@ -214,22 +245,37 @@ def chunk_text_by_sentences(text: str, max_sentences: int = 10, overlap: int = 0
     if language is None:
         language = detect_language(text)
 
-    nltk.download('punkt', quiet=True)
-
     if language.startswith('zh'):  # Chinese
         import jieba
-        sentences = list(jieba.cut(text, cut_all=False))
+        # Use jieba to perform sentence segmentation
+        # jieba does not support sentence segmentation out of the box
+        # Use punctuation as delimiters
+        sentences = re.split(r'[。！？；]', text)
+        sentences = [s.strip() for s in sentences if s.strip()]
     elif language == 'ja':  # Japanese
         import fugashi
         tagger = fugashi.Tagger()
-        sentences = [word.surface for word in tagger(text) if word.feature.pos1 in ['記号', '補助記号'] and word.surface.strip()]
+        # Simple sentence segmentation based on punctuation
+        sentences = re.split(r'[。！？]', text)
+        sentences = [s.strip() for s in sentences if s.strip()]
     else:  # Default to NLTK for other languages
-        sentences = sent_tokenize(text, language=language)
+        try:
+            sentences = sent_tokenize(text, language=language)
+        except LookupError:
+            logging.warning(f"Punkt tokenizer not found for language '{language}'. Using default 'english'.")
+            sentences = sent_tokenize(text, language='english')
 
     chunks = []
+    previous_overlap = []
+
     for i in range(0, len(sentences), max_sentences - overlap):
-        chunk = ' '.join(sentences[i:i + max_sentences])
+        current_sentences = sentences[i:i + max_sentences]
+        if overlap > 0 and previous_overlap:
+            current_sentences = previous_overlap + current_sentences
+        chunk = ' '.join(current_sentences)
         chunks.append(chunk)
+        previous_overlap = sentences[i + max_sentences - overlap:i + max_sentences] if overlap > 0 else []
+
     return post_process_chunks(chunks)
 
 
@@ -266,6 +312,16 @@ def chunk_text_by_tokens(text: str, max_tokens: int = 1000, overlap: int = 0) ->
         chunks.append(' '.join(current_chunk))
 
     return post_process_chunks(chunks)
+# def chunk_text_by_tokens(text: str, max_tokens: int = 1000, overlap: int = 0) -> List[str]:
+#     logging.debug("chunk_text_by_tokens...")
+#     # Use GPT2 tokenizer for tokenization
+#     tokens = tokenizer.encode(text)
+#     chunks = []
+#     for i in range(0, len(tokens), max_tokens - overlap):
+#         chunk_tokens = tokens[i:i + max_tokens]
+#         chunk = tokenizer.decode(chunk_tokens)
+#         chunks.append(chunk)
+#     return post_process_chunks(chunks)
 
 
 def post_process_chunks(chunks: List[str]) -> List[str]:
@@ -274,35 +330,35 @@ def post_process_chunks(chunks: List[str]) -> List[str]:
 
 # FIXME - F
 def get_chunk_metadata(chunk: str, full_text: str, chunk_type: str = "generic",
-                       chapter_number: Optional[int] = None,
-                       chapter_pattern: Optional[str] = None,
-                       language: str = None) -> Dict[str, Any]:
-    try:
-        logging.debug("get_chunk_metadata...")
-        start_index = full_text.index(chunk)
-        end_index = start_index + len(chunk)
-        # Calculate a hash for the chunk
-        chunk_hash = hashlib.md5(chunk.encode()).hexdigest()
+                      chapter_number: Optional[int] = None,
+                      chapter_pattern: Optional[str] = None,
+                      language: str = None) -> Dict[str, Any]:
+    """
+    Generate metadata for a chunk based on its position in the full text.
+    """
+    chunk_length = len(chunk)
+    start_index = full_text.find(chunk)
+    end_index = start_index + chunk_length if start_index != -1 else None
 
-        metadata = {
-            'start_index': start_index,
-            'end_index': end_index,
-            'word_count': len(chunk.split()),
-            'char_count': len(chunk),
-            'chunk_type': chunk_type,
-            'language': language,
-            'chunk_hash': chunk_hash,
-            'relative_position': start_index / len(full_text)
-        }
+    # Calculate a hash for the chunk
+    chunk_hash = hashlib.md5(chunk.encode()).hexdigest()
 
-        if chunk_type == "chapter":
-            metadata['chapter_number'] = chapter_number
-            metadata['chapter_pattern'] = chapter_pattern
+    metadata = {
+        'start_index': start_index,
+        'end_index': end_index,
+        'word_count': len(chunk.split()),
+        'char_count': chunk_length,
+        'chunk_type': chunk_type,
+        'language': language,
+        'chunk_hash': chunk_hash,
+        'relative_position': start_index / len(full_text) if len(full_text) > 0 and start_index != -1 else 0
+    }
 
-        return metadata
-    except ValueError as e:
-        logging.error(f"Chunk not found in full_text: {chunk[:50]}... Full text length: {len(full_text)}")
-        raise
+    if chunk_type == "chapter":
+        metadata['chapter_number'] = chapter_number
+        metadata['chapter_pattern'] = chapter_pattern
+
+    return metadata
 
 
 def process_document_with_metadata(text: str, chunk_options: Dict[str, Any],
@@ -316,27 +372,33 @@ def process_document_with_metadata(text: str, chunk_options: Dict[str, Any],
 
 
 # Hybrid approach, chunk each sentence while ensuring total token size does not exceed a maximum number
-def chunk_text_hybrid(text, max_tokens=1000):
+def chunk_text_hybrid(text: str, max_tokens: int = 1000, overlap: int = 0) -> List[str]:
     logging.debug("chunk_text_hybrid...")
-    sentences = nltk.tokenize.sent_tokenize(text)
+    sentences = sent_tokenize(text)
     chunks = []
     current_chunk = []
     current_length = 0
 
     for sentence in sentences:
         tokens = tokenizer.encode(sentence)
-        if current_length + len(tokens) <= max_tokens:
-            current_chunk.append(sentence)
-            current_length += len(tokens)
-        else:
+        if current_length + len(tokens) > max_tokens and current_chunk:
             chunks.append(' '.join(current_chunk))
-            current_chunk = [sentence]
-            current_length = len(tokens)
+            # Handle overlap
+            if overlap > 0:
+                overlap_tokens = tokenizer.encode(' '.join(current_chunk[-overlap:]))
+                current_chunk = current_chunk[-overlap:]
+                current_length = len(overlap_tokens)
+            else:
+                current_chunk = []
+                current_length = 0
+
+        current_chunk.append(sentence)
+        current_length += len(tokens)
 
     if current_chunk:
         chunks.append(' '.join(current_chunk))
 
-    return chunks
+    return post_process_chunks(chunks)
 
 
 # Thanks openai
@@ -348,21 +410,22 @@ def chunk_on_delimiter(input_string: str,
     combined_chunks, _, dropped_chunk_count = combine_chunks_with_no_minimum(
         chunks, max_tokens, chunk_delimiter=delimiter, add_ellipsis_for_overflow=True)
     if dropped_chunk_count > 0:
-        print(f"Warning: {dropped_chunk_count} chunks were dropped due to exceeding the token limit.")
+        logging.warning(f"Warning: {dropped_chunk_count} chunks were dropped due to exceeding the token limit.")
     combined_chunks = [f"{chunk}{delimiter}" for chunk in combined_chunks]
     return combined_chunks
 
 
 
 
-# ????FIXME
-def recursive_summarize_chunks(chunks, summarize_func, custom_prompt, temp=None, system_prompt=None):
+# FIXME
+def recursive_summarize_chunks(chunks: List[str], summarize_func, custom_prompt: Optional[str] = None,
+                               temp: Optional[float] = None, system_prompt: Optional[str] = None) -> List[str]:
     logging.debug("recursive_summarize_chunks...")
     summarized_chunks = []
     current_summary = ""
 
-    logging.debug(f"recursive_summarize_chunks: Summarizing {len(chunks)} chunks recursively...")
-    logging.debug(f"recursive_summarize_chunks:  temperature is @ {temp}")
+    logging.debug(f"Summarizing {len(chunks)} chunks recursively...")
+    logging.debug(f"Temperature is set to {temp}")
     for i, chunk in enumerate(chunks):
         if i == 0:
             current_summary = summarize_func(chunk, custom_prompt, temp, system_prompt)
@@ -414,20 +477,20 @@ Natural language processing has its roots in the 1950s. Already in 1950, Alan Tu
 #
 
 # Chunk text into segments based on semantic similarity
-def count_units(text, unit='words'):
+def count_units(text: str, unit: str = 'words') -> int:
     if unit == 'words':
         return len(text.split())
     elif unit == 'tokens':
-        return len(word_tokenize(text))
+        return len(tokenizer.encode(text))
     elif unit == 'characters':
         return len(text)
     else:
         raise ValueError("Invalid unit. Choose 'words', 'tokens', or 'characters'.")
 
 
-def semantic_chunking(text, max_chunk_size=2000, unit='words'):
+
+def semantic_chunking(text: str, max_chunk_size: int = 2000, unit: str = 'words') -> List[str]:
     logging.debug("semantic_chunking...")
-    nltk.download('punkt', quiet=True)
     sentences = sent_tokenize(text)
     vectorizer = TfidfVectorizer()
     sentence_vectors = vectorizer.fit_transform(sentences)
@@ -440,9 +503,9 @@ def semantic_chunking(text, max_chunk_size=2000, unit='words'):
         sentence_size = count_units(sentence, unit)
         if current_size + sentence_size > max_chunk_size and current_chunk:
             chunks.append(' '.join(current_chunk))
-            overlap_size = count_units(' '.join(current_chunk[-3:]), unit)  # Use last 3 sentences for overlap
-            current_chunk = current_chunk[-3:]  # Keep last 3 sentences for overlap
-            current_size = overlap_size
+            # Use last 3 sentences for overlap
+            current_chunk = current_chunk[-3:]
+            current_size = count_units(' '.join(current_chunk), unit)
 
         current_chunk.append(sentence)
         current_size += sentence_size
@@ -453,9 +516,8 @@ def semantic_chunking(text, max_chunk_size=2000, unit='words'):
             similarity = cosine_similarity(current_vector, next_vector)[0][0]
             if similarity < 0.5 and current_size >= max_chunk_size // 2:
                 chunks.append(' '.join(current_chunk))
-                overlap_size = count_units(' '.join(current_chunk[-3:]), unit)
                 current_chunk = current_chunk[-3:]
-                current_size = overlap_size
+                current_size = count_units(' '.join(current_chunk), unit)
 
     if current_chunk:
         chunks.append(' '.join(current_chunk))
@@ -463,7 +525,7 @@ def semantic_chunking(text, max_chunk_size=2000, unit='words'):
     return chunks
 
 
-def semantic_chunk_long_file(file_path, max_chunk_size=1000, overlap=100, unit='words'):
+def semantic_chunk_long_file(file_path: str, max_chunk_size: int = 1000, overlap: int = 100, unit: str = 'words') -> Optional[List[str]]:
     logging.debug("semantic_chunk_long_file...")
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -551,6 +613,7 @@ def chunk_text_by_json(text: str, max_size: int = 1000, overlap: int = 0) -> Lis
         logging.error("Unsupported JSON structure. Only JSON objects and arrays are supported.")
         raise ValueError("Unsupported JSON structure. Only JSON objects and arrays are supported.")
 
+
 def chunk_json_list(json_list: List[Any], max_size: int, overlap: int) -> List[Dict[str, Any]]:
     """
     Chunk a JSON array into smaller chunks.
@@ -589,6 +652,7 @@ def chunk_json_list(json_list: List[Any], max_size: int, overlap: int) -> List[D
     return chunks
 
 
+
 def chunk_json_dict(json_dict: Dict[str, Any], max_size: int, overlap: int) -> List[Dict[str, Any]]:
     """
     Chunk a JSON object into smaller chunks based on its 'data' key while preserving other keys like 'metadata'.
@@ -622,7 +686,7 @@ def chunk_json_dict(json_dict: Dict[str, Any], max_size: int, overlap: int) -> L
         raise ValueError("max_size must be greater than overlap.")
 
     # Adjust the loop to prevent creating an extra chunk
-    for i in range(0, total_keys - max_size + 1, step):
+    for i in range(0, total_keys, step):
         chunk_keys = data_keys[i:i + max_size]
 
         # Handle overlap
@@ -692,45 +756,38 @@ def get_chat_completion(messages, model='gpt-4-turbo'):
 def combine_chunks_with_no_minimum(
         chunks: List[str],
         max_tokens: int,
-        chunk_delimiter="\n\n",
+        chunk_delimiter: str = "\n\n",
         header: Optional[str] = None,
-        add_ellipsis_for_overflow=False,
+        add_ellipsis_for_overflow: bool = False,
 ) -> Tuple[List[str], List[List[int]], int]:
     dropped_chunk_count = 0
     output = []  # list to hold the final combined chunks
     output_indices = []  # list to hold the indices of the final combined chunks
-    candidate = (
-        [] if header is None else [header]
-    )  # list to hold the current combined chunk candidate
+    candidate = [header] if header else []  # list to hold the current combined chunk candidate
     candidate_indices = []
     for chunk_i, chunk in enumerate(chunks):
-        chunk_with_header = [chunk] if header is None else [header, chunk]
-        # FIXME MAKE NOT OPENAI SPECIFIC
-        if len(openai_tokenize(chunk_delimiter.join(chunk_with_header))) > max_tokens:
-            print(f"warning: chunk overflow")
-            if (
-                    add_ellipsis_for_overflow
-                    # FIXME MAKE NOT OPENAI SPECIFIC
-                    and len(openai_tokenize(chunk_delimiter.join(candidate + ["..."]))) <= max_tokens
-            ):
-                candidate.append("...")
+        chunk_with_header = [chunk] if not header else [header, chunk]
+        combined_text = chunk_delimiter.join(candidate + chunk_with_header)
+        token_count = len(tokenizer.encode(combined_text))
+        if token_count > max_tokens:
+            if add_ellipsis_for_overflow and len(candidate) > 0:
+                ellipsis_text = chunk_delimiter.join(candidate + ["..."])
+                if len(tokenizer.encode(ellipsis_text)) <= max_tokens:
+                    candidate = candidate + ["..."]
+                    dropped_chunk_count += 1
+            if len(candidate) > 0:
+                output.append(chunk_delimiter.join(candidate))
+                output_indices.append(candidate_indices)
+                candidate = chunk_with_header
+                candidate_indices = [chunk_i]
+            else:
+                logging.warning(f"Single chunk at index {chunk_i} exceeds max_tokens and will be dropped.")
                 dropped_chunk_count += 1
-            continue  # this case would break downstream assumptions
-        # estimate token count with the current chunk added
-        # FIXME MAKE NOT OPENAI SPECIFIC
-        extended_candidate_token_count = len(openai_tokenize(chunk_delimiter.join(candidate + [chunk])))
-        # If the token count exceeds max_tokens, add the current candidate to output and start a new candidate
-        if extended_candidate_token_count > max_tokens:
-            output.append(chunk_delimiter.join(candidate))
-            output_indices.append(candidate_indices)
-            candidate = chunk_with_header  # re-initialize candidate
-            candidate_indices = [chunk_i]
-        # otherwise keep extending the candidate
         else:
-            candidate.append(chunk)
+            candidate.extend(chunk_with_header)
             candidate_indices.append(chunk_i)
-    # add the remaining candidate to output if it's not empty
-    if (header is not None and len(candidate) > 1) or (header is None and len(candidate) > 0):
+
+    if candidate:
         output.append(chunk_delimiter.join(candidate))
         output_indices.append(candidate_indices)
     return output, output_indices, dropped_chunk_count
@@ -738,27 +795,25 @@ def combine_chunks_with_no_minimum(
 
 def rolling_summarize(text: str,
                       detail: float = 0,
-                      model: str = 'gpt-4-turbo',
+                      model: str = 'gpt-4o',
                       additional_instructions: Optional[str] = None,
                       minimum_chunk_size: Optional[int] = 500,
                       chunk_delimiter: str = ".",
-                      summarize_recursively=False,
-                      verbose=False):
+                      summarize_recursively: bool = False,
+                      verbose: bool = False) -> str:
     """
     Summarizes a given text by splitting it into chunks, each of which is summarized individually.
     The level of detail in the summary can be adjusted, and the process can optionally be made recursive.
 
     Parameters:
         - text (str): The text to be summarized.
-        - detail (float, optional): A value between 0 and 1
-            indicating the desired level of detail in the summary. 0 leads to a higher level summary, and 1 results in a more
-            detailed summary. Defaults to 0.
-        - additional_instructions (Optional[str], optional): Additional instructions to provide to the
-            model for customizing summaries. - minimum_chunk_size (Optional[int], optional): The minimum size for text
-            chunks. Defaults to 500.
-        - chunk_delimiter (str, optional): The delimiter used to split the text into chunks. Defaults to ".".
-        - summarize_recursively (bool, optional): If True, summaries are generated recursively, using previous summaries for context.
+        - detail (float, optional): A value between 0 and 1 indicating the desired level of detail in the summary.
+        - additional_instructions (Optional[str], optional): Additional instructions for the model.
+        - minimum_chunk_size (Optional[int], optional): The minimum size for text chunks.
+        - chunk_delimiter (str, optional): The delimiter used to split the text into chunks.
+        - summarize_recursively (bool, optional): If True, summaries are generated recursively.
         - verbose (bool, optional): If True, prints detailed information about the chunking process.
+
     Returns:
     - str: The final compiled summary of the text.
 
@@ -768,31 +823,29 @@ def rolling_summarize(text: str,
     summarization process. The function returns a compiled summary of all chunks.
     """
 
-    # check detail is set correctly
-    assert 0 <= detail <= 1
+    # Check detail is set correctly
+    assert 0 <= detail <= 1, "Detail must be between 0 and 1."
 
-    # interpolate the number of chunks based to get specified level of detail
-    max_chunks = len(chunk_on_delimiter(text, minimum_chunk_size, chunk_delimiter))
+    # Interpolate the number of chunks based on the detail parameter
+    text_length = len(tokenizer.encode(text))
+    max_chunks = text_length // minimum_chunk_size if minimum_chunk_size else 10
     min_chunks = 1
     num_chunks = int(min_chunks + detail * (max_chunks - min_chunks))
 
-    # adjust chunk_size based on interpolated number of chunks
-    # FIXME MAKE NOT OPENAI SPECIFIC
-    document_length = len(openai_tokenize(text))
-    chunk_size = max(minimum_chunk_size, document_length // num_chunks)
+    # Adjust chunk_size based on interpolated number of chunks
+    chunk_size = max(minimum_chunk_size, text_length // num_chunks) if num_chunks else text_length
     text_chunks = chunk_on_delimiter(text, chunk_size, chunk_delimiter)
     if verbose:
         print(f"Splitting the text into {len(text_chunks)} chunks to be summarized.")
-        # FIXME MAKE NOT OPENAI SPECIFIC
-        print(f"Chunk lengths are {[len(openai_tokenize(x)) for x in text_chunks]}")
+        print(f"Chunk lengths are {[len(tokenizer.encode(x)) for x in text_chunks]} tokens.")
 
-    # set system message - FIXME
+    # Set system message
     system_message_content = "Rewrite this text in summarized form."
-    if additional_instructions is not None:
+    if additional_instructions:
         system_message_content += f"\n\n{additional_instructions}"
 
     accumulated_summaries = []
-    for i, chunk in enumerate(tqdm(text_chunks)):
+    for i, chunk in enumerate(tqdm(text_chunks, desc="Summarizing chunks")):
         if summarize_recursively and accumulated_summaries:
             # Combine previous summary with current chunk for recursive summarization
             combined_text = accumulated_summaries[-1] + "\n\n" + chunk
@@ -820,8 +873,8 @@ def rolling_summarize(text: str,
 
 def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:
     logging.debug("chunk_ebook_by_chapters")
-    max_chunk_size = chunk_options.get('max_size', 300)
-    overlap = chunk_options.get('overlap', 0)
+    max_chunk_size = int(chunk_options.get('max_size', 300))
+    overlap = int(chunk_options.get('overlap', 0))
     custom_pattern = chunk_options.get('custom_chapter_pattern', None)
 
     # List of chapter heading patterns to try, in order
@@ -847,7 +900,13 @@ def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Di
 
     # If no chapters found, return the entire content as one chunk
     if not chapter_positions:
-        return [{'text': text, 'metadata': get_chunk_metadata(text, text, chunk_type="whole_document")}]
+        metadata = get_chunk_metadata(
+            chunk=text,
+            full_text=text,
+            chunk_type="whole_document",
+            language=chunk_options.get('language', 'english')
+        )
+        return [{'text': text, 'metadata': metadata}]
 
     # Split content into chapters
     chunks = []
@@ -858,7 +917,7 @@ def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Di
 
         # Apply overlap if specified
         if overlap > 0 and i > 0:
-            overlap_start = max(0, start - overlap)
+            overlap_start = max(0, chapter_positions[i] - overlap)
             chapter = text[overlap_start:end]
 
         chunks.append(chapter)
@@ -867,52 +926,19 @@ def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Di
     processed_chunks = post_process_chunks(chunks)
 
     # Add metadata to chunks
-    return [{'text': chunk, 'metadata': get_chunk_metadata(chunk, text, chunk_type="chapter", chapter_number=i + 1,
-                                                           chapter_pattern=used_pattern)}
-            for i, chunk in enumerate(processed_chunks)]
+    chunks_with_metadata = []
+    for i, chunk in enumerate(processed_chunks):
+        metadata = get_chunk_metadata(
+            chunk=chunk,
+            full_text=text,
+            chunk_type="chapter",
+            chapter_number=i + 1,
+            chapter_pattern=used_pattern,
+            language=chunk_options.get('language', 'english')
+        )
+        chunks_with_metadata.append({'text': chunk, 'metadata': metadata})
 
-
-# # Example usage
-# if __name__ == "__main__":
-#     sample_ebook_content = """
-# # Chapter 1: Introduction
-#
-# This is the introduction.
-#
-# ## Section 1.1
-#
-# Some content here.
-#
-# # Chapter 2: Main Content
-#
-# This is the main content.
-#
-# ## Section 2.1
-#
-# More content here.
-#
-# CHAPTER THREE
-#
-# This is the third chapter.
-#
-# 4. Fourth Chapter
-#
-# This is the fourth chapter.
-# """
-#
-#     chunk_options = {
-#         'method': 'chapters',
-#         'max_size': 500,
-#         'overlap': 50,
-#         'custom_chapter_pattern': r'^CHAPTER\s+[A-Z]+'  # Custom pattern for 'CHAPTER THREE' style
-#     }
-#
-#     chunked_chapters = improved_chunking_process(sample_ebook_content, chunk_options)
-#
-#     for i, chunk in enumerate(chunked_chapters, 1):
-#         print(f"Chunk {i}:")
-#         print(chunk['text'])
-#         print(f"Metadata: {chunk['metadata']}\n")
+    return chunks_with_metadata
 
 #
 # End of ebook chapter chunking
@@ -923,12 +949,13 @@ def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Di
 # Functions for adapative chunking:
 
 # FIXME - punkt
-def adaptive_chunk_size(text: str, base_size: int = 1000, min_size: int = 500, max_size: int = 2000) -> int:
-    # Ensure NLTK data is downloaded
-    nltk.download('punkt', quiet=True)
 
+def adaptive_chunk_size(text: str, base_size: int = 1000, min_size: int = 500, max_size: int = 2000) -> int:
     # Tokenize the text into sentences
     sentences = sent_tokenize(text)
+
+    if not sentences:
+        return base_size
 
     # Calculate average sentence length
     avg_sentence_length = sum(len(s.split()) for s in sentences) / len(sentences)
