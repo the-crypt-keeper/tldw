@@ -240,7 +240,7 @@ def launch_ui(share_public=None, server_mode=False):
         background-color: #ffeeee;
     }
     .transcription, .summary {
-        max-height: 300px;
+        max-height: 800px;
         overflow-y: auto;
         border: 1px solid #eee;
         padding: 10px;

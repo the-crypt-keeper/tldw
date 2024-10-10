@@ -309,7 +309,10 @@ def add_media_to_database(*args, **kwargs):
         result = sqlite_add_media_to_database(*args, **kwargs)
 
         # Extract content
-        segments = args[2]
+        segments = kwargs.get('segments') if 'segments' in kwargs else args[2] if len(args) > 2 else None
+        if segments is None:
+            raise ValueError("Segments not provided in arguments")
+
         if isinstance(segments, list):
             content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
         elif isinstance(segments, dict):

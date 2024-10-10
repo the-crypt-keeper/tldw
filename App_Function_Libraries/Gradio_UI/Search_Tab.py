@@ -73,7 +73,7 @@ def format_as_html(content, title):
     return f"""
     <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;">
         <h3>{title}</h3>
-        <div style="max-height: 300px; overflow-y: auto;">
+        <div style="max-height: 700px; overflow-y: auto;">
             {formatted_content}
         </div>
     </div>
