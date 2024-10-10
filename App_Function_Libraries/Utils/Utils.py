@@ -15,8 +15,6 @@
 # 6. normalize_title(title)
 # 7.
 #
-#
-#
 ####################
 #
 # Import necessary libraries
@@ -552,15 +550,10 @@ def safe_read_file(file_path):
             logging.debug(f"Failed to decode with {encoding}")
             continue
 
-    # If all else fails, try to decode ignoring errors
-    try:
-        decoded_content = raw_data.decode('utf-8', errors='ignore')
-        logging.warning(f"Decoded file {file_path} ignoring errors")
-        return decoded_content
-    except Exception as e:
-        logging.error(f"Failed to decode file even when ignoring errors: {e}")
+    # If all decoding attempts fail, return the error message
+    logging.error(f"Unable to decode the file {file_path}")
+    return f"Unable to decode the file {file_path}"
 
-    return f"Unable to decode the file {file_path} with any of the attempted encodings: {encodings}"
 
 #
 # End of Files-saving Function Definitions

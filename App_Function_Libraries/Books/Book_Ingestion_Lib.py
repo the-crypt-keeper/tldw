@@ -197,6 +197,80 @@ def process_zip_file(zip_file, title, author, keywords, custom_prompt, system_pr
 
     return "\n".join(results)
 
+
+def import_file_handler(file, title, author, keywords, system_prompt, custom_prompt, auto_summarize, api_name,
+                        api_key, max_chunk_size, chunk_overlap, custom_chapter_pattern):
+    try:
+        # Handle max_chunk_size
+        if isinstance(max_chunk_size, str):
+            max_chunk_size = int(max_chunk_size) if max_chunk_size.strip() else 4000
+        elif not isinstance(max_chunk_size, int):
+            max_chunk_size = 4000  # Default value if not a string or int
+
+        # Handle chunk_overlap
+        if isinstance(chunk_overlap, str):
+            chunk_overlap = int(chunk_overlap) if chunk_overlap.strip() else 0
+        elif not isinstance(chunk_overlap, int):
+            chunk_overlap = 0  # Default value if not a string or int
+
+        chunk_options = {
+            'method': 'chapter',
+            'max_size': max_chunk_size,
+            'overlap': chunk_overlap,
+            'custom_chapter_pattern': custom_chapter_pattern if custom_chapter_pattern else None
+        }
+
+        if file is None:
+            return "No file uploaded."
+
+        file_path = file.name
+        if not os.path.exists(file_path):
+            return "Uploaded file not found."
+
+        if file_path.lower().endswith('.epub'):
+            status = import_epub(
+                file_path,
+                title,
+                author,
+                keywords,
+                custom_prompt=custom_prompt,
+                system_prompt=system_prompt,
+                summary=None,
+                auto_summarize=auto_summarize,
+                api_name=api_name,
+                api_key=api_key,
+                chunk_options=chunk_options,
+                custom_chapter_pattern=custom_chapter_pattern
+            )
+            return f"📚 EPUB Imported Successfully:\n{status}"
+        elif file.name.lower().endswith('.zip'):
+            status = process_zip_file(
+                zip_file=file,
+                title=title,
+                author=author,
+                keywords=keywords,
+                custom_prompt=custom_prompt,
+                system_prompt=system_prompt,
+                summary=None,  # Let the library handle summarization
+                auto_summarize=auto_summarize,
+                api_name=api_name,
+                api_key=api_key,
+                chunk_options=chunk_options
+            )
+            return f"📦 ZIP Processed Successfully:\n{status}"
+        elif file.name.lower().endswith(('.chm', '.html', '.pdf', '.xml', '.opml')):
+            file_type = file.name.split('.')[-1].upper()
+            return f"{file_type} file import is not yet supported."
+        else:
+            return "❌ Unsupported file type. Please upload an `.epub` file or a `.zip` file containing `.epub` files."
+
+    except ValueError as ve:
+        logging.exception(f"Error parsing input values: {str(ve)}")
+        return f"❌ Error: Invalid input for chunk size or overlap. Please enter valid numbers."
+    except Exception as e:
+        logging.exception(f"Error during file import: {str(e)}")
+        return f"❌ Error during import: {str(e)}"
+
 def read_epub(file_path):
     """
     Reads and extracts text from an EPUB file.
