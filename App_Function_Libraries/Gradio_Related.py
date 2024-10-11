@@ -288,8 +288,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_chat_with_llamafile_tab()
                 create_chat_management_tab()
                 chat_workflows_tab()
-                create_multiple_character_chat_tab()
-                create_narrator_controlled_conversation_tab()
 
 
             with gr.TabItem("Character Chat"):
@@ -298,6 +296,8 @@ def launch_ui(share_public=None, server_mode=False):
                     create_character_chat_mgmt_tab()
                     create_custom_character_card_tab()
                     create_character_card_validation_tab()
+                    create_multiple_character_chat_tab()
+                    create_narrator_controlled_conversation_tab()
 
 
             with gr.TabItem("View DB Items"):
