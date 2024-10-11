@@ -1,8 +1,10 @@
-# Character_Interaction_Library_3.py
+# Character_Interaction_Library.py
 # Description: Library for character card import functions
 #
 # Imports
+import os
 import re
+import tempfile
 import uuid
 from datetime import datetime
 import json
@@ -13,9 +15,13 @@ from typing import Dict, Any, Optional, List, Tuple, Union, cast
 #
 # External Imports
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 import gradio as gr
 #
 # Local Imports
+from App_Function_Libraries.Character_Chat.Character_Chat_Lib import validate_character_book, validate_v2_card, \
+    replace_placeholders, replace_user_placeholder, extract_json_from_image, parse_character_book, \
+    load_chat_and_character, load_chat_history, load_character_and_image, extract_character_id, load_character_wrapper
 from App_Function_Libraries.Chat import chat
 from App_Function_Libraries.DB.Character_Chat_DB import (
     add_character_card,
@@ -34,64 +40,6 @@ from App_Function_Libraries.Utils.Utils import sanitize_user_input
 ############################################################################################################
 #
 # Functions:
-
-
-#################################################################################
-#
-# Placeholder functions:
-
-def replace_placeholders(text: str, char_name: str, user_name: str) -> str:
-    """
-    Replace placeholders in the given text with appropriate values.
-
-    Args:
-        text (str): The text containing placeholders.
-        char_name (str): The name of the character.
-        user_name (str): The name of the user.
-
-    Returns:
-        str: The text with placeholders replaced.
-    """
-    replacements = {
-        '{{char}}': char_name,
-        '{{user}}': user_name,
-        '{{random_user}}': user_name  # Assuming random_user is the same as user for simplicity
-    }
-
-    for placeholder, value in replacements.items():
-        text = text.replace(placeholder, value)
-
-    return text
-
-def replace_user_placeholder(history, user_name):
-    """
-    Replaces all instances of '{{user}}' in the chat history with the actual user name.
-
-    Args:
-        history (list): The current chat history as a list of tuples (user_message, bot_message).
-        user_name (str): The name entered by the user.
-
-    Returns:
-        list: Updated chat history with placeholders replaced.
-    """
-    if not user_name:
-        user_name = "User"  # Default name if none provided
-
-    updated_history = []
-    for user_msg, bot_msg in history:
-        # Replace in user message
-        if user_msg:
-            user_msg = user_msg.replace("{{user}}", user_name)
-        # Replace in bot message
-        if bot_msg:
-            bot_msg = bot_msg.replace("{{user}}", user_name)
-        updated_history.append((user_msg, bot_msg))
-    return updated_history
-
-#
-# End of Placeholder functions
-#################################################################################
-
 
 #################################################################################
 #
@@ -154,68 +102,7 @@ def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
         logging.error(f"Unexpected error parsing JSON: {e}")
     return None
 
-def extract_json_from_image(image_file):
-    logging.debug(f"Attempting to extract JSON from image: {image_file.name}")
-    try:
-        with Image.open(image_file) as img:
-            logging.debug("Image opened successfully")
-            metadata = img.info
-            if 'chara' in metadata:
-                logging.debug("Found 'chara' in image metadata")
-                chara_content = metadata['chara']
-                logging.debug(f"Content of 'chara' metadata (first 100 chars): {chara_content[:100]}...")
-                try:
-                    decoded_content = base64.b64decode(chara_content).decode('utf-8')
-                    logging.debug(f"Decoded content (first 100 chars): {decoded_content[:100]}...")
-                    return decoded_content
-                except Exception as e:
-                    logging.error(f"Error decoding base64 content: {e}")
 
-            logging.warning("'chara' not found in metadata, attempting to find JSON data in image bytes")
-            # Alternative method to extract embedded JSON from image bytes if metadata is not available
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_bytes = img_byte_arr.getvalue()
-            img_str = img_bytes.decode('latin1')  # Use 'latin1' to preserve byte values
-
-            # Search for JSON-like structures in the image bytes
-            json_start = img_str.find('{')
-            json_end = img_str.rfind('}')
-            if json_start != -1 and json_end != -1 and json_end > json_start:
-                possible_json = img_str[json_start:json_end+1]
-                try:
-                    json.loads(possible_json)
-                    logging.debug("Found JSON data in image bytes")
-                    return possible_json
-                except json.JSONDecodeError:
-                    logging.debug("No valid JSON found in image bytes")
-
-            logging.warning("No JSON data found in the image")
-    except Exception as e:
-        logging.error(f"Error extracting JSON from image: {e}")
-    return None
-
-
-def process_chat_history(chat_history: List[Tuple[str, str]], char_name: str, user_name: str) -> List[Tuple[str, str]]:
-    """
-    Process the chat history to replace placeholders in both user and character messages.
-
-    Args:
-        chat_history (List[Tuple[str, str]]): The chat history.
-        char_name (str): The name of the character.
-        user_name (str): The name of the user.
-
-    Returns:
-        List[Tuple[str, str]]: The processed chat history.
-    """
-    processed_history = []
-    for user_msg, char_msg in chat_history:
-        if user_msg:
-            user_msg = replace_placeholders(user_msg, char_name, user_name)
-        if char_msg:
-            char_msg = replace_placeholders(char_msg, char_name, user_name)
-        processed_history.append((user_msg, char_msg))
-    return processed_history
 
 def parse_v2_card(card_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     try:
@@ -295,166 +182,10 @@ def parse_v1_card(card_data: Dict[str, Any]) -> Dict[str, Any]:
 
     return v2_data
 
-def extract_character_id(choice: str) -> int:
-    """Extract the character ID from the dropdown selection string."""
-    return int(choice.split('(ID: ')[1].rstrip(')'))
+#
+# End of Character card import functions
+####################################################
 
-def load_character_wrapper(character_id: int, user_name: str) -> Tuple[Dict[str, Any], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
-    """Wrapper function to load character and image using the extracted ID."""
-    char_data, chat_history, img = load_character_and_image(character_id, user_name)
-    return char_data, chat_history, img
-
-def parse_character_book(book_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Parse the character book data from a V2 character card.
-
-    Args:
-        book_data (Dict[str, Any]): The raw character book data from the character card.
-
-    Returns:
-        Dict[str, Any]: The parsed and structured character book data.
-    """
-    parsed_book = {
-        'name': book_data.get('name', ''),
-        'description': book_data.get('description', ''),
-        'scan_depth': book_data.get('scan_depth'),
-        'token_budget': book_data.get('token_budget'),
-        'recursive_scanning': book_data.get('recursive_scanning', False),
-        'extensions': book_data.get('extensions', {}),
-        'entries': []
-    }
-
-    for entry in book_data.get('entries', []):
-        parsed_entry = {
-            'keys': entry['keys'],
-            'content': entry['content'],
-            'extensions': entry.get('extensions', {}),
-            'enabled': entry['enabled'],
-            'insertion_order': entry['insertion_order'],
-            'case_sensitive': entry.get('case_sensitive', False),
-            'name': entry.get('name', ''),
-            'priority': entry.get('priority'),
-            'id': entry.get('id'),
-            'comment': entry.get('comment', ''),
-            'selective': entry.get('selective', False),
-            'secondary_keys': entry.get('secondary_keys', []),
-            'constant': entry.get('constant', False),
-            'position': entry.get('position')
-        }
-        parsed_book['entries'].append(parsed_entry)
-
-    return parsed_book
-
-def load_character_and_image(character_id: int, user_name: str) -> Tuple[Optional[Dict[str, Any]], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
-    """
-    Load a character and its associated image based on the character ID.
-
-    Args:
-        character_id (int): The ID of the character to load.
-        user_name (str): The name of the user, used for placeholder replacement.
-
-    Returns:
-        Tuple[Optional[Dict[str, Any]], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
-        A tuple containing the character data, chat history, and character image (if available).
-    """
-    try:
-        char_data = get_character_card_by_id(character_id)
-        if not char_data:
-            logging.warning(f"No character data found for ID: {character_id}")
-            return None, [], None
-
-        # Replace placeholders in character data
-        for field in ['first_mes', 'mes_example', 'scenario', 'description', 'personality']:
-            if field in char_data:
-                char_data[field] = replace_placeholders(char_data[field], char_data['name'], user_name)
-
-        # Replace placeholders in first_mes
-        first_mes = char_data.get('first_mes', "Hello! I'm ready to chat.")
-        first_mes = replace_placeholders(first_mes, char_data['name'], user_name)
-
-        chat_history = [(None, first_mes)] if first_mes else []
-
-        img = None
-        if char_data.get('image'):
-            try:
-                image_data = base64.b64decode(char_data['image'])
-                img = Image.open(io.BytesIO(image_data)).convert("RGBA")
-            except Exception as e:
-                logging.error(f"Error processing image for character '{char_data['name']}': {e}")
-
-        return char_data, chat_history, img
-
-    except Exception as e:
-        logging.error(f"Error in load_character_and_image: {e}")
-        return None, [], None
-
-def load_chat_and_character(chat_id: int, user_name: str) -> Tuple[Optional[Dict[str, Any]], List[Tuple[str, str]], Optional[Image.Image]]:
-    """
-    Load a chat and its associated character, including the character image and process templates.
-
-    Args:
-        chat_id (int): The ID of the chat to load.
-        user_name (str): The name of the user.
-
-    Returns:
-        Tuple[Optional[Dict[str, Any]], List[Tuple[str, str]], Optional[Image.Image]]:
-        A tuple containing the character data, processed chat history, and character image (if available).
-    """
-    try:
-        # Load the chat
-        chat = get_character_chat_by_id(chat_id)
-        if not chat:
-            logging.warning(f"No chat found with ID: {chat_id}")
-            return None, [], None
-
-        # Load the associated character
-        character_id = chat['character_id']
-        char_data = get_character_card_by_id(character_id)
-        if not char_data:
-            logging.warning(f"No character found for chat ID: {chat_id}")
-            return None, chat['chat_history'], None
-
-        # Process the chat history
-        processed_history = process_chat_history(chat['chat_history'], char_data['name'], user_name)
-
-        # Load the character image
-        img = None
-        if char_data.get('image'):
-            try:
-                image_data = base64.b64decode(char_data['image'])
-                img = Image.open(io.BytesIO(image_data)).convert("RGBA")
-            except Exception as e:
-                logging.error(f"Error processing image for character '{char_data['name']}': {e}")
-
-        # Process character data templates
-        for field in ['first_mes', 'mes_example', 'scenario', 'description', 'personality']:
-            if field in char_data:
-                char_data[field] = replace_placeholders(char_data[field], char_data['name'], user_name)
-
-        return char_data, processed_history, img
-
-    except Exception as e:
-        logging.error(f"Error in load_chat_and_character: {e}")
-        return None, [], None
-
-
-def load_chat_history(file):
-    try:
-        content = file.read().decode('utf-8')
-        chat_data = json.loads(content)
-
-        # Extract history and character name from the loaded data
-        history = chat_data.get('history') or chat_data.get('messages')
-        character_name = chat_data.get('character') or chat_data.get('character_name')
-
-        if not history or not character_name:
-            logging.error("Chat history or character name missing in the imported file.")
-            return None, None
-
-        return history, character_name
-    except Exception as e:
-        logging.error(f"Error loading chat history: {e}")
-        return None, None
 
 ####################################################
 #
@@ -513,6 +244,8 @@ def create_character_card_interaction_tab():
                 chat_history = gr.Chatbot(label="Conversation", height=800)
                 user_input = gr.Textbox(label="Your message")
                 send_message_button = gr.Button("Send Message")
+                answer_for_me_button = gr.Button("Answer for Me")
+                continue_talking_button = gr.Button("Continue Talking")
                 regenerate_button = gr.Button("Regenerate Last Message")
                 clear_chat_button = gr.Button("Clear Chat")
                 save_snapshot_button = gr.Button("Save Chat Snapshot")
@@ -899,11 +632,200 @@ def create_character_card_interaction_tab():
             else:
                 return "Failed to update chat."
 
+        def continue_talking(
+                history, char_data, api_endpoint, api_key,
+                temperature, user_name_val, auto_save
+        ):
+            """
+            Causes the character to continue the conversation or think out loud.
+            """
+            if not char_data:
+                return history, "Please select a character first."
+
+            user_name_val = user_name_val or "User"
+            char_name = char_data.get('name', 'AI Assistant')
+
+            # Prepare the character's background information
+            char_background = f"""
+            Name: {char_name}
+            Description: {char_data.get('description', 'N/A')}
+            Personality: {char_data.get('personality', 'N/A')}
+            Scenario: {char_data.get('scenario', 'N/A')}
+            """
+
+            # Prepare the system prompt
+            system_message = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}
+            If the user does not respond, continue expressing your thoughts or continue the conversation by thinking out loud. If thinking out loud, prefix the message with "Thinking: "."""
+
+            # Prepare chat context
+            media_content = {
+                'id': char_name,
+                'title': char_name,
+                'content': char_background,
+                'description': char_data.get('description', ''),
+                'personality': char_data.get('personality', ''),
+                'scenario': char_data.get('scenario', '')
+            }
+            selected_parts = ['description', 'personality', 'scenario']
+
+            prompt = char_data.get('post_history_instructions', '')
+
+            # Simulate empty user input
+            user_message = ""
+
+            # Generate bot response
+            bot_message = chat(
+                user_message,
+                history,
+                media_content,
+                selected_parts,
+                api_endpoint,
+                api_key,
+                prompt,
+                temperature,
+                system_message
+            )
+
+            # Replace placeholders in bot message
+            bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+
+            # Update history
+            history.append((None, bot_message))
+
+            # Auto-save if enabled
+            save_status = ""
+            if auto_save:
+                character_id = char_data.get('id')
+                if character_id:
+                    conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    add_character_chat(character_id, conversation_name, history)
+                    save_status = "Chat auto-saved."
+                else:
+                    save_status = "Character ID not found; chat not saved."
+
+            return history, save_status
+
+        def answer_for_me(
+                history, char_data, api_endpoint, api_key,
+                temperature, user_name_val, auto_save
+        ):
+            """
+            Generates a likely user response and continues the conversation.
+            """
+            if not char_data:
+                return history, "Please select a character first."
+
+            user_name_val = user_name_val or "User"
+            char_name = char_data.get('name', 'AI Assistant')
+
+            # Prepare the character's background information
+            char_background = f"""
+            Name: {char_name}
+            Description: {char_data.get('description', 'N/A')}
+            Personality: {char_data.get('personality', 'N/A')}
+            Scenario: {char_data.get('scenario', 'N/A')}
+            """
+
+            # Prepare system message for generating user's response
+            system_message_user = f"""You are simulating the user {user_name_val}. Based on the conversation so far, generate a natural and appropriate response that {user_name_val} might say next. The response should fit the context and flow of the conversation. ONLY SPEAK FOR {user_name_val}."""
+
+            # Prepare chat context
+            media_content = {
+                'id': char_name,
+                'title': char_name,
+                'content': char_background,
+                'description': char_data.get('description', ''),
+                'personality': char_data.get('personality', ''),
+                'scenario': char_data.get('scenario', '')
+            }
+            selected_parts = ['description', 'personality', 'scenario']
+
+            # Generate user response
+            user_response = chat(
+                "",  # No new message
+                history,
+                media_content,
+                selected_parts,
+                api_endpoint,
+                api_key,
+                prompt="",
+                temperature=temperature,
+                system_message=system_message_user
+            )
+
+            # Append the generated user response to history
+            history.append((user_response, None))
+
+            # Now generate the character's response to this user response
+            # Prepare the system message for the character
+            system_message_bot = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}"""
+
+            bot_message = chat(
+                f"{user_name_val}: {user_response}",
+                history[:-1],
+                media_content,
+                selected_parts,
+                api_endpoint,
+                api_key,
+                prompt=char_data.get('post_history_instructions', ''),
+                temperature=temperature,
+                system_message=system_message_bot
+            )
+
+            # Replace placeholders in bot message
+            bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+
+            # Update history with bot's response
+            history[-1] = (user_response, bot_message)
+
+            # Auto-save if enabled
+            save_status = ""
+            if auto_save:
+                character_id = char_data.get('id')
+                if character_id:
+                    conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    add_character_chat(character_id, conversation_name, history)
+                    save_status = "Chat auto-saved."
+                else:
+                    save_status = "Character ID not found; chat not saved."
+
+            return history, save_status
+
+
         # Define States for conversation_id and media_content, which are required for saving chat history
         conversation_id = gr.State(str(uuid.uuid4()))
         media_content = gr.State({})
 
         # Button Callbacks
+
+        # Add the new button callbacks here
+        answer_for_me_button.click(
+            fn=answer_for_me,
+            inputs=[
+                chat_history,
+                character_data,
+                api_name_input,
+                api_key_input,
+                temperature_slider,
+                user_name_input,
+                auto_save_checkbox
+            ],
+            outputs=[chat_history, save_status]
+        )
+
+        continue_talking_button.click(
+            fn=continue_talking,
+            inputs=[
+                chat_history,
+                character_data,
+                api_name_input,
+                api_key_input,
+                temperature_slider,
+                user_name_input,
+                auto_save_checkbox
+            ],
+            outputs=[chat_history, save_status]
+        )
 
         import_card_button.click(
             fn=import_character_card,
@@ -1061,6 +983,7 @@ def create_character_chat_mgmt_tab():
                 gr.Markdown("## Select Character")
                 characters = get_character_cards()
                 character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
+                load_characters_button = gr.Button("Load Existing Characters")
                 select_character = gr.Dropdown(label="Select Character", choices=character_choices, interactive=True)
                 character_image = gr.Image(label="Character Image", type="pil", interactive=False)
 
@@ -1380,6 +1303,11 @@ def create_character_chat_mgmt_tab():
             outputs=[chat_content, chat_preview]
         )
 
+        load_characters_button.click(
+            fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
+            outputs=select_character
+        )
+
         return (
             character_files, import_characters_button, import_status,
             search_query, search_button, search_results, search_status,
@@ -1389,288 +1317,860 @@ def create_character_chat_mgmt_tab():
             chat_preview, result_message, character_image
         )
 
-# def create_character_chat_mgmt_tab():
-#     with gr.TabItem("Chat Management"):
-#         gr.Markdown("# Chat Management")
+def create_custom_character_card_tab():
+    with gr.TabItem("Create a New Character Card"):
+        gr.Markdown("# Create a New Character Card (v2)")
+
+        with gr.Row():
+            with gr.Column():
+                # Input fields for character card data
+                name_input = gr.Textbox(label="Name", placeholder="Enter character name")
+                description_input = gr.TextArea(label="Description", placeholder="Enter character description")
+                personality_input = gr.TextArea(label="Personality", placeholder="Enter character personality")
+                scenario_input = gr.TextArea(label="Scenario", placeholder="Enter character scenario")
+                first_mes_input = gr.TextArea(label="First Message", placeholder="Enter the first message")
+                mes_example_input = gr.TextArea(label="Example Messages", placeholder="Enter example messages")
+                creator_notes_input = gr.TextArea(label="Creator Notes", placeholder="Enter notes for the creator")
+                system_prompt_input = gr.TextArea(label="System Prompt", placeholder="Enter system prompt")
+                post_history_instructions_input = gr.TextArea(label="Post History Instructions", placeholder="Enter post history instructions")
+                alternate_greetings_input = gr.TextArea(
+                    label="Alternate Greetings (one per line)",
+                    placeholder="Enter alternate greetings, one per line"
+                )
+                tags_input = gr.Textbox(label="Tags", placeholder="Enter tags, separated by commas")
+                creator_input = gr.Textbox(label="Creator", placeholder="Enter creator name")
+                character_version_input = gr.Textbox(label="Character Version", placeholder="Enter character version")
+                extensions_input = gr.TextArea(
+                    label="Extensions (JSON)",
+                    placeholder="Enter extensions as JSON (optional)"
+                )
+                image_input = gr.Image(label="Character Image", type="pil")
+
+                # Buttons
+                save_button = gr.Button("Save Character Card")
+                download_button = gr.Button("Download Character Card")
+                download_image_button = gr.Button("Download Character Card as Image")
+
+                # Output status and outputs
+                save_status = gr.Markdown("")
+                download_output = gr.File(label="Download Character Card", interactive=False)
+                download_image_output = gr.File(label="Download Character Card as Image", interactive=False)
+
+        # Import PngInfo
+        from PIL.PngImagePlugin import PngInfo
+
+        # Callback Functions
+        def build_character_card(
+            name, description, personality, scenario, first_mes, mes_example,
+            creator_notes, system_prompt, post_history_instructions,
+            alternate_greetings_str, tags_str, creator, character_version,
+            extensions_str
+        ):
+            # Parse alternate_greetings from multiline string
+            alternate_greetings = [line.strip() for line in alternate_greetings_str.strip().split('\n') if line.strip()]
+
+            # Parse tags from comma-separated string
+            tags = [tag.strip() for tag in tags_str.strip().split(',') if tag.strip()]
+
+            # Parse extensions from JSON string
+            try:
+                extensions = json.loads(extensions_str) if extensions_str.strip() else {}
+            except json.JSONDecodeError as e:
+                extensions = {}
+                logging.error(f"Error parsing extensions JSON: {e}")
+
+            # Build the character card dictionary according to V2 spec
+            character_card = {
+                'spec': 'chara_card_v2',
+                'spec_version': '2.0',
+                'data': {
+                    'name': name,
+                    'description': description,
+                    'personality': personality,
+                    'scenario': scenario,
+                    'first_mes': first_mes,
+                    'mes_example': mes_example,
+                    'creator_notes': creator_notes,
+                    'system_prompt': system_prompt,
+                    'post_history_instructions': post_history_instructions,
+                    'alternate_greetings': alternate_greetings,
+                    'tags': tags,
+                    'creator': creator,
+                    'character_version': character_version,
+                    'extensions': extensions,
+                }
+            }
+            return character_card
+
+        def validate_character_card_data(character_card):
+            """
+            Validates the character card data using the extended validation logic.
+            """
+            is_valid, validation_messages = validate_v2_card(character_card)
+            return is_valid, validation_messages
+
+        def save_character_card(
+            name, description, personality, scenario, first_mes, mes_example,
+            creator_notes, system_prompt, post_history_instructions,
+            alternate_greetings_str, tags_str, creator, character_version,
+            extensions_str, image
+        ):
+            # Build the character card
+            character_card = build_character_card(
+                name, description, personality, scenario, first_mes, mes_example,
+                creator_notes, system_prompt, post_history_instructions,
+                alternate_greetings_str, tags_str, creator, character_version,
+                extensions_str
+            )
+
+            # Validate the character card
+            is_valid, validation_messages = validate_character_card_data(character_card)
+            if not is_valid:
+                # Return validation errors
+                validation_output = "Character card validation failed:\n"
+                validation_output += "\n".join(validation_messages)
+                return validation_output
+
+            # If image is provided, encode it to base64
+            if image:
+                img_byte_arr = io.BytesIO()
+                image.save(img_byte_arr, format='PNG')
+                character_card['data']['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+
+            # Save character card to database
+            character_id = add_character_card(character_card['data'])
+            if character_id:
+                return f"Character card '{name}' saved successfully."
+            else:
+                return f"Failed to save character card '{name}'. It may already exist."
+
+        def download_character_card(
+            name, description, personality, scenario, first_mes, mes_example,
+            creator_notes, system_prompt, post_history_instructions,
+            alternate_greetings_str, tags_str, creator, character_version,
+            extensions_str, image
+        ):
+            # Build the character card
+            character_card = build_character_card(
+                name, description, personality, scenario, first_mes, mes_example,
+                creator_notes, system_prompt, post_history_instructions,
+                alternate_greetings_str, tags_str, creator, character_version,
+                extensions_str
+            )
+
+            # Validate the character card
+            is_valid, validation_messages = validate_character_card_data(character_card)
+            if not is_valid:
+                # Return validation errors
+                validation_output = "Character card validation failed:\n"
+                validation_output += "\n".join(validation_messages)
+                return gr.update(value=None), validation_output  # Return None for the file output
+
+            # If image is provided, include it as base64
+            if image:
+                img_byte_arr = io.BytesIO()
+                image.save(img_byte_arr, format='PNG')
+                character_card['data']['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+
+            # Convert to JSON string
+            json_str = json.dumps(character_card, indent=2)
+
+            # Write the JSON to a temporary file
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json', encoding='utf-8') as temp_file:
+                temp_file.write(json_str)
+                temp_file_path = temp_file.name
+
+            # Return the file path and clear validation output
+            return temp_file_path, ""
+
+        def download_character_card_as_image(
+            name, description, personality, scenario, first_mes, mes_example,
+            creator_notes, system_prompt, post_history_instructions,
+            alternate_greetings_str, tags_str, creator, character_version,
+            extensions_str, image
+        ):
+            # Build the character card
+            character_card = build_character_card(
+                name, description, personality, scenario, first_mes, mes_example,
+                creator_notes, system_prompt, post_history_instructions,
+                alternate_greetings_str, tags_str, creator, character_version,
+                extensions_str
+            )
+
+            # Validate the character card
+            is_valid, validation_messages = validate_character_card_data(character_card)
+            if not is_valid:
+                # Return validation errors
+                validation_output = "Character card validation failed:\n"
+                validation_output += "\n".join(validation_messages)
+                return gr.update(value=None), validation_output  # Return None for the file output
+
+            # Convert the character card JSON to a string
+            json_str = json.dumps(character_card, indent=2)
+
+            # Encode the JSON string to base64
+            chara_content = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+
+            # Create PNGInfo object to hold metadata
+            png_info = PngInfo()
+            png_info.add_text('chara', chara_content)
+
+            # If image is provided, use it; otherwise, create a blank image
+            if image:
+                img = image.copy()
+            else:
+                # Create a default blank image
+                img = Image.new('RGB', (512, 512), color='white')
+
+            # Save the image to a temporary file with metadata
+            with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.png') as temp_file:
+                img.save(temp_file, format='PNG', pnginfo=png_info)
+                temp_file_path = temp_file.name
+
+            # Return the file path and clear validation output
+            return temp_file_path, ""
+
+        # Include the validate_v2_card function here (from previous code)
+
+        # Button Callbacks
+        save_button.click(
+            fn=save_character_card,
+            inputs=[
+                name_input, description_input, personality_input, scenario_input,
+                first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
+                post_history_instructions_input, alternate_greetings_input, tags_input,
+                creator_input, character_version_input, extensions_input, image_input
+            ],
+            outputs=[save_status]
+        )
+
+        download_button.click(
+            fn=download_character_card,
+            inputs=[
+                name_input, description_input, personality_input, scenario_input,
+                first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
+                post_history_instructions_input, alternate_greetings_input, tags_input,
+                creator_input, character_version_input, extensions_input, image_input
+            ],
+            outputs=[download_output, save_status]
+        )
+
+        download_image_button.click(
+            fn=download_character_card_as_image,
+            inputs=[
+                name_input, description_input, personality_input, scenario_input,
+                first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
+                post_history_instructions_input, alternate_greetings_input, tags_input,
+                creator_input, character_version_input, extensions_input, image_input
+            ],
+            outputs=[download_image_output, save_status]
+        )
+
+#v1
+def create_character_card_validation_tab():
+    with gr.TabItem("Validate Character Card"):
+        gr.Markdown("# Validate Character Card (v2)")
+        gr.Markdown("Upload a character card (PNG, WEBP, or JSON) to validate whether it conforms to the Character Card V2 specification.")
+
+        with gr.Row():
+            with gr.Column():
+                # File uploader
+                file_upload = gr.File(
+                    label="Upload Character Card (PNG, WEBP, JSON)",
+                    file_types=[".png", ".webp", ".json"]
+                )
+                # Validation button
+                validate_button = gr.Button("Validate Character Card")
+                # Output area for validation results
+                validation_output = gr.Markdown("")
+
+        # Callback Functions
+        def validate_character_card(file):
+            if file is None:
+                return "No file provided for validation."
+
+            try:
+                if file.name.lower().endswith(('.png', '.webp')):
+                    json_data = extract_json_from_image(file)
+                    if not json_data:
+                        return "Failed to extract JSON data from the image. The image might not contain embedded character card data."
+                elif file.name.lower().endswith('.json'):
+                    with open(file.name, 'r', encoding='utf-8') as f:
+                        json_data = f.read()
+                else:
+                    return "Unsupported file type. Please upload a PNG, WEBP, or JSON file."
+
+                # Parse the JSON content
+                try:
+                    card_data = json.loads(json_data)
+                except json.JSONDecodeError as e:
+                    return f"JSON decoding error: {e}"
+
+                # Validate the character card
+                is_valid, validation_messages = validate_v2_card(card_data)
+
+                # Prepare the validation output
+                if is_valid:
+                    return "Character card is valid according to the V2 specification."
+                else:
+                    # Concatenate all validation error messages
+                    validation_output = "Character card validation failed:\n"
+                    validation_output += "\n".join(validation_messages)
+                    return validation_output
+
+            except Exception as e:
+                logging.error(f"Error validating character card: {e}")
+                return f"An unexpected error occurred during validation: {e}"
+
+        def validate_v2_card(card_data):
+            """
+            Validate a character card according to the V2 specification.
+
+            Args:
+                card_data (dict): The parsed character card data.
+
+            Returns:
+                Tuple[bool, List[str]]: A tuple containing a boolean indicating validity and a list of validation messages.
+            """
+            validation_messages = []
+
+            # Check top-level fields
+            if 'spec' not in card_data:
+                validation_messages.append("Missing 'spec' field.")
+            elif card_data['spec'] != 'chara_card_v2':
+                validation_messages.append(f"Invalid 'spec' value: {card_data['spec']}. Expected 'chara_card_v2'.")
+
+            if 'spec_version' not in card_data:
+                validation_messages.append("Missing 'spec_version' field.")
+            else:
+                # Ensure 'spec_version' is '2.0' or higher
+                try:
+                    spec_version = float(card_data['spec_version'])
+                    if spec_version < 2.0:
+                        validation_messages.append(f"'spec_version' must be '2.0' or higher. Found '{card_data['spec_version']}'.")
+                except ValueError:
+                    validation_messages.append(f"Invalid 'spec_version' format: {card_data['spec_version']}. Must be a number as a string.")
+
+            if 'data' not in card_data:
+                validation_messages.append("Missing 'data' field.")
+                return False, validation_messages  # Cannot proceed without 'data' field
+
+            data = card_data['data']
+
+            # Required fields in 'data'
+            required_fields = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example']
+            for field in required_fields:
+                if field not in data:
+                    validation_messages.append(f"Missing required field in 'data': '{field}'.")
+                elif not isinstance(data[field], str):
+                    validation_messages.append(f"Field '{field}' must be a string.")
+                elif not data[field].strip():
+                    validation_messages.append(f"Field '{field}' cannot be empty.")
+
+            # Optional fields with expected types
+            optional_fields = {
+                'creator_notes': str,
+                'system_prompt': str,
+                'post_history_instructions': str,
+                'alternate_greetings': list,
+                'tags': list,
+                'creator': str,
+                'character_version': str,
+                'extensions': dict,
+                'character_book': dict  # If present, should be a dict
+            }
+
+            for field, expected_type in optional_fields.items():
+                if field in data:
+                    if not isinstance(data[field], expected_type):
+                        validation_messages.append(f"Field '{field}' must be of type '{expected_type.__name__}'.")
+                    elif field == 'extensions':
+                        # Validate that extensions keys are properly namespaced
+                        for key in data[field].keys():
+                            if '/' not in key and '_' not in key:
+                                validation_messages.append(f"Extension key '{key}' in 'extensions' should be namespaced to prevent conflicts.")
+
+            # If 'alternate_greetings' is present, check that it's a list of non-empty strings
+            if 'alternate_greetings' in data and isinstance(data['alternate_greetings'], list):
+                for idx, greeting in enumerate(data['alternate_greetings']):
+                    if not isinstance(greeting, str) or not greeting.strip():
+                        validation_messages.append(f"Element {idx} in 'alternate_greetings' must be a non-empty string.")
+
+            # If 'tags' is present, check that it's a list of non-empty strings
+            if 'tags' in data and isinstance(data['tags'], list):
+                for idx, tag in enumerate(data['tags']):
+                    if not isinstance(tag, str) or not tag.strip():
+                        validation_messages.append(f"Element {idx} in 'tags' must be a non-empty string.")
+
+            # Validate 'extensions' field
+            if 'extensions' in data and not isinstance(data['extensions'], dict):
+                validation_messages.append("Field 'extensions' must be a dictionary.")
+
+            # Validate 'character_book' if present
+            if 'character_book' in data:
+                is_valid_book, book_messages = validate_character_book(data['character_book'])
+                if not is_valid_book:
+                    validation_messages.extend(book_messages)
+
+            is_valid = len(validation_messages) == 0
+            return is_valid, validation_messages
+
+        # Button Callback
+        validate_button.click(
+            fn=validate_character_card,
+            inputs=[file_upload],
+            outputs=[validation_output]
+        )
+# v2-not-working-on-export-def create_character_card_validation_tab():
+#     with gr.TabItem("Validate and Edit Character Card"):
+#         gr.Markdown("# Validate and Edit Character Card (v2)")
+#         gr.Markdown("Upload a character card (PNG, WEBP, or JSON) to validate and modify it.")
 #
 #         with gr.Row():
-#             # Search Section
-#             with gr.Column(scale=1):
-#                 gr.Markdown("## Search Conversations or Characters")
-#                 search_query = gr.Textbox(label="Search Conversations or Characters", placeholder="Enter search keywords")
-#                 search_button = gr.Button("Search")
-#                 search_results = gr.Dropdown(label="Search Results", choices=[], visible=False)
-#                 search_status = gr.Markdown("", visible=True)
+#             with gr.Column():
+#                 # File uploader
+#                 file_upload = gr.File(
+#                     label="Upload Character Card (PNG, WEBP, JSON)",
+#                     file_types=[".png", ".webp", ".json"]
+#                 )
+#                 # Validation button
+#                 validate_button = gr.Button("Validate and Load Character Card")
+#                 # Output area for validation results
+#                 validation_output = gr.Markdown("")
 #
-#             # Select Character and Chat Section
-#             with gr.Column(scale=1):
-#                 gr.Markdown("## Select Character and Associated Chats")
-#                 characters = get_character_cards()
-#                 character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
-#                 select_character = gr.Dropdown(label="Select Character", choices=character_choices, interactive=True)
-#                 select_chat = gr.Dropdown(label="Select Chat", choices=[], visible=False, interactive=True)
-#                 load_chat_button = gr.Button("Load Selected Chat", visible=False)
-#
+#         # Input fields for character card data (duplicated from the create tab)
 #         with gr.Row():
-#             conversation_list = gr.Dropdown(label="Select Conversation or Character", choices=[])
-#             conversation_mapping = gr.State({})
+#             with gr.Column():
+#                 name_input = gr.Textbox(label="Name", placeholder="Enter character name")
+#                 description_input = gr.TextArea(label="Description", placeholder="Enter character description")
+#                 personality_input = gr.TextArea(label="Personality", placeholder="Enter character personality")
+#                 scenario_input = gr.TextArea(label="Scenario", placeholder="Enter character scenario")
+#                 first_mes_input = gr.TextArea(label="First Message", placeholder="Enter the first message")
+#                 mes_example_input = gr.TextArea(label="Example Messages", placeholder="Enter example messages")
+#                 creator_notes_input = gr.TextArea(label="Creator Notes", placeholder="Enter notes for the creator")
+#                 system_prompt_input = gr.TextArea(label="System Prompt", placeholder="Enter system prompt")
+#                 post_history_instructions_input = gr.TextArea(label="Post History Instructions", placeholder="Enter post history instructions")
+#                 alternate_greetings_input = gr.TextArea(
+#                     label="Alternate Greetings (one per line)",
+#                     placeholder="Enter alternate greetings, one per line"
+#                 )
+#                 tags_input = gr.Textbox(label="Tags", placeholder="Enter tags, separated by commas")
+#                 creator_input = gr.Textbox(label="Creator", placeholder="Enter creator name")
+#                 character_version_input = gr.Textbox(label="Character Version", placeholder="Enter character version")
+#                 extensions_input = gr.TextArea(
+#                     label="Extensions (JSON)",
+#                     placeholder="Enter extensions as JSON (optional)"
+#                 )
+#                 image_input = gr.Image(label="Character Image", type="pil")
 #
-#         with gr.Tabs():
-#             with gr.TabItem("Edit"):
-#                 chat_content = gr.TextArea(label="Chat/Character Content (JSON)", lines=20, max_lines=50)
-#                 save_button = gr.Button("Save Changes")
-#                 delete_button = gr.Button("Delete Conversation/Character", variant="stop")
+#                 # Buttons
+#                 save_button = gr.Button("Save Character Card")
+#                 download_button = gr.Button("Download Character Card")
+#                 download_image_button = gr.Button("Download Character Card as Image")
 #
-#             with gr.TabItem("Preview"):
-#                 chat_preview = gr.HTML(label="Chat/Character Preview")
-#         result_message = gr.Markdown("")
+#                 # Output status and outputs
+#                 save_status = gr.Markdown("")
+#                 download_output = gr.File(label="Download Character Card", interactive=False)
+#                 download_image_output = gr.File(label="Download Character Card as Image", interactive=False)
 #
 #         # Callback Functions
-#
-#         def search_conversations_or_characters(query):
-#             if not query.strip():
-#                 return gr.update(choices=[], visible=False), "Please enter a search query."
-#
+#         def extract_json_from_image(file):
 #             try:
-#                 # Search Chats using FTS5
-#                 chat_results, chat_message = search_character_chats(query)
-#
-#                 # Format chat results
-#                 formatted_chat_results = [
-#                     f"Chat: {chat['conversation_name']} (ID: {chat['id']})" for chat in chat_results
-#                 ]
-#
-#                 # Search Characters using substring match
-#                 characters = get_character_cards()
-#                 filtered_characters = [
-#                     char for char in characters
-#                     if query.lower() in char['name'].lower()
-#                 ]
-#                 formatted_character_results = [
-#                     f"Character: {char['name']} (ID: {char['id']})" for char in filtered_characters
-#                 ]
-#
-#                 # Combine results
-#                 all_choices = formatted_chat_results + formatted_character_results
-#                 mapping = {choice: conv['id'] for choice, conv in zip(formatted_chat_results, chat_results)}
-#                 mapping.update({choice: char['id'] for choice, char in zip(formatted_character_results, filtered_characters)})
-#
-#                 if all_choices:
-#                     return gr.update(choices=all_choices, visible=True), f"Found {len(all_choices)} result(s) matching '{query}'."
+#                 image = Image.open(file.name)
+#                 if "chara" in image.info:
+#                     json_data = image.info["chara"]
+#                     # Decode base64 if necessary
+#                     try:
+#                         json_data = base64.b64decode(json_data).decode('utf-8')
+#                     except Exception:
+#                         pass  # Assume it's already in plain text
+#                     return json_data
 #                 else:
-#                     return gr.update(choices=[], visible=False), f"No results found for '{query}'."
-#
+#                     return None
 #             except Exception as e:
-#                 logging.error(f"Error during search: {e}")
-#                 return gr.update(choices=[], visible=False), f"Error occurred during search: {e}"
+#                 logging.error(f"Error extracting JSON from image: {e}")
+#                 return None
 #
-#         def load_conversation_or_character(selected, conversation_mapping):
-#             if not selected or selected not in conversation_mapping:
-#                 return "", "<p>No selection made.</p>"
-#
-#             selected_id = conversation_mapping[selected]
-#             if selected.startswith("Chat:"):
-#                 chat = get_character_chat_by_id(selected_id)
-#                 if chat:
-#                     json_content = json.dumps({
-#                         "conversation_id": chat['id'],
-#                         "conversation_name": chat['conversation_name'],
-#                         "messages": chat['chat_history']
-#                     }, indent=2)
-#
-#                     html_preview = create_chat_preview_html(chat['chat_history'])
-#                     return json_content, html_preview
-#             elif selected.startswith("Character:"):
-#                 character = get_character_card_by_id(selected_id)
-#                 if character:
-#                     json_content = json.dumps({
-#                         "id": character['id'],
-#                         "name": character['name'],
-#                         "description": character['description'],
-#                         "personality": character['personality'],
-#                         "scenario": character['scenario'],
-#                         "post_history_instructions": character['post_history_instructions'],
-#                         "first_mes": character['first_mes'],
-#                         "mes_example": character['mes_example'],
-#                         "creator_notes": character.get('creator_notes', ''),
-#                         "system_prompt": character.get('system_prompt', ''),
-#                         "tags": character.get('tags', []),
-#                         "creator": character.get('creator', ''),
-#                         "character_version": character.get('character_version', ''),
-#                         "extensions": character.get('extensions', {})
-#                     }, indent=2)
-#
-#                     html_preview = create_character_preview_html(character)
-#                     return json_content, html_preview
-#
-#             return "", "<p>Unable to load the selected item.</p>"
-#
-#         def validate_content(selected, content):
-#             try:
-#                 data = json.loads(content)
-#                 if selected.startswith("Chat:"):
-#                     assert "conversation_id" in data and "messages" in data
-#                 elif selected.startswith("Character:"):
-#                     assert "id" in data and "name" in data
-#                 return True, data
-#             except Exception as e:
-#                 return False, f"Invalid JSON: {e}"
-#
-#         def save_conversation_or_character(selected, conversation_mapping, content):
-#             if not selected or selected not in conversation_mapping:
-#                 return "Please select an item to save.", "<p>No changes made.</p>"
-#
-#             is_valid, result = validate_content(selected, content)
-#             if not is_valid:
-#                 return f"Error: {result}", "<p>No changes made due to validation error.</p>"
-#
-#             selected_id = conversation_mapping[selected]
-#
-#             if selected.startswith("Chat:"):
-#                 success = update_character_chat(selected_id, result['messages'])
-#                 return ("Chat updated successfully." if success else "Failed to update chat."), ("<p>Chat updated.</p>" if success else "<p>Failed to update chat.</p>")
-#             elif selected.startswith("Character:"):
-#                 success = update_character_card(selected_id, result)
-#                 return ("Character updated successfully." if success else "Failed to update character."), ("<p>Character updated.</p>" if success else "<p>Failed to update character.</p>")
-#
-#             return "Unknown item type.", "<p>No changes made.</p>"
-#
-#         def delete_conversation_or_character(selected, conversation_mapping):
-#             if not selected or selected not in conversation_mapping:
-#                 return "Please select an item to delete.", "<p>No changes made.</p>", gr.update(choices=[])
-#
-#             selected_id = conversation_mapping[selected]
-#
-#             if selected.startswith("Chat:"):
-#                 success = delete_character_chat(selected_id)
-#             elif selected.startswith("Character:"):
-#                 success = delete_character_card(selected_id)
-#             else:
-#                 return "Unknown item type.", "<p>No changes made.</p>", gr.update()
-#
-#             if success:
-#                 updated_choices = [choice for choice in conversation_mapping.keys() if choice != selected]
-#                 conversation_mapping.value.pop(selected, None)
-#                 return f"{selected.split(':')[0]} deleted successfully.", f"<p>{selected.split(':')[0]} deleted.</p>", gr.update(choices=updated_choices)
-#             else:
-#                 return f"Failed to delete {selected.split(':')[0].lower()}.", f"<p>Failed to delete {selected.split(':')[0].lower()}.</p>", gr.update()
-#
-#         def populate_chats(character_selection):
-#             if not character_selection:
-#                 return gr.update(choices=[], visible=False), "Please select a character first."
-#
-#             try:
-#                 character_id = int(character_selection.split('(ID: ')[1].rstrip(')'))
-#                 chats = get_character_chats(character_id=character_id)
-#
-#                 if not chats:
-#                     return gr.update(choices=[], visible=False), f"No chats found for the selected character."
-#
-#                 formatted_chats = [f"{chat['conversation_name']} (ID: {chat['id']})" for chat in chats]
-#                 return gr.update(choices=formatted_chats, visible=True), f"Found {len(formatted_chats)} chat(s)."
-#             except Exception as e:
-#                 logging.error(f"Error populating chats: {e}")
-#                 return gr.update(choices=[], visible=False), f"Error occurred: {e}"
-#
-#         def load_chat_from_character(selected_chat):
-#             if not selected_chat:
-#                 return "", "<p>No chat selected.</p>"
-#
-#             try:
-#                 chat_id = int(selected_chat.split('(ID: ')[1].rstrip(')'))
-#                 chat = get_character_chat_by_id(chat_id)
-#                 if not chat:
-#                     return "", "<p>Selected chat not found.</p>"
-#
-#                 json_content = json.dumps({
-#                     "conversation_id": chat['id'],
-#                     "conversation_name": chat['conversation_name'],
-#                     "messages": chat['chat_history']
-#                 }, indent=2)
-#
-#                 html_preview = create_chat_preview_html(chat['chat_history'])
-#                 return json_content, html_preview
-#             except Exception as e:
-#                 logging.error(f"Error loading chat: {e}")
-#                 return "", f"<p>Error loading chat: {e}</p>"
-#
-#         def create_chat_preview_html(chat_history):
-#             html_preview = "<div style='max-height: 500px; overflow-y: auto;'>"
-#             for user_msg, bot_msg in chat_history:
-#                 user_style = "background-color: #e6f3ff; padding: 10px; border-radius: 5px; margin-bottom: 5px;"
-#                 bot_style = "background-color: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 10px;"
-#                 html_preview += f"<div style='{user_style}'><strong>User:</strong> {user_msg}</div>"
-#                 html_preview += f"<div style='{bot_style}'><strong>Bot:</strong> {bot_msg}</div>"
-#             html_preview += "</div>"
-#             return html_preview
-#
-#         def create_character_preview_html(character):
-#             return f"""
-#             <div>
-#                 <h2>{character['name']}</h2>
-#                 <p><strong>Description:</strong> {character['description']}</p>
-#                 <p><strong>Personality:</strong> {character['personality']}</p>
-#                 <p><strong>Scenario:</strong> {character['scenario']}</p>
-#                 <p><strong>First Message:</strong> {character['first_mes']}</p>
-#                 <p><strong>Example Message:</strong> {character['mes_example']}</p>
-#                 <p><strong>Post History Instructions:</strong> {character['post_history_instructions']}</p>
-#                 <p><strong>System Prompt:</strong> {character.get('system_prompt', 'N/A')}</p>
-#                 <p><strong>Tags:</strong> {', '.join(character.get('tags', []))}</p>
-#                 <p><strong>Creator:</strong> {character.get('creator', 'N/A')}</p>
-#                 <p><strong>Version:</strong> {character.get('character_version', 'N/A')}</p>
-#             </div>
+#         def validate_v2_card(card_data):
 #             """
+#             Validate a character card according to the V2 specification.
 #
-#         # Register Callback Functions with Gradio Components
-#         search_button.click(
-#             fn=search_conversations_or_characters,
-#             inputs=[search_query],
-#             outputs=[search_results, search_status]
+#             Args:
+#                 card_data (dict): The parsed character card data.
+#
+#             Returns:
+#                 Tuple[bool, List[str]]: A tuple containing a boolean indicating validity and a list of validation messages.
+#             """
+#             validation_messages = []
+#
+#             # Check top-level fields
+#             if 'spec' not in card_data:
+#                 validation_messages.append("Missing 'spec' field.")
+#             elif card_data['spec'] != 'chara_card_v2':
+#                 validation_messages.append(f"Invalid 'spec' value: {card_data['spec']}. Expected 'chara_card_v2'.")
+#
+#             if 'spec_version' not in card_data:
+#                 validation_messages.append("Missing 'spec_version' field.")
+#             else:
+#                 # Ensure 'spec_version' is '2.0' or higher
+#                 try:
+#                     spec_version = float(card_data['spec_version'])
+#                     if spec_version < 2.0:
+#                         validation_messages.append(
+#                             f"'spec_version' must be '2.0' or higher. Found '{card_data['spec_version']}'.")
+#                 except ValueError:
+#                     validation_messages.append(
+#                         f"Invalid 'spec_version' format: {card_data['spec_version']}. Must be a number as a string.")
+#
+#             if 'data' not in card_data:
+#                 validation_messages.append("Missing 'data' field.")
+#                 return False, validation_messages  # Cannot proceed without 'data' field
+#
+#             data = card_data['data']
+#
+#             # Required fields in 'data'
+#             required_fields = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example']
+#             for field in required_fields:
+#                 if field not in data:
+#                     validation_messages.append(f"Missing required field in 'data': '{field}'.")
+#                 elif not isinstance(data[field], str):
+#                     validation_messages.append(f"Field '{field}' must be a string.")
+#                 elif not data[field].strip():
+#                     validation_messages.append(f"Field '{field}' cannot be empty.")
+#
+#             # Optional fields with expected types
+#             optional_fields = {
+#                 'creator_notes': str,
+#                 'system_prompt': str,
+#                 'post_history_instructions': str,
+#                 'alternate_greetings': list,
+#                 'tags': list,
+#                 'creator': str,
+#                 'character_version': str,
+#                 'extensions': dict,
+#                 'character_book': dict  # If present, should be a dict
+#             }
+#
+#             for field, expected_type in optional_fields.items():
+#                 if field in data:
+#                     if not isinstance(data[field], expected_type):
+#                         validation_messages.append(f"Field '{field}' must be of type '{expected_type.__name__}'.")
+#                     elif field == 'extensions':
+#                         # Validate that extensions keys are properly namespaced
+#                         for key in data[field].keys():
+#                             if '/' not in key and '_' not in key:
+#                                 validation_messages.append(
+#                                     f"Extension key '{key}' in 'extensions' should be namespaced to prevent conflicts.")
+#
+#             # If 'alternate_greetings' is present, check that it's a list of non-empty strings
+#             if 'alternate_greetings' in data and isinstance(data['alternate_greetings'], list):
+#                 for idx, greeting in enumerate(data['alternate_greetings']):
+#                     if not isinstance(greeting, str) or not greeting.strip():
+#                         validation_messages.append(
+#                             f"Element {idx} in 'alternate_greetings' must be a non-empty string.")
+#
+#             # If 'tags' is present, check that it's a list of non-empty strings
+#             if 'tags' in data and isinstance(data['tags'], list):
+#                 for idx, tag in enumerate(data['tags']):
+#                     if not isinstance(tag, str) or not tag.strip():
+#                         validation_messages.append(f"Element {idx} in 'tags' must be a non-empty string.")
+#
+#             # Validate 'extensions' field
+#             if 'extensions' in data and not isinstance(data['extensions'], dict):
+#                 validation_messages.append("Field 'extensions' must be a dictionary.")
+#
+#             # Validate 'character_book' if present
+#             # (Assuming you have a validate_character_book function)
+#             # if 'character_book' in data:
+#             #     is_valid_book, book_messages = validate_character_book(data['character_book'])
+#             #     if not is_valid_book:
+#             #         validation_messages.extend(book_messages)
+#
+#             is_valid = len(validation_messages) == 0
+#             return is_valid, validation_messages
+#
+#         # Include the save_character_card, download_character_card, and download_character_card_as_image functions
+#         def save_character_card(
+#                 name, description, personality, scenario, first_mes, mes_example,
+#                 creator_notes, system_prompt, post_history_instructions,
+#                 alternate_greetings_str, tags_str, creator, character_version,
+#                 extensions_str, image
+#         ):
+#             # Build the character card
+#             character_card = build_character_card(
+#                 name, description, personality, scenario, first_mes, mes_example,
+#                 creator_notes, system_prompt, post_history_instructions,
+#                 alternate_greetings_str, tags_str, creator, character_version,
+#                 extensions_str
+#             )
+#
+#             # Validate the character card
+#             is_valid, validation_messages = validate_v2_card(character_card)
+#             if not is_valid:
+#                 # Return validation errors
+#                 validation_output = "Character card validation failed:\n"
+#                 validation_output += "\n".join(validation_messages)
+#                 return validation_output
+#
+#             # If image is provided, encode it to base64
+#             if image:
+#                 img_byte_arr = io.BytesIO()
+#                 image.save(img_byte_arr, format='PNG')
+#                 character_card['data']['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+#
+#             # Save character card to database
+#             character_id = add_character_card(character_card['data'])
+#             if character_id:
+#                 return f"Character card '{name}' saved successfully."
+#             else:
+#                 return f"Failed to save character card '{name}'. It may already exist."
+#
+#         def download_character_card(
+#                 name, description, personality, scenario, first_mes, mes_example,
+#                 creator_notes, system_prompt, post_history_instructions,
+#                 alternate_greetings_str, tags_str, creator, character_version,
+#                 extensions_str, image
+#         ):
+#             # Build the character card
+#             character_card = build_character_card(
+#                 name, description, personality, scenario, first_mes, mes_example,
+#                 creator_notes, system_prompt, post_history_instructions,
+#                 alternate_greetings_str, tags_str, creator, character_version,
+#                 extensions_str
+#             )
+#
+#             # Validate the character card
+#             is_valid, validation_messages = validate_v2_card(character_card)
+#             if not is_valid:
+#                 # Return validation errors
+#                 validation_output = "Character card validation failed:\n"
+#                 validation_output += "\n".join(validation_messages)
+#                 return gr.update(value=None), validation_output  # Return None for the file output
+#
+#             # If image is provided, include it as base64
+#             if image:
+#                 img_byte_arr = io.BytesIO()
+#                 image.save(img_byte_arr, format='PNG')
+#                 character_card['data']['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+#
+#             # Convert to JSON string
+#             json_str = json.dumps(character_card, indent=2)
+#
+#             # Write the JSON to a temporary file
+#             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json', encoding='utf-8') as temp_file:
+#                 temp_file.write(json_str)
+#                 temp_file_path = temp_file.name
+#
+#             # Return the file path and clear validation output
+#             return temp_file_path, ""
+#
+#         def download_character_card_as_image(
+#                 name, description, personality, scenario, first_mes, mes_example,
+#                 creator_notes, system_prompt, post_history_instructions,
+#                 alternate_greetings_str, tags_str, creator, character_version,
+#                 extensions_str, image
+#         ):
+#             # Build the character card
+#             character_card = build_character_card(
+#                 name, description, personality, scenario, first_mes, mes_example,
+#                 creator_notes, system_prompt, post_history_instructions,
+#                 alternate_greetings_str, tags_str, creator, character_version,
+#                 extensions_str
+#             )
+#
+#             # Validate the character card
+#             is_valid, validation_messages = validate_v2_card(character_card)
+#             if not is_valid:
+#                 # Return validation errors
+#                 validation_output = "Character card validation failed:\n"
+#                 validation_output += "\n".join(validation_messages)
+#                 return gr.update(value=None), validation_output  # Return None for the file output
+#
+#             # Convert the character card JSON to a string
+#             json_str = json.dumps(character_card, indent=2)
+#
+#             # Encode the JSON string to base64
+#             chara_content = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+#
+#             # Create PNGInfo object to hold metadata
+#             png_info = PngInfo()
+#             png_info.add_text('chara', chara_content)
+#
+#             # If image is provided, use it; otherwise, create a blank image
+#             if image:
+#                 img = image.copy()
+#             else:
+#                 # Create a default blank image
+#                 img = Image.new('RGB', (512, 512), color='white')
+#
+#             # Save the image to a temporary file with metadata
+#             with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.png') as temp_file:
+#                 img.save(temp_file, format='PNG', pnginfo=png_info)
+#                 temp_file_path = temp_file.name
+#
+#             # Return the file path and clear validation output
+#             return temp_file_path, ""
+#
+#         def build_character_card(
+#                 name, description, personality, scenario, first_mes, mes_example,
+#                 creator_notes, system_prompt, post_history_instructions,
+#                 alternate_greetings_str, tags_str, creator, character_version,
+#                 extensions_str
+#         ):
+#             # Parse alternate_greetings from multiline string
+#             alternate_greetings = [line.strip() for line in alternate_greetings_str.strip().split('\n') if line.strip()]
+#
+#             # Parse tags from comma-separated string
+#             tags = [tag.strip() for tag in tags_str.strip().split(',') if tag.strip()]
+#
+#             # Parse extensions from JSON string
+#             try:
+#                 extensions = json.loads(extensions_str) if extensions_str.strip() else {}
+#             except json.JSONDecodeError as e:
+#                 extensions = {}
+#                 logging.error(f"Error parsing extensions JSON: {e}")
+#
+#             # Build the character card dictionary according to V2 spec
+#             character_card = {
+#                 'spec': 'chara_card_v2',
+#                 'spec_version': '2.0',
+#                 'data': {
+#                     'name': name,
+#                     'description': description,
+#                     'personality': personality,
+#                     'scenario': scenario,
+#                     'first_mes': first_mes,
+#                     'mes_example': mes_example,
+#                     'creator_notes': creator_notes,
+#                     'system_prompt': system_prompt,
+#                     'post_history_instructions': post_history_instructions,
+#                     'alternate_greetings': alternate_greetings,
+#                     'tags': tags,
+#                     'creator': creator,
+#                     'character_version': character_version,
+#                     'extensions': extensions,
+#                 }
+#             }
+#             return character_card
+#
+#         def validate_and_load_character_card(file):
+#             if file is None:
+#                 return ["No file provided for validation."] + [gr.update() for _ in range(15)]
+#
+#             try:
+#                 if file.name.lower().endswith(('.png', '.webp')):
+#                     json_data = extract_json_from_image(file)
+#                     if not json_data:
+#                         return ["Failed to extract JSON data from the image."] + [gr.update() for _ in range(15)]
+#                 elif file.name.lower().endswith('.json'):
+#                     with open(file.name, 'r', encoding='utf-8') as f:
+#                         json_data = f.read()
+#                 else:
+#                     return ["Unsupported file type."] + [gr.update() for _ in range(15)]
+#
+#                 # Parse the JSON content
+#                 try:
+#                     card_data = json.loads(json_data)
+#                 except json.JSONDecodeError as e:
+#                     return [f"JSON decoding error: {e}"] + [gr.update() for _ in range(15)]
+#
+#                 # Validate the character card
+#                 is_valid, validation_messages = validate_v2_card(card_data)
+#
+#                 # Prepare the validation output
+#                 if is_valid:
+#                     validation_output_msg = "Character card is valid according to the V2 specification."
+#                 else:
+#                     validation_output_msg = "Character card validation failed:\n" + "\n".join(validation_messages)
+#
+#                 # Extract data to populate input fields
+#                 data = card_data.get('data', {})
+#
+#                 # Handle image data
+#                 if 'image' in data:
+#                     # Decode base64 image
+#                     image_data = base64.b64decode(data['image'])
+#                     image = Image.open(io.BytesIO(image_data))
+#                 else:
+#                     image = None
+#
+#                 # Prepare values for input fields
+#                 alternate_greetings_str = "\n".join(data.get('alternate_greetings', []))
+#                 tags_str = ", ".join(data.get('tags', []))
+#                 extensions_str = json.dumps(data.get('extensions', {}), indent=2) if data.get('extensions', {}) else ""
+#
+#                 outputs = [
+#                     validation_output_msg,
+#                     data.get('name', ''),
+#                     data.get('description', ''),
+#                     data.get('personality', ''),
+#                     data.get('scenario', ''),
+#                     data.get('first_mes', ''),
+#                     data.get('mes_example', ''),
+#                     data.get('creator_notes', ''),
+#                     data.get('system_prompt', ''),
+#                     data.get('post_history_instructions', ''),
+#                     alternate_greetings_str,
+#                     tags_str,
+#                     data.get('creator', ''),
+#                     data.get('character_version', ''),
+#                     extensions_str,
+#                     image
+#                 ]
+#
+#                 return outputs
+#
+#             except Exception as e:
+#                 logging.error(f"Error validating character card: {e}")
+#                 return [f"An unexpected error occurred: {e}"] + [gr.update() for _ in range(15)]
+#
+#         # Button Callback for validation
+#         validate_button.click(
+#             fn=validate_and_load_character_card,
+#             inputs=[file_upload],
+#             outputs=[
+#                 validation_output,
+#                 name_input, description_input, personality_input, scenario_input,
+#                 first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
+#                 post_history_instructions_input, alternate_greetings_input, tags_input,
+#                 creator_input, character_version_input, extensions_input, image_input
+#             ]
 #         )
 #
-#         search_results.change(
-#             fn=load_conversation_or_character,
-#             inputs=[search_results, conversation_mapping],
-#             outputs=[chat_content, chat_preview]
-#         )
-#
+#         # Button Callbacks for save, download, etc.
 #         save_button.click(
-#             fn=save_conversation_or_character,
-#             inputs=[conversation_list, conversation_mapping, chat_content],
-#             outputs=[result_message, chat_preview]
+#             fn=save_character_card,
+#             inputs=[
+#                 name_input, description_input, personality_input, scenario_input,
+#                 first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
+#                 post_history_instructions_input, alternate_greetings_input, tags_input,
+#                 creator_input, character_version_input, extensions_input, image_input
+#             ],
+#             outputs=[save_status]
 #         )
 #
-#         delete_button.click(
-#             fn=delete_conversation_or_character,
-#             inputs=[conversation_list, conversation_mapping],
-#             outputs=[result_message, chat_preview, conversation_list]
+#         download_button.click(
+#             fn=download_character_card,
+#             inputs=[
+#                 name_input, description_input, personality_input, scenario_input,
+#                 first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
+#                 post_history_instructions_input, alternate_greetings_input, tags_input,
+#                 creator_input, character_version_input, extensions_input, image_input
+#             ],
+#             outputs=[download_output, save_status]
 #         )
 #
-#         select_character.change(
-#             fn=populate_chats,
-#             inputs=[select_character],
-#             outputs=[select_chat, search_status]
+#         download_image_button.click(
+#             fn=download_character_card_as_image,
+#             inputs=[
+#                 name_input, description_input, personality_input, scenario_input,
+#                 first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
+#                 post_history_instructions_input, alternate_greetings_input, tags_input,
+#                 creator_input, character_version_input, extensions_input, image_input
+#             ],
+#             outputs=[download_image_output, save_status]
 #         )
-#
-#         select_chat.change(
-#             fn=load_chat_from_character,
-#             inputs=[select_chat],
-#             outputs=[chat_content, chat_preview]
-#         )
-#
-#         load_chat_button.click(
-#             fn=load_chat_from_character,
-#             inputs=[select_chat],
-#             outputs=[chat_content, chat_preview]
-#         )
-#
-#         return (
-#             search_query, search_button, search_results, search_status,
-#             select_character, select_chat, load_chat_button,
-#             conversation_list, conversation_mapping,
-#             chat_content, save_button, delete_button,
-#             chat_preview, result_message
-#         )
+
 
 #
 # End of Character_Chat_tab.py
