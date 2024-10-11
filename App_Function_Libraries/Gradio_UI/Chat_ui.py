@@ -167,6 +167,39 @@ def delete_message_from_chat(message_id, history):
     return updated_history
 
 
+def regenerate_last_message(history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature, system_prompt):
+    if not history:
+        return history, "No messages to regenerate."
+
+    last_entry = history[-1]
+    last_user_message, last_bot_message = last_entry
+
+    if last_bot_message is None:
+        return history, "The last message is not from the bot."
+
+    new_history = history[:-1]
+
+    if not last_user_message:
+        return new_history, "No user message to regenerate the bot response."
+
+    full_message = last_user_message
+
+    bot_message = chat(
+        full_message,
+        new_history,
+        media_content,
+        selected_parts,
+        api_endpoint,
+        api_key,
+        custom_prompt,
+        temperature,
+        system_prompt
+    )
+
+    new_history.append((last_user_message, bot_message))
+
+    return new_history, "Last message regenerated successfully."
+
 def create_chat_interface():
     custom_css = """
     .chatbot-container .message-wrap .message {
@@ -231,6 +264,7 @@ def create_chat_interface():
                 chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
+                regenerate_button = gr.Button("Regenerate Last Message")
                 clear_chat_button = gr.Button("Clear Chat")
 
                 edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
@@ -367,6 +401,12 @@ def create_chat_interface():
             outputs=[conversation_id, gr.Textbox(label="Save Status")]
         )
 
+        regenerate_button.click(
+            regenerate_last_message,
+            inputs=[chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, temperature, system_prompt_input],
+            outputs=[chatbot, save_status]
+        )
+
         chatbot.select(show_edit_message, None, [edit_message_text, edit_message_id, update_message_button])
         chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
@@ -430,6 +470,7 @@ def create_chat_interface_stacked():
         with gr.Row():
             with gr.Column():
                 submit = gr.Button("Submit")
+                regenerate_button = gr.Button("Regenerate Last Message")
                 clear_chat_button = gr.Button("Clear Chat")
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)", visible=True)
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
@@ -521,6 +562,12 @@ def create_chat_interface_stacked():
             outputs=[conversation_id, gr.Textbox(label="Save Status")]
         )
 
+        regenerate_button.click(
+            regenerate_last_message,
+            inputs=[chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, temp, system_prompt],
+            outputs=[chatbot, gr.Textbox(label="Regenerate Status")]
+        )
+
 
 # FIXME - System prompts
 def create_chat_interface_multi_api():
@@ -578,13 +625,8 @@ def create_chat_interface_multi_api():
         with gr.Row():
             msg = gr.Textbox(label="Enter your message", scale=4)
             submit = gr.Button("Submit", scale=1)
-            # FIXME - clear chat
-        #     clear_chat_button = gr.Button("Clear Chat")
-        #
-        # clear_chat_button.click(
-        #     clear_chat,
-        #     outputs=[chatbot]
-        # )
+            regenerate_button = gr.Button(f"Regenerate Last Message {i + 1}")
+            clear_chat_button = gr.Button("Clear All Chats")
 
         # State variables
         chat_history = [gr.State([]) for _ in range(3)]
@@ -601,6 +643,14 @@ def create_chat_interface_multi_api():
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
 
+
+        def clear_all_chats():
+            return [[]] * 3 + [[]] * 3
+
+        clear_chat_button.click(
+            clear_all_chats,
+            outputs=chatbots + chat_history
+        )
         def chat_wrapper_multi(message, custom_prompt, system_prompt, *args):
             chat_histories = args[:3]
             chatbots = args[3:6]
@@ -654,6 +704,7 @@ def create_chat_interface_multi_api():
                 inputs=[use_content, use_summary, use_prompt],
                 outputs=[selected_parts]
             )
+
 
 
 def create_chat_interface_four():
