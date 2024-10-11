@@ -581,7 +581,7 @@ def create_chat_interface_multi_api():
     }
     """
     with gr.TabItem("One Prompt - Multiple APIs"):
-        gr.Markdown("# One Prompt but Multiple API Chat Interface")
+        gr.Markdown("# One Prompt but Multiple APIs Chat Interface")
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -598,34 +598,35 @@ def create_chat_interface_multi_api():
             with gr.Column():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
                 system_prompt = gr.Textbox(label="System Prompt", value="You are a helpful AI assistant.", lines=5)
-                user_prompt = gr.Textbox(label="Modify Prompt", lines=5, value=".")
+                user_prompt = gr.Textbox(label="Modify Prompt (Prefixed to your message every time)", lines=5, value="", visible=True)
 
         with gr.Row():
             chatbots = []
             api_endpoints = []
             api_keys = []
             temperatures = []
+            regenerate_buttons = []
             for i in range(3):
                 with gr.Column():
                     gr.Markdown(f"### Chat Window {i + 1}")
                     api_endpoint = gr.Dropdown(label=f"API Endpoint {i + 1}",
                                                choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
                                                         "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold",
-                                                        "Ooba",
-                                                        "Tabbyapi", "VLLM", "ollama", "HuggingFace"])
+                                                        "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"])
                     api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
                     temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.05,
                                             value=0.7)
                     chatbot = gr.Chatbot(height=800, elem_classes="chat-window")
+                    regenerate_button = gr.Button(f"Regenerate Last Message {i + 1}")
                     chatbots.append(chatbot)
                     api_endpoints.append(api_endpoint)
                     api_keys.append(api_key)
                     temperatures.append(temperature)
+                    regenerate_buttons.append(regenerate_button)
 
         with gr.Row():
             msg = gr.Textbox(label="Enter your message", scale=4)
             submit = gr.Button("Submit", scale=1)
-            regenerate_button = gr.Button(f"Regenerate Last Message {i + 1}")
             clear_chat_button = gr.Button("Clear All Chats")
 
         # State variables
@@ -679,6 +680,46 @@ def create_chat_interface_multi_api():
                 new_chatbots.append(new_chatbot)
 
             return [gr.update(value="")] + new_chatbots + new_chat_histories
+
+
+        def regenerate_last_message(chat_history, chatbot, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature, system_prompt):
+            if not chat_history:
+                return chatbot, chat_history, "No messages to regenerate."
+
+            last_entry = chat_history[-1]
+            last_user_message, last_bot_message = last_entry
+
+            if last_bot_message is None:
+                return chatbot, chat_history, "The last message is not from the bot."
+
+            new_history = chat_history[:-1]
+
+            if not last_user_message:
+                return chatbot[:-1], new_history, "No user message to regenerate the bot response."
+
+            bot_message = chat(
+                last_user_message,
+                new_history,
+                media_content,
+                selected_parts,
+                api_endpoint,
+                api_key,
+                custom_prompt,
+                temperature,
+                system_prompt
+            )
+
+            new_history.append((last_user_message, bot_message))
+            new_chatbot = chatbot[:-1] + [(last_user_message, bot_message)]
+
+            return new_chatbot, new_history, "Last message regenerated successfully."
+
+        for i in range(3):
+            regenerate_buttons[i].click(
+                regenerate_last_message,
+                inputs=[chat_history[i], chatbots[i], media_content, selected_parts, api_endpoints[i], api_keys[i], user_prompt, temperatures[i], system_prompt],
+                outputs=[chatbots[i], chat_history[i], gr.Textbox(label=f"Regenerate Status {i + 1}")]
+            )
 
         # In the create_chat_interface_multi_api function:
         submit.click(
