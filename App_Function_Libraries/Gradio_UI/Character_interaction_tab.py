@@ -140,6 +140,7 @@ def load_chat_history(file):
 #
 # Multi-Character Chat Interface
 
+# FIXME - refactor and move these functions to the Character_Chat library so that it uses the same functions
 def character_interaction_setup():
     characters = load_characters()
     return characters, [], None, None
