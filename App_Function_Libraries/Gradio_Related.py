@@ -18,7 +18,8 @@ from App_Function_Libraries.Gradio_UI.Arxiv_tab import create_arxiv_tab
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
 from App_Function_Libraries.Gradio_UI.Character_Chat_tab import create_character_card_interaction_tab, \
-    create_character_card_interaction_tab, create_character_chat_mgmt_tab
+    create_character_card_interaction_tab, create_character_chat_mgmt_tab, create_custom_character_card_tab, \
+    create_character_card_validation_tab
 from App_Function_Libraries.Gradio_UI.Character_interaction_tab import create_narrator_controlled_conversation_tab, \
     create_multiple_character_chat_tab
 from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
@@ -273,9 +274,11 @@ def launch_ui(share_public=None, server_mode=False):
                 create_search_tab()
                 create_search_summaries_tab()
 
+
             with gr.TabItem("RAG Search"):
                 create_rag_tab()
                 create_rag_qa_chat_tab()
+
 
             with gr.TabItem("Chat with an LLM"):
                 create_chat_interface()
@@ -293,6 +296,9 @@ def launch_ui(share_public=None, server_mode=False):
                 with gr.Tabs():
                     create_character_card_interaction_tab()
                     create_character_chat_mgmt_tab()
+                    create_custom_character_card_tab()
+                    create_character_card_validation_tab()
+
 
             with gr.TabItem("View DB Items"):
                 # This one works
@@ -300,6 +306,7 @@ def launch_ui(share_public=None, server_mode=False):
                 # This one is WIP
                 create_viewing_tab()
                 create_prompt_view_tab()
+
 
             with gr.TabItem("Prompts"):
                 create_prompt_view_tab()
@@ -315,6 +322,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_media_edit_and_clone_tab()
                 # FIXME
                 #create_compare_transcripts_tab()
+
 
             with gr.TabItem("Embeddings Management"):
                 create_embeddings_tab()
