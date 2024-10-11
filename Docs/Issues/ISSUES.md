@@ -6,3 +6,4 @@
 Setting up Single-File executable:
     pyinstaller  --add-data "F:\Working\*.dll;." "./summarize.py" -n "tldw-windows"    
     https://github.com/Purfview/whisper-standalone-win/releases
+    https://stackoverflow.com/questions/47850064/add-configuration-file-outside-pyinstaller-onefile-exe-file-into-dist-director
