@@ -779,16 +779,6 @@ def create_chat_interface_four():
         chat_interfaces = []
 
         def create_single_chat_interface(index, user_prompt_component):
-            """
-            Creates a single chat interface with its own set of components and event bindings.
-
-            Parameters:
-                index (int): The index of the chat interface.
-                user_prompt_component (gr.Textbox): The user prompt textbox component.
-
-            Returns:
-                dict: A dictionary containing all components of the chat interface.
-            """
             with gr.Column():
                 gr.Markdown(f"### Chat Window {index + 1}")
                 api_endpoint = gr.Dropdown(
@@ -813,6 +803,7 @@ def create_chat_interface_four():
                 chatbot = gr.Chatbot(height=400, elem_classes="chat-window")
                 msg = gr.Textbox(label=f"Enter your message for Chat {index + 1}")
                 submit = gr.Button(f"Submit to Chat {index + 1}")
+                regenerate_button = gr.Button(f"Regenerate Last Message {index + 1}")
                 clear_chat_button = gr.Button(f"Clear Chat {index + 1}")
 
                 # State to maintain chat history
@@ -826,13 +817,10 @@ def create_chat_interface_four():
                     'chatbot': chatbot,
                     'msg': msg,
                     'submit': submit,
+                    'regenerate_button': regenerate_button,
                     'clear_chat_button': clear_chat_button,
                     'chat_history': chat_history
                 })
-
-        # # Create four chat interfaces
-        # for i in range(4):
-        #     create_single_chat_interface(i, user_prompt)
 
         # Create four chat interfaces arranged in a 2x2 grid
         with gr.Row():
@@ -840,7 +828,6 @@ def create_chat_interface_four():
                 with gr.Column():
                     for j in range(2):
                         create_single_chat_interface(i * 2 + j, user_prompt)
-
 
         # Update user_prompt based on preset_prompt selection
         preset_prompt.change(
@@ -852,7 +839,6 @@ def create_chat_interface_four():
         def chat_wrapper_single(message, chat_history, api_endpoint, api_key, temperature, user_prompt):
             logging.debug(f"Chat Wrapper Single - Message: {message}, Chat History: {chat_history}")
 
-            # Call chat_wrapper with the new signature and the additional parameters
             new_msg, new_history, _ = chat_wrapper(
                 message,
                 chat_history,
@@ -865,13 +851,12 @@ def create_chat_interface_four():
                 False,  # save_conversation
                 temperature,  # temperature
                 system_prompt="",  # system_prompt
-                max_tokens=None,  # Additional parameters with default None values
+                max_tokens=None,
                 top_p=None,
                 frequency_penalty=None,
                 presence_penalty=None,
                 stop_sequence=None
             )
-            # Only append to history if the new message was successful (i.e., no error in API response)
             if "API request failed" not in new_msg:
                 chat_history.append((message, new_msg))
             else:
@@ -879,9 +864,40 @@ def create_chat_interface_four():
 
             return "", chat_history, chat_history
 
+        def regenerate_last_message(chat_history, api_endpoint, api_key, temperature, user_prompt):
+            if not chat_history:
+                return chat_history, chat_history, "No messages to regenerate."
+
+            last_user_message, _ = chat_history[-1]
+
+            new_msg, new_history, _ = chat_wrapper(
+                last_user_message,
+                chat_history[:-1],
+                {},  # Empty media_content
+                [],  # Empty selected_parts
+                api_endpoint,
+                api_key,
+                user_prompt,  # custom_prompt
+                None,  # conversation_id
+                False,  # save_conversation
+                temperature,  # temperature
+                system_prompt="",  # system_prompt
+                max_tokens=None,
+                top_p=None,
+                frequency_penalty=None,
+                presence_penalty=None,
+                stop_sequence=None
+            )
+
+            if "API request failed" not in new_msg:
+                new_history.append((last_user_message, new_msg))
+                return new_history, new_history, "Last message regenerated successfully."
+            else:
+                logging.error(f"API request failed during regeneration: {new_msg}")
+                return chat_history, chat_history, f"Failed to regenerate: {new_msg}"
+
         # Attach click events for each chat interface
         for interface in chat_interfaces:
-            logging.debug(f"Chat Interface - Clicked Submit for Chat {interface['chatbot']}"),
             interface['submit'].click(
                 chat_wrapper_single,
                 inputs=[
@@ -899,7 +915,22 @@ def create_chat_interface_four():
                 ]
             )
 
-            # Bind the clear chat button
+            interface['regenerate_button'].click(
+                regenerate_last_message,
+                inputs=[
+                    interface['chat_history'],
+                    interface['api_endpoint'],
+                    interface['api_key'],
+                    interface['temperature'],
+                    user_prompt
+                ],
+                outputs=[
+                    interface['chatbot'],
+                    interface['chat_history'],
+                    gr.Textbox(label="Regenerate Status")
+                ]
+            )
+
             interface['clear_chat_button'].click(
                 clear_chat_single,
                 inputs=[],
