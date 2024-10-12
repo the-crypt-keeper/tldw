@@ -16,7 +16,38 @@ Needs to be updated - 7/31
 - Goal of this page is to help provide documentation and guidance for the various pieces of the project.
 - This page will be updated as the project progresses and more pieces are added.
 - Specifically, this page will walk through each of the functions exposed by the project and provide a brief overview of what they do and how they work by mapping the code functions used throughout the process.
-- 
+
+- **What's in the Repo currently?**
+  1. `summarize.py` - Main script for downloading, transcribing, and summarizing videos, audio files, books and documents.
+  2. `config.txt` - Config file used for settings for main app.
+  3. `requirements.txt` - Packages to install for Nvidia GPUs
+  4. `AMD_requirements.txt` - Packages to install for AMD GPUs
+  5. `llamafile` - Llama.cpp wrapper for local LLM inference, is multi-platform and multi-LLM compatible.
+  6. `media_summary.db` - SQLite DB that stores all the data ingested, transcribed, and summarized.
+  7. `prompts.db` - SQLite DB that stores all the prompts.
+  8. `App_Function_Libraries` Folder - Folder containing the applications function libraries
+  9. `Docs` - Folder containing documentation for the application
+  10. `Tests` Folder - Folder containing tests for the application (ha.)
+  11. `Helper_Scripts` - Folder containing helper scripts for the application
+        * `DB-Related` folder
+        * `Installer_Scripts` folder
+        * `Parsing_Files` folder
+        * `Prompts` folder
+  12. `models` - Folder containing the models for the speaker diarization LLMs
+  13. `tldw-original-scripts` - Original scripts from the original repo
+- **What's in the original repo?**
+  - `summarize.py` - download, transcribe and summarize audio
+    1. First uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio(optionally video) from supplied URL
+    2. Next, it uses [ffmpeg](https://github.com/FFmpeg/FFmpeg) to convert the resulting `.m4a` file to `.wav`
+    3. Then it uses [faster_whisper](https://github.com/SYSTRAN/faster-whisper) to transcribe the `.wav` file to `.txt`
+    4. After that, it uses [pyannote](https://github.com/pyannote/pyannote-audio) to perform 'diarization'
+    5. Finally, it'll send the resulting txt to an LLM endpoint of your choice for summarization of the text.
+  - `chunker.py` - break text into parts and prepare each part for LLM summarization
+  - `roller-*.py` - rolling summarization
+    - [can-ai-code](https://github.com/the-crypt-keeper/can-ai-code) - interview executors to run LLM inference
+  - `compare.py` - prepare LLM outputs for webapp
+  - `compare-app.py` - summary viewer webapp
+
 ------------------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------------------------------------------
