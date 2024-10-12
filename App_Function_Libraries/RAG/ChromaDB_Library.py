@@ -329,10 +329,8 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
             raise ValueError("No metadata found in the collection")
 
         # Check if all embeddings use the same model and provider
-        embedding_models = [metadata.get('embedding_model') for metadata in sample_results['metadatas'] if
-                            metadata.get('embedding_model')]
-        embedding_providers = [metadata.get('embedding_provider') for metadata in sample_results['metadatas'] if
-                               metadata.get('embedding_provider')]
+        embedding_models = [metadata.get('embedding_model') for metadata in sample_results['metadatas'] if metadata.get('embedding_model')]
+        embedding_providers = [metadata.get('embedding_provider') for metadata in sample_results['metadatas'] if metadata.get('embedding_provider')]
 
         if not embedding_models or not embedding_providers:
             raise ValueError("Embedding model or provider information not found in metadata")
@@ -345,6 +343,10 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
         # Generate query embedding using the existing create_embedding function
         query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
 
+        # Ensure query_embedding is a list
+        if isinstance(query_embedding, np.ndarray):
+            query_embedding = query_embedding.tolist()
+
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=k,
@@ -355,8 +357,7 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
             logging.warning("No results found for the query")
             return []
 
-        return [{"content": doc, "metadata": meta} for doc, meta in
-                zip(results['documents'][0], results['metadatas'][0])]
+        return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
     except Exception as e:
         logging.error(f"Error in vector_search: {str(e)}", exc_info=True)
         raise

@@ -230,7 +230,10 @@ def create_embeddings_batch(texts: List[str],
         raise
 
 def create_embedding(text: str, provider: str, model: str, api_url: str) -> List[float]:
-    return create_embeddings_batch([text], provider, model, api_url)[0]
+    embedding = create_embeddings_batch([text], provider, model, api_url)[0]
+    if isinstance(embedding, np.ndarray):
+        embedding = embedding.tolist()
+    return embedding
 
 def create_openai_embedding(text: str, model: str) -> List[float]:
     embedding = get_openai_embeddings(text, model)
