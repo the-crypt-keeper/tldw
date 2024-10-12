@@ -32,7 +32,7 @@ embedding_provider = loaded_config['Embeddings']['embedding_provider']
 embedding_model = loaded_config['Embeddings']['embedding_model']
 embedding_api_url = loaded_config['Embeddings']['embedding_api_url']
 embedding_api_key = loaded_config['Embeddings']['embedding_api_key']
-model_dir = loaded_config['Embeddings'].get('model_dir', '/tldw/App_Function_Libraries/models/embedding_models/')
+model_dir = loaded_config['Embeddings'].get('model_dir', './App_Function_Libraries/models/embedding_models/')
 
 # Embedding Chunking Settings
 chunk_size = loaded_config['Embeddings']['chunk_size']
@@ -42,8 +42,9 @@ overlap = loaded_config['Embeddings']['overlap']
 embedding_models = {}
 
 class HuggingFaceEmbedder:
-    def __init__(self, model_name, timeout_seconds=120):
+    def __init__(self, model_name, cache_dir, timeout_seconds=30):
         self.model_name = model_name
+        self.cache_dir = cache_dir  # Store cache_dir
         self.tokenizer = None
         self.model = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -53,9 +54,17 @@ class HuggingFaceEmbedder:
 
     def load_model(self):
         if self.model is None:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
-            # Dirty hack? FIXME
-            self.model = AutoModel.from_pretrained(self.model_name, trust_remote_code=True)
+            # Pass cache_dir to from_pretrained to specify download directory
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name,
+                trust_remote_code=True,
+                cache_dir=self.cache_dir  # Specify cache directory
+            )
+            self.model = AutoModel.from_pretrained(
+                self.model_name,
+                trust_remote_code=True,
+                cache_dir=self.cache_dir  # Specify cache directory
+            )
             self.model.to(self.device)
         self.last_used_time = time.time()
         self.reset_timer()
@@ -79,7 +88,13 @@ class HuggingFaceEmbedder:
 
     def create_embeddings(self, texts):
         self.load_model()
-        inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
+        inputs = self.tokenizer(
+            texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=512
+        )
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
         try:
             with torch.no_grad():
@@ -99,10 +114,14 @@ class HuggingFaceEmbedder:
                 raise
 
 class ONNXEmbedder:
-    def __init__(self, model_name, onnx_model_dir, timeout_seconds=120):
+    def __init__(self, model_name, onnx_model_dir, timeout_seconds=30):
         self.model_name = model_name
         self.model_path = os.path.join(onnx_model_dir, f"{model_name}.onnx")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            trust_remote_code=True,
+            cache_dir=onnx_model_dir  # Ensure tokenizer uses the same directory
+        )
         self.session = None
         self.timeout_seconds = timeout_seconds
         self.last_used_time = 0
@@ -135,7 +154,13 @@ class ONNXEmbedder:
         self.load_model()
 
         try:
-            inputs = self.tokenizer(texts, return_tensors="np", padding=True, truncation=True, max_length=512)
+            inputs = self.tokenizer(
+                texts,
+                return_tensors="np",
+                padding=True,
+                truncation=True,
+                max_length=512
+            )
             input_ids = inputs["input_ids"].astype(np.int64)
             attention_mask = inputs["attention_mask"].astype(np.int64)
 
@@ -205,7 +230,8 @@ def create_embeddings_batch(texts: List[str],
                 if model == "dunzhang/stella_en_400M_v5":
                     embedding_models[model] = ONNXEmbedder(model, model_dir, timeout_seconds)
                 else:
-                    embedding_models[model] = HuggingFaceEmbedder(model, timeout_seconds)
+                    # Pass model_dir to HuggingFaceEmbedder
+                    embedding_models[model] = HuggingFaceEmbedder(model, model_dir, timeout_seconds)
             embedder = embedding_models[model]
             return embedder.create_embeddings(texts)
 

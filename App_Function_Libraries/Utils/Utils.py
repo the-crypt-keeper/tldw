@@ -254,6 +254,7 @@ def load_and_log_configs():
         logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
         logging.debug(f"Loaded VLLM API URL: {vllm_api_url}")
 
+
         # Retrieve output paths from the configuration file
         output_path = config.get('Paths', 'output_path', fallback='results')
         logging.debug(f"Output path set to: {output_path}")
@@ -261,6 +262,18 @@ def load_and_log_configs():
         # Retrieve processing choice from the configuration file
         processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
         logging.debug(f"Processing choice set to: {processing_choice}")
+
+        # Retrieve Embedding model settings from the configuration file
+        embedding_model = config.get('Embeddings', 'embedding_model', fallback='')
+        logging.debug(f"Embedding model set to: {embedding_model}")
+        embedding_provider = config.get('Embeddings', 'embedding_provider', fallback='')
+        embedding_model = config.get('Embeddings', 'embedding_model', fallback='')
+        onnx_model_path = config.get('Embeddings', 'onnx_model_path', fallback="./App_Function_Libraries/onnx_models/text-embedding-3-small.onnx")
+        model_dir = config.get('Embeddings', 'model_dir', fallback="./App_Function_Libraries/onnx_models")
+        embedding_api_url = config.get('Embeddings', 'embedding_api_url', fallback="http://localhost:8080/v1/embeddings")
+        embedding_api_key = config.get('Embeddings', 'embedding_api_key', fallback='')
+        chunk_size = config.get('Embeddings', 'chunk_size', fallback=400)
+        overlap = config.get('Embeddings', 'overlap', fallback=200)
 
         # Prompts - FIXME
         prompt_path = config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')
@@ -318,6 +331,16 @@ def load_and_log_configs():
                 'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200),
                 'chroma_db_path': get_project_relative_path(config.get('Database', 'chroma_db_path', fallback='Databases/chroma.db'))
             },
+            'embedding_config': {
+                'embedding_provider': embedding_provider,
+                'embedding_model': embedding_model,
+                'onnx_model_path': onnx_model_path,
+                'model_dir': model_dir,
+                'embedding_api_url': embedding_api_url,
+                'embedding_api_key': embedding_api_key,
+                'chunk_size': chunk_size,
+                'overlap': overlap
+            }
         }
 
     except Exception as e:
