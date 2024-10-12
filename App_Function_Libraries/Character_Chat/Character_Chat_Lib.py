@@ -10,18 +10,16 @@ from typing import Dict, Any, Optional, List, Tuple
 #
 # External Imports
 from PIL import Image
-
-from App_Function_Libraries.DB.DB_Manager import get_character_card_by_id, get_character_chat_by_id
-
-
 #
 # Local imports
+from App_Function_Libraries.DB.DB_Manager import get_character_card_by_id, get_character_chat_by_id
 #
 # Constants
 ####################################################################################################
 #
 # Functions
 
+# Using https://github.com/malfoyslastname/character-card-spec-v2 as the standard for v2 character cards
 
 #################################################################################
 #
