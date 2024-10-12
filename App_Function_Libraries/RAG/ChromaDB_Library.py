@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 import chromadb
 from chromadb import Settings
 from itertools import islice
+import numpy as np
 #
 # Local Imports:
 from App_Function_Libraries.Chunk_Lib import chunk_for_embedding, chunk_options
@@ -214,54 +215,166 @@ def reset_chroma_collection(collection_name: str):
         logging.error(f"Error resetting ChromaDB collection: {str(e)}")
 
 
-def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], metadatas: List[Dict[str, Any]]):
+#v2
+def store_in_chroma(collection_name: str, texts: List[str], embeddings: Any, ids: List[str],
+                    metadatas: List[Dict[str, Any]]):
+    # Convert embeddings to list if it's a numpy array
+    if isinstance(embeddings, np.ndarray):
+        embeddings = embeddings.tolist()
+    elif not isinstance(embeddings, list):
+        raise TypeError("Embeddings must be either a list or a numpy array")
+
+    if not embeddings:
+        raise ValueError("No embeddings provided")
+
+    embedding_dim = len(embeddings[0])
+
+    logging.info(f"Storing embeddings in ChromaDB - Collection: {collection_name}")
+    logging.info(f"Number of embeddings: {len(embeddings)}, Dimension: {embedding_dim}")
+
     try:
-        collection = chroma_client.get_or_create_collection(name=collection_name)
+        # Attempt to get or create the collection
+        try:
+            collection = chroma_client.get_collection(name=collection_name)
+            logging.info(f"Existing collection '{collection_name}' found")
 
-        # Log the inputs for debugging
-        logging.debug(f"Storing in ChromaDB - Collection: {collection_name}")
-        logging.debug(f"Texts (first 100 chars): {texts[0][:100]}...")
-        logging.debug(f"Embeddings (first 5 values): {embeddings[0][:5]}")
-        logging.debug(f"IDs: {ids}")
-        logging.debug(f"Metadatas: {metadatas}")
+            # Check dimension of existing embeddings
+            existing_embeddings = collection.get(limit=1, include=['embeddings'])['embeddings']
+            if existing_embeddings:
+                existing_dim = len(existing_embeddings[0])
+                if existing_dim != embedding_dim:
+                    logging.warning(f"Embedding dimension mismatch. Existing: {existing_dim}, New: {embedding_dim}")
+                    logging.warning("Deleting existing collection and creating a new one")
+                    chroma_client.delete_collection(name=collection_name)
+                    collection = chroma_client.create_collection(name=collection_name)
+            else:
+                logging.info("No existing embeddings in the collection")
+        except Exception as e:
+            logging.info(f"Collection '{collection_name}' not found. Creating new collection")
+            collection = chroma_client.create_collection(name=collection_name)
 
-        # Use upsert instead of add/update
+        # Perform the upsert operation
         collection.upsert(
             documents=texts,
             embeddings=embeddings,
             ids=ids,
             metadatas=metadatas
         )
+        logging.info(f"Successfully upserted {len(embeddings)} embeddings")
 
-        # Verify storage
-        for doc_id in ids:
-            result = collection.get(ids=[doc_id], include=["documents", "embeddings", "metadatas"])
-            if not result['embeddings'] or result['embeddings'][0] is None:
-                logging.error(f"Failed to store embedding for {doc_id}")
+        # Verify all stored embeddings
+        results = collection.get(ids=ids, include=["documents", "embeddings", "metadatas"])
+
+        for i, doc_id in enumerate(ids):
+            if results['embeddings'][i] is None:
+                raise ValueError(f"Failed to store embedding for {doc_id}")
             else:
-                logging.info(f"Embedding stored successfully for {doc_id}")
-                logging.debug(f"Stored document: {result['documents'][0][:100]}...")
-                logging.debug(f"Stored metadata: {result['metadatas'][0]}")
+                logging.debug(f"Embedding stored successfully for {doc_id}")
+                logging.debug(f"Stored document preview: {results['documents'][i][:100]}...")
+                logging.debug(f"Stored metadata: {results['metadatas'][i]}")
+
+        logging.info("Successfully stored and verified all embeddings in ChromaDB")
 
     except Exception as e:
-        logging.error(f"Error storing embeddings in ChromaDB: {str(e)}")
+        logging.error(f"Error in store_in_chroma: {str(e)}")
         raise
+
+    return collection
+
+
+# v1
+# def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], metadatas: List[Dict[str, Any]]):
+#     try:
+#         collection = chroma_client.get_or_create_collection(name=collection_name)
+#
+#         # Log the inputs for debugging
+#         logging.debug(f"Storing in ChromaDB - Collection: {collection_name}")
+#         logging.debug(f"Texts (first 100 chars): {texts[0][:100]}...")
+#         logging.debug(f"Embeddings (first 5 values): {embeddings[0][:5]}")
+#         logging.debug(f"IDs: {ids}")
+#         logging.debug(f"Metadatas: {metadatas}")
+#
+#         # Use upsert instead of add/update
+#         collection.upsert(
+#             documents=texts,
+#             embeddings=embeddings,
+#             ids=ids,
+#             metadatas=metadatas
+#         )
+#
+#         # Verify storage
+#         for doc_id in ids:
+#             result = collection.get(ids=[doc_id], include=["documents", "embeddings", "metadatas"])
+#             if not result['embeddings'] or result['embeddings'][0] is None:
+#                 logging.error(f"Failed to store embedding for {doc_id}")
+#             else:
+#                 logging.info(f"Embedding stored successfully for {doc_id}")
+#                 logging.debug(f"Stored document: {result['documents'][0][:100]}...")
+#                 logging.debug(f"Stored metadata: {result['metadatas'][0]}")
+#
+#     except Exception as e:
+#         logging.error(f"Error storing embeddings in ChromaDB: {str(e)}")
+#         raise
 
 
 # Function to perform vector search using ChromaDB + Keywords from the media_db
+#v2
 def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[str, Any]]:
     try:
-        query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
         collection = chroma_client.get_collection(name=collection_name)
+
+        # Fetch a sample of embeddings to check metadata
+        sample_results = collection.get(limit=10, include=["metadatas"])
+        if not sample_results['metadatas']:
+            raise ValueError("No metadata found in the collection")
+
+        # Check if all embeddings use the same model and provider
+        embedding_models = [metadata.get('embedding_model') for metadata in sample_results['metadatas'] if metadata.get('embedding_model')]
+        embedding_providers = [metadata.get('embedding_provider') for metadata in sample_results['metadatas'] if metadata.get('embedding_provider')]
+
+        if not embedding_models or not embedding_providers:
+            raise ValueError("Embedding model or provider information not found in metadata")
+
+        embedding_model = max(set(embedding_models), key=embedding_models.count)
+        embedding_provider = max(set(embedding_providers), key=embedding_providers.count)
+
+        logging.info(f"Using embedding model: {embedding_model} from provider: {embedding_provider}")
+
+        # Generate query embedding using the existing create_embedding function
+        query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
+
+        # Ensure query_embedding is a list
+        if isinstance(query_embedding, np.ndarray):
+            query_embedding = query_embedding.tolist()
+
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=k,
             include=["documents", "metadatas"]
         )
+
+        if not results['documents'][0]:
+            logging.warning("No results found for the query")
+            return []
+
         return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
     except Exception as e:
-        logging.error(f"Error in vector_search: {str(e)}")
+        logging.error(f"Error in vector_search: {str(e)}", exc_info=True)
         raise
+# v1
+# def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[str, Any]]:
+#     try:
+#         query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
+#         collection = chroma_client.get_collection(name=collection_name)
+#         results = collection.query(
+#             query_embeddings=[query_embedding],
+#             n_results=k,
+#             include=["documents", "metadatas"]
+#         )
+#         return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
+#     except Exception as e:
+#         logging.error(f"Error in vector_search: {str(e)}")
+#         raise
 
 def schedule_embedding(media_id: int, content: str, media_name: str):
     try:
@@ -311,3 +424,141 @@ def schedule_embedding(media_id: int, content: str, media_name: str):
 #
 # End of Functions for ChromaDB
 #######################################################################################################################
+
+
+# FIXME - Suggestions from ChatGPT:
+# 2. Detailed Mapping and Assessment
+# a. preprocess_all_content
+#
+# Test: test_preprocess_all_content
+#
+# Coverage:
+#
+#     Mocks the get_unprocessed_media function to return a predefined unprocessed media list.
+#     Mocks process_and_store_content and mark_media_as_processed to verify their invocation with correct arguments.
+#     Asserts that process_and_store_content and mark_media_as_processed are called exactly once with expected parameters.
+#
+# Assessment:
+#
+#     Strengths: Ensures that preprocess_all_content correctly retrieves unprocessed media, processes each item, and marks it as processed.
+#     Suggestions:
+#         Multiple Media Items: Test with multiple media items to verify loop handling.
+#         Exception Handling: Simulate exceptions within process_and_store_content to ensure proper logging and continuation or halting as intended.
+#
+# b. process_and_store_content
+#
+# Test: test_process_and_store_content
+#
+# Coverage:
+#
+#     Mocks dependencies: chunk_for_embedding, process_chunks, situate_context, create_embeddings_batch, and chroma_client.
+#     Simulates the scenario where the specified ChromaDB collection does not exist initially and needs to be created.
+#     Verifies that chunks are processed, embeddings are created, stored in ChromaDB, and database queries are executed correctly.
+#
+# Assessment:
+#
+#     Strengths: Thoroughly checks the workflow of processing content, including chunking, embedding creation, and storage.
+#     Suggestions:
+#         Existing Collection: Add a test case where the collection already exists to ensure that get_collection is used without attempting to create a new one.
+#         Embedding Creation Disabled: Test with create_embeddings=False to verify alternative code paths.
+#         Error Scenarios: Simulate failures in embedding creation or storage to ensure exceptions are handled gracefully.
+#
+# c. check_embedding_status
+#
+# Test: test_check_embedding_status
+#
+# Coverage:
+#
+#     Mocks the ChromaDB client to return predefined embeddings and metadata.
+#     Verifies that the function correctly identifies the existence of embeddings and retrieves relevant metadata.
+#
+# Assessment:
+#
+#     Strengths: Confirms that the function accurately detects existing embeddings and handles metadata appropriately.
+#     Suggestions:
+#         No Embeddings Found: Test the scenario where no embeddings exist for the selected item.
+#         Missing Metadata: Simulate missing or incomplete metadata to ensure robust error handling.
+#
+# d. reset_chroma_collection
+#
+# Test: test_reset_chroma_collection
+#
+# Coverage:
+#
+#     Mocks the ChromaDB client’s delete_collection and create_collection methods.
+#     Verifies that the specified collection is deleted and recreated.
+#
+# Assessment:
+#
+#     Strengths: Ensures that the reset operation performs both deletion and creation as intended.
+#     Suggestions:
+#         Non-Existent Collection: Test resetting a collection that does not exist to verify behavior.
+#         Exception Handling: Simulate failures during deletion or creation to check error logging and propagation.
+#
+# e. store_in_chroma
+#
+# Test: test_store_in_chroma
+#
+# Coverage:
+#
+#     Mocks the ChromaDB client to return a mock collection.
+#     Verifies that documents, embeddings, IDs, and metadata are upserted correctly into the collection.
+#
+# Assessment:
+#
+#     Strengths: Confirms that embeddings and associated data are stored accurately in ChromaDB.
+#     Suggestions:
+#         Empty Embeddings: Test storing with empty embeddings to ensure proper error handling.
+#         Embedding Dimension Mismatch: Simulate a dimension mismatch to verify that the function handles it as expected.
+#
+# f. vector_search
+#
+# Test: test_vector_search
+#
+# Coverage:
+#
+#     Mocks the ChromaDB client’s get_collection, get, and query methods.
+#     Mocks the create_embedding function to return a predefined embedding.
+#     Verifies that the search retrieves the correct documents and metadata based on the query.
+#
+# Assessment:
+#
+#     Strengths: Ensures that the vector search mechanism correctly interacts with ChromaDB and returns expected results.
+#     Suggestions:
+#         No Results Found: Test queries that return no results to verify handling.
+#         Multiple Results: Ensure that multiple documents are retrieved and correctly formatted.
+#         Metadata Variations: Test with diverse metadata to confirm accurate retrieval.
+#
+# g. batched
+#
+# Test: test_batched
+#
+# Coverage:
+#
+#     Uses pytest.mark.parametrize to test multiple scenarios:
+#         Regular batching.
+#         Batch size larger than the iterable.
+#         Empty iterable.
+#
+# Assessment:
+#
+#     Strengths: Comprehensive coverage of typical and edge batching scenarios.
+#     Suggestions:
+#         Non-Integer Batch Sizes: Test with invalid batch sizes (e.g., zero, negative numbers) to ensure proper handling or error raising.
+#
+# h. situate_context and schedule_embedding
+#
+# Tests: Not directly tested
+#
+# Coverage:
+#
+#     These functions are currently not directly tested in the test_chromadb.py suite.
+#
+# Assessment:
+#
+#     Suggestions:
+#         situate_context:
+#             Unit Test: Since it's a pure function that interacts with the summarize function, create a separate test to mock summarize and verify the context generation.
+#             Edge Cases: Test with empty strings, very long texts, or special characters to ensure robustness.
+#         schedule_embedding:
+#             Integration Test: Since it orchestrates multiple operations (chunking, embedding creation, storage), consider writing an integration test that mocks all dependent functions and verifies the complete workflow.
