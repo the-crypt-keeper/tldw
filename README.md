@@ -64,13 +64,13 @@
       * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
   - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
 
-
 ----------
 **GUI Screenshot**
 - Planning to replace with several short gifs to show functionality and how it can be used.
-- ![tldw Walkthrough of a fresh install][tldw-run-through-blank.webm](https://github.com/user-attachments/assets/9328eabe-d05d-4442-827b-1e75f4f81e94)
+- ![tldw-run-through-blank.webm](https://github.com/user-attachments/assets/9328eabe-d05d-4442-827b-1e75f4f81e94)
 
 
+--------------
 ### What is tl/dw?
 **tl/dw** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
 1. **Ingesting**: Importing media from URLs or local files into an offline database.
