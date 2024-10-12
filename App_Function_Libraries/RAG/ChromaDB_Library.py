@@ -424,3 +424,141 @@ def schedule_embedding(media_id: int, content: str, media_name: str):
 #
 # End of Functions for ChromaDB
 #######################################################################################################################
+
+
+# FIXME - Suggestions from ChatGPT:
+# 2. Detailed Mapping and Assessment
+# a. preprocess_all_content
+#
+# Test: test_preprocess_all_content
+#
+# Coverage:
+#
+#     Mocks the get_unprocessed_media function to return a predefined unprocessed media list.
+#     Mocks process_and_store_content and mark_media_as_processed to verify their invocation with correct arguments.
+#     Asserts that process_and_store_content and mark_media_as_processed are called exactly once with expected parameters.
+#
+# Assessment:
+#
+#     Strengths: Ensures that preprocess_all_content correctly retrieves unprocessed media, processes each item, and marks it as processed.
+#     Suggestions:
+#         Multiple Media Items: Test with multiple media items to verify loop handling.
+#         Exception Handling: Simulate exceptions within process_and_store_content to ensure proper logging and continuation or halting as intended.
+#
+# b. process_and_store_content
+#
+# Test: test_process_and_store_content
+#
+# Coverage:
+#
+#     Mocks dependencies: chunk_for_embedding, process_chunks, situate_context, create_embeddings_batch, and chroma_client.
+#     Simulates the scenario where the specified ChromaDB collection does not exist initially and needs to be created.
+#     Verifies that chunks are processed, embeddings are created, stored in ChromaDB, and database queries are executed correctly.
+#
+# Assessment:
+#
+#     Strengths: Thoroughly checks the workflow of processing content, including chunking, embedding creation, and storage.
+#     Suggestions:
+#         Existing Collection: Add a test case where the collection already exists to ensure that get_collection is used without attempting to create a new one.
+#         Embedding Creation Disabled: Test with create_embeddings=False to verify alternative code paths.
+#         Error Scenarios: Simulate failures in embedding creation or storage to ensure exceptions are handled gracefully.
+#
+# c. check_embedding_status
+#
+# Test: test_check_embedding_status
+#
+# Coverage:
+#
+#     Mocks the ChromaDB client to return predefined embeddings and metadata.
+#     Verifies that the function correctly identifies the existence of embeddings and retrieves relevant metadata.
+#
+# Assessment:
+#
+#     Strengths: Confirms that the function accurately detects existing embeddings and handles metadata appropriately.
+#     Suggestions:
+#         No Embeddings Found: Test the scenario where no embeddings exist for the selected item.
+#         Missing Metadata: Simulate missing or incomplete metadata to ensure robust error handling.
+#
+# d. reset_chroma_collection
+#
+# Test: test_reset_chroma_collection
+#
+# Coverage:
+#
+#     Mocks the ChromaDB client’s delete_collection and create_collection methods.
+#     Verifies that the specified collection is deleted and recreated.
+#
+# Assessment:
+#
+#     Strengths: Ensures that the reset operation performs both deletion and creation as intended.
+#     Suggestions:
+#         Non-Existent Collection: Test resetting a collection that does not exist to verify behavior.
+#         Exception Handling: Simulate failures during deletion or creation to check error logging and propagation.
+#
+# e. store_in_chroma
+#
+# Test: test_store_in_chroma
+#
+# Coverage:
+#
+#     Mocks the ChromaDB client to return a mock collection.
+#     Verifies that documents, embeddings, IDs, and metadata are upserted correctly into the collection.
+#
+# Assessment:
+#
+#     Strengths: Confirms that embeddings and associated data are stored accurately in ChromaDB.
+#     Suggestions:
+#         Empty Embeddings: Test storing with empty embeddings to ensure proper error handling.
+#         Embedding Dimension Mismatch: Simulate a dimension mismatch to verify that the function handles it as expected.
+#
+# f. vector_search
+#
+# Test: test_vector_search
+#
+# Coverage:
+#
+#     Mocks the ChromaDB client’s get_collection, get, and query methods.
+#     Mocks the create_embedding function to return a predefined embedding.
+#     Verifies that the search retrieves the correct documents and metadata based on the query.
+#
+# Assessment:
+#
+#     Strengths: Ensures that the vector search mechanism correctly interacts with ChromaDB and returns expected results.
+#     Suggestions:
+#         No Results Found: Test queries that return no results to verify handling.
+#         Multiple Results: Ensure that multiple documents are retrieved and correctly formatted.
+#         Metadata Variations: Test with diverse metadata to confirm accurate retrieval.
+#
+# g. batched
+#
+# Test: test_batched
+#
+# Coverage:
+#
+#     Uses pytest.mark.parametrize to test multiple scenarios:
+#         Regular batching.
+#         Batch size larger than the iterable.
+#         Empty iterable.
+#
+# Assessment:
+#
+#     Strengths: Comprehensive coverage of typical and edge batching scenarios.
+#     Suggestions:
+#         Non-Integer Batch Sizes: Test with invalid batch sizes (e.g., zero, negative numbers) to ensure proper handling or error raising.
+#
+# h. situate_context and schedule_embedding
+#
+# Tests: Not directly tested
+#
+# Coverage:
+#
+#     These functions are currently not directly tested in the test_chromadb.py suite.
+#
+# Assessment:
+#
+#     Suggestions:
+#         situate_context:
+#             Unit Test: Since it's a pure function that interacts with the summarize function, create a separate test to mock summarize and verify the context generation.
+#             Edge Cases: Test with empty strings, very long texts, or special characters to ensure robustness.
+#         schedule_embedding:
+#             Integration Test: Since it orchestrates multiple operations (chunking, embedding creation, storage), consider writing an integration test that mocks all dependent functions and verifies the complete workflow.
