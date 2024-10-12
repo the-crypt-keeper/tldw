@@ -68,7 +68,6 @@
   - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
 
 
---------------
 ### What is tl/dw?
 **tl/dw** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
 1. **Ingesting**: Importing media from URLs or local files into an offline database.
