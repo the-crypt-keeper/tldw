@@ -67,7 +67,7 @@
 ----------
 **GUI Screenshot**
 - Planning to replace with several short gifs to show functionality and how it can be used.
-  <source src="https://github.com/user-attachments/assets/9328eabe-d05d-4442-827b-1e75f4f81e94" type="video/webm">
+![tldw-run-through-blank](./Docs/tldw-run-through-blank.webm)
 
 
 --------------
