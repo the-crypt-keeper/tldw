@@ -38,37 +38,7 @@
   - There's a docker build for GPU use(Needs Nvidia CUDA Controller(?): https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw-nvidia_amd64_Dockerfile 
   - and plain CPU use: https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw_Debian_cpu-Dockerfile
   - the `Dockerfile` in the main directory is the Nvidia base-image-based one. So you can use your GPU if you want with it.
-#### Less Quick Start
-1. **Download the Installer Script for your OS:**
-   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
-   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
-   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
-2. **Run the Installer Script:**
-   - **Linux:** 
-     - `chmod +x Linux_Install_Update.sh && chmod +x ./Linux_Run_tldw.sh`
-     - `./Linux_Install_Update.sh` and then `./Linux_Run_tldw.sh`
-     - This will install `tldw` to the directory from where the script is ran.
-   - **Windows:** `Windows_Install_Update.bat`
-     - Double-click the downloaded batch file to install it.
-     - This will install `tldw` to the directory from where the script is ran.
-   - **MacOS:** `bash MacOS-Install_Updater.sh`
-     - `chmod +x MacOS_Install_Update.sh` and then `chmod +x ./MacOS_Run_tldw.sh`
-     - `./MacOS_Install_Update.sh` and then `./MacOS_Run_tldw.sh`
-     - This will install `tldw` to the directory from where the script is ran.
-3. **Follow the prompts to install the necessary packages and setup the program.**
-4. **You are Ready to Go! You should see `tldw` start up at the end of the script, assuming everything worked as expected**
-5. **BE SURE TO UPDATE 'config.txt' WITH YOUR API KEYS AND SETTINGS!** - You need to do this unless you want to manually input your API keys everytime you interact with a commercial LLM...
-- **Run it as a WebApp**
-  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
-    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
-    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
-      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
-      * So everything you might consume during your path of research, tracked and assimilated and tagged.
-      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
-  - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
 
-
-----------
 
 ### What is tl/dw?
 **tl/dw** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
@@ -109,6 +79,39 @@ All features are designed to run **locally** on your device, ensuring privacy an
 - **Grammar & Style Checks**: Use LLMs to review your writing for grammar and style.
 - **Tone Analyzer**: Analyze and adjust the tone of your text.
 - **Writing Prompts**: Generate creative writing prompts based on your preferences.
+
+#### Less Quick Start
+1. **Download the Installer Script for your OS:**
+   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
+   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
+2. **Run the Installer Script:**
+   - **Linux:** 
+     - `chmod +x Linux_Install_Update.sh && chmod +x ./Linux_Run_tldw.sh`
+     - `./Linux_Install_Update.sh` and then `./Linux_Run_tldw.sh`
+     - This will install `tldw` to the directory from where the script is ran.
+   - **Windows:** `Windows_Install_Update.bat`
+     - Double-click the downloaded batch file to install it.
+     - This will install `tldw` to the directory from where the script is ran.
+   - **MacOS:** `bash MacOS-Install_Updater.sh`
+     - `chmod +x MacOS_Install_Update.sh` and then `chmod +x ./MacOS_Run_tldw.sh`
+     - `./MacOS_Install_Update.sh` and then `./MacOS_Run_tldw.sh`
+     - This will install `tldw` to the directory from where the script is ran.
+3. **Follow the prompts to install the necessary packages and setup the program.**
+4. **You are Ready to Go! You should see `tldw` start up at the end of the script, assuming everything worked as expected**
+5. **BE SURE TO UPDATE 'config.txt' WITH YOUR API KEYS AND SETTINGS!** - You need to do this unless you want to manually input your API keys everytime you interact with a commercial LLM...
+- **Run it as a WebApp**
+  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
+    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
+    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
+      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
+      * So everything you might consume during your path of research, tracked and assimilated and tagged.
+      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
+  - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+
+
+----------
+
 
 ###  <a name="what"></a>(Much longer) What is this (TL/DW)?
 - **What it is now:**
