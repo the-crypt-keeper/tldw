@@ -23,7 +23,6 @@ from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, creat
 #
 # Functions:
 
-# FIXME - under construction
 def create_embeddings_tab():
     with gr.TabItem("Create Embeddings"):
         gr.Markdown("# Create Embeddings for All Content")
@@ -36,13 +35,36 @@ def create_embeddings_tab():
                     value="huggingface"
                 )
                 gr.Markdown("Note: Local provider requires a running Llama.cpp/llamafile server.")
-                gr.Markdown("OpenAI provider requires a valid API key. ")
-                gr.Markdown("OpenAI Embeddings models: `text-embedding-3-small`, `text-embedding-3-large`")
-                gr.Markdown("HuggingFace provider requires a valid model name, i.e. `dunzhang/stella_en_400M_v5`")
-                embedding_model = gr.Textbox(
-                    label="Embedding Model",
-                    value="Enter your embedding model name here", lines=3
+                gr.Markdown("OpenAI provider requires a valid API key.")
+
+                huggingface_model = gr.Dropdown(
+                    choices=[
+                        "jinaai/jina-embeddings-v3",
+                        "Alibaba-NLP/gte-large-en-v1.5",
+                        "dunzhang/setll_en_400M_v5",
+                        "custom"
+                    ],
+                    label="Hugging Face Model",
+                    value="jinaai/jina-embeddings-v3",
+                    visible=True
                 )
+
+                openai_model = gr.Dropdown(
+                    choices=[
+                        "text-embedding-3-small",
+                        "text-embedding-3-large"
+                    ],
+                    label="OpenAI Embedding Model",
+                    value="text-embedding-3-small",
+                    visible=False
+                )
+
+                custom_embedding_model = gr.Textbox(
+                    label="Custom Embedding Model",
+                    placeholder="Enter your custom embedding model name here",
+                    visible=False
+                )
+
                 embedding_api_url = gr.Textbox(
                     label="API URL (for local provider)",
                     value="http://localhost:8080/embedding",
@@ -74,15 +96,32 @@ def create_embeddings_tab():
                 status_output = gr.Textbox(label="Status", lines=10)
 
         def update_provider_options(provider):
-            return gr.update(visible=provider == "local")
+            if provider == "huggingface":
+                return gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+            elif provider == "local":
+                return gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
+            else:  # OpenAI
+                return gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)
+
+        def update_huggingface_options(model):
+            if model == "custom":
+                return gr.update(visible=True)
+            else:
+                return gr.update(visible=False)
 
         embedding_provider.change(
             fn=update_provider_options,
             inputs=[embedding_provider],
-            outputs=[embedding_api_url]
+            outputs=[huggingface_model, openai_model, custom_embedding_model, embedding_api_url]
         )
 
-        def create_all_embeddings(provider, model, api_url, method, max_size, overlap, adaptive):
+        huggingface_model.change(
+            fn=update_huggingface_options,
+            inputs=[huggingface_model],
+            outputs=[custom_embedding_model]
+        )
+
+        def create_all_embeddings(provider, hf_model, openai_model, custom_model, api_url, method, max_size, overlap, adaptive):
             try:
                 all_content = get_all_content_from_database()
                 if not all_content:
@@ -97,6 +136,14 @@ def create_embeddings_tab():
 
                 collection_name = "all_content_embeddings"
                 collection = chroma_client.get_or_create_collection(name=collection_name)
+
+                # Determine the model to use
+                if provider == "huggingface":
+                    model = custom_model if hf_model == "custom" else hf_model
+                elif provider == "openai":
+                    model = openai_model
+                else:
+                    model = custom_model
 
                 for item in all_content:
                     media_id = item['id']
@@ -133,7 +180,7 @@ def create_embeddings_tab():
 
         create_button.click(
             fn=create_all_embeddings,
-            inputs=[embedding_provider, embedding_model, embedding_api_url,
+            inputs=[embedding_provider, huggingface_model, openai_model, custom_embedding_model, embedding_api_url,
                     chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking],
             outputs=status_output
         )
@@ -159,13 +206,36 @@ def create_view_embeddings_tab():
                     value="huggingface"
                 )
                 gr.Markdown("Note: Local provider requires a running Llama.cpp/llamafile server.")
-                gr.Markdown("OpenAI provider requires a valid API key. ")
-                gr.Markdown("OpenAI Embeddings models: `text-embedding-3-small`, `text-embedding-3-large`")
-                gr.Markdown("HuggingFace provider requires a valid model name, i.e. `dunzhang/stella_en_400M_v5`")
-                embedding_model = gr.Textbox(
-                    label="Embedding Model",
-                    value="Enter your embedding model name here", lines=3
+                gr.Markdown("OpenAI provider requires a valid API key.")
+
+                huggingface_model = gr.Dropdown(
+                    choices=[
+                        "jinaai/jina-embeddings-v3",
+                        "Alibaba-NLP/gte-large-en-v1.5",
+                        "dunzhang/stella_en_400M_v5",
+                        "custom"
+                    ],
+                    label="Hugging Face Model",
+                    value="jinaai/jina-embeddings-v3",
+                    visible=True
                 )
+
+                openai_model = gr.Dropdown(
+                    choices=[
+                        "text-embedding-3-small",
+                        "text-embedding-3-large"
+                    ],
+                    label="OpenAI Embedding Model",
+                    value="text-embedding-3-small",
+                    visible=False
+                )
+
+                custom_embedding_model = gr.Textbox(
+                    label="Custom Embedding Model",
+                    placeholder="Enter your custom embedding model name here",
+                    visible=False
+                )
+
                 embedding_api_url = gr.Textbox(
                     label="API URL (for local provider)",
                     value="http://localhost:8080/embedding",
@@ -222,7 +292,18 @@ def create_view_embeddings_tab():
                 return gr.update(choices=["Error: Unable to fetch items"]), {}
 
         def update_provider_options(provider):
-            return gr.update(visible=provider == "local")
+            if provider == "huggingface":
+                return gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+            elif provider == "local":
+                return gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
+            else:  # OpenAI
+                return gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)
+
+        def update_huggingface_options(model):
+            if model == "custom":
+                return gr.update(visible=True)
+            else:
+                return gr.update(visible=False)
 
         def check_embedding_status(selected_item, item_mapping):
             if not selected_item:
@@ -255,7 +336,7 @@ def create_view_embeddings_tab():
                 logging.error(f"Error in check_embedding_status: {str(e)}")
                 return f"Error processing item: {selected_item}. Details: {str(e)}", "", ""
 
-        def create_new_embedding_for_item(selected_item, provider, model, api_url, method, max_size, overlap, adaptive,
+        def create_new_embedding_for_item(selected_item, provider, hf_model, openai_model, custom_model, api_url, method, max_size, overlap, adaptive,
                                           item_mapping, use_contextual, contextual_api_choice=None):
             if not selected_item:
                 return "Please select an item", "", ""
@@ -305,6 +386,15 @@ def create_view_embeddings_tab():
                         context = None
 
                     chunk_id = f"doc_{item_id}_chunk_{i}"
+
+                    # Determine the model to use
+                    if provider == "huggingface":
+                        model = custom_model if hf_model == "custom" else hf_model
+                    elif provider == "openai":
+                        model = openai_model
+                    else:
+                        model = custom_model
+
                     metadata = {
                         "media_id": str(item_id),
                         "chunk_index": i,
@@ -360,7 +450,7 @@ def create_view_embeddings_tab():
         )
         create_new_embedding_button.click(
             create_new_embedding_for_item,
-            inputs=[item_dropdown, embedding_provider, embedding_model, embedding_api_url,
+            inputs=[item_dropdown, embedding_provider, huggingface_model, openai_model, custom_embedding_model, embedding_api_url,
                     chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking, item_mapping,
                     use_contextual_embeddings, contextual_api_choice],
             outputs=[embedding_status, embedding_preview, embedding_metadata]
@@ -368,11 +458,16 @@ def create_view_embeddings_tab():
         embedding_provider.change(
             update_provider_options,
             inputs=[embedding_provider],
-            outputs=[embedding_api_url]
+            outputs=[huggingface_model, openai_model, custom_embedding_model, embedding_api_url]
+        )
+        huggingface_model.change(
+            update_huggingface_options,
+            inputs=[huggingface_model],
+            outputs=[custom_embedding_model]
         )
 
     return (item_dropdown, refresh_button, embedding_status, embedding_preview, embedding_metadata,
-            create_new_embedding_button, embedding_provider, embedding_model, embedding_api_url,
+            create_new_embedding_button, embedding_provider, huggingface_model, openai_model, custom_embedding_model, embedding_api_url,
             chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking,
             use_contextual_embeddings, contextual_api_choice, contextual_api_key)
 
