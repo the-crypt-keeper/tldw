@@ -7,23 +7,24 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 import webbrowser
 #
 # Local Library Imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
-from App_Function_Libraries.Book_Ingestion_Lib import ingest_folder, ingest_text_file
+from App_Function_Libraries.Books.Book_Ingestion_Lib import ingest_folder, ingest_text_file
 from App_Function_Libraries.Chunk_Lib import  semantic_chunk_long_file#, rolling_summarize_function,
 from App_Function_Libraries.Gradio_Related import launch_ui
 from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import cleanup_process, local_llm_function
-from App_Function_Libraries.Local_Summarization_Lib import summarize_with_local_llm
-from App_Function_Libraries.Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, \
+from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_local_llm
+from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, \
     summarize_with_cohere, summarize_with_groq, perform_transcription, perform_summarization
-from App_Function_Libraries.Audio_Transcription_Lib import speech_to_text
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Local_File_Processing_Lib import read_paths_from_file, process_local_file
-from App_Function_Libraries.SQLite_DB import add_media_to_database
-from App_Function_Libraries.System_Checks_Lib import cuda_check, platform_check, check_ffmpeg
-from App_Function_Libraries.Utils import load_and_log_configs, create_download_directory, extract_text_from_segments, \
+from App_Function_Libraries.DB.DB_Manager import add_media_to_database
+from App_Function_Libraries.Utils.System_Checks_Lib import cuda_check, platform_check, check_ffmpeg
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, create_download_directory, extract_text_from_segments, \
     cleanup_downloads
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 #
@@ -33,6 +34,9 @@ from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extrac
 #
 # Other Tokenizers
 #
+# Code responsible for launching GUI and leading to most functionality on line 838-862: launch UI launches the Gradio UI, which starts in the `Gradio_Related.py` file, where every tab it loads proceeds to load that page in a chain,
+# this means that the `Gradio_Related.py` file is the main file for the UI, and then calls out to all the other pieces, through the individual tabs.
+# So if you're trying to understand the codebase, start with `Gradio_Related.py` and then follow the chain of calls to understand how the UI is built/works on the backend as I've isolated/grouped most things together.
 #######################
 # Logging Setup
 #
@@ -68,6 +72,7 @@ whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large",
                   "distil-large-v2", "distil-medium.en", "distil-small.en"]
 server_mode = False
 share_public = False
+
 #
 #
 #######################
@@ -176,7 +181,9 @@ source_languages = {
     "es": "Spanish",
     "ru": "Russian",
     "ko": "Korean",
-    "fr": "French"
+    "fr": "French",
+    "it": "Italian",
+    "ja": "Japanese",
 }
 source_language_list = [key[0] for key in source_languages.items()]
 
@@ -672,9 +679,14 @@ def main(input_path, api_name=None, api_key=None,
 
 
 def signal_handler(sig, frame):
-    logging.info('Signal handler called with signal: %s', sig)
-    cleanup_process()
+    logging.info("Ctrl-C pressed, shutting down...")
+    # Check for active threads before shutdown
+    logging.debug(f"Active threads before shutdown: {threading.enumerate()}")
+    # Check for active threads after shutdown
+    logging.debug(f"Active threads after shutdown: {threading.enumerate()}")
     sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 
 ############################## MAIN ##############################
@@ -832,7 +844,9 @@ Sample commands:
                                       keywords=args.keywords)
             print(result)
         sys.exit(0)
-
+########################################################################################################################
+#
+#   Launch the UI
     # Launch the GUI
     if args.user_interface:
         if local_llm:
@@ -855,7 +869,7 @@ Sample commands:
     elif not args.input_path:
         parser.print_help()
         sys.exit(1)
-
+########################################################################################################################
     else:
         logging.info('Starting the transcription and summarization process.')
         logging.info(f'Input path: {args.input_path}')
@@ -878,7 +892,7 @@ Sample commands:
         api_name = args.api_name
 
         summary = None  # Initialize to ensure it's always defined
-        if args.detail_level == None:
+        if args.detail_level is None:
             args.detail_level = 0.01
 
         # FIXME
@@ -942,6 +956,7 @@ Sample commands:
 
             logging.info('Transcription process completed.')
             atexit.register(cleanup_process)
+
         except Exception as e:
             logging.error('An error occurred during the transcription process.')
             logging.error(str(e))
