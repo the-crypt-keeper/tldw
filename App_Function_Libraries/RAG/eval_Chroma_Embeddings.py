@@ -23,6 +23,8 @@ from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 # Functions:
 import chardet
+# FIXME
+
 
 def detect_file_encoding(file_path):
     with open(file_path, 'rb') as file:
