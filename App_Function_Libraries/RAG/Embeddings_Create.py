@@ -42,7 +42,7 @@ overlap = loaded_config['Embeddings']['overlap']
 embedding_models = {}
 
 class HuggingFaceEmbedder:
-    def __init__(self, model_name, timeout_seconds=120):
+    def __init__(self, model_name, timeout_seconds=30):
         self.model_name = model_name
         self.tokenizer = None
         self.model = None
@@ -99,7 +99,7 @@ class HuggingFaceEmbedder:
                 raise
 
 class ONNXEmbedder:
-    def __init__(self, model_name, onnx_model_dir, timeout_seconds=120):
+    def __init__(self, model_name, onnx_model_dir, timeout_seconds=30):
         self.model_name = model_name
         self.model_path = os.path.join(onnx_model_dir, f"{model_name}.onnx")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
