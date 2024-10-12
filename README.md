@@ -67,7 +67,7 @@
 ----------
 **GUI Screenshot**
 - Planning to replace with several short gifs to show functionality and how it can be used.
-![tldw-run-through-blank](./Docs/tldw-run-through-blank.webm)
+[![tldw-run-through-blank](./Docs/tldw-run-through-blank.webm)](https://github.com/rmusser01/tldw/blob/main/Docs/Screenshots/tldw-run-through-blank.mp4)
 
 
 --------------
