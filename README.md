@@ -68,7 +68,7 @@
 ----------
 **GUI Screenshot**
 - Planning to replace with several short gifs to show functionality and how it can be used.
-![tldw-summarization-gui-demo](Docs/GUI-Front_Page.PNG)
+![tldw-summarization-gui-blank-walkthrough](https://github.com/rmusser01/tldw/blob/main/Docs/Screenshots/tldw-run-through-blank.mp4))
 
 ### What is tl/dw?
 **tl/dw** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
