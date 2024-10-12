@@ -42,7 +42,7 @@ overlap = loaded_config['Embeddings']['overlap']
 embedding_models = {}
 
 class HuggingFaceEmbedder:
-    def __init__(self, model_name, timeout_seconds=120):  # Default timeout of 2 minutes
+    def __init__(self, model_name, timeout_seconds=120):
         self.model_name = model_name
         self.tokenizer = None
         self.model = None
@@ -81,10 +81,22 @@ class HuggingFaceEmbedder:
         self.load_model()
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-        embeddings = outputs.last_hidden_state.mean(dim=1)
-        return embeddings.cpu().numpy()
+        try:
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+            embeddings = outputs.last_hidden_state.mean(dim=1)
+            return embeddings.cpu().float().numpy()  # Convert to float32 before returning
+        except RuntimeError as e:
+            if "Got unsupported ScalarType BFloat16" in str(e):
+                logging.warning("BFloat16 not supported. Falling back to float32.")
+                # Convert model to float32
+                self.model = self.model.float()
+                with torch.no_grad():
+                    outputs = self.model(**inputs)
+                embeddings = outputs.last_hidden_state.mean(dim=1)
+                return embeddings.cpu().float().numpy()
+            else:
+                raise
 
 class ONNXEmbedder:
     def __init__(self, model_name, onnx_model_dir, timeout_seconds=120):

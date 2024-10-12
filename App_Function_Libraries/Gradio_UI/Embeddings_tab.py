@@ -7,17 +7,15 @@ import logging
 #
 # External Imports
 import gradio as gr
+import numpy as np
 from tqdm import tqdm
-
-from App_Function_Libraries.Chunk_Lib import improved_chunking_process, chunk_for_embedding
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_all_content_from_database
 from App_Function_Libraries.RAG.ChromaDB_Library import chroma_client, \
     store_in_chroma, situate_context
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, create_embeddings_batch
-
-
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process, chunk_for_embedding
 #
 ########################################################################################################################
 #
@@ -336,7 +334,8 @@ def create_view_embeddings_tab():
                 logging.error(f"Error in check_embedding_status: {str(e)}")
                 return f"Error processing item: {selected_item}. Details: {str(e)}", "", ""
 
-        def create_new_embedding_for_item(selected_item, provider, hf_model, openai_model, custom_model, api_url, method, max_size, overlap, adaptive,
+        def create_new_embedding_for_item(selected_item, provider, hf_model, openai_model, custom_model, api_url,
+                                          method, max_size, overlap, adaptive,
                                           item_mapping, use_contextual, contextual_api_choice=None):
             if not selected_item:
                 return "Please select an item", "", ""
@@ -371,13 +370,10 @@ def create_view_embeddings_tab():
                 texts, ids, metadatas = [], [], []
                 chunk_count = 0
                 logging.info("Generating contextual summaries and preparing chunks for embedding")
-                for i, chunk in tqdm(enumerate(chunks), total=len(chunks), desc="Processing chunks"):
+                for i, chunk in enumerate(chunks):
                     chunk_text = chunk['text']
                     chunk_metadata = chunk['metadata']
-                    if chunk_count == 0:
-                        chunk_count = 1
                     if use_contextual:
-                        # Generate contextual summary
                         logging.debug(f"Generating contextual summary for chunk {chunk_count}")
                         context = situate_context(contextual_api_choice, item['content'], chunk_text)
                         contextualized_text = f"{chunk_text}\n\nContextual Summary: {context}"
@@ -414,7 +410,7 @@ def create_view_embeddings_tab():
                     texts.append(contextualized_text)
                     ids.append(chunk_id)
                     metadatas.append(metadata)
-                    chunk_count = chunk_count+1
+                    chunk_count += 1
 
                 # Create embeddings in batch
                 logging.info(f"Creating embeddings for {len(texts)} chunks")
@@ -424,7 +420,12 @@ def create_view_embeddings_tab():
                 store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
 
                 # Create a preview of the first embedding
-                embedding_preview = str(embeddings[0][:50]) if embeddings else "No embeddings created"
+                if isinstance(embeddings, np.ndarray) and embeddings.size > 0:
+                    embedding_preview = str(embeddings[0][:50])
+                elif isinstance(embeddings, list) and len(embeddings) > 0:
+                    embedding_preview = str(embeddings[0][:50])
+                else:
+                    embedding_preview = "No embeddings created"
 
                 # Return status message
                 status = f"New embeddings created and stored for item: {item['title']} (ID: {item_id})"
@@ -434,9 +435,10 @@ def create_view_embeddings_tab():
                     status += " (with contextual summaries)"
 
                 # Return status message, embedding preview, and metadata
-                return status, f"First 50 elements of new embedding:\n{embedding_preview}", json.dumps(metadatas[0], indent=2)
+                return status, f"First 50 elements of new embedding:\n{embedding_preview}", json.dumps(metadatas[0],
+                                                                                                       indent=2)
             except Exception as e:
-                logging.error(f"Error in create_new_embedding_for_item: {str(e)}")
+                logging.error(f"Error in create_new_embedding_for_item: {str(e)}", exc_info=True)
                 return f"Error creating embedding: {str(e)}", "", ""
 
         refresh_button.click(
