@@ -68,7 +68,7 @@
 ----------
 **GUI Screenshot**
 - Planning to replace with several short gifs to show functionality and how it can be used.
-[tldw-run-through-blank.webm](https://github.com/user-attachments/assets/9328eabe-d05d-4442-827b-1e75f4f81e94)
+- ![tldw Walkthrough of a fresh install][tldw-run-through-blank.webm](https://github.com/user-attachments/assets/9328eabe-d05d-4442-827b-1e75f4f81e94)
 
 
 ### What is tl/dw?
