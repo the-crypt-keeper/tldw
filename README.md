@@ -8,6 +8,7 @@
   - (Note: YouTube may block the demo unless you provide a session cookie. Placeholder content is included, random contents of a conference and whatever videos I decided to use for testing that patch version.)
 
 #### [Video Walkthrough of a Fresh Install](Docs/tldw-run-through-blank.webm)
+#### Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)`
 
 #### Key Features:
 - Full-text+RAG search across all ingested content (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking).
