@@ -282,41 +282,6 @@ def store_in_chroma(collection_name: str, texts: List[str], embeddings: Any, ids
     return collection
 
 
-# v1
-# def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], metadatas: List[Dict[str, Any]]):
-#     try:
-#         collection = chroma_client.get_or_create_collection(name=collection_name)
-#
-#         # Log the inputs for debugging
-#         logging.debug(f"Storing in ChromaDB - Collection: {collection_name}")
-#         logging.debug(f"Texts (first 100 chars): {texts[0][:100]}...")
-#         logging.debug(f"Embeddings (first 5 values): {embeddings[0][:5]}")
-#         logging.debug(f"IDs: {ids}")
-#         logging.debug(f"Metadatas: {metadatas}")
-#
-#         # Use upsert instead of add/update
-#         collection.upsert(
-#             documents=texts,
-#             embeddings=embeddings,
-#             ids=ids,
-#             metadatas=metadatas
-#         )
-#
-#         # Verify storage
-#         for doc_id in ids:
-#             result = collection.get(ids=[doc_id], include=["documents", "embeddings", "metadatas"])
-#             if not result['embeddings'] or result['embeddings'][0] is None:
-#                 logging.error(f"Failed to store embedding for {doc_id}")
-#             else:
-#                 logging.info(f"Embedding stored successfully for {doc_id}")
-#                 logging.debug(f"Stored document: {result['documents'][0][:100]}...")
-#                 logging.debug(f"Stored metadata: {result['metadatas'][0]}")
-#
-#     except Exception as e:
-#         logging.error(f"Error storing embeddings in ChromaDB: {str(e)}")
-#         raise
-
-
 # Function to perform vector search using ChromaDB + Keywords from the media_db
 #v2
 def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[str, Any]]:
@@ -361,20 +326,7 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
     except Exception as e:
         logging.error(f"Error in vector_search: {str(e)}", exc_info=True)
         raise
-# v1
-# def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[str, Any]]:
-#     try:
-#         query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
-#         collection = chroma_client.get_collection(name=collection_name)
-#         results = collection.query(
-#             query_embeddings=[query_embedding],
-#             n_results=k,
-#             include=["documents", "metadatas"]
-#         )
-#         return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
-#     except Exception as e:
-#         logging.error(f"Error in vector_search: {str(e)}")
-#         raise
+
 
 def schedule_embedding(media_id: int, content: str, media_name: str):
     try:
