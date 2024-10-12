@@ -7,10 +7,15 @@
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
   - (Note: YouTube may block the demo unless you provide a session cookie. Placeholder content is included, random contents of a conference and whatever videos I decided to use for testing that patch version.)
 
+#### [Video Walkthrough of a Fresh Install](Docs/tldw-run-through-blank.webm)
+#### Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)`
+
 #### Key Features:
-- Full-text search across all ingested content (with RAG, BM25 + Vectors support).
+- Full-text+RAG search across all ingested content (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking).
 - Local LLM inference for offline summarization and chat (via `llamafile`).
-- Comprehensive ingestion capabilities for video, audio, text, and web articles.
+- Local Embeddings generation for RAG search (via `llamafile`).
+- Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
+- Also writing tools! Grammar/Style checker, Tone Analyzer, Writing editor(feedback), and more.
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 ----------
 
@@ -56,19 +61,12 @@
 - **Run it as a WebApp**
   * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
     * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
-    * Has an option to download the generated transcript, and summary as text files from the UI.
-    * Can also download video/audio as files if selected in the UI (WIP - doesn't currently work)
     - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
       * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
       * So everything you might consume during your path of research, tracked and assimilated and tagged.
       * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
   - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
 
-
-----------
-**GUI Screenshot**
-- Planning to replace with several short gifs to show functionality and how it can be used.
-![tldw-summarization-gui-blank-walkthrough](https://github.com/rmusser01/tldw/blob/main/Docs/Screenshots/tldw-run-through-blank.mp4))
 
 ### What is tl/dw?
 **tl/dw** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
@@ -181,15 +179,15 @@ All features are designed to run **locally** on your device, ensuring privacy an
 You can view the full roadmap on our [GitHub Issues page](https://github.com/rmusser01/tldw/issues).
 
 Some planned features include:
-- Improved **RAG (Retrieval-Augmented Generation)** support with enhanced testing.
-- New, more intuitive **UI**, migrating to FastAPI with custom front-ends.
+- **Improved RAG Pipeline** (Retrieval-Augmented Generation) support with enhanced testing.
+- **New, more intuitive UI**, migrating to FastAPI with custom front-ends.
 - **Streaming responses** for real-time answers.
-- **Whisper model transcription accuracy** testing.
+- **Whisper model transcription accuracy testing**
     - Identify accuracy of used models.
     - Set it up so users can test against their own datasets
-- Add TTS/STT support for the UI so you can ask questions directly to the model or have it speak out the results to you.
+- **TTS/STT support** for the UI so you can ask questions directly to the model or have it speak out the results to you.
   - Having something like this would be pretty fucking cool I think: https://github.com/smellslikeml/dolla_llama/tree/main (Need to look more into nemesis by specterops)
-- Add some neat writing tools, since why not have some fun?
+- Add **some neat writing tools**, since why not have some fun?
   - https://github.com/the-crypt-keeper/the-muse 
   - https://github.com/the-crypt-keeper/LLooM 
   - https://github.com/lmg-anon/mikupad 
@@ -276,10 +274,8 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 - **Requirements**
   - Python3
   - ffmpeg (Script will install this for you)
-  - pandoc (Optional. For epub to markdown conversion) - https://pandoc.org/installing.html
-    - `pandoc -f epub -t markdown -o output.md input.epub` -> Can then import/ingest the markdown file into the DB.
-    - If done from the CLI using the `--ingest_text_file` flag, you can specify the title and author of the book, as well as any additional keywords you'd like to tag it with. (if not a regex will attempt to identify it)
-    - Or just do it through the GUI, drag and drop the file into the UI, set the Title, Author, and any keywords and hit `Import Data`.
+  - pandoc (Optional. For manual epub to markdown conversion) - https://pandoc.org/installing.html
+    - `pandoc -f epub -t markdown -o output.md input.epub` -> Can then import/ingest the markdown file into the DB. Only reason you would use this is because you have a large amount of epubs you would like to convert to plain text? idk.
   - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
     - Apparently there is a ROCm version of PyTorch.
       - MS Pytorch: https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
