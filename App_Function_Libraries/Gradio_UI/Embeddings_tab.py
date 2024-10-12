@@ -486,9 +486,11 @@ def create_purge_embeddings_tab():
 
     def purge_all_embeddings():
         try:
+            # It came to me in a dream....I literally don't remember how the fuck this works, cant find documentation...
             collection_name = "all_content_embeddings"
             chroma_client.delete_collection(collection_name)
             chroma_client.create_collection(collection_name)
+            logging.info(f"All embeddings have been purged successfully.")
             return "All embeddings have been purged successfully."
         except Exception as e:
             logging.error(f"Error during embedding purge: {str(e)}")
