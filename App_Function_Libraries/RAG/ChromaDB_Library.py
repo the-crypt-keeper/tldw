@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 import chromadb
 from chromadb import Settings
 from itertools import islice
+import numpy as np
 #
 # Local Imports:
 from App_Function_Libraries.Chunk_Lib import chunk_for_embedding, chunk_options
@@ -214,54 +215,165 @@ def reset_chroma_collection(collection_name: str):
         logging.error(f"Error resetting ChromaDB collection: {str(e)}")
 
 
-def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], metadatas: List[Dict[str, Any]]):
+#v2
+def store_in_chroma(collection_name: str, texts: List[str], embeddings: Any, ids: List[str],
+                    metadatas: List[Dict[str, Any]]):
+    # Convert embeddings to list if it's a numpy array
+    if isinstance(embeddings, np.ndarray):
+        embeddings = embeddings.tolist()
+    elif not isinstance(embeddings, list):
+        raise TypeError("Embeddings must be either a list or a numpy array")
+
+    if not embeddings:
+        raise ValueError("No embeddings provided")
+
+    embedding_dim = len(embeddings[0])
+
+    logging.info(f"Storing embeddings in ChromaDB - Collection: {collection_name}")
+    logging.info(f"Number of embeddings: {len(embeddings)}, Dimension: {embedding_dim}")
+
     try:
-        collection = chroma_client.get_or_create_collection(name=collection_name)
+        # Attempt to get or create the collection
+        try:
+            collection = chroma_client.get_collection(name=collection_name)
+            logging.info(f"Existing collection '{collection_name}' found")
 
-        # Log the inputs for debugging
-        logging.debug(f"Storing in ChromaDB - Collection: {collection_name}")
-        logging.debug(f"Texts (first 100 chars): {texts[0][:100]}...")
-        logging.debug(f"Embeddings (first 5 values): {embeddings[0][:5]}")
-        logging.debug(f"IDs: {ids}")
-        logging.debug(f"Metadatas: {metadatas}")
+            # Check dimension of existing embeddings
+            existing_embeddings = collection.get(limit=1, include=['embeddings'])['embeddings']
+            if existing_embeddings:
+                existing_dim = len(existing_embeddings[0])
+                if existing_dim != embedding_dim:
+                    logging.warning(f"Embedding dimension mismatch. Existing: {existing_dim}, New: {embedding_dim}")
+                    logging.warning("Deleting existing collection and creating a new one")
+                    chroma_client.delete_collection(name=collection_name)
+                    collection = chroma_client.create_collection(name=collection_name)
+            else:
+                logging.info("No existing embeddings in the collection")
+        except Exception as e:
+            logging.info(f"Collection '{collection_name}' not found. Creating new collection")
+            collection = chroma_client.create_collection(name=collection_name)
 
-        # Use upsert instead of add/update
+        # Perform the upsert operation
         collection.upsert(
             documents=texts,
             embeddings=embeddings,
             ids=ids,
             metadatas=metadatas
         )
+        logging.info(f"Successfully upserted {len(embeddings)} embeddings")
 
-        # Verify storage
-        for doc_id in ids:
-            result = collection.get(ids=[doc_id], include=["documents", "embeddings", "metadatas"])
-            if not result['embeddings'] or result['embeddings'][0] is None:
-                logging.error(f"Failed to store embedding for {doc_id}")
+        # Verify all stored embeddings
+        results = collection.get(ids=ids, include=["documents", "embeddings", "metadatas"])
+
+        for i, doc_id in enumerate(ids):
+            if results['embeddings'][i] is None:
+                raise ValueError(f"Failed to store embedding for {doc_id}")
             else:
-                logging.info(f"Embedding stored successfully for {doc_id}")
-                logging.debug(f"Stored document: {result['documents'][0][:100]}...")
-                logging.debug(f"Stored metadata: {result['metadatas'][0]}")
+                logging.debug(f"Embedding stored successfully for {doc_id}")
+                logging.debug(f"Stored document preview: {results['documents'][i][:100]}...")
+                logging.debug(f"Stored metadata: {results['metadatas'][i]}")
+
+        logging.info("Successfully stored and verified all embeddings in ChromaDB")
 
     except Exception as e:
-        logging.error(f"Error storing embeddings in ChromaDB: {str(e)}")
+        logging.error(f"Error in store_in_chroma: {str(e)}")
         raise
+
+    return collection
+
+
+# v1
+# def store_in_chroma(collection_name: str, texts: List[str], embeddings: List[List[float]], ids: List[str], metadatas: List[Dict[str, Any]]):
+#     try:
+#         collection = chroma_client.get_or_create_collection(name=collection_name)
+#
+#         # Log the inputs for debugging
+#         logging.debug(f"Storing in ChromaDB - Collection: {collection_name}")
+#         logging.debug(f"Texts (first 100 chars): {texts[0][:100]}...")
+#         logging.debug(f"Embeddings (first 5 values): {embeddings[0][:5]}")
+#         logging.debug(f"IDs: {ids}")
+#         logging.debug(f"Metadatas: {metadatas}")
+#
+#         # Use upsert instead of add/update
+#         collection.upsert(
+#             documents=texts,
+#             embeddings=embeddings,
+#             ids=ids,
+#             metadatas=metadatas
+#         )
+#
+#         # Verify storage
+#         for doc_id in ids:
+#             result = collection.get(ids=[doc_id], include=["documents", "embeddings", "metadatas"])
+#             if not result['embeddings'] or result['embeddings'][0] is None:
+#                 logging.error(f"Failed to store embedding for {doc_id}")
+#             else:
+#                 logging.info(f"Embedding stored successfully for {doc_id}")
+#                 logging.debug(f"Stored document: {result['documents'][0][:100]}...")
+#                 logging.debug(f"Stored metadata: {result['metadatas'][0]}")
+#
+#     except Exception as e:
+#         logging.error(f"Error storing embeddings in ChromaDB: {str(e)}")
+#         raise
 
 
 # Function to perform vector search using ChromaDB + Keywords from the media_db
+#v2
 def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[str, Any]]:
     try:
-        query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
         collection = chroma_client.get_collection(name=collection_name)
+
+        # Fetch a sample of embeddings to check metadata
+        sample_results = collection.get(limit=10, include=["metadatas"])
+        if not sample_results['metadatas']:
+            raise ValueError("No metadata found in the collection")
+
+        # Check if all embeddings use the same model and provider
+        embedding_models = [metadata.get('embedding_model') for metadata in sample_results['metadatas'] if
+                            metadata.get('embedding_model')]
+        embedding_providers = [metadata.get('embedding_provider') for metadata in sample_results['metadatas'] if
+                               metadata.get('embedding_provider')]
+
+        if not embedding_models or not embedding_providers:
+            raise ValueError("Embedding model or provider information not found in metadata")
+
+        embedding_model = max(set(embedding_models), key=embedding_models.count)
+        embedding_provider = max(set(embedding_providers), key=embedding_providers.count)
+
+        logging.info(f"Using embedding model: {embedding_model} from provider: {embedding_provider}")
+
+        # Generate query embedding using the existing create_embedding function
+        query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
+
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=k,
             include=["documents", "metadatas"]
         )
-        return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
+
+        if not results['documents'][0]:
+            logging.warning("No results found for the query")
+            return []
+
+        return [{"content": doc, "metadata": meta} for doc, meta in
+                zip(results['documents'][0], results['metadatas'][0])]
     except Exception as e:
-        logging.error(f"Error in vector_search: {str(e)}")
+        logging.error(f"Error in vector_search: {str(e)}", exc_info=True)
         raise
+# v1
+# def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[str, Any]]:
+#     try:
+#         query_embedding = create_embedding(query, embedding_provider, embedding_model, embedding_api_url)
+#         collection = chroma_client.get_collection(name=collection_name)
+#         results = collection.query(
+#             query_embeddings=[query_embedding],
+#             n_results=k,
+#             include=["documents", "metadatas"]
+#         )
+#         return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
+#     except Exception as e:
+#         logging.error(f"Error in vector_search: {str(e)}")
+#         raise
 
 def schedule_embedding(media_id: int, content: str, media_name: str):
     try:
