@@ -89,7 +89,7 @@ def summarize(
         elif api_name.lower() == "custom-openai":
             return summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp, system_message)
         elif api_name.lower() == "ollama":
-            return summarize_with_ollama(input_data, custom_prompt_arg, api_key, temp, system_message)
+            return summarize_with_ollama(input_data, custom_prompt_arg, None, api_key, temp, system_message)
         else:
             return f"Error: Invalid API Name {api_name}"
 
