@@ -401,7 +401,7 @@ def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="h
 
 
 # FIXME
-def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/api/generate", api_key=None, temp=None, system_message=None, model=None):
+def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/api/chat", api_key=None, temp=None, system_message=None, model=None):
     try:
         logging.debug("ollama: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -485,7 +485,7 @@ def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/
         if response.status_code == 200:
             # if 'X' in response_data:
             logging.debug(response_data)
-            summary = response_data['content'].strip()
+            summary = response_data['message']['content'].strip()
             logging.debug("Ollama: Chat request successful")
             print("\n\nChat request successful.")
             return summary
