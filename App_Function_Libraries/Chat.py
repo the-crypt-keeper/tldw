@@ -94,7 +94,7 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
             response = chat_with_huggingface(api_key, input_data, prompt, temp)  # , system_message)
 
         elif api_endpoint.lower() == "ollama":
-            response = chat_with_ollama(input_data, prompt, temp, system_message)
+            response = chat_with_ollama(input_data, prompt, None, api_key, temp, system_message)
 
         elif api_endpoint.lower() == "aphrodite":
             response = chat_with_aphrodite(input_data, prompt, temp, system_message)

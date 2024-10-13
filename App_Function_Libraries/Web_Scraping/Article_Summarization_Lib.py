@@ -165,7 +165,7 @@ def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, cu
                 elif api_name.lower() == "ollama":
                     logging.debug(f"MAIN: Trying to summarize with OLLAMA")
                     # def summarize_with_ollama(input_data, api_key, custom_prompt, api_url):
-                    summary = summarize_with_ollama(json_file_path, article_custom_prompt, api_key, None, system_message, None)
+                    summary = summarize_with_ollama(json_file_path, article_custom_prompt, None, api_key, None, system_message, None)
 
                 elif api_name == "custom_openai_api":
                     logging.debug(f"MAIN: Trying to summarize with Custom_OpenAI API")
