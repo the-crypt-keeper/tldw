@@ -74,8 +74,7 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
             response = chat_with_mistral(api_key, input_data, prompt, temp, system_message)
 
         elif api_endpoint.lower() == "llama.cpp":
-            response = chat_with_llama(input_data, prompt, temp, system_message)
-
+            response = chat_with_llama(input_data, prompt, temp, None, api_key, system_message)
         elif api_endpoint.lower() == "kobold":
             response = chat_with_kobold(input_data, api_key, prompt, temp, system_message)
 

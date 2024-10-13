@@ -99,7 +99,8 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
         print("Error occurred while processing Chat request with Local LLM:", str(e))
         return "Local LLM: Error occurred while processing Chat response"
 
-def chat_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/completion", api_key=None, system_prompt=None):
+# FIXME
+def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8080/completion", api_key=None, system_prompt=None):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -112,6 +113,15 @@ def chat_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/co
             logging.info("llama.cpp: API key not found or is empty")
 
         logging.debug(f"llama.cpp: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        if api_url is None:
+            logging.info("llama.cpp: API URL not provided as parameter")
+            logging.info("llama.cpp: Attempting to use API URL from config file")
+            api_url = loaded_config_data['local_api_ip']['llama']
+
+        if api_url is None or api_url.strip() == "":
+            logging.info("llama.cpp: API URL not found or is empty")
+            return "llama.cpp: API URL not found or is empty"
 
         headers = {
             'accept': 'application/json',
@@ -132,7 +142,29 @@ def chat_with_llama(input_data, custom_prompt, api_url="http://127.0.0.1:8080/co
 
         data = {
             "prompt": f"{llama_prompt}",
-            "system_prompt": f"{system_prompt}"
+            "system_prompt": f"{system_prompt}",
+            'temperature': temp,
+            #'top_k': '40',
+            #'top_p': '0.95',
+            #'min_p': '0.05',
+            #'n_predict': '-1',
+            #'n_keep': '0',
+            #'stream': 'false',
+            #'stop': '["\n"]',
+            #'tfs_z': '1.0',
+            #'repeat_penalty': '1.1',
+            #'repeat_last_n': '64',
+            #'presence_penalty': '0.0',
+            #'frequency_penalty': '0.0',
+            #'mirostat': '0',
+            #'grammar': '0',
+            #'json_schema': '0',
+            #'ignore_eos': 'false',
+            #'logit_bias': [],
+            #'n_probs': '0',
+            #'min_keep': '0',
+            #'samplers': '["top_k", "tfs_z", "typical_p", "top_p", "min_p", "temperature"]',
+
         }
 
         logging.debug("llama: Submitting request to API endpoint")
