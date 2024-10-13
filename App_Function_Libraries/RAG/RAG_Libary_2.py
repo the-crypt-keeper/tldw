@@ -263,7 +263,7 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
 
     elif api_choice.lower() == "ollama":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_ollama
-        return summarize_with_ollama(prompt, "", config['Local-API']['ollama_api_key'], None, None, None)
+        return summarize_with_ollama(prompt, "", config['Local-API']['ollama_api_IP'], config['Local-API']['ollama_api_key'], None, None, None)
 
     elif api_choice.lower() == "custom_openai_api":
         logging.debug(f"RAG Answer Gen: Trying with Custom_OpenAI API")

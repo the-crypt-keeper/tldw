@@ -21,6 +21,7 @@
 import json
 import logging
 import os
+import time
 from typing import Union
 
 import requests
@@ -640,10 +641,19 @@ def summarize_with_vllm(
         return f"Error: Unexpected error during vLLM summarization - {str(e)}"
 
 
-# FIXME - update to be a summarize request
-def summarize_with_ollama(input_data, custom_prompt, api_key=None, temp=None, system_message=None, model=None, api_url="http://127.0.0.1:11434/api/generate",):
+def summarize_with_ollama(
+    input_data,
+    custom_prompt,
+    api_url="http://127.0.0.1:11434/v1/chat/completions",
+    api_key=None,
+    temp=None,
+    system_message=None,
+    model=None,
+    max_retries=5,
+    retry_delay=20
+):
     try:
-        logging.debug("ollama: Loading and validating configurations")
+        logging.debug("Ollama: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
         if loaded_config_data is None:
             logging.error("Failed to load configuration data")
@@ -661,7 +671,19 @@ def summarize_with_ollama(input_data, custom_prompt, api_key=None, temp=None, sy
                 else:
                     logging.warning("Ollama: No API key found in config file")
 
-        model = loaded_config_data['models']['ollama']
+            # Set model from parameter or config
+            if model is None:
+                model = loaded_config_data['models'].get('ollama')
+                if model is None:
+                    logging.error("Ollama: Model not found in config file")
+                    return "Ollama: Model not found in config file"
+
+            # Set api_url from parameter or config
+            if api_url is None:
+                api_url = loaded_config_data['local_api_ip'].get('ollama')
+                if api_url is None:
+                    logging.error("Ollama: API URL not found in config file")
+                    return "Ollama: API URL not found in config file"
 
         # Load transcript
         logging.debug("Ollama: Loading JSON data")
@@ -690,57 +712,92 @@ def summarize_with_ollama(input_data, custom_prompt, api_key=None, temp=None, sy
         else:
             raise ValueError("Ollama: Invalid input data format")
 
-        if custom_prompt is None:
-            custom_prompt = f"{summarizer_prompt}\n\n\n\n{text}"
-        else:
-            custom_prompt = f"{custom_prompt}\n\n\n\n{text}"
-
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
         }
-        if len(ollama_api_key) > 5:
+        if ollama_api_key and len(ollama_api_key) > 5:
             headers['Authorization'] = f'Bearer {ollama_api_key}'
 
-        ollama_prompt = f"{custom_prompt} \n\n\n\n{text}"
+        ollama_prompt = f"{custom_prompt}\n\n{text}"
         if system_message is None:
             system_message = "You are a helpful AI assistant."
-        logging.debug(f"llama: Prompt being sent is {ollama_prompt}")
-        if system_message is None:
-            system_message = "You are a helpful AI assistant."
+        logging.debug(f"Ollama: Prompt being sent is: {ollama_prompt}")
 
-        data = {
+        data_payload = {
             "model": model,
             "messages": [
-                {"role": "system",
-                 "content": system_message
-                 },
-                {"role": "user",
-                 "content": ollama_prompt
-                 }
+                {
+                    "role": "system",
+                    "content": system_message
+                },
+                {
+                    "role": "user",
+                    "content": ollama_prompt
+                }
             ],
+            'temperature': temp
         }
 
-        logging.debug("Ollama: Submitting request to API endpoint")
-        print("Ollama: Submitting request to API endpoint")
-        response = requests.post(api_url, headers=headers, json=data)
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+        for attempt in range(1, max_retries + 1):
+            logging.debug("Ollama: Submitting request to API endpoint")
+            print("Ollama: Submitting request to API endpoint")
+            try:
+                response = requests.post(api_url, headers=headers, json=data_payload, timeout=30)
+                response.raise_for_status()  # Raises HTTPError for bad responses
+                response_data = response.json()
+            except requests.exceptions.Timeout:
+                logging.error("Ollama: Request timed out.")
+                return "Ollama: Request timed out."
+            except requests.exceptions.HTTPError as http_err:
+                logging.error(f"Ollama: HTTP error occurred: {http_err}")
+                return f"Ollama: HTTP error occurred: {http_err}"
+            except requests.exceptions.RequestException as req_err:
+                logging.error(f"Ollama: Request exception: {req_err}")
+                return f"Ollama: Request exception: {req_err}"
+            except json.JSONDecodeError:
+                logging.error("Ollama: Failed to decode JSON response")
+                return "Ollama: Failed to decode JSON response."
+            except Exception as e:
+                logging.error(f"Ollama: An unexpected error occurred: {str(e)}")
+                return f"Ollama: An unexpected error occurred: {str(e)}"
 
-        if response.status_code == 200:
-            # if 'X' in response_data:
-            logging.debug(response_data)
-            summary = response_data['content'].strip()
-            logging.debug("Ollama: Summarization successful")
-            print("Summarization successful.")
-            return summary
-        else:
-            logging.error(f"Ollama: API request failed with status code {response.status_code}: {response.text}")
-            return f"Ollama: API request failed: {response.text}"
+            logging.debug(f"API Response Data: {response_data}")
+
+            if response.status_code == 200:
+                # Inspect available keys
+                available_keys = list(response_data.keys())
+                logging.debug(f"Ollama: Available keys in response: {available_keys}")
+
+                # Attempt to retrieve 'response'
+                summary = None
+                if 'response' in response_data and response_data['response']:
+                    summary = response_data['response'].strip()
+                elif 'choices' in response_data and len(response_data['choices']) > 0:
+                    choice = response_data['choices'][0]
+                    if 'message' in choice and 'content' in choice['message']:
+                        summary = choice['message']['content'].strip()
+
+                if summary:
+                    logging.debug("Ollama: Chat request successful")
+                    print("\n\nChat request successful.")
+                    return summary
+                elif response_data.get('done_reason') == 'load':
+                    logging.warning(f"Ollama: Model is loading. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    logging.error("Ollama: API response does not contain 'response' or 'choices'.")
+                    return "Ollama: API response does not contain 'response' or 'choices'."
+            else:
+                logging.error(f"Ollama: API request failed with status code {response.status_code}: {response.text}")
+                return f"Ollama: API request failed: {response.text}"
+
+        logging.error("Ollama: Maximum retry attempts reached. Model is still loading.")
+        return "Ollama: Maximum retry attempts reached. Model is still loading."
 
     except Exception as e:
-        logging.error("Ollama: Error in processing: %s", str(e))
-        return f"Ollama: Error occurred while processing summary with ollama: {str(e)}"
+        logging.error("\n\nOllama: Error in processing: %s", str(e))
+        return f"Ollama: Error occurred while processing summary with Ollama: {str(e)}"
 
 
 # FIXME - update to be a summarize request
