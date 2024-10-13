@@ -245,7 +245,6 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
     elif api_choice == "Llama.cpp":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama
         return summarize_with_llama(prompt, "", config['Local-API']['llama_api_key'], None, None)
-
     elif api_choice == "Kobold":
         from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_kobold
         return summarize_with_kobold(prompt, config['Local-API']['kobold_api_key'], "", system_message=None, temp=None)
