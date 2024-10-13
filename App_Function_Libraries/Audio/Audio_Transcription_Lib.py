@@ -55,7 +55,7 @@ class WhisperModel(OriginalWhisperModel):
     valid_model_sizes = [
         "tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium",
         "large-v1", "large-v2", "large-v3", "large", "distil-large-v2", "distil-medium.en",
-        "distil-small.en", "distil-large-v3"
+        "distil-small.en", "distil-large-v3", "deepdml/faster-whisper-large-v3-turbo-ct2"
     ]
 
     def __init__(
@@ -199,11 +199,12 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
             return segments
 
         logging.info('speech-to-text: Starting transcription...')
-        options = dict(language=selected_source_lang, beam_size=5, best_of=5, vad_filter=vad_filter)
+        options = dict(language=selected_source_lang, beam_size=10, best_of=10, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
         # use function and config at top of file
         logging.debug("speech-to-text: Using whisper model: %s", whisper_model)
         whisper_model_instance = get_whisper_model(whisper_model, processing_choice)
+        # faster_whisper transcription right here - FIXME -test batching
         segments_raw, info = whisper_model_instance.transcribe(audio_file_path, **transcribe_options)
 
         segments = []
@@ -216,7 +217,7 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
             logging.debug("Segment: %s", chunk)
             segments.append(chunk)
             # Print to verify its working
-            print(f"{segment_chunk.start:.2f}s - {segment_chunk.end:.2f}s | {segment_chunk.text}")
+            logging.info(f"{segment_chunk.start:.2f}s - {segment_chunk.end:.2f}s | {segment_chunk.text}")
 
             # Log it as well.
             logging.debug(

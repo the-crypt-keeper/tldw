@@ -43,6 +43,7 @@ def create_video_transcription_tab():
                                        lines=5)
                 video_file_input = gr.File(label="Upload Video File (Optional)", file_types=["video/*"])
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
+                vad_checkbox = gr.Checkbox(label="Enable Voice-Audio-Detection(VAD)", value=True)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
 
                 with gr.Row():
@@ -185,7 +186,7 @@ def create_video_transcription_tab():
                 download_summary = gr.File(label="Download All Summaries as Text")
 
             @error_handler
-            def process_videos_with_error_handling(inputs, start_time, end_time, diarize, whisper_model,
+            def process_videos_with_error_handling(inputs, start_time, end_time, diarize, vad_use, whisper_model,
                                                    custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                                                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                                    use_multi_level_chunking, chunk_language, api_name,
@@ -301,7 +302,7 @@ def create_video_transcription_tab():
                                     input_item, 2, whisper_model,
                                     custom_prompt,
                                     start_seconds, api_name, api_key,
-                                    False, False, False, False, 0.01, None, keywords, None, diarize,
+                                    vad_use, False, False, False, 0.01, None, keywords, None, diarize,
                                     end_time=end_seconds,
                                     include_timestamps=timestamp_option,
                                     metadata=video_metadata,
@@ -425,7 +426,7 @@ def create_video_transcription_tab():
                         None
                     )
 
-            def process_videos_wrapper(url_input, video_file, start_time, end_time, diarize, whisper_model,
+            def process_videos_wrapper(url_input, video_file, start_time, end_time, diarize, vad_use, whisper_model,
                                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                        use_multi_level_chunking, chunk_language, summarize_recursively, api_name,
@@ -460,7 +461,7 @@ def create_video_transcription_tab():
                         raise ValueError("No input provided. Please enter URLs or upload a video file.")
 
                     result = process_videos_with_error_handling(
-                        inputs, start_time, end_time, diarize, whisper_model,
+                        inputs, start_time, end_time, diarize, vad_use, whisper_model,
                         custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                         chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                         use_multi_level_chunking, chunk_language, api_name,
@@ -507,6 +508,7 @@ def create_video_transcription_tab():
                 try:
                     logging.info(f"Starting process_url_metadata for URL: {input_item}")
                     # Create download path
+
                     download_path = create_download_directory("Video_Downloads")
                     logging.info(f"Download path created at: {download_path}")
 
@@ -743,15 +745,37 @@ def create_video_transcription_tab():
                 inputs=[confab_checkbox],
                 outputs=[confabulation_output]
             )
+
             process_button.click(
                 fn=process_videos_wrapper,
                 inputs=[
-                    url_input, video_file_input, start_time_input, end_time_input, diarize_input, whisper_model_input,
-                    custom_prompt_checkbox, custom_prompt_input, chunking_options_checkbox,
-                    chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                    use_multi_level_chunking, chunk_language, summarize_recursively, api_name_input, api_key_input,
-                    keywords_input, use_cookies_input, cookies_input, batch_size_input,
-                    timestamp_option, keep_original_video, confab_checkbox, overwrite_checkbox
+                    url_input,
+                    video_file_input,
+                    start_time_input,
+                    end_time_input,
+                    diarize_input,
+                    vad_checkbox,
+                    whisper_model_input,
+                    custom_prompt_checkbox,
+                    custom_prompt_input,
+                    chunking_options_checkbox,
+                    chunk_method,
+                    max_chunk_size,
+                    chunk_overlap,
+                    use_adaptive_chunking,
+                    use_multi_level_chunking,
+                    chunk_language,
+                    summarize_recursively,
+                    api_name_input,
+                    api_key_input,
+                    keywords_input,
+                    use_cookies_input,
+                    cookies_input,
+                    batch_size_input,
+                    timestamp_option,
+                    keep_original_video,
+                    confab_checkbox,
+                    overwrite_checkbox
                 ],
                 outputs=[progress_output, error_output, results_output, download_transcription, download_summary, confabulation_output]
             )
