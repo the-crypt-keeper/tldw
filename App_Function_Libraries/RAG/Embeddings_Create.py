@@ -41,6 +41,13 @@ overlap = loaded_config['Embeddings']['overlap']
 # Global cache for embedding models
 embedding_models = {}
 
+# Commit hashes
+commit_hashes = {
+    "jinaai/jina-embeddings-v3": "4be32c2f5d65b95e4bcce473545b7883ec8d2edd",
+    "Alibaba-NLP/gte-large-en-v1.5": "104333d6af6f97649377c2afbde10a7704870c7b",
+    "dunzhang/setll_en_400M_v5": "2aa5579fcae1c579de199a3866b6e514bbbf5d10"
+}
+
 class HuggingFaceEmbedder:
     def __init__(self, model_name, cache_dir, timeout_seconds=30):
         self.model_name = model_name
@@ -53,17 +60,20 @@ class HuggingFaceEmbedder:
         self.unload_timer = None
 
     def load_model(self):
+        # https://huggingface.co/docs/transformers/custom_models
         if self.model is None:
             # Pass cache_dir to from_pretrained to specify download directory
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.model_name,
                 trust_remote_code=True,
-                cache_dir=self.cache_dir  # Specify cache directory
+                cache_dir=self.cache_dir,  # Specify cache directory
+                revision=commit_hashes.get(self.model_name, None)  # Pass commit hash
             )
             self.model = AutoModel.from_pretrained(
                 self.model_name,
                 trust_remote_code=True,
-                cache_dir=self.cache_dir  # Specify cache directory
+                cache_dir=self.cache_dir,  # Specify cache directory
+                revision=commit_hashes.get(self.model_name, None)  # Pass commit hash
             )
             self.model.to(self.device)
         self.last_used_time = time.time()
@@ -88,6 +98,7 @@ class HuggingFaceEmbedder:
 
     def create_embeddings(self, texts):
         self.load_model()
+        # https://huggingface.co/docs/transformers/custom_models
         inputs = self.tokenizer(
             texts,
             return_tensors="pt",
@@ -117,10 +128,12 @@ class ONNXEmbedder:
     def __init__(self, model_name, onnx_model_dir, timeout_seconds=30):
         self.model_name = model_name
         self.model_path = os.path.join(onnx_model_dir, f"{model_name}.onnx")
+        # https://huggingface.co/docs/transformers/custom_models
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_name,
             trust_remote_code=True,
-            cache_dir=onnx_model_dir  # Ensure tokenizer uses the same directory
+            cache_dir=onnx_model_dir,  # Ensure tokenizer uses the same directory
+            revision=commit_hashes.get(model_name, None)  # Pass commit hash
         )
         self.session = None
         self.timeout_seconds = timeout_seconds
