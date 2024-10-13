@@ -177,7 +177,7 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
                     summarization_response = summarize_with_deepseek(api_key, input_data, user_prompt, temp,
                                                                      system_prompt)
                 elif api_endpoint.lower() == "llama.cpp":
-                    summarization_response = summarize_with_llama(input_data, user_prompt, temp, system_prompt)
+                    summarization_response = summarize_with_llama(input_data, user_prompt, api_key, temp, system_prompt)
                 elif api_endpoint.lower() == "kobold":
                     summarization_response = summarize_with_kobold(input_data, api_key, user_prompt, temp,
                                                                    system_prompt)
