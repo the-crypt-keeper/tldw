@@ -15,7 +15,7 @@ import gradio as gr
 from App_Function_Libraries.Books.Book_Ingestion_Lib import read_epub
 from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_files, add_media_with_keywords
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
-from App_Function_Libraries.RAG.RAG_Libary_2 import generate_answer, enhanced_rag_pipeline
+from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, rag_qa_chat
 # Eventually... FIXME
 from App_Function_Libraries.RAG.RAG_QA_Chat import load_chat_history, save_chat_history
