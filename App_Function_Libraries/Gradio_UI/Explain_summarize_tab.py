@@ -194,7 +194,7 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
                     summarization_response = summarize_with_huggingface(api_key, input_data, user_prompt,
                                                                         temp)  # , system_prompt)
                 elif api_endpoint.lower() == "ollama":
-                    summarization_response = summarize_with_ollama(input_data, user_prompt, temp, system_prompt)
+                    summarization_response = summarize_with_ollama(input_data, user_prompt, None, api_key, temp, system_prompt)
                 else:
                     raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
         except Exception as e:
