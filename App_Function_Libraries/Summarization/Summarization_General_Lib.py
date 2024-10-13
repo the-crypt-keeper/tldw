@@ -73,7 +73,7 @@ def summarize(
         elif api_name.lower() == "mistral":
             return summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp, system_message)
         elif api_name.lower() == "llama.cpp":
-            return summarize_with_llama(input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_llama(input_data, custom_prompt_arg, api_key, temp, system_message)
         elif api_name.lower() == "kobold":
             return summarize_with_kobold(input_data, api_key, custom_prompt_arg, temp, system_message)
         elif api_name.lower() == "ooba":
