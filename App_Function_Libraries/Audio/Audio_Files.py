@@ -268,18 +268,23 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
     progress = []
     all_transcriptions = []
     all_summaries = []
-
+    #v2
     def format_transcription_with_timestamps(segments):
         if keep_timestamps:
             formatted_segments = []
             for segment in segments:
                 start = segment.get('Time_Start', 0)
                 end = segment.get('Time_End', 0)
-                text = segment.get('Text', '')
+                text = segment.get('Text', '').strip()  # Ensure text is stripped of leading/trailing spaces
+
+                # Add the formatted timestamp and text to the list, followed by a newline
                 formatted_segments.append(f"[{start:.2f}-{end:.2f}] {text}")
-            return " ".join(formatted_segments)
+
+            # Join the segments with a newline to ensure proper formatting
+            return "\n".join(formatted_segments)
         else:
-            return " ".join([segment.get('Text', '') for segment in segments])
+            # Join the text without timestamps
+            return "\n".join([segment.get('Text', '').strip() for segment in segments])
 
     def update_progress(message):
         progress.append(message)
