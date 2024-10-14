@@ -69,7 +69,7 @@ custom_prompt_summarize_bulleted_notes = ("""
 #
 # Global variables
 whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
-                  "distil-large-v2", "distil-medium.en", "distil-small.en"]
+                  "distil-large-v2", "distil-medium.en", "distil-small.en", ]
 server_mode = False
 share_public = False
 
