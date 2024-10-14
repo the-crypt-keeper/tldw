@@ -12,3 +12,10 @@ Writing
     https://github.com/EMNLP-2024-CritiCS/Collective-Critics-for-Creative-Story-Generation
 
 
+Update model suggestions for RAG vs Chatting/General use
+    https://huggingface.co/THUDM/glm-4-9b-chat/blob/main/README_en.md
+    https://huggingface.co/byroneverson/glm-4-9b-chat-abliterated-gguf/tree/main
+
+Whisper pipeline
+    https://huggingface.co/spaces/aadnk/faster-whisper-webui
+    https://huggingface.co/spaces/zhang082799/openai-whisper-large-v3-turbo

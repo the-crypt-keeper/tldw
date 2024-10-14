@@ -12,7 +12,7 @@ from typing import List, Tuple, IO, Union
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import db, search_db, DatabaseError, get_media_content
-from App_Function_Libraries.RAG.RAG_Libary_2 import generate_answer
+from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer
 #
 ########################################################################################################################
 #

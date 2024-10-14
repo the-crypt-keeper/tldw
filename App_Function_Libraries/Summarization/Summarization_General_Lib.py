@@ -1151,7 +1151,7 @@ def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize
 
         return audio_file_path, diarized_segments
 
-    # Non-diarized transcription (existing functionality)
+    # Non-diarized transcription
     if os.path.exists(segments_json_path):
         logging.info(f"Segments file already exists: {segments_json_path}")
         try:
