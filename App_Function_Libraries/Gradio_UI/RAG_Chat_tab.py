@@ -9,7 +9,7 @@ import gradio as gr
 #
 # Local Imports
 
-from App_Function_Libraries.RAG.RAG_Libary_2 import enhanced_rag_pipeline
+from App_Function_Libraries.RAG.RAG_Library_2 import enhanced_rag_pipeline
 #
 ########################################################################################################################
 #
