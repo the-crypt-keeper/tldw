@@ -4,12 +4,15 @@
 # Import necessary modules and functions
 import logging
 import os
+import time
+
 # External Imports
 import gradio as gr
 # Local Imports
 from App_Function_Libraries.Audio.Audio_Transcription_Lib import (record_audio, speech_to_text, save_audio_temp,
                                                                   stop_recording)
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 #######################################################################################################################
 #
@@ -38,11 +41,17 @@ def create_live_recording_tab():
         recording_state = gr.State(value=None)
 
         def start_recording(duration):
+            log_counter("live_recording_start_attempt", labels={"duration": duration})
             p, stream, audio_queue, stop_event, audio_thread = record_audio(duration)
+            log_counter("live_recording_start_success", labels={"duration": duration})
             return (p, stream, audio_queue, stop_event, audio_thread)
 
         def end_recording_and_transcribe(recording_state, whisper_model, vad_filter, save_recording, save_to_db, custom_title):
+            log_counter("live_recording_end_attempt", labels={"model": whisper_model})
+            start_time = time.time()
+
             if recording_state is None:
+                log_counter("live_recording_end_error", labels={"error": "Recording hasn't started yet"})
                 return "Recording hasn't started yet.", None
 
             p, stream, audio_queue, stop_event, audio_thread = recording_state
@@ -53,12 +62,18 @@ def create_live_recording_tab():
             transcription = "\n".join([segment["Text"] for segment in segments])
 
             if save_recording:
-                return transcription, temp_file
+                log_counter("live_recording_saved", labels={"model": whisper_model})
             else:
                 os.remove(temp_file)
-                return transcription, None
+
+            end_time = time.time() - start_time
+            log_histogram("live_recording_end_duration", end_time, labels={"model": whisper_model})
+            log_counter("live_recording_end_success", labels={"model": whisper_model})
+            return transcription, temp_file if save_recording else None
 
         def save_transcription_to_db(transcription, custom_title):
+            log_counter("save_transcription_to_db_attempt")
+            start_time = time.time()
             if custom_title.strip() == "":
                 custom_title = "Self-recorded Audio"
 
@@ -86,9 +101,13 @@ def create_live_recording_tab():
                     whisper_model=whisper_model,
                     media_type=media_type
                 )
+                end_time = time.time() - start_time
+                log_histogram("save_transcription_to_db_duration", end_time)
+                log_counter("save_transcription_to_db_success")
                 return f"Transcription saved to database successfully. {result}"
             except Exception as e:
                 logging.error(f"Error saving transcription to database: {str(e)}")
+                log_counter("save_transcription_to_db_error", labels={"error": str(e)})
                 return f"Error saving transcription to database: {str(e)}"
 
         def update_custom_title_visibility(save_to_db):

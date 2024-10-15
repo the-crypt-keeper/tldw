@@ -11,32 +11,42 @@
 #
 ####################
 #
-# Import necessary libraries
+# Imports
 import os
 import re
 import tempfile
 import zipfile
 from datetime import datetime
 import logging
-
+#
+# External Imports
 import ebooklib
 from bs4 import BeautifulSoup
 from ebooklib import epub
-
-from App_Function_Libraries.Chunk_Lib import chunk_ebook_by_chapters
 #
 # Import Local
 from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords, add_media_to_database
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
-
-
+from App_Function_Libraries.Chunk_Lib import chunk_ebook_by_chapters
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 #######################################################################################################################
 # Function Definitions
 #
 
-def import_epub(file_path, title=None, author=None, keywords=None, custom_prompt=None, system_prompt=None, summary=None,
-               auto_summarize=False, api_name=None, api_key=None, chunk_options=None, custom_chapter_pattern=None):
+def import_epub(file_path,
+                title=None,
+                author=None,
+                keywords=None,
+                custom_prompt=None,
+                system_prompt=None,
+                summary=None,
+                auto_summarize=False,
+                api_name=None,
+                api_key=None,
+                chunk_options=None,
+                custom_chapter_pattern=None
+                ):
     """
     Imports an EPUB file, extracts its content, chunks it, optionally summarizes it, and adds it to the database.
 
@@ -58,6 +68,9 @@ def import_epub(file_path, title=None, author=None, keywords=None, custom_prompt
     """
     try:
         logging.info(f"Importing EPUB file from {file_path}")
+        log_counter("epub_import_attempt", labels={"file_path": file_path})
+
+        start_time = datetime.now()
 
         # Convert EPUB to Markdown
         markdown_content = epub_to_markdown(file_path)
@@ -90,9 +103,10 @@ def import_epub(file_path, title=None, author=None, keywords=None, custom_prompt
         # Chunk the content by chapters
         chunks = chunk_ebook_by_chapters(markdown_content, chunk_options)
         logging.info(f"Total chunks created: {len(chunks)}")
+        log_histogram("epub_chunks_created", len(chunks), labels={"file_path": file_path})
+
         if chunks:
             logging.debug(f"Structure of first chunk: {chunks[0].keys()}")
-
 
         # Handle summarization if enabled
         if auto_summarize and api_name and api_key:
@@ -101,11 +115,15 @@ def import_epub(file_path, title=None, author=None, keywords=None, custom_prompt
             for chunk in chunks:
                 chunk_text = chunk.get('text', '')
                 if chunk_text:
-                    summary_text = perform_summarization(api_name, chunk_text, custom_prompt, api_key, recursive_summarization=False, temp=None, system_message=system_prompt)
+                    summary_text = perform_summarization(api_name, chunk_text, custom_prompt, api_key,
+                                                            recursive_summarization=False, temp=None,
+                                                            system_message=system_prompt
+                                                            )
                     chunk['metadata']['summary'] = summary_text
                     summarized_chunks.append(chunk)
             chunks = summarized_chunks
             logging.info("Summarization of chunks completed.")
+            log_counter("epub_chunks_summarized", value=len(chunks), labels={"file_path": file_path})
         else:
             # If not summarizing, set a default summary or use provided summary
             if summary:
@@ -137,15 +155,33 @@ def import_epub(file_path, title=None, author=None, keywords=None, custom_prompt
             overwrite=False
         )
 
+        end_time = datetime.now()
+        processing_time = (end_time - start_time).total_seconds()
+        log_histogram("epub_import_duration", processing_time, labels={"file_path": file_path})
+
         logging.info(f"Ebook '{title}' by {author} imported successfully. Database result: {result}")
+        log_counter("epub ingested into the DB successfully", labels={"file_path": file_path})
         return f"Ebook '{title}' by {author} imported successfully. Database result: {result}"
 
     except Exception as e:
         logging.exception(f"Error importing ebook: {str(e)}")
+        log_counter("epub_import_error", labels={"file_path": file_path, "error": str(e)})
         return f"Error importing ebook: {str(e)}"
 
+
 # FIXME
-def process_zip_file(zip_file, title, author, keywords, custom_prompt, system_prompt, summary, auto_summarize, api_name, api_key, chunk_options):
+def process_zip_file(zip_file,
+                     title,
+                     author,
+                     keywords,
+                     custom_prompt,
+                     system_prompt,
+                     summary,
+                     auto_summarize,
+                     api_name,
+                     api_key,
+                     chunk_options
+                     ):
     """
     Processes a ZIP file containing multiple EPUB files and imports each one.
 
@@ -169,38 +205,58 @@ def process_zip_file(zip_file, title, author, keywords, custom_prompt, system_pr
         with tempfile.TemporaryDirectory() as temp_dir:
             zip_path = zip_file.name if hasattr(zip_file, 'name') else zip_file.path
             logging.info(f"Extracting ZIP file {zip_path} to temporary directory {temp_dir}")
+            log_counter("zip_processing_attempt", labels={"zip_path": zip_path})
+
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(temp_dir)
 
-            for filename in os.listdir(temp_dir):
-                if filename.lower().endswith('.epub'):
-                    file_path = os.path.join(temp_dir, filename)
-                    logging.info(f"Processing EPUB file {filename} from ZIP.")
-                    result = import_epub(
-                        file_path=file_path,
-                        title=title,
-                        author=author,
-                        keywords=keywords,
-                        custom_prompt=custom_prompt,
-                        summary=summary,
-                        auto_summarize=auto_summarize,
-                        api_name=api_name,
-                        api_key=api_key,
-                        chunk_options=chunk_options,
-                        custom_chapter_pattern=chunk_options.get('custom_chapter_pattern') if chunk_options else None
-                    )
-                    results.append(f"File: {filename} - {result}")
+            epub_files = [f for f in os.listdir(temp_dir) if f.lower().endswith('.epub')]
+            log_histogram("epub_files_in_zip", len(epub_files), labels={"zip_path": zip_path})
+
+            for filename in epub_files:
+                file_path = os.path.join(temp_dir, filename)
+                logging.info(f"Processing EPUB file {filename} from ZIP.")
+                result = import_epub(
+                    file_path=file_path,
+                    title=title,
+                    author=author,
+                    keywords=keywords,
+                    custom_prompt=custom_prompt,
+                    summary=summary,
+                    auto_summarize=auto_summarize,
+                    api_name=api_name,
+                    api_key=api_key,
+                    chunk_options=chunk_options,
+                    custom_chapter_pattern=chunk_options.get('custom_chapter_pattern') if chunk_options else None
+                )
+                results.append(f"File: {filename} - {result}")
+
             logging.info("Completed processing all EPUB files in the ZIP.")
+            log_counter("zip_processing_success", labels={"zip_path": zip_path})
     except Exception as e:
         logging.exception(f"Error processing ZIP file: {str(e)}")
+        log_counter("zip_processing_error", labels={"zip_path": zip_path, "error": str(e)})
         return f"Error processing ZIP file: {str(e)}"
 
     return "\n".join(results)
 
 
-def import_file_handler(file, title, author, keywords, system_prompt, custom_prompt, auto_summarize, api_name,
-                        api_key, max_chunk_size, chunk_overlap, custom_chapter_pattern):
+def import_file_handler(file,
+                        title,
+                        author,
+                        keywords,
+                        system_prompt,
+                        custom_prompt,
+                        auto_summarize,
+                        api_name,
+                        api_key,
+                        max_chunk_size,
+                        chunk_overlap,
+                        custom_chapter_pattern
+                        ):
     try:
+        log_counter("file_import_attempt", labels={"file_name": file.name})
+
         # Handle max_chunk_size
         if isinstance(max_chunk_size, str):
             max_chunk_size = int(max_chunk_size) if max_chunk_size.strip() else 4000
@@ -221,11 +277,15 @@ def import_file_handler(file, title, author, keywords, system_prompt, custom_pro
         }
 
         if file is None:
+            log_counter("file_import_error", labels={"error": "No file uploaded"})
             return "No file uploaded."
 
         file_path = file.name
         if not os.path.exists(file_path):
+            log_counter("file_import_error", labels={"error": "File not found", "file_name": file.name})
             return "Uploaded file not found."
+
+        start_time = datetime.now()
 
         if file_path.lower().endswith('.epub'):
             status = import_epub(
@@ -242,7 +302,8 @@ def import_file_handler(file, title, author, keywords, system_prompt, custom_pro
                 chunk_options=chunk_options,
                 custom_chapter_pattern=custom_chapter_pattern
             )
-            return f"📚 EPUB Imported Successfully:\n{status}"
+            log_counter("epub_import_success", labels={"file_name": file.name})
+            result = f"📚 EPUB Imported Successfully:\n{status}"
         elif file.name.lower().endswith('.zip'):
             status = process_zip_file(
                 zip_file=file,
@@ -251,25 +312,37 @@ def import_file_handler(file, title, author, keywords, system_prompt, custom_pro
                 keywords=keywords,
                 custom_prompt=custom_prompt,
                 system_prompt=system_prompt,
-                summary=None,  # Let the library handle summarization
+                summary=None,
                 auto_summarize=auto_summarize,
                 api_name=api_name,
                 api_key=api_key,
                 chunk_options=chunk_options
             )
-            return f"📦 ZIP Processed Successfully:\n{status}"
+            log_counter("zip_import_success", labels={"file_name": file.name})
+            result = f"📦 ZIP Processed Successfully:\n{status}"
         elif file.name.lower().endswith(('.chm', '.html', '.pdf', '.xml', '.opml')):
             file_type = file.name.split('.')[-1].upper()
-            return f"{file_type} file import is not yet supported."
+            log_counter("unsupported_file_type", labels={"file_type": file_type})
+            result = f"{file_type} file import is not yet supported."
         else:
-            return "❌ Unsupported file type. Please upload an `.epub` file or a `.zip` file containing `.epub` files."
+            log_counter("unsupported_file_type", labels={"file_type": file.name.split('.')[-1]})
+            result = "❌ Unsupported file type. Please upload an `.epub` file or a `.zip` file containing `.epub` files."
+
+        end_time = datetime.now()
+        processing_time = (end_time - start_time).total_seconds()
+        log_histogram("file_import_duration", processing_time, labels={"file_name": file.name})
+
+        return result
 
     except ValueError as ve:
         logging.exception(f"Error parsing input values: {str(ve)}")
+        log_counter("file_import_error", labels={"error": "Invalid input", "file_name": file.name})
         return f"❌ Error: Invalid input for chunk size or overlap. Please enter valid numbers."
     except Exception as e:
         logging.exception(f"Error during file import: {str(e)}")
+        log_counter("file_import_error", labels={"error": str(e), "file_name": file.name})
         return f"❌ Error during import: {str(e)}"
+
 
 def read_epub(file_path):
     """
