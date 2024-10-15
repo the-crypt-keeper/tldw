@@ -74,8 +74,10 @@ class TestRAGFunctions(unittest.TestCase):
         # The function should return an empty list upon exception
         self.assertEqual(result, [])
 
-        # Assert that an error was logged
-        mock_logging.error.assert_called_once_with("Error fetching relevant media IDs: Database error")
+        # Assert that errors were logged for both keywords
+        mock_logging.error.assert_any_call("Error fetching relevant media IDs for keyword 'geography': Database error")
+        mock_logging.error.assert_any_call("Error fetching relevant media IDs for keyword 'cities': Database error")
+        self.assertEqual(mock_logging.error.call_count, 2)
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.vector_search')
     @patch('App_Function_Libraries.RAG.RAG_Library_2.chroma_client')
@@ -258,7 +260,8 @@ class TestRAGFunctions(unittest.TestCase):
         self.assertEqual(sorted(result), [1, 2])
 
         # Assert that an error was logged for 'cities'
-        mock_logging.error.assert_called_once_with("Error fetching relevant media IDs: Database error")
+        mock_logging.error.assert_called_once_with(
+            "Error fetching relevant media IDs for keyword 'cities': Database error")
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.chroma_client')
     @patch('App_Function_Libraries.RAG.RAG_Library_2.vector_search')
