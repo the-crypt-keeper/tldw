@@ -32,6 +32,7 @@ from typing import Optional, Union, List, Dict, Any
 #
 # Import Local
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 #######################################################################################################################
 # Function Definitions
@@ -118,12 +119,17 @@ def get_whisper_model(model_name, device):
 #DEBUG
 #@profile
 def convert_to_wav(video_file_path, offset=0, overwrite=False):
+    log_counter("convert_to_wav_attempt", labels={"file_path": video_file_path})
+    start_time = time.time()
+
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
 
     if os.path.exists(out_path) and not overwrite:
         print(f"File '{out_path}' already exists. Skipping conversion.")
         logging.info(f"Skipping conversion as file already exists: {out_path}")
+        log_counter("convert_to_wav_skipped", labels={"file_path": video_file_path})
         return out_path
+
     print("Starting conversion process of .m4a to .WAV")
     out_path = os.path.splitext(video_file_path)[0] + ".wav"
 
@@ -165,12 +171,15 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
         else:
             raise RuntimeError("Unsupported operating system")
         logging.info("Conversion to WAV completed: %s", out_path)
-    except subprocess.CalledProcessError as e:
-        logging.error("Error executing FFmpeg command: %s", str(e))
-        raise RuntimeError("Error converting video file to WAV")
+        log_counter("convert_to_wav_success", labels={"file_path": video_file_path})
     except Exception as e:
         logging.error("speech-to-text: Error transcribing audio: %s", str(e))
+        log_counter("convert_to_wav_error", labels={"file_path": video_file_path, "error": str(e)})
         return {"error": str(e)}
+
+    conversion_time = time.time() - start_time
+    log_histogram("convert_to_wav_duration", conversion_time, labels={"file_path": video_file_path})
+
     gc.collect()
     return out_path
 
@@ -180,11 +189,11 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 #@profile
 # FIXME - I feel like the `vad_filter` shoudl be enabled by default....
 def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, diarize=False):
-    global whisper_model_instance, processing_choice
-    logging.info('speech-to-text: Loading faster_whisper model: %s', whisper_model)
-
+    log_counter("speech_to_text_attempt", labels={"file_path": audio_file_path, "model": whisper_model})
     time_start = time.time()
+
     if audio_file_path is None:
+        log_counter("speech_to_text_error", labels={"error": "No audio file provided"})
         raise ValueError("speech-to-text: No audio file provided")
     logging.info("speech-to-text: Audio file path: %s", audio_file_path)
 
@@ -229,16 +238,19 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
             segments[0]["Text"] = f"This text was transcribed using whisper model: {whisper_model}\n\n" + segments[0]["Text"]
 
         if not segments:
+            log_counter("speech_to_text_error", labels={"error": "No transcription produced"})
             raise RuntimeError("No transcription produced. The audio file may be invalid or empty.")
-        logging.info("speech-to-text: Transcription completed in %.2f seconds", time.time() - time_start)
 
+        transcription_time = time.time() - time_start
+        logging.info("speech-to-text: Transcription completed in %.2f seconds", transcription_time)
+        log_histogram("speech_to_text_duration", transcription_time, labels={"file_path": audio_file_path, "model": whisper_model})
+        log_counter("speech_to_text_success", labels={"file_path": audio_file_path, "model": whisper_model})
         # Save the segments to a JSON file - prettified and non-prettified
-        # FIXME so this is an optional flag to save either the prettified json file or the normal one
+        # FIXME refactor so this is an optional flag to save either the prettified json file or the normal one
         save_json = True
         if save_json:
             logging.info("speech-to-text: Saving segments to JSON file")
             output_data = {'segments': segments}
-
             logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
             with open(prettified_out_file, 'w') as f:
                 json.dump(output_data, f, indent=2)
@@ -253,10 +265,12 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
 
     except Exception as e:
         logging.error("speech-to-text: Error transcribing audio: %s", str(e))
+        log_counter("speech_to_text_error", labels={"file_path": audio_file_path, "model": whisper_model, "error": str(e)})
         raise RuntimeError("speech-to-text: Error transcribing audio")
 
 
 def record_audio(duration, sample_rate=16000, chunk_size=1024):
+    log_counter("record_audio_attempt", labels={"duration": duration})
     p = pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paInt16,
                     channels=1,
@@ -283,6 +297,8 @@ def record_audio(duration, sample_rate=16000, chunk_size=1024):
 
 
 def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
+    log_counter("stop_recording_attempt")
+    start_time = time.time()
     stop_recording_event.set()
     audio_thread.join()
 
@@ -296,9 +312,13 @@ def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
     stream.close()
     p.terminate()
 
+    stop_time = time.time() - start_time
+    log_histogram("stop_recording_duration", stop_time)
+    log_counter("stop_recording_success")
     return b''.join(frames)
 
 def save_audio_temp(audio_data, sample_rate=16000):
+    log_counter("save_audio_temp_attempt")
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
         import wave
         wf = wave.open(temp_file.name, 'wb')
@@ -307,6 +327,7 @@ def save_audio_temp(audio_data, sample_rate=16000):
         wf.setframerate(sample_rate)
         wf.writeframes(audio_data)
         wf.close()
+        log_counter("save_audio_temp_success")
         return temp_file.name
 
 #
