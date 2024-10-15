@@ -5,17 +5,18 @@
 ### All automated. All local. All yours.
 
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)
-  - (Note: YouTube may block the demo unless you provide a session cookie. Placeholder content is included, random contents of a conference and whatever videos I decided to use for testing that patch version.)
+  - (Note: YouTube blocks requests from the demo. You have to provide a session cookie :/. Placeholder content is included for testing/demo. HuggingFace API is setup in it, so that works fine.)
 
-#### [Video Walkthrough of a Fresh Install](Docs/tldw-run-through-blank.webm)
+#### ![Video Walkthrough of a Fresh Install](Docs/Screenshots/tldw-run-through-blank.webm)
 #### Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)`
 
 #### Key Features:
 - Full-text+RAG search across all ingested content (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking).
-- Local LLM inference for offline summarization and chat (via `llamafile` and HuggingFace Transformers).
-- Local Embeddings generation for RAG search (via `llamafile` and HuggingFace Transformers).
+- Local LLM inference for offline summarization and chat (via `llamafile`/`llama.cpp`/`HuggingFace Transformers`).
+- Local Embeddings generation for RAG search (via `llamafile`/`llama.cpp`/`HuggingFace Transformers`).
 - Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
 - Also writing tools! Grammar/Style checker, Tone Analyzer, Writing editor(feedback), and more.
+- Full Character Chat Support - Create/Edit & Import/Export Character Cards, and chat with them.
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 ----------
 
@@ -23,6 +24,10 @@
 - [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#whatbox) | [Helpful Terms and Things to Know](#helpful) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits) | [Roadmap Plans](#plans) | 
 
 #### Quickstart
+<details>
+<summary>Quickstart - Click-Here</summary>
+
+### QuickStart
 - **Bash/Batch Script:**
   - **Use the Installer Script! Download and run it to install the necessary packages + launch tl/dw**
     - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
@@ -38,7 +43,11 @@
   - There's a docker build for GPU use(Needs Nvidia CUDA Controller(?): https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw-nvidia_amd64_Dockerfile 
   - and plain CPU use: https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw_Debian_cpu-Dockerfile
   - the `Dockerfile` in the main directory is the Nvidia base-image-based one. So you can use your GPU if you want with it.
+</details>
 
+### What is tl/dw?
+<details>
+<summary>What is this? - Click-Here</summary>
 
 ### What is tl/dw?
 **tl/dw** is a versatile tool designed to help you manage and interact with media files (videos, audio, documents, web articles, and books) by:
@@ -79,8 +88,14 @@ All features are designed to run **locally** on your device, ensuring privacy an
 - **Grammar & Style Checks**: Use LLMs to review your writing for grammar and style.
 - **Tone Analyzer**: Analyze and adjust the tone of your text.
 - **Writing Prompts**: Generate creative writing prompts based on your preferences.
+</details>
+
 
 #### Less Quick Start
+<details>
+<summary>**Less Quick Start - Click-Here**</summary>
+
+### Less Quick Start
 1. **Download the Installer Script for your OS:**
    - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
    - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
@@ -108,12 +123,17 @@ All features are designed to run **locally** on your device, ensuring privacy an
       * So everything you might consume during your path of research, tracked and assimilated and tagged.
       * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
   - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+</details>
 
 
 ----------
 
 
-###  <a name="what"></a>(Much longer) What is this (TL/DW)?
+### What is this (tl/dw)?
+<details>
+<summary>**What is this Project? (Extended) - Click-Here**</summary>
+
+### What is this Project?
 - **What it is now:**
   - A tool that can ingest: audio, videos, articles, free form text, documents, and books as text into a personal, offline database, so that you can then search and chat with it at any time on your own device/locally.
     - (+ act as a nice way of creating your personal 'media' database, a personal digital library with search!)
@@ -179,11 +199,15 @@ All features are designed to run **locally** on your device, ensuring privacy an
     - I view this as a personal tool I'll ideally continue to use for some time until something better/more suited to my needs comes along.
     - Until then, I plan to continue working on this project and improving as much as possible.
     - If I can't get a "Young Lady's Illustrated Primer" in the immediate, I'll just have to hack together some poor imitation of one....
+</details>
+
 
 ### Planned Features
-You can view the full roadmap on our [GitHub Issues page](https://github.com/rmusser01/tldw/issues).
+You can view the full roadmap on the [GitHub Issues page](https://github.com/rmusser01/tldw/issues).
+<details>
+<summary>**Planned Features(Extended) - Click-Here**</summary>
 
-Some planned features include:
+### Some planned features include:
 - **Improved RAG Pipeline** (Retrieval-Augmented Generation) support with enhanced testing.
 - **New, more intuitive UI**, migrating to FastAPI with custom front-ends.
 - **Streaming responses** for real-time answers.
@@ -200,6 +224,12 @@ Some planned features include:
 - Support for multiple different Evaluations
   - G-Eval summarization check is available in the video transcript tab, as well as under the `Benchmarks` tab (along with InfiniteBench[WIP] and [MMLU-Pro](https://github.com/TIGER-AI-Lab/MMLU-Pro).
   - I'd like to add more benchmarks so that user can identify/measure how well their config works, so they can tweak things and have an idea if its better/worse.
+</details>
+
+
+### Local Models I recommend
+<details>
+<summary>**Local Models I Can Recommend - Click-Here**</summary>
 
 ### Local Models I recommend
 - These are just the 'standard smaller' models I recommend, there are many more out there, and you can use any of them with this project.
@@ -241,10 +271,15 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 2024 service quality is not a metric they want to optimize, they’re forced to, only to maintain some 
   directional income
 ```
+</details>
 
 ----------
 
 #### Command Line usage:
+<details>
+<summary>**Command Line Usage: - Click-Here**</summary>
+
+### Command Line Usage
 - **Transcribe audio from a Youtube URL:**
   * `python summarize.py https://www.youtube.com/watch?v=4nd1CDZP21s`
 
@@ -274,8 +309,14 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   3. Ingest your converted epub into the DB:
      * `python summarize.py path/to/your/textfile.txt --ingest_text_file --text_title "Book Title" --text_author "Author Name" -k additional,keywords`
 
+</details>
+
 ----------
 ### <a name="setup"></a>Setting it up Manually
+<details>
+<summary>**Manual Setup/Installation - Click-Here**</summary>
+
+### Setup
 - **Requirements**
   - Python3
   - ffmpeg (Script will install this for you)
@@ -364,12 +405,16 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 - **Ingest Converted text files en-masse**
     - `python summarize.py <path_to_text_file> --ingest_text_file --text_title "Title" --text_author "Author Name" -k additional,keywords`
 
-
+</details>
 
 
 
 ----------
 ### <a name="using"></a>Using tldw
+<details>
+<summary>**Using tl/dw - Click-Here**</summary>
+
+### Using tl/dw
 - Run the GUI and get access to all the features of the script(+ more) in a more user-friendly manner.
   * `python summarize.py -gui`
 - Single file (remote URL) transcription
@@ -401,9 +446,15 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 - Run it as a WebApp:
   >`python summarize.py -gui
   
+</details>
+
 ------------
 
 ### <a name="helpful"></a> Helpful Terms and Things to Know
+<details>
+<summary>**Helpful things to know - Click-Here**</summary>
+
+### Helpful things to know
 - Purpose of this section is to help bring awareness to certain concepts and terms that are used in the field of AI/ML/NLP, as well as to provide some resources for learning more about them.
 - Also because some of those things are extremely relevant and important to know if you care about accuracy and the effectiveness of the LLMs you're using.
 - Some of this stuff may be 101 level, but I'm going to include it anyways. This repo is aimed at people from a lot of different fields, so I want to make sure everyone can understand what's going on. Or at least has an idea.
@@ -461,7 +512,13 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   9. `faster_whisper` - A fast, lightweight, and accurate speech-to-text model. 
       * https://github.com/SYSTRAN/faster-whisper
 
+</details>
+
+
 ------------
+### Potential Issues
+<details>
+<summary>Potential Issues - Click-Here</summary>
 
 ### Potential Issues
 ```
@@ -486,11 +543,11 @@ In order of attempts:
 3. Download/copy the already installed DLLs: https://forums.developer.nvidia.com/t/could-not-load-library-cudnn-cnn-infer64-8-dll-error-code-193/218437/16
 4. Just install outside of a venv. That is what I had to do on my windows machine. (I actually ended up 'fixing' this by copying the two dlls to the tldw folder, and it worked fine after that. https://github.com/Purfview/whisper-standalone-win/releases/tag/Faster-Whisper-XXL)
 
+</details>
+
 
 
 ----------
-
-
 ### <a name="localllm"></a>Setting up a Local LLM Inference Engine
 - **See 'Setting up a Local LLM' in the `Docs` folder for more information.**
 
