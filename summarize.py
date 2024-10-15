@@ -10,6 +10,8 @@ import sys
 import threading
 import time
 import webbrowser
+from logging.handlers import RotatingFileHandler
+
 #
 # Local Library Imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
@@ -72,6 +74,15 @@ whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large",
                   "distil-large-v2", "distil-medium.en", "distil-small.en", ]
 server_mode = False
 share_public = False
+
+# FIXME - add to config.txt
+log_file_path = os.getenv("tldw_LOG_FILE_PATH", "tldw_app_logs.json")
+max_bytes = int(os.getenv("tldw_LOG_MAX_BYTES", 10 * 1024 * 1024))  # 10 MB
+backup_count = int(os.getenv("tldw_LOG_BACKUP_COUNT", 5))
+
+file_handler = RotatingFileHandler(
+    log_file_path, maxBytes=max_bytes, backupCount=backup_count
+)
 
 #
 #
