@@ -12,6 +12,9 @@ from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models
 from App_Function_Libraries.Utils.Utils import cleanup_temp_files
+# Import metrics logging
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Metrics.logger_config import logger
 #
 #######################################################################################################################
 # Functions:

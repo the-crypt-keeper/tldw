@@ -17,6 +17,7 @@ Jinja2
 joblib
 langchain
 langdetect
+lxml_html_clean
 mwparserfromhell
 mwxml
 nltk
@@ -27,6 +28,7 @@ pandas
 Pillow
 playwright
 psycopg2
+#psycopg2-binary
 pyannote.audio
 PyAudio
 pydub
@@ -35,6 +37,7 @@ pypandoc
 pypandoc_binary
 pytest
 python-dotenv
+python-json-logger
 PyYAML
 Requests
 rouge_score
