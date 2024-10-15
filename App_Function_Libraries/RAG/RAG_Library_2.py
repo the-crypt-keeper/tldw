@@ -385,19 +385,19 @@ def fetch_relevant_media_ids(keywords: List[str]) -> List[int]:
     log_counter("fetch_relevant_media_ids_attempt", labels={"keyword_count": len(keywords)})
     start_time = time.time()
     relevant_ids = set()
-    try:
-        for keyword in keywords:
+    for keyword in keywords:
+        try:
             media_ids = fetch_keywords_for_media(keyword)
             relevant_ids.update(media_ids)
+        except Exception as e:
+            log_counter("fetch_relevant_media_ids_error", labels={"error": str(e)})
+            logging.error(f"Error fetching relevant media IDs for keyword '{keyword}': {str(e)}")
+            # Continue processing other keywords
 
-        fetch_duration = time.time() - start_time
-        log_histogram("fetch_relevant_media_ids_duration", fetch_duration)
-        log_counter("fetch_relevant_media_ids_success", labels={"result_count": len(relevant_ids)})
-        return list(relevant_ids)
-    except Exception as e:
-        log_counter("fetch_relevant_media_ids_error", labels={"error": str(e)})
-        logging.error(f"Error fetching relevant media IDs: {str(e)}")
-        return []
+    fetch_duration = time.time() - start_time
+    log_histogram("fetch_relevant_media_ids_duration", fetch_duration)
+    log_counter("fetch_relevant_media_ids_success", labels={"result_count": len(relevant_ids)})
+    return list(relevant_ids)
 
 
 def filter_results_by_keywords(results: List[Dict[str, Any]], keywords: List[str]) -> List[Dict[str, Any]]:
