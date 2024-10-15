@@ -250,6 +250,16 @@ def launch_ui(share_public=None, server_mode=False):
     """
 
     with gr.Blocks(theme='bethecloud/storj_theme',css=css) as iface:
+        gr.HTML(
+            """
+            <script>
+            document.addEventListener('DOMContentLoaded', (event) => {
+                document.body.classList.add('dark');
+                document.querySelector('gradio-app').style.backgroundColor = 'var(--color-background-primary)';
+            });
+            </script>
+            """
+        )
         db_config = get_db_config()
         db_type = db_config['type']
         gr.Markdown(f"# tl/dw: Your LLM-powered Research Multi-tool")

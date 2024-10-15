@@ -19,6 +19,7 @@ import torch
 # Local Imports:
 from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 #######################################################################################################################
 #
@@ -58,8 +59,11 @@ class HuggingFaceEmbedder:
         self.timeout_seconds = timeout_seconds
         self.last_used_time = 0
         self.unload_timer = None
+        log_counter("huggingface_embedder_init", labels={"model_name": model_name})
 
     def load_model(self):
+        log_counter("huggingface_model_load_attempt", labels={"model_name": self.model_name})
+        start_time = time.time()
         # https://huggingface.co/docs/transformers/custom_models
         if self.model is None:
             # Pass cache_dir to from_pretrained to specify download directory
@@ -78,8 +82,12 @@ class HuggingFaceEmbedder:
             self.model.to(self.device)
         self.last_used_time = time.time()
         self.reset_timer()
+        load_time = time.time() - start_time
+        log_histogram("huggingface_model_load_duration", load_time, labels={"model_name": self.model_name})
+        log_counter("huggingface_model_load_success", labels={"model_name": self.model_name})
 
     def unload_model(self):
+        log_counter("huggingface_model_unload", labels={"model_name": self.model_name})
         if self.model is not None:
             del self.model
             del self.tokenizer
@@ -97,6 +105,8 @@ class HuggingFaceEmbedder:
         self.unload_timer.start()
 
     def create_embeddings(self, texts):
+        log_counter("huggingface_create_embeddings_attempt", labels={"model_name": self.model_name})
+        start_time = time.time()
         self.load_model()
         # https://huggingface.co/docs/transformers/custom_models
         inputs = self.tokenizer(
@@ -120,8 +130,13 @@ class HuggingFaceEmbedder:
                 with torch.no_grad():
                     outputs = self.model(**inputs)
                 embeddings = outputs.last_hidden_state.mean(dim=1)
+                embedding_time = time.time() - start_time
+                log_histogram("huggingface_create_embeddings_duration", embedding_time,
+                              labels={"model_name": self.model_name})
+                log_counter("huggingface_create_embeddings_success", labels={"model_name": self.model_name})
                 return embeddings.cpu().float().numpy()
             else:
+                log_counter("huggingface_create_embeddings_failure", labels={"model_name": self.model_name})
                 raise
 
 class ONNXEmbedder:
@@ -140,8 +155,11 @@ class ONNXEmbedder:
         self.last_used_time = 0
         self.unload_timer = None
         self.device = "cpu"  # ONNX Runtime will default to CPU unless GPU is configured
+        log_counter("onnx_embedder_init", labels={"model_name": model_name})
 
     def load_model(self):
+        log_counter("onnx_model_load_attempt", labels={"model_name": self.model_name})
+        start_time = time.time()
         if self.session is None:
             if not os.path.exists(self.model_path):
                 raise FileNotFoundError(f"ONNX model not found at {self.model_path}")
@@ -149,8 +167,12 @@ class ONNXEmbedder:
             self.session = ort.InferenceSession(self.model_path)
         self.last_used_time = time.time()
         self.reset_timer()
+        load_time = time.time() - start_time
+        log_histogram("onnx_model_load_duration", load_time, labels={"model_name": self.model_name})
+        log_counter("onnx_model_load_success", labels={"model_name": self.model_name})
 
     def unload_model(self):
+        log_counter("onnx_model_unload", labels={"model_name": self.model_name})
         if self.session is not None:
             logging.info("Unloading ONNX model to free resources.")
             self.session = None
@@ -164,8 +186,9 @@ class ONNXEmbedder:
         self.unload_timer.start()
 
     def create_embeddings(self, texts: List[str]) -> List[List[float]]:
+        log_counter("onnx_create_embeddings_attempt", labels={"model_name": self.model_name})
+        start_time = time.time()
         self.load_model()
-
         try:
             inputs = self.tokenizer(
                 texts,
@@ -187,8 +210,12 @@ class ONNXEmbedder:
             last_hidden_state = ort_outputs[0]
             embeddings = np.mean(last_hidden_state, axis=1)
 
+            embedding_time = time.time() - start_time
+            log_histogram("onnx_create_embeddings_duration", embedding_time, labels={"model_name": self.model_name})
+            log_counter("onnx_create_embeddings_success", labels={"model_name": self.model_name})
             return embeddings.tolist()
         except Exception as e:
+            log_counter("onnx_create_embeddings_failure", labels={"model_name": self.model_name})
             logging.error(f"Error creating embeddings with ONNX model: {str(e)}")
             raise
 
@@ -236,6 +263,8 @@ def create_embeddings_batch(texts: List[str],
                             timeout_seconds: int = 300
                             ) -> List[List[float]]:
     global embedding_models
+    log_counter("create_embeddings_batch_attempt", labels={"provider": provider, "model": model})
+    start_time = time.time()
 
     try:
         if provider.lower() == 'huggingface':
@@ -246,10 +275,18 @@ def create_embeddings_batch(texts: List[str],
                     # Pass model_dir to HuggingFaceEmbedder
                     embedding_models[model] = HuggingFaceEmbedder(model, model_dir, timeout_seconds)
             embedder = embedding_models[model]
+            embedding_time = time.time() - start_time
+            log_histogram("create_embeddings_batch_duration", embedding_time,
+                          labels={"provider": provider, "model": model})
+            log_counter("create_embeddings_batch_success", labels={"provider": provider, "model": model})
             return embedder.create_embeddings(texts)
 
         elif provider.lower() == 'openai':
             logging.debug(f"Creating embeddings for {len(texts)} texts using OpenAI API")
+            embedding_time = time.time() - start_time
+            log_histogram("create_embeddings_batch_duration", embedding_time,
+                          labels={"provider": provider, "model": model})
+            log_counter("create_embeddings_batch_success", labels={"provider": provider, "model": model})
             return [create_openai_embedding(text, model) for text in texts]
 
         elif provider.lower() == 'local':
@@ -259,23 +296,38 @@ def create_embeddings_batch(texts: List[str],
                 headers={"Authorization": f"Bearer {embedding_api_key}"}
             )
             if response.status_code == 200:
+                embedding_time = time.time() - start_time
+                log_histogram("create_embeddings_batch_duration", embedding_time,
+                              labels={"provider": provider, "model": model})
+                log_counter("create_embeddings_batch_success", labels={"provider": provider, "model": model})
                 return response.json()['embeddings']
             else:
                 raise Exception(f"Error from local API: {response.text}")
         else:
             raise ValueError(f"Unsupported embedding provider: {provider}")
     except Exception as e:
+        log_counter("create_embeddings_batch_error", labels={"provider": provider, "model": model, "error": str(e)})
         logging.error(f"Error in create_embeddings_batch: {str(e)}")
         raise
 
 def create_embedding(text: str, provider: str, model: str, api_url: str) -> List[float]:
+    log_counter("create_embedding_attempt", labels={"provider": provider, "model": model})
+    start_time = time.time()
     embedding = create_embeddings_batch([text], provider, model, api_url)[0]
     if isinstance(embedding, np.ndarray):
         embedding = embedding.tolist()
+    embedding_time = time.time() - start_time
+    log_histogram("create_embedding_duration", embedding_time, labels={"provider": provider, "model": model})
+    log_counter("create_embedding_success", labels={"provider": provider, "model": model})
     return embedding
 
 def create_openai_embedding(text: str, model: str) -> List[float]:
+    log_counter("create_openai_embedding_attempt", labels={"model": model})
+    start_time = time.time()
     embedding = get_openai_embeddings(text, model)
+    embedding_time = time.time() - start_time
+    log_histogram("create_openai_embedding_duration", embedding_time, labels={"model": model})
+    log_counter("create_openai_embedding_success", labels={"model": model})
     return embedding
 
 

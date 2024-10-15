@@ -3,7 +3,6 @@
 #
 # Imports
 #
-#
 # External Imports
 import gradio as gr
 #
@@ -11,8 +10,6 @@ import gradio as gr
 from App_Function_Libraries.Audio.Audio_Files import process_podcast
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models, update_user_prompt
-
-
 #
 ########################################################################################################################
 #

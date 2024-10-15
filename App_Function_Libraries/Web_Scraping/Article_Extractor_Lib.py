@@ -13,13 +13,14 @@
 ####################
 #
 # Import necessary libraries
+import json
 import logging
 # 3rd-Party Imports
 import asyncio
 import os
 import tempfile
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Union
 from urllib.parse import urljoin, urlparse
 from xml.dom import minidom
 from playwright.async_api import async_playwright
@@ -375,6 +376,152 @@ def scrape_and_convert_with_filter(source: str, output_file: str, filter_functio
         f.write(markdown_content)
 
     logging.info(f"Scraped and filtered content saved to {output_file}")
+
+
+###################################################
+#
+# Bookmark Parsing Functions
+
+def parse_chromium_bookmarks(json_data: dict) -> Dict[str, Union[str, List[str]]]:
+    """
+    Parse Chromium-based browser bookmarks from JSON data.
+
+    :param json_data: The JSON data from the bookmarks file
+    :return: A dictionary with bookmark names as keys and URLs as values or lists of URLs if duplicates exist
+    """
+    bookmarks = {}
+
+    def recurse_bookmarks(nodes):
+        for node in nodes:
+            if node.get('type') == 'url':
+                name = node.get('name')
+                url = node.get('url')
+                if name and url:
+                    if name in bookmarks:
+                        if isinstance(bookmarks[name], list):
+                            bookmarks[name].append(url)
+                        else:
+                            bookmarks[name] = [bookmarks[name], url]
+                    else:
+                        bookmarks[name] = url
+            elif node.get('type') == 'folder' and 'children' in node:
+                recurse_bookmarks(node['children'])
+
+    # Chromium bookmarks have a 'roots' key
+    if 'roots' in json_data:
+        for root in json_data['roots'].values():
+            if 'children' in root:
+                recurse_bookmarks(root['children'])
+    else:
+        recurse_bookmarks(json_data.get('children', []))
+
+    return bookmarks
+
+
+def parse_firefox_bookmarks(html_content: str) -> Dict[str, Union[str, List[str]]]:
+    """
+    Parse Firefox bookmarks from HTML content.
+
+    :param html_content: The HTML content from the bookmarks file
+    :return: A dictionary with bookmark names as keys and URLs as values or lists of URLs if duplicates exist
+    """
+    bookmarks = {}
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # Firefox stores bookmarks within <a> tags inside <dt>
+    for a in soup.find_all('a'):
+        name = a.get_text()
+        url = a.get('href')
+        if name and url:
+            if name in bookmarks:
+                if isinstance(bookmarks[name], list):
+                    bookmarks[name].append(url)
+                else:
+                    bookmarks[name] = [bookmarks[name], url]
+            else:
+                bookmarks[name] = url
+
+    return bookmarks
+
+
+def load_bookmarks(file_path: str) -> Dict[str, Union[str, List[str]]]:
+    """
+    Load bookmarks from a file (JSON for Chrome/Edge or HTML for Firefox).
+
+    :param file_path: Path to the bookmarks file
+    :return: A dictionary with bookmark names as keys and URLs as values or lists of URLs if duplicates exist
+    :raises ValueError: If the file format is unsupported or parsing fails
+    """
+    if not os.path.isfile(file_path):
+        logging.error(f"File '{file_path}' does not exist.")
+        raise FileNotFoundError(f"File '{file_path}' does not exist.")
+
+    _, ext = os.path.splitext(file_path)
+    ext = ext.lower()
+
+    if ext == '.json' or ext == '':
+        # Attempt to parse as JSON (Chrome/Edge)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                json_data = json.load(f)
+            return parse_chromium_bookmarks(json_data)
+        except json.JSONDecodeError:
+            logging.error("Failed to parse JSON. Ensure the file is a valid Chromium bookmarks JSON file.")
+            raise ValueError("Invalid JSON format for Chromium bookmarks.")
+    elif ext in ['.html', '.htm']:
+        # Parse as HTML (Firefox)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            return parse_firefox_bookmarks(html_content)
+        except Exception as e:
+            logging.error(f"Failed to parse HTML bookmarks: {e}")
+            raise ValueError(f"Failed to parse HTML bookmarks: {e}")
+    else:
+        logging.error("Unsupported file format. Please provide a JSON (Chrome/Edge) or HTML (Firefox) bookmarks file.")
+        raise ValueError("Unsupported file format for bookmarks.")
+
+
+def collect_bookmarks(file_path: str) -> Dict[str, Union[str, List[str]]]:
+    """
+    Collect bookmarks from the provided bookmarks file and return a dictionary.
+
+    :param file_path: Path to the bookmarks file
+    :return: Dictionary with bookmark names as keys and URLs as values or lists of URLs if duplicates exist
+    """
+    try:
+        bookmarks = load_bookmarks(file_path)
+        logging.info(f"Successfully loaded {len(bookmarks)} bookmarks from '{file_path}'.")
+        return bookmarks
+    except (FileNotFoundError, ValueError) as e:
+        logging.error(f"Error loading bookmarks: {e}")
+        return {}
+
+# Usage:
+# from Article_Extractor_Lib import collect_bookmarks
+#
+# # Path to your bookmarks file
+# # For Chrome or Edge (JSON format)
+# chromium_bookmarks_path = "/path/to/Bookmarks"
+#
+# # For Firefox (HTML format)
+# firefox_bookmarks_path = "/path/to/bookmarks.html"
+#
+# # Collect bookmarks from Chromium-based browser
+# chromium_bookmarks = collect_bookmarks(chromium_bookmarks_path)
+# print("Chromium Bookmarks:")
+# for name, url in chromium_bookmarks.items():
+#     print(f"{name}: {url}")
+#
+# # Collect bookmarks from Firefox
+# firefox_bookmarks = collect_bookmarks(firefox_bookmarks_path)
+# print("\nFirefox Bookmarks:")
+# for name, url in firefox_bookmarks.items():
+#     print(f"{name}: {url}")
+
+#
+# End of Bookmarking Parsing Functions
+#####################################################################
 
 #
 #
