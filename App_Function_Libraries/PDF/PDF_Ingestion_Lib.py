@@ -22,6 +22,8 @@ import logging
 #
 # Import Local
 from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+#
 # Constants
 MAX_FILE_SIZE_MB = 50
 CONVERSION_TIMEOUT_SECONDS = 300
@@ -35,6 +37,9 @@ def extract_text_and_format_from_pdf(pdf_path):
     Extract text from a PDF file and convert it to Markdown, preserving formatting.
     """
     try:
+        log_counter("pdf_text_extraction_attempt", labels={"file_path": pdf_path})
+        start_time = datetime.now()
+
         markdown_text = ""
         with pymupdf.open(pdf_path) as doc:
             for page_num, page in enumerate(doc, 1):
@@ -87,9 +92,15 @@ def extract_text_and_format_from_pdf(pdf_path):
         # Clean up hyphenated words
         markdown_text = re.sub(r'(\w+)-\s*\n(\w+)', r'\1\2', markdown_text)
 
+        end_time = datetime.now()
+        processing_time = (end_time - start_time).total_seconds()
+        log_histogram("pdf_text_extraction_duration", processing_time, labels={"file_path": pdf_path})
+        log_counter("pdf_text_extraction_success", labels={"file_path": pdf_path})
+
         return markdown_text
     except Exception as e:
         logging.error(f"Error extracting text and formatting from PDF: {str(e)}")
+        log_counter("pdf_text_extraction_error", labels={"file_path": pdf_path, "error": str(e)})
         raise
 
 
@@ -98,19 +109,26 @@ def extract_metadata_from_pdf(pdf_path):
     Extract metadata from a PDF file using PyMuPDF.
     """
     try:
+        log_counter("pdf_metadata_extraction_attempt", labels={"file_path": pdf_path})
         with pymupdf.open(pdf_path) as doc:
             metadata = doc.metadata
+        log_counter("pdf_metadata_extraction_success", labels={"file_path": pdf_path})
         return metadata
     except Exception as e:
         logging.error(f"Error extracting metadata from PDF: {str(e)}")
+        log_counter("pdf_metadata_extraction_error", labels={"file_path": pdf_path, "error": str(e)})
         return {}
 
 
 def process_and_ingest_pdf(file, title, author, keywords):
     if file is None:
+        log_counter("pdf_ingestion_error", labels={"error": "No file uploaded"})
         return "Please select a PDF file to upload."
 
     try:
+        log_counter("pdf_ingestion_attempt", labels={"file_name": file.name})
+        start_time = datetime.now()
+
         # Create a temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a path for the temporary PDF file
@@ -155,21 +173,38 @@ def process_and_ingest_pdf(file, title, author, keywords):
                 ingestion_date=datetime.now().strftime('%Y-%m-%d')
             )
 
+        end_time = datetime.now()
+        processing_time = (end_time - start_time).total_seconds()
+        log_histogram("pdf_ingestion_duration", processing_time, labels={"file_name": file.name})
+        log_counter("pdf_ingestion_success", labels={"file_name": file.name})
+
         return f"PDF file '{title}' by {author} ingested successfully and converted to Markdown."
     except Exception as e:
         logging.error(f"Error ingesting PDF file: {str(e)}")
+        log_counter("pdf_ingestion_error", labels={"file_name": file.name, "error": str(e)})
         return f"Error ingesting PDF file: {str(e)}"
 
 
 def process_and_cleanup_pdf(file, title, author, keywords):
     if file is None:
+        log_counter("pdf_processing_error", labels={"error": "No file uploaded"})
         return "No file uploaded. Please upload a PDF file."
 
     try:
+        log_counter("pdf_processing_attempt", labels={"file_name": file.name})
+        start_time = datetime.now()
+
         result = process_and_ingest_pdf(file, title, author, keywords)
+
+        end_time = datetime.now()
+        processing_time = (end_time - start_time).total_seconds()
+        log_histogram("pdf_processing_duration", processing_time, labels={"file_name": file.name})
+        log_counter("pdf_processing_success", labels={"file_name": file.name})
+
         return result
     except Exception as e:
         logging.error(f"Error in processing and cleanup: {str(e)}")
+        log_counter("pdf_processing_error", labels={"file_name": file.name, "error": str(e)})
         return f"Error: {str(e)}"
 
 #
