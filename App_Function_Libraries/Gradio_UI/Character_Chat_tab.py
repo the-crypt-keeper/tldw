@@ -1793,6 +1793,7 @@ def create_export_characters_tab():
 
         with gr.Row():
             with gr.Column(scale=1):
+                load_characters_button = gr.Button("Load Existing Characters")
                 # Dropdown to select a character for individual export
                 characters = get_character_cards()
                 character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
@@ -1811,6 +1812,11 @@ def create_export_characters_tab():
         export_status = gr.Markdown("")
 
         # Event listeners
+        load_characters_button.click(
+            fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
+            outputs=export_character_dropdown
+        )
+        
         export_single_button.click(
             fn=export_single_character,
             inputs=[export_character_dropdown],
