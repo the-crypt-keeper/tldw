@@ -1000,7 +1000,6 @@ def add_media_version(conn, media_id: int, prompt: str, summary: str) -> None:
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
-
 def sqlite_search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10, connection=None):
     if page < 1:
         raise ValueError("Page number must be 1 or greater.")
@@ -1052,6 +1051,7 @@ def sqlite_search_db(search_query: str, search_fields: List[str], keywords: str,
     else:
         with db.get_connection() as conn:
             return execute_query(conn)
+
 
 # Gradio function to handle user input and display results with pagination, with better feedback
 def search_and_display(search_query, search_fields, keywords, page):

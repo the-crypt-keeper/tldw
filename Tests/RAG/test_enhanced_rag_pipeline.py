@@ -15,10 +15,10 @@ from App_Function_Libraries.RAG.ChromaDB_Library import vector_search
 
 class TestEnhancedRagPipeline(unittest.TestCase):
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.fetch_relevant_media_ids')
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.perform_vector_search')
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.perform_full_text_search')
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.generate_answer')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.fetch_relevant_media_ids')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.perform_vector_search')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.perform_full_text_search')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.generate_answer')
     def test_enhanced_rag_pipeline(self, mock_generate_answer, mock_fts_search, mock_vector_search, mock_fetch_keywords):
         """
         Test the enhanced_rag_pipeline function by mocking the dependent functions such as
