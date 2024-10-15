@@ -15,7 +15,7 @@ from pathlib import Path
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_conversation_name, save_chat_history_to_database
 from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_cohere, \
-    chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface  #, chat_with_vllm
+    chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface
 from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
     chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi, chat_with_vllm, chat_with_custom_openai
 from App_Function_Libraries.DB.SQLite_DB import load_media_content
@@ -155,7 +155,6 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
     except Exception as e:
         logging.error(f"Error in chat function: {str(e)}")
         return f"An error occurred: {str(e)}"
-
 
 
 def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content, media_name=None):
@@ -319,10 +318,10 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
 
 #
 # End of Chat functions
-##########################################################################################################################
+#######################################################################################################################
 
 
-##########################################################################################################################
+#######################################################################################################################
 #
 # Character Card Functions
 
@@ -360,7 +359,6 @@ def save_character(character_data):
         logging.info(f"Character '{char_name}' saved successfully.")
     except Exception as e:
         logging.error(f"Error saving character: {str(e)}")
-
 
 
 def load_characters():

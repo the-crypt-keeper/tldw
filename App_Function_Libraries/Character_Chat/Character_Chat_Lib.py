@@ -6,6 +6,7 @@ import json
 import logging
 import io
 import base64
+import time
 from typing import Dict, Any, Optional, List, Tuple
 #
 # External Imports
@@ -13,6 +14,7 @@ from PIL import Image
 #
 # Local imports
 from App_Function_Libraries.DB.DB_Manager import get_character_card_by_id, get_character_chat_by_id
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 # Constants
 ####################################################################################################
@@ -79,16 +81,32 @@ def replace_user_placeholder(history, user_name):
 
 #################################################################################
 #
-# f
+# Functions for character card processing:
 
 def extract_character_id(choice: str) -> int:
     """Extract the character ID from the dropdown selection string."""
-    return int(choice.split('(ID: ')[1].rstrip(')'))
+    log_counter("extract_character_id_attempt")
+    try:
+        character_id = int(choice.split('(ID: ')[1].rstrip(')'))
+        log_counter("extract_character_id_success")
+        return character_id
+    except Exception as e:
+        log_counter("extract_character_id_error", labels={"error": str(e)})
+        raise
 
 def load_character_wrapper(character_id: int, user_name: str) -> Tuple[Dict[str, Any], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
     """Wrapper function to load character and image using the extracted ID."""
-    char_data, chat_history, img = load_character_and_image(character_id, user_name)
-    return char_data, chat_history, img
+    log_counter("load_character_wrapper_attempt")
+    start_time = time.time()
+    try:
+        char_data, chat_history, img = load_character_and_image(character_id, user_name)
+        load_duration = time.time() - start_time
+        log_histogram("load_character_wrapper_duration", load_duration)
+        log_counter("load_character_wrapper_success")
+        return char_data, chat_history, img
+    except Exception as e:
+        log_counter("load_character_wrapper_error", labels={"error": str(e)})
+        raise
 
 def parse_character_book(book_data: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -143,9 +161,12 @@ def load_character_and_image(character_id: int, user_name: str) -> Tuple[Optiona
         Tuple[Optional[Dict[str, Any]], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
         A tuple containing the character data, chat history, and character image (if available).
     """
+    log_counter("load_character_and_image_attempt")
+    start_time = time.time()
     try:
         char_data = get_character_card_by_id(character_id)
         if not char_data:
+            log_counter("load_character_and_image_no_data")
             logging.warning(f"No character data found for ID: {character_id}")
             return None, [], None
 
@@ -165,12 +186,18 @@ def load_character_and_image(character_id: int, user_name: str) -> Tuple[Optiona
             try:
                 image_data = base64.b64decode(char_data['image'])
                 img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+                log_counter("load_character_image_success")
             except Exception as e:
+                log_counter("load_character_image_error", labels={"error": str(e)})
                 logging.error(f"Error processing image for character '{char_data['name']}': {e}")
 
+        load_duration = time.time() - start_time
+        log_histogram("load_character_and_image_duration", load_duration)
+        log_counter("load_character_and_image_success")
         return char_data, chat_history, img
 
     except Exception as e:
+        log_counter("load_character_and_image_error", labels={"error": str(e)})
         logging.error(f"Error in load_character_and_image: {e}")
         return None, [], None
 
@@ -186,10 +213,13 @@ def load_chat_and_character(chat_id: int, user_name: str) -> Tuple[Optional[Dict
         Tuple[Optional[Dict[str, Any]], List[Tuple[str, str]], Optional[Image.Image]]:
         A tuple containing the character data, processed chat history, and character image (if available).
     """
+    log_counter("load_chat_and_character_attempt")
+    start_time = time.time()
     try:
         # Load the chat
         chat = get_character_chat_by_id(chat_id)
         if not chat:
+            log_counter("load_chat_and_character_no_chat")
             logging.warning(f"No chat found with ID: {chat_id}")
             return None, [], None
 
@@ -197,6 +227,7 @@ def load_chat_and_character(chat_id: int, user_name: str) -> Tuple[Optional[Dict
         character_id = chat['character_id']
         char_data = get_character_card_by_id(character_id)
         if not char_data:
+            log_counter("load_chat_and_character_no_character")
             logging.warning(f"No character found for chat ID: {chat_id}")
             return None, chat['chat_history'], None
 
@@ -209,7 +240,9 @@ def load_chat_and_character(chat_id: int, user_name: str) -> Tuple[Optional[Dict
             try:
                 image_data = base64.b64decode(char_data['image'])
                 img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+                log_counter("load_chat_character_image_success")
             except Exception as e:
+                log_counter("load_chat_character_image_error", labels={"error": str(e)})
                 logging.error(f"Error processing image for character '{char_data['name']}': {e}")
 
         # Process character data templates
@@ -217,14 +250,21 @@ def load_chat_and_character(chat_id: int, user_name: str) -> Tuple[Optional[Dict
             if field in char_data:
                 char_data[field] = replace_placeholders(char_data[field], char_data['name'], user_name)
 
+        load_duration = time.time() - start_time
+        log_histogram("load_chat_and_character_duration", load_duration)
+        log_counter("load_chat_and_character_success")
         return char_data, processed_history, img
 
     except Exception as e:
+        log_counter("load_chat_and_character_error", labels={"error": str(e)})
         logging.error(f"Error in load_chat_and_character: {e}")
         return None, [], None
 
+
 def extract_json_from_image(image_file):
     logging.debug(f"Attempting to extract JSON from image: {image_file.name}")
+    log_counter("extract_json_from_image_attempt")
+    start_time = time.time()
     try:
         with Image.open(image_file) as img:
             logging.debug("Image opened successfully")
@@ -236,16 +276,18 @@ def extract_json_from_image(image_file):
                 try:
                     decoded_content = base64.b64decode(chara_content).decode('utf-8')
                     logging.debug(f"Decoded content (first 100 chars): {decoded_content[:100]}...")
+                    log_counter("extract_json_from_image_metadata_success")
                     return decoded_content
                 except Exception as e:
                     logging.error(f"Error decoding base64 content: {e}")
+                    log_counter("extract_json_from_image_decode_error", labels={"error": str(e)})
 
             logging.warning("'chara' not found in metadata, attempting to find JSON data in image bytes")
             # Alternative method to extract embedded JSON from image bytes if metadata is not available
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
             img_bytes = img_byte_arr.getvalue()
-            img_str = img_bytes.decode('latin1')  # Use 'latin1' to preserve byte values
+            img_str = img_bytes.decode('latin1')
 
             # Search for JSON-like structures in the image bytes
             json_start = img_str.find('{')
@@ -255,18 +297,26 @@ def extract_json_from_image(image_file):
                 try:
                     json.loads(possible_json)
                     logging.debug("Found JSON data in image bytes")
+                    log_counter("extract_json_from_image_bytes_success")
                     return possible_json
                 except json.JSONDecodeError:
                     logging.debug("No valid JSON found in image bytes")
+                    log_counter("extract_json_from_image_invalid_json")
 
             logging.warning("No JSON data found in the image")
+            log_counter("extract_json_from_image_no_json_found")
     except Exception as e:
+        log_counter("extract_json_from_image_error", labels={"error": str(e)})
         logging.error(f"Error extracting JSON from image: {e}")
+
+    extract_duration = time.time() - start_time
+    log_histogram("extract_json_from_image_duration", extract_duration)
     return None
 
 
-
 def load_chat_history(file):
+    log_counter("load_chat_history_attempt")
+    start_time = time.time()
     try:
         content = file.read().decode('utf-8')
         chat_data = json.loads(content)
@@ -276,11 +326,16 @@ def load_chat_history(file):
         character_name = chat_data.get('character') or chat_data.get('character_name')
 
         if not history or not character_name:
+            log_counter("load_chat_history_incomplete_data")
             logging.error("Chat history or character name missing in the imported file.")
             return None, None
 
+        load_duration = time.time() - start_time
+        log_histogram("load_chat_history_duration", load_duration)
+        log_counter("load_chat_history_success")
         return history, character_name
     except Exception as e:
+        log_counter("load_chat_history_error", labels={"error": str(e)})
         logging.error(f"Error loading chat history: {e}")
         return None, None
 
@@ -297,14 +352,25 @@ def process_chat_history(chat_history: List[Tuple[str, str]], char_name: str, us
     Returns:
         List[Tuple[str, str]]: The processed chat history.
     """
-    processed_history = []
-    for user_msg, char_msg in chat_history:
-        if user_msg:
-            user_msg = replace_placeholders(user_msg, char_name, user_name)
-        if char_msg:
-            char_msg = replace_placeholders(char_msg, char_name, user_name)
-        processed_history.append((user_msg, char_msg))
-    return processed_history
+    log_counter("process_chat_history_attempt")
+    start_time = time.time()
+    try:
+        processed_history = []
+        for user_msg, char_msg in chat_history:
+            if user_msg:
+                user_msg = replace_placeholders(user_msg, char_name, user_name)
+            if char_msg:
+                char_msg = replace_placeholders(char_msg, char_name, user_name)
+            processed_history.append((user_msg, char_msg))
+
+        process_duration = time.time() - start_time
+        log_histogram("process_chat_history_duration", process_duration)
+        log_counter("process_chat_history_success", labels={"message_count": len(chat_history)})
+        return processed_history
+    except Exception as e:
+        log_counter("process_chat_history_error", labels={"error": str(e)})
+        logging.error(f"Error processing chat history: {e}")
+        raise
 
 def validate_character_book(book_data):
     """
