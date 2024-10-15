@@ -1,14 +1,22 @@
-![License](https://img.shields.io/badge/license-apache2.0-green)
+<div align="center">
 
-# **tl/dw: Too Long, Didn't Watch** 
-## Summary: Your personal offline research assistant – Download, Transcribe, Summarize & Chat with/about Videos, Audio, Documents, Web Articles, and Books. 
-### All automated. All local. All yours.
+<h1>tl/dw</h1>
+<h3>Your personal research multi-tool</h3>
+<h3>Download, Transcribe, Summarize/Analyze & then Chat with/about Videos, Audio, Documents, Web Articles, and Books.</h3>
+
+[![madewithlove](https://img.shields.io/badge/made_with-%E2%9D%A4-red?style=for-the-badge&labelColor=orange)](https://github.com/rmusser01/tldw)
+
+[![License](https://img.shields.io/badge/license-apache2.0-green)](https://img.shields.io/badge/license-apache2.0-green)
+
+## All Automated. All Local. All Yours.
 
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)
   - (Note: YouTube blocks requests from the demo. You have to provide a session cookie :/. Placeholder content is included for testing/demo. HuggingFace API is setup in it, so that works fine.)
 
 #### ![Video Walkthrough of a Fresh Install](Docs/Screenshots/tldw-run-through-blank.webm)
 #### Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)`
+
+</div>
 
 #### Key Features:
 - Full-text+RAG search across all ingested content (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking).
@@ -18,8 +26,9 @@
 - Also writing tools! Grammar/Style checker, Tone Analyzer, Writing editor(feedback), and more.
 - Full Character Chat Support - Create/Edit & Import/Export Character Cards, and chat with them.
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
-----------
 
+
+----------
 ### Table of Contents
 - [What?](#what) | [Quickstart](#quickstart) | [Setup](#setup) | [Using tldw](#using) | [What's in the Repo / Pieces](#whatbox) | [Helpful Terms and Things to Know](#helpful) | [Setting up a Local LLM Inference Engine](#localllm) | [Credits](#credits) | [Roadmap Plans](#plans) | 
 
