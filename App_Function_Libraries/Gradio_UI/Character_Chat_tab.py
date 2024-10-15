@@ -223,7 +223,6 @@ def export_all_characters_as_zip():
                     buffered = io.BytesIO()
                     img.save(buffered, format="PNG")
                     character_data['image'] = base64.b64encode(buffered.getvalue()).decode('utf-8')
-
                 json_data = json.dumps(character_data, indent=2)
                 zf.writestr(f"{character['name']}.json", json_data)
         return temp_zip.name
@@ -1793,7 +1792,6 @@ def create_export_characters_tab():
 
         with gr.Row():
             with gr.Column(scale=1):
-                load_characters_button = gr.Button("Load Existing Characters")
                 # Dropdown to select a character for individual export
                 characters = get_character_cards()
                 character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
@@ -1801,35 +1799,48 @@ def create_export_characters_tab():
                     label="Select Character to Export",
                     choices=character_choices
                 )
+                load_characters_button = gr.Button("Load Existing Characters")
                 export_single_button = gr.Button("Export Selected Character")
-
-            with gr.Column(scale=1):
-                # Button to export all characters
                 export_all_button = gr.Button("Export All Characters")
 
-        # Output components
-        export_output = gr.File(label="Exported Character(s)", interactive=False)
-        export_status = gr.Markdown("")
+            with gr.Column(scale=1):
+                # Output components
+                export_output = gr.File(label="Exported Character(s)", interactive=False)
+                export_status = gr.Markdown("")
+
+        def export_single_character_wrapper(character_selection):
+            file_path, status_message = export_single_character(character_selection)
+            if file_path:
+                return gr.File.update(value=file_path), status_message
+            else:
+                return gr.File.update(value=None), status_message
+
+        def export_all_characters_wrapper():
+            zip_path = export_all_characters_as_zip()
+            characters = get_character_cards()
+            exported_characters = [char['name'] for char in characters]
+            status_message = f"Exported {len(exported_characters)} characters successfully:\n" + "\n".join(exported_characters)
+            return gr.File.update(value=zip_path), status_message
 
         # Event listeners
         load_characters_button.click(
             fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
             outputs=export_character_dropdown
         )
-        
+
         export_single_button.click(
-            fn=export_single_character,
+            fn=export_single_character_wrapper,
             inputs=[export_character_dropdown],
             outputs=[export_output, export_status]
         )
 
         export_all_button.click(
-            fn=export_all_characters,
+            fn=export_all_characters_wrapper,
             inputs=[],
             outputs=[export_output, export_status]
         )
 
-    return export_character_dropdown, export_single_button, export_all_button, export_output, export_status
+    return export_character_dropdown, load_characters_button, export_single_button, export_all_button, export_output, export_status
 
 #
 # End of Character_Chat_tab.py
