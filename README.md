@@ -11,12 +11,15 @@
 ## All Automated. All Local. All Yours.
 
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)
-  - (Note: YouTube blocks requests from the demo. You have to provide a session cookie :/. Placeholder content is included for testing/demo. HuggingFace API is setup in it, so that works fine.)
+- Please Note: YouTube blocks requests from the demo. You have to provide a logged-in session cookie to bypass it :sadface: 
+- Placeholder content is included for the demo. HuggingFace API is also setup in it, so you can select that as your API.)
+
+</div>
 
 #### ![Video Walkthrough of a Fresh Install](Docs/Screenshots/tldw-run-through-blank.webm)
 #### Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)`
 
-</div>
+
 
 #### Key Features:
 - Full-text+RAG search across all ingested content (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking).
