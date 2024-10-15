@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 #
@@ -20,15 +21,15 @@ from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat
     chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi, chat_with_vllm, chat_with_custom_openai
 from App_Function_Libraries.DB.SQLite_DB import load_media_content
 from App_Function_Libraries.Utils.Utils import generate_unique_filename, load_and_log_configs
-
-
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 ####################################################################################################
 #
 # Functions:
 
-
 def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message=None):
+    log_counter("chat_api_call_attempt", labels={"api_endpoint": api_endpoint})
+    start_time = time.time()
     if not api_key:
         api_key = None
     model = None
@@ -105,14 +106,21 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
         else:
             raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
 
+        call_duration = time.time() - start_time
+        log_histogram("chat_api_call_duration", call_duration, labels={"api_endpoint": api_endpoint})
+        log_counter("chat_api_call_success", labels={"api_endpoint": api_endpoint})
         return response
 
     except Exception as e:
+        log_counter("chat_api_call_error", labels={"api_endpoint": api_endpoint, "error": str(e)})
         logging.error(f"Error in chat function: {str(e)}")
         return f"An error occurred: {str(e)}"
 
+
 def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt, temperature,
          system_message=None):
+    log_counter("chat_attempt", labels={"api_endpoint": api_endpoint})
+    start_time = time.time()
     try:
         logging.info(f"Debug - Chat Function - Message: {message}")
         logging.info(f"Debug - Chat Function - Media Content: {media_content}")
@@ -151,13 +159,19 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         # Use the existing API request code based on the selected endpoint
         response = chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message)
 
+        chat_duration = time.time() - start_time
+        log_histogram("chat_duration", chat_duration, labels={"api_endpoint": api_endpoint})
+        log_counter("chat_success", labels={"api_endpoint": api_endpoint})
         return response
     except Exception as e:
+        log_counter("chat_error", labels={"api_endpoint": api_endpoint, "error": str(e)})
         logging.error(f"Error in chat function: {str(e)}")
         return f"An error occurred: {str(e)}"
 
 
 def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content, media_name=None):
+    log_counter("save_chat_history_to_db_attempt")
+    start_time = time.time()
     logging.info(f"Attempting to save chat history. Media content type: {type(media_content)}")
     try:
         # Extract the media_id and media_name from the media_content
@@ -205,14 +219,20 @@ def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content, med
 
         new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_id, media_name,
                                                             conversation_name)
+        save_duration = time.time() - start_time
+        log_histogram("save_chat_history_to_db_duration", save_duration)
+        log_counter("save_chat_history_to_db_success")
         return new_conversation_id, f"Chat history saved successfully as {conversation_name}!"
     except Exception as e:
+        log_counter("save_chat_history_to_db_error", labels={"error": str(e)})
         error_message = f"Failed to save chat history: {str(e)}"
         logging.error(error_message, exc_info=True)
         return conversation_id, error_message
 
 
 def save_chat_history(history, conversation_id, media_content):
+    log_counter("save_chat_history_attempt")
+    start_time = time.time()
     try:
         content, conversation_name = generate_chat_history_content(history, conversation_id, media_content)
 
@@ -232,8 +252,12 @@ def save_chat_history(history, conversation_id, media_content):
         # Rename the temporary file to the unique filename
         os.rename(temp_file_path, final_path)
 
+        save_duration = time.time() - start_time
+        log_histogram("save_chat_history_duration", save_duration)
+        log_counter("save_chat_history_success")
         return final_path
     except Exception as e:
+        log_counter("save_chat_history_error", labels={"error": str(e)})
         logging.error(f"Error saving chat history: {str(e)}")
         return None
 
@@ -285,6 +309,8 @@ def extract_media_name(media_content):
 
 
 def update_chat_content(selected_item, use_content, use_summary, use_prompt, item_mapping):
+    log_counter("update_chat_content_attempt")
+    start_time = time.time()
     logging.debug(f"Debug - Update Chat Content - Selected Item: {selected_item}\n")
     logging.debug(f"Debug - Update Chat Content - Use Content: {use_content}\n\n\n\n")
     logging.debug(f"Debug - Update Chat Content - Use Summary: {use_summary}\n\n")
@@ -311,8 +337,12 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
             print(f"Debug - Update Chat Content - Content(first 500 char): {str(content)[:500]}\n\n\n\n")
 
         print(f"Debug - Update Chat Content - Selected Parts: {selected_parts}")
+        update_duration = time.time() - start_time
+        log_histogram("update_chat_content_duration", update_duration)
+        log_counter("update_chat_content_success")
         return content, selected_parts
     else:
+        log_counter("update_chat_content_error", labels={"error": str("No item selected or item not in mapping")})
         print(f"Debug - Update Chat Content - No item selected or item not in mapping")
         return {}, []
 
@@ -329,6 +359,8 @@ CHARACTERS_FILE = Path('.', 'Helper_Scripts', 'Character_Cards', 'Characters.jso
 
 
 def save_character(character_data):
+    log_counter("save_character_attempt")
+    start_time = time.time()
     characters_file = os.path.join(os.path.dirname(__file__), '..', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
     characters_dir = os.path.dirname(characters_file)
 
@@ -356,26 +388,51 @@ def save_character(character_data):
         with open(characters_file, 'w') as f:
             json.dump(characters, f, indent=2)
 
+        save_duration = time.time() - start_time
+        log_histogram("save_character_duration", save_duration)
+        log_counter("save_character_success")
         logging.info(f"Character '{char_name}' saved successfully.")
     except Exception as e:
+        log_counter("save_character_error", labels={"error": str(e)})
         logging.error(f"Error saving character: {str(e)}")
 
 
 def load_characters():
-    characters_file = os.path.join(os.path.dirname(__file__), '..', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
-    if os.path.exists(characters_file):
-        with open(characters_file, 'r') as f:
-            characters = json.load(f)
-        logging.debug(f"Loaded {len(characters)} characters from {characters_file}")
-        return characters
-    logging.warning(f"Characters file not found: {characters_file}")
-    return {}
+    log_counter("load_characters_attempt")
+    start_time = time.time()
+    try:
+        characters_file = os.path.join(os.path.dirname(__file__), '..', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
+        if os.path.exists(characters_file):
+            with open(characters_file, 'r') as f:
+                characters = json.load(f)
+            logging.debug(f"Loaded {len(characters)} characters from {characters_file}")
+            load_duration = time.time() - start_time
+            log_histogram("load_characters_duration", load_duration)
+            log_counter("load_characters_success", labels={"character_count": len(characters)})
+            return characters
+        else:
+            logging.warning(f"Characters file not found: {characters_file}")
+            return {}
+    except Exception as e:
+        log_counter("load_characters_error", labels={"error": str(e)})
+        return {}
+
 
 
 def get_character_names():
-    characters = load_characters()
-    return list(characters.keys())
-
+    log_counter("get_character_names_attempt")
+    start_time = time.time()
+    try:
+        characters = load_characters()
+        names = list(characters.keys())
+        get_names_duration = time.time() - start_time
+        log_histogram("get_character_names_duration", get_names_duration)
+        log_counter("get_character_names_success", labels={"name_count": len(names)})
+        return names
+    except Exception as e:
+        log_counter("get_character_names_error", labels={"error": str(e)})
+        logging.error(f"Error getting character names: {str(e)}")
+        return []
 
 #
 # End of Chat.py
