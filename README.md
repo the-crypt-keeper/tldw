@@ -4,7 +4,7 @@
 ## Summary: Your personal offline research assistant – Download, Transcribe, Summarize & Chat with/about Videos, Audio, Documents, Web Articles, and Books. 
 ### All automated. All local. All yours.
 
-### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer)
+### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)
   - (Note: YouTube may block the demo unless you provide a session cookie. Placeholder content is included, random contents of a conference and whatever videos I decided to use for testing that patch version.)
 
 #### [Video Walkthrough of a Fresh Install](Docs/tldw-run-through-blank.webm)
@@ -12,8 +12,8 @@
 
 #### Key Features:
 - Full-text+RAG search across all ingested content (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking).
-- Local LLM inference for offline summarization and chat (via `llamafile`).
-- Local Embeddings generation for RAG search (via `llamafile`).
+- Local LLM inference for offline summarization and chat (via `llamafile` and HuggingFace Transformers).
+- Local Embeddings generation for RAG search (via `llamafile` and HuggingFace Transformers).
 - Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
 - Also writing tools! Grammar/Style checker, Tone Analyzer, Writing editor(feedback), and more.
 #### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
@@ -150,7 +150,7 @@ All features are designed to run **locally** on your device, ensuring privacy an
       - Chat management, with the ability to save, delete, edit, search and export chats. (WIP)
       - Chat 'Workflows' - A way to string together multiple questions and responses into a single chat. (WIP)
       - Chat 'Sessions' - A way to save a chat and come back to it later.
-      - Support for SillyTavern character cards, and the ability to store/select from them in the chat UI. (saves as a JSON file, not to the SQLite DB)
+      - Support for SillyTavern character cards, and the ability to store/select from them in the chat UI. (Saves to a separate sqlite DB specifically for Character cards/character card chats)
     - **Ability to edit any of the content you've ingested, as well as the ability to delete it. (Including prompts)**
     - **Writing Tools**
       - Writing Feedback - A way to get feedback on your writing from an LLM, impersonating a variety of different authors.
@@ -484,7 +484,7 @@ In order of attempts:
 1. https://github.com/SYSTRAN/faster-whisper/issues/85
 2. Install specific cuda version: `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 --force-reinstall --no-cache`
 3. Download/copy the already installed DLLs: https://forums.developer.nvidia.com/t/could-not-load-library-cudnn-cnn-infer64-8-dll-error-code-193/218437/16
-4. Just install outside of a venv. That is what I had to do on my windows machine.
+4. Just install outside of a venv. That is what I had to do on my windows machine. (I actually ended up 'fixing' this by copying the two dlls to the tldw folder, and it worked fine after that. https://github.com/Purfview/whisper-standalone-win/releases/tag/Faster-Whisper-XXL)
 
 
 

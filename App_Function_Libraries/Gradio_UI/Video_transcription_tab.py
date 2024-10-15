@@ -5,6 +5,7 @@
 import json
 import logging
 import os
+from datetime import datetime
 from typing import Dict, Any
 
 #
@@ -23,6 +24,8 @@ from App_Function_Libraries.Utils.Utils import convert_to_seconds, safe_read_fil
     create_download_directory, generate_unique_identifier, extract_text_from_segments
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, extract_metadata, download_video
 from App_Function_Libraries.Benchmarks_Evaluations.ms_g_eval import run_geval
+# Import metrics logging
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 #######################################################################################################################
 #
@@ -194,6 +197,8 @@ def create_video_transcription_tab():
                                                    timestamp_option, keep_original_video, summarize_recursively, overwrite_existing=False,
                                                    progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
+                    # Start overall processing timer
+                    proc_start_time = datetime.utcnow()
                     # FIXME - summarize_recursively is not being used...
                     logging.info("Entering process_videos_with_error_handling")
                     logging.info(f"Received inputs: {inputs}")
@@ -245,11 +250,17 @@ def create_video_transcription_tab():
                     all_transcriptions = {}
                     all_summaries = ""
 
+                    # Start timing
+                    # FIXME - utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+                    start_proc = datetime.utcnow()
+
                     for i in range(0, len(all_inputs), batch_size):
                         batch = all_inputs[i:i + batch_size]
                         batch_results = []
 
                         for input_item in batch:
+                            # Start individual video processing timer
+                            video_start_time = datetime.utcnow()
                             try:
                                 start_seconds = convert_to_seconds(start_time)
                                 end_seconds = convert_to_seconds(end_time) if end_time else None
@@ -318,6 +329,14 @@ def create_video_transcription_tab():
                                     batch_results.append(
                                         (input_item, error_message, "Error", video_metadata, None, None))
                                     errors.append(f"Error processing {input_item}: {error_message}")
+
+                                    # Log failure metric
+                                    log_counter(
+                                        metric_name="videos_failed_total",
+                                        labels={"whisper_model": whisper_model, "api_name": api_name},
+                                        value=1
+                                    )
+
                                 else:
                                     url, transcription, summary, json_file, summary_file, result_metadata = result
                                     if transcription is None:
@@ -325,13 +344,56 @@ def create_video_transcription_tab():
                                         batch_results.append(
                                             (input_item, error_message, "Error", result_metadata, None, None))
                                         errors.append(error_message)
+
+                                        # Log failure metric
+                                        log_counter(
+                                            metric_name="videos_failed_total",
+                                            labels={"whisper_model": whisper_model, "api_name": api_name},
+                                            value=1
+                                        )
+
                                     else:
                                         batch_results.append(
                                             (input_item, transcription, "Success", result_metadata, json_file,
                                              summary_file))
 
+                                        # Log success metric
+                                        log_counter(
+                                            metric_name="videos_processed_total",
+                                            labels={"whisper_model": whisper_model, "api_name": api_name},
+                                            value=1
+                                        )
+
+                                        # Calculate processing time
+                                        video_end_time = datetime.utcnow()
+                                        processing_time = (video_end_time - video_start_time).total_seconds()
+                                        log_histogram(
+                                            metric_name="video_processing_time_seconds",
+                                            value=processing_time,
+                                            labels={"whisper_model": whisper_model, "api_name": api_name}
+                                        )
+
+                                        # Log transcription and summary metrics
+                                        if transcription:
+                                            log_counter(
+                                                metric_name="transcriptions_generated_total",
+                                                labels={"whisper_model": whisper_model},
+                                                value=1
+                                            )
+                                        if summary:
+                                            log_counter(
+                                                metric_name="summaries_generated_total",
+                                                labels={"whisper_model": whisper_model},
+                                                value=1
+                                            )
 
                             except Exception as e:
+                                # Log failure
+                                log_counter(
+                                    metric_name="videos_failed_total",
+                                    labels={"whisper_model": whisper_model, "api_name": api_name},
+                                    value=1
+                                )
                                 error_message = f"Error processing {input_item}: {str(e)}"
                                 logging.error(error_message, exc_info=True)
                                 batch_results.append((input_item, error_message, "Error", {}, None, None))
@@ -409,6 +471,16 @@ def create_video_transcription_tab():
                     error_summary = "\n".join(errors) if errors else "No errors occurred."
 
                     total_inputs = len(all_inputs)
+
+                    # End overall processing timer
+                    proc_end_time = datetime.utcnow()
+                    total_processing_time = (proc_end_time - proc_start_time).total_seconds()
+                    log_histogram(
+                        metric_name="total_processing_time_seconds",
+                        value=total_processing_time,
+                        labels={"whisper_model": whisper_model, "api_name": api_name}
+                    )
+
                     return (
                         f"Processed {total_inputs} videos. {len(errors)} errors occurred.",
                         error_summary,
@@ -418,6 +490,14 @@ def create_video_transcription_tab():
                     )
                 except Exception as e:
                     logging.error(f"Unexpected error in process_videos_with_error_handling: {str(e)}", exc_info=True)
+
+                    # Log unexpected failure metric
+                    log_counter(
+                        metric_name="videos_failed_total",
+                        labels={"whisper_model": whisper_model, "api_name": api_name},
+                        value=1
+                    )
+
                     return (
                         f"An unexpected error occurred: {str(e)}",
                         str(e),
