@@ -5,6 +5,7 @@
 import configparser
 import logging
 import os
+import time
 from typing import Dict, Any, List, Optional
 
 from App_Function_Libraries.DB.Character_Chat_DB import get_character_chats, perform_full_text_search_chat, \
@@ -17,6 +18,7 @@ from App_Function_Libraries.Summarization.Local_Summarization_Lib import summari
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.DB.DB_Manager import search_db, fetch_keywords_for_media
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 # 3rd-Party Imports
 import openai
@@ -116,6 +118,8 @@ config.read('config.txt')
 
 # RAG Search with keyword filtering
 def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> Dict[str, Any]:
+    log_counter("enhanced_rag_pipeline_attempt", labels={"api_choice": api_choice})
+    start_time = time.time()
     try:
         # Load embedding provider from config, or fallback to 'openai'
         embedding_provider = config.get('Embeddings', 'provider', fallback='openai')
@@ -185,13 +189,19 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
                 "answer": "No relevant information based on your query and keywords were found in the database. Your query has been directly passed to the LLM, and here is its answer: \n\n" + answer,
                 "context": "No relevant information based on your query and keywords were found in the database. The only context used was your query: \n\n" + query
             }
-
+        # Metrics
+        pipeline_duration = time.time() - start_time
+        log_histogram("enhanced_rag_pipeline_duration", pipeline_duration, labels={"api_choice": api_choice})
+        log_counter("enhanced_rag_pipeline_success", labels={"api_choice": api_choice})
         return {
             "answer": answer,
             "context": context
         }
 
     except Exception as e:
+        # Metrics
+        log_counter("enhanced_rag_pipeline_error", labels={"api_choice": api_choice, "error": str(e)})
+        logging.error(f"Error in enhanced_rag_pipeline: {str(e)}")
         logging.error(f"Error in enhanced_rag_pipeline: {str(e)}")
         return {
             "answer": "An error occurred while processing your request.",
@@ -200,118 +210,199 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
 
 # Need to write a test for this function FIXME
 def generate_answer(api_choice: str, context: str, query: str) -> str:
+    # Metrics
+    log_counter("generate_answer_attempt", labels={"api_choice": api_choice})
+    start_time = time.time()
     logging.debug("Entering generate_answer function")
     config = load_comprehensive_config()
     logging.debug(f"Config sections: {config.sections()}")
     prompt = f"Context: {context}\n\nQuestion: {query}"
-    if api_choice == "OpenAI":
-        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai
-        return summarize_with_openai(config['API']['openai_api_key'], prompt, "")
+    try:
+        if api_choice == "OpenAI":
+            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_openai(config['API']['openai_api_key'], prompt, "")
 
-    elif api_choice == "Anthropic":
-        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_anthropic
-        return summarize_with_anthropic(config['API']['anthropic_api_key'], prompt, "")
+        elif api_choice == "Anthropic":
+            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_anthropic
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_anthropic(config['API']['anthropic_api_key'], prompt, "")
 
-    elif api_choice == "Cohere":
-        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_cohere
-        return summarize_with_cohere(config['API']['cohere_api_key'], prompt, "")
+        elif api_choice == "Cohere":
+            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_cohere
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_cohere(config['API']['cohere_api_key'], prompt, "")
 
-    elif api_choice == "Groq":
-        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_groq
-        return summarize_with_groq(config['API']['groq_api_key'], prompt, "")
+        elif api_choice == "Groq":
+            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_groq
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_groq(config['API']['groq_api_key'], prompt, "")
 
-    elif api_choice == "OpenRouter":
-        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openrouter
-        return summarize_with_openrouter(config['API']['openrouter_api_key'], prompt, "")
+        elif api_choice == "OpenRouter":
+            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openrouter
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_openrouter(config['API']['openrouter_api_key'], prompt, "")
 
-    elif api_choice == "HuggingFace":
-        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_huggingface
-        return summarize_with_huggingface(config['API']['huggingface_api_key'], prompt, "")
+        elif api_choice == "HuggingFace":
+            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_huggingface
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_huggingface(config['API']['huggingface_api_key'], prompt, "")
 
-    elif api_choice == "DeepSeek":
-        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_deepseek
-        return summarize_with_deepseek(config['API']['deepseek_api_key'], prompt, "")
+        elif api_choice == "DeepSeek":
+            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_deepseek
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_deepseek(config['API']['deepseek_api_key'], prompt, "")
 
-    elif api_choice == "Mistral":
-        from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_mistral
-        return summarize_with_mistral(config['API']['mistral_api_key'], prompt, "")
+        elif api_choice == "Mistral":
+            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_mistral
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_mistral(config['API']['mistral_api_key'], prompt, "")
 
-    # Local LLM APIs
-    elif api_choice == "Local-LLM":
-        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_local_llm
-        # FIXME
-        return summarize_with_local_llm(config['Local-API']['local_llm_path'], prompt, "")
+        # Local LLM APIs
+        elif api_choice == "Local-LLM":
+            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_local_llm
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            # FIXME
+            return summarize_with_local_llm(config['Local-API']['local_llm_path'], prompt, "")
 
-    elif api_choice == "Llama.cpp":
-        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama
-        return summarize_with_llama(prompt, "", config['Local-API']['llama_api_key'], None, None)
-    elif api_choice == "Kobold":
-        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_kobold
-        return summarize_with_kobold(prompt, config['Local-API']['kobold_api_key'], "", system_message=None, temp=None)
+        elif api_choice == "Llama.cpp":
+            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_llama(prompt, "", config['Local-API']['llama_api_key'], None, None)
+        elif api_choice == "Kobold":
+            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_kobold
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_kobold(prompt, config['Local-API']['kobold_api_key'], "", system_message=None, temp=None)
 
-    elif api_choice == "Ooba":
-        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_oobabooga
-        return summarize_with_oobabooga(prompt, config['Local-API']['ooba_api_key'], custom_prompt="", system_message=None, temp=None)
+        elif api_choice == "Ooba":
+            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_oobabooga
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_oobabooga(prompt, config['Local-API']['ooba_api_key'], custom_prompt="", system_message=None, temp=None)
 
-    elif api_choice == "TabbyAPI":
-        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_tabbyapi
-        return summarize_with_tabbyapi(prompt, None, None, None, None, )
+        elif api_choice == "TabbyAPI":
+            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_tabbyapi
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_tabbyapi(prompt, None, None, None, None, )
 
-    elif api_choice == "vLLM":
-        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_vllm
-        return summarize_with_vllm(prompt, "", config['Local-API']['vllm_api_key'], None, None)
+        elif api_choice == "vLLM":
+            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_vllm
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_vllm(prompt, "", config['Local-API']['vllm_api_key'], None, None)
 
-    elif api_choice.lower() == "ollama":
-        from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_ollama
-        return summarize_with_ollama(prompt, "", config['Local-API']['ollama_api_IP'], config['Local-API']['ollama_api_key'], None, None, None)
+        elif api_choice.lower() == "ollama":
+            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_ollama
+            answer_generation_duration = time.time() - start_time
+            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            log_counter("generate_answer_success", labels={"api_choice": api_choice})
+            return summarize_with_ollama(prompt, "", config['Local-API']['ollama_api_IP'], config['Local-API']['ollama_api_key'], None, None, None)
 
-    elif api_choice.lower() == "custom_openai_api":
-        logging.debug(f"RAG Answer Gen: Trying with Custom_OpenAI API")
-        summary = summarize_with_custom_openai(prompt, "", config['API']['custom_openai_api_key'], None,
-                                               None)
-
-    else:
-        raise ValueError(f"Unsupported API choice: {api_choice}")
-
+        elif api_choice.lower() == "custom_openai_api":
+            logging.debug(f"RAG Answer Gen: Trying with Custom_OpenAI API")
+            summary = summarize_with_custom_openai(prompt, "", config['API']['custom_openai_api_key'], None,
+                                                   None)
+        else:
+            log_counter("generate_answer_error", labels={"api_choice": api_choice, "error": str()})
+            raise ValueError(f"Unsupported API choice: {api_choice}")
+    except Exception as e:
+        log_counter("generate_answer_error", labels={"api_choice": api_choice, "error": str(e)})
+        logging.error(f"Error in generate_answer: {str(e)}")
+        return "An error occurred while generating the answer."
 
 def perform_vector_search(query: str, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
+    log_counter("perform_vector_search_attempt")
+    start_time = time.time()
     all_collections = chroma_client.list_collections()
     vector_results = []
-    for collection in all_collections:
-        collection_results = vector_search(collection.name, query, k=5)
-        filtered_results = [
-            result for result in collection_results
-            if relevant_media_ids is None or result['metadata'].get('media_id') in relevant_media_ids
-        ]
-        vector_results.extend(filtered_results)
-    return vector_results
-
+    try:
+        for collection in all_collections:
+            collection_results = vector_search(collection.name, query, k=5)
+            filtered_results = [
+                result for result in collection_results
+                if relevant_media_ids is None or result['metadata'].get('media_id') in relevant_media_ids
+            ]
+            vector_results.extend(filtered_results)
+        search_duration = time.time() - start_time
+        log_histogram("perform_vector_search_duration", search_duration)
+        log_counter("perform_vector_search_success", labels={"result_count": len(vector_results)})
+        return vector_results
+    except Exception as e:
+        log_counter("perform_vector_search_error", labels={"error": str(e)})
+        logging.error(f"Error in perform_vector_search: {str(e)}")
+        raise
 
 def perform_full_text_search(query: str, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
-    fts_results = search_db(query, ["content"], "", page=1, results_per_page=5)
-    filtered_fts_results = [
-        {
-            "content": result['content'],
-            "metadata": {"media_id": result['id']}
-        }
-        for result in fts_results
-        if relevant_media_ids is None or result['id'] in relevant_media_ids
-    ]
-    return filtered_fts_results
+    log_counter("perform_full_text_search_attempt")
+    start_time = time.time()
+    try:
+        fts_results = search_db(query, ["content"], "", page=1, results_per_page=5)
+        filtered_fts_results = [
+            {
+                "content": result['content'],
+                "metadata": {"media_id": result['id']}
+            }
+            for result in fts_results
+            if relevant_media_ids is None or result['id'] in relevant_media_ids
+        ]
+        search_duration = time.time() - start_time
+        log_histogram("perform_full_text_search_duration", search_duration)
+        log_counter("perform_full_text_search_success", labels={"result_count": len(filtered_fts_results)})
+        return filtered_fts_results
+    except Exception as e:
+        log_counter("perform_full_text_search_error", labels={"error": str(e)})
+        logging.error(f"Error in perform_full_text_search: {str(e)}")
+        raise
 
 
 def fetch_relevant_media_ids(keywords: List[str]) -> List[int]:
+    log_counter("fetch_relevant_media_ids_attempt", labels={"keyword_count": len(keywords)})
+    start_time = time.time()
     relevant_ids = set()
-    try:
-        for keyword in keywords:
+    for keyword in keywords:
+        try:
             media_ids = fetch_keywords_for_media(keyword)
             relevant_ids.update(media_ids)
-    except Exception as e:
-        logging.error(f"Error fetching relevant media IDs: {str(e)}")
+        except Exception as e:
+            log_counter("fetch_relevant_media_ids_error", labels={"error": str(e)})
+            logging.error(f"Error fetching relevant media IDs for keyword '{keyword}': {str(e)}")
+            # Continue processing other keywords
+
+    fetch_duration = time.time() - start_time
+    log_histogram("fetch_relevant_media_ids_duration", fetch_duration)
+    log_counter("fetch_relevant_media_ids_success", labels={"result_count": len(relevant_ids)})
     return list(relevant_ids)
 
 
 def filter_results_by_keywords(results: List[Dict[str, Any]], keywords: List[str]) -> List[Dict[str, Any]]:
+    log_counter("filter_results_by_keywords_attempt", labels={"result_count": len(results), "keyword_count": len(keywords)})
+    start_time = time.time()
     if not keywords:
         return results
 
@@ -337,6 +428,9 @@ def filter_results_by_keywords(results: List[Dict[str, Any]], keywords: List[str
         except Exception as e:
             logging.error(f"Error processing result: {result}. Error: {str(e)}")
 
+    filter_duration = time.time() - start_time
+    log_histogram("filter_results_by_keywords_duration", filter_duration)
+    log_counter("filter_results_by_keywords_success", labels={"filtered_count": len(filtered_results)})
     return filtered_results
 
 # FIXME: to be implememted
@@ -371,6 +465,8 @@ def enhanced_rag_pipeline_chat(query: str, api_choice: str, character_id: int, k
     Returns:
         Dict[str, Any]: Contains the generated answer and the context used.
     """
+    log_counter("enhanced_rag_pipeline_chat_attempt", labels={"api_choice": api_choice, "character_id": character_id})
+    start_time = time.time()
     try:
         # Load embedding provider from config, or fallback to 'openai'
         embedding_provider = config.get('Embeddings', 'provider', fallback='openai')
@@ -391,6 +487,11 @@ def enhanced_rag_pipeline_chat(query: str, api_choice: str, character_id: int, k
             logging.info(f"No chats found for the given keywords and character ID: {character_id}")
             # Fallback to generating answer without context
             answer = generate_answer(api_choice, "", query)
+            # Metrics
+            pipeline_duration = time.time() - start_time
+            log_histogram("enhanced_rag_pipeline_chat_duration", pipeline_duration, labels={"api_choice": api_choice})
+            log_counter("enhanced_rag_pipeline_chat_success",
+                        labels={"api_choice": api_choice, "character_id": character_id})
             return {
                 "answer": answer,
                 "context": ""
@@ -450,6 +551,7 @@ def enhanced_rag_pipeline_chat(query: str, api_choice: str, character_id: int, k
         }
 
     except Exception as e:
+        log_counter("enhanced_rag_pipeline_chat_error", labels={"api_choice": api_choice, "character_id": character_id, "error": str(e)})
         logging.error(f"Error in enhanced_rag_pipeline_chat: {str(e)}")
         return {
             "answer": "An error occurred while processing your request.",
@@ -468,13 +570,21 @@ def fetch_relevant_chat_ids(character_id: int, keywords: List[str]) -> List[int]
     Returns:
         List[int]: List of relevant chat IDs.
     """
+    log_counter("fetch_relevant_chat_ids_attempt", labels={"character_id": character_id, "keyword_count": len(keywords)})
+    start_time = time.time()
     relevant_ids = set()
     try:
         media_ids = fetch_keywords_for_chats(keywords)
+        fetch_duration = time.time() - start_time
+        log_histogram("fetch_relevant_chat_ids_duration", fetch_duration)
+        log_counter("fetch_relevant_chat_ids_success",
+                    labels={"character_id": character_id, "result_count": len(relevant_ids)})
         relevant_ids.update(media_ids)
+        return list(relevant_ids)
     except Exception as e:
+        log_counter("fetch_relevant_chat_ids_error", labels={"character_id": character_id, "error": str(e)})
         logging.error(f"Error fetching relevant chat IDs: {str(e)}")
-    return list(relevant_ids)
+        return []
 
 
 def fetch_all_chat_ids(character_id: int) -> List[int]:
@@ -487,10 +597,17 @@ def fetch_all_chat_ids(character_id: int) -> List[int]:
     Returns:
         List[int]: List of all chat IDs for the character.
     """
+    log_counter("fetch_all_chat_ids_attempt", labels={"character_id": character_id})
+    start_time = time.time()
     try:
         chats = get_character_chats(character_id=character_id)
-        return [chat['id'] for chat in chats]
+        chat_ids = [chat['id'] for chat in chats]
+        fetch_duration = time.time() - start_time
+        log_histogram("fetch_all_chat_ids_duration", fetch_duration)
+        log_counter("fetch_all_chat_ids_success", labels={"character_id": character_id, "chat_count": len(chat_ids)})
+        return chat_ids
     except Exception as e:
+        log_counter("fetch_all_chat_ids_error", labels={"character_id": character_id, "error": str(e)})
         logging.error(f"Error fetching all chat IDs for character {character_id}: {str(e)}")
         return []
 

@@ -24,7 +24,7 @@ class TestRAGFunctions(unittest.TestCase):
     Unit tests for RAG-related functions.
     """
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.fetch_keywords_for_media')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.fetch_keywords_for_media')
     def test_fetch_relevant_media_ids_success(self, mock_fetch_keywords_for_media):
         """
         Test fetch_relevant_media_ids with valid keywords.
@@ -49,7 +49,7 @@ class TestRAGFunctions(unittest.TestCase):
         mock_fetch_keywords_for_media.assert_any_call('cities')
         self.assertEqual(mock_fetch_keywords_for_media.call_count, 2)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.fetch_keywords_for_media')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.fetch_keywords_for_media')
     def test_fetch_relevant_media_ids_empty_keywords(self, mock_fetch_keywords_for_media):
         """
         Test fetch_relevant_media_ids with an empty keywords list.
@@ -59,8 +59,8 @@ class TestRAGFunctions(unittest.TestCase):
         self.assertEqual(result, [])
         mock_fetch_keywords_for_media.assert_not_called()
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.fetch_keywords_for_media')
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.logging')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.fetch_keywords_for_media')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.logging')
     def test_fetch_relevant_media_ids_exception(self, mock_logging, mock_fetch_keywords_for_media):
         """
         Test fetch_relevant_media_ids when fetch_keywords_for_media raises an exception.
@@ -74,11 +74,13 @@ class TestRAGFunctions(unittest.TestCase):
         # The function should return an empty list upon exception
         self.assertEqual(result, [])
 
-        # Assert that an error was logged
-        mock_logging.error.assert_called_once_with("Error fetching relevant media IDs: Database error")
+        # Assert that errors were logged for both keywords
+        mock_logging.error.assert_any_call("Error fetching relevant media IDs for keyword 'geography': Database error")
+        mock_logging.error.assert_any_call("Error fetching relevant media IDs for keyword 'cities': Database error")
+        self.assertEqual(mock_logging.error.call_count, 2)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.vector_search')
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.chroma_client')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.vector_search')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.chroma_client')
     def test_perform_vector_search_with_relevant_media_ids(self, mock_chroma_client, mock_vector_search):
         """
         Test perform_vector_search with relevant_media_ids provided.
@@ -115,8 +117,8 @@ class TestRAGFunctions(unittest.TestCase):
         # Assert vector_search was called with correct arguments
         mock_vector_search.assert_called_once_with('collection1', query, k=5)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.vector_search')
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.chroma_client')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.vector_search')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.chroma_client')
     def test_perform_vector_search_without_relevant_media_ids(self, mock_chroma_client, mock_vector_search):
         """
         Test perform_vector_search without relevant_media_ids (None).
@@ -152,7 +154,7 @@ class TestRAGFunctions(unittest.TestCase):
         # Assert vector_search was called with correct arguments
         mock_vector_search.assert_called_once_with('collection1', query, k=5)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.search_db')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_with_relevant_media_ids(self, mock_search_db):
         """
         Test perform_full_text_search with relevant_media_ids provided.
@@ -182,7 +184,7 @@ class TestRAGFunctions(unittest.TestCase):
         mock_search_db.assert_called_once_with(
             query, ['content'], '', page=1, results_per_page=5)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.search_db')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_without_relevant_media_ids(self, mock_search_db):
         """
         Test perform_full_text_search without relevant_media_ids (None).
@@ -211,7 +213,7 @@ class TestRAGFunctions(unittest.TestCase):
         mock_search_db.assert_called_once_with(
             query, ['content'], '', page=1, results_per_page=5)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.search_db')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_empty_results(self, mock_search_db):
         """
         Test perform_full_text_search when search_db returns no results.
@@ -234,8 +236,8 @@ class TestRAGFunctions(unittest.TestCase):
         mock_search_db.assert_called_once_with(
             query, ['content'], '', page=1, results_per_page=5)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.fetch_keywords_for_media')
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.logging')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.fetch_keywords_for_media')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.logging')
     def test_fetch_relevant_media_ids_partial_failure(self, mock_logging, mock_fetch_keywords_for_media):
         """
         Test fetch_relevant_media_ids when fetch_keywords_for_media partially fails.
@@ -258,10 +260,11 @@ class TestRAGFunctions(unittest.TestCase):
         self.assertEqual(sorted(result), [1, 2])
 
         # Assert that an error was logged for 'cities'
-        mock_logging.error.assert_called_once_with("Error fetching relevant media IDs: Database error")
+        mock_logging.error.assert_called_once_with(
+            "Error fetching relevant media IDs for keyword 'cities': Database error")
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.chroma_client')
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.vector_search')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.chroma_client')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.vector_search')
     def test_perform_vector_search_no_collections(self, mock_vector_search, mock_chroma_client):
         """
         Test perform_vector_search when there are no collections.
@@ -286,7 +289,7 @@ class TestRAGFunctions(unittest.TestCase):
         # Assert vector_search was not called since there are no collections
         mock_vector_search.assert_not_called()
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.fetch_keywords_for_media')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.fetch_keywords_for_media')
     def test_fetch_relevant_media_ids_duplicate_media_ids(self, mock_fetch_keywords_for_media):
         """
         Test fetch_relevant_media_ids with duplicate media_ids across keywords.
@@ -313,7 +316,7 @@ class TestRAGFunctions(unittest.TestCase):
         mock_fetch_keywords_for_media.assert_any_call('engineering')
         self.assertEqual(mock_fetch_keywords_for_media.call_count, 3)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.search_db')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_case_insensitive_filtering(self, mock_search_db):
         """
         Test perform_full_text_search with case-insensitive filtering of media_ids.
@@ -343,7 +346,7 @@ class TestRAGFunctions(unittest.TestCase):
         mock_search_db.assert_called_once_with(
             query, ['content'], '', page=1, results_per_page=5)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.search_db')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_multiple_pages(self, mock_search_db):
         """
         Test perform_full_text_search with multiple pages of results.
@@ -379,8 +382,8 @@ class TestRAGFunctions(unittest.TestCase):
         mock_search_db.assert_called_once_with(
             query, ['content'], '', page=1, results_per_page=5)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.chroma_client')
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.vector_search')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.chroma_client')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.vector_search')
     def test_perform_vector_search_multiple_collections(self, mock_vector_search, mock_chroma_client):
         """
         Test perform_vector_search with multiple collections.
@@ -430,7 +433,7 @@ class TestRAGFunctions(unittest.TestCase):
         mock_vector_search.assert_any_call('collection2', query, k=5)
         self.assertEqual(mock_vector_search.call_count, 2)
 
-    @patch('App_Function_Libraries.RAG.RAG_Libary_2.search_db')
+    @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_partial_matches(self, mock_search_db):
         """
         Test perform_full_text_search where some media_ids do not match the relevant_media_ids.
