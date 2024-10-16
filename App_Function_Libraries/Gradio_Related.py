@@ -8,6 +8,8 @@
 # Built-In Imports
 import logging
 import os
+import webbrowser
+
 #
 # Import 3rd-Party Libraries
 import gradio as gr
@@ -229,6 +231,7 @@ custom_prompt_summarize_bulleted_notes = ("""
 
 
 def launch_ui(share_public=None, server_mode=False):
+    webbrowser.open_new_tab('http://127.0.0.1:7860')
     share=share_public
     css = """
     .result-box {
