@@ -384,6 +384,9 @@ def launch_ui(share_public=None, server_mode=False):
                 create_utilities_yt_audio_tab()
                 create_utilities_yt_timestamp_tab()
 
+            with gr.TabItem("Local LLM"):
+                create_chat_with_llamafile_tab()
+
             with gr.TabItem("Trashcan"):
                 create_search_and_mark_trash_tab()
                 create_view_trash_tab()
