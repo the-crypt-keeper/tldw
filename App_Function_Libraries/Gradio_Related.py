@@ -68,6 +68,7 @@ from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_vie
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
 #from App_Function_Libraries.Local_LLM.Local_LLM_huggingface import create_huggingface_tab
 from App_Function_Libraries.Local_LLM.Local_LLM_ollama import create_ollama_tab
+from App_Function_Libraries.RAG.RAG_QA_Chat_Notes import create_rag_qa_chat_notes_tab
 
 #
 #######################################################################################################################
@@ -289,11 +290,12 @@ def launch_ui(share_public=None, server_mode=False):
                 create_search_tab()
                 create_search_summaries_tab()
 
+            with gr.TabItem("RAG Chat+Notes"):
+                create_rag_qa_chat_notes_tab()
 
             with gr.TabItem("RAG Search"):
                 create_rag_tab()
                 create_rag_qa_chat_tab()
-
 
             with gr.TabItem("Chat with an LLM"):
                 create_chat_interface()

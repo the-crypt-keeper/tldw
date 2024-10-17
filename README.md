@@ -29,7 +29,7 @@
 - Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
 - Also writing tools! Grammar/Style checker, Tone Analyzer, Writing editor(feedback), and more.
 - Full Character Chat Support - Create/Edit & Import/Export Character Cards, and chat with them.
-#### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
+#### The original scripts by `the-crypt-keeper` for transcribing and summarizing youtube videos are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 
 
 ----------
@@ -58,7 +58,7 @@
   - the `Dockerfile` in the main directory is the Nvidia base-image-based one. So you can use your GPU if you want with it.
 </details>
 
-### What is tl/dw?
+### Overview of what tl/dw currenlty is
 <details>
 <summary>What is this? - Click-Here</summary>
 
@@ -142,7 +142,7 @@ All features are designed to run **locally** on your device, ensuring privacy an
 ----------
 
 
-### What is this (tl/dw)?
+### More Detailed explanation of this project (tl/dw)
 <details>
 <summary>**What is this Project? (Extended) - Click-Here**</summary>
 
