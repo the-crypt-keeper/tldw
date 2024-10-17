@@ -4,21 +4,19 @@ import argparse
 import atexit
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import signal
 import sys
 import threading
 import time
-import webbrowser
-from logging.handlers import RotatingFileHandler
-
 #
 # Local Library Imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
 from App_Function_Libraries.Books.Book_Ingestion_Lib import ingest_folder, ingest_text_file
 from App_Function_Libraries.Chunk_Lib import  semantic_chunk_long_file#, rolling_summarize_function,
 from App_Function_Libraries.Gradio_Related import launch_ui
-from App_Function_Libraries.Local_LLM_Inference_Engine_Lib import cleanup_process, local_llm_function
+from App_Function_Libraries.Local_LLM.Local_LLM_Inference_Engine_Lib import cleanup_process
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_local_llm
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, \
     summarize_with_cohere, summarize_with_groq, perform_transcription, perform_summarization
@@ -860,22 +858,10 @@ Sample commands:
 #   Launch the UI
     # Launch the GUI
     if args.user_interface:
-        if local_llm:
-            local_llm_function()
-            time.sleep(2)
-            webbrowser.open_new_tab('http://127.0.0.1:7860')
-        launch_ui(share_public=False)
-    elif local_llm:
-        local_llm_function()
-        time.sleep(2)
-        webbrowser.open_new_tab('http://127.0.0.1:7860')
         launch_ui(share_public=False)
     elif share_public is not None:
         if local_llm:
-            local_llm_function()
             time.sleep(2)
-            webbrowser.open_new_tab('http://127.0.0.1:7860')
-        else:
             launch_ui(share_public=True)
     elif not args.input_path:
         parser.print_help()
