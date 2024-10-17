@@ -231,7 +231,7 @@ custom_prompt_summarize_bulleted_notes = ("""
 
 
 def launch_ui(share_public=None, server_mode=False):
-    webbrowser.open_new_tab('http://127.0.0.1:7860')
+    webbrowser.open_new_tab('http://127.0.0.1:7860/?__theme=dark')
     share=share_public
     css = """
     .result-box {

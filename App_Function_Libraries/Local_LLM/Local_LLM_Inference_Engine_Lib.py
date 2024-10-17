@@ -9,23 +9,15 @@
 ####################
 # Function List
 #
-# 1. download_latest_llamafile(repo, asset_name_prefix, output_filename)
-# 2. download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5)
-# 3. verify_checksum(file_path, expected_checksum)
-# 4. cleanup_process()
-# 5. signal_handler(sig, frame)
-# 6. local_llm_function()
-# 7. launch_in_new_terminal_windows(executable, args)
-# 8. launch_in_new_terminal_linux(executable, args)
-# 9. launch_in_new_terminal_mac(executable, args)
+# 1.
 #
 ####################
 # Import necessary libraries
 #import atexit
+import glob
 import logging
 import os
 import re
-import requests
 import signal
 import subprocess
 import sys
@@ -33,6 +25,7 @@ import time
 from typing import List, Optional
 
 # Import 3rd-pary Libraries
+import requests
 #
 # Import Local
 from App_Function_Libraries.Web_Scraping.Article_Summarization_Lib import *
@@ -104,7 +97,6 @@ def launch_in_new_terminal(executable: str, args: List[str]) -> subprocess.Popen
     Returns the subprocess.Popen object.
     """
     useros = os.name
-    command = ""
     if useros == "nt":
         # For Windows
         args_str = ' '.join(args)
@@ -126,7 +118,7 @@ def launch_in_new_terminal(executable: str, args: List[str]) -> subprocess.Popen
         logging.error(f"Failed to launch the process: {e}")
         raise
 
-#########################################################################################################################
+#######################################################################################################################
 # LLM models information
 
 llm_models = {
@@ -155,6 +147,30 @@ llm_models = {
         "hash": "406868a97f02f57183716c7e4441d427f223fdbc7fa42964ef10c4d60dd8ed37"
     }
 }
+
+# Function to scan the directory for .gguf and .llamafile files
+def get_gguf_llamafile_files(directory: str) -> List[str]:
+    """
+    Retrieves model files with extensions .gguf or .llamafile from the specified directory.
+    """
+    logging.debug(f"Scanning directory: {directory}")  # Debug print for directory
+
+    # Print all files in the directory for debugging
+    all_files = os.listdir(directory)
+    logging.debug(f"All files in directory: {all_files}")
+
+    pattern_gguf = os.path.join(directory, "*.gguf")
+    pattern_llamafile = os.path.join(directory, "*.llamafile")
+
+    gguf_files = glob.glob(pattern_gguf)
+    llamafile_files = glob.glob(pattern_llamafile)
+
+    # Debug: Print the files found
+    logging.debug(f"Found .gguf files: {gguf_files}")
+    logging.debug(f"Found .llamafile files: {llamafile_files}")
+
+    return [os.path.basename(f) for f in gguf_files + llamafile_files]
+
 
 # Initialize process with type annotation
 process: Optional[subprocess.Popen] = None
@@ -264,3 +280,7 @@ def start_llamafile(
     except Exception as e:
         logging.error(f"Failed to start llamafile: {e}")
         return f"Failed to start llamafile: {e}"
+
+#
+# End of Local_LLM_Inference_Engine_Lib.py
+#######################################################################################################################
