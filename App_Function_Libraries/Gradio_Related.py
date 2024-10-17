@@ -66,7 +66,7 @@ from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_vie
 #
 # Gradio UI Imports
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
-from App_Function_Libraries.Local_LLM.Local_LLM_huggingface import create_huggingface_tab
+#from App_Function_Libraries.Local_LLM.Local_LLM_huggingface import create_huggingface_tab
 from App_Function_Libraries.Local_LLM.Local_LLM_ollama import create_ollama_tab
 
 #
