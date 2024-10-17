@@ -11,7 +11,8 @@ faster_whisper
 fire
 FlashRank
 fugashi
-gradio
+# well fuck gradio. again.
+gradio==4.44.1
 jieba
 Jinja2
 joblib
@@ -28,6 +29,7 @@ pandas
 Pillow
 playwright
 psycopg2
+psutil
 #psycopg2-binary
 pyannote.audio
 PyAudio

@@ -19,8 +19,7 @@ from App_Function_Libraries.DB.DB_Manager import get_db_config
 from App_Function_Libraries.Gradio_UI.Arxiv_tab import create_arxiv_tab
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
-from App_Function_Libraries.Gradio_UI.Character_Chat_tab import create_character_card_interaction_tab, \
-    create_character_card_interaction_tab, create_character_chat_mgmt_tab, create_custom_character_card_tab, \
+from App_Function_Libraries.Gradio_UI.Character_Chat_tab import create_character_card_interaction_tab, create_character_chat_mgmt_tab, create_custom_character_card_tab, \
     create_character_card_validation_tab, create_export_characters_tab
 from App_Function_Libraries.Gradio_UI.Character_interaction_tab import create_narrator_controlled_conversation_tab, \
     create_multiple_character_chat_tab
@@ -68,7 +67,7 @@ from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_vie
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
 #from App_Function_Libraries.Local_LLM.Local_LLM_huggingface import create_huggingface_tab
 from App_Function_Libraries.Local_LLM.Local_LLM_ollama import create_ollama_tab
-from App_Function_Libraries.RAG.RAG_QA_Chat_Notes import create_rag_qa_chat_notes_tab
+from App_Function_Libraries.Gradio_UI.RAG_QA_Chat_Notes import create_rag_qa_chat_notes_tab
 
 #
 #######################################################################################################################
