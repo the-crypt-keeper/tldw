@@ -22,15 +22,15 @@ def create_rag_qa_chat_notes_tab():
         state = gr.State({
             "conversation_id": None,
             "page": 1,
-            "context_source": "All Files in the Database"
+            "context_source": "Entire Media Database",
         })
 
         with gr.Row():
             with gr.Column(scale=1):
                 context_source = gr.Radio(
-                    ["All Files in the Database", "Search Database", "Upload File"],
+                    ["Entire Media Database", "Search Database", "Upload File"],
                     label="Context Source",
-                    value="All Files in the Database"
+                    value="Entire Media Database"
                 )
                 existing_file = gr.Dropdown(label="Select Existing File", choices=[], interactive=True)
                 file_page = gr.State(value=1)
