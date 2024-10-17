@@ -1,20 +1,21 @@
 <div align="center">
 
 <h1>tl/dw</h1>
+
+[![License](https://img.shields.io/badge/license-apache2.0-green)](https://img.shields.io/badge/license-apache2.0-green)
+[![madewithlove](https://img.shields.io/badge/made_with-%E2%9D%A4-red?style=for-the-badge&labelColor=orange)](https://github.com/rmusser01/tldw) 
+
 <h3>Your personal research multi-tool</h3>
 <h3>Download, Transcribe, Summarize/Analyze & then Chat with/about Videos, Audio, Documents, Web Articles, and Books.</h3>
 
-[![License](https://img.shields.io/badge/license-apache2.0-green)](https://img.shields.io/badge/license-apache2.0-green) 
-
-[![madewithlove](https://img.shields.io/badge/made_with-%E2%9D%A4-red?style=for-the-badge&labelColor=orange)](https://github.com/rmusser01/tldw) 
-
 ## All Automated. All Local. All Yours.
+</div>
 
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)
-- Please Note: YouTube blocks requests from the demo. You have to provide a logged-in session cookie to bypass it :frowning_face: 
+- **Please Note:** YouTube blocks requests from the demo. You have to provide a logged-in session cookie to bypass it :frowning_face: 
 - Placeholder content is included for the demo. HuggingFace API is also setup in it, so you can select that as your API.)
 
-</div>
+
 
 #### ![Video Walkthrough of a Fresh Install](Docs/Screenshots/tldw-run-through-blank.webm)
 #### Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)`
@@ -23,7 +24,7 @@
 
 #### Key Features:
 - Full-text+RAG search across all ingested content (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking).
-- Local LLM inference for offline summarization and chat (via `llamafile`/`llama.cpp`/`HuggingFace Transformers`).
+- Local LLM inference for offline usage and chat (via `llamafile`/`HuggingFace Transformers`).
 - Local Embeddings generation for RAG search (via `llamafile`/`llama.cpp`/`HuggingFace Transformers`).
 - Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
 - Also writing tools! Grammar/Style checker, Tone Analyzer, Writing editor(feedback), and more.
