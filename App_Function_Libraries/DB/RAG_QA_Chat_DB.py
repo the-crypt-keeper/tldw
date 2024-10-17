@@ -1,11 +1,20 @@
-#DB Imports
+# RAG_QA_Chat_DB.py
+# Description: This file contains the database operations for the RAG QA Chat + Notes system.
+#
+# Imports
 import logging
 import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
-
-
+#
+# External Imports
+#
+# Local Imports
+#
+########################################################################################################################
+#
+# Functions:
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -59,6 +68,24 @@ CREATE TABLE IF NOT EXISTS rag_qa_collection_keywords (
     collection_id INTEGER NOT NULL,
     keyword_id INTEGER NOT NULL,
     FOREIGN KEY (collection_id) REFERENCES rag_qa_keyword_collections(id),
+    FOREIGN KEY (keyword_id) REFERENCES rag_qa_keywords(id)
+);
+
+-- Table for storing notes
+CREATE TABLE IF NOT EXISTS rag_qa_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    timestamp DATETIME NOT NULL,
+    FOREIGN KEY (conversation_id) REFERENCES conversation_metadata(conversation_id)
+);
+
+-- Table for linking notes to keywords
+CREATE TABLE IF NOT EXISTS rag_qa_note_keywords (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    keyword_id INTEGER NOT NULL,
+    FOREIGN KEY (note_id) REFERENCES rag_qa_notes(id),
     FOREIGN KEY (keyword_id) REFERENCES rag_qa_keywords(id)
 );
 
@@ -127,9 +154,6 @@ def create_tables():
 # Initialize the database
 create_tables()
 
-
-
-
 # Input validation
 def validate_keyword(keyword):
     if not isinstance(keyword, str):
@@ -142,7 +166,6 @@ def validate_keyword(keyword):
         raise ValueError("Keyword contains invalid characters")
     return keyword.strip()
 
-
 def validate_collection_name(name):
     if not isinstance(name, str):
         raise ValueError("Collection name must be a string")
@@ -153,7 +176,6 @@ def validate_collection_name(name):
     if not re.match(r'^[a-zA-Z0-9\s\-_]+$', name):
         raise ValueError("Collection name contains invalid characters")
     return name.strip()
-
 
 # Core functions
 def add_keyword(keyword):
@@ -169,7 +191,6 @@ def add_keyword(keyword):
         logger.error(f"Error adding keyword '{keyword}': {e}")
         raise
 
-
 def create_keyword_collection(name, parent_id=None):
     try:
         validated_name = validate_collection_name(name)
@@ -182,7 +203,6 @@ def create_keyword_collection(name, parent_id=None):
     except Exception as e:
         logger.error(f"Error creating keyword collection '{name}': {e}")
         raise
-
 
 def add_keyword_to_collection(collection_name, keyword):
     try:
@@ -207,7 +227,6 @@ def add_keyword_to_collection(collection_name, keyword):
     except Exception as e:
         logger.error(f"Error adding keyword '{keyword}' to collection '{collection_name}': {e}")
         raise
-
 
 def add_keywords_to_conversation(conversation_id, keywords):
     if not isinstance(keywords, (list, tuple)):
@@ -234,7 +253,6 @@ def add_keywords_to_conversation(conversation_id, keywords):
         logger.error(f"Error adding keywords to conversation '{conversation_id}': {e}")
         raise
 
-
 def get_keywords_for_conversation(conversation_id):
     try:
         query = '''
@@ -250,7 +268,6 @@ def get_keywords_for_conversation(conversation_id):
     except Exception as e:
         logger.error(f"Error getting keywords for conversation '{conversation_id}': {e}")
         raise
-
 
 def get_keywords_for_collection(collection_name):
     try:
@@ -269,6 +286,89 @@ def get_keywords_for_collection(collection_name):
         logger.error(f"Error getting keywords for collection '{collection_name}': {e}")
         raise
 
+def save_notes(conversation_id, content):
+    """Save notes to the database."""
+    try:
+        query = "INSERT INTO rag_qa_notes (conversation_id, content, timestamp) VALUES (?, ?, ?)"
+        timestamp = datetime.now().isoformat()
+        execute_query(query, (conversation_id, content, timestamp))
+        logger.info(f"Notes saved for conversation '{conversation_id}'")
+    except Exception as e:
+        logger.error(f"Error saving notes for conversation '{conversation_id}': {e}")
+        raise
+
+def get_notes(conversation_id):
+    """Retrieve notes for a given conversation."""
+    try:
+        query = "SELECT content FROM rag_qa_notes WHERE conversation_id = ?"
+        result = execute_query(query, (conversation_id,))
+        notes = [row[0] for row in result]
+        logger.info(f"Retrieved {len(notes)} notes for conversation '{conversation_id}'")
+        return notes
+    except Exception as e:
+        logger.error(f"Error getting notes for conversation '{conversation_id}': {e}")
+        raise
+
+def clear_notes(conversation_id):
+    """Clear all notes for a given conversation."""
+    try:
+        query = "DELETE FROM rag_qa_notes WHERE conversation_id = ?"
+        execute_query(query, (conversation_id,))
+        logger.info(f"Cleared notes for conversation '{conversation_id}'")
+    except Exception as e:
+        logger.error(f"Error clearing notes for conversation '{conversation_id}': {e}")
+        raise
+
+def add_keywords_to_note(note_id, keywords):
+    """Associate keywords with a note."""
+    try:
+        with transaction() as conn:
+            for keyword in keywords:
+                validated_keyword = validate_keyword(keyword)
+
+                # Insert the keyword into the rag_qa_keywords table if it doesn't exist
+                query = "INSERT OR IGNORE INTO rag_qa_keywords (keyword) VALUES (?)"
+                execute_query(query, (validated_keyword,), conn)
+
+                # Retrieve the keyword ID
+                query = "SELECT id FROM rag_qa_keywords WHERE keyword = ?"
+                keyword_id = execute_query(query, (validated_keyword,), conn)[0][0]
+
+                # Link the note and keyword
+                query = "INSERT INTO rag_qa_note_keywords (note_id, keyword_id) VALUES (?, ?)"
+                execute_query(query, (note_id, keyword_id), conn)
+
+        logger.info(f"Keywords added to note ID '{note_id}' successfully")
+    except Exception as e:
+        logger.error(f"Error adding keywords to note ID '{note_id}': {e}")
+        raise
+
+def get_keywords_for_note(note_id):
+    """Retrieve keywords associated with a given note."""
+    try:
+        query = '''
+        SELECT k.keyword
+        FROM rag_qa_keywords k
+        JOIN rag_qa_note_keywords nk ON k.id = nk.keyword_id
+        WHERE nk.note_id = ?
+        '''
+        result = execute_query(query, (note_id,))
+        keywords = [row[0] for row in result]
+        logger.info(f"Retrieved {len(keywords)} keywords for note ID '{note_id}'")
+        return keywords
+    except Exception as e:
+        logger.error(f"Error getting keywords for note ID '{note_id}': {e}")
+        raise
+
+def clear_keywords_from_note(note_id):
+    """Clear all keywords from a given note."""
+    try:
+        query = "DELETE FROM rag_qa_note_keywords WHERE note_id = ?"
+        execute_query(query, (note_id,))
+        logger.info(f"Cleared keywords for note ID '{note_id}'")
+    except Exception as e:
+        logger.error(f"Error clearing keywords for note ID '{note_id}': {e}")
+        raise
 
 def save_message(conversation_id, role, content):
     try:
@@ -279,7 +379,6 @@ def save_message(conversation_id, role, content):
     except Exception as e:
         logger.error(f"Error saving message for conversation '{conversation_id}': {e}")
         raise
-
 
 def start_new_conversation(title="Untitled Conversation"):
     try:
@@ -292,7 +391,6 @@ def start_new_conversation(title="Untitled Conversation"):
     except Exception as e:
         logger.error(f"Error starting new conversation: {e}")
         raise
-
 
 # Pagination helper function
 def get_paginated_results(query, params=None, page=1, page_size=20):
@@ -317,7 +415,6 @@ def get_paginated_results(query, params=None, page=1, page_size=20):
         logger.error(f"Error retrieving paginated results: {e}")
         raise
 
-
 def get_all_collections(page=1, page_size=20):
     try:
         query = "SELECT name FROM rag_qa_keyword_collections"
@@ -328,7 +425,6 @@ def get_all_collections(page=1, page_size=20):
     except Exception as e:
         logger.error(f"Error getting collections: {e}")
         raise
-
 
 def search_conversations_by_keywords(keywords, page=1, page_size=20):
     try:
@@ -348,7 +444,6 @@ def search_conversations_by_keywords(keywords, page=1, page_size=20):
         logger.error(f"Error searching conversations by keywords {keywords}: {e}")
         raise
 
-
 def load_chat_history(conversation_id, page=1, page_size=50):
     try:
         query = "SELECT role, content FROM rag_qa_chats WHERE conversation_id = ? ORDER BY timestamp"
@@ -362,5 +457,5 @@ def load_chat_history(conversation_id, page=1, page_size=50):
         raise
 
 #
-# End of RAQ_QA_Chat_DB.py
+# End of RAG_QA_Chat_DB.py
 ####################################################################################################

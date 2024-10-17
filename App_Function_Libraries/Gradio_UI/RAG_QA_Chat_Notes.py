@@ -8,10 +8,9 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import save_message, add_keywords_to_conversation, \
-    search_conversations_by_keywords, load_chat_history
+    search_conversations_by_keywords, load_chat_history, save_notes, get_notes, clear_notes, \
+    add_keywords_to_note, execute_query, start_new_conversation
 from App_Function_Libraries.RAG.RAG_QA_Chat import rag_qa_chat
-
-
 #
 ####################################################################################################
 #
@@ -82,30 +81,29 @@ def create_rag_qa_chat_notes_tab():
 
             with gr.Column(scale=1):
                 notes = gr.TextArea(label="Notes", placeholder="Enter your notes here...", lines=20)
-                save_notes = gr.Button("Save Notes")
-                clear_notes = gr.Button("Clear Notes")
-
-
+                keywords_for_notes = gr.Textbox(label="Keywords for Notes (comma-separated)",
+                                                placeholder="Enter keywords for the note", visible=True)
+                save_notes_btn = gr.Button("Save Notes")  # Renamed to avoid conflict
+                clear_notes_btn = gr.Button("Clear Notes")  # Renamed to avoid conflict
 
         loading_indicator = gr.HTML(visible=False)
 
         def rag_qa_chat_wrapper(message, history, state, context_source, existing_file, search_results, file_upload,
                                 convert_to_text, keywords, api_choice, use_query_rewriting):
             try:
-                conversation_id = state["conversation_id"]
+                conversation_id = state.value["conversation_id"]
                 if not conversation_id:
-                    conversation_id = start_new_conversation()
+                    conversation_id = start_new_conversation("Untitled Conversation")  # Provide a title or handle accordingly
                     state = update_state(state, conversation_id=conversation_id)
 
                 save_message(conversation_id, 'human', message)
 
                 if keywords:
-                    add_keywords_to_conversation(conversation_id, keywords.split(','))
+                    add_keywords_to_conversation(conversation_id, [kw.strip() for kw in keywords.split(',')])
 
-                # Here you would implement your actual RAG logic
-                # FIXME
-                response = rag_qa_chat(message: str, history: List[Tuple[str, str]], context: Union[str, IO[str]],
-                                api_choice: str) -> Tuple[List[Tuple[str, str]], str]:
+                # Implement your actual RAG logic here
+                response = "response"#rag_qa_chat(message, conversation_id, context_source, existing_file, search_results,
+                                       #file_upload, convert_to_text, api_choice, use_query_rewriting)
 
                 save_message(conversation_id, 'ai', response)
 
@@ -121,29 +119,31 @@ def create_rag_qa_chat_notes_tab():
 
         def load_conversation_history(selected_conversation_id, page, page_size, state):
             if selected_conversation_id:
-                history, total_pages, _ = load_chat_history(selected_conversation_id, page, page_size)
-                return history, total_pages, update_state(state, conversation_id=selected_conversation_id, page=page)
-            return [], 1, state
+                history, total_pages_val, _ = load_chat_history(selected_conversation_id, page, page_size)
+                notes_content = get_notes(selected_conversation_id)  # Retrieve notes here
+                updated_state = update_state(state, conversation_id=selected_conversation_id, page=page)
+                return history, total_pages_val, updated_state, "\n".join(notes_content)
+            return [], 1, state, ""
 
-        def start_new_conversation(title, state):
+        def start_new_conversation_wrapper(title, state):
             new_conversation_id = start_new_conversation(title if title else "Untitled Conversation")
             return [], update_state(state, conversation_id=new_conversation_id, page=1)
 
         def update_state(state, **kwargs):
-            new_state = state.copy()
+            new_state = state.value.copy()
             new_state.update(kwargs)
             return new_state
 
-        def update_page(direction, current_page, total_pages):
-            new_page = max(1, min(current_page + direction, total_pages))
+        def update_page(direction, current_page, total_pages_val):
+            new_page = max(1, min(current_page + direction, total_pages_val))
             return new_page
 
         def update_context_source(choice):
             return {
-                existing_file: gr.update(visible=choice == "Existing File"),
-                prev_page_btn: gr.update(visible=choice == "Existing File"),
-                next_page_btn: gr.update(visible=choice == "Existing File"),
-                page_info: gr.update(visible=choice == "Existing File"),
+                existing_file: gr.update(visible=choice == "Select Existing File"),
+                prev_page_btn: gr.update(visible=choice == "Search Database"),
+                next_page_btn: gr.update(visible=choice == "Search Database"),
+                page_info: gr.update(visible=choice == "Search Database"),
                 search_query: gr.update(visible=choice == "Search Database"),
                 search_button: gr.update(visible=choice == "Search Database"),
                 search_results: gr.update(visible=choice == "Search Database"),
@@ -154,7 +154,7 @@ def create_rag_qa_chat_notes_tab():
 
         def perform_search(query):
             try:
-                results = search_conversations_by_keywords(query.split())
+                results = search_conversations_by_keywords([kw.strip() for kw in query.split()])
                 return gr.update(choices=[f"{title} (ID: {id})" for id, title in results[0]])
             except Exception as e:
                 logging.error(f"Error performing search: {e}")
@@ -164,12 +164,32 @@ def create_rag_qa_chat_notes_tab():
         def clear_chat_history():
             return [], ""
 
-        def save_notes_function(notes):
-            # Implement saving notes functionality here
-            logging.info("Notes saved successfully!")
-            return notes
+        def save_notes_function(notes_content, keywords_content):
+            """Save the notes and associated keywords to the database."""
+            conversation_id = state.value["conversation_id"]
+            if conversation_id and notes_content:
+                # Save the note
+                save_notes(conversation_id, notes_content)
+
+                # Get the last inserted note ID
+                query = "SELECT id FROM rag_qa_notes WHERE conversation_id = ? ORDER BY timestamp DESC LIMIT 1"
+                note_id = execute_query(query, (conversation_id,))[0][0]
+
+                if keywords_content:
+                    add_keywords_to_note(note_id, [kw.strip() for kw in keywords_content.split(',')])
+
+                logging.info("Notes and keywords saved successfully!")
+                return notes_content
+            else:
+                logging.warning("No conversation ID or notes to save.")
+                return ""
 
         def clear_notes_function():
+            """Clear notes for the current conversation."""
+            conversation_id = state.value["conversation_id"]
+            if conversation_id:
+                clear_notes(conversation_id)
+                logging.info("Notes cleared successfully!")
             return ""
 
         # Event handlers
@@ -183,43 +203,44 @@ def create_rag_qa_chat_notes_tab():
         load_conversation.change(
             load_conversation_history,
             inputs=[load_conversation, page_number, page_size, state],
-            outputs=[chatbot, total_pages, state]
+            outputs=[chatbot, total_pages, state, notes]
         )
 
         new_conversation.click(
-            start_new_conversation,
+            start_new_conversation_wrapper,
             inputs=[conversation_title, state],
             outputs=[chatbot, state]
         )
 
-        # Event handlers
+        # Pagination Event handlers
         prev_page_btn.click(
             update_page,
-            inputs=[gr.Number(-1, visible=False), page_number, total_pages],
+            inputs=[-1, page_number, total_pages],
             outputs=[page_number]
         )
         next_page_btn.click(
             update_page,
-            inputs=[gr.Number(1, visible=False), page_number, total_pages],
+            inputs=[1, page_number, total_pages],
             outputs=[page_number]
         )
 
-        context_source.change(update_context_source, context_source,
-                              [existing_file, prev_page_btn, next_page_btn, page_info, search_query, search_button,
-                               search_results, file_upload, convert_to_text, keywords])
+        context_source.change(update_context_source, inputs=[context_source],
+                              outputs=[existing_file, prev_page_btn, next_page_btn, page_info,
+                                       search_query, search_button, search_results,
+                                       file_upload, convert_to_text, keywords])
 
         search_button.click(perform_search, inputs=[search_query], outputs=[search_results])
 
         clear_chat.click(clear_chat_history, outputs=[chatbot, msg])
 
-        save_notes.click(save_notes_function, inputs=[notes], outputs=[notes])
-        clear_notes.click(clear_notes_function, outputs=[notes])
+        save_notes_btn.click(save_notes_function, inputs=[notes, keywords_for_notes], outputs=[notes])
+        clear_notes_btn.click(clear_notes_function, outputs=[notes])
 
     return (context_source, existing_file, search_query, search_button, search_results, file_upload,
             convert_to_text, keywords, api_choice, use_query_rewriting, chatbot, msg, submit, clear_chat,
-            notes, save_notes, clear_notes, load_conversation, new_conversation, conversation_title,
+            notes, save_notes_btn, clear_notes_btn, load_conversation, new_conversation, conversation_title,
             prev_page_btn, next_page_btn, page_number, page_size, total_pages)
 
 #
-# End of Rag_QA_Chat_Notes.py
+# End of RAG_QA_Chat_Notes.py
 ####################################################################################################
