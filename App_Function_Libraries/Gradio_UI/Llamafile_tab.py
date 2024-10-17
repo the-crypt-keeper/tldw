@@ -1,122 +1,284 @@
 # Llamafile_tab.py
-# Description: Functions relating to the Llamafile tab
-#
+# Description: Gradio interface for configuring and launching Llamafile with Local LLMs
+
 # Imports
 import os
 import glob
-#
-# External Imports
+import logging
+from typing import List, Tuple, Optional
 import gradio as gr
-#
-# Local Imports
-from App_Function_Libraries.Local_LLM.Llamafile import start_llamafile
+from App_Function_Libraries.Local_LLM.Local_LLM_Inference_Engine_Lib import (
+    download_llm_model,
+    llm_models,
+    start_llamafile
+)
 #
 #######################################################################################################################
 #
 # Functions:
 
-
 def create_chat_with_llamafile_tab():
-    def get_model_files(directory):
-        pattern = os.path.join(directory, "*.{gguf,llamafile}")
-        return [os.path.basename(f) for f in glob.glob(pattern)]
+    def get_model_files(directory: str) -> List[str]:
+        """
+        Retrieves model files with extensions .gguf or .llamafile from the specified directory.
+        """
+        pattern_gguf = os.path.join(directory, "*.gguf")
+        pattern_llamafile = os.path.join(directory, "*.llamafile")
+        files = glob.glob(pattern_gguf) + glob.glob(pattern_llamafile)
+        return [os.path.basename(f) for f in files]
 
-    def update_dropdowns():
-        current_dir_models = get_model_files(".")
-        parent_dir_models = get_model_files("..")
-        return (
-            {"choices": current_dir_models, "value": None},
-            {"choices": parent_dir_models, "value": None}
-        )
+    def update_dropdowns(search_directory: str) -> Tuple[dict, str]:
+        """
+        Updates the model dropdown based on the search directory.
+
+        Args:
+            search_directory (str): The directory path to search for model files.
+
+        Returns:
+            Tuple[dict, str]: A dictionary for updating the Dropdown component and a status message.
+        """
+        if not os.path.isdir(search_directory):
+            return {"choices": [], "value": None}, "Directory does not exist."
+
+        model_files = get_model_files(search_directory)
+        if not model_files:
+            return {"choices": [], "value": None}, "No model files found in the specified directory."
+        return {"choices": model_files, "value": None}, f"Models loaded from {search_directory}."
+
+    def download_preset_model(selected_model: str) -> Tuple[str, str]:
+        """
+        Downloads the selected preset model.
+
+        Args:
+            selected_model (str): The key of the selected preset model.
+
+        Returns:
+            Tuple[str, str]: Status message and the path to the downloaded model.
+        """
+        model_info = llm_models.get(selected_model)
+        if not model_info:
+            return "Invalid model selection.", ""
+
+        try:
+            model_path = download_llm_model(
+                model_name=model_info["name"],
+                model_url=model_info["url"],
+                model_filename=model_info["filename"],
+                model_hash=model_info["hash"]
+            )
+            return f"Model '{model_info['name']}' downloaded successfully.", model_path
+        except Exception as e:
+            logging.error(f"Error downloading model: {e}")
+            return f"Failed to download model: {e}", ""
 
     with gr.TabItem("Local LLM with Llamafile"):
         gr.Markdown("# Settings for Llamafile")
+
         with gr.Row():
             with gr.Column():
-                am_noob = gr.Checkbox(label="Check this to enable sane defaults", value=False, visible=True)
-                # FIXME - these get deleted at some point?
-                advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Enable to show all settings", value=False)
-
+                am_noob = gr.Checkbox(label="Enable Sane Defaults", value=False, visible=True)
+                advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Show All Settings", value=False)
 
             with gr.Column():
-                # FIXME - make this actually work
-                model_checked = gr.Checkbox(label="Enable Setting Local LLM Model Path", value=False, visible=True)
-                current_dir_dropdown = gr.Dropdown(
-                    label="Select Model from Current Directory (.)",
-                    choices=[],  # Start with an empty list
-                    visible=True
+                # Model Selection Section
+                gr.Markdown("## Model Selection")
+
+                # Option 1: Select from Local Filesystem
+                with gr.Row():
+                    search_directory = gr.Textbox(
+                        label="Model Directory",
+                        placeholder="Enter directory path to search for models",
+                        value=".",
+                        interactive=True
+                    )
+                    refresh_button = gr.Button("Refresh Models")
+
+                # Initial population of local models
+                initial_dropdown_update, _ = update_dropdowns(".")
+                local_model_dropdown = gr.Dropdown(
+                    label="Select Model from Directory",
+                    choices=initial_dropdown_update['choices'],
+                    value=initial_dropdown_update['value'],
+                    interactive=True
                 )
-                parent_dir_dropdown = gr.Dropdown(
-                    label="Select Model from Parent Directory (..)",
-                    choices=[],  # Start with an empty list
-                    visible=True
+
+                # Option 2: Download Preset Models
+                gr.Markdown("## Download Preset Models")
+
+                preset_model_dropdown = gr.Dropdown(
+                    label="Select a Preset Model",
+                    choices=list(llm_models.keys()),
+                    value=None,
+                    interactive=True,
+                    info="Choose a preset model to download."
                 )
-                refresh_button = gr.Button("Refresh Model Lists")
-                model_value = gr.Textbox(label="Selected Model File", value="", visible=True)
+                download_preset_button = gr.Button("Download Selected Preset")
+
+                # Display selected model path
+                model_value = gr.Textbox(label="Selected Model File Path", value="", interactive=False)
+
         with gr.Row():
             with gr.Column():
-                ngl_checked = gr.Checkbox(label="Enable Setting GPU Layers", value=False, visible=True)
+                # Advanced Inputs
+                verbose_checked = gr.Checkbox(label="Enable Verbose Output", value=False, visible=False)
+                threads_checked = gr.Checkbox(label="Set CPU Threads", value=False, visible=False)
+                threads_value = gr.Number(label="Number of CPU Threads", value=None, precision=0, visible=False)
+                http_threads_checked = gr.Checkbox(label="Set HTTP Server Threads", value=False, visible=False)
+                http_threads_value = gr.Number(label="Number of HTTP Server Threads", value=None, precision=0, visible=False)
+                hf_repo_checked = gr.Checkbox(label="Use Huggingface Repo Model", value=False, visible=False)
+                hf_repo_value = gr.Textbox(label="Huggingface Repo Name", value="", visible=False)
+                hf_file_checked = gr.Checkbox(label="Set Huggingface Model File", value=False, visible=False)
+                hf_file_value = gr.Textbox(label="Huggingface Model File", value="", visible=False)
+                ctx_size_checked = gr.Checkbox(label="Set Prompt Context Size", value=False, visible=False)
+                ctx_size_value = gr.Number(label="Prompt Context Size", value=8124, precision=0, visible=False)
+                ngl_checked = gr.Checkbox(label="Enable GPU Layers", value=False, visible=True)
                 ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
-                advanced_inputs = create_llamafile_advanced_inputs()
+                host_checked = gr.Checkbox(label="Set IP to Listen On", value=False, visible=False)
+                host_value = gr.Textbox(label="Host IP Address", value="", visible=False)
+                port_checked = gr.Checkbox(label="Set Server Port", value=False, visible=False)
+                port_value = gr.Number(label="Port Number", value=8080, precision=0, visible=False)
+
+        with gr.Row():
             with gr.Column():
                 start_button = gr.Button("Start Llamafile")
                 stop_button = gr.Button("Stop Llamafile (doesn't work)")
                 output_display = gr.Markdown()
 
-
-        def update_model_value(current_dir_model, parent_dir_model):
-            if current_dir_model:
-                return current_dir_model
-            elif parent_dir_model:
-                return os.path.join("..", parent_dir_model)
-            else:
-                return ""
-
-        current_dir_dropdown.change(
-            fn=update_model_value,
-            inputs=[current_dir_dropdown, parent_dir_dropdown],
-            outputs=model_value
-        )
-        parent_dir_dropdown.change(
-            fn=update_model_value,
-            inputs=[current_dir_dropdown, parent_dir_dropdown],
-            outputs=model_value
-        )
-
+        # Event Handlers
         refresh_button.click(
             fn=update_dropdowns,
-            inputs=[],
-            outputs=[current_dir_dropdown, parent_dir_dropdown]
+            inputs=[search_directory],
+            outputs=[local_model_dropdown, output_display]
+        )
+
+        def on_local_model_change(search_directory: str, selected_model: str) -> str:
+            """
+            Updates the model_value textbox based on the selected model and search directory.
+            """
+            if selected_model and search_directory:
+                model_path = os.path.abspath(os.path.join(search_directory, selected_model))
+                return model_path
+            return ""
+
+        # Update the event handler
+        local_model_dropdown.change(
+            fn=on_local_model_change,
+            inputs=[search_directory, local_model_dropdown],
+            outputs=[model_value]
+        )
+
+        download_preset_button.click(
+            fn=download_preset_model,
+            inputs=[preset_model_dropdown],
+            outputs=[output_display, model_value]
+        )
+
+        # Show/hide advanced inputs based on toggle
+        def update_visibility(show_advanced: bool):
+            components = [
+                verbose_checked, threads_checked, threads_value,
+                http_threads_checked, http_threads_value,
+                hf_repo_checked, hf_repo_value,
+                hf_file_checked, hf_file_value,
+                ctx_size_checked, ctx_size_value,
+                ngl_checked, ngl_value,
+                host_checked, host_value,
+                port_checked, port_value
+            ]
+            return [gr.update(visible=show_advanced) for _ in components]
+
+        def on_start_button_click(
+                am_noob: bool,
+                verbose_checked: bool,
+                threads_checked: bool,
+                threads_value: Optional[int],
+                http_threads_checked: bool,
+                http_threads_value: Optional[int],
+                model_value: str,
+                hf_repo_checked: bool,
+                hf_repo_value: str,
+                hf_file_checked: bool,
+                hf_file_value: str,
+                ctx_size_checked: bool,
+                ctx_size_value: Optional[int],
+                ngl_checked: bool,
+                ngl_value: Optional[int],
+                host_checked: bool,
+                host_value: str,
+                port_checked: bool,
+                port_value: Optional[int],
+        ) -> str:
+            """
+            Event handler for the Start Llamafile button.
+            """
+            try:
+                result = start_llamafile(
+                    am_noob,
+                    verbose_checked,
+                    threads_checked,
+                    threads_value,
+                    http_threads_checked,
+                    http_threads_value,
+                    model_value,
+                    hf_repo_checked,
+                    hf_repo_value,
+                    hf_file_checked,
+                    hf_file_value,
+                    ctx_size_checked,
+                    ctx_size_value,
+                    ngl_checked,
+                    ngl_value,
+                    host_checked,
+                    host_value,
+                    port_checked,
+                    port_value,
+                )
+                return result
+            except Exception as e:
+                logging.error(f"Error starting Llamafile: {e}")
+                return f"Failed to start Llamafile: {e}"
+
+        advanced_mode_toggle.change(
+            fn=update_visibility,
+            inputs=[advanced_mode_toggle],
+            outputs=[
+                verbose_checked, threads_checked, threads_value,
+                http_threads_checked, http_threads_value,
+                hf_repo_checked, hf_repo_value,
+                hf_file_checked, hf_file_value,
+                ctx_size_checked, ctx_size_value,
+                ngl_checked, ngl_value,
+                host_checked, host_value,
+                port_checked, port_value
+            ]
         )
 
         start_button.click(
-            fn=start_llamafile,
-            inputs=[am_noob, model_checked, model_value, ngl_checked, ngl_value] + advanced_inputs,
+            fn=on_start_button_click,
+            inputs=[
+                am_noob,
+                verbose_checked,
+                threads_checked,
+                threads_value,
+                http_threads_checked,
+                http_threads_value,
+                model_value,
+                hf_repo_checked,
+                hf_repo_value,
+                hf_file_checked,
+                hf_file_value,
+                ctx_size_checked,
+                ctx_size_value,
+                ngl_checked,
+                ngl_value,
+                host_checked,
+                host_value,
+                port_checked,
+                port_value,
+            ],
             outputs=output_display
         )
 
-
-def create_llamafile_advanced_inputs():
-    verbose_checked = gr.Checkbox(label="Enable Verbose Output", value=False, visible=False)
-    threads_checked = gr.Checkbox(label="Set CPU Threads", value=False, visible=False)
-    threads_value = gr.Number(label="Number of CPU Threads", value=None, precision=0, visible=False)
-    http_threads_checked = gr.Checkbox(label="Set HTTP Server Threads", value=False, visible=False)
-    http_threads_value = gr.Number(label="Number of HTTP Server Threads", value=None, precision=0, visible=False)
-    hf_repo_checked = gr.Checkbox(label="Use Huggingface Repo Model", value=False, visible=False)
-    hf_repo_value = gr.Textbox(label="Huggingface Repo Name", value="", visible=False)
-    hf_file_checked = gr.Checkbox(label="Set Huggingface Model File", value=False, visible=False)
-    hf_file_value = gr.Textbox(label="Huggingface Model File", value="", visible=False)
-    ctx_size_checked = gr.Checkbox(label="Set Prompt Context Size", value=False, visible=False)
-    ctx_size_value = gr.Number(label="Prompt Context Size", value=8124, precision=0, visible=False)
-    host_checked = gr.Checkbox(label="Set IP to Listen On", value=False, visible=False)
-    host_value = gr.Textbox(label="Host IP Address", value="", visible=False)
-    port_checked = gr.Checkbox(label="Set Server Port", value=False, visible=False)
-    port_value = gr.Number(label="Port Number", value=None, precision=0, visible=False)
-
-    return [verbose_checked, threads_checked, threads_value, http_threads_checked, http_threads_value,
-            hf_repo_checked, hf_repo_value, hf_file_checked, hf_file_value, ctx_size_checked, ctx_size_value,
-            host_checked, host_value, port_checked, port_value]
-
 #
-# End of Llamafile_tab.py
-#########################################################################################################################
+#
+#######################################################################################################################
