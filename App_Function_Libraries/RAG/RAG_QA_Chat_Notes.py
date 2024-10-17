@@ -9,6 +9,9 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import save_message, add_keywords_to_conversation, \
     search_conversations_by_keywords, load_chat_history
+from App_Function_Libraries.RAG.RAG_QA_Chat import rag_qa_chat
+
+
 #
 ####################################################################################################
 #
@@ -100,8 +103,9 @@ def create_rag_qa_chat_notes_tab():
                     add_keywords_to_conversation(conversation_id, keywords.split(','))
 
                 # Here you would implement your actual RAG logic
-                # For this example, we'll just echo the message
-                response = f"RAG QA Chat: You said '{message}'"
+                # FIXME
+                response = rag_qa_chat(message: str, history: List[Tuple[str, str]], context: Union[str, IO[str]],
+                                api_choice: str) -> Tuple[List[Tuple[str, str]], str]:
 
                 save_message(conversation_id, 'ai', response)
 
