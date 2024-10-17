@@ -68,11 +68,6 @@ def create_rag_qa_chat_notes_tab():
                                                 placeholder="Enter a title for the new conversation")
 
         with gr.Row():
-            page_number = gr.Number(value=1, label="Page", precision=0)
-            page_size = gr.Number(value=20, label="Items per page", precision=0)
-            total_pages = gr.Number(label="Total Pages", interactive=False)
-
-        with gr.Row():
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=500)
                 msg = gr.Textbox(label="Enter your message")
