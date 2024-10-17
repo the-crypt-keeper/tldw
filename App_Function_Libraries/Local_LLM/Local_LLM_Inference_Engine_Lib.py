@@ -207,7 +207,6 @@ def start_llamafile(
     threads_value: Optional[int],
     http_threads_checked: bool,
     http_threads_value: Optional[int],
-    model_checked: bool,
     model_value: str,
     hf_repo_checked: bool,
     hf_repo_value: str,
@@ -242,9 +241,9 @@ def start_llamafile(
     if http_threads_checked and http_threads_value is not None:
         command.extend(['--threads', str(http_threads_value)])
 
-    if model_checked and model_value:
-        model_path = os.path.abspath(model_value)
-        command.extend(['-m', model_path])
+    # Set model path
+    model_path = os.path.abspath(model_value)
+    command.extend(['-m', model_path])
 
     if hf_repo_checked and hf_repo_value:
         command.extend(['-hfr', hf_repo_value])

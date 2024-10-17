@@ -112,7 +112,7 @@ def create_chat_with_llamafile_tab():
                                                   interactive=True)
 
                 # Initial population of local models
-                initial_dropdown_update, _ = update_dropdowns(".")
+                initial_dropdown_update, _ = update_dropdowns(".\Models")
                 refresh_button = gr.Button("Refresh Models")
                 local_model_dropdown = gr.Dropdown(label="Select Model from Directory", choices=[])
                 # Display selected model path
