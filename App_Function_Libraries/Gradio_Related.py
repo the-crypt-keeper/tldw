@@ -8,6 +8,8 @@
 # Built-In Imports
 import logging
 import os
+import webbrowser
+
 #
 # Import 3rd-Party Libraries
 import gradio as gr
@@ -19,7 +21,7 @@ from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_pr
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
 from App_Function_Libraries.Gradio_UI.Character_Chat_tab import create_character_card_interaction_tab, \
     create_character_card_interaction_tab, create_character_chat_mgmt_tab, create_custom_character_card_tab, \
-    create_character_card_validation_tab
+    create_character_card_validation_tab, create_export_characters_tab
 from App_Function_Libraries.Gradio_UI.Character_interaction_tab import create_narrator_controlled_conversation_tab, \
     create_multiple_character_chat_tab
 from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
@@ -229,6 +231,7 @@ custom_prompt_summarize_bulleted_notes = ("""
 
 
 def launch_ui(share_public=None, server_mode=False):
+    webbrowser.open_new_tab('http://127.0.0.1:7860/?__theme=dark')
     share=share_public
     css = """
     .result-box {
@@ -308,6 +311,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_character_card_validation_tab()
                     create_multiple_character_chat_tab()
                     create_narrator_controlled_conversation_tab()
+                    create_export_characters_tab()
 
 
             with gr.TabItem("View DB Items"):
@@ -379,6 +383,9 @@ def launch_ui(share_public=None, server_mode=False):
                 create_utilities_yt_video_tab()
                 create_utilities_yt_audio_tab()
                 create_utilities_yt_timestamp_tab()
+
+            with gr.TabItem("Local LLM"):
+                create_chat_with_llamafile_tab()
 
             with gr.TabItem("Trashcan"):
                 create_search_and_mark_trash_tab()
