@@ -85,20 +85,31 @@ def create_chat_with_llamafile_tab():
                 verbose_checked = gr.Checkbox(label="Enable Verbose Output", value=False, visible=False)
                 threads_checked = gr.Checkbox(label="Set CPU Threads", value=False, visible=False)
                 threads_value = gr.Number(label="Number of CPU Threads", value=None, precision=0, visible=False)
+                threads_batched_checked = gr.Checkbox(label="Enable Batched Inference", value=False, visible=False)
+                threads_batched_value = gr.Number(label="Batch Size for Inference", value=None, precision=0, visible=False)
+                model_alias_checked = gr.Checkbox(label="Set Model Alias", value=False, visible=False)
+                model_alias_value = gr.Textbox(label="Model Alias", value="", visible=False)
+                ctx_size_checked = gr.Checkbox(label="Set Prompt Context Size", value=False, visible=False)
+                ctx_size_value = gr.Number(label="Prompt Context Size", value=8124, precision=0, visible=False)
+                ngl_checked = gr.Checkbox(label="Enable GPU Layers", value=False, visible=True)
+                ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
+                batch_size_checked = gr.Checkbox(label="Set Batch Size", value=False, visible=False)
+                batch_size_value = gr.Number(label="Batch Size", value=512, visible=False)
+                memory_f32_checked = gr.Checkbox(label="Use 32-bit Floating Point", value=False, visible=False)
+                numa_checked = gr.Checkbox(label="Enable NUMA", value=False, visible=False)
+                server_timeout_value = gr.Number(label="Server Timeout", value=600, precision=0, visible=False)
+                host_checked = gr.Checkbox(label="Set IP to Listen On", value=False, visible=False)
+                host_value = gr.Textbox(label="Host IP Address", value="", visible=False)
+                port_checked = gr.Checkbox(label="Set Server Port", value=False, visible=False)
+                port_value = gr.Number(label="Port Number", value=8080, precision=0, visible=False)
+                api_key_checked = gr.Checkbox(label="Set API Key", value=False, visible=False)
+                api_key_value = gr.Textbox(label="API Key", value="", visible=False)
                 http_threads_checked = gr.Checkbox(label="Set HTTP Server Threads", value=False, visible=False)
                 http_threads_value = gr.Number(label="Number of HTTP Server Threads", value=None, precision=0, visible=False)
                 hf_repo_checked = gr.Checkbox(label="Use Huggingface Repo Model", value=False, visible=False)
                 hf_repo_value = gr.Textbox(label="Huggingface Repo Name", value="", visible=False)
                 hf_file_checked = gr.Checkbox(label="Set Huggingface Model File", value=False, visible=False)
                 hf_file_value = gr.Textbox(label="Huggingface Model File", value="", visible=False)
-                ctx_size_checked = gr.Checkbox(label="Set Prompt Context Size", value=False, visible=False)
-                ctx_size_value = gr.Number(label="Prompt Context Size", value=8124, precision=0, visible=False)
-                ngl_checked = gr.Checkbox(label="Enable GPU Layers", value=False, visible=True)
-                ngl_value = gr.Number(label="Number of GPU Layers", value=None, precision=0, visible=True)
-                host_checked = gr.Checkbox(label="Set IP to Listen On", value=False, visible=False)
-                host_value = gr.Textbox(label="Host IP Address", value="", visible=False)
-                port_checked = gr.Checkbox(label="Set Server Port", value=False, visible=False)
-                port_value = gr.Number(label="Port Number", value=8080, precision=0, visible=False)
 
             with gr.Column():
                 # Model Selection Section
@@ -156,6 +167,10 @@ def create_chat_with_llamafile_tab():
                 verbose_checked: bool,
                 threads_checked: bool,
                 threads_value: Optional[int],
+                threads_batched_checked: bool,
+                threads_batched_value: Optional[int],
+                model_alias_checked: bool,
+                model_alias_value: str,
                 http_threads_checked: bool,
                 http_threads_value: Optional[int],
                 model_value: str,
@@ -167,10 +182,17 @@ def create_chat_with_llamafile_tab():
                 ctx_size_value: Optional[int],
                 ngl_checked: bool,
                 ngl_value: Optional[int],
+                batch_size_checked: bool,
+                batch_size_value: Optional[int],
+                memory_f32_checked: bool,
+                numa_checked: bool,
+                server_timeout_value: Optional[int],
                 host_checked: bool,
                 host_value: str,
                 port_checked: bool,
                 port_value: Optional[int],
+                api_key_checked: bool,
+                api_key_value: str
         ) -> str:
             """
             Event handler for the Start Llamafile button.
@@ -181,6 +203,10 @@ def create_chat_with_llamafile_tab():
                     verbose_checked,
                     threads_checked,
                     threads_value,
+                    threads_batched_checked,
+                    threads_batched_value,
+                    model_alias_checked,
+                    model_alias_value,
                     http_threads_checked,
                     http_threads_value,
                     model_value,
@@ -192,10 +218,17 @@ def create_chat_with_llamafile_tab():
                     ctx_size_value,
                     ngl_checked,
                     ngl_value,
+                    batch_size_checked,
+                    batch_size_value,
+                    memory_f32_checked,
+                    numa_checked,
+                    server_timeout_value,
                     host_checked,
                     host_value,
                     port_checked,
                     port_value,
+                    api_key_checked,
+                    api_key_value
                 )
                 return result
             except Exception as e:
@@ -224,6 +257,10 @@ def create_chat_with_llamafile_tab():
                 verbose_checked,
                 threads_checked,
                 threads_value,
+                threads_batched_checked,
+                threads_batched_value,
+                model_alias_checked,
+                model_alias_value,
                 http_threads_checked,
                 http_threads_value,
                 model_value,
@@ -235,10 +272,17 @@ def create_chat_with_llamafile_tab():
                 ctx_size_value,
                 ngl_checked,
                 ngl_value,
+                batch_size_checked,
+                batch_size_value,
+                memory_f32_checked,
+                numa_checked,
+                server_timeout_value,
                 host_checked,
                 host_value,
                 port_checked,
                 port_value,
+                api_key_checked,
+                api_key_value
             ],
             outputs=output_display
         )
