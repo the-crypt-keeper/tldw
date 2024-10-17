@@ -39,25 +39,25 @@ from App_Function_Libraries.Utils.Utils import download_file
 # LLM models information
 
 llm_models = {
-    "1": {
+    "Mistral-7B-Instruct-v0.2-Q8.llamafile": {
         "name": "Mistral-7B-Instruct-v0.2-Q8.llamafile",
         "url": "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true",
         "filename": "mistral-7b-instruct-v0.2.Q8_0.llamafile",
         "hash": "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
     },
-    "2": {
+    "Samantha-Mistral-Instruct-7B-Bulleted-Notes-Q8.gguf": {
         "name": "Samantha-Mistral-Instruct-7B-Bulleted-Notes-Q8.gguf",
         "url": "https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b-bulleted-notes-GGUF/resolve/main/samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf?download=true",
         "filename": "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf",
         "hash": "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
     },
-    "3": {
+    "Phi-3-mini-128k-instruct-Q8_0.gguf": {
         "name": "Phi-3-mini-128k-instruct-Q8_0.gguf",
         "url": "https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF/resolve/main/Phi-3-mini-128k-instruct-Q8_0.gguf?download=true",
         "filename": "Phi-3-mini-128k-instruct-Q8_0.gguf",
         "hash": "6817b66d1c3c59ab06822e9732f0e594eea44e64cae2110906eac9d17f75d193"
     },
-    "4": {
+    "Meta-Llama-3-8B-Instruct.Q8_0.llamafile": {
         "name": "Meta-Llama-3-8B-Instruct.Q8_0.llamafile",
         "url": "https://huggingface.co/Mozilla/Meta-Llama-3-8B-Instruct-llamafile/resolve/main/Meta-Llama-3-8B-Instruct.Q8_0.llamafile?download=true",
         "filename": "Meta-Llama-3-8B-Instruct.Q8_0.llamafile",
