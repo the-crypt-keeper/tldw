@@ -32,7 +32,9 @@ def serve_ollama_model(model_name, port):
                 return f"Port {port} is already in use. Please choose a different port."
 
         # Start the Ollama server
-        cmd = f"ollama serve -m {model_name} -p {port}"
+        port = str(port)
+        os.environ["OLLAMA_HOST"] = port
+        cmd = f"ollama serve"
         process = subprocess.Popen(cmd, shell=True)
         return f"Started Ollama server for model {model_name} on port {port}. Process ID: {process.pid}"
     except Exception as e:
@@ -71,6 +73,7 @@ def create_ollama_tab():
         pull_output = gr.Textbox(label="Pull Status")
 
         with gr.Row():
+            # FIXME - Update to update config.txt file
             serve_model = gr.Dropdown(label="Model to Serve", choices=get_ollama_models())
             port = gr.Number(label="Port", value=11434, precision=0)
             serve_button = gr.Button("Start Server")
