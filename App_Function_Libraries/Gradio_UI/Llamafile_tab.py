@@ -107,8 +107,8 @@ def create_chat_with_llamafile_tab():
                 # Option 1: Select from Local Filesystem
                 with gr.Row():
                     search_directory = gr.Textbox(label="Model Directory",
-                                                  placeholder="Enter directory path(currently '.')",
-                                                  value=".",
+                                                  placeholder="Enter directory path(currently '.\Models')",
+                                                  value=".\Models",
                                                   interactive=True)
 
                 # Initial population of local models
