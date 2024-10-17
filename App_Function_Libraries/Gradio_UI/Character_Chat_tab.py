@@ -12,6 +12,7 @@ import logging
 import io
 import base64
 from typing import Dict, Any, Optional, List, Tuple, Union, cast
+import zipfile
 #
 # External Imports
 from PIL import Image
@@ -186,6 +187,67 @@ def parse_v1_card(card_data: Dict[str, Any]) -> Dict[str, Any]:
 # End of Character card import functions
 ####################################################
 
+####################################################
+#
+# Character card export functions
+
+def export_character_as_json(character_id):
+    character = get_character_card_by_id(character_id)
+    if character:
+        # Remove the 'id' field from the character data
+        character_data = {k: v for k, v in character.items() if k != 'id'}
+
+        # Convert image to base64 if it exists
+        if 'image' in character_data and character_data['image']:
+            image_data = base64.b64decode(character_data['image'])
+            img = Image.open(io.BytesIO(image_data))
+            buffered = io.BytesIO()
+            img.save(buffered, format="PNG")
+            character_data['image'] = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+        json_data = json.dumps(character_data, indent=2)
+        return json_data
+    return None
+
+def export_all_characters_as_zip():
+    characters = get_character_cards()
+    with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.zip') as temp_zip:
+        with zipfile.ZipFile(temp_zip, 'w') as zf:
+            for character in characters:
+                character_data = {k: v for k, v in character.items() if k != 'id'}
+
+                # Convert image to base64 if it exists
+                if 'image' in character_data and character_data['image']:
+                    image_data = base64.b64decode(character_data['image'])
+                    img = Image.open(io.BytesIO(image_data))
+                    buffered = io.BytesIO()
+                    img.save(buffered, format="PNG")
+                    character_data['image'] = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                json_data = json.dumps(character_data, indent=2)
+                zf.writestr(f"{character['name']}.json", json_data)
+        return temp_zip.name
+
+def export_single_character(character_selection):
+    if not character_selection:
+        return None, "No character selected."
+
+    character_id = int(character_selection.split('(ID: ')[1].rstrip(')'))
+    json_data = export_character_as_json(character_id)
+
+    if json_data:
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json', encoding='utf-8') as temp_file:
+            temp_file.write(json_data)
+            return temp_file.name, f"Character '{character_selection.split(' (ID:')[0]}' exported successfully."
+    else:
+        return None, f"Failed to export character '{character_selection.split(' (ID:')[0]}'."
+
+def export_all_characters():
+    zip_path = export_all_characters_as_zip()
+    return zip_path, "All characters exported successfully."
+
+#
+# End of Character card export functions
+####################################################
 
 ####################################################
 #
@@ -1721,456 +1783,64 @@ def create_character_card_validation_tab():
             inputs=[file_upload],
             outputs=[validation_output]
         )
-# v2-not-working-on-export-def create_character_card_validation_tab():
-#     with gr.TabItem("Validate and Edit Character Card"):
-#         gr.Markdown("# Validate and Edit Character Card (v2)")
-#         gr.Markdown("Upload a character card (PNG, WEBP, or JSON) to validate and modify it.")
-#
-#         with gr.Row():
-#             with gr.Column():
-#                 # File uploader
-#                 file_upload = gr.File(
-#                     label="Upload Character Card (PNG, WEBP, JSON)",
-#                     file_types=[".png", ".webp", ".json"]
-#                 )
-#                 # Validation button
-#                 validate_button = gr.Button("Validate and Load Character Card")
-#                 # Output area for validation results
-#                 validation_output = gr.Markdown("")
-#
-#         # Input fields for character card data (duplicated from the create tab)
-#         with gr.Row():
-#             with gr.Column():
-#                 name_input = gr.Textbox(label="Name", placeholder="Enter character name")
-#                 description_input = gr.TextArea(label="Description", placeholder="Enter character description")
-#                 personality_input = gr.TextArea(label="Personality", placeholder="Enter character personality")
-#                 scenario_input = gr.TextArea(label="Scenario", placeholder="Enter character scenario")
-#                 first_mes_input = gr.TextArea(label="First Message", placeholder="Enter the first message")
-#                 mes_example_input = gr.TextArea(label="Example Messages", placeholder="Enter example messages")
-#                 creator_notes_input = gr.TextArea(label="Creator Notes", placeholder="Enter notes for the creator")
-#                 system_prompt_input = gr.TextArea(label="System Prompt", placeholder="Enter system prompt")
-#                 post_history_instructions_input = gr.TextArea(label="Post History Instructions", placeholder="Enter post history instructions")
-#                 alternate_greetings_input = gr.TextArea(
-#                     label="Alternate Greetings (one per line)",
-#                     placeholder="Enter alternate greetings, one per line"
-#                 )
-#                 tags_input = gr.Textbox(label="Tags", placeholder="Enter tags, separated by commas")
-#                 creator_input = gr.Textbox(label="Creator", placeholder="Enter creator name")
-#                 character_version_input = gr.Textbox(label="Character Version", placeholder="Enter character version")
-#                 extensions_input = gr.TextArea(
-#                     label="Extensions (JSON)",
-#                     placeholder="Enter extensions as JSON (optional)"
-#                 )
-#                 image_input = gr.Image(label="Character Image", type="pil")
-#
-#                 # Buttons
-#                 save_button = gr.Button("Save Character Card")
-#                 download_button = gr.Button("Download Character Card")
-#                 download_image_button = gr.Button("Download Character Card as Image")
-#
-#                 # Output status and outputs
-#                 save_status = gr.Markdown("")
-#                 download_output = gr.File(label="Download Character Card", interactive=False)
-#                 download_image_output = gr.File(label="Download Character Card as Image", interactive=False)
-#
-#         # Callback Functions
-#         def extract_json_from_image(file):
-#             try:
-#                 image = Image.open(file.name)
-#                 if "chara" in image.info:
-#                     json_data = image.info["chara"]
-#                     # Decode base64 if necessary
-#                     try:
-#                         json_data = base64.b64decode(json_data).decode('utf-8')
-#                     except Exception:
-#                         pass  # Assume it's already in plain text
-#                     return json_data
-#                 else:
-#                     return None
-#             except Exception as e:
-#                 logging.error(f"Error extracting JSON from image: {e}")
-#                 return None
-#
-#         def validate_v2_card(card_data):
-#             """
-#             Validate a character card according to the V2 specification.
-#
-#             Args:
-#                 card_data (dict): The parsed character card data.
-#
-#             Returns:
-#                 Tuple[bool, List[str]]: A tuple containing a boolean indicating validity and a list of validation messages.
-#             """
-#             validation_messages = []
-#
-#             # Check top-level fields
-#             if 'spec' not in card_data:
-#                 validation_messages.append("Missing 'spec' field.")
-#             elif card_data['spec'] != 'chara_card_v2':
-#                 validation_messages.append(f"Invalid 'spec' value: {card_data['spec']}. Expected 'chara_card_v2'.")
-#
-#             if 'spec_version' not in card_data:
-#                 validation_messages.append("Missing 'spec_version' field.")
-#             else:
-#                 # Ensure 'spec_version' is '2.0' or higher
-#                 try:
-#                     spec_version = float(card_data['spec_version'])
-#                     if spec_version < 2.0:
-#                         validation_messages.append(
-#                             f"'spec_version' must be '2.0' or higher. Found '{card_data['spec_version']}'.")
-#                 except ValueError:
-#                     validation_messages.append(
-#                         f"Invalid 'spec_version' format: {card_data['spec_version']}. Must be a number as a string.")
-#
-#             if 'data' not in card_data:
-#                 validation_messages.append("Missing 'data' field.")
-#                 return False, validation_messages  # Cannot proceed without 'data' field
-#
-#             data = card_data['data']
-#
-#             # Required fields in 'data'
-#             required_fields = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example']
-#             for field in required_fields:
-#                 if field not in data:
-#                     validation_messages.append(f"Missing required field in 'data': '{field}'.")
-#                 elif not isinstance(data[field], str):
-#                     validation_messages.append(f"Field '{field}' must be a string.")
-#                 elif not data[field].strip():
-#                     validation_messages.append(f"Field '{field}' cannot be empty.")
-#
-#             # Optional fields with expected types
-#             optional_fields = {
-#                 'creator_notes': str,
-#                 'system_prompt': str,
-#                 'post_history_instructions': str,
-#                 'alternate_greetings': list,
-#                 'tags': list,
-#                 'creator': str,
-#                 'character_version': str,
-#                 'extensions': dict,
-#                 'character_book': dict  # If present, should be a dict
-#             }
-#
-#             for field, expected_type in optional_fields.items():
-#                 if field in data:
-#                     if not isinstance(data[field], expected_type):
-#                         validation_messages.append(f"Field '{field}' must be of type '{expected_type.__name__}'.")
-#                     elif field == 'extensions':
-#                         # Validate that extensions keys are properly namespaced
-#                         for key in data[field].keys():
-#                             if '/' not in key and '_' not in key:
-#                                 validation_messages.append(
-#                                     f"Extension key '{key}' in 'extensions' should be namespaced to prevent conflicts.")
-#
-#             # If 'alternate_greetings' is present, check that it's a list of non-empty strings
-#             if 'alternate_greetings' in data and isinstance(data['alternate_greetings'], list):
-#                 for idx, greeting in enumerate(data['alternate_greetings']):
-#                     if not isinstance(greeting, str) or not greeting.strip():
-#                         validation_messages.append(
-#                             f"Element {idx} in 'alternate_greetings' must be a non-empty string.")
-#
-#             # If 'tags' is present, check that it's a list of non-empty strings
-#             if 'tags' in data and isinstance(data['tags'], list):
-#                 for idx, tag in enumerate(data['tags']):
-#                     if not isinstance(tag, str) or not tag.strip():
-#                         validation_messages.append(f"Element {idx} in 'tags' must be a non-empty string.")
-#
-#             # Validate 'extensions' field
-#             if 'extensions' in data and not isinstance(data['extensions'], dict):
-#                 validation_messages.append("Field 'extensions' must be a dictionary.")
-#
-#             # Validate 'character_book' if present
-#             # (Assuming you have a validate_character_book function)
-#             # if 'character_book' in data:
-#             #     is_valid_book, book_messages = validate_character_book(data['character_book'])
-#             #     if not is_valid_book:
-#             #         validation_messages.extend(book_messages)
-#
-#             is_valid = len(validation_messages) == 0
-#             return is_valid, validation_messages
-#
-#         # Include the save_character_card, download_character_card, and download_character_card_as_image functions
-#         def save_character_card(
-#                 name, description, personality, scenario, first_mes, mes_example,
-#                 creator_notes, system_prompt, post_history_instructions,
-#                 alternate_greetings_str, tags_str, creator, character_version,
-#                 extensions_str, image
-#         ):
-#             # Build the character card
-#             character_card = build_character_card(
-#                 name, description, personality, scenario, first_mes, mes_example,
-#                 creator_notes, system_prompt, post_history_instructions,
-#                 alternate_greetings_str, tags_str, creator, character_version,
-#                 extensions_str
-#             )
-#
-#             # Validate the character card
-#             is_valid, validation_messages = validate_v2_card(character_card)
-#             if not is_valid:
-#                 # Return validation errors
-#                 validation_output = "Character card validation failed:\n"
-#                 validation_output += "\n".join(validation_messages)
-#                 return validation_output
-#
-#             # If image is provided, encode it to base64
-#             if image:
-#                 img_byte_arr = io.BytesIO()
-#                 image.save(img_byte_arr, format='PNG')
-#                 character_card['data']['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-#
-#             # Save character card to database
-#             character_id = add_character_card(character_card['data'])
-#             if character_id:
-#                 return f"Character card '{name}' saved successfully."
-#             else:
-#                 return f"Failed to save character card '{name}'. It may already exist."
-#
-#         def download_character_card(
-#                 name, description, personality, scenario, first_mes, mes_example,
-#                 creator_notes, system_prompt, post_history_instructions,
-#                 alternate_greetings_str, tags_str, creator, character_version,
-#                 extensions_str, image
-#         ):
-#             # Build the character card
-#             character_card = build_character_card(
-#                 name, description, personality, scenario, first_mes, mes_example,
-#                 creator_notes, system_prompt, post_history_instructions,
-#                 alternate_greetings_str, tags_str, creator, character_version,
-#                 extensions_str
-#             )
-#
-#             # Validate the character card
-#             is_valid, validation_messages = validate_v2_card(character_card)
-#             if not is_valid:
-#                 # Return validation errors
-#                 validation_output = "Character card validation failed:\n"
-#                 validation_output += "\n".join(validation_messages)
-#                 return gr.update(value=None), validation_output  # Return None for the file output
-#
-#             # If image is provided, include it as base64
-#             if image:
-#                 img_byte_arr = io.BytesIO()
-#                 image.save(img_byte_arr, format='PNG')
-#                 character_card['data']['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-#
-#             # Convert to JSON string
-#             json_str = json.dumps(character_card, indent=2)
-#
-#             # Write the JSON to a temporary file
-#             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json', encoding='utf-8') as temp_file:
-#                 temp_file.write(json_str)
-#                 temp_file_path = temp_file.name
-#
-#             # Return the file path and clear validation output
-#             return temp_file_path, ""
-#
-#         def download_character_card_as_image(
-#                 name, description, personality, scenario, first_mes, mes_example,
-#                 creator_notes, system_prompt, post_history_instructions,
-#                 alternate_greetings_str, tags_str, creator, character_version,
-#                 extensions_str, image
-#         ):
-#             # Build the character card
-#             character_card = build_character_card(
-#                 name, description, personality, scenario, first_mes, mes_example,
-#                 creator_notes, system_prompt, post_history_instructions,
-#                 alternate_greetings_str, tags_str, creator, character_version,
-#                 extensions_str
-#             )
-#
-#             # Validate the character card
-#             is_valid, validation_messages = validate_v2_card(character_card)
-#             if not is_valid:
-#                 # Return validation errors
-#                 validation_output = "Character card validation failed:\n"
-#                 validation_output += "\n".join(validation_messages)
-#                 return gr.update(value=None), validation_output  # Return None for the file output
-#
-#             # Convert the character card JSON to a string
-#             json_str = json.dumps(character_card, indent=2)
-#
-#             # Encode the JSON string to base64
-#             chara_content = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
-#
-#             # Create PNGInfo object to hold metadata
-#             png_info = PngInfo()
-#             png_info.add_text('chara', chara_content)
-#
-#             # If image is provided, use it; otherwise, create a blank image
-#             if image:
-#                 img = image.copy()
-#             else:
-#                 # Create a default blank image
-#                 img = Image.new('RGB', (512, 512), color='white')
-#
-#             # Save the image to a temporary file with metadata
-#             with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.png') as temp_file:
-#                 img.save(temp_file, format='PNG', pnginfo=png_info)
-#                 temp_file_path = temp_file.name
-#
-#             # Return the file path and clear validation output
-#             return temp_file_path, ""
-#
-#         def build_character_card(
-#                 name, description, personality, scenario, first_mes, mes_example,
-#                 creator_notes, system_prompt, post_history_instructions,
-#                 alternate_greetings_str, tags_str, creator, character_version,
-#                 extensions_str
-#         ):
-#             # Parse alternate_greetings from multiline string
-#             alternate_greetings = [line.strip() for line in alternate_greetings_str.strip().split('\n') if line.strip()]
-#
-#             # Parse tags from comma-separated string
-#             tags = [tag.strip() for tag in tags_str.strip().split(',') if tag.strip()]
-#
-#             # Parse extensions from JSON string
-#             try:
-#                 extensions = json.loads(extensions_str) if extensions_str.strip() else {}
-#             except json.JSONDecodeError as e:
-#                 extensions = {}
-#                 logging.error(f"Error parsing extensions JSON: {e}")
-#
-#             # Build the character card dictionary according to V2 spec
-#             character_card = {
-#                 'spec': 'chara_card_v2',
-#                 'spec_version': '2.0',
-#                 'data': {
-#                     'name': name,
-#                     'description': description,
-#                     'personality': personality,
-#                     'scenario': scenario,
-#                     'first_mes': first_mes,
-#                     'mes_example': mes_example,
-#                     'creator_notes': creator_notes,
-#                     'system_prompt': system_prompt,
-#                     'post_history_instructions': post_history_instructions,
-#                     'alternate_greetings': alternate_greetings,
-#                     'tags': tags,
-#                     'creator': creator,
-#                     'character_version': character_version,
-#                     'extensions': extensions,
-#                 }
-#             }
-#             return character_card
-#
-#         def validate_and_load_character_card(file):
-#             if file is None:
-#                 return ["No file provided for validation."] + [gr.update() for _ in range(15)]
-#
-#             try:
-#                 if file.name.lower().endswith(('.png', '.webp')):
-#                     json_data = extract_json_from_image(file)
-#                     if not json_data:
-#                         return ["Failed to extract JSON data from the image."] + [gr.update() for _ in range(15)]
-#                 elif file.name.lower().endswith('.json'):
-#                     with open(file.name, 'r', encoding='utf-8') as f:
-#                         json_data = f.read()
-#                 else:
-#                     return ["Unsupported file type."] + [gr.update() for _ in range(15)]
-#
-#                 # Parse the JSON content
-#                 try:
-#                     card_data = json.loads(json_data)
-#                 except json.JSONDecodeError as e:
-#                     return [f"JSON decoding error: {e}"] + [gr.update() for _ in range(15)]
-#
-#                 # Validate the character card
-#                 is_valid, validation_messages = validate_v2_card(card_data)
-#
-#                 # Prepare the validation output
-#                 if is_valid:
-#                     validation_output_msg = "Character card is valid according to the V2 specification."
-#                 else:
-#                     validation_output_msg = "Character card validation failed:\n" + "\n".join(validation_messages)
-#
-#                 # Extract data to populate input fields
-#                 data = card_data.get('data', {})
-#
-#                 # Handle image data
-#                 if 'image' in data:
-#                     # Decode base64 image
-#                     image_data = base64.b64decode(data['image'])
-#                     image = Image.open(io.BytesIO(image_data))
-#                 else:
-#                     image = None
-#
-#                 # Prepare values for input fields
-#                 alternate_greetings_str = "\n".join(data.get('alternate_greetings', []))
-#                 tags_str = ", ".join(data.get('tags', []))
-#                 extensions_str = json.dumps(data.get('extensions', {}), indent=2) if data.get('extensions', {}) else ""
-#
-#                 outputs = [
-#                     validation_output_msg,
-#                     data.get('name', ''),
-#                     data.get('description', ''),
-#                     data.get('personality', ''),
-#                     data.get('scenario', ''),
-#                     data.get('first_mes', ''),
-#                     data.get('mes_example', ''),
-#                     data.get('creator_notes', ''),
-#                     data.get('system_prompt', ''),
-#                     data.get('post_history_instructions', ''),
-#                     alternate_greetings_str,
-#                     tags_str,
-#                     data.get('creator', ''),
-#                     data.get('character_version', ''),
-#                     extensions_str,
-#                     image
-#                 ]
-#
-#                 return outputs
-#
-#             except Exception as e:
-#                 logging.error(f"Error validating character card: {e}")
-#                 return [f"An unexpected error occurred: {e}"] + [gr.update() for _ in range(15)]
-#
-#         # Button Callback for validation
-#         validate_button.click(
-#             fn=validate_and_load_character_card,
-#             inputs=[file_upload],
-#             outputs=[
-#                 validation_output,
-#                 name_input, description_input, personality_input, scenario_input,
-#                 first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
-#                 post_history_instructions_input, alternate_greetings_input, tags_input,
-#                 creator_input, character_version_input, extensions_input, image_input
-#             ]
-#         )
-#
-#         # Button Callbacks for save, download, etc.
-#         save_button.click(
-#             fn=save_character_card,
-#             inputs=[
-#                 name_input, description_input, personality_input, scenario_input,
-#                 first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
-#                 post_history_instructions_input, alternate_greetings_input, tags_input,
-#                 creator_input, character_version_input, extensions_input, image_input
-#             ],
-#             outputs=[save_status]
-#         )
-#
-#         download_button.click(
-#             fn=download_character_card,
-#             inputs=[
-#                 name_input, description_input, personality_input, scenario_input,
-#                 first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
-#                 post_history_instructions_input, alternate_greetings_input, tags_input,
-#                 creator_input, character_version_input, extensions_input, image_input
-#             ],
-#             outputs=[download_output, save_status]
-#         )
-#
-#         download_image_button.click(
-#             fn=download_character_card_as_image,
-#             inputs=[
-#                 name_input, description_input, personality_input, scenario_input,
-#                 first_mes_input, mes_example_input, creator_notes_input, system_prompt_input,
-#                 post_history_instructions_input, alternate_greetings_input, tags_input,
-#                 creator_input, character_version_input, extensions_input, image_input
-#             ],
-#             outputs=[download_image_output, save_status]
-#         )
 
+
+def create_export_characters_tab():
+    with gr.TabItem("Export Characters"):
+        gr.Markdown("# Export Characters")
+        gr.Markdown("Export character cards individually as JSON files or all together as a ZIP file.")
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                # Dropdown to select a character for individual export
+                characters = get_character_cards()
+                character_choices = [f"{char['name']} (ID: {char['id']})" for char in characters]
+                export_character_dropdown = gr.Dropdown(
+                    label="Select Character to Export",
+                    choices=character_choices
+                )
+                load_characters_button = gr.Button("Load Existing Characters")
+                export_single_button = gr.Button("Export Selected Character")
+                export_all_button = gr.Button("Export All Characters")
+
+            with gr.Column(scale=1):
+                # Output components
+                export_output = gr.File(label="Exported Character(s)", interactive=False)
+                export_status = gr.Markdown("")
+
+        def export_single_character_wrapper(character_selection):
+            file_path, status_message = export_single_character(character_selection)
+            if file_path:
+                return gr.File.update(value=file_path), status_message
+            else:
+                return gr.File.update(value=None), status_message
+
+        def export_all_characters_wrapper():
+            zip_path = export_all_characters_as_zip()
+            characters = get_character_cards()
+            exported_characters = [char['name'] for char in characters]
+            status_message = f"Exported {len(exported_characters)} characters successfully:\n" + "\n".join(exported_characters)
+            return gr.File.update(value=zip_path), status_message
+
+        # Event listeners
+        load_characters_button.click(
+            fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
+            outputs=export_character_dropdown
+        )
+
+        export_single_button.click(
+            fn=export_single_character_wrapper,
+            inputs=[export_character_dropdown],
+            outputs=[export_output, export_status]
+        )
+
+        export_all_button.click(
+            fn=export_all_characters_wrapper,
+            inputs=[],
+            outputs=[export_output, export_status]
+        )
+
+    return export_character_dropdown, load_characters_button, export_single_button, export_all_button, export_output, export_status
 
 #
 # End of Character_Chat_tab.py
