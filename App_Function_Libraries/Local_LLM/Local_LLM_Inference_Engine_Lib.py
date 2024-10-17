@@ -23,7 +23,7 @@ import subprocess
 import sys
 import time
 from typing import List, Optional
-
+#
 # Import 3rd-pary Libraries
 import requests
 #
@@ -33,6 +33,39 @@ from App_Function_Libraries.Utils.Utils import download_file
 #
 #######################################################################################################################
 # Function Definitions:
+
+
+###############################################################
+# LLM models information
+
+llm_models = {
+    "1": {
+        "name": "Mistral-7B-Instruct-v0.2-Q8.llamafile",
+        "url": "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true",
+        "filename": "mistral-7b-instruct-v0.2.Q8_0.llamafile",
+        "hash": "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
+    },
+    "2": {
+        "name": "Samantha-Mistral-Instruct-7B-Bulleted-Notes-Q8.gguf",
+        "url": "https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b-bulleted-notes-GGUF/resolve/main/samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf?download=true",
+        "filename": "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf",
+        "hash": "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
+    },
+    "3": {
+        "name": "Phi-3-mini-128k-instruct-Q8_0.gguf",
+        "url": "https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF/resolve/main/Phi-3-mini-128k-instruct-Q8_0.gguf?download=true",
+        "filename": "Phi-3-mini-128k-instruct-Q8_0.gguf",
+        "hash": "6817b66d1c3c59ab06822e9732f0e594eea44e64cae2110906eac9d17f75d193"
+    },
+    "4": {
+        "name": "Meta-Llama-3-8B-Instruct.Q8_0.llamafile",
+        "url": "https://huggingface.co/Mozilla/Meta-Llama-3-8B-Instruct-llamafile/resolve/main/Meta-Llama-3-8B-Instruct.Q8_0.llamafile?download=true",
+        "filename": "Meta-Llama-3-8B-Instruct.Q8_0.llamafile",
+        "hash": "406868a97f02f57183716c7e4441d427f223fdbc7fa42964ef10c4d60dd8ed37"
+    }
+}
+#
+###############################################################
 
 # Function to download the latest llamafile from the Mozilla-Ocho/llamafile repo
 def download_latest_llamafile(output_filename: str) -> str:
@@ -118,36 +151,6 @@ def launch_in_new_terminal(executable: str, args: List[str]) -> subprocess.Popen
         logging.error(f"Failed to launch the process: {e}")
         raise
 
-#######################################################################################################################
-# LLM models information
-
-llm_models = {
-    "1": {
-        "name": "Mistral-7B-Instruct-v0.2-Q8.llamafile",
-        "url": "https://huggingface.co/Mozilla/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q8_0.llamafile?download=true",
-        "filename": "mistral-7b-instruct-v0.2.Q8_0.llamafile",
-        "hash": "1ee6114517d2f770425c880e5abc443da36b193c82abec8e2885dd7ce3b9bfa6"
-    },
-    "2": {
-        "name": "Samantha-Mistral-Instruct-7B-Bulleted-Notes-Q8.gguf",
-        "url": "https://huggingface.co/cognitivetech/samantha-mistral-instruct-7b-bulleted-notes-GGUF/resolve/main/samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf?download=true",
-        "filename": "samantha-mistral-instruct-7b-bulleted-notes.Q8_0.gguf",
-        "hash": "6334c1ab56c565afd86535271fab52b03e67a5e31376946bce7bf5c144e847e4"
-    },
-    "3": {
-        "name": "Phi-3-mini-128k-instruct-Q8_0.gguf",
-        "url": "https://huggingface.co/gaianet/Phi-3-mini-128k-instruct-GGUF/resolve/main/Phi-3-mini-128k-instruct-Q8_0.gguf?download=true",
-        "filename": "Phi-3-mini-128k-instruct-Q8_0.gguf",
-        "hash": "6817b66d1c3c59ab06822e9732f0e594eea44e64cae2110906eac9d17f75d193"
-    },
-    "4": {
-        "name": "Meta-Llama-3-8B-Instruct.Q8_0.llamafile",
-        "url": "https://huggingface.co/Mozilla/Meta-Llama-3-8B-Instruct-llamafile/resolve/main/Meta-Llama-3-8B-Instruct.Q8_0.llamafile?download=true",
-        "filename": "Meta-Llama-3-8B-Instruct.Q8_0.llamafile",
-        "hash": "406868a97f02f57183716c7e4441d427f223fdbc7fa42964ef10c4d60dd8ed37"
-    }
-}
-
 # Function to scan the directory for .gguf and .llamafile files
 def get_gguf_llamafile_files(directory: str) -> List[str]:
     """
@@ -205,6 +208,10 @@ def start_llamafile(
     verbose_checked: bool,
     threads_checked: bool,
     threads_value: Optional[int],
+    threads_batched_checked: bool,
+    threads_batched_value: Optional[int],
+    model_alias_checked: bool,
+    model_alias_value: str,
     http_threads_checked: bool,
     http_threads_value: Optional[int],
     model_value: str,
@@ -216,10 +223,17 @@ def start_llamafile(
     ctx_size_value: Optional[int],
     ngl_checked: bool,
     ngl_value: Optional[int],
+    batch_size_checked: bool,
+    batch_size_value: Optional[int],
+    memory_f32_checked: bool,
+    numa_checked: bool,
+    server_timeout_value: Optional[int],
     host_checked: bool,
     host_value: str,
     port_checked: bool,
     port_value: Optional[int],
+    api_key_checked: bool,
+    api_key_value: Optional[str],
 ) -> str:
     """
     Starts the llamafile process based on provided configuration.
@@ -241,6 +255,12 @@ def start_llamafile(
     if http_threads_checked and http_threads_value is not None:
         command.extend(['--threads', str(http_threads_value)])
 
+    if threads_batched_checked and threads_batched_value is not None:
+        command.extend(['-tb', str(threads_batched_value)])
+
+    if model_alias_checked and model_alias_value:
+        command.extend(['-a', model_alias_value])
+
     # Set model path
     model_path = os.path.abspath(model_value)
     command.extend(['-m', model_path])
@@ -257,11 +277,26 @@ def start_llamafile(
     if ngl_checked and ngl_value is not None:
         command.extend(['-ngl', str(ngl_value)])
 
+    if batch_size_checked and batch_size_value is not None:
+        command.extend(['-b', str(batch_size_value)])
+
+    if memory_f32_checked:
+        command.append('--memory-f32')
+
+    if numa_checked:
+        command.append('--numa')
+
+    if server_timeout_value is not None:
+        command.extend(['--to', str(server_timeout_value)])
+
     if host_checked and host_value:
         command.extend(['--host', host_value])
 
     if port_checked and port_value is not None:
         command.extend(['--port', str(port_value)])
+
+    if api_key_checked and api_key_value:
+        command.extend(['--api-key', api_key_value])
 
     try:
         useros = os.name
