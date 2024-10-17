@@ -214,13 +214,14 @@ def create_rag_qa_chat_notes_tab():
 
         # Pagination Event handlers
         prev_page_btn.click(
-            update_page,
-            inputs=[-1, page_number, total_pages],
+            lambda current_page, total_pages_val: update_page(-1, current_page, total_pages_val),
+            inputs=[page_number, total_pages],
             outputs=[page_number]
         )
+
         next_page_btn.click(
-            update_page,
-            inputs=[1, page_number, total_pages],
+            lambda current_page, total_pages_val: update_page(1, current_page, total_pages_val),
+            inputs=[page_number, total_pages],
             outputs=[page_number]
         )
 
