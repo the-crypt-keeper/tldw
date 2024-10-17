@@ -3,14 +3,16 @@
 
 # Imports
 import os
-import glob
 import logging
-from typing import List, Tuple, Optional
+from typing import Tuple, Optional
 import gradio as gr
+
+
 from App_Function_Libraries.Local_LLM.Local_LLM_Inference_Engine_Lib import (
     download_llm_model,
     llm_models,
-    start_llamafile
+    start_llamafile,
+    get_gguf_llamafile_files
 )
 #
 #######################################################################################################################
@@ -18,32 +20,33 @@ from App_Function_Libraries.Local_LLM.Local_LLM_Inference_Engine_Lib import (
 # Functions:
 
 def create_chat_with_llamafile_tab():
-    def get_model_files(directory: str) -> List[str]:
-        """
-        Retrieves model files with extensions .gguf or .llamafile from the specified directory.
-        """
-        pattern_gguf = os.path.join(directory, "*.gguf")
-        pattern_llamafile = os.path.join(directory, "*.llamafile")
-        files = glob.glob(pattern_gguf) + glob.glob(pattern_llamafile)
-        return [os.path.basename(f) for f in files]
+    # Function to update model path based on selection
+    def on_local_model_change(selected_model: str, search_directory: str) -> str:
+        if selected_model and isinstance(search_directory, str):
+            model_path = os.path.abspath(os.path.join(search_directory, selected_model))
+            logging.debug(f"Selected model path: {model_path}")  # Debug print for selected model path
+            return model_path
+        return "Invalid selection or directory."
 
+    # Function to update the dropdown with available models
     def update_dropdowns(search_directory: str) -> Tuple[dict, str]:
-        """
-        Updates the model dropdown based on the search directory.
-
-        Args:
-            search_directory (str): The directory path to search for model files.
-
-        Returns:
-            Tuple[dict, str]: A dictionary for updating the Dropdown component and a status message.
-        """
+        logging.debug(f"User-entered directory: {search_directory}")  # Debug print for directory
         if not os.path.isdir(search_directory):
-            return {"choices": [], "value": None}, "Directory does not exist."
+            logging.debug(f"Directory does not exist: {search_directory}")  # Debug print for non-existing directory
+            return gr.update(choices=[], value=None), "Directory does not exist."
 
-        model_files = get_model_files(search_directory)
+        logging.debug(f"Directory exists: {search_directory}, scanning for files...")  # Confirm directory exists
+        model_files = get_gguf_llamafile_files(search_directory)
+
         if not model_files:
-            return {"choices": [], "value": None}, "No model files found in the specified directory."
-        return {"choices": model_files, "value": None}, f"Models loaded from {search_directory}."
+            logging.debug(f"No model files found in {search_directory}")  # Debug print for no files found
+            return gr.update(choices=[], value=None), "No model files found in the specified directory."
+
+        # Update the dropdown choices with the model files found
+        logging.debug(f"Models loaded from {search_directory}: {model_files}")  # Debug: Print model files loaded
+        return gr.update(choices=model_files, value=None), f"Models loaded from {search_directory}."
+
+
 
     def download_preset_model(selected_model: str) -> Tuple[str, str]:
         """
@@ -78,47 +81,6 @@ def create_chat_with_llamafile_tab():
             with gr.Column():
                 am_noob = gr.Checkbox(label="Enable Sane Defaults", value=False, visible=True)
                 advanced_mode_toggle = gr.Checkbox(label="Advanced Mode - Show All Settings", value=False)
-
-            with gr.Column():
-                # Model Selection Section
-                gr.Markdown("## Model Selection")
-
-                # Option 1: Select from Local Filesystem
-                with gr.Row():
-                    search_directory = gr.Textbox(
-                        label="Model Directory",
-                        placeholder="Enter directory path to search for models",
-                        value=".",
-                        interactive=True
-                    )
-                    refresh_button = gr.Button("Refresh Models")
-
-                # Initial population of local models
-                initial_dropdown_update, _ = update_dropdowns(".")
-                local_model_dropdown = gr.Dropdown(
-                    label="Select Model from Directory",
-                    choices=initial_dropdown_update['choices'],
-                    value=initial_dropdown_update['value'],
-                    interactive=True
-                )
-
-                # Option 2: Download Preset Models
-                gr.Markdown("## Download Preset Models")
-
-                preset_model_dropdown = gr.Dropdown(
-                    label="Select a Preset Model",
-                    choices=list(llm_models.keys()),
-                    value=None,
-                    interactive=True,
-                    info="Choose a preset model to download."
-                )
-                download_preset_button = gr.Button("Download Selected Preset")
-
-                # Display selected model path
-                model_value = gr.Textbox(label="Selected Model File Path", value="", interactive=False)
-
-        with gr.Row():
-            with gr.Column():
                 # Advanced Inputs
                 verbose_checked = gr.Checkbox(label="Enable Verbose Output", value=False, visible=False)
                 threads_checked = gr.Checkbox(label="Set CPU Threads", value=False, visible=False)
@@ -138,40 +100,42 @@ def create_chat_with_llamafile_tab():
                 port_checked = gr.Checkbox(label="Set Server Port", value=False, visible=False)
                 port_value = gr.Number(label="Port Number", value=8080, precision=0, visible=False)
 
+            with gr.Column():
+                # Model Selection Section
+                gr.Markdown("## Model Selection")
+
+                # Option 1: Select from Local Filesystem
+                with gr.Row():
+                    search_directory = gr.Textbox(label="Model Directory",
+                                                  placeholder="Enter directory path(currently '.')",
+                                                  value=".",
+                                                  interactive=True)
+
+                # Initial population of local models
+                initial_dropdown_update, _ = update_dropdowns(".")
+                refresh_button = gr.Button("Refresh Models")
+                local_model_dropdown = gr.Dropdown(label="Select Model from Directory", choices=[])
+                # Display selected model path
+                model_value = gr.Textbox(label="Selected Model File Path", value="", interactive=False)
+
+                # Option 2: Download Preset Models
+                gr.Markdown("## Download Preset Models")
+
+                preset_model_dropdown = gr.Dropdown(
+                    label="Select a Preset Model",
+                    choices=list(llm_models.keys()),
+                    value=None,
+                    interactive=True,
+                    info="Choose a preset model to download."
+                )
+                download_preset_button = gr.Button("Download Selected Preset")
+
         with gr.Row():
             with gr.Column():
                 start_button = gr.Button("Start Llamafile")
                 stop_button = gr.Button("Stop Llamafile (doesn't work)")
                 output_display = gr.Markdown()
 
-        # Event Handlers
-        refresh_button.click(
-            fn=update_dropdowns,
-            inputs=[search_directory],
-            outputs=[local_model_dropdown, output_display]
-        )
-
-        def on_local_model_change(search_directory: str, selected_model: str) -> str:
-            """
-            Updates the model_value textbox based on the selected model and search directory.
-            """
-            if selected_model and search_directory:
-                model_path = os.path.abspath(os.path.join(search_directory, selected_model))
-                return model_path
-            return ""
-
-        # Update the event handler
-        local_model_dropdown.change(
-            fn=on_local_model_change,
-            inputs=[search_directory, local_model_dropdown],
-            outputs=[model_value]
-        )
-
-        download_preset_button.click(
-            fn=download_preset_model,
-            inputs=[preset_model_dropdown],
-            outputs=[output_display, model_value]
-        )
 
         # Show/hide advanced inputs based on toggle
         def update_visibility(show_advanced: bool):
@@ -277,6 +241,26 @@ def create_chat_with_llamafile_tab():
                 port_value,
             ],
             outputs=output_display
+        )
+
+        download_preset_button.click(
+            fn=download_preset_model,
+            inputs=[preset_model_dropdown],
+            outputs=[output_display, model_value]
+        )
+
+        # Click event for refreshing models
+        refresh_button.click(
+            fn=update_dropdowns,
+            inputs=[search_directory],  # Ensure that the directory path (string) is passed
+            outputs=[local_model_dropdown, output_display]  # Update dropdown and status
+        )
+
+        # Event to update model_value when a model is selected from the dropdown
+        local_model_dropdown.change(
+            fn=on_local_model_change,  # Function that calculates the model path
+            inputs=[local_model_dropdown, search_directory],  # Inputs: selected model and directory
+            outputs=[model_value]  # Output: Update the model_value textbox with the selected model path
         )
 
 #

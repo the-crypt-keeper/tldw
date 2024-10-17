@@ -10,7 +10,6 @@ import signal
 import sys
 import threading
 import time
-import webbrowser
 #
 # Local Library Imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
@@ -859,12 +858,10 @@ Sample commands:
 #   Launch the UI
     # Launch the GUI
     if args.user_interface:
-        webbrowser.open_new_tab('http://127.0.0.1:7860')
         launch_ui(share_public=False)
     elif share_public is not None:
         if local_llm:
             time.sleep(2)
-            webbrowser.open_new_tab('http://127.0.0.1:7860')
             launch_ui(share_public=True)
     elif not args.input_path:
         parser.print_help()
