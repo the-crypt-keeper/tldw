@@ -2,11 +2,15 @@
 # Description: This file contains the database operations for the RAG QA Chat + Notes system.
 #
 # Imports
+import configparser
 import logging
 import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
+
+from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path
+
 #
 # External Imports
 #
@@ -15,7 +19,27 @@ from datetime import datetime
 ########################################################################################################################
 #
 # Functions:
+# FIXME - Setup properly and test/add documentation for its existence...
+# Construct the path to the config file
+config_path = get_project_relative_path('Config_Files/config.txt')
 
+# Read the config file
+config = configparser.ConfigParser()
+config.read(config_path)
+
+# Get the SQLite path from the config, or use the default if not specified
+rag_qa_path = config.get('Database', 'rag_qa_db_path', fallback=get_database_path('RAG_QA_Chat.db'))
+
+# Get the backup path from the config, or use the default if not specified
+rag_chat_backup_path = config.get('Database', 'backup_path', fallback='rag_database_backups')
+rag_chat_backup_path = get_project_relative_path(rag_chat_backup_path)
+
+# Set the final paths
+rag_qa_db_path = rag_qa_path
+rag_qa_backup_dir = rag_chat_backup_path
+
+print(f"RAG QA Chat Database path: {rag_qa_db_path}")
+print(f"RAG QA Chat DB Backup directory: {rag_qa_backup_dir}")
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

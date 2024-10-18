@@ -259,7 +259,7 @@ def run_geval(transcript: str, summary: str, api_key: str, api_name: str = None,
 
 
 def create_geval_tab():
-    with gr.Tab("G-Eval"):
+    with gr.Tab("G-Eval", id="g-eval"):
         gr.Markdown("# G-Eval Summarization Evaluation")
         with gr.Row():
             with gr.Column():
