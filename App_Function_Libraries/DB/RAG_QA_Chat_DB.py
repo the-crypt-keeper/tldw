@@ -6,6 +6,7 @@ import configparser
 import logging
 import re
 import sqlite3
+import uuid
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -19,7 +20,6 @@ from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_da
 ########################################################################################################################
 #
 # Functions:
-# FIXME - Setup properly and test/add documentation for its existence...
 # Construct the path to the config file
 config_path = get_project_relative_path('Config_Files/config.txt')
 
@@ -28,18 +28,13 @@ config = configparser.ConfigParser()
 config.read(config_path)
 
 # Get the SQLite path from the config, or use the default if not specified
-rag_qa_path = config.get('Database', 'rag_qa_db_path', fallback=get_database_path('RAG_QA_Chat.db'))
-
-# Get the backup path from the config, or use the default if not specified
-rag_chat_backup_path = config.get('Database', 'backup_path', fallback='rag_database_backups')
-rag_chat_backup_path = get_project_relative_path(rag_chat_backup_path)
-
-# Set the final paths
-rag_qa_db_path = rag_qa_path
-rag_qa_backup_dir = rag_chat_backup_path
+if config.has_section('Database') and config.has_option('Database', 'rag_qa_db_path'):
+    rag_qa_db_path = config.get('Database', 'rag_qa_db_path')
+else:
+    rag_qa_db_path = get_database_path('RAG_QA_Chat.db')
 
 print(f"RAG QA Chat Database path: {rag_qa_db_path}")
-print(f"RAG QA Chat DB Backup directory: {rag_qa_backup_dir}")
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -135,7 +130,7 @@ END;
 # Database connection management
 @contextmanager
 def get_db_connection():
-    conn = sqlite3.connect('rag_qa_chat.db')
+    conn = sqlite3.connect(rag_qa_db_path)
     try:
         yield conn
     finally:
@@ -145,16 +140,15 @@ def get_db_connection():
 def transaction():
     with get_db_connection() as conn:
         try:
-            conn.execute('BEGIN TRANSACTION')
             yield conn
             conn.commit()
         except Exception:
             conn.rollback()
             raise
 
-def execute_query(query, params=None, transaction_conn=None):
-    if transaction_conn:
-        cursor = transaction_conn.cursor()
+def execute_query(query, params=None, conn=None):
+    if conn:
+        cursor = conn.cursor()
         if params:
             cursor.execute(query, params)
         else:
@@ -202,11 +196,11 @@ def validate_collection_name(name):
     return name.strip()
 
 # Core functions
-def add_keyword(keyword):
+def add_keyword(keyword, conn=None):
     try:
         validated_keyword = validate_keyword(keyword)
         query = "INSERT OR IGNORE INTO rag_qa_keywords (keyword) VALUES (?)"
-        execute_query(query, (validated_keyword,))
+        execute_query(query, (validated_keyword,), conn)
         logger.info(f"Keyword '{validated_keyword}' added successfully")
     except ValueError as e:
         logger.error(f"Invalid keyword: {e}")
@@ -234,7 +228,7 @@ def add_keyword_to_collection(collection_name, keyword):
         validated_keyword = validate_keyword(keyword)
 
         with transaction() as conn:
-            add_keyword(validated_keyword)
+            add_keyword(validated_keyword, conn)
 
             query = '''
             INSERT INTO rag_qa_collection_keywords (collection_id, keyword_id)
@@ -259,9 +253,7 @@ def add_keywords_to_conversation(conversation_id, keywords):
         with transaction() as conn:
             for keyword in keywords:
                 validated_keyword = validate_keyword(keyword)
-
-                query = "INSERT OR IGNORE INTO rag_qa_keywords (keyword) VALUES (?)"
-                execute_query(query, (validated_keyword,), conn)
+                add_keyword(validated_keyword, conn)
 
                 query = '''
                 INSERT INTO rag_qa_conversation_keywords (conversation_id, keyword_id)
@@ -349,14 +341,15 @@ def add_keywords_to_note(note_id, keywords):
         with transaction() as conn:
             for keyword in keywords:
                 validated_keyword = validate_keyword(keyword)
-
-                # Insert the keyword into the rag_qa_keywords table if it doesn't exist
-                query = "INSERT OR IGNORE INTO rag_qa_keywords (keyword) VALUES (?)"
-                execute_query(query, (validated_keyword,), conn)
+                add_keyword(validated_keyword, conn)
 
                 # Retrieve the keyword ID
                 query = "SELECT id FROM rag_qa_keywords WHERE keyword = ?"
-                keyword_id = execute_query(query, (validated_keyword,), conn)[0][0]
+                result = execute_query(query, (validated_keyword,), conn)
+                if result:
+                    keyword_id = result[0][0]
+                else:
+                    raise Exception(f"Keyword '{validated_keyword}' not found after insertion")
 
                 # Link the note and keyword
                 query = "INSERT INTO rag_qa_note_keywords (note_id, keyword_id) VALUES (?, ?)"
@@ -396,9 +389,14 @@ def clear_keywords_from_note(note_id):
 
 def save_message(conversation_id, role, content):
     try:
-        query = "INSERT INTO rag_qa_chats (conversation_id, timestamp, role, content) VALUES (?, ?, ?, ?)"
         timestamp = datetime.now().isoformat()
+        query = "INSERT INTO rag_qa_chats (conversation_id, timestamp, role, content) VALUES (?, ?, ?, ?)"
         execute_query(query, (conversation_id, timestamp, role, content))
+
+        # Update last_updated in conversation_metadata
+        update_query = "UPDATE conversation_metadata SET last_updated = ? WHERE conversation_id = ?"
+        execute_query(update_query, (timestamp, conversation_id))
+
         logger.info(f"Message saved for conversation '{conversation_id}'")
     except Exception as e:
         logger.error(f"Error saving message for conversation '{conversation_id}': {e}")
@@ -406,9 +404,9 @@ def save_message(conversation_id, role, content):
 
 def start_new_conversation(title="Untitled Conversation"):
     try:
-        conversation_id = datetime.now().isoformat()
+        conversation_id = str(uuid.uuid4())
         query = "INSERT INTO conversation_metadata (conversation_id, created_at, last_updated, title) VALUES (?, ?, ?, ?)"
-        now = datetime.now()
+        now = datetime.now().isoformat()
         execute_query(query, (conversation_id, now, now, title))
         logger.info(f"New conversation '{conversation_id}' started with title '{title}'")
         return conversation_id
@@ -422,14 +420,16 @@ def get_paginated_results(query, params=None, page=1, page_size=20):
         offset = (page - 1) * page_size
         paginated_query = f"{query} LIMIT ? OFFSET ?"
         if params:
-            params = tuple(params) + (page_size, offset)
+            paginated_params = params + (page_size, offset)
         else:
-            params = (page_size, offset)
+            paginated_params = (page_size, offset)
 
-        result = execute_query(paginated_query, params)
+        result = execute_query(paginated_query, paginated_params)
 
-        count_query = f"SELECT COUNT(*) FROM ({query})"
-        total_count = execute_query(count_query, params[:-2] if params else None)[0][0]
+        count_query = f"SELECT COUNT(*) FROM ({query}) AS total"
+        count_params = params if params else ()
+
+        total_count = execute_query(count_query, count_params)[0][0]
 
         total_pages = (total_count + page_size - 1) // page_size
 
@@ -460,7 +460,7 @@ def search_conversations_by_keywords(keywords, page=1, page_size=20):
         JOIN rag_qa_keywords k ON ck.keyword_id = k.id
         WHERE k.keyword IN ({placeholders})
         '''
-        results, total_pages, total_count = get_paginated_results(query, keywords, page, page_size)
+        results, total_pages, total_count = get_paginated_results(query, tuple(keywords), page, page_size)
         logger.info(
             f"Found {total_count} conversations matching keywords: {', '.join(keywords)} (page {page} of {total_pages})")
         return results, total_pages, total_count
@@ -472,10 +472,9 @@ def load_chat_history(conversation_id, page=1, page_size=50):
     try:
         query = "SELECT role, content FROM rag_qa_chats WHERE conversation_id = ? ORDER BY timestamp"
         results, total_pages, total_count = get_paginated_results(query, (conversation_id,), page, page_size)
-        history = [(msg[1] if msg[0] == 'human' else None, msg[1] if msg[0] == 'ai' else None) for msg in results]
         logger.info(
-            f"Loaded {len(history)} messages for conversation '{conversation_id}' (page {page} of {total_pages})")
-        return history, total_pages, total_count
+            f"Loaded {len(results)} messages for conversation '{conversation_id}' (page {page} of {total_pages})")
+        return results, total_pages, total_count
     except Exception as e:
         logger.error(f"Error loading chat history for conversation '{conversation_id}': {e}")
         raise
