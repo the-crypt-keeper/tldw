@@ -29,7 +29,7 @@
 - Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
 - Also writing tools! Grammar/Style checker, Tone Analyzer, Writing editor(feedback), and more.
 - Full Character Chat Support - Create/Edit & Import/Export Character Cards, and chat with them.
-#### The original scripts by `the-crypt-keeper` are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
+#### The original scripts by `the-crypt-keeper` for transcribing and summarizing youtube videos are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 
 
 ----------
@@ -52,13 +52,16 @@
     - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
         - Then double-click the downloaded batch file `Windows_Install_Update.bat` to install it, and `Windows_Run_tldw.bat` to run it.
         - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+        - If you don't have CUDA installed on your system and available in your system path, go here: https://github.com/Purfview/whisper-standalone-win/releases/download/Faster-Whisper-XXL/Faster-Whisper-XXL_r192.3.4_windows.7z
+          - Extract the two files named `cudnn_ops_infer64_8.dll` and `cudnn_cnn_infer64_8.dll` from the 7z file to the `tldw` directory, and then run the `Windows_Run_tldw.bat` file.
+          - This will allow you to use the faster whisper models with the app. Otherwise, you won't be able to perform transcription.
 - **Docker:**
   - There's a docker build for GPU use(Needs Nvidia CUDA Controller(?): https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw-nvidia_amd64_Dockerfile 
   - and plain CPU use: https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw_Debian_cpu-Dockerfile
   - the `Dockerfile` in the main directory is the Nvidia base-image-based one. So you can use your GPU if you want with it.
 </details>
 
-### What is tl/dw?
+### Overview of what tl/dw currenlty is
 <details>
 <summary>What is this? - Click-Here</summary>
 
@@ -142,7 +145,7 @@ All features are designed to run **locally** on your device, ensuring privacy an
 ----------
 
 
-### What is this (tl/dw)?
+### More Detailed explanation of this project (tl/dw)
 <details>
 <summary>**What is this Project? (Extended) - Click-Here**</summary>
 
