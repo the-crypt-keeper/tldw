@@ -62,6 +62,7 @@ def create_rag_qa_chat_notes_tab():
                 )
                 use_query_rewriting = gr.Checkbox(label="Use Query Rewriting", value=True)
 
+                # FIXME - add load conversations button
                 load_conversation = gr.Dropdown(label="Load Conversation", choices=[])
                 new_conversation = gr.Button("New Conversation")
                 conversation_title = gr.Textbox(label="Conversation Title",

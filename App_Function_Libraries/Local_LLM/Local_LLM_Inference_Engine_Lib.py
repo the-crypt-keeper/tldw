@@ -286,9 +286,6 @@ def start_llamafile(
     if numa_checked:
         command.append('--numa')
 
-    if server_timeout_value is not None:
-        command.extend(['--to', str(server_timeout_value)])
-
     if host_checked and host_value:
         command.extend(['--host', host_value])
 
