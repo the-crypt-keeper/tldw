@@ -1,5 +1,5 @@
-# Podcast_tab.py
-# Description: Gradio UI for ingesting podcasts into the database
+# RAG_QA_Chat.py
+# Description: Functions supporting the RAG QA Chat functionality
 #
 # Imports
 #

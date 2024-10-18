@@ -155,6 +155,8 @@ powershell -Command "Expand-Archive -Path 'ffmpeg.zip' -DestinationPath 'ffmpeg'
 move ffmpeg\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe .
 rmdir /s /q ffmpeg
 del ffmpeg.zip
+mkdir .\Bin
+move ffmpeg .\Bin\
 goto :eof
 
 :cleanup
