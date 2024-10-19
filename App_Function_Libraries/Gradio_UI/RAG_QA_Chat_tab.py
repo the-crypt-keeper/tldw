@@ -490,7 +490,7 @@ Rewritten Question:"""
             except Exception as e:
                 logging.error(f"Unexpected error in rag_qa_chat_wrapper: {e}", exc_info=True)
                 gr.Error("An unexpected error occurred. Please try again later.")
-                yield history, "", gr.update(visible=False), state_value
+                yield new_history, "", gr.update(visible=False), state_value
 
         def clear_chat_history():
             return [], ""
