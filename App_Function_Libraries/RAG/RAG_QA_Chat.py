@@ -13,56 +13,42 @@ from typing import List, Tuple, IO, Union
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import db, search_db, DatabaseError, get_media_content
-from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer
+from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 ########################################################################################################################
 #
 # Functions:
 
-def rag_qa_chat(message: str, history: List[Tuple[str, str]], context: Union[str, IO[str]], api_choice: str) -> Tuple[List[Tuple[str, str]], str]:
+def rag_qa_chat(query, history, context, api_choice):
     log_counter("rag_qa_chat_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
+
     try:
-        # Prepare the context based on the selected source
-        if hasattr(context, 'read'):
-            # Handle uploaded file
-            context_text = context.read()
-            if isinstance(context_text, bytes):
-                context_text = context_text.decode('utf-8')
-            log_counter("rag_qa_chat_uploaded_file")
-        elif isinstance(context, str) and context.startswith("media_id:"):
-            # Handle existing file or search result
-            media_id = int(context.split(":")[1])
-            context_text = get_media_content(media_id)
-            log_counter("rag_qa_chat_existing_media", labels={"media_id": media_id})
-        else:
-            context_text = str(context)
+        if isinstance(context, str):
             log_counter("rag_qa_chat_string_context")
-
-        # Prepare the full context including chat history
-        full_context = "\n".join([f"Human: {h[0]}\nAI: {h[1]}" for h in history])
-        full_context += f"\n\nContext: {context_text}\n\nHuman: {message}\nAI:"
-
-        # Generate response using the selected API
-        response = generate_answer(api_choice, full_context, message)
+            # Use the answer and context directly from enhanced_rag_pipeline
+            result = enhanced_rag_pipeline(query, api_choice)
+            answer = result['answer']
+        else:
+            log_counter("rag_qa_chat_no_context")
+            # If no context is provided, call generate_answer directly
+            answer = generate_answer(api_choice, "", query)
 
         # Update history
-        history.append((message, response))
+        new_history = history + [(query, answer)]
 
-        chat_duration = time.time() - start_time
-        log_histogram("rag_qa_chat_duration", chat_duration, labels={"api_choice": api_choice})
+        # Metrics
+        duration = time.time() - start_time
+        log_histogram("rag_qa_chat_duration", duration, labels={"api_choice": api_choice})
         log_counter("rag_qa_chat_success", labels={"api_choice": api_choice})
 
-        return history, ""
-    except DatabaseError as e:
-        log_counter("rag_qa_chat_database_error", labels={"error": str(e)})
-        logging.error(f"Database error in rag_qa_chat: {str(e)}")
-        return history, f"An error occurred while accessing the database: {str(e)}"
+        return new_history, answer
     except Exception as e:
-        log_counter("rag_qa_chat_unexpected_error", labels={"error": str(e)})
-        logging.error(f"Unexpected error in rag_qa_chat: {str(e)}")
-        return history, f"An unexpected error occurred: {str(e)}"
+        log_counter("rag_qa_chat_error", labels={"api_choice": api_choice, "error": str(e)})
+        logging.error(f"Error in rag_qa_chat: {str(e)}")
+        return history + [(query, "An error occurred while processing your request.")], "An error occurred while processing your request."
+
 
 
 
@@ -131,6 +117,12 @@ def get_existing_files() -> List[Tuple[int, str]]:
         log_counter("get_existing_files_error", labels={"error": str(e)})
         logging.error(f"Error fetching existing files: {str(e)}")
         raise
+
+######################################################
+#
+# Notes
+
+
 
 #
 # End of RAG_QA_Chat.py
