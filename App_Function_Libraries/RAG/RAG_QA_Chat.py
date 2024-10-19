@@ -20,7 +20,7 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 #
 # Functions:
 
-def rag_qa_chat(query, history, context, api_choice):
+def rag_qa_chat(query, history, context, api_choice, keywords=None, apply_re_ranking=False):
     log_counter("rag_qa_chat_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
 
@@ -28,7 +28,7 @@ def rag_qa_chat(query, history, context, api_choice):
         if isinstance(context, str):
             log_counter("rag_qa_chat_string_context")
             # Use the answer and context directly from enhanced_rag_pipeline
-            result = enhanced_rag_pipeline(query, api_choice)
+            result = enhanced_rag_pipeline(query, api_choice, keywords, apply_re_ranking)
             answer = result['answer']
         else:
             log_counter("rag_qa_chat_no_context")
