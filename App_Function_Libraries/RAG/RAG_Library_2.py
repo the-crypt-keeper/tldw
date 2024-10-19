@@ -117,7 +117,7 @@ config.read('config.txt')
 
 
 # RAG Search with keyword filtering
-def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> Dict[str, Any]:
+def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, apply_re_ranking=True) -> Dict[str, Any]:
     log_counter("enhanced_rag_pipeline_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
     try:
@@ -150,30 +150,30 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None) -> 
         # Combine results
         all_results = vector_results + fts_results
 
-        apply_re_ranking = True
         if apply_re_ranking:
             logging.debug(f"\nenhanced_rag_pipeline - Applying Re-Ranking")
             # FIXME - add option to use re-ranking at call time
             # FIXME - specify model + add param to modify at call time
             # FIXME - add option to set a custom top X results
             # You can specify a model if necessary, e.g., model_name="ms-marco-MiniLM-L-12-v2"
-            ranker = Ranker()
+            if all_results:
+                ranker = Ranker()
 
-            # Prepare passages for re-ranking
-            passages = [{"id": i, "text": result['content']} for i, result in enumerate(all_results)]
-            rerank_request = RerankRequest(query=query, passages=passages)
+                # Prepare passages for re-ranking
+                passages = [{"id": i, "text": result['content']} for i, result in enumerate(all_results)]
+                rerank_request = RerankRequest(query=query, passages=passages)
 
-            # Rerank the results
-            reranked_results = ranker.rerank(rerank_request)
+                # Rerank the results
+                reranked_results = ranker.rerank(rerank_request)
 
-            # Sort results based on the re-ranking score
-            reranked_results = sorted(reranked_results, key=lambda x: x['score'], reverse=True)
+                # Sort results based on the re-ranking score
+                reranked_results = sorted(reranked_results, key=lambda x: x['score'], reverse=True)
 
-            # Log reranked results
-            logging.debug(f"\n\nenhanced_rag_pipeline - Reranked results: {reranked_results}")
+                # Log reranked results
+                logging.debug(f"\n\nenhanced_rag_pipeline - Reranked results: {reranked_results}")
 
-            # Update all_results based on reranking
-            all_results = [all_results[result['id']] for result in reranked_results]
+                # Update all_results based on reranking
+                all_results = [all_results[result['id']] for result in reranked_results]
 
         # Extract content from results (top 10)
         context = "\n".join([result['content'] for result in all_results[:10]])  # Limit to top 10 results
