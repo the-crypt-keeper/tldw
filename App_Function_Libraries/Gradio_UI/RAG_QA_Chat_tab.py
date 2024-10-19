@@ -6,6 +6,7 @@ import csv
 import logging
 import json
 import os
+import uuid
 from datetime import datetime
 #
 # External Imports
@@ -43,10 +44,10 @@ def create_rag_qa_chat_tab():
         gr.Markdown("# RAG QA Chat")
 
         state = gr.State({
-            "conversation_id": None,  # No conversation ID initially
+            "conversation_id": str(uuid.uuid4()),
             "page": 1,
             "context_source": "Entire Media Database",
-            "conversation_messages": [],  # Store messages before saving
+            "conversation_messages": [],
         })
 
         note_state = gr.State({"note_id": None})
@@ -286,8 +287,11 @@ def create_rag_qa_chat_tab():
         )
 
         def start_new_conversation_wrapper(title, state_value):
-            # Reset the state without saving to the database
-            updated_state = update_state(state_value, conversation_id=None, page=1, conversation_messages=[])
+            # Generate a new UUID for the new conversation
+            new_conversation_id = str(uuid.uuid4())
+            # Reset the state with the new conversation_id
+            updated_state = update_state(state_value, conversation_id=new_conversation_id, page=1,
+                                         conversation_messages=[])
             # Clear the chat history
             return [], updated_state
 
