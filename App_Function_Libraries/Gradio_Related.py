@@ -45,7 +45,8 @@ from App_Function_Libraries.Gradio_UI.PDF_ingestion_tab import create_pdf_ingest
 from App_Function_Libraries.Gradio_UI.Plaintext_tab_import import create_plain_text_import_tab
 from App_Function_Libraries.Gradio_UI.Podcast_tab import create_podcast_tab
 from App_Function_Libraries.Gradio_UI.Prompt_Suggestion_tab import create_prompt_suggestion_tab
-from App_Function_Libraries.Gradio_UI.RAG_QA_Chat_tab import create_rag_qa_chat_tab
+from App_Function_Libraries.Gradio_UI.RAG_QA_Chat_tab import create_rag_qa_chat_tab, create_rag_qa_notes_management_tab, \
+    create_rag_qa_chat_management_tab
 from App_Function_Libraries.Gradio_UI.Re_summarize_tab import create_resummary_tab
 from App_Function_Libraries.Gradio_UI.Search_Tab import create_prompt_search_tab, \
     create_search_summaries_tab, create_search_tab
@@ -67,8 +68,6 @@ from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_vie
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
 #from App_Function_Libraries.Local_LLM.Local_LLM_huggingface import create_huggingface_tab
 from App_Function_Libraries.Local_LLM.Local_LLM_ollama import create_ollama_tab
-from App_Function_Libraries.Gradio_UI.RAG_QA_Chat_Notes import create_rag_qa_chat_notes_tab
-
 #
 #######################################################################################################################
 # Function Definitions
@@ -289,12 +288,11 @@ def launch_ui(share_public=None, server_mode=False):
                 create_search_tab()
                 create_search_summaries_tab()
 
-            with gr.TabItem("RAG Chat+Notes", id="RAG Chat Notes group", visible=True):
-                create_rag_qa_chat_notes_tab()
-
-            with gr.TabItem("RAG Search", id="RAG Search group", visible=True):
+            with gr.TabItem("RAG Chat/Search", id="RAG Chat Notes group", visible=True):
                 create_rag_tab()
                 create_rag_qa_chat_tab()
+                create_rag_qa_notes_management_tab()
+                create_rag_qa_chat_management_tab()
 
             with gr.TabItem("Chat with an LLM", id="LLM Chat group", visible=True):
                 create_chat_interface()

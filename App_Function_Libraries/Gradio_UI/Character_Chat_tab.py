@@ -2,7 +2,6 @@
 # Description: Library for character card import functions
 #
 # Imports
-import os
 import re
 import tempfile
 import uuid
@@ -16,7 +15,6 @@ import zipfile
 #
 # External Imports
 from PIL import Image
-from PIL.PngImagePlugin import PngInfo
 import gradio as gr
 #
 # Local Imports
@@ -1628,7 +1626,7 @@ def create_custom_character_card_tab():
             outputs=[download_image_output, save_status]
         )
 
-#v1
+
 def create_character_card_validation_tab():
     with gr.TabItem("Validate Character Card", visible=True):
         gr.Markdown("# Validate Character Card (v2)")
@@ -1812,16 +1810,16 @@ def create_export_characters_tab():
         def export_single_character_wrapper(character_selection):
             file_path, status_message = export_single_character(character_selection)
             if file_path:
-                return gr.File.update(value=file_path), status_message
+                return gr.update(value=file_path), status_message
             else:
-                return gr.File.update(value=None), status_message
+                return gr.update(value=None), status_message
 
         def export_all_characters_wrapper():
             zip_path = export_all_characters_as_zip()
             characters = get_character_cards()
             exported_characters = [char['name'] for char in characters]
             status_message = f"Exported {len(exported_characters)} characters successfully:\n" + "\n".join(exported_characters)
-            return gr.File.update(value=zip_path), status_message
+            return gr.update(value=zip_path), status_message
 
         # Event listeners
         load_characters_button.click(

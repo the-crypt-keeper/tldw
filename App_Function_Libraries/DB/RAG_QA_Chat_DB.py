@@ -14,12 +14,15 @@ from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_da
 
 #
 # External Imports
+# (No external imports)
 #
 # Local Imports
+# (No additional local imports)
 #
 ########################################################################################################################
 #
 # Functions:
+
 # Construct the path to the config file
 config_path = get_project_relative_path('Config_Files/config.txt')
 
@@ -94,6 +97,7 @@ CREATE TABLE IF NOT EXISTS rag_qa_collection_keywords (
 CREATE TABLE IF NOT EXISTS rag_qa_notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id TEXT NOT NULL,
+    title TEXT NOT NULL,
     content TEXT NOT NULL,
     timestamp DATETIME NOT NULL,
     FOREIGN KEY (conversation_id) REFERENCES conversation_metadata(conversation_id)
@@ -171,6 +175,15 @@ def create_tables():
 
 # Initialize the database
 create_tables()
+
+#
+# End of Setup
+############################################################
+
+
+############################################################
+#
+# Keyword-related functions
 
 # Input validation
 def validate_keyword(keyword):
@@ -302,15 +315,38 @@ def get_keywords_for_collection(collection_name):
         logger.error(f"Error getting keywords for collection '{collection_name}': {e}")
         raise
 
-def save_notes(conversation_id, content):
+#
+# End of Keyword-related functions
+###################################################
+
+
+###################################################
+#
+# Notes and chat-related functions
+
+def save_notes(conversation_id, title, content):
     """Save notes to the database."""
     try:
-        query = "INSERT INTO rag_qa_notes (conversation_id, content, timestamp) VALUES (?, ?, ?)"
+        query = "INSERT INTO rag_qa_notes (conversation_id, title, content, timestamp) VALUES (?, ?, ?, ?)"
         timestamp = datetime.now().isoformat()
-        execute_query(query, (conversation_id, content, timestamp))
-        logger.info(f"Notes saved for conversation '{conversation_id}'")
+        with transaction() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (conversation_id, title, content, timestamp))
+            note_id = cursor.lastrowid
+        logger.info(f"Notes saved for conversation '{conversation_id}', note ID '{note_id}'")
+        return note_id
     except Exception as e:
         logger.error(f"Error saving notes for conversation '{conversation_id}': {e}")
+        raise
+
+def update_note(note_id, title, content):
+    try:
+        query = "UPDATE rag_qa_notes SET title = ?, content = ?, timestamp = ? WHERE id = ?"
+        timestamp = datetime.now().isoformat()
+        execute_query(query, (title, content, timestamp, note_id))
+        logger.info(f"Note ID '{note_id}' updated successfully")
+    except Exception as e:
+        logger.error(f"Error updating note ID '{note_id}': {e}")
         raise
 
 def get_notes(conversation_id):
@@ -323,6 +359,54 @@ def get_notes(conversation_id):
         return notes
     except Exception as e:
         logger.error(f"Error getting notes for conversation '{conversation_id}': {e}")
+        raise
+
+def get_note_by_id(note_id):
+    try:
+        query = "SELECT id, title, content FROM rag_qa_notes WHERE id = ?"
+        result = execute_query(query, (note_id,))
+        return result
+    except Exception as e:
+        logger.error(f"Error getting note by ID '{note_id}': {e}")
+        raise
+
+def get_notes_by_keywords(keywords, page=1, page_size=20):
+    try:
+        placeholders = ','.join(['?'] * len(keywords))
+        query = f'''
+        SELECT n.id, n.title, n.content, n.timestamp
+        FROM rag_qa_notes n
+        JOIN rag_qa_note_keywords nk ON n.id = nk.note_id
+        JOIN rag_qa_keywords k ON nk.keyword_id = k.id
+        WHERE k.keyword IN ({placeholders})
+        ORDER BY n.timestamp DESC
+        '''
+        results, total_pages, total_count = get_paginated_results(query, tuple(keywords), page, page_size)
+        logger.info(f"Retrieved {len(results)} notes matching keywords: {', '.join(keywords)} (page {page} of {total_pages})")
+        notes = [(row[0], row[1], row[2], row[3]) for row in results]
+        return notes, total_pages, total_count
+    except Exception as e:
+        logger.error(f"Error getting notes by keywords: {e}")
+        raise
+
+def get_notes_by_keyword_collection(collection_name, page=1, page_size=20):
+    try:
+        query = '''
+        SELECT n.id, n.title, n.content, n.timestamp
+        FROM rag_qa_notes n
+        JOIN rag_qa_note_keywords nk ON n.id = nk.note_id
+        JOIN rag_qa_keywords k ON nk.keyword_id = k.id
+        JOIN rag_qa_collection_keywords ck ON k.id = ck.keyword_id
+        JOIN rag_qa_keyword_collections c ON ck.collection_id = c.id
+        WHERE c.name = ?
+        ORDER BY n.timestamp DESC
+        '''
+        results, total_pages, total_count = get_paginated_results(query, (collection_name,), page, page_size)
+        logger.info(f"Retrieved {len(results)} notes for collection '{collection_name}' (page {page} of {total_pages})")
+        notes = [(row[0], row[1], row[2], row[3]) for row in results]
+        return notes, total_pages, total_count
+    except Exception as e:
+        logger.error(f"Error getting notes by keyword collection '{collection_name}': {e}")
         raise
 
 def clear_notes(conversation_id):
@@ -387,6 +471,36 @@ def clear_keywords_from_note(note_id):
         logger.error(f"Error clearing keywords for note ID '{note_id}': {e}")
         raise
 
+def delete_note_by_id(note_id, conn=None):
+    """Delete a note and its associated keywords."""
+    try:
+        # Delete note keywords
+        execute_query("DELETE FROM rag_qa_note_keywords WHERE note_id = ?", (note_id,), conn)
+        # Delete the note
+        execute_query("DELETE FROM rag_qa_notes WHERE id = ?", (note_id,), conn)
+        logging.info(f"Note ID '{note_id}' deleted successfully.")
+    except Exception as e:
+        logger.error(f"Error deleting note ID '{note_id}': {e}")
+        raise
+
+def delete_note(note_id):
+    """Delete a note by ID."""
+    try:
+        with transaction() as conn:
+            delete_note_by_id(note_id, conn)
+    except Exception as e:
+        logger.error(f"Error deleting note ID '{note_id}': {e}")
+        raise
+
+#
+# End of Notes related functions
+###################################################
+
+
+###################################################
+#
+# Chat-related functions
+
 def save_message(conversation_id, role, content):
     try:
         timestamp = datetime.now().isoformat()
@@ -412,6 +526,17 @@ def start_new_conversation(title="Untitled Conversation"):
         return conversation_id
     except Exception as e:
         logger.error(f"Error starting new conversation: {e}")
+        raise
+
+def get_all_conversations(page=1, page_size=20):
+    try:
+        query = "SELECT conversation_id, title FROM conversation_metadata ORDER BY last_updated DESC"
+        results, total_pages, total_count = get_paginated_results(query, page=page, page_size=page_size)
+        conversations = [(row[0], row[1]) for row in results]
+        logger.info(f"Retrieved {len(conversations)} conversations (page {page} of {total_pages})")
+        return conversations, total_pages, total_count
+    except Exception as e:
+        logger.error(f"Error getting conversations: {e}")
         raise
 
 # Pagination helper function
@@ -478,6 +603,39 @@ def load_chat_history(conversation_id, page=1, page_size=50):
     except Exception as e:
         logger.error(f"Error loading chat history for conversation '{conversation_id}': {e}")
         raise
+
+def update_conversation_title(conversation_id, new_title):
+    """Update the title of a conversation."""
+    try:
+        query = "UPDATE conversation_metadata SET title = ? WHERE conversation_id = ?"
+        execute_query(query, (new_title, conversation_id))
+        logger.info(f"Conversation '{conversation_id}' title updated to '{new_title}'")
+    except Exception as e:
+        logger.error(f"Error updating conversation title: {e}")
+        raise
+
+def delete_conversation(conversation_id):
+    """Delete a conversation and its associated messages and notes."""
+    try:
+        with transaction() as conn:
+            # Delete messages
+            execute_query("DELETE FROM rag_qa_chats WHERE conversation_id = ?", (conversation_id,), conn)
+            # Delete conversation metadata
+            execute_query("DELETE FROM conversation_metadata WHERE conversation_id = ?", (conversation_id,), conn)
+            # Delete conversation keywords
+            execute_query("DELETE FROM rag_qa_conversation_keywords WHERE conversation_id = ?", (conversation_id,), conn)
+            # Delete notes associated with the conversation
+            note_ids = execute_query("SELECT id FROM rag_qa_notes WHERE conversation_id = ?", (conversation_id,), conn)
+            for (note_id,) in note_ids:
+                delete_note_by_id(note_id, conn)
+            logging.info(f"Conversation '{conversation_id}' deleted successfully.")
+    except Exception as e:
+        logger.error(f"Error deleting conversation '{conversation_id}': {e}")
+        raise
+
+#
+# End of Chat-related functions
+###################################################
 
 #
 # End of RAG_QA_Chat_DB.py

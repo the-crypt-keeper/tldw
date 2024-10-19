@@ -132,6 +132,12 @@ def get_existing_files() -> List[Tuple[int, str]]:
         logging.error(f"Error fetching existing files: {str(e)}")
         raise
 
+######################################################
+#
+# Notes
+
+
+
 #
 # End of RAG_QA_Chat.py
 ########################################################################################################################
