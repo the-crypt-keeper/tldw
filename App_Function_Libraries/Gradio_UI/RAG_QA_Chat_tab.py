@@ -29,7 +29,8 @@ from App_Function_Libraries.DB.RAG_QA_Chat_DB import (
     get_notes_by_keyword_collection,
     update_note,
     clear_keywords_from_note, get_notes, get_keywords_for_note, delete_conversation, delete_note, execute_query,
-    add_keywords_to_conversation,
+    add_keywords_to_conversation, fetch_all_notes, fetch_all_conversations, fetch_conversations_by_ids,
+    fetch_notes_by_ids,
 )
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
@@ -776,8 +777,130 @@ def create_rag_qa_chat_management_tab():
                     )
             return gr.update(value=''), gr.update(value=''), gr.update(value=''), state_value
 
-    # Return components if needed
-    # ...
+
+def create_export_data_tab():
+    with gr.TabItem("Export Data"):
+        gr.Markdown("# Export Data")
+
+        export_option = gr.Radio(
+            ["Export All", "Export Selected"],
+            label="Export Option",
+            value="Export All"
+        )
+
+        conversations_checklist = gr.CheckboxGroup(
+            choices=[],
+            label="Select Conversations",
+            visible=False
+        )
+
+        notes_checklist = gr.CheckboxGroup(
+            choices=[],
+            label="Select Notes",
+            visible=False
+        )
+
+        export_button = gr.Button("Export")
+        download_link = gr.File(label="Download Exported Data", visible=False)
+        status_message = gr.HTML()
+
+        # Function to update visibility and populate checklists
+        def update_visibility(export_option_value):
+            if export_option_value == "Export Selected":
+                # Fetch conversations and notes to populate the checklists
+                conversations = fetch_all_conversations()
+                notes = fetch_all_notes()
+
+                conversation_choices = [f"{title} (ID: {conversation_id})" for conversation_id, title, _ in conversations]
+                note_choices = [f"{title} (ID: {note_id})" for note_id, title, _ in notes]
+
+                return (
+                    gr.update(visible=True, choices=conversation_choices),
+                    gr.update(visible=True, choices=note_choices)
+                )
+            else:
+                return (
+                    gr.update(visible=False),
+                    gr.update(visible=False)
+                )
+
+        export_option.change(
+            update_visibility,
+            inputs=[export_option],
+            outputs=[conversations_checklist, notes_checklist]
+        )
+
+        import zipfile
+        import io
+        def update_visibility(export_option_value):
+            if export_option_value == "Export Selected":
+                # Fetch conversations and notes to populate the checklists
+                conversations = fetch_all_conversations()
+                notes = fetch_all_notes()
+
+                conversation_choices = [f"{title} (ID: {conversation_id})" for conversation_id, title, _ in
+                                        conversations]
+                note_choices = [f"{title} (ID: {note_id})" for note_id, title, _ in notes]
+
+                return (
+                    gr.update(visible=True, choices=conversation_choices),
+                    gr.update(visible=True, choices=note_choices)
+                )
+            else:
+                return (
+                    gr.update(visible=False),
+                    gr.update(visible=False)
+                )
+
+        export_option.change(
+            update_visibility,
+            inputs=[export_option],
+            outputs=[conversations_checklist, notes_checklist]
+        )
+
+        def export_data_function(export_option, selected_conversations, selected_notes):
+            try:
+                zip_buffer = io.BytesIO()
+
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    if export_option == "Export All":
+                        # Fetch all conversations and notes
+                        conversations = fetch_all_conversations()
+                        notes = fetch_all_notes()
+                    else:
+                        # Fetch selected conversations and notes
+                        conversation_ids = [int(item.split(' (ID: ')[1][:-1]) for item in selected_conversations]
+                        note_ids = [int(item.split(' (ID: ')[1][:-1]) for item in selected_notes]
+                        conversations = fetch_conversations_by_ids(conversation_ids)
+                        notes = fetch_notes_by_ids(note_ids)
+
+                    # Export conversations
+                    for conversation in conversations:
+                        conversation_id, title, _ = conversation
+                        filename = f"conversation_{conversation_id}_{title.replace(' ', '_')}.md"
+                        zip_file.writestr(filename, conversation)
+
+                    # Export notes
+                    for note in notes:
+                        note_id, title, _ = note
+                        filename = f"note_{note_id}_{title.replace(' ', '_')}.md"
+                        zip_file.writestr(filename, note)
+
+                zip_buffer.seek(0)
+                return zip_buffer, gr.update(visible=True), gr.update(
+                    value="<p style='color:green;'>Export successful!</p>")
+            except Exception as e:
+                logging.error(f"Error exporting data: {str(e)}")
+                return None, gr.update(visible=False), gr.update(value=f"<p style='color:red;'>Error: {str(e)}</p>")
+
+        export_button.click(
+            export_data_function,
+            inputs=[export_option, conversations_checklist, notes_checklist],
+            outputs=[download_link, download_link, status_message]
+        )
+
+
+
 
 def update_conversation_title(conversation_id, new_title):
     """Update the title of a conversation."""

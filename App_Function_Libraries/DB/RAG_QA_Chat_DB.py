@@ -637,6 +637,86 @@ def delete_conversation(conversation_id):
 # End of Chat-related functions
 ###################################################
 
+
+###################################################
+#
+# Functions to export DB data
+
+def fetch_all_conversations():
+    try:
+        # Fetch all conversation IDs and titles
+        query = "SELECT conversation_id, title FROM conversation_metadata ORDER BY last_updated DESC"
+        results = execute_query(query)
+        conversations = []
+        for row in results:
+            conversation_id, title = row
+            # Fetch all messages for this conversation
+            messages = load_all_chat_history(conversation_id)
+            conversations.append((conversation_id, title, messages))
+        logger.info(f"Fetched all conversations: {len(conversations)} found.")
+        return conversations
+    except Exception as e:
+        logger.error(f"Error fetching all conversations: {e}")
+        raise
+
+def load_all_chat_history(conversation_id):
+    try:
+        query = "SELECT role, content FROM rag_qa_chats WHERE conversation_id = ? ORDER BY timestamp"
+        results = execute_query(query, (conversation_id,))
+        messages = [(row[0], row[1]) for row in results]
+        return messages
+    except Exception as e:
+        logger.error(f"Error loading chat history for conversation '{conversation_id}': {e}")
+        raise
+
+def fetch_all_notes():
+    try:
+        query = "SELECT id, title, content FROM rag_qa_notes ORDER BY timestamp DESC"
+        results = execute_query(query)
+        notes = [(row[0], row[1], row[2]) for row in results]
+        logger.info(f"Fetched all notes: {len(notes)} found.")
+        return notes
+    except Exception as e:
+        logger.error(f"Error fetching all notes: {e}")
+        raise
+
+def fetch_conversations_by_ids(conversation_ids):
+    try:
+        if not conversation_ids:
+            return []
+        placeholders = ','.join(['?'] * len(conversation_ids))
+        query = f"SELECT conversation_id, title FROM conversation_metadata WHERE conversation_id IN ({placeholders})"
+        results = execute_query(query, conversation_ids)
+        conversations = []
+        for row in results:
+            conversation_id, title = row
+            # Fetch all messages for this conversation
+            messages = load_all_chat_history(conversation_id)
+            conversations.append((conversation_id, title, messages))
+        logger.info(f"Fetched {len(conversations)} conversations by IDs.")
+        return conversations
+    except Exception as e:
+        logger.error(f"Error fetching conversations by IDs: {e}")
+        raise
+
+def fetch_notes_by_ids(note_ids):
+    try:
+        if not note_ids:
+            return []
+        placeholders = ','.join(['?'] * len(note_ids))
+        query = f"SELECT id, title, content FROM rag_qa_notes WHERE id IN ({placeholders})"
+        results = execute_query(query, note_ids)
+        notes = [(row[0], row[1], row[2]) for row in results]
+        logger.info(f"Fetched {len(notes)} notes by IDs.")
+        return notes
+    except Exception as e:
+        logger.error(f"Error fetching notes by IDs: {e}")
+        raise
+
+#
+# End of Export functions
+###################################################
+
 #
 # End of RAG_QA_Chat_DB.py
 ####################################################################################################
