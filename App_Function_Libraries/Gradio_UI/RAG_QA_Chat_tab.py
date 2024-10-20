@@ -127,7 +127,7 @@ def create_rag_qa_chat_tab():
 
         with gr.Row():
             with gr.Column(scale=2):
-                chatbot = gr.Chatbot(height=500)
+                chatbot = gr.Chatbot(height=700)
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
                 clear_chat = gr.Button("Clear Chat History")
@@ -135,7 +135,7 @@ def create_rag_qa_chat_tab():
             with gr.Column(scale=1):
                 # Adding UI elements for notes
                 note_title = gr.Textbox(label="Note Title", placeholder="Enter a title for the note")
-                notes = gr.TextArea(label="Notes", placeholder="Enter your notes here...", lines=20)
+                notes = gr.TextArea(label="Notes", placeholder="Enter your notes here...", lines=25)
                 keywords_for_notes = gr.Textbox(
                     label="Keywords for Notes (comma-separated)",
                     placeholder="Enter keywords for the note",
