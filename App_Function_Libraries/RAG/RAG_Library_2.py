@@ -115,9 +115,9 @@ config.read('config.txt')
 #         return {"error": "An unexpected error occurred", "details": str(e)}
 
 
-
 # RAG Search with keyword filtering
-def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, apply_re_ranking=True) -> Dict[str, Any]:
+# FIXME - Update each called function to support modifiable top-k results
+def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top_k=10, apply_re_ranking=True) -> Dict[str, Any]:
     log_counter("enhanced_rag_pipeline_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
     try:
@@ -175,8 +175,8 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, app
                 # Update all_results based on reranking
                 all_results = [all_results[result['id']] for result in reranked_results]
 
-        # Extract content from results (top 10)
-        context = "\n".join([result['content'] for result in all_results[:10]])  # Limit to top 10 results
+        # Extract content from results (top 10 by default)
+        context = "\n".join([result['content'] for result in all_results[:top_k]])
         logging.debug(f"Context length: {len(context)}")
         logging.debug(f"Context: {context[:200]}")
 
@@ -336,14 +336,15 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
         logging.error(f"Error in generate_answer: {str(e)}")
         return "An error occurred while generating the answer."
 
-def perform_vector_search(query: str, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
+def perform_vector_search(query: str, relevant_media_ids: List[str] = None, top_k=10) -> List[Dict[str, Any]]:
     log_counter("perform_vector_search_attempt")
     start_time = time.time()
     all_collections = chroma_client.list_collections()
     vector_results = []
     try:
         for collection in all_collections:
-            collection_results = vector_search(collection.name, query, k=5)
+            k = top_k
+            collection_results = vector_search(collection.name, query, k)
             filtered_results = [
                 result for result in collection_results
                 if relevant_media_ids is None or result['metadata'].get('media_id') in relevant_media_ids
@@ -358,11 +359,11 @@ def perform_vector_search(query: str, relevant_media_ids: List[str] = None) -> L
         logging.error(f"Error in perform_vector_search: {str(e)}")
         raise
 
-def perform_full_text_search(query: str, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
+def perform_full_text_search(query: str, relevant_media_ids: List[str] = None, fts_top_k=None) -> List[Dict[str, Any]]:
     log_counter("perform_full_text_search_attempt")
     start_time = time.time()
     try:
-        fts_results = search_db(query, ["content"], "", page=1, results_per_page=5)
+        fts_results = search_db(query, ["content"], "", page=1, results_per_page=fts_top_k or 10)
         filtered_fts_results = [
             {
                 "content": result['content'],
@@ -381,7 +382,7 @@ def perform_full_text_search(query: str, relevant_media_ids: List[str] = None) -
         raise
 
 
-def fetch_relevant_media_ids(keywords: List[str]) -> List[int]:
+def fetch_relevant_media_ids(keywords: List[str], top_k=10) -> List[int]:
     log_counter("fetch_relevant_media_ids_attempt", labels={"keyword_count": len(keywords)})
     start_time = time.time()
     relevant_ids = set()
