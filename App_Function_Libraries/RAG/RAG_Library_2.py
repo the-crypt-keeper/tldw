@@ -115,9 +115,9 @@ config.read('config.txt')
 #         return {"error": "An unexpected error occurred", "details": str(e)}
 
 
-
 # RAG Search with keyword filtering
-def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, apply_re_ranking=True) -> Dict[str, Any]:
+# FIXME - Update each called function to support modifiable top-k results
+def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top_k=10, apply_re_ranking=True) -> Dict[str, Any]:
     log_counter("enhanced_rag_pipeline_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
     try:
@@ -175,8 +175,8 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, app
                 # Update all_results based on reranking
                 all_results = [all_results[result['id']] for result in reranked_results]
 
-        # Extract content from results (top 10)
-        context = "\n".join([result['content'] for result in all_results[:10]])  # Limit to top 10 results
+        # Extract content from results (top 10 by default)
+        context = "\n".join([result['content'] for result in all_results[:top_k]])
         logging.debug(f"Context length: {len(context)}")
         logging.debug(f"Context: {context[:200]}")
 
