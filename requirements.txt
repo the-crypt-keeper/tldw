@@ -29,6 +29,7 @@ pandas
 Pillow
 playwright
 psycopg2
+psycopg2-binary
 psutil
 #psycopg2-binary
 pyannote.audio

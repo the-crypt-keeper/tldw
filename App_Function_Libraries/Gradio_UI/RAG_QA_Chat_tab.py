@@ -6,13 +6,12 @@ import csv
 import logging
 import json
 import os
-import uuid
 from datetime import datetime
 #
 # External Imports
 import docx2txt
 import gradio as gr
-
+#
 # Local Imports
 from App_Function_Libraries.Books.Book_Ingestion_Lib import read_epub
 from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_files, add_media_with_keywords
@@ -45,13 +44,18 @@ def create_rag_qa_chat_tab():
         gr.Markdown("# RAG QA Chat")
 
         state = gr.State({
-            "conversation_id": str(uuid.uuid4()),
             "page": 1,
             "context_source": "Entire Media Database",
             "conversation_messages": [],
         })
 
         note_state = gr.State({"note_id": None})
+
+        # Update the conversation list function
+        def update_conversation_list():
+            conversations, total_pages, total_count = get_all_conversations()
+            choices = [f"{title} (ID: {conversation_id})" for conversation_id, title in conversations]
+            return choices
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -83,7 +87,10 @@ def create_rag_qa_chat_tab():
                 convert_to_text = gr.Checkbox(label="Convert to plain text", visible=False)
 
             with gr.Column(scale=1):
-                load_conversation = gr.Dropdown(label="Load Conversation", choices=[])
+                load_conversation = gr.Dropdown(
+                    label="Load Conversation",
+                    choices=update_conversation_list()
+                    )
                 new_conversation = gr.Button("New Conversation")
                 save_conversation_button = gr.Button("Save Conversation")
                 conversation_title = gr.Textbox(
@@ -141,6 +148,7 @@ def create_rag_qa_chat_tab():
 
         loading_indicator = gr.HTML("Loading...", visible=False)
         status_message = gr.HTML()
+
         # Function Definitions
 
         def update_state(state, **kwargs):
@@ -189,7 +197,7 @@ def create_rag_qa_chat_tab():
 
         def save_notes_function(note_title_text, notes_content, keywords_content, note_state_value, state_value):
             """Save the notes and associated keywords to the database."""
-            conversation_id = state_value["conversation_id"]
+            conversation_id = state_value.get("conversation_id")
             note_id = note_state_value["note_id"]
             if conversation_id and notes_content:
                 if note_id:
@@ -217,7 +225,7 @@ def create_rag_qa_chat_tab():
         )
 
         def clear_notes_function():
-            """Clear notes for the current conversation."""
+            """Clear notes for the current note."""
             return gr.update(value=''), {"note_id": None}
 
         clear_notes_btn.click(
@@ -260,14 +268,17 @@ def create_rag_qa_chat_tab():
             outputs=[chatbot, state, notes]
         )
 
+        # Modify save_conversation_function to use gr.update()
         def save_conversation_function(conversation_title_text, keywords_text, state_value):
             conversation_messages = state_value.get("conversation_messages", [])
             if not conversation_messages:
                 return gr.update(
-                    value="<p style='color:red;'>No conversation to save.</p>"), state_value, update_conversation_list()
+                    value="<p style='color:red;'>No conversation to save.</p>"
+                ), state_value, gr.update()
             # Start a new conversation in the database
             new_conversation_id = start_new_conversation(
-                conversation_title_text if conversation_title_text else "Untitled Conversation")
+                conversation_title_text if conversation_title_text else "Untitled Conversation"
+            )
             # Save the messages
             for role, content in conversation_messages:
                 save_message(new_conversation_id, role, content)
@@ -279,7 +290,8 @@ def create_rag_qa_chat_tab():
             # Update the conversation list
             conversation_choices = update_conversation_list()
             return gr.update(
-                value="<p style='color:green;'>Conversation saved successfully.</p>"), updated_state, conversation_choices
+                value="<p style='color:green;'>Conversation saved successfully.</p>"
+            ), updated_state, gr.update(choices=conversation_choices)
 
         save_conversation_button.click(
             save_conversation_function,
@@ -288,10 +300,8 @@ def create_rag_qa_chat_tab():
         )
 
         def start_new_conversation_wrapper(title, state_value):
-            # Generate a new UUID for the new conversation
-            new_conversation_id = str(uuid.uuid4())
-            # Reset the state with the new conversation_id
-            updated_state = update_state(state_value, conversation_id=new_conversation_id, page=1,
+            # Reset the state with no conversation_id
+            updated_state = update_state(state_value, conversation_id=None, page=1,
                                          conversation_messages=[])
             # Clear the chat history
             return [], updated_state
@@ -334,8 +344,9 @@ def create_rag_qa_chat_tab():
         next_page_btn.click(next_page_fn, inputs=[file_page], outputs=[existing_file, page_info, file_page])
         prev_page_btn.click(prev_page_fn, inputs=[file_page], outputs=[existing_file, page_info, file_page])
 
-        # Initialize the file list
-        context_source.change(lambda: update_file_list(1), outputs=[existing_file, page_info, file_page])
+        # Initialize the file list when context source is changed to "Existing File"
+        context_source.change(lambda choice: update_file_list(1) if choice == "Existing File" else (gr.update(), gr.update(), 1),
+                              inputs=[context_source], outputs=[existing_file, page_info, file_page])
 
         def perform_search(query):
             try:
@@ -495,7 +506,7 @@ Rewritten Question:"""
             except Exception as e:
                 logging.error(f"Unexpected error in rag_qa_chat_wrapper: {e}", exc_info=True)
                 gr.Error("An unexpected error occurred. Please try again later.")
-                yield new_history, "", gr.update(visible=False), state_value
+                yield history, "", gr.update(visible=False), state_value
 
         def clear_chat_history():
             return [], ""
@@ -541,6 +552,7 @@ Rewritten Question:"""
     )
 
 
+
 def create_rag_qa_notes_management_tab():
     # New Management Tab
     with gr.TabItem("Notes Management", visible=True):
@@ -562,7 +574,7 @@ def create_rag_qa_notes_management_tab():
                 load_note_button = gr.Button("Load Note")
                 delete_note_button = gr.Button("Delete Note")
                 note_title_input = gr.Textbox(label="Note Title")
-                note_content_input = gr.TextArea(label="Note Content", lines=15)
+                note_content_input = gr.TextArea(label="Note Content", lines=20)
                 note_keywords_input = gr.Textbox(label="Note Keywords (comma-separated)")
                 save_note_button = gr.Button("Save Note")
                 create_new_note_button = gr.Button("Create New Note")
@@ -665,9 +677,6 @@ def create_rag_qa_notes_management_tab():
             outputs=[note_title_input, note_content_input, note_keywords_input, management_state]
         )
 
-    # Return components if needed
-    # ...
-
 
 def create_rag_qa_chat_management_tab():
     # New Management Tab
@@ -679,18 +688,23 @@ def create_rag_qa_chat_management_tab():
             "selected_note_id": None,
         })
 
+        # State to store the mapping between titles and IDs
+        conversation_mapping = gr.State({})
+
         with gr.Row():
             with gr.Column(scale=1):
                 # Search Conversations
                 search_conversations_input = gr.Textbox(label="Search Conversations by Keywords")
                 search_conversations_button = gr.Button("Search Conversations")
                 conversations_list = gr.Dropdown(label="Conversations", choices=[])
+                new_conversation_button = gr.Button("New Conversation")
 
                 # Manage Conversations
                 load_conversation_button = gr.Button("Load Conversation")
                 delete_conversation_button = gr.Button("Delete Conversation")
                 conversation_title_input = gr.Textbox(label="Conversation Title")
-                save_conversation_title_button = gr.Button("Save Conversation Title")
+                conversation_content_input = gr.TextArea(label="Conversation Content", lines=20)
+                save_conversation_button = gr.Button("Save Conversation")
                 status_message = gr.HTML()
 
         # Function Definitions
@@ -698,84 +712,196 @@ def create_rag_qa_chat_management_tab():
             if keywords:
                 keywords_list = [kw.strip() for kw in keywords.split(',')]
                 conversations, total_pages, total_count = search_conversations_by_keywords(keywords_list)
-                choices = [f"{title} (ID: {conversation_id})" for conversation_id, title in conversations]
-                return gr.update(choices=choices)
             else:
                 conversations, total_pages, total_count = get_all_conversations()
-                choices = [f"{title} (ID: {conversation_id})" for conversation_id, title in conversations]
-                return gr.update(choices=choices)
+
+            # Build choices as list of titles (ensure uniqueness)
+            choices = []
+            mapping = {}
+            for conversation_id, title in conversations:
+                display_title = f"{title} (ID: {conversation_id[:8]})"
+                choices.append(display_title)
+                mapping[display_title] = conversation_id
+
+            return gr.update(choices=choices), mapping
 
         search_conversations_button.click(
             search_conversations,
             inputs=[search_conversations_input],
-            outputs=[conversations_list]
+            outputs=[conversations_list, conversation_mapping]
         )
 
-        def load_selected_conversation(selected_conversation, state_value):
-            if selected_conversation:
-                conversation_id = selected_conversation.split('(ID: ')[1][:-1]
+        def load_selected_conversation(selected_title, state_value, mapping):
+            conversation_id = mapping.get(selected_title)
+            if conversation_id:
                 # Load conversation title
-                conversation_title = selected_conversation.split(' (ID: ')[0]
+                conversation_title = get_conversation_title(conversation_id)
+                # Load conversation messages
+                messages, total_pages, total_count = load_chat_history(conversation_id)
+                # Concatenate messages into a single string
+                conversation_content = ""
+                for role, content in messages:
+                    conversation_content += f"{role}: {content}\n\n"
                 # Update state
-                state_value["selected_conversation_id"] = conversation_id
-                return gr.update(value=conversation_title), state_value
-            return gr.update(value=''), state_value
+                new_state = state_value.copy()
+                new_state["selected_conversation_id"] = conversation_id
+                return (
+                    gr.update(value=conversation_title),
+                    gr.update(value=conversation_content.strip()),
+                    new_state
+                )
+            return gr.update(value=''), gr.update(value=''), state_value
 
         load_conversation_button.click(
             load_selected_conversation,
-            inputs=[conversations_list, management_state],
-            outputs=[conversation_title_input, management_state]
+            inputs=[conversations_list, management_state, conversation_mapping],
+            outputs=[conversation_title_input, conversation_content_input, management_state]
         )
 
-        def save_conversation_title(title, state_value):
+        def save_conversation(title, content, state_value):
             conversation_id = state_value["selected_conversation_id"]
             if conversation_id:
+                # Update conversation title
                 update_conversation_title(conversation_id, title)
-                return gr.Info("Conversation title updated successfully.")
-            else:
-                return gr.Error("No conversation selected.")
 
-        save_conversation_title_button.click(
-            save_conversation_title,
-            inputs=[conversation_title_input, management_state],
-            outputs=[]
+                # Clear existing messages
+                delete_messages_in_conversation(conversation_id)
+
+                # Parse the content back into messages
+                messages = []
+                for line in content.strip().split('\n\n'):
+                    if ': ' in line:
+                        role, message_content = line.split(': ', 1)
+                        messages.append((role.strip(), message_content.strip()))
+                    else:
+                        # If the format is incorrect, skip or handle accordingly
+                        continue
+
+                # Save new messages
+                for role, message_content in messages:
+                    save_message(conversation_id, role, message_content)
+
+                return (
+                    gr.HTML("<p style='color: green;'>Conversation updated successfully.</p>"),
+                    gr.update(value=title),
+                    gr.update(value=content),
+                    state_value
+                )
+            else:
+                return (
+                    gr.HTML("<p style='color: red;'>No conversation selected to save.</p>"),
+                    gr.update(value=title),
+                    gr.update(value=content),
+                    state_value
+                )
+
+        save_conversation_button.click(
+            save_conversation,
+            inputs=[conversation_title_input, conversation_content_input, management_state],
+            outputs=[status_message, conversation_title_input, conversation_content_input, management_state]
         )
 
-        def delete_selected_conversation(state_value):
+        def delete_selected_conversation(state_value, mapping):
             conversation_id = state_value["selected_conversation_id"]
             if conversation_id:
                 delete_conversation(conversation_id)
                 # Reset state
-                state_value["selected_conversation_id"] = None
-                # Update conversations list
-                updated_conversations = search_conversations("")
-                return updated_conversations, gr.update(value="Conversation deleted successfully."), state_value
+                new_state = state_value.copy()
+                new_state["selected_conversation_id"] = None
+                # Update conversations list and mapping
+                conversations, _, _ = get_all_conversations()
+                choices = []
+                new_mapping = {}
+                for conv_id, title in conversations:
+                    display_title = f"{title} (ID: {conv_id[:8]})"
+                    choices.append(display_title)
+                    new_mapping[display_title] = conv_id
+                return (
+                    gr.update(choices=choices, value=None),
+                    gr.HTML("<p style='color: green;'>Conversation deleted successfully.</p>"),
+                    new_state,
+                    gr.update(value=''),
+                    gr.update(value=''),
+                    new_mapping
+                )
             else:
-                return gr.update(), gr.update(value="No conversation selected."), state_value
+                return (
+                    gr.update(),
+                    gr.HTML("<p style='color: red;'>No conversation selected.</p>"),
+                    state_value,
+                    gr.update(),
+                    gr.update(),
+                    mapping
+                )
 
         delete_conversation_button.click(
             delete_selected_conversation,
-            inputs=[management_state],
-            outputs=[conversations_list, status_message, management_state]
+            inputs=[management_state, conversation_mapping],
+            outputs=[
+                conversations_list,
+                status_message,
+                management_state,
+                conversation_title_input,
+                conversation_content_input,
+                conversation_mapping
+            ]
         )
 
-        def load_selected_note(selected_note, state_value):
-            if selected_note:
-                note_id = int(selected_note.split('(ID: ')[1][:-1])
-                note_data = get_note_by_id(note_id)
-                if note_data:
-                    note_id, title, content = note_data[0]
-                    state_value["selected_note_id"] = note_id
-                    # Get keywords for the note
-                    keywords = get_keywords_for_note(note_id)
-                    keywords_str = ', '.join(keywords)
-                    return (
-                        gr.update(value=title),
-                        gr.update(value=content),
-                        gr.update(value=keywords_str),
-                        state_value
-                    )
-            return gr.update(value=''), gr.update(value=''), gr.update(value=''), state_value
+        def create_new_conversation(state_value, mapping):
+            conversation_id = start_new_conversation()
+            # Update state
+            new_state = state_value.copy()
+            new_state["selected_conversation_id"] = conversation_id
+            # Update conversations list and mapping
+            conversations, _, _ = get_all_conversations()
+            choices = []
+            new_mapping = {}
+            for conv_id, title in conversations:
+                display_title = f"{title} (ID: {conv_id[:8]})"
+                choices.append(display_title)
+                new_mapping[display_title] = conv_id
+            # Set the new conversation as selected
+            selected_title = f"Untitled Conversation (ID: {conversation_id[:8]})"
+            return (
+                gr.update(choices=choices, value=selected_title),
+                gr.update(value='Untitled Conversation'),
+                gr.update(value=''),
+                gr.HTML("<p style='color: green;'>New conversation created.</p>"),
+                new_state,
+                new_mapping
+            )
+
+        new_conversation_button.click(
+            create_new_conversation,
+            inputs=[management_state, conversation_mapping],
+            outputs=[
+                conversations_list,
+                conversation_title_input,
+                conversation_content_input,
+                status_message,
+                management_state,
+                conversation_mapping
+            ]
+        )
+
+        def delete_messages_in_conversation(conversation_id):
+            """Helper function to delete all messages in a conversation."""
+            try:
+                execute_query("DELETE FROM rag_qa_chats WHERE conversation_id = ?", (conversation_id,))
+                logging.info(f"Messages in conversation '{conversation_id}' deleted successfully.")
+            except Exception as e:
+                logging.error(f"Error deleting messages in conversation '{conversation_id}': {e}")
+                raise
+
+        def get_conversation_title(conversation_id):
+            """Helper function to get the conversation title."""
+            query = "SELECT title FROM conversation_metadata WHERE conversation_id = ?"
+            result = execute_query(query, (conversation_id,))
+            if result:
+                return result[0][0]
+            else:
+                return "Untitled Conversation"
+
 
 
 def create_export_data_tab():
