@@ -115,7 +115,7 @@ class TestRAGFunctions(unittest.TestCase):
         mock_chroma_client.list_collections.assert_called_once()
 
         # Assert vector_search was called with correct arguments
-        mock_vector_search.assert_called_once_with('collection1', query, k=5)
+        mock_vector_search.assert_called_once_with('collection1', query, k=10)
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.vector_search')
     @patch('App_Function_Libraries.RAG.RAG_Library_2.chroma_client')
@@ -152,7 +152,7 @@ class TestRAGFunctions(unittest.TestCase):
         mock_chroma_client.list_collections.assert_called_once()
 
         # Assert vector_search was called with correct arguments
-        mock_vector_search.assert_called_once_with('collection1', query, k=5)
+        mock_vector_search.assert_called_once_with('collection1', query, k=10)
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_with_relevant_media_ids(self, mock_search_db):
@@ -171,7 +171,7 @@ class TestRAGFunctions(unittest.TestCase):
         relevant_media_ids = [1, 3]
 
         # Call the function
-        result = perform_full_text_search(query, relevant_media_ids)
+        result = perform_full_text_search(query, relevant_media_ids, fts_top_k=10)
 
         # Expected to filter out id 2
         expected = [
@@ -182,7 +182,7 @@ class TestRAGFunctions(unittest.TestCase):
 
         # Assert search_db was called with correct arguments
         mock_search_db.assert_called_once_with(
-            query, ['content'], '', page=1, results_per_page=5)
+            query, ['content'], '', page=1, results_per_page=10)
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_without_relevant_media_ids(self, mock_search_db):
@@ -211,7 +211,7 @@ class TestRAGFunctions(unittest.TestCase):
 
         # Assert search_db was called with correct arguments
         mock_search_db.assert_called_once_with(
-            query, ['content'], '', page=1, results_per_page=5)
+            query, ['content'], '', page=1, results_per_page=10)
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_empty_results(self, mock_search_db):
@@ -234,7 +234,7 @@ class TestRAGFunctions(unittest.TestCase):
 
         # Assert search_db was called with correct arguments
         mock_search_db.assert_called_once_with(
-            query, ['content'], '', page=1, results_per_page=5)
+            query, ['content'], '', page=1, results_per_page=10)
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.fetch_keywords_for_media')
     @patch('App_Function_Libraries.RAG.RAG_Library_2.logging')
@@ -344,7 +344,7 @@ class TestRAGFunctions(unittest.TestCase):
 
         # Assert search_db was called with correct arguments
         mock_search_db.assert_called_once_with(
-            query, ['content'], '', page=1, results_per_page=5)
+            query, ['content'], '', page=1, results_per_page=10)
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
     def test_perform_full_text_search_multiple_pages(self, mock_search_db):
@@ -380,7 +380,7 @@ class TestRAGFunctions(unittest.TestCase):
 
         # Assert search_db was called with correct arguments
         mock_search_db.assert_called_once_with(
-            query, ['content'], '', page=1, results_per_page=5)
+            query, ['content'], '', page=1, results_per_page=10)
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.chroma_client')
     @patch('App_Function_Libraries.RAG.RAG_Library_2.vector_search')
@@ -429,8 +429,8 @@ class TestRAGFunctions(unittest.TestCase):
         mock_chroma_client.list_collections.assert_called_once()
 
         # Assert vector_search was called twice with correct arguments
-        mock_vector_search.assert_any_call('collection1', query, k=5)
-        mock_vector_search.assert_any_call('collection2', query, k=5)
+        mock_vector_search.assert_any_call('collection1', query, k=10)
+        mock_vector_search.assert_any_call('collection2', query, k=10)
         self.assertEqual(mock_vector_search.call_count, 2)
 
     @patch('App_Function_Libraries.RAG.RAG_Library_2.search_db')
@@ -462,7 +462,7 @@ class TestRAGFunctions(unittest.TestCase):
 
         # Assert search_db was called with correct arguments
         mock_search_db.assert_called_once_with(
-            query, ['content'], '', page=1, results_per_page=5)
+            query, ['content'], '', page=1, results_per_page=10)
 
 
 if __name__ == '__main__':
