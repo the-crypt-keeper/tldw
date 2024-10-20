@@ -67,13 +67,17 @@ def create_rag_qa_chat_tab():
                 existing_file = gr.Dropdown(label="Select Existing File", choices=[], interactive=True)
                 file_page = gr.State(value=1)
                 with gr.Row():
-                    page_number = gr.Number(value=1, label="Page", precision=0)
-                    page_size = gr.Number(value=20, label="Items per page", precision=0)
-                    total_pages = gr.Number(label="Total Pages", interactive=False)
-                with gr.Row():
                     prev_page_btn = gr.Button("Previous Page")
                     next_page_btn = gr.Button("Next Page")
                     page_info = gr.HTML("Page 1")
+                top_k_input = gr.Number(value=10, label="Maximum amount of results to use (Default: 10)", minimum=1, maximum=50, step=1, precision=0, interactive=True)
+                keywords_input = gr.Textbox(label="Keywords (comma-separated) to filter results by)", visible=True)
+                use_query_rewriting = gr.Checkbox(label="Use Query Rewriting", value=True)
+                # with gr.Row():
+                #     page_number = gr.Number(value=1, label="Page", precision=0)
+                #     page_size = gr.Number(value=20, label="Items per page", precision=0)
+                #     total_pages = gr.Number(label="Total Pages", interactive=False)
+
 
                 search_query = gr.Textbox(label="Search Query", visible=False)
                 search_button = gr.Button("Search", visible=False)
@@ -119,7 +123,6 @@ def create_rag_qa_chat_tab():
                     label="Select API for RAG",
                     value="OpenAI",
                 )
-                use_query_rewriting = gr.Checkbox(label="Use Query Rewriting", value=True)
 
         with gr.Row():
             with gr.Column(scale=2):
@@ -381,7 +384,8 @@ Rewritten Question:"""
             return rephrased_question.strip()
 
         def rag_qa_chat_wrapper(message, history, context_source, existing_file, search_results, file_upload,
-                                convert_to_text, keywords, api_choice, use_query_rewriting, state_value):
+                                convert_to_text, keywords, api_choice, use_query_rewriting, state_value,
+                                keywords_input, top_k_input):
             try:
                 logging.info(f"Starting rag_qa_chat_wrapper with message: {message}")
                 logging.info(f"Context source: {context_source}")
@@ -417,7 +421,8 @@ Rewritten Question:"""
 
                 if context_source == "All Files in the Database":
                     # Use the enhanced_rag_pipeline to search the entire database
-                    context = enhanced_rag_pipeline(rephrased_question, api_choice)
+                    context = enhanced_rag_pipeline(rephrased_question, api_choice, keywords=keywords_input,
+                                                    top_k=int(top_k_input))
                     logging.info(f"Using enhanced_rag_pipeline for database search")
                 elif context_source == "Search Database":
                     context = f"media_id:{search_results.split('(ID: ')[1][:-1]}"
@@ -525,6 +530,8 @@ Rewritten Question:"""
                 api_choice,
                 use_query_rewriting,
                 state,
+                keywords_input,
+                top_k_input
             ],
             outputs=[chatbot, msg, loading_indicator, state],
         )
