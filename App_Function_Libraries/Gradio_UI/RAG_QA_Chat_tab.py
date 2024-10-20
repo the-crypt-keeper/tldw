@@ -562,7 +562,7 @@ def create_rag_qa_notes_management_tab():
                 load_note_button = gr.Button("Load Note")
                 delete_note_button = gr.Button("Delete Note")
                 note_title_input = gr.Textbox(label="Note Title")
-                note_content_input = gr.TextArea(label="Note Content", lines=15)
+                note_content_input = gr.TextArea(label="Note Content", lines=20)
                 note_keywords_input = gr.Textbox(label="Note Keywords (comma-separated)")
                 save_note_button = gr.Button("Save Note")
                 create_new_note_button = gr.Button("Create New Note")
@@ -665,9 +665,6 @@ def create_rag_qa_notes_management_tab():
             outputs=[note_title_input, note_content_input, note_keywords_input, management_state]
         )
 
-    # Return components if needed
-    # ...
-
 
 def create_rag_qa_chat_management_tab():
     # New Management Tab
@@ -690,7 +687,8 @@ def create_rag_qa_chat_management_tab():
                 load_conversation_button = gr.Button("Load Conversation")
                 delete_conversation_button = gr.Button("Delete Conversation")
                 conversation_title_input = gr.Textbox(label="Conversation Title")
-                save_conversation_title_button = gr.Button("Save Conversation Title")
+                conversation_content_input = gr.TextArea(label="Conversation Content", lines=20)
+                save_conversation_button = gr.Button("Save Conversation")
                 status_message = gr.HTML()
 
         # Function Definitions
@@ -716,29 +714,58 @@ def create_rag_qa_chat_management_tab():
                 conversation_id = selected_conversation.split('(ID: ')[1][:-1]
                 # Load conversation title
                 conversation_title = selected_conversation.split(' (ID: ')[0]
+                # Load conversation messages
+                messages, total_pages, total_count = load_chat_history(conversation_id)
+                # Concatenate messages into a single string
+                conversation_content = ""
+                for role, content in messages:
+                    conversation_content += f"{role}: {content}\n\n"
                 # Update state
                 state_value["selected_conversation_id"] = conversation_id
-                return gr.update(value=conversation_title), state_value
-            return gr.update(value=''), state_value
+                return (
+                    gr.update(value=conversation_title),
+                    gr.update(value=conversation_content.strip()),
+                    state_value
+                )
+            return gr.update(value=''), gr.update(value=''), state_value
 
         load_conversation_button.click(
             load_selected_conversation,
             inputs=[conversations_list, management_state],
-            outputs=[conversation_title_input, management_state]
+            outputs=[conversation_title_input, conversation_content_input, management_state]
         )
 
-        def save_conversation_title(title, state_value):
+        def save_conversation(title, content, state_value):
             conversation_id = state_value["selected_conversation_id"]
             if conversation_id:
+                # Update conversation title
                 update_conversation_title(conversation_id, title)
-                return gr.Info("Conversation title updated successfully.")
+
+                # Clear existing messages
+                delete_messages_in_conversation(conversation_id)
+
+                # Parse the content back into messages
+                messages = []
+                for line in content.strip().split('\n\n'):
+                    if ': ' in line:
+                        role, message_content = line.split(': ', 1)
+                        messages.append((role.strip(), message_content.strip()))
+                    else:
+                        # If the format is incorrect, skip or handle accordingly
+                        continue
+
+                # Save new messages
+                for role, message_content in messages:
+                    save_message(conversation_id, role, message_content)
+
+                return gr.Info("Conversation updated successfully.")
             else:
                 return gr.Error("No conversation selected.")
 
-        save_conversation_title_button.click(
-            save_conversation_title,
-            inputs=[conversation_title_input, management_state],
-            outputs=[]
+        save_conversation_button.click(
+            save_conversation,
+            inputs=[conversation_title_input, conversation_content_input, management_state],
+            outputs=[status_message]
         )
 
         def delete_selected_conversation(state_value):
@@ -759,23 +786,14 @@ def create_rag_qa_chat_management_tab():
             outputs=[conversations_list, status_message, management_state]
         )
 
-        def load_selected_note(selected_note, state_value):
-            if selected_note:
-                note_id = int(selected_note.split('(ID: ')[1][:-1])
-                note_data = get_note_by_id(note_id)
-                if note_data:
-                    note_id, title, content = note_data[0]
-                    state_value["selected_note_id"] = note_id
-                    # Get keywords for the note
-                    keywords = get_keywords_for_note(note_id)
-                    keywords_str = ', '.join(keywords)
-                    return (
-                        gr.update(value=title),
-                        gr.update(value=content),
-                        gr.update(value=keywords_str),
-                        state_value
-                    )
-            return gr.update(value=''), gr.update(value=''), gr.update(value=''), state_value
+        def delete_messages_in_conversation(conversation_id):
+            """Helper function to delete all messages in a conversation."""
+            try:
+                execute_query("DELETE FROM rag_qa_chats WHERE conversation_id = ?", (conversation_id,))
+                logger.info(f"Messages in conversation '{conversation_id}' deleted successfully.")
+            except Exception as e:
+                logger.error(f"Error deleting messages in conversation '{conversation_id}': {e}")
+                raise
 
 
 def create_export_data_tab():
