@@ -343,8 +343,7 @@ def perform_vector_search(query: str, relevant_media_ids: List[str] = None, top_
     vector_results = []
     try:
         for collection in all_collections:
-            k = top_k
-            collection_results = vector_search(collection.name, query, k)
+            collection_results = vector_search(collection.name, query, k=top_k)
             filtered_results = [
                 result for result in collection_results
                 if relevant_media_ids is None or result['metadata'].get('media_id') in relevant_media_ids
