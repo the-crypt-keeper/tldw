@@ -31,7 +31,9 @@ RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     build-essential \
     git \
+    libpq-dev \
     python3 \
+    python3-dev \
     python3-pyaudio \
     portaudio19-dev \
     python3-pip \
