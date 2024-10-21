@@ -19,3 +19,10 @@ Update model suggestions for RAG vs Chatting/General use
 Whisper pipeline
     https://huggingface.co/spaces/aadnk/faster-whisper-webui
     https://huggingface.co/spaces/zhang082799/openai-whisper-large-v3-turbo
+
+
+Create Documentation for how this can help
+    https://stevenberlinjohnson.com/how-to-use-notebooklm-as-a-research-tool-6ad5c3a227cc?gi=9a0b63820ff0
+
+Create a blog post
+    tldwproject.com

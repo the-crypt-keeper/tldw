@@ -2,7 +2,6 @@
 # Description: Library for character card import functions
 #
 # Imports
-import os
 import re
 import tempfile
 import uuid
@@ -16,7 +15,6 @@ import zipfile
 #
 # External Imports
 from PIL import Image
-from PIL.PngImagePlugin import PngInfo
 import gradio as gr
 #
 # Local Imports
@@ -254,7 +252,7 @@ def export_all_characters():
 # Gradio tabs
 
 def create_character_card_interaction_tab():
-    with gr.TabItem("Chat with a Character Card"):
+    with gr.TabItem("Chat with a Character Card", visible=True):
         gr.Markdown("# Chat with a Character Card")
         with gr.Row():
             with gr.Column(scale=1):
@@ -1025,7 +1023,7 @@ def create_character_card_interaction_tab():
 
 
 def create_character_chat_mgmt_tab():
-    with gr.TabItem("Character and Chat Management"):
+    with gr.TabItem("Character and Chat Management", visible=True):
         gr.Markdown("# Character and Chat Management")
 
         with gr.Row():
@@ -1063,12 +1061,12 @@ def create_character_chat_mgmt_tab():
             conversation_mapping = gr.State({})
 
         with gr.Tabs():
-            with gr.TabItem("Edit"):
+            with gr.TabItem("Edit", visible=True):
                 chat_content = gr.TextArea(label="Chat/Character Content (JSON)", lines=20, max_lines=50)
                 save_button = gr.Button("Save Changes")
                 delete_button = gr.Button("Delete Conversation/Character", variant="stop")
 
-            with gr.TabItem("Preview"):
+            with gr.TabItem("Preview", visible=True):
                 chat_preview = gr.HTML(label="Chat/Character Preview")
         result_message = gr.Markdown("")
 
@@ -1380,7 +1378,7 @@ def create_character_chat_mgmt_tab():
         )
 
 def create_custom_character_card_tab():
-    with gr.TabItem("Create a New Character Card"):
+    with gr.TabItem("Create a New Character Card", visible=True):
         gr.Markdown("# Create a New Character Card (v2)")
 
         with gr.Row():
@@ -1628,9 +1626,9 @@ def create_custom_character_card_tab():
             outputs=[download_image_output, save_status]
         )
 
-#v1
+
 def create_character_card_validation_tab():
-    with gr.TabItem("Validate Character Card"):
+    with gr.TabItem("Validate Character Card", visible=True):
         gr.Markdown("# Validate Character Card (v2)")
         gr.Markdown("Upload a character card (PNG, WEBP, or JSON) to validate whether it conforms to the Character Card V2 specification.")
 
@@ -1786,7 +1784,7 @@ def create_character_card_validation_tab():
 
 
 def create_export_characters_tab():
-    with gr.TabItem("Export Characters"):
+    with gr.TabItem("Export Characters", visible=True):
         gr.Markdown("# Export Characters")
         gr.Markdown("Export character cards individually as JSON files or all together as a ZIP file.")
 
@@ -1808,19 +1806,20 @@ def create_export_characters_tab():
                 export_output = gr.File(label="Exported Character(s)", interactive=False)
                 export_status = gr.Markdown("")
 
+# FIXME
         def export_single_character_wrapper(character_selection):
             file_path, status_message = export_single_character(character_selection)
             if file_path:
-                return gr.File.update(value=file_path), status_message
+                return gr.update(value=file_path), status_message
             else:
-                return gr.File.update(value=None), status_message
+                return gr.update(value=None), status_message
 
         def export_all_characters_wrapper():
             zip_path = export_all_characters_as_zip()
             characters = get_character_cards()
             exported_characters = [char['name'] for char in characters]
             status_message = f"Exported {len(exported_characters)} characters successfully:\n" + "\n".join(exported_characters)
-            return gr.File.update(value=zip_path), status_message
+            return gr.update(value=zip_path), status_message
 
         # Event listeners
         load_characters_button.click(
