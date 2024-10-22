@@ -261,7 +261,7 @@ def create_chat_interface():
                                                  lines=3,
                                                  visible=False)
             with gr.Column(scale=2):
-                chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
+                chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
                 regenerate_button = gr.Button("Regenerate Last Message")
@@ -465,7 +465,7 @@ def create_chat_interface_stacked():
                 gr.Markdown("Scroll down for the chat window...")
         with gr.Row():
             with gr.Column(scale=1):
-                chatbot = gr.Chatbot(height=600, elem_classes="chatbot-container")
+                chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
         with gr.Row():
             with gr.Column():
