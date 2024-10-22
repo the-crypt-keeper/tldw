@@ -24,8 +24,8 @@ from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Local_File_Processing_Lib import read_paths_from_file, process_local_file
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Utils.System_Checks_Lib import cuda_check, platform_check, check_ffmpeg
-from App_Function_Libraries.Utils.Utils import load_and_log_configs, create_download_directory, extract_text_from_segments, \
-    cleanup_downloads
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, create_download_directory, \
+    extract_text_from_segments, cleanup_downloads
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 #
 # 3rd-Party Module Imports
@@ -82,6 +82,12 @@ file_handler = RotatingFileHandler(
     log_file_path, maxBytes=max_bytes, backupCount=backup_count
 )
 
+global_api_endpoints = ["anthropic", "cohere", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
+# Setup Default API Endpoint
+loaded_config_data = load_and_log_configs()
+
+default_api_endpoint = loaded_config_data['default_api']
+print(f"Default API Endpoint: {default_api_endpoint}")
 #
 #
 #######################
