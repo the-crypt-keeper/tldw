@@ -19,8 +19,8 @@ from playwright.sync_api import sync_playwright
 
 #
 # Local Imports
-from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, scrape_article
-from App_Function_Libraries.Web_Scraping.Article_Summarization_Lib import scrape_and_summarize_multiple
+from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, \
+    scrape_article, collect_bookmarks, scrape_and_summarize_multiple
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
@@ -35,12 +35,12 @@ def get_url_depth(url: str) -> int:
     return len(urlparse(url).path.strip('/').split('/'))
 
 
-def sync_recursive_scrape(url_input, max_pages, max_depth, progress_callback, delay=1.0):
+def sync_recursive_scrape(url_input, max_pages, max_depth, progress_callback, delay=1.0, custom_cookies=None):
     def run_async_scrape():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         return loop.run_until_complete(
-            recursive_scrape(url_input, max_pages, max_depth, progress_callback, delay)
+            recursive_scrape(url_input, max_pages, max_depth, progress_callback, delay, custom_cookies=custom_cookies)
         )
 
     with ThreadPoolExecutor() as executor:
@@ -55,7 +55,8 @@ async def recursive_scrape(
         progress_callback: callable,
         delay: float = 1.0,
         resume_file: str = 'scrape_progress.json',
-        user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+        custom_cookies: Optional[List[Dict[str, Any]]] = None
 ) -> List[Dict]:
     async def save_progress():
         temp_file = resume_file + ".tmp"
@@ -89,6 +90,10 @@ async def recursive_scrape(
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(user_agent=user_agent)
+
+            # Set custom cookies if provided
+            if custom_cookies:
+                await context.add_cookies(custom_cookies)
 
             try:
                 while to_visit and pages_scraped < max_pages:
@@ -293,7 +298,7 @@ def create_website_scraping_tab():
                     lines=5
                 )
                 with gr.Row():
-                    summarize_checkbox = gr.Checkbox(label="Summarize Articles", value=False)
+                    summarize_checkbox = gr.Checkbox(label="Summarize/Analyze Articles", value=False)
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt", value=False, visible=True)
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt", value=False, visible=True)
                 with gr.Row():
@@ -348,10 +353,23 @@ def create_website_scraping_tab():
                     placeholder="Enter your API key here; Ignore if using Local API or Built-in API",
                     type="password"
                 )
+                custom_cookies_input = gr.Textbox(
+                    label="Custom Cookies (JSON format)",
+                    placeholder="Enter custom cookies in JSON format",
+                    lines=3,
+                    visible=True
+                )
                 keywords_input = gr.Textbox(
                     label="Keywords",
                     placeholder="Enter keywords here (comma-separated)",
                     value="default,no_keyword_set",
+                    visible=True
+                )
+                # FIXME
+                bookmarks_file_input = gr.File(
+                    label="Upload Bookmarks File",
+                    type="file",
+                    file_types=[".json", ".html"],
                     visible=True
                 )
 
@@ -413,15 +431,46 @@ def create_website_scraping_tab():
                 keywords: str,
                 custom_titles: Optional[str],
                 system_prompt: Optional[str],
-                temperature: float = 0.7,
+                temperature: float,
+                custom_cookies: Optional[str],
+                bookmarks_file,
                 progress: gr.Progress = gr.Progress()
         ) -> str:
             try:
                 result: List[Dict[str, Any]] = []
 
+                # Handle bookmarks file if provided
+                if bookmarks_file is not None:
+                    bookmarks = collect_bookmarks(bookmarks_file.name)
+                    # Extract URLs from bookmarks
+                    urls_from_bookmarks = []
+                    for value in bookmarks.values():
+                        if isinstance(value, list):
+                            urls_from_bookmarks.extend(value)
+                        elif isinstance(value, str):
+                            urls_from_bookmarks.append(value)
+                    if scrape_method == "Individual URLs":
+                        url_input = "\n".join(urls_from_bookmarks)
+                    else:
+                        if urls_from_bookmarks:
+                            url_input = urls_from_bookmarks[0]
+                        else:
+                            return convert_json_to_markdown(json.dumps({"error": "No URLs found in the bookmarks file."}))
+
+                # Handle custom cookies
+                custom_cookies_list = None
+                if custom_cookies:
+                    try:
+                        custom_cookies_list = json.loads(custom_cookies)
+                        if not isinstance(custom_cookies_list, list):
+                            custom_cookies_list = [custom_cookies_list]
+                    except json.JSONDecodeError as e:
+                        return convert_json_to_markdown(json.dumps({"error": f"Invalid JSON format for custom cookies: {e}"}))
+
                 if scrape_method == "Individual URLs":
+                    # FIXME modify scrape_and_summarize_multiple to accept custom_cookies
                     result = await scrape_and_summarize_multiple(url_input, custom_prompt, api_name, api_key, keywords,
-                                                                 custom_titles, system_prompt)
+                                                                 custom_titles, system_prompt, custom_cookies=custom_cookies_list)
                 elif scrape_method == "Sitemap":
                     result = await asyncio.to_thread(scrape_from_sitemap, url_input)
                 elif scrape_method == "URL Level":
@@ -430,7 +479,8 @@ def create_website_scraping_tab():
                             json.dumps({"error": "URL level is required for URL Level scraping."}))
                     result = await asyncio.to_thread(scrape_by_url_level, url_input, url_level)
                 elif scrape_method == "Recursive Scraping":
-                    result = await recursive_scrape(url_input, max_pages, max_depth, progress.update, delay=1.0)
+                    result = await recursive_scrape(url_input, max_pages, max_depth, progress.update, delay=1.0,
+                                                    custom_cookies=custom_cookies_list)
                 else:
                     return convert_json_to_markdown(json.dumps({"error": f"Unknown scraping method: {scrape_method}"}))
 
@@ -496,7 +546,8 @@ def create_website_scraping_tab():
             fn=lambda *args: asyncio.run(scrape_and_summarize_wrapper(*args)),
             inputs=[scrape_method, url_input, url_level, max_pages, max_depth, summarize_checkbox,
                     website_custom_prompt_input, api_name_input, api_key_input, keywords_input,
-                    custom_article_title_input, system_prompt_input, temp_slider],
+                    custom_article_title_input, system_prompt_input, temp_slider,
+                    custom_cookies_input, bookmarks_file_input],
             outputs=[result_output]
         )
 
@@ -549,6 +600,7 @@ def convert_json_to_markdown(json_str: str) -> str:
         return f"# Error\n\nMissing key in JSON data: {str(e)}"
     except Exception as e:
         return f"# Error\n\nAn unexpected error occurred: {str(e)}"
+
 #
 # End of File
 ########################################################################################################################
