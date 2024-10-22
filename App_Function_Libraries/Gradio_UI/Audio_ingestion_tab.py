@@ -106,7 +106,7 @@ def create_audio_processing_tab():
                     inputs=preset_prompt,
                     outputs=[custom_prompt_input, system_prompt_input]
                 )
-
+                global_api_endpoints
                 api_name_input = gr.Dropdown(
                     choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
                              "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],

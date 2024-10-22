@@ -14,14 +14,13 @@
 ####################
 # Import necessary libraries
 #import atexit
-import glob
 import logging
 import os
 import re
 import signal
 import subprocess
 import sys
-import time
+from pathlib import Path
 from typing import List, Optional
 #
 # Import 3rd-pary Libraries
@@ -157,21 +156,25 @@ def get_gguf_llamafile_files(directory: str) -> List[str]:
     """
     logging.debug(f"Scanning directory: {directory}")  # Debug print for directory
 
-    # Print all files in the directory for debugging
-    all_files = os.listdir(directory)
-    logging.debug(f"All files in directory: {all_files}")
+    try:
+        dir_path = Path(directory)
+        all_files = list(dir_path.iterdir())
+        logging.debug(f"All files in directory: {[str(f) for f in all_files]}")
+    except Exception as e:
+        logging.error(f"Failed to list files in directory {directory}: {e}")
+        return []
 
-    pattern_gguf = os.path.join(directory, "*.gguf")
-    pattern_llamafile = os.path.join(directory, "*.llamafile")
+    try:
+        gguf_files = list(dir_path.glob("*.gguf"))
+        llamafile_files = list(dir_path.glob("*.llamafile"))
 
-    gguf_files = glob.glob(pattern_gguf)
-    llamafile_files = glob.glob(pattern_llamafile)
+        logging.debug(f"Found .gguf files: {[str(f) for f in gguf_files]}")
+        logging.debug(f"Found .llamafile files: {[str(f) for f in llamafile_files]}")
 
-    # Debug: Print the files found
-    logging.debug(f"Found .gguf files: {gguf_files}")
-    logging.debug(f"Found .llamafile files: {llamafile_files}")
-
-    return [os.path.basename(f) for f in gguf_files + llamafile_files]
+        return [f.name for f in gguf_files + llamafile_files]
+    except Exception as e:
+        logging.error(f"Error during glob operations in directory {directory}: {e}")
+        return []
 
 
 # Initialize process with type annotation

@@ -527,7 +527,6 @@ def create_website_scraping_tab():
                         return convert_json_to_markdown(json.dumps({"error": f"Invalid JSON format for custom cookies: {e}"}))
 
                 if scrape_method == "Individual URLs":
-                    # FIXME modify scrape_and_summarize_multiple to accept custom_cookies
                     result = await scrape_and_summarize_multiple(url_input, custom_prompt, api_name, api_key, keywords,
                                                                  custom_titles, system_prompt, summarize_checkbox, custom_cookies=custom_cookies_list)
                 elif scrape_method == "Sitemap":
