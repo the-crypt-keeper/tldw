@@ -1,9 +1,10 @@
 # Article_Summarization_Lib.py
+# DEAD CODE
 #########################################
 # Article Summarization Library
 # This library is used to handle summarization of articles.
 import asyncio
-# FIXME - this library should be refactored into `Article_Extractor_Lib` and then renamed to `Web_Scraping_Lib`
+
 
 #
 ####
@@ -41,38 +42,13 @@ from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
 # Function Definitions
 #
 
-async def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles, system_message=None):
-    urls = [url.strip() for url in urls.split('\n') if url.strip()]
-    custom_titles = custom_article_titles.split('\n') if custom_article_titles else []
 
-    results = []
-    errors = []
+#
+# All dead code
+#
+#
 
-    # Create a progress bar
-    progress = gr.Progress()
-
-    # FIXME - add progress tracking to the gradio UI
-    for i, url in enumerate(urls):
-        custom_title = custom_titles[i] if i < len(custom_titles) else None
-        try:
-            article = await scrape_article(url)
-            if article and article['extraction_successful']:
-                if custom_title:
-                    article['title'] = custom_title
-                results.append(article)
-        except Exception as e:
-            error_message = f"Error processing URL {i + 1} ({url}): {str(e)}"
-            errors.append(error_message)
-
-        # Update progress
-        progress((i + 1) / len(urls), desc=f"Processed {i + 1}/{len(urls)} URLs")
-
-    if errors:
-        logging.error("\n".join(errors))
-
-    return results
-
-
+#
 
 def scrape_and_summarize(url, custom_prompt_arg, api_name, api_key, keywords, custom_article_title, system_message=None):
     try:

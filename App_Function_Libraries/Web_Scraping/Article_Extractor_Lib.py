@@ -13,23 +13,25 @@
 ####################
 #
 # Import necessary libraries
+from datetime import datetime
 import json
 import logging
-# 3rd-Party Imports
-import asyncio
 import os
 import tempfile
-from datetime import datetime
-from typing import List, Dict, Union
+from typing import Any, Dict, List, Union, Optional
+#
+# 3rd-Party Imports
+import asyncio
 from urllib.parse import urljoin, urlparse
 from xml.dom import minidom
-from playwright.async_api import async_playwright
-from bs4 import BeautifulSoup
+import xml.etree.ElementTree as ET
+#
+# External Libraries
 import requests
 import trafilatura
-import xml.etree.ElementTree as ET
-
-
+from playwright.async_api import async_playwright
+from bs4 import BeautifulSoup
+#
 # Import Local
 #
 #######################################################################################################################
@@ -48,12 +50,15 @@ def get_page_title(url: str) -> str:
         return "Untitled"
 
 
-async def scrape_article(url):
+async def scrape_article(url, custom_cookies: Optional[List[Dict[str, Any]]] = None):
     async def fetch_html(url: str) -> str:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+            )
+            if custom_cookies:
+                await context.add_cookies(custom_cookies)
             page = await context.new_page()
             await page.goto(url)
             await page.wait_for_load_state("networkidle")  # Wait for the network to be idle
@@ -106,6 +111,32 @@ async def scrape_article(url):
     if article_data['extraction_successful']:
         article_data['content'] = convert_html_to_markdown(article_data['content'])
     return article_data
+
+
+async def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles, system_message=None, custom_cookies=None):
+    urls = [url.strip() for url in urls.split('\n') if url.strip()]
+    custom_titles = custom_article_titles.split('\n') if custom_article_titles else []
+
+    results = []
+    errors = []
+
+    # FIXME - add progress tracking
+    for i, url in enumerate(urls):
+        custom_title = custom_titles[i] if i < len(custom_titles) else None
+        try:
+            article = await scrape_article(url)
+            if article and article['extraction_successful']:
+                if custom_title:
+                    article['title'] = custom_title
+                results.append(article)
+        except Exception as e:
+            error_message = f"Error processing URL {i + 1} ({url}): {str(e)}"
+            errors.append(error_message)
+
+    if errors:
+        logging.error("\n".join(errors))
+
+    return results
 
 
 def collect_internal_links(base_url: str) -> set:
