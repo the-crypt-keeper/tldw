@@ -365,15 +365,23 @@ def create_website_scraping_tab():
                     value="default,no_keyword_set",
                     visible=True
                 )
-                # FIXME
+                # Updated: Added output to display parsed URLs
                 bookmarks_file_input = gr.File(
                     label="Upload Bookmarks File",
                     type="filepath",
                     file_types=[".json", ".html"],
                     visible=True
                 )
+                parsed_urls_output = gr.Textbox(
+                    label="Parsed URLs from Bookmarks",
+                    placeholder="URLs will be displayed here after uploading a bookmarks file.",
+                    lines=10,
+                    interactive=False,
+                    visible=False  # Initially hidden, shown only when URLs are parsed
+                )
 
                 scrape_button = gr.Button("Scrape and Summarize")
+
             with gr.Column():
                 progress_output = gr.Textbox(label="Progress", lines=3)
                 result_output = gr.Textbox(label="Result", lines=20)
@@ -414,8 +422,59 @@ def create_website_scraping_tab():
 
         preset_prompt.change(
             update_prompts,
-            inputs=preset_prompt,
+            inputs=[preset_prompt],
             outputs=[website_custom_prompt_input, system_prompt_input]
+        )
+
+        def parse_bookmarks(file_path):
+            """
+            Parses the uploaded bookmarks file and extracts URLs.
+
+            Args:
+                file_path (str): Path to the uploaded bookmarks file.
+
+            Returns:
+                str: Formatted string of extracted URLs or error message.
+            """
+            try:
+                bookmarks = collect_bookmarks(file_path)
+                # Extract URLs
+                urls = []
+                for value in bookmarks.values():
+                    if isinstance(value, list):
+                        urls.extend(value)
+                    elif isinstance(value, str):
+                        urls.append(value)
+                if not urls:
+                    return "No URLs found in the bookmarks file."
+                # Format URLs for display
+                formatted_urls = "\n".join(urls)
+                return formatted_urls
+            except Exception as e:
+                logging.error(f"Error parsing bookmarks file: {str(e)}")
+                return f"Error parsing bookmarks file: {str(e)}"
+
+        def show_parsed_urls(bookmarks_file):
+            """
+            Determines whether to show the parsed URLs output.
+
+            Args:
+                bookmarks_file: Uploaded file object.
+
+            Returns:
+                Tuple indicating visibility and content of parsed_urls_output.
+            """
+            if bookmarks_file is None:
+                return gr.update(visible=False), ""
+            file_path = bookmarks_file.name
+            parsed_urls = parse_bookmarks(file_path)
+            return gr.update(visible=True), parsed_urls
+
+        # Connect the parsing function to the file upload event
+        bookmarks_file_input.change(
+            fn=show_parsed_urls,
+            inputs=[bookmarks_file_input],
+            outputs=[parsed_urls_output, parsed_urls_output]
         )
 
         async def scrape_and_summarize_wrapper(
@@ -578,11 +637,15 @@ def convert_json_to_markdown(json_str: str) -> str:
         markdown += f"- **Scrape Method:** {data['scrape_method']}\n"
         markdown += f"- **API Used:** {data['api_used']}\n"
         markdown += f"- **Keywords:** {data['keywords']}\n"
-        if data['url_level'] is not None:
+        if data.get('url_level') is not None:
             markdown += f"- **URL Level:** {data['url_level']}\n"
+        if data.get('max_pages') is not None:
+            markdown += f"- **Maximum Pages:** {data['max_pages']}\n"
+        if data.get('max_depth') is not None:
+            markdown += f"- **Maximum Depth:** {data['max_depth']}\n"
         markdown += f"- **Total Articles Scraped:** {data['total_articles_scraped']}\n\n"
 
-        # Add URLs scraped
+        # Add URLs Scraped
         markdown += "## URLs Scraped\n\n"
         for url in data['urls_scraped']:
             markdown += f"- {url}\n"
