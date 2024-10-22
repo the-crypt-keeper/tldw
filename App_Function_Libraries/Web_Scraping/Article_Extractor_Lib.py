@@ -31,12 +31,24 @@ import requests
 import trafilatura
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
+
+from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
+from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
+from App_Function_Libraries.Utils.Utils import sanitize_filename, load_comprehensive_config
+
+
 #
 # Import Local
 #
 #######################################################################################################################
 # Function Definitions
 #
+
+
+
+#################################################################
+#
+# Scraping-related functions:
 
 def get_page_title(url: str) -> str:
     try:
@@ -65,6 +77,7 @@ async def scrape_article(url, custom_cookies: Optional[List[Dict[str, Any]]] = N
             content = await page.content()
             await browser.close()
             return content
+
 
     # FIXME - Add option for extracting comments/tables/images
     def extract_article_data(html: str, url: str) -> dict:
@@ -113,30 +126,250 @@ async def scrape_article(url, custom_cookies: Optional[List[Dict[str, Any]]] = N
     return article_data
 
 
-async def scrape_and_summarize_multiple(urls, custom_prompt_arg, api_name, api_key, keywords, custom_article_titles, system_message=None, custom_cookies=None):
-    urls = [url.strip() for url in urls.split('\n') if url.strip()]
+async def scrape_and_summarize_multiple(
+    urls: str,
+    custom_prompt_arg: Optional[str],
+    api_name: str,
+    api_key: Optional[str],
+    keywords: str,
+    custom_article_titles: Optional[str],
+    system_message: Optional[str] = None,
+    summarize_checkbox: bool = False,
+    custom_cookies: Optional[List[Dict[str, Any]]] = None,
+    temperature: float = 0.7
+) -> List[Dict[str, Any]]:
+    urls_list = [url.strip() for url in urls.split('\n') if url.strip()]
     custom_titles = custom_article_titles.split('\n') if custom_article_titles else []
 
     results = []
     errors = []
 
-    # FIXME - add progress tracking
-    for i, url in enumerate(urls):
+    # Loop over each URL to scrape and optionally summarize
+    for i, url in enumerate(urls_list):
         custom_title = custom_titles[i] if i < len(custom_titles) else None
         try:
-            article = await scrape_article(url)
+            # Scrape the article
+            article = await scrape_article(url, custom_cookies=custom_cookies)
             if article and article['extraction_successful']:
                 if custom_title:
                     article['title'] = custom_title
+
+                # If summarization is requested
+                if summarize_checkbox:
+                    content = article.get('content', '')
+                    if content:
+                        # Prepare prompts
+                        system_message_final = system_message or "Act as a professional summarizer and summarize this article."
+                        article_custom_prompt = custom_prompt_arg or "Act as a professional summarizer and summarize this article."
+
+                        # Summarize the content using the summarize function
+                        summary = summarize(
+                            input_data=content,
+                            custom_prompt_arg=article_custom_prompt,
+                            api_name=api_name,
+                            api_key=api_key,
+                            temp=temperature,
+                            system_message=system_message_final
+                        )
+                        article['summary'] = summary
+                        logging.info(f"Summary generated for URL {url}")
+                    else:
+                        article['summary'] = "No content available to summarize."
+                        logging.warning(f"No content to summarize for URL {url}")
+                else:
+                    article['summary'] = None
+
                 results.append(article)
+            else:
+                error_message = f"Extraction unsuccessful for URL {url}"
+                errors.append(error_message)
+                logging.error(error_message)
         except Exception as e:
             error_message = f"Error processing URL {i + 1} ({url}): {str(e)}"
             errors.append(error_message)
+            logging.error(error_message, exc_info=True)
 
     if errors:
         logging.error("\n".join(errors))
 
+    if not results:
+        logging.error("No articles were successfully scraped and summarized/analyzed.")
+        return []
+
     return results
+
+
+def scrape_and_no_summarize_then_ingest(url, keywords, custom_article_title):
+    try:
+        # Step 1: Scrape the article
+        article_data = asyncio.run(scrape_article(url))
+        print(f"Scraped Article Data: {article_data}")  # Debugging statement
+        if not article_data:
+            return "Failed to scrape the article."
+
+        # Use the custom title if provided, otherwise use the scraped title
+        title = custom_article_title.strip() if custom_article_title else article_data.get('title', 'Untitled')
+        author = article_data.get('author', 'Unknown')
+        content = article_data.get('content', '')
+        ingestion_date = datetime.now().strftime('%Y-%m-%d')
+
+        print(f"Title: {title}, Author: {author}, Content Length: {len(content)}")  # Debugging statement
+
+        # Step 2: Ingest the article into the database
+        ingestion_result = ingest_article_to_db(url, title, author, content, keywords, ingestion_date, None, None)
+
+        return f"Title: {title}\nAuthor: {author}\nIngestion Result: {ingestion_result}\n\nArticle Contents: {content}"
+    except Exception as e:
+        logging.error(f"Error processing URL {url}: {str(e)}")
+        return f"Failed to process URL {url}: {str(e)}"
+
+
+def scrape_from_filtered_sitemap(sitemap_file: str, filter_function) -> list:
+    """
+    Scrape articles from a sitemap file, applying an additional filter function.
+
+    :param sitemap_file: Path to the sitemap file
+    :param filter_function: A function that takes a URL and returns True if it should be scraped
+    :return: List of scraped articles
+    """
+    try:
+        tree = ET.parse(sitemap_file)
+        root = tree.getroot()
+
+        articles = []
+        for url in root.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc'):
+            if filter_function(url.text):
+                article_data = scrape_article(url.text)
+                if article_data:
+                    articles.append(article_data)
+
+        return articles
+    except ET.ParseError as e:
+        logging.error(f"Error parsing sitemap: {e}")
+        return []
+
+
+def is_content_page(url: str) -> bool:
+    """
+    Determine if a URL is likely to be a content page.
+    This is a basic implementation and may need to be adjusted based on the specific website structure.
+
+    :param url: The URL to check
+    :return: True if the URL is likely a content page, False otherwise
+    """
+    #Add more specific checks here based on the website's structure
+    # Exclude common non-content pages
+    exclude_patterns = [
+        '/tag/', '/category/', '/author/', '/search/', '/page/',
+        'wp-content', 'wp-includes', 'wp-json', 'wp-admin',
+        'login', 'register', 'cart', 'checkout', 'account',
+        '.jpg', '.png', '.gif', '.pdf', '.zip'
+    ]
+    return not any(pattern in url.lower() for pattern in exclude_patterns)
+
+def scrape_and_convert_with_filter(source: str, output_file: str, filter_function=is_content_page, level: int = None):
+    """
+    Scrape articles from a sitemap or by URL level, apply filtering, and convert to a single markdown file.
+
+    :param source: URL of the sitemap, base URL for level-based scraping, or path to a local sitemap file
+    :param output_file: Path to save the output markdown file
+    :param filter_function: Function to filter URLs (default is is_content_page)
+    :param level: URL level for scraping (None if using sitemap)
+    """
+    if level is not None:
+        # Scraping by URL level
+        articles = scrape_by_url_level(source, level)
+        articles = [article for article in articles if filter_function(article['url'])]
+    elif source.startswith('http'):
+        # Scraping from online sitemap
+        articles = scrape_from_sitemap(source)
+        articles = [article for article in articles if filter_function(article['url'])]
+    else:
+        # Scraping from local sitemap file
+        articles = scrape_from_filtered_sitemap(source, filter_function)
+
+    articles = [article for article in articles if filter_function(article['url'])]
+    markdown_content = convert_to_markdown(articles)
+
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(markdown_content)
+
+    logging.info(f"Scraped and filtered content saved to {output_file}")
+
+
+async def scrape_entire_site(base_url: str) -> List[Dict]:
+    """
+    Scrape the entire site by generating a temporary sitemap and extracting content from each page.
+
+    :param base_url: The base URL of the site to scrape
+    :return: A list of dictionaries containing scraped article data
+    """
+    # Step 1: Collect internal links from the site
+    links = collect_internal_links(base_url)
+    logging.info(f"Collected {len(links)} internal links.")
+
+    # Step 2: Generate the temporary sitemap
+    temp_sitemap_path = generate_temp_sitemap_from_links(links)
+
+    # Step 3: Scrape each URL in the sitemap
+    scraped_articles = []
+    try:
+        async def scrape_and_log(link):
+            logging.info(f"Scraping {link} ...")
+            article_data = await scrape_article(link)
+
+            if article_data:
+                logging.info(f"Title: {article_data['title']}")
+                logging.info(f"Author: {article_data['author']}")
+                logging.info(f"Date: {article_data['date']}")
+                logging.info(f"Content: {article_data['content'][:500]}...")
+
+                return article_data
+            return None
+
+        # Use asyncio.gather to scrape multiple articles concurrently
+        scraped_articles = await asyncio.gather(*[scrape_and_log(link) for link in links])
+        # Remove any None values (failed scrapes)
+        scraped_articles = [article for article in scraped_articles if article is not None]
+
+    finally:
+        # Clean up the temporary sitemap file
+        os.unlink(temp_sitemap_path)
+        logging.info("Temporary sitemap file deleted")
+
+    return scraped_articles
+
+
+def scrape_by_url_level(base_url: str, level: int) -> list:
+    """Scrape articles from URLs up to a certain level under the base URL."""
+
+    def get_url_level(url: str) -> int:
+        return len(urlparse(url).path.strip('/').split('/'))
+
+    links = collect_internal_links(base_url)
+    filtered_links = [link for link in links if get_url_level(link) <= level]
+
+    return [article for link in filtered_links if (article := scrape_article(link))]
+
+
+def scrape_from_sitemap(sitemap_url: str) -> list:
+    """Scrape articles from a sitemap URL."""
+    try:
+        response = requests.get(sitemap_url)
+        response.raise_for_status()
+        root = ET.fromstring(response.content)
+
+        return [article for url in root.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc')
+                if (article := scrape_article(url.text))]
+    except requests.RequestException as e:
+        logging.error(f"Error fetching sitemap: {e}")
+        return []
+
+#
+# End of Scraping Functions
+#######################################################
+#
+# Sitemap/Crawling-related Functions
 
 
 def collect_internal_links(base_url: str) -> set:
@@ -230,106 +463,6 @@ def generate_sitemap_for_url(url: str) -> List[Dict[str, str]]:
 
     return sitemap
 
-async def scrape_entire_site(base_url: str) -> List[Dict]:
-    """
-    Scrape the entire site by generating a temporary sitemap and extracting content from each page.
-
-    :param base_url: The base URL of the site to scrape
-    :return: A list of dictionaries containing scraped article data
-    """
-    # Step 1: Collect internal links from the site
-    links = collect_internal_links(base_url)
-    logging.info(f"Collected {len(links)} internal links.")
-
-    # Step 2: Generate the temporary sitemap
-    temp_sitemap_path = generate_temp_sitemap_from_links(links)
-
-    # Step 3: Scrape each URL in the sitemap
-    scraped_articles = []
-    try:
-        async def scrape_and_log(link):
-            logging.info(f"Scraping {link} ...")
-            article_data = await scrape_article(link)
-
-            if article_data:
-                logging.info(f"Title: {article_data['title']}")
-                logging.info(f"Author: {article_data['author']}")
-                logging.info(f"Date: {article_data['date']}")
-                logging.info(f"Content: {article_data['content'][:500]}...")
-
-                return article_data
-            return None
-
-        # Use asyncio.gather to scrape multiple articles concurrently
-        scraped_articles = await asyncio.gather(*[scrape_and_log(link) for link in links])
-        # Remove any None values (failed scrapes)
-        scraped_articles = [article for article in scraped_articles if article is not None]
-
-    finally:
-        # Clean up the temporary sitemap file
-        os.unlink(temp_sitemap_path)
-        logging.info("Temporary sitemap file deleted")
-
-    return scraped_articles
-
-
-def scrape_by_url_level(base_url: str, level: int) -> list:
-    """Scrape articles from URLs up to a certain level under the base URL."""
-
-    def get_url_level(url: str) -> int:
-        return len(urlparse(url).path.strip('/').split('/'))
-
-    links = collect_internal_links(base_url)
-    filtered_links = [link for link in links if get_url_level(link) <= level]
-
-    return [article for link in filtered_links if (article := scrape_article(link))]
-
-
-def scrape_from_sitemap(sitemap_url: str) -> list:
-    """Scrape articles from a sitemap URL."""
-    try:
-        response = requests.get(sitemap_url)
-        response.raise_for_status()
-        root = ET.fromstring(response.content)
-
-        return [article for url in root.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc')
-                if (article := scrape_article(url.text))]
-    except requests.RequestException as e:
-        logging.error(f"Error fetching sitemap: {e}")
-        return []
-
-
-def convert_to_markdown(articles: list) -> str:
-    """Convert a list of article data into a single markdown document."""
-    markdown = ""
-    for article in articles:
-        markdown += f"# {article['title']}\n\n"
-        markdown += f"Author: {article['author']}\n"
-        markdown += f"Date: {article['date']}\n\n"
-        markdown += f"{article['content']}\n\n"
-        markdown += "---\n\n"  # Separator between articles
-    return markdown
-
-
-def is_content_page(url: str) -> bool:
-    """
-    Determine if a URL is likely to be a content page.
-    This is a basic implementation and may need to be adjusted based on the specific website structure.
-
-    :param url: The URL to check
-    :return: True if the URL is likely a content page, False otherwise
-    """
-    #Add more specific checks here based on the website's structure
-    # Exclude common non-content pages
-    exclude_patterns = [
-        '/tag/', '/category/', '/author/', '/search/', '/page/',
-        'wp-content', 'wp-includes', 'wp-json', 'wp-admin',
-        'login', 'register', 'cart', 'checkout', 'account',
-        '.jpg', '.png', '.gif', '.pdf', '.zip'
-    ]
-    return not any(pattern in url.lower() for pattern in exclude_patterns)
-
-
 def create_filtered_sitemap(base_url: str, output_file: str, filter_function):
     """
     Create a sitemap from internal links and filter them based on a custom function.
@@ -354,61 +487,25 @@ def create_filtered_sitemap(base_url: str, output_file: str, filter_function):
     print(f"Filtered sitemap saved to {output_file}")
 
 
-def scrape_from_filtered_sitemap(sitemap_file: str, filter_function) -> list:
-    """
-    Scrape articles from a sitemap file, applying an additional filter function.
+#
+# End of Crawling Functions
+#################################################################
+#
+# Utility Functions
 
-    :param sitemap_file: Path to the sitemap file
-    :param filter_function: A function that takes a URL and returns True if it should be scraped
-    :return: List of scraped articles
-    """
-    try:
-        tree = ET.parse(sitemap_file)
-        root = tree.getroot()
+def convert_to_markdown(articles: list) -> str:
+    """Convert a list of article data into a single markdown document."""
+    markdown = ""
+    for article in articles:
+        markdown += f"# {article['title']}\n\n"
+        markdown += f"Author: {article['author']}\n"
+        markdown += f"Date: {article['date']}\n\n"
+        markdown += f"{article['content']}\n\n"
+        markdown += "---\n\n"  # Separator between articles
+    return markdown
 
-        articles = []
-        for url in root.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc'):
-            if filter_function(url.text):
-                article_data = scrape_article(url.text)
-                if article_data:
-                    articles.append(article_data)
-
-        return articles
-    except ET.ParseError as e:
-        logging.error(f"Error parsing sitemap: {e}")
-        return []
-
-
-def scrape_and_convert_with_filter(source: str, output_file: str, filter_function=is_content_page, level: int = None):
-    """
-    Scrape articles from a sitemap or by URL level, apply filtering, and convert to a single markdown file.
-
-    :param source: URL of the sitemap, base URL for level-based scraping, or path to a local sitemap file
-    :param output_file: Path to save the output markdown file
-    :param filter_function: Function to filter URLs (default is is_content_page)
-    :param level: URL level for scraping (None if using sitemap)
-    """
-    if level is not None:
-        # Scraping by URL level
-        articles = scrape_by_url_level(source, level)
-        articles = [article for article in articles if filter_function(article['url'])]
-    elif source.startswith('http'):
-        # Scraping from online sitemap
-        articles = scrape_from_sitemap(source)
-        articles = [article for article in articles if filter_function(article['url'])]
-    else:
-        # Scraping from local sitemap file
-        articles = scrape_from_filtered_sitemap(source, filter_function)
-
-    articles = [article for article in articles if filter_function(article['url'])]
-    markdown_content = convert_to_markdown(articles)
-
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write(markdown_content)
-
-    logging.info(f"Scraped and filtered content saved to {output_file}")
-
-
+#
+#
 ###################################################
 #
 # Bookmark Parsing Functions
@@ -555,5 +652,5 @@ def collect_bookmarks(file_path: str) -> Dict[str, Union[str, List[str]]]:
 #####################################################################
 
 #
-#
+# End of Article_Extractor_Lib.py
 #######################################################################################################################
