@@ -470,7 +470,7 @@ def create_website_scraping_tab():
                 if scrape_method == "Individual URLs":
                     # FIXME modify scrape_and_summarize_multiple to accept custom_cookies
                     result = await scrape_and_summarize_multiple(url_input, custom_prompt, api_name, api_key, keywords,
-                                                                 custom_titles, system_prompt, custom_cookies=custom_cookies_list)
+                                                                 custom_titles, system_prompt, summarize_checkbox, custom_cookies=custom_cookies_list)
                 elif scrape_method == "Sitemap":
                     result = await asyncio.to_thread(scrape_from_sitemap, url_input)
                 elif scrape_method == "URL Level":
