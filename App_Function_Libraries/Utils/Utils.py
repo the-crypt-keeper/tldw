@@ -254,6 +254,8 @@ def load_and_log_configs():
         logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
         logging.debug(f"Loaded VLLM API URL: {vllm_api_url}")
 
+        # Retrieve default API choices from the configuration file
+        default_api = config.get('API', 'default_api', fallback='openai')
 
         # Retrieve output paths from the configuration file
         output_path = config.get('Paths', 'output_path', fallback='results')
@@ -340,7 +342,8 @@ def load_and_log_configs():
                 'embedding_api_key': embedding_api_key,
                 'chunk_size': chunk_size,
                 'overlap': overlap
-            }
+            },
+            'default_api': default_api
         }
 
     except Exception as e:

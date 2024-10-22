@@ -19,6 +19,9 @@ from App_Function_Libraries.Local_LLM.Local_LLM_Inference_Engine_Lib import (
 #
 # Functions:
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, "Models")
+
 def create_chat_with_llamafile_tab():
     # Function to update model path based on selection
     def on_local_model_change(selected_model: str, search_directory: str) -> str:
@@ -35,8 +38,13 @@ def create_chat_with_llamafile_tab():
             logging.debug(f"Directory does not exist: {search_directory}")  # Debug print for non-existing directory
             return gr.update(choices=[], value=None), "Directory does not exist."
 
-        logging.debug(f"Directory exists: {search_directory}, scanning for files...")  # Confirm directory exists
-        model_files = get_gguf_llamafile_files(search_directory)
+        try:
+            logging.debug(f"Directory exists: {search_directory}, scanning for files...")  # Confirm directory exists
+            model_files = get_gguf_llamafile_files(search_directory)
+            logging.debug("Completed scanning for model files.")
+        except Exception as e:
+            logging.error(f"Error scanning directory: {e}")
+            return gr.update(choices=[], value=None), f"Error scanning directory: {e}"
 
         if not model_files:
             logging.debug(f"No model files found in {search_directory}")  # Debug print for no files found
@@ -117,15 +125,22 @@ def create_chat_with_llamafile_tab():
 
                 # Option 1: Select from Local Filesystem
                 with gr.Row():
-                    search_directory = gr.Textbox(label="Model Directory",
-                                                  placeholder="Enter directory path(currently '.\Models')",
-                                                  value=".\Models",
-                                                  interactive=True)
+                    search_directory = gr.Textbox(
+                        label="Model Directory",
+                        placeholder="Enter directory path (currently './Models')",
+                        value=MODELS_DIR,
+                        interactive=True
+                    )
 
                 # Initial population of local models
-                initial_dropdown_update, _ = update_dropdowns(".\Models")
+                initial_dropdown_update, _ = update_dropdowns(MODELS_DIR)
+                logging.debug(f"Scanning directory: {MODELS_DIR}")
                 refresh_button = gr.Button("Refresh Models")
-                local_model_dropdown = gr.Dropdown(label="Select Model from Directory", choices=[])
+                local_model_dropdown = gr.Dropdown(
+                    label="Select Model from Directory",
+                    choices=initial_dropdown_update["choices"],
+                    value=None
+                )
                 # Display selected model path
                 model_value = gr.Textbox(label="Selected Model File Path", value="", interactive=False)
 
