@@ -13,6 +13,7 @@
 ####################
 #
 # Import necessary libraries
+import hashlib
 from datetime import datetime
 import json
 import logging
@@ -31,20 +32,13 @@ import requests
 import trafilatura
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
-
-from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
-from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
-from App_Function_Libraries.Utils.Utils import sanitize_filename, load_comprehensive_config
-
-
 #
 # Import Local
-#
+from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
+from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
 #######################################################################################################################
 # Function Definitions
 #
-
-
 
 #################################################################
 #
@@ -78,9 +72,8 @@ async def scrape_article(url, custom_cookies: Optional[List[Dict[str, Any]]] = N
             await browser.close()
             return content
 
-
-    # FIXME - Add option for extracting comments/tables/images
     def extract_article_data(html: str, url: str) -> dict:
+        # FIXME - Add option for extracting comments/tables/images
         downloaded = trafilatura.extract(html, include_comments=False, include_tables=False, include_images=False)
         metadata = trafilatura.extract_metadata(html)
 
@@ -503,6 +496,25 @@ def convert_to_markdown(articles: list) -> str:
         markdown += f"{article['content']}\n\n"
         markdown += "---\n\n"  # Separator between articles
     return markdown
+
+def compute_content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+def load_hashes(filename: str) -> Dict[str, str]:
+    if os.path.exists(filename):
+        with open(filename, 'r') as f:
+            return json.load(f)
+    else:
+        return {}
+
+def save_hashes(hashes: Dict[str, str], filename: str):
+    with open(filename, 'w') as f:
+        json.dump(hashes, f)
+
+def has_page_changed(url: str, new_hash: str, stored_hashes: Dict[str, str]) -> bool:
+    old_hash = stored_hashes.get(url)
+    return old_hash != new_hash
+
 
 #
 #

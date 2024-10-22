@@ -368,7 +368,7 @@ def create_website_scraping_tab():
                 # FIXME
                 bookmarks_file_input = gr.File(
                     label="Upload Bookmarks File",
-                    type="file",
+                    type="filepath",
                     file_types=[".json", ".html"],
                     visible=True
                 )
