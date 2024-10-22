@@ -28,7 +28,6 @@ from typing import List, Optional
 import requests
 #
 # Import Local
-from App_Function_Libraries.Web_Scraping.Article_Summarization_Lib import *
 from App_Function_Libraries.Utils.Utils import download_file
 #
 #######################################################################################################################
