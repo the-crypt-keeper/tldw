@@ -40,6 +40,7 @@ RUN apt-get update && apt-get install -y \
     portaudio19-dev \
     python3-venv \
     && rm -rf /var/lib/apt/lists/*
+# libpq-dev is needed for psycopg2 - which is needed for Postgres
 
 # Set the working directory in the container
 WORKDIR /tldw
