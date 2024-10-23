@@ -10,12 +10,26 @@ import gradio as gr
 # Local Imports
 
 from App_Function_Libraries.RAG.RAG_Library_2 import enhanced_rag_pipeline
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+
+
 #
 ########################################################################################################################
 #
 # Functions:
 
 def create_rag_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
+
     with gr.TabItem("RAG Search", visible=True):
         gr.Markdown("# Retrieval-Augmented Generation (RAG) Search")
 
@@ -36,10 +50,11 @@ def create_rag_tab():
                     visible=False
                 )
 
+                # Refactored API selection dropdown
                 api_choice = gr.Dropdown(
-                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
-                    label="Select API for RAG",
-                    value="OpenAI"
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Chat Response (Optional)"
                 )
                 search_button = gr.Button("Search")
 

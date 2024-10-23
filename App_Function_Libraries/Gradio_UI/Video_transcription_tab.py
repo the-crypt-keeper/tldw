@@ -21,7 +21,8 @@ from App_Function_Libraries.Gradio_UI.Gradio_Shared import error_handler
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_transcription, perform_summarization, \
     save_transcription_and_summary
 from App_Function_Libraries.Utils.Utils import convert_to_seconds, safe_read_file, format_transcription, \
-    create_download_directory, generate_unique_identifier, extract_text_from_segments
+    create_download_directory, generate_unique_identifier, extract_text_from_segments, default_api_endpoint, \
+    global_api_endpoints, format_api_name
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, extract_metadata, download_video
 from App_Function_Libraries.Benchmarks_Evaluations.ms_g_eval import run_geval
 # Import metrics logging
@@ -32,6 +33,16 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 # Functions:
 
 def create_video_transcription_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Video Transcription + Summarization", visible=True):
         gr.Markdown("# Transcribe & Summarize Videos from URLs")
         with gr.Row():
@@ -111,11 +122,12 @@ def create_video_transcription_tab():
                     outputs=[custom_prompt_input, system_prompt_input]
                 )
 
+                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                             "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace", "Custom-OpenAI-API"],
-                    value=None, label="API Name (Mandatory)")
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Summarization/Analysis (Optional)"
+                )
                 api_key_input = gr.Textbox(label="API Key (Optional - Set in Config.txt)", placeholder="Enter your API key here",
                                            type="password")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",

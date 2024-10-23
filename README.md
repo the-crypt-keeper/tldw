@@ -49,12 +49,22 @@
     - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh`
       - `bash MacOS-Run-Install-Update.sh`
       - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
-    - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+    - **Windows:** `curl -O https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && curl -O https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
         - Then double-click the downloaded batch file `Windows_Install_Update.bat` to install it, and `Windows_Run_tldw.bat` to run it.
         - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
         - If you don't have CUDA installed on your system and available in your system path, go here: https://github.com/Purfview/whisper-standalone-win/releases/download/Faster-Whisper-XXL/Faster-Whisper-XXL_r192.3.4_windows.7z
           - Extract the two files named `cudnn_ops_infer64_8.dll` and `cudnn_cnn_infer64_8.dll` from the 7z file to the `tldw` directory, and then run the `Windows_Run_tldw.bat` file.
           - This will allow you to use the faster whisper models with the app. Otherwise, you won't be able to perform transcription.
+  - **BE SURE TO UPDATE 'config.txt' WITH YOUR API KEYS AND SETTINGS!** 
+    - You need to do this unless you want to manually input your API keys everytime you interact with a commercial LLM...
+- **Run it as a WebApp**
+  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
+    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
+    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
+      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
+      * So everything you might consume during your path of research, tracked and assimilated and tagged.
+      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
+  - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
 - **Docker:**
   - There's a docker build for GPU use(Needs Nvidia CUDA Controller(?): https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw-nvidia_amd64_Dockerfile 
   - and plain CPU use: https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw_Debian_cpu-Dockerfile
@@ -106,44 +116,104 @@ All features are designed to run **locally** on your device, ensuring privacy an
 - **Writing Prompts**: Generate creative writing prompts based on your preferences.
 </details>
 
-
-#### Less Quick Start
+----------
+### <a name="setup"></a>Setting it up Manually
 <details>
-<summary>**Less Quick Start - Click-Here**</summary>
+<summary>**Manual Setup/Installation - Click-Here**</summary>
 
-### Less Quick Start
-1. **Download the Installer Script for your OS:**
-   - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
-   - **Windows:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat && wget wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
-   - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Run_tldw.sh`
-2. **Run the Installer Script:**
-   - **Linux:** 
-     - `chmod +x Linux_Install_Update.sh && chmod +x ./Linux_Run_tldw.sh`
-     - `./Linux_Install_Update.sh` and then `./Linux_Run_tldw.sh`
-     - This will install `tldw` to the directory from where the script is ran.
-   - **Windows:** `Windows_Install_Update.bat`
-     - Double-click the downloaded batch file to install it.
-     - This will install `tldw` to the directory from where the script is ran.
-   - **MacOS:** `bash MacOS-Install_Updater.sh`
-     - `chmod +x MacOS_Install_Update.sh` and then `chmod +x ./MacOS_Run_tldw.sh`
-     - `./MacOS_Install_Update.sh` and then `./MacOS_Run_tldw.sh`
-     - This will install `tldw` to the directory from where the script is ran.
-3. **Follow the prompts to install the necessary packages and setup the program.**
-4. **You are Ready to Go! You should see `tldw` start up at the end of the script, assuming everything worked as expected**
-5. **BE SURE TO UPDATE 'config.txt' WITH YOUR API KEYS AND SETTINGS!** - You need to do this unless you want to manually input your API keys everytime you interact with a commercial LLM...
-- **Run it as a WebApp**
-  * `python summarize.py -gui` - This requires you to either stuff your API keys into the `config.txt` file, or pass them into the app every time you want to use it.
-    * It exposes every CLI option, and has a nice toggle to make it 'simple' vs 'Advanced'
-    - Gives you access to the whole SQLite DB backing it, with search, tagging, and export functionality
-      * Yes, that's right. Everything you ingest, transcribe and summarize is tracked through a local(!) SQLite DB.
-      * So everything you might consume during your path of research, tracked and assimilated and tagged.
-      * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
-  - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
+### Setup
+- **Requirements**
+  - [Python3](https://www.python.org/downloads/windows/) - Make sure to add it to your PATH during installation.
+  - git - https://git-scm.com/downloads
+  - ffmpeg (Script will install this for you) - https://ffmpeg.org/download.html
+  - pandoc (Optional. For manual epub to markdown conversion) - https://pandoc.org/installing.html
+    - `pandoc -f epub -t markdown -o output.md input.epub` -> Can then import/ingest the markdown file into the DB. Only reason you would use this is because you have a large amount of epubs you would like to convert to plain text? idk.
+  - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
+    - Apparently there is a ROCm version of PyTorch.
+      - MS Pytorch: https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
+      - Use the 'AMD_requests.txt' file to install the necessary packages for AMD GPU support.
+      - AMD Pytorch: https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/wsl/install-pytorch.html
+  - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
+  - System RAM (8GB minimum, realistically 12GB)
+  - Disk Space (Depends on how much you ingest, 8GB or so should be fine for the total size of the project + DB)
+    - This can balloon real quick. The whisper model used for transcription can be 1-2GB per.
+    - Pytorch + other ML libraries will also cause the size to increase.
+    - As such, I would say you want at least 12GB of free space on your system to devote to the app.
+    - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
+- **Linux**
+    1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg` or `dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
+    2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
+    3. `git clone https://github.com/rmusser01/tldw`
+    4. `cd tldw`
+    5. Create a virtual env: `sudo python3 -m venv ./`
+    6. Launch/activate your virtual environment: `source ./bin/activate`
+    7. Setup the necessary python packages:
+       * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
+       * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
+       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+         * Also be sure to change `cuda` to `cpu` in `config.txt`
+       * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
+    8. Then see `Linux && Windows`
+- **MacOS**
+    1. I don't own a mac/have access to one reliably so I can't test this, but it should be the same as/similar to Linux.
+- **Windows**
+    1. Download necessary pre-requisites, Update your GPU drivers/CUDA drivers if you'll be running an LLM locally, ffmpeg will be installed by the script)
+    2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
+    3. `git clone https://github.com/rmusser01/tldw`
+    4. `cd tldw`
+    5. Create a virtual env: `python3 -m venv ./`
+    6. Launch/activate your virtual env: PowerShell: `. .\scripts\activate.ps1` or for CMD: `.\scripts\activate.bat`
+    7. Setup the necessary python packages:
+       - Cuda
+         * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/windows.html
+           * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118` 
+       - CPU Only: `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu`
+           * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
+           * Also be sure to change `cuda` to `cpu` in `config.txt`
+       - AMD
+         * `pip install torch-directml`
+    8. See `Linux && Windows`
+- **Linux && Windows**
+    1. `pip install -r requirements.txt` - may take a bit of time...
+    2. **GUI Usage:**
+         - Put your API keys and settings in the `config.txt` file.
+           - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
+         - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+         - Run `python ./summarize.py -gui` - This will launch a webapp that will allow you to interact with the script in a more user-friendly manner.
+           * You can pass in the API keys for the LLMs you want to use in the `config.txt` file, or pass them in when you use the GUI.
+           * You can also download the generated transcript and summary as text files from the UI.
+           * You can also download the video/audio as files from the UI. (WIP - doesn't currently work)
+           * You can also access the SQLite DB that backs the app, with search, tagging, and export functionality.
+    3. **Local LLM with the Script Usage:**
+       - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
+       - I recognize some people may like the functionality and idea of it all, but don't necessarily know/want to know about LLMs/getting them working, so you can also have the script download and run a local model, using system RAM and llamafile/llama.cpp.
+       - Simply pass `--local_llm` to the script (`python summarize.py --local-llm`), and it'll ask you if you want to download a model, and which one you'd like to download.
+       - Then, after downloading and selecting a model, it'll launch the model using llamafile, so you'll have a browser window/tab opened with a frontend to the model/llama.cpp server.
+       - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
+       - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
+- **Setting up Backups**
+  - Manual backups are possible through the GUI. These use the `VACUUM` command to create a new DB file at your backup folder location. (default is `./tldw_DB_Backups/`
+  - If you'd like something more automated + don't have to think about it: https://litestream.io/getting-started/
+    - This will allow you to have a backup of your DB that is always up-to-date, and can be restored with a single command. + It's free.
+- **Encrypting your Database at rest using 7zip**
+  - 7zip since its cross-platform and easy to use.
+  - https://superuser.com/questions/1377414/how-to-encrypt-txt-files-with-aes256-via-windows-7z-command-line
+  - `7za u -mx -mhe -pPASSWORD ARCHIVE-FILE-NAME.7Z SOURCE-FILE`
+    - `-pPASSWORD` - sets the password to `PASSWORD`
+    - `u` - updates the archive
+    - `-mx` - sets the compression level to default (-mx1 == fastest, -mx9 == best)
+    - `-mhe` - encrypts the file headers - No unencrypted filenames in the archive
+- **Setting up Epub to Markdown conversion with Pandoc**
+    - **Linux / MacOS / Windows**
+        - Download and install from: https://pandoc.org/installing.html
+- **Converting Epub to markdown**
+    - `pandoc -f epub -t markdown -o output.md input.epub`
+- **Ingest Converted text files en-masse**
+    - `python summarize.py <path_to_text_file> --ingest_text_file --text_title "Title" --text_author "Author Name" -k additional,keywords`
+
 </details>
 
-
 ----------
-
 
 ### More Detailed explanation of this project (tl/dw)
 <details>
@@ -326,103 +396,6 @@ None of these companies exist to provide AI services in 2024. They’re only doi
      * `python summarize.py path/to/your/textfile.txt --ingest_text_file --text_title "Book Title" --text_author "Author Name" -k additional,keywords`
 
 </details>
-
-----------
-### <a name="setup"></a>Setting it up Manually
-<details>
-<summary>**Manual Setup/Installation - Click-Here**</summary>
-
-### Setup
-- **Requirements**
-  - Python3
-  - ffmpeg (Script will install this for you)
-  - pandoc (Optional. For manual epub to markdown conversion) - https://pandoc.org/installing.html
-    - `pandoc -f epub -t markdown -o output.md input.epub` -> Can then import/ingest the markdown file into the DB. Only reason you would use this is because you have a large amount of epubs you would like to convert to plain text? idk.
-  - GPU Drivers/CUDA drivers or CPU-only PyTorch installation for ML processing
-    - Apparently there is a ROCm version of PyTorch.
-      - MS Pytorch: https://learn.microsoft.com/en-us/windows/ai/directml/pytorch-windows -> `pip install torch-directml`
-      - Use the 'AMD_requests.txt' file to install the necessary packages for AMD GPU support.
-      - AMD Pytorch: https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/wsl/install-pytorch.html
-  - API keys for the LLMs you want to use (or use the local LLM option/Self-hosted)
-  - System RAM (8GB minimum, realistically 12GB)
-  - Disk Space (Depends on how much you ingest, 8GB or so should be fine for the total size of the project + DB)
-    - This can balloon real quick. The whisper model used for transcription can be 1-2GB per.
-    - Pytorch + other ML libraries will also cause the size to increase.
-    - As such, I would say you want at least 12GB of free space on your system to devote to the app.
-    - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
-- **Linux**
-    1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg` or `dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
-    2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
-    3. `git clone https://github.com/rmusser01/tldw`
-    4. `cd tldw`
-    5. Create a virtual env: `sudo python3 -m venv ./`
-    6. Launch/activate your virtual environment: `source ./bin/activate`
-    7. Setup the necessary python packages:
-       * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
-       * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
-       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
-         * Also be sure to change `cuda` to `cpu` in `config.txt`
-       * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
-    8. Then see `Linux && Windows`
-- **MacOS**
-    1. I don't own a mac/have access to one reliably so I can't test this, but it should be the same as/similar to Linux.
-- **Windows**
-    1. Download necessary packages ([Python3](https://www.python.org/downloads/windows/), Update your GPU drivers/CUDA drivers if you'll be running an LLM locally, ffmpeg will be installed by the script)
-    2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
-    3. `git clone https://github.com/rmusser01/tldw`
-    4. `cd tldw`
-    5. Create a virtual env: `python3 -m venv ./`
-    6. Launch/activate your virtual env: PowerShell: `. .\scripts\activate.ps1` or for CMD: `.\scripts\activate.bat`
-    7. Setup the necessary python packages:
-       - Cuda
-         * https://docs.nvidia.com/deeplearning/cudnn/latest/installation/windows.html
-           * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
-       - CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
-           * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
-           * Also be sure to change `cuda` to `cpu` in `config.txt`
-       - AMD
-         * `pip install torch-directml`
-    8. See `Linux && Windows`
-- **Linux && Windows**
-    1. `pip install -r requirements.txt` - may take a bit of time...
-    2. **GUI Usage:**
-         - Put your API keys and settings in the `config.txt` file.
-           - This is where you'll put your API keys for the LLMs you want to use, as well as any other settings you want to have set by default. (Like the IP of your local LLM to use for summarization)
-         - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
-         - Run `python ./summarize.py -gui` - This will launch a webapp that will allow you to interact with the script in a more user-friendly manner.
-           * You can pass in the API keys for the LLMs you want to use in the `config.txt` file, or pass them in when you use the GUI.
-           * You can also download the generated transcript and summary as text files from the UI.
-           * You can also download the video/audio as files from the UI. (WIP - doesn't currently work)
-           * You can also access the SQLite DB that backs the app, with search, tagging, and export functionality.
-    3. **Local LLM with the Script Usage:**
-       - (make sure your in the python venv - Run `source ./bin/activate` or `.\scripts\activate.ps1` or `.\scripts\activate.bat` from the `tldw` directory)
-       - I recognize some people may like the functionality and idea of it all, but don't necessarily know/want to know about LLMs/getting them working, so you can also have the script download and run a local model, using system RAM and llamafile/llama.cpp.
-       - Simply pass `--local_llm` to the script (`python summarize.py --local-llm`), and it'll ask you if you want to download a model, and which one you'd like to download.
-       - Then, after downloading and selecting a model, it'll launch the model using llamafile, so you'll have a browser window/tab opened with a frontend to the model/llama.cpp server.
-       - You'll also have the GUI open in another tab as well, a couple seconds after the model is launched, like normal.
-       - You can then interact with both at the same time, being able to ask questions directly to the model, or have the model ingest output from the transcript/summary and use it to ask questions you don't necessarily care to have stored within the DB. (All transcripts, URLs processed, prompts used, and summaries generated, are stored in the DB, so you can always go back and review them or re-prompt with them)
-- **Setting up Backups**
-  - Manual backups are possible through the GUI. These use the `VACUUM` command to create a new DB file at your backup folder location. (default is `./tldw_DB_Backups/`
-  - If you'd like something more automated + don't have to think about it: https://litestream.io/getting-started/
-    - This will allow you to have a backup of your DB that is always up-to-date, and can be restored with a single command. + It's free.
-- **Encrypting your Database at rest using 7zip**
-  - 7zip since its cross-platform and easy to use.
-  - https://superuser.com/questions/1377414/how-to-encrypt-txt-files-with-aes256-via-windows-7z-command-line
-  - `7za u -mx -mhe -pPASSWORD ARCHIVE-FILE-NAME.7Z SOURCE-FILE`
-    - `-pPASSWORD` - sets the password to `PASSWORD`
-    - `u` - updates the archive
-    - `-mx` - sets the compression level to default (-mx1 == fastest, -mx9 == best)
-    - `-mhe` - encrypts the file headers - No unencrypted filenames in the archive
-- **Setting up Epub to Markdown conversion with Pandoc**
-    - **Linux / MacOS / Windows**
-        - Download and install from: https://pandoc.org/installing.html
-- **Converting Epub to markdown**
-    - `pandoc -f epub -t markdown -o output.md input.epub`
-- **Ingest Converted text files en-masse**
-    - `python summarize.py <path_to_text_file> --ingest_text_file --text_title "Title" --text_author "Author Name" -k additional,keywords`
-
-</details>
-
 
 
 ----------

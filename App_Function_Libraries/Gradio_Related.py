@@ -66,6 +66,7 @@ from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_vie
 #
 # Gradio UI Imports
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
+from App_Function_Libraries.Gradio_UI.XML_Ingestion_Tab import create_xml_import_tab
 #from App_Function_Libraries.Local_LLM.Local_LLM_huggingface import create_huggingface_tab
 from App_Function_Libraries.Local_LLM.Local_LLM_ollama import create_ollama_tab
 #
@@ -276,6 +277,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_podcast_tab()
                     create_import_book_tab()
                     create_plain_text_import_tab()
+                    create_xml_import_tab()
                     create_website_scraping_tab()
                     create_pdf_ingestion_tab()
                     create_pdf_ingestion_test_tab()
@@ -283,6 +285,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_summarize_explain_tab()
                     create_live_recording_tab()
                     create_arxiv_tab()
+
 
             with gr.TabItem("Text Search", id="text search", visible=True):
                 create_search_tab()
