@@ -20,6 +20,9 @@ from PIL import Image
 from App_Function_Libraries.Chat import chat, load_characters, save_chat_history_to_db_wrapper
 from App_Function_Libraries.Gradio_UI.Chat_ui import chat_wrapper
 from App_Function_Libraries.Gradio_UI.Writing_tab import generate_writing_feedback
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints
+
+
 #
 ########################################################################################################################
 #
@@ -253,6 +256,16 @@ def character_interaction(character1: str, character2: str, api_endpoint: str, a
 
 
 def create_multiple_character_chat_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Multi-Character Chat", visible=True):
         characters, conversation, current_character, other_character = character_interaction_setup()
 
@@ -264,13 +277,12 @@ def create_multiple_character_chat_tab():
                 character_selectors = [gr.Dropdown(label=f"Character {i + 1}", choices=list(characters.keys())) for i in
                                        range(4)]
 
-            api_endpoint = gr.Dropdown(label="API Endpoint",
-                                       choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek",
-                                                "Mistral",
-                                                "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM",
-                                                "ollama", "HuggingFace",
-                                                "Custom-OpenAI-API"],
-                                        value="HuggingFace")
+            # Refactored API selection dropdown
+            api_endpoint = gr.Dropdown(
+                choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                value=default_value,
+                label="API for Interaction (Optional)"
+            )
             api_key = gr.Textbox(label="API Key (if required)", type="password")
             temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)
             scenario = gr.Textbox(label="Scenario (optional)", lines=3)
@@ -393,17 +405,26 @@ def create_multiple_character_chat_tab():
 
 # From `Fuzzlewumper` on Reddit.
 def create_narrator_controlled_conversation_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Narrator-Controlled Conversation", visible=True):
         gr.Markdown("# Narrator-Controlled Conversation")
 
         with gr.Row():
             with gr.Column(scale=1):
+                # Refactored API selection dropdown
                 api_endpoint = gr.Dropdown(
-                    label="API Endpoint",
-                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                             "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace",
-                             "Custom-OpenAI-API"],
-                    value="HuggingFace"
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Chat Interaction (Optional)"
                 )
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
                 temperature = gr.Slider(label="Temperature", minimum=0.1, maximum=1.0, step=0.1, value=0.7)

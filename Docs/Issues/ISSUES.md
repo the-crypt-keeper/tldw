@@ -26,3 +26,6 @@ Create Documentation for how this can help
 
 Create a blog post
     tldwproject.com
+
+Linux Cuda
+     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/user/venv/lib/python3.X/site-packages/nvidia/cudnn/lib/

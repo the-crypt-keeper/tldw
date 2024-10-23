@@ -15,7 +15,10 @@ from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import fetch_item_details, fetch_items_by_keyword, \
     fetch_items_by_content, fetch_items_by_title_or_url
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_chunk
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config, default_api_endpoint, global_api_endpoints, \
+    format_api_name
+
+
 #
 #
 ######################################################################################################################
@@ -23,6 +26,16 @@ from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 # Functions:
 
 def create_resummary_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Re-Summarize", visible=True):
         gr.Markdown("# Re-Summarize Existing Content")
         with gr.Row():
@@ -35,10 +48,12 @@ def create_resummary_tab():
                 item_mapping = gr.State({})
 
                 with gr.Row():
+                    # Refactored API selection dropdown
                     api_name_input = gr.Dropdown(
-                        choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace"],
-                        value="Local-LLM", label="API Name")
+                        choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                        value=default_value,
+                        label="API for Summarization/Analysis (Optional)"
+                    )
                     api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here", type="password")
 
                 chunking_options_checkbox = gr.Checkbox(label="Use Chunking", value=False)

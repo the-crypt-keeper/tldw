@@ -34,12 +34,25 @@ from App_Function_Libraries.DB.RAG_QA_Chat_DB import (
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, rag_qa_chat
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+
+
 #
 ########################################################################################################################
 #
 # Functions:
 
 def create_rag_qa_chat_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("RAG QA Chat", visible=True):
         gr.Markdown("# RAG QA Chat")
 
@@ -103,26 +116,11 @@ def create_rag_qa_chat_tab():
                 )
                 keywords = gr.Textbox(label="Keywords (comma-separated)", visible=True)
 
+                # Refactored API selection dropdown
                 api_choice = gr.Dropdown(
-                    choices=[
-                        "Local-LLM",
-                        "OpenAI",
-                        "Anthropic",
-                        "Cohere",
-                        "Groq",
-                        "DeepSeek",
-                        "Mistral",
-                        "OpenRouter",
-                        "Llama.cpp",
-                        "Kobold",
-                        "Ooba",
-                        "Tabbyapi",
-                        "VLLM",
-                        "ollama",
-                        "HuggingFace",
-                    ],
-                    label="Select API for RAG",
-                    value="OpenAI",
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Chat Response (Optional)"
                 )
 
         with gr.Row():
@@ -558,7 +556,6 @@ Rewritten Question:"""
         submit,
         clear_chat,
     )
-
 
 
 def create_rag_qa_notes_management_tab():

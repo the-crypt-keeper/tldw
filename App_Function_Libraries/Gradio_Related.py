@@ -66,6 +66,7 @@ from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_vie
 #
 # Gradio UI Imports
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
+from App_Function_Libraries.Gradio_UI.XML_Ingestion_Tab import create_xml_import_tab
 #from App_Function_Libraries.Local_LLM.Local_LLM_huggingface import create_huggingface_tab
 from App_Function_Libraries.Local_LLM.Local_LLM_ollama import create_ollama_tab
 #
@@ -276,6 +277,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_podcast_tab()
                     create_import_book_tab()
                     create_plain_text_import_tab()
+                    create_xml_import_tab()
                     create_website_scraping_tab()
                     create_pdf_ingestion_tab()
                     create_pdf_ingestion_test_tab()
@@ -303,7 +305,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_chat_management_tab()
                 chat_workflows_tab()
 
-
             with gr.TabItem("Character Chat", id="character chat group", visible=True):
                 create_character_card_interaction_tab()
                 create_character_chat_mgmt_tab()
@@ -313,14 +314,12 @@ def launch_ui(share_public=None, server_mode=False):
                 create_narrator_controlled_conversation_tab()
                 create_export_characters_tab()
 
-
             with gr.TabItem("View DB Items", id="view db items group", visible=True):
                 # This one works
                 create_view_all_with_versions_tab()
                 # This one is WIP
                 create_viewing_tab()
                 create_prompt_view_tab()
-
 
             with gr.TabItem("Prompts", id='view prompts group', visible=True):
                 create_prompt_view_tab()
@@ -329,14 +328,12 @@ def launch_ui(share_public=None, server_mode=False):
                 create_prompt_clone_tab()
                 create_prompt_suggestion_tab()
 
-
             with gr.TabItem("Manage / Edit Existing Items", id="manage group", visible=True):
                 create_media_edit_tab()
                 create_manage_items_tab()
                 create_media_edit_and_clone_tab()
                 # FIXME
                 #create_compare_transcripts_tab()
-
 
             with gr.TabItem("Embeddings Management", id="embeddings group", visible=True):
                 create_embeddings_tab()
@@ -354,7 +351,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_creative_writing_tab()
                 from App_Function_Libraries.Gradio_UI.Writing_tab import create_mikupad_tab
                 create_mikupad_tab()
-
 
             with gr.TabItem("Keywords", id="keywords group", visible=True):
                 create_view_keywords_tab()

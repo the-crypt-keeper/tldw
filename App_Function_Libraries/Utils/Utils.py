@@ -350,6 +350,35 @@ def load_and_log_configs():
         logging.error(f"Error loading config: {str(e)}")
         return None
 
+global_api_endpoints = ["anthropic", "cohere", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
+
+# Setup Default API Endpoint
+loaded_config_data = load_and_log_configs()
+default_api_endpoint = loaded_config_data['default_api']
+
+def format_api_name(api):
+    name_mapping = {
+        "openai": "OpenAI",
+        "anthropic": "Anthropic",
+        "cohere": "Cohere",
+        "groq": "Groq",
+        "huggingface": "HuggingFace",
+        "openrouter": "OpenRouter",
+        "deepseek": "DeepSeek",
+        "mistral": "Mistral",
+        "custom_openai_api": "Custom-OpenAI-API",
+        "llama": "Llama.cpp",
+        "ooba": "Ooba",
+        "kobold": "Kobold",
+        "tabby": "Tabbyapi",
+        "vllm": "VLLM",
+        "ollama": "Ollama",
+        "aphrodite": "Aphrodite"
+    }
+    return name_mapping.get(api, api.title())
+print(f"Default API Endpoint: {default_api_endpoint}")
+
+
 
 #
 # End of Config loading

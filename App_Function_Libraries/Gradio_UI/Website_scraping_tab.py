@@ -17,6 +17,7 @@ import gradio as gr
 from playwright.async_api import TimeoutError, async_playwright
 from playwright.sync_api import sync_playwright
 
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
 #
 # Local Imports
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, \
@@ -254,6 +255,16 @@ async def scrape_with_retry(url: str, max_retries: int = 3, retry_delay: float =
 
 
 def create_website_scraping_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Website Scraping", visible=True):
         gr.Markdown("# Scrape Websites & Summarize Articles")
         with gr.Row():
@@ -340,13 +351,11 @@ def create_website_scraping_tab():
                         visible=False
                     )
 
+                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                             "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace",
-                             "Custom-OpenAI-API"],
-                    value=None,
-                    label="API Name (Mandatory for Summarization)"
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Summarization/Analysis (Optional)"
                 )
                 api_key_input = gr.Textbox(
                     label="API Key (Mandatory if API Name is specified)",
