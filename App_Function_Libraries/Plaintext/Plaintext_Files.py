@@ -3,22 +3,15 @@
 #
 # Import necessary libraries
 import os
-import re
-from datetime import datetime
-import logging
 import tempfile
 import zipfile
-
+#
+# External Imports
 from docx2txt import docx2txt
 from pypandoc import convert_file
-
-from App_Function_Libraries.Gradio_UI.Import_Functionality import import_data
-
-
-#
-# Non-Local Imports
 #
 # Local Imports
+from App_Function_Libraries.Gradio_UI.Import_Functionality import import_data
 #
 #######################################################################################################################
 #
@@ -71,4 +64,7 @@ def import_file_handler(file, title, author, keywords, system_prompt, user_promp
     else:
         return "Unsupported file type. Please upload a .md, .txt, .rtf, .docx file or a .zip file containing these file types."
 
+#
+# End of Plaintext_Files.py
+#######################################################################################################################
 

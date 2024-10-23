@@ -946,57 +946,143 @@ def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Di
 #
 # XML Chunking
 
+def extract_xml_structure(element, path=""):
+    """
+    Recursively extract XML structure and content.
+    Returns a list of (path, text) tuples.
+    """
+    results = []
+    current_path = f"{path}/{element.tag}" if path else element.tag
+
+    # Get direct text content
+    if element.text and element.text.strip():
+        results.append((current_path, element.text.strip()))
+
+    # Process attributes if any
+    if element.attrib:
+        for key, value in element.attrib.items():
+            results.append((f"{current_path}/@{key}", value))
+
+    # Process child elements
+    for child in element:
+        results.extend(extract_xml_structure(child, current_path))
+
+    return results
+
+
 def chunk_xml(xml_text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
-    Chunk XML content while preserving structure.
+    Enhanced XML chunking that preserves structure and hierarchy.
+    Processes XML content into chunks while maintaining structural context.
+
+    Args:
+        xml_text (str): The XML content as a string
+        chunk_options (Dict[str, Any]): Configuration options including:
+            - max_size (int): Maximum chunk size (default: 1000)
+            - overlap (int): Number of overlapping elements (default: 0)
+            - method (str): Chunking method (default: 'xml')
+            - language (str): Content language (default: 'english')
+
+    Returns:
+        List[Dict[str, Any]]: List of chunks, each containing:
+            - text: The chunk content
+            - metadata: Chunk metadata including XML paths and chunking info
     """
-    logging.debug("chunk_xml started...")
+    logging.debug("Starting XML chunking process...")
+
     try:
+        # Parse XML content
         root = ET.fromstring(xml_text)
         chunks = []
 
-        # Get chunking parameters
+        # Get chunking parameters with defaults
         max_size = chunk_options.get('max_size', 1000)
         overlap = chunk_options.get('overlap', 0)
+        language = chunk_options.get('language', 'english')
 
-        # Process each major section/element
-        for element in root:
-            # Extract text content from the element and its children
-            text_content = []
-            for child in element.iter():
-                if child.text and child.text.strip():
-                    text_content.append(child.text.strip())
+        logging.debug(f"Chunking parameters - max_size: {max_size}, overlap: {overlap}, language: {language}")
 
-            element_text = '\n'.join(text_content)
+        # Extract full structure with hierarchy
+        xml_content = extract_xml_structure(root)
+        logging.debug(f"Extracted {len(xml_content)} XML elements")
 
-            # Use existing chunking methods based on the content
-            element_chunks = chunk_text(
-                element_text,
-                method=chunk_options.get('method', 'words'),
-                max_size=max_size,
-                overlap=overlap,
-                language=chunk_options.get('language', None)
-            )
+        # Initialize chunking variables
+        current_chunk = []
+        current_size = 0
+        chunk_count = 0
 
-            # Add metadata for each chunk
-            for i, chunk in enumerate(element_chunks):
-                metadata = {
-                    'element_tag': element.tag,
-                    'element_attributes': dict(element.attrib),
-                    'chunk_index': i + 1,
-                    'total_chunks': len(element_chunks),
-                    'chunk_method': 'xml',
-                    'max_size': max_size,
-                    'overlap': overlap
-                }
+        # Process XML content into chunks
+        for path, content in xml_content:
+            # Calculate content size (by words)
+            content_size = len(content.split())
+
+            # Check if adding this content would exceed max_size
+            if current_size + content_size > max_size and current_chunk:
+                # Create chunk from current content
+                chunk_text = '\n'.join(f"{p}: {c}" for p, c in current_chunk)
+                chunk_count += 1
+
+                # Create chunk with metadata
                 chunks.append({
-                    'text': chunk,
-                    'metadata': metadata
+                    'text': chunk_text,
+                    'metadata': {
+                        'paths': [p for p, _ in current_chunk],
+                        'chunk_method': 'xml',
+                        'chunk_index': chunk_count,
+                        'max_size': max_size,
+                        'overlap': overlap,
+                        'language': language,
+                        'root_tag': root.tag,
+                        'xml_attributes': dict(root.attrib)
+                    }
                 })
 
+                # Handle overlap if specified
+                if overlap > 0:
+                    # Keep last few items for overlap
+                    overlap_items = current_chunk[-overlap:]
+                    current_chunk = overlap_items
+                    current_size = sum(len(c.split()) for _, c in overlap_items)
+                    logging.debug(f"Created overlap chunk with {len(overlap_items)} items")
+                else:
+                    current_chunk = []
+                    current_size = 0
+
+            # Add current content to chunk
+            current_chunk.append((path, content))
+            current_size += content_size
+
+        # Process final chunk if content remains
+        if current_chunk:
+            chunk_text = '\n'.join(f"{p}: {c}" for p, c in current_chunk)
+            chunk_count += 1
+
+            chunks.append({
+                'text': chunk_text,
+                'metadata': {
+                    'paths': [p for p, _ in current_chunk],
+                    'chunk_method': 'xml',
+                    'chunk_index': chunk_count,
+                    'max_size': max_size,
+                    'overlap': overlap,
+                    'language': language,
+                    'root_tag': root.tag,
+                    'xml_attributes': dict(root.attrib)
+                }
+            })
+
+        # Update total chunks count in metadata
+        for chunk in chunks:
+            chunk['metadata']['total_chunks'] = chunk_count
+
+        logging.debug(f"XML chunking complete. Created {len(chunks)} chunks")
         return chunks
+
     except ET.ParseError as e:
-        logging.error(f"Error parsing XML: {str(e)}")
+        logging.error(f"XML parsing error: {str(e)}")
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error during XML chunking: {str(e)}")
         raise
 
 #
