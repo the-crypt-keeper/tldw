@@ -11,6 +11,7 @@ import json
 import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
+import xml.etree.ElementTree as ET
 #
 # Import 3rd party
 from openai import OpenAI
@@ -23,7 +24,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 #
 # Import Local
-from App_Function_Libraries.Tokenization_Methods_Lib import openai_tokenize
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 #
 #######################################################################################################################
@@ -942,6 +942,65 @@ def chunk_ebook_by_chapters(text: str, chunk_options: Dict[str, Any]) -> List[Di
 
 #
 # End of ebook chapter chunking
+#######################################################################################################################
+#
+# XML Chunking
+
+def chunk_xml(xml_text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Chunk XML content while preserving structure.
+    """
+    logging.debug("chunk_xml started...")
+    try:
+        root = ET.fromstring(xml_text)
+        chunks = []
+
+        # Get chunking parameters
+        max_size = chunk_options.get('max_size', 1000)
+        overlap = chunk_options.get('overlap', 0)
+
+        # Process each major section/element
+        for element in root:
+            # Extract text content from the element and its children
+            text_content = []
+            for child in element.iter():
+                if child.text and child.text.strip():
+                    text_content.append(child.text.strip())
+
+            element_text = '\n'.join(text_content)
+
+            # Use existing chunking methods based on the content
+            element_chunks = chunk_text(
+                element_text,
+                method=chunk_options.get('method', 'words'),
+                max_size=max_size,
+                overlap=overlap,
+                language=chunk_options.get('language', None)
+            )
+
+            # Add metadata for each chunk
+            for i, chunk in enumerate(element_chunks):
+                metadata = {
+                    'element_tag': element.tag,
+                    'element_attributes': dict(element.attrib),
+                    'chunk_index': i + 1,
+                    'total_chunks': len(element_chunks),
+                    'chunk_method': 'xml',
+                    'max_size': max_size,
+                    'overlap': overlap
+                }
+                chunks.append({
+                    'text': chunk,
+                    'metadata': metadata
+                })
+
+        return chunks
+    except ET.ParseError as e:
+        logging.error(f"Error parsing XML: {str(e)}")
+        raise
+
+#
+# End of XML Chunking
 #######################################################################################################################
 
 #######################################################################################################################

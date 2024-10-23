@@ -4,11 +4,16 @@
 # Imports
 #
 # External Imports
+import logging
+
 import gradio as gr
 import textstat
 #
 # Local Imports
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+
+
 #
 ########################################################################################################################
 #
@@ -41,6 +46,16 @@ def grammar_style_check(input_text, custom_prompt, api_name, api_key, system_pro
 
 
 def create_grammar_style_check_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Grammar and Style Check", visible=True):
         with gr.Row():
             with gr.Column():
@@ -74,11 +89,11 @@ def create_grammar_style_check_tab():
                     inputs=[custom_prompt_checkbox],
                     outputs=[custom_prompt_input, system_prompt_input]
                 )
+                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],
-                    value=None,
-                    label="API for Grammar Check"
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Analysis (Optional)"
                 )
                 api_key_input = gr.Textbox(label="API Key (if not set in Config_Files/config.txt)", placeholder="Enter your API key here",
                                                type="password")

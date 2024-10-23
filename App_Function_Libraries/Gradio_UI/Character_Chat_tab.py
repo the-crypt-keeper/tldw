@@ -34,7 +34,10 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     delete_character_card,
     update_character_card, search_character_chats,
 )
-from App_Function_Libraries.Utils.Utils import sanitize_user_input
+from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
+    default_api_endpoint
+
+
 #
 ############################################################################################################
 #
@@ -252,6 +255,16 @@ def export_all_characters():
 # Gradio tabs
 
 def create_character_card_interaction_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Chat with a Character Card", visible=True):
         gr.Markdown("# Chat with a Character Card")
         with gr.Row():
@@ -265,13 +278,10 @@ def create_character_card_interaction_tab():
                 load_characters_button = gr.Button("Load Existing Characters")
                 character_dropdown = gr.Dropdown(label="Select Character", choices=[])
                 user_name_input = gr.Textbox(label="Your Name", placeholder="Enter your name here")
+                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
-                    choices=[
-                        "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                        "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace",
-                        "Custom-OpenAI-API"
-                    ],
-                    value="HuggingFace",
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
                     label="API for Interaction (Mandatory)"
                 )
                 api_key_input = gr.Textbox(
