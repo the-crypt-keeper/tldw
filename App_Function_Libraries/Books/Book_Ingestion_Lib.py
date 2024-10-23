@@ -18,6 +18,9 @@ import tempfile
 import zipfile
 from datetime import datetime
 import logging
+import xml.etree.ElementTree as ET
+import html2text
+import csv
 #
 # External Imports
 import ebooklib
@@ -239,6 +242,147 @@ def process_zip_file(zip_file,
         return f"Error processing ZIP file: {str(e)}"
 
     return "\n".join(results)
+
+
+def import_html(file_path, title=None, author=None, keywords=None, **kwargs):
+    """
+    Imports an HTML file and converts it to markdown format.
+    """
+    try:
+        logging.info(f"Importing HTML file from {file_path}")
+        h = html2text.HTML2Text()
+        h.ignore_links = False
+
+        with open(file_path, 'r', encoding='utf-8') as file:
+            html_content = file.read()
+
+        markdown_content = h.handle(html_content)
+
+        # Extract title from HTML if not provided
+        if not title:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            title_tag = soup.find('title')
+            title = title_tag.string if title_tag else os.path.basename(file_path)
+
+        return process_markdown_content(markdown_content, file_path, title, author, keywords, **kwargs)
+
+    except Exception as e:
+        logging.exception(f"Error importing HTML file: {str(e)}")
+        raise
+
+
+def import_xml(file_path, title=None, author=None, keywords=None, **kwargs):
+    """
+    Imports an XML file and converts it to markdown format.
+    """
+    try:
+        logging.info(f"Importing XML file from {file_path}")
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+
+        # Convert XML to markdown
+        markdown_content = xml_to_markdown(root)
+
+        return process_markdown_content(markdown_content, file_path, title, author, keywords, **kwargs)
+
+    except Exception as e:
+        logging.exception(f"Error importing XML file: {str(e)}")
+        raise
+
+
+def import_opml(file_path, title=None, author=None, keywords=None, **kwargs):
+    """
+    Imports an OPML file and converts it to markdown format.
+    """
+    try:
+        logging.info(f"Importing OPML file from {file_path}")
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+
+        # Extract title from OPML if not provided
+        if not title:
+            title_elem = root.find(".//title")
+            title = title_elem.text if title_elem is not None else os.path.basename(file_path)
+
+        # Convert OPML to markdown
+        markdown_content = opml_to_markdown(root)
+
+        return process_markdown_content(markdown_content, file_path, title, author, keywords, **kwargs)
+
+    except Exception as e:
+        logging.exception(f"Error importing OPML file: {str(e)}")
+        raise
+
+
+def xml_to_markdown(element, level=0):
+    """
+    Recursively converts XML elements to markdown format.
+    """
+    markdown = ""
+
+    # Add element name as heading
+    if level > 0:
+        markdown += f"{'#' * min(level, 6)} {element.tag}\n\n"
+
+    # Add element text if it exists
+    if element.text and element.text.strip():
+        markdown += f"{element.text.strip()}\n\n"
+
+    # Process child elements
+    for child in element:
+        markdown += xml_to_markdown(child, level + 1)
+
+    return markdown
+
+
+def opml_to_markdown(root):
+    """
+    Converts OPML structure to markdown format.
+    """
+    markdown = "# Table of Contents\n\n"
+
+    def process_outline(outline, level=0):
+        result = ""
+        for item in outline.findall("outline"):
+            text = item.get("text", "")
+            result += f"{'  ' * level}- {text}\n"
+            result += process_outline(item, level + 1)
+        return result
+
+    body = root.find(".//body")
+    if body is not None:
+        markdown += process_outline(body)
+
+    return markdown
+
+
+def process_markdown_content(markdown_content, file_path, title, author, keywords, **kwargs):
+    """
+    Processes markdown content and adds it to the database.
+    """
+    info_dict = {
+        'title': title or os.path.basename(file_path),
+        'uploader': author or "Unknown",
+        'ingestion_date': datetime.now().strftime('%Y-%m-%d')
+    }
+
+    # Create segments (you may want to adjust the chunking method)
+    segments = [{'Text': markdown_content}]
+
+    # Add to database
+    result = add_media_to_database(
+        url=file_path,
+        info_dict=info_dict,
+        segments=segments,
+        summary=kwargs.get('summary', "No summary provided"),
+        keywords=keywords.split(',') if keywords else [],
+        custom_prompt_input=kwargs.get('custom_prompt'),
+        whisper_model="Imported",
+        media_type="document",
+        overwrite=False
+    )
+
+    return f"Document '{title}' imported successfully. Database result: {result}"
 
 
 def import_file_handler(file,
