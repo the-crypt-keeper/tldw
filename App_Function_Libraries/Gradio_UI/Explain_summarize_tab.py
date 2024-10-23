@@ -17,6 +17,9 @@ from App_Function_Libraries.Summarization.Local_Summarization_Lib import summari
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, \
     summarize_with_cohere, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+
+
 #
 #
 ############################################################################################################
@@ -24,6 +27,16 @@ from App_Function_Libraries.Summarization.Summarization_General_Lib import summa
 # Functions:
 
 def create_summarize_explain_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Analyze Text", visible=True):
         gr.Markdown("# Analyze / Explain / Summarize Text without ingesting it into the DB")
         with gr.Row():
@@ -72,12 +85,11 @@ def create_summarize_explain_tab():
                                                      lines=3,
                                                      visible=False,
                                                      interactive=True)
+                    # Refactored API selection dropdown
                     api_endpoint = gr.Dropdown(
-                        choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                                 "OpenRouter",
-                                 "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace", "Custom-OpenAI-API"],
-                        value=None,
-                        label="API to be used for request (Mandatory)"
+                        choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                        value=default_value,
+                        label="API for Summarization/Analysis (Optional)"
                     )
                 with gr.Row():
                     api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here",

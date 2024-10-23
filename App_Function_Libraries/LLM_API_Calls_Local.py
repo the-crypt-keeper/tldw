@@ -251,8 +251,6 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
         # FIXME
         # Values literally c/p from the api docs....
         data = {
-            "max_context_length": 8096,
-            "max_length": 4096,
             "prompt": kobold_prompt,
             "temperature": 0.7,
             #"top_p": 0.9,

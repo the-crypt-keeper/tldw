@@ -17,6 +17,7 @@ from App_Function_Libraries.Chat import chat, save_chat_history, update_chat_con
 from App_Function_Libraries.DB.DB_Manager import add_chat_message, search_chat_conversations, create_chat_conversation, \
     get_chat_messages, update_chat_message, delete_chat_message, load_preset_prompts, db
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints
 
 
 #
@@ -201,6 +202,16 @@ def regenerate_last_message(history, media_content, selected_parts, api_endpoint
     return new_history, "Last message regenerated successfully."
 
 def create_chat_interface():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     custom_css = """
     .chatbot-container .message-wrap .message {
         font-size: 14px !important;
@@ -237,11 +248,12 @@ def create_chat_interface():
                 with gr.Row():
                     load_conversations_btn = gr.Button("Load Selected Conversation")
 
-                api_endpoint = gr.Dropdown(label="Select API Endpoint",
-                                           choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek",
-                                                    "Mistral", "OpenRouter",
-                                                    "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama",
-                                                    "HuggingFace"])
+                # Refactored API selection dropdown
+                api_endpoint = gr.Dropdown(
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Chat Interaction (Optional)"
+                )
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
                 custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
                                                      value=False,
@@ -412,6 +424,16 @@ def create_chat_interface():
 
 
 def create_chat_interface_stacked():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     custom_css = """
     .chatbot-container .message-wrap .message {
         font-size: 14px !important;
@@ -446,10 +468,12 @@ def create_chat_interface_stacked():
                     search_conversations_btn = gr.Button("Search Conversations")
                     load_conversations_btn = gr.Button("Load Selected Conversation")
             with gr.Column():
-                api_endpoint = gr.Dropdown(label="Select API Endpoint",
-                                           choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek",
-                                                    "OpenRouter", "Mistral", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi",
-                                                    "VLLM", "ollama", "HuggingFace"])
+                # Refactored API selection dropdown
+                api_endpoint = gr.Dropdown(
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Chat Interaction (Optional)"
+                )
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt",
                                             choices=load_preset_prompts(),
@@ -571,6 +595,16 @@ def create_chat_interface_stacked():
 
 # FIXME - System prompts
 def create_chat_interface_multi_api():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     custom_css = """
     .chatbot-container .message-wrap .message {
         font-size: 14px !important;
@@ -609,10 +643,12 @@ def create_chat_interface_multi_api():
             for i in range(3):
                 with gr.Column():
                     gr.Markdown(f"### Chat Window {i + 1}")
-                    api_endpoint = gr.Dropdown(label=f"API Endpoint {i + 1}",
-                                               choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
-                                                        "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold",
-                                                        "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"])
+                    # Refactored API selection dropdown
+                    api_endpoint = gr.Dropdown(
+                        choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                        value=default_value,
+                        label="API for Chat Interaction (Optional)"
+                    )
                     api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
                     temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.05,
                                             value=0.7)
@@ -749,6 +785,16 @@ def create_chat_interface_multi_api():
 
 
 def create_chat_interface_four():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     custom_css = """
     .chatbot-container .message-wrap .message {
         font-size: 14px !important;
@@ -781,13 +827,11 @@ def create_chat_interface_four():
         def create_single_chat_interface(index, user_prompt_component):
             with gr.Column():
                 gr.Markdown(f"### Chat Window {index + 1}")
+                # Refactored API selection dropdown
                 api_endpoint = gr.Dropdown(
-                    label=f"API Endpoint {index + 1}",
-                    choices=[
-                        "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq",
-                        "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp", "Kobold",
-                        "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"
-                    ]
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Chat Interaction (Optional)"
                 )
                 api_key = gr.Textbox(
                     label=f"API Key {index + 1} (if required)",

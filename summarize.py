@@ -82,12 +82,7 @@ file_handler = RotatingFileHandler(
     log_file_path, maxBytes=max_bytes, backupCount=backup_count
 )
 
-global_api_endpoints = ["anthropic", "cohere", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
-# Setup Default API Endpoint
-loaded_config_data = load_and_log_configs()
 
-default_api_endpoint = loaded_config_data['default_api']
-print(f"Default API Endpoint: {default_api_endpoint}")
 #
 #
 #######################
