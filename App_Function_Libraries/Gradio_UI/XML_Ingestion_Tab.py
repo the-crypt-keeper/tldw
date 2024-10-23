@@ -3,16 +3,13 @@
 #
 # Imports
 import logging
-import os
-import xml.etree.ElementTree as ET
 #
 # External Imports
 import gradio as gr
-
-from App_Function_Libraries.Plaintext.XML_Ingestion_Lib import import_xml_handler
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+from App_Function_Libraries.Plaintext.XML_Ingestion_Lib import import_xml_handler
 #
 #######################################################################################################################
 #
@@ -37,13 +34,12 @@ def create_xml_import_tab():
                 gr.Markdown("Upload XML files for import")
                 import_file = gr.File(label="Upload XML file", file_types=[".xml"])
                 title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
-                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords, comma-separated")
                 system_prompt_input = gr.Textbox(label="System Prompt (for Summarization)", lines=3,
                                                  value="""<s>[Your default system prompt here]</s>""")
                 custom_prompt_input = gr.Textbox(label="Custom User Prompt",
                                                  placeholder="Enter a custom user prompt for summarization (optional)")
-                auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
+                auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize/analyze", value=False)
                 api_name_input = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                     value=default_value,
@@ -56,12 +52,12 @@ def create_xml_import_tab():
 
         import_button.click(
             fn=import_xml_handler,
-            inputs=[import_file, title_input, author_input, keywords_input, system_prompt_input,
+            inputs=[import_file, title_input, keywords_input, system_prompt_input,
                     custom_prompt_input, auto_summarize_checkbox, api_name_input, api_key_input],
             outputs=import_output
         )
 
-    return import_file, title_input, author_input, keywords_input, system_prompt_input, custom_prompt_input, auto_summarize_checkbox, api_name_input, api_key_input, import_button, import_output
+    return import_file, title_input, keywords_input, system_prompt_input, custom_prompt_input, auto_summarize_checkbox, api_name_input, api_key_input, import_button, import_output
 
 #
 # End of XML_Ingestion_Tab.py
