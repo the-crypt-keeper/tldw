@@ -49,7 +49,7 @@
     - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh`
       - `bash MacOS-Run-Install-Update.sh`
       - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
-    - **Windows:** `curl -O https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat` && `curl -O https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
+    - **Windows:** `curl -O https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Install_Update.bat` and then `curl -O https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Windows_Run_tldw.bat`
         - Then double-click the downloaded batch file `Windows_Install_Update.bat` to install it, and `Windows_Run_tldw.bat` to run it.
         - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
         - If you don't have CUDA installed on your system and available in your system path, go here: https://github.com/Purfview/whisper-standalone-win/releases/download/Faster-Whisper-XXL/Faster-Whisper-XXL_r192.3.4_windows.7z
