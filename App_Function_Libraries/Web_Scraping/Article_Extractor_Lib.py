@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import tempfile
-from typing import Any, Dict, List, Union, Optional
+from typing import Any, Dict, List, Union, Optional, Tuple
 #
 # 3rd-Party Imports
 import asyncio
@@ -28,10 +28,11 @@ from xml.dom import minidom
 import xml.etree.ElementTree as ET
 #
 # External Libraries
+from bs4 import BeautifulSoup
+import pandas as pd
+from playwright.async_api import async_playwright
 import requests
 import trafilatura
-from playwright.async_api import async_playwright
-from bs4 import BeautifulSoup
 #
 # Import Local
 from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
@@ -56,7 +57,7 @@ def get_page_title(url: str) -> str:
         return "Untitled"
 
 
-async def scrape_article(url, custom_cookies: Optional[List[Dict[str, Any]]] = None):
+async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     async def fetch_html(url: str) -> str:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -67,7 +68,7 @@ async def scrape_article(url, custom_cookies: Optional[List[Dict[str, Any]]] = N
                 await context.add_cookies(custom_cookies)
             page = await context.new_page()
             await page.goto(url)
-            await page.wait_for_load_state("networkidle")  # Wait for the network to be idle
+            await page.wait_for_load_state("networkidle")
             content = await page.content()
             await browser.close()
             return content
@@ -87,7 +88,16 @@ async def scrape_article(url, custom_cookies: Optional[List[Dict[str, Any]]] = N
         }
 
         if downloaded:
-            result['content'] = downloaded
+            # Add metadata to content
+            result['content'] = ContentMetadataHandler.format_content_with_metadata(
+                url=url,
+                content=downloaded,
+                pipeline="Trafilatura",
+                additional_metadata={
+                    "extracted_date": metadata.date if metadata and metadata.date else 'N/A',
+                    "author": metadata.author if metadata and metadata.author else 'N/A'
+                }
+            )
             result['extraction_successful'] = True
 
         if metadata:
@@ -211,7 +221,9 @@ def scrape_and_no_summarize_then_ingest(url, keywords, custom_article_title):
         # Step 2: Ingest the article into the database
         ingestion_result = ingest_article_to_db(url, title, author, content, keywords, ingestion_date, None, None)
 
-        return f"Title: {title}\nAuthor: {author}\nIngestion Result: {ingestion_result}\n\nArticle Contents: {content}"
+        # When displaying content, we might want to strip metadata
+        display_content = ContentMetadataHandler.strip_metadata(content)
+        return f"Title: {title}\nAuthor: {author}\nIngestion Result: {ingestion_result}\n\nArticle Contents: {display_content}"
     except Exception as e:
         logging.error(f"Error processing URL {url}: {str(e)}")
         return f"Failed to process URL {url}: {str(e)}"
@@ -637,6 +649,72 @@ def collect_bookmarks(file_path: str) -> Dict[str, Union[str, List[str]]]:
         logging.error(f"Error loading bookmarks: {e}")
         return {}
 
+
+def parse_csv_urls(file_path: str) -> Dict[str, Union[str, List[str]]]:
+    """
+    Parse URLs from a CSV file. The CSV should have at minimum a 'url' column,
+    and optionally a 'title' or 'name' column.
+
+    :param file_path: Path to the CSV file
+    :return: Dictionary with titles/names as keys and URLs as values
+    """
+    try:
+        # Read CSV file
+        df = pd.read_csv(file_path)
+
+        # Check if required columns exist
+        if 'url' not in df.columns:
+            raise ValueError("CSV must contain a 'url' column")
+
+        # Initialize result dictionary
+        urls_dict = {}
+
+        # Determine which column to use as key
+        key_column = next((col for col in ['title', 'name'] if col in df.columns), None)
+
+        for idx in range(len(df)):
+            url = df.iloc[idx]['url'].strip()
+
+            # Use title/name if available, otherwise use URL as key
+            if key_column:
+                key = df.iloc[idx][key_column].strip()
+            else:
+                key = f"Article {idx + 1}"
+
+            # Handle duplicate keys
+            if key in urls_dict:
+                if isinstance(urls_dict[key], list):
+                    urls_dict[key].append(url)
+                else:
+                    urls_dict[key] = [urls_dict[key], url]
+            else:
+                urls_dict[key] = url
+
+        return urls_dict
+
+    except pd.errors.EmptyDataError:
+        logging.error("The CSV file is empty")
+        return {}
+    except Exception as e:
+        logging.error(f"Error parsing CSV file: {str(e)}")
+        return {}
+
+
+def collect_urls_from_file(file_path: str) -> Dict[str, Union[str, List[str]]]:
+    """
+    Unified function to collect URLs from either bookmarks or CSV files.
+
+    :param file_path: Path to the file (bookmarks or CSV)
+    :return: Dictionary with names as keys and URLs as values
+    """
+    _, ext = os.path.splitext(file_path)
+    ext = ext.lower()
+
+    if ext == '.csv':
+        return parse_csv_urls(file_path)
+    else:
+        return collect_bookmarks(file_path)
+
 # Usage:
 # from Article_Extractor_Lib import collect_bookmarks
 #
@@ -662,6 +740,138 @@ def collect_bookmarks(file_path: str) -> Dict[str, Union[str, List[str]]]:
 #
 # End of Bookmarking Parsing Functions
 #####################################################################
+
+
+#####################################################################
+#
+# Article Scraping Metadata Functions
+
+class ContentMetadataHandler:
+    """Handles the addition and parsing of metadata for scraped content."""
+
+    METADATA_START = "[METADATA]"
+    METADATA_END = "[/METADATA]"
+
+    @staticmethod
+    def format_content_with_metadata(
+            url: str,
+            content: str,
+            pipeline: str = "Trafilatura",
+            additional_metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Format content with metadata header.
+
+        Args:
+            url: The source URL
+            content: The scraped content
+            pipeline: The scraping pipeline used
+            additional_metadata: Optional dictionary of additional metadata to include
+
+        Returns:
+            Formatted content with metadata header
+        """
+        metadata = {
+            "url": url,
+            "ingestion_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "content_hash": hashlib.sha256(content.encode('utf-8')).hexdigest(),
+            "scraping_pipeline": pipeline
+        }
+
+        # Add any additional metadata
+        if additional_metadata:
+            metadata.update(additional_metadata)
+
+        formatted_content = f"""{ContentMetadataHandler.METADATA_START}
+{json.dumps(metadata, indent=2)}
+{ContentMetadataHandler.METADATA_END}
+
+{content}"""
+
+        return formatted_content
+
+    @staticmethod
+    def extract_metadata(content: str) -> Tuple[Dict[str, Any], str]:
+        """
+        Extract metadata and content separately.
+
+        Args:
+            content: The full content including metadata
+
+        Returns:
+            Tuple of (metadata dict, clean content)
+        """
+        try:
+            metadata_start = content.index(ContentMetadataHandler.METADATA_START) + len(
+                ContentMetadataHandler.METADATA_START)
+            metadata_end = content.index(ContentMetadataHandler.METADATA_END)
+            metadata_json = content[metadata_start:metadata_end].strip()
+            metadata = json.loads(metadata_json)
+            clean_content = content[metadata_end + len(ContentMetadataHandler.METADATA_END):].strip()
+            return metadata, clean_content
+        except (ValueError, json.JSONDecodeError) as e:
+            return {}, content
+
+    @staticmethod
+    def has_metadata(content: str) -> bool:
+        """
+        Check if content contains metadata.
+
+        Args:
+            content: The content to check
+
+        Returns:
+            bool: True if metadata is present
+        """
+        return (ContentMetadataHandler.METADATA_START in content and
+                ContentMetadataHandler.METADATA_END in content)
+
+    @staticmethod
+    def strip_metadata(content: str) -> str:
+        """
+        Remove metadata from content if present.
+
+        Args:
+            content: The content to strip metadata from
+
+        Returns:
+            Content without metadata
+        """
+        try:
+            metadata_end = content.index(ContentMetadataHandler.METADATA_END)
+            return content[metadata_end + len(ContentMetadataHandler.METADATA_END):].strip()
+        except ValueError:
+            return content
+
+    @staticmethod
+    def get_content_hash(content: str) -> str:
+        """
+        Get hash of content without metadata.
+
+        Args:
+            content: The content to hash
+
+        Returns:
+            SHA-256 hash of the clean content
+        """
+        clean_content = ContentMetadataHandler.strip_metadata(content)
+        return hashlib.sha256(clean_content.encode('utf-8')).hexdigest()
+
+    @staticmethod
+    def content_changed(old_content: str, new_content: str) -> bool:
+        """
+        Check if content has changed by comparing hashes.
+
+        Args:
+            old_content: Previous version of content
+            new_content: New version of content
+
+        Returns:
+            bool: True if content has changed
+        """
+        old_hash = ContentMetadataHandler.get_content_hash(old_content)
+        new_hash = ContentMetadataHandler.get_content_hash(new_content)
+        return old_hash != new_hash
 
 #
 # End of Article_Extractor_Lib.py
