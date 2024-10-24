@@ -3,15 +3,482 @@
 #
 # Imports
 import json
+import logging
+from datetime import datetime
+from typing import Dict, Any
+
 #
 # External Imports
 import gradio as gr
+#from outlines import models, prompts
 #
 # Local Imports
+from App_Function_Libraries.Gradio_UI.Chat_ui import chat_wrapper
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints
 #
 ############################################################################################################
 #
 # Functions:
+
+# def create_anki_generation_tab():
+#     try:
+#         default_value = None
+#         if default_api_endpoint:
+#             if default_api_endpoint in global_api_endpoints:
+#                 default_value = format_api_name(default_api_endpoint)
+#             else:
+#                 logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+#     except Exception as e:
+#         logging.error(f"Error setting default API endpoint: {str(e)}")
+#         default_value = None
+#     with gr.TabItem("Anki Flashcard Generation", visible=True):
+#         gr.Markdown("# Anki Flashcard Generation")
+#         chat_history = gr.State([])
+#         generated_cards_state = gr.State({})
+#
+#         # Add progress tracking
+#         generation_progress = gr.Progress()
+#         status_message = gr.Status()
+#
+#         with gr.Row():
+#             # Left Column: Generation Controls
+#             with gr.Column(scale=1):
+#                 gr.Markdown("## Content Input")
+#                 source_text = gr.TextArea(
+#                     label="Source Text or Topic",
+#                     placeholder="Enter the text or topic you want to create flashcards from...",
+#                     lines=5
+#                 )
+#
+#                 # API Configuration
+#                 api_endpoint = gr.Dropdown(
+#                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+#                     value=default_value,
+#                     label="API for Card Generation"
+#                 )
+#                 api_key = gr.Textbox(label="API Key (if required)", type="password")
+#
+#                 with gr.Accordion("Generation Settings", open=True):
+#                     num_cards = gr.Slider(
+#                         minimum=1,
+#                         maximum=20,
+#                         value=5,
+#                         step=1,
+#                         label="Number of Cards"
+#                     )
+#
+#                     card_types = gr.CheckboxGroup(
+#                         choices=["basic", "cloze", "reverse"],
+#                         value=["basic"],
+#                         label="Card Types to Generate"
+#                     )
+#
+#                     difficulty_level = gr.Radio(
+#                         choices=["beginner", "intermediate", "advanced"],
+#                         value="intermediate",
+#                         label="Difficulty Level"
+#                     )
+#
+#                     subject_area = gr.Dropdown(
+#                         choices=[
+#                             "general",
+#                             "language_learning",
+#                             "science",
+#                             "mathematics",
+#                             "history",
+#                             "geography",
+#                             "computer_science",
+#                             "custom"
+#                         ],
+#                         value="general",
+#                         label="Subject Area"
+#                     )
+#
+#                     custom_subject = gr.Textbox(
+#                         label="Custom Subject",
+#                         visible=False,
+#                         placeholder="Enter custom subject..."
+#                     )
+#
+#                 with gr.Accordion("Advanced Options", open=False):
+#                     temperature = gr.Slider(
+#                         label="Temperature",
+#                         minimum=0.00,
+#                         maximum=1.0,
+#                         step=0.05,
+#                         value=0.7
+#                     )
+#
+#                     max_retries = gr.Slider(
+#                         label="Max Retries on Error",
+#                         minimum=1,
+#                         maximum=5,
+#                         step=1,
+#                         value=3
+#                     )
+#
+#                     include_examples = gr.Checkbox(
+#                         label="Include example usage",
+#                         value=True
+#                     )
+#
+#                     include_mnemonics = gr.Checkbox(
+#                         label="Generate mnemonics",
+#                         value=True
+#                     )
+#
+#                     include_hints = gr.Checkbox(
+#                         label="Include hints",
+#                         value=True
+#                     )
+#
+#                     tag_style = gr.Radio(
+#                         choices=["broad", "specific", "hierarchical"],
+#                         value="specific",
+#                         label="Tag Style"
+#                     )
+#
+#                     system_prompt = gr.Textbox(
+#                         label="System Prompt",
+#                         value="You are an expert at creating effective Anki flashcards.",
+#                         lines=2
+#                     )
+#
+#                 generate_button = gr.Button("Generate Flashcards")
+#                 regenerate_button = gr.Button("Regenerate", visible=False)
+#                 error_log = gr.TextArea(
+#                     label="Error Log",
+#                     visible=False,
+#                     lines=3
+#                 )
+#
+#             # Right Column: Chat Interface and Preview
+#             with gr.Column(scale=1):
+#                 gr.Markdown("## Interactive Card Generation")
+#                 chatbot = gr.Chatbot(height=400, elem_classes="chatbot-container")
+#
+#                 with gr.Row():
+#                     msg = gr.Textbox(
+#                         label="Chat to refine cards",
+#                         placeholder="Ask questions or request modifications..."
+#                     )
+#                     submit_chat = gr.Button("Submit")
+#
+#                 gr.Markdown("## Generated Cards Preview")
+#                 generated_cards = gr.JSON(label="Generated Flashcards")
+#
+#                 with gr.Row():
+#                     edit_generated = gr.Button("Edit in Validator")
+#                     save_generated = gr.Button("Save to File")
+#                     clear_chat = gr.Button("Clear Chat")
+#
+#                 generation_status = gr.Markdown("")
+#                 download_file = gr.File(label="Download Cards", visible=False)
+#
+#         # Helper Functions and Classes
+#         class AnkiCardGenerator:
+#             def __init__(self):
+#                 self.schema = {
+#                     "type": "object",
+#                     "properties": {
+#                         "cards": {
+#                             "type": "array",
+#                             "items": {
+#                                 "type": "object",
+#                                 "properties": {
+#                                     "id": {"type": "string"},
+#                                     "type": {"type": "string", "enum": ["basic", "cloze", "reverse"]},
+#                                     "front": {"type": "string"},
+#                                     "back": {"type": "string"},
+#                                     "tags": {
+#                                         "type": "array",
+#                                         "items": {"type": "string"}
+#                                     },
+#                                     "note": {"type": "string"}
+#                                 },
+#                                 "required": ["id", "type", "front", "back", "tags"]
+#                             }
+#                         }
+#                     },
+#                     "required": ["cards"]
+#                 }
+#
+#                 self.template = prompts.TextTemplate("""
+#                 Generate {num_cards} Anki flashcards about: {text}
+#
+#                 Requirements:
+#                 - Difficulty: {difficulty}
+#                 - Subject: {subject}
+#                 - Card Types: {card_types}
+#                 - Include Examples: {include_examples}
+#                 - Include Mnemonics: {include_mnemonics}
+#                 - Include Hints: {include_hints}
+#                 - Tag Style: {tag_style}
+#
+#                 Each card must have:
+#                 1. Unique ID starting with CARD_
+#                 2. Type (one of: basic, cloze, reverse)
+#                 3. Clear question/prompt on front
+#                 4. Comprehensive answer on back
+#                 5. Relevant tags including subject and difficulty
+#                 6. Optional note with study tips or mnemonics
+#
+#                 For cloze deletions, use the format {{c1::text to be hidden}}.
+#
+#                 Ensure each card:
+#                 - Focuses on a single concept
+#                 - Is clear and unambiguous
+#                 - Uses appropriate formatting
+#                 - Has relevant tags
+#                 - Includes requested additional information
+#                 """)
+#
+#             async def generate_with_progress(
+#                     self,
+#                     text: str,
+#                     config: Dict[str, Any],
+#                     progress: gr.Progress
+#             ) -> GenerationResult:
+#                 try:
+#                     # Initialize progress
+#                     progress(0, desc="Initializing generation...")
+#
+#                     # Configure model
+#                     model = models.Model(config["api_endpoint"])
+#
+#                     # Generate with schema validation
+#                     progress(0.3, desc="Generating cards...")
+#                     response = await model.generate(
+#                         self.template,
+#                         schema=self.schema,
+#                         text=text,
+#                         **config
+#                     )
+#
+#                     # Validate response
+#                     progress(0.6, desc="Validating generated cards...")
+#                     validated_cards = self.validate_cards(response)
+#
+#                     # Final processing
+#                     progress(0.9, desc="Finalizing...")
+#                     time.sleep(0.5)  # Brief pause for UI feedback
+#                     return GenerationResult(
+#                         cards=validated_cards,
+#                         error=None,
+#                         status="Generation completed successfully!",
+#                         progress=1.0
+#                     )
+#
+#                 except Exception as e:
+#                     logging.error(f"Card generation error: {str(e)}")
+#                     return GenerationResult(
+#                         cards=None,
+#                         error=str(e),
+#                         status=f"Error: {str(e)}",
+#                         progress=1.0
+#                     )
+#
+#             def validate_cards(self, cards: Dict[str, Any]) -> Dict[str, Any]:
+#                 """Validate and clean generated cards"""
+#                 if not isinstance(cards, dict) or "cards" not in cards:
+#                     raise ValueError("Invalid card format")
+#
+#                 seen_ids = set()
+#                 cleaned_cards = []
+#
+#                 for card in cards["cards"]:
+#                     # Check ID uniqueness
+#                     if card["id"] in seen_ids:
+#                         card["id"] = f"{card['id']}_{len(seen_ids)}"
+#                     seen_ids.add(card["id"])
+#
+#                     # Validate card type
+#                     if card["type"] not in ["basic", "cloze", "reverse"]:
+#                         raise ValueError(f"Invalid card type: {card['type']}")
+#
+#                     # Check content
+#                     if not card["front"].strip() or not card["back"].strip():
+#                         raise ValueError("Empty card content")
+#
+#                     # Validate cloze format
+#                     if card["type"] == "cloze" and "{{c1::" not in card["front"]:
+#                         raise ValueError("Invalid cloze format")
+#
+#                     # Clean and standardize tags
+#                     if not isinstance(card["tags"], list):
+#                         card["tags"] = [str(card["tags"])]
+#                     card["tags"] = [tag.strip().lower() for tag in card["tags"] if tag.strip()]
+#
+#                     cleaned_cards.append(card)
+#
+#                 return {"cards": cleaned_cards}
+#
+#         # Initialize generator
+#         generator = AnkiCardGenerator()
+#
+#         async def generate_flashcards(*args):
+#             text, num_cards, card_types, difficulty, subject, custom_subject, \
+#                 include_examples, include_mnemonics, include_hints, tag_style, \
+#                 temperature, api_endpoint, api_key, system_prompt, max_retries = args
+#
+#             actual_subject = custom_subject if subject == "custom" else subject
+#
+#             config = {
+#                 "num_cards": num_cards,
+#                 "difficulty": difficulty,
+#                 "subject": actual_subject,
+#                 "card_types": card_types,
+#                 "include_examples": include_examples,
+#                 "include_mnemonics": include_mnemonics,
+#                 "include_hints": include_hints,
+#                 "tag_style": tag_style,
+#                 "temperature": temperature,
+#                 "api_endpoint": api_endpoint,
+#                 "api_key": api_key,
+#                 "system_prompt": system_prompt
+#             }
+#
+#             errors = []
+#             retry_count = 0
+#
+#             while retry_count < max_retries:
+#                 try:
+#                     result = await generator.generate_with_progress(text, config, generation_progress)
+#
+#                     if result.error:
+#                         errors.append(f"Attempt {retry_count + 1}: {result.error}")
+#                         retry_count += 1
+#                         await asyncio.sleep(1)
+#                         continue
+#
+#                     return (
+#                         result.cards,
+#                         gr.update(visible=True),
+#                         result.status,
+#                         gr.update(visible=False),
+#                         [[None, "Cards generated! You can now modify them through chat."]]
+#                     )
+#
+#                 except Exception as e:
+#                     errors.append(f"Attempt {retry_count + 1}: {str(e)}")
+#                     retry_count += 1
+#                     await asyncio.sleep(1)
+#
+#             error_log = "\n".join(errors)
+#             return (
+#                 None,
+#                 gr.update(visible=False),
+#                 "Failed to generate cards after all retries",
+#                 gr.update(value=error_log, visible=True),
+#                 [[None, "Failed to generate cards. Please check the error log."]]
+#             )
+#
+#         def save_generated_cards(cards):
+#             if not cards:
+#                 return "No cards to save", None
+#
+#             try:
+#                 cards_json = json.dumps(cards, indent=2)
+#                 current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+#                 filename = f"anki_cards_{current_time}.json"
+#
+#                 return (
+#                     "Cards saved successfully!",
+#                     (filename, cards_json, "application/json")
+#                 )
+#             except Exception as e:
+#                 logging.error(f"Error saving cards: {e}")
+#                 return f"Error saving cards: {str(e)}", None
+#
+#         def clear_chat_history():
+#             return [], [], "Chat cleared"
+#
+#         def toggle_custom_subject(choice):
+#             return gr.update(visible=choice == "custom")
+#
+#         def send_to_validator(cards):
+#             if not cards:
+#                 return "No cards to validate"
+#             try:
+#                 # Here you would integrate with your validation tab
+#                 validated_cards = generator.validate_cards(cards)
+#                 return "Cards validated and sent to validator"
+#             except Exception as e:
+#                 logging.error(f"Validation error: {e}")
+#                 return f"Validation error: {str(e)}"
+#
+#         # Register callbacks
+#         subject_area.change(
+#             fn=toggle_custom_subject,
+#             inputs=subject_area,
+#             outputs=custom_subject
+#         )
+#
+#         generate_button.click(
+#             fn=generate_flashcards,
+#             inputs=[
+#                 source_text, num_cards, card_types, difficulty_level,
+#                 subject_area, custom_subject, include_examples,
+#                 include_mnemonics, include_hints, tag_style,
+#                 temperature, api_endpoint, api_key, system_prompt,
+#                 max_retries
+#             ],
+#             outputs=[
+#                 generated_cards,
+#                 regenerate_button,
+#                 generation_status,
+#                 error_log,
+#                 chatbot
+#             ]
+#         )
+#
+#         regenerate_button.click(
+#             fn=generate_flashcards,
+#             inputs=[
+#                 source_text, num_cards, card_types, difficulty_level,
+#                 subject_area, custom_subject, include_examples,
+#                 include_mnemonics, include_hints, tag_style,
+#                 temperature, api_endpoint, api_key, system_prompt,
+#                 max_retries
+#             ],
+#             outputs=[
+#                 generated_cards,
+#                 regenerate_button,
+#                 generation_status,
+#                 error_log,
+#                 chatbot
+#             ]
+#         )
+#
+#         clear_chat.click(
+#             fn=clear_chat_history,
+#             outputs=[chatbot, chat_history, generation_status]
+#         )
+#
+#         edit_generated.click(
+#             fn=send_to_validator,
+#             inputs=generated_cards,
+#             outputs=generation_status
+#         )
+#
+#         save_generated.click(
+#             fn=save_generated_cards,
+#             inputs=generated_cards,
+#             outputs=[generation_status, download_file]
+#         )
+#
+#         return (
+#             source_text, num_cards, card_types, difficulty_level,
+#             subject_area, custom_subject, include_examples,
+#             include_mnemonics, include_hints, tag_style,
+#             api_endpoint, api_key, temperature, system_prompt,
+#             generate_button, regenerate_button, generated_cards,
+#             edit_generated, save_generated, clear_chat,
+#             generation_status, chatbot, msg, submit_chat,
+#             chat_history, generated_cards_state, download_file,
+#             error_log, max_retries
+#         )
+
 
 def create_anki_validation_tab():
     with gr.TabItem("Anki Flashcard Validation", visible=True):
