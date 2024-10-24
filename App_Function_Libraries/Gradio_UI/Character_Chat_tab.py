@@ -2,10 +2,10 @@
 # Description: Library for character card import functions
 #
 # Imports
+from datetime import datetime
 import re
 import tempfile
 import uuid
-from datetime import datetime
 import json
 import logging
 import io
@@ -308,7 +308,7 @@ def create_character_card_interaction_tab():
                 auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=True)
                 chat_media_name = gr.Textbox(label="Custom Chat Name (optional)", visible=True)
                 save_chat_history_to_db = gr.Button("Save Chat History to Database")
-                save_status = gr.Textbox(label="Save Status", interactive=False)
+                save_status = gr.Textbox(label="Status", interactive=False)
 
             with gr.Column(scale=2):
                 chat_history = gr.Chatbot(label="Conversation", height=800)
@@ -1067,13 +1067,17 @@ def create_character_chat_mgmt_tab():
             gr.Markdown("## Chat Management")
             select_chat = gr.Dropdown(label="Select Chat", choices=[], visible=False, interactive=True)
             load_chat_button = gr.Button("Load Selected Chat", visible=False)
-            conversation_list = gr.Dropdown(label="Select Conversation or Character", choices=[])
+            conversation_list = gr.Dropdown(label="Select Conversatio", choices=[])
             conversation_mapping = gr.State({})
 
         with gr.Tabs():
             with gr.TabItem("Edit", visible=True):
                 chat_content = gr.TextArea(label="Chat/Character Content (JSON)", lines=20, max_lines=50)
                 save_button = gr.Button("Save Changes")
+                export_chat_button = gr.Button("Export Current Conversation", variant="secondary")
+                export_all_chats_button = gr.Button("Export All Character Conversations", variant="secondary")
+                export_file = gr.File(label="Downloaded File", visible=False)
+                export_status = gr.Markdown("")
                 delete_button = gr.Button("Delete Conversation/Character", variant="stop")
 
             with gr.TabItem("Preview", visible=True):
@@ -1316,6 +1320,90 @@ def create_character_chat_mgmt_tab():
 
             return "Import results:\n" + "\n".join(results)
 
+        def export_current_conversation(selected_chat):
+            if not selected_chat:
+                return "Please select a conversation to export.", None
+
+            try:
+                chat_id = int(selected_chat.split('(ID: ')[1].rstrip(')'))
+                chat = get_character_chat_by_id(chat_id)
+
+                if not chat:
+                    return "Selected chat not found.", None
+
+                # Ensure chat_history is properly parsed
+                chat_history = chat['chat_history']
+                if isinstance(chat_history, str):
+                    chat_history = json.loads(chat_history)
+
+                export_data = {
+                    "conversation_id": chat['id'],
+                    "conversation_name": chat['conversation_name'],
+                    "character_id": chat['character_id'],
+                    "chat_history": chat_history,
+                    "exported_at": datetime.now().isoformat()
+                }
+
+                # Convert to JSON string
+                json_str = json.dumps(export_data, indent=2, ensure_ascii=False)
+
+                # Create file name
+                file_name = f"conversation_{chat['id']}_{chat['conversation_name']}.json"
+
+                # Return file for download
+                return "Conversation exported successfully!", (file_name, json_str, "application/json")
+
+            except Exception as e:
+                logging.error(f"Error exporting conversation: {e}")
+                return f"Error exporting conversation: {str(e)}", None
+
+        def export_all_character_conversations(character_selection):
+            if not character_selection:
+                return "Please select a character first.", None
+
+            try:
+                character_id = int(character_selection.split('(ID: ')[1].rstrip(')'))
+                character = get_character_card_by_id(character_id)
+                chats = get_character_chats(character_id=character_id)
+
+                if not chats:
+                    return "No conversations found for this character.", None
+
+                # Process chat histories
+                conversations = []
+                for chat in chats:
+                    chat_history = chat['chat_history']
+                    if isinstance(chat_history, str):
+                        chat_history = json.loads(chat_history)
+
+                    conversations.append({
+                        "conversation_id": chat['id'],
+                        "conversation_name": chat['conversation_name'],
+                        "chat_history": chat_history
+                    })
+
+                export_data = {
+                    "character": {
+                        "id": character['id'],
+                        "name": character['name']
+                    },
+                    "conversations": conversations,
+                    "exported_at": datetime.now().isoformat()
+                }
+
+                # Convert to JSON string
+                json_str = json.dumps(export_data, indent=2, ensure_ascii=False)
+
+                # Create file name
+                file_name = f"all_conversations_{character['name']}_{character['id']}.json"
+
+                # Return file for download
+                return "All conversations exported successfully!", (file_name, json_str, "application/json")
+
+            except Exception as e:
+                logging.error(f"Error exporting all conversations: {e}")
+                return f"Error exporting conversations: {str(e)}", None
+
         # Register new callback for character import
         import_characters_button.click(
             fn=import_multiple_characters,
@@ -1376,6 +1464,18 @@ def create_character_chat_mgmt_tab():
         load_characters_button.click(
             fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
             outputs=select_character
+        )
+
+        export_chat_button.click(
+            fn=export_current_conversation,
+            inputs=[select_chat],
+            outputs=[export_status, export_file]
+        )
+
+        export_all_chats_button.click(
+            fn=export_all_character_conversations,
+            inputs=[select_character],
+            outputs=[export_status, export_file]
         )
 
         return (

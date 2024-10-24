@@ -62,7 +62,8 @@ from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
 from App_Function_Libraries.Gradio_UI.Chat_Workflows import chat_workflows_tab
 from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_view_tab, \
-    create_view_all_with_versions_tab, create_viewing_tab
+    create_view_all_mediadb_with_versions_tab, create_viewing_mediadb_tab, create_view_all_rag_notes_tab, \
+    create_viewing_ragdb_tab
 #
 # Gradio UI Imports
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
@@ -315,10 +316,10 @@ def launch_ui(share_public=None, server_mode=False):
                 create_export_characters_tab()
 
             with gr.TabItem("View DB Items", id="view db items group", visible=True):
-                # This one works
-                create_view_all_with_versions_tab()
-                # This one is WIP
-                create_viewing_tab()
+                create_view_all_mediadb_with_versions_tab()
+                create_viewing_mediadb_tab()
+                create_view_all_rag_notes_tab()
+                create_viewing_ragdb_tab()
                 create_prompt_view_tab()
 
             with gr.TabItem("Prompts", id='view prompts group', visible=True):

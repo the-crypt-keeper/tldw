@@ -21,7 +21,7 @@ from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_
 #
 # Local Imports
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, \
-    scrape_article, collect_bookmarks, scrape_and_summarize_multiple
+    scrape_article, collect_bookmarks, scrape_and_summarize_multiple, collect_urls_from_file
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
@@ -374,19 +374,24 @@ def create_website_scraping_tab():
                     value="default,no_keyword_set",
                     visible=True
                 )
-                # Updated: Added output to display parsed URLs
                 bookmarks_file_input = gr.File(
-                    label="Upload Bookmarks File",
+                    label="Upload Bookmarks File/CSV",
                     type="filepath",
-                    file_types=[".json", ".html"],
+                    file_types=[".json", ".html", ".csv"],  # Added .csv
                     visible=True
                 )
+                gr.Markdown("""
+                Supported file formats:
+                - Chrome/Edge bookmarks (JSON)
+                - Firefox bookmarks (HTML)
+                - CSV file with 'url' column (optionally 'title' or 'name' column)
+                """)
                 parsed_urls_output = gr.Textbox(
-                    label="Parsed URLs from Bookmarks",
-                    placeholder="URLs will be displayed here after uploading a bookmarks file.",
+                    label="Parsed URLs",
+                    placeholder="URLs will be displayed here after uploading a file.",
                     lines=10,
                     interactive=False,
-                    visible=False  # Initially hidden, shown only when URLs are parsed
+                    visible=False
                 )
 
                 scrape_button = gr.Button("Scrape and Summarize")
@@ -463,21 +468,36 @@ def create_website_scraping_tab():
                 logging.error(f"Error parsing bookmarks file: {str(e)}")
                 return f"Error parsing bookmarks file: {str(e)}"
 
-        def show_parsed_urls(bookmarks_file):
+        def show_parsed_urls(urls_file):
             """
             Determines whether to show the parsed URLs output.
 
             Args:
-                bookmarks_file: Uploaded file object.
+                urls_file: Uploaded file object.
 
             Returns:
                 Tuple indicating visibility and content of parsed_urls_output.
             """
-            if bookmarks_file is None:
+            if urls_file is None:
                 return gr.update(visible=False), ""
-            file_path = bookmarks_file.name
-            parsed_urls = parse_bookmarks(file_path)
-            return gr.update(visible=True), parsed_urls
+
+            file_path = urls_file.name
+            try:
+                # Use the unified collect_urls_from_file function
+                parsed_urls = collect_urls_from_file(file_path)
+
+                # Format the URLs for display
+                formatted_urls = []
+                for name, urls in parsed_urls.items():
+                    if isinstance(urls, list):
+                        for url in urls:
+                            formatted_urls.append(f"{name}: {url}")
+                    else:
+                        formatted_urls.append(f"{name}: {urls}")
+
+                return gr.update(visible=True), "\n".join(formatted_urls)
+            except Exception as e:
+                return gr.update(visible=True), f"Error parsing file: {str(e)}"
 
         # Connect the parsing function to the file upload event
         bookmarks_file_input.change(
