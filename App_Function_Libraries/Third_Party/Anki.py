@@ -9,6 +9,8 @@ import tempfile
 import os
 import shutil
 import base64
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Tuple, Optional, Any, List
 import re
@@ -55,11 +57,19 @@ def sanitize_html(content: str) -> str:
     return content
 
 
-def extract_media_from_apkg(zip_path: str, temp_dir: str) -> Dict[str, str]:
+def extract_media_from_apkg(zip_path: Any, temp_dir: str) -> Dict[str, str]:
     """Extract and process media files from APKG."""
     media_files = {}
     try:
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        # Handle file path whether it's a string or file object
+        if hasattr(zip_path, 'name'):
+            # It's a file object from Gradio
+            file_name = zip_path.name
+        else:
+            # It's a string path
+            file_name = str(zip_path)
+
+        with zipfile.ZipFile(file_name, 'r') as zip_ref:
             if 'media' in zip_ref.namelist():
                 media_json = json.loads(zip_ref.read('media').decode('utf-8'))
 
@@ -136,9 +146,16 @@ def validate_card_content(card: Dict[str, Any], seen_ids: set) -> list:
 
 
 def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], str]:
-    """Process APKG file with robust resource management."""
+    """Process APKG file with support for different Anki database versions."""
     if not file_path:
         return None, None, "No file provided"
+    # Handle file path whether it's a string or file object
+    if hasattr(file_path, 'name'):
+        # It's a file object from Gradio
+        file_name = file_path.name
+    else:
+        # It's a string path
+        file_name = str(file_path)
 
     temp_dir = None
     db_conn = None
@@ -151,10 +168,11 @@ def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], s
         temp_dir = tempfile.mkdtemp()
 
         # Extract media files first
-        media_files = extract_media_from_apkg(file_path.name, temp_dir)
+        media_files = extract_media_from_apkg(file_name, temp_dir)
 
         # Extract APKG contents
-        with zipfile.ZipFile(file_path.name, 'r') as zip_ref:
+        with zipfile.ZipFile(file_name, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
             zip_ref.extractall(temp_dir)
 
         db_path = os.path.join(temp_dir, 'collection.anki2')
@@ -172,32 +190,61 @@ def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], s
                 "models": json.loads(models_json)
             }
 
-            # Process cards and notes
-            cursor.execute("""
-                SELECT 
-                    n.id, n.flds, n.tags, c.type, n.mid, 
-                    m.name, n.sfld, m.flds, m.tmpls
-                FROM notes n
-                JOIN cards c ON c.nid = n.id
-                JOIN notetypes m ON m.id = n.mid
-            """)
+            # Check if we're dealing with an older or newer Anki version
+            try:
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='notetypes'")
+                has_notetypes = cursor.fetchone() is not None
 
-            # Fetch all rows at once
-            rows = cursor.fetchall()
+                if has_notetypes:
+                    # New Anki version (2.1.28+)
+                    cursor.execute("""
+                        SELECT 
+                            n.id, n.flds, n.tags, c.type, n.mid, 
+                            m.name, n.sfld, m.flds, m.tmpls
+                        FROM notes n
+                        JOIN cards c ON c.nid = n.id
+                        JOIN notetypes m ON m.id = n.mid
+                    """)
+                else:
+                    # Older Anki version
+                    cursor.execute("""
+                        SELECT 
+                            n.id, n.flds, n.tags, c.type, n.mid, 
+                            m.name, n.sfld, m.flds, m.tmpls
+                        FROM notes n
+                        JOIN cards c ON c.nid = n.id
+                        JOIN col AS m ON m.id = 1 AND json_extract(m.models, '$.' || n.mid) IS NOT NULL
+                    """)
+
+                rows = cursor.fetchall()
+
+            except sqlite3.Error as e:
+                # Fallback query for very old Anki versions
+                cursor.execute("""
+                    SELECT 
+                        n.id, n.flds, n.tags, c.type, n.mid,
+                        '', n.sfld, '[]', '[]'
+                    FROM notes n
+                    JOIN cards c ON c.nid = n.id
+                """)
+                rows = cursor.fetchall()
 
         finally:
-            # Close cursor and connection explicitly
-            if cursor:
-                cursor.close()
-            if db_conn:
-                db_conn.close()
+            cursor.close()
+            db_conn.close()
 
-        # Process the fetched data after closing database connection
+        # Process the fetched data
         for row in rows:
-            note_id, fields, tags, card_type, model_id, model_name, sort_field, fields_json, templates_json = row
+            note_id, fields, tags, card_type, model_id = row[0:5]
+            model_name = row[5] if row[5] else "Unknown Model"
             fields_list = fields.split('\x1f')
-            fields_config = json.loads(fields_json)
-            templates = json.loads(templates_json)
+
+            try:
+                fields_config = json.loads(row[7]) if row[7] else []
+                templates = json.loads(row[8]) if row[8] else []
+            except json.JSONDecodeError:
+                fields_config = []
+                templates = []
 
             # Process fields with media
             processed_fields = []
@@ -210,27 +257,30 @@ def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], s
                     )
                 processed_fields.append(sanitize_html(field_html))
 
-            # Determine card type
+            # Determine card type (simplified logic)
             converted_type = 'basic'
-            if 'cloze' in model_name.lower():
+            if any('cloze' in str(t).lower() for t in templates):
                 converted_type = 'cloze'
-            elif any('{{FrontSide}}' in t.get('afmt', '') for t in templates):
+            elif any('{{FrontSide}}' in str(t) for t in templates):
                 converted_type = 'reverse'
 
             card_data = {
                 "id": f"APKG_{note_id}",
                 "type": converted_type,
-                "front": processed_fields[0],
+                "front": processed_fields[0] if processed_fields else "",
                 "back": processed_fields[1] if len(processed_fields) > 1 else "",
                 "tags": tags.strip().split(" ") if tags.strip() else ["imported"],
                 "note": f"Imported from deck: {model_name}",
                 "has_media": any('<img' in field for field in processed_fields),
                 "model_name": model_name,
-                "field_names": [f['name'] for f in fields_config],
-                "template_names": [t['name'] for t in templates]
+                "field_names": [f.get('name', f'Field_{i}') for i, f in enumerate(fields_config)],
+                "template_names": [t.get('name', f'Template_{i}') for i, t in enumerate(templates)]
             }
 
             cards_data["cards"].append(card_data)
+
+        if not cards_data["cards"]:
+            return None, None, "No cards found in the APKG file"
 
         return cards_data, deck_info, "APKG file processed successfully!"
 
@@ -241,7 +291,7 @@ def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], s
     except Exception as e:
         return None, None, f"Error processing APKG file: {str(e)}"
     finally:
-        # Ensure all database resources are closed
+        # Clean up resources
         if cursor:
             try:
                 cursor.close()
@@ -252,24 +302,15 @@ def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], s
                 db_conn.close()
             except:
                 pass
-
-        # Clean up temporary directory
         if temp_dir and os.path.exists(temp_dir):
             try:
-                # Add small delay to ensure all file handles are released
-                import time
                 time.sleep(0.1)
-
-                # Try to remove read-only attribute if present
                 for root, dirs, files in os.walk(temp_dir):
                     for fname in files:
-                        full_path = os.path.join(root, fname)
                         try:
-                            os.chmod(full_path, 0o777)
+                            os.chmod(os.path.join(root, fname), 0o777)
                         except:
                             pass
-
-                # Remove directory and contents
                 shutil.rmtree(temp_dir, ignore_errors=True)
             except Exception as e:
                 print(f"Warning: Could not remove temporary directory {temp_dir}: {str(e)}")
@@ -299,6 +340,7 @@ def validate_flashcards(content: str) -> Tuple[bool, str]:
     except Exception as e:
         return False, f"Validation error: {str(e)}"
 
+
 def enhanced_file_upload(file: Any, input_type: str) -> Tuple[Optional[str], Optional[Dict], str, List[str]]:
     """Enhanced file upload handler with better error handling."""
     if not file:
@@ -310,10 +352,9 @@ def enhanced_file_upload(file: Any, input_type: str) -> Tuple[Optional[str], Opt
             if cards_data:
                 content = json.dumps(cards_data, indent=2)
                 choices = update_card_choices(content)
-                # Add count of successfully imported cards to message
-                card_count = len(cards_data.get("cards", []))
-                success_message = f"✅ Successfully imported {card_count} cards from APKG file"
-                return content, deck_info, success_message, choices
+                # Validate the converted content
+                validation_msg = handle_validation(content, "APKG")
+                return content, deck_info, validation_msg, choices
             return None, None, f"❌ {message}", []
         else:
             # Original JSON file handling
@@ -562,7 +603,7 @@ def update_card_with_validation(
 
 def handle_validation(content: str, input_format: str) -> str:
     """Handle validation for both JSON and APKG formats."""
-    if not content:
+    if not content or not content.strip():
         return "❌ No content to validate"
 
     try:
@@ -580,17 +621,17 @@ def handle_validation(content: str, input_format: str) -> str:
         if not data["cards"]:
             return "❌ No cards found in the data"
 
-        # If input is from APKG, we've already validated during import
+        card_count = len(data["cards"])
         if input_format == "APKG":
-            card_count = len(data["cards"])
-            return f"✅ Successfully validated {card_count} cards from APKG file"
-
-        # For JSON input, perform full validation
-        is_valid, message = validate_flashcards(content)
-        return f"✅ {message}" if is_valid else f"❌ {message}"
+            return f"✅ Successfully imported and validated {card_count} cards from APKG file"
+        else:
+            # For JSON input, perform additional validation
+            is_valid, message = validate_flashcards(content)
+            return f"✅ {message}" if is_valid else f"❌ {message}"
 
     except json.JSONDecodeError as je:
-        return f"❌ Invalid JSON format: {str(je)}"
+        line_col = f" (line {je.lineno}, column {je.colno})" if hasattr(je, 'lineno') else ""
+        return f"❌ Invalid JSON format: {str(je)}{line_col}"
     except Exception as e:
         return f"❌ Validation error: {str(e)}"
 
