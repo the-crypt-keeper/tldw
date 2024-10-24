@@ -1067,7 +1067,7 @@ def create_character_chat_mgmt_tab():
             gr.Markdown("## Chat Management")
             select_chat = gr.Dropdown(label="Select Chat", choices=[], visible=False, interactive=True)
             load_chat_button = gr.Button("Load Selected Chat", visible=False)
-            conversation_list = gr.Dropdown(label="Select Conversatio", choices=[])
+            conversation_list = gr.Dropdown(label="Select Conversation", choices=[])
             conversation_mapping = gr.State({})
 
         with gr.Tabs():
