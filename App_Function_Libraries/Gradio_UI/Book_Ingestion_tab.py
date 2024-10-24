@@ -44,7 +44,8 @@ def create_import_book_tab():
                 gr.Markdown("Upload a single .epub file or a .zip file containing multiple .epub files")
                 gr.Markdown(
                     "🔗 **How to remove DRM from your ebooks:** [Reddit Guide](https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/)")
-                import_file = gr.File(label="Upload file for import", file_types=[".epub", ".zip"])
+                import_file = gr.File(label="Upload file for import",
+                                      file_types=[".epub", ".zip", ".html", ".htm", ".xml", ".opml"])
                 title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content (for single files)")
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name (for single files)")
                 keywords_input = gr.Textbox(label="Keywords (like genre or publish year)",
