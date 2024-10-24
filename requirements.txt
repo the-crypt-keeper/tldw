@@ -13,6 +13,7 @@ FlashRank
 fugashi
 # well fuck gradio. again.
 gradio==4.44.1
+html2text
 jieba
 Jinja2
 joblib
