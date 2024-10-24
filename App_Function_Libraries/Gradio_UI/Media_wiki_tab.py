@@ -32,6 +32,13 @@ def create_mediawiki_import_tab():
                     value="sentences",
                     label="Chunking Method"
                 )
+                # FIXME - add API selection dropdown + Analysis/Summarization options
+                # Refactored API selection dropdown
+                # api_name_input = gr.Dropdown(
+                #     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                #     value=default_value,
+                #     label="API for Summarization (Optional)"
+                # )
                 chunk_size = gr.Slider(minimum=100, maximum=2000, value=1000, step=100, label="Chunk Size")
                 chunk_overlap = gr.Slider(minimum=0, maximum=500, value=100, step=10, label="Chunk Overlap")
                 # FIXME - Add checkbox for 'Enable Summarization upon ingestion' for API summarization of chunks

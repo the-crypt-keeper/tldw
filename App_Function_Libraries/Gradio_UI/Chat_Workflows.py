@@ -12,6 +12,8 @@ import gradio as gr
 from App_Function_Libraries.Gradio_UI.Chat_ui import chat_wrapper, search_conversations, \
     load_conversation
 from App_Function_Libraries.Chat import save_chat_history_to_db_wrapper
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+
 #
 ############################################################################################################
 #
@@ -24,6 +26,16 @@ with json_path.open('r') as f:
 
 
 def chat_workflows_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Chat Workflows", visible=True):
         gr.Markdown("# Workflows using LLMs")
         chat_history = gr.State([])
@@ -35,12 +47,11 @@ def chat_workflows_tab():
         with gr.Row():
             with gr.Column():
                 workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
+                # Refactored API selection dropdown
                 api_selector = gr.Dropdown(
-                    label="Select API Endpoint",
-                    choices=["Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                             "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace",
-                             "Custom-OpenAI-API"],
-                    value="HuggingFace"
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Interaction (Optional)"
                 )
                 api_key_input = gr.Textbox(label="API Key (optional)", type="password")
                 temperature = gr.Slider(label="Temperature", minimum=0.00, maximum=1.0, step=0.05, value=0.7)

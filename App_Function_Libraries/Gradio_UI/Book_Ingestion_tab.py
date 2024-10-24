@@ -10,10 +10,15 @@
 # Imports
 #
 # External Imports
+import logging
+
 import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Books.Book_Ingestion_Lib import process_zip_file, import_epub, import_file_handler
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+
+
 #
 ########################################################################################################################
 #
@@ -22,6 +27,16 @@ from App_Function_Libraries.Books.Book_Ingestion_Lib import process_zip_file, im
 
 
 def create_import_book_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Ebook(epub) Files", visible=True):
         with gr.Row():
             with gr.Column():
@@ -29,7 +44,8 @@ def create_import_book_tab():
                 gr.Markdown("Upload a single .epub file or a .zip file containing multiple .epub files")
                 gr.Markdown(
                     "🔗 **How to remove DRM from your ebooks:** [Reddit Guide](https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/)")
-                import_file = gr.File(label="Upload file for import", file_types=[".epub", ".zip"])
+                import_file = gr.File(label="Upload file for import",
+                                      file_types=[".epub", ".zip", ".html", ".htm", ".xml", ".opml"])
                 title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content (for single files)")
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name (for single files)")
                 keywords_input = gr.Textbox(label="Keywords (like genre or publish year)",
@@ -56,10 +72,11 @@ def create_import_book_tab():
                 custom_prompt_input = gr.Textbox(label="Custom User Prompt",
                                                  placeholder="Enter a custom user prompt for summarization (optional)")
                 auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
+                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                             "OpenRouter", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace"],
-                    label="API for Auto-summarization"
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Summarization/Analysis (Optional)"
                 )
                 api_key_input = gr.Textbox(label="API Key", type="password")
 

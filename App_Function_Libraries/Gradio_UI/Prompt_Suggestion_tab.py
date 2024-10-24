@@ -1,11 +1,14 @@
 # Description: Gradio UI for Creating and Testing new Prompts
 #
 # Imports
+import logging
+
 import gradio as gr
 
 from App_Function_Libraries.Chat import chat
 from App_Function_Libraries.DB.SQLite_DB import add_or_update_prompt
 from App_Function_Libraries.Prompt_Engineering.Prompt_Engineering import generate_prompt, test_generated_prompt
+from App_Function_Libraries.Utils.Utils import format_api_name, global_api_endpoints, default_api_endpoint
 
 
 #
@@ -18,6 +21,16 @@ from App_Function_Libraries.Prompt_Engineering.Prompt_Engineering import generat
 
 # Gradio tab for prompt suggestion and testing
 def create_prompt_suggestion_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Prompt Suggestion/Creation", visible=True):
         gr.Markdown("# Generate and Test AI Prompts with the Metaprompt Approach")
 
@@ -30,11 +43,11 @@ def create_prompt_suggestion_tab():
                                              placeholder="E.g., CUSTOMER_COMPLAINT, COMPANY_NAME")
 
                 # API-related inputs
+                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
-                    choices=["OpenAI", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter", "Llama.cpp",
-                             "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace", "Custom-OpenAI-API"],
-                    label="API Provider",
-                    value="OpenAI"  # Default selection
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Analysis (Optional)"
                 )
 
                 api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key (if required)",
