@@ -10,7 +10,7 @@ import os
 import shutil
 import base64
 from pathlib import Path
-from typing import Dict, Tuple, Optional, Any
+from typing import Dict, Tuple, Optional, Any, List
 import re
 from html.parser import HTMLParser
 #
@@ -136,43 +136,64 @@ def validate_card_content(card: Dict[str, Any], seen_ids: set) -> list:
 
 
 def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], str]:
-    """Process APKG file and extract cards, media, and deck information."""
+    """Process APKG file with robust resource management."""
     if not file_path:
         return None, None, "No file provided"
 
-    temp_dir = tempfile.mkdtemp()
+    temp_dir = None
+    db_conn = None
+    cursor = None
+    cards_data = {"cards": []}
+    deck_info = None
+
     try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+
         # Extract media files first
         media_files = extract_media_from_apkg(file_path.name, temp_dir)
 
-        # Process database
+        # Extract APKG contents
         with zipfile.ZipFile(file_path.name, 'r') as zip_ref:
             zip_ref.extractall(temp_dir)
 
         db_path = os.path.join(temp_dir, 'collection.anki2')
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
 
-        # Get collection info
-        cursor.execute("SELECT decks, models FROM col")
-        decks_json, models_json = cursor.fetchone()
-        deck_info = {
-            "decks": json.loads(decks_json),
-            "models": json.loads(models_json)
-        }
+        # Process database with explicit connection management
+        db_conn = sqlite3.connect(db_path)
+        cursor = db_conn.cursor()
 
-        # Process cards and notes
-        cards_data = {"cards": []}
-        cursor.execute("""
-            SELECT 
-                n.id, n.flds, n.tags, c.type, n.mid, 
-                m.name, n.sfld, m.flds, m.tmpls
-            FROM notes n
-            JOIN cards c ON c.nid = n.id
-            JOIN notetypes m ON m.id = n.mid
-        """)
+        try:
+            # Get collection info
+            cursor.execute("SELECT decks, models FROM col")
+            decks_json, models_json = cursor.fetchone()
+            deck_info = {
+                "decks": json.loads(decks_json),
+                "models": json.loads(models_json)
+            }
 
-        for row in cursor:
+            # Process cards and notes
+            cursor.execute("""
+                SELECT 
+                    n.id, n.flds, n.tags, c.type, n.mid, 
+                    m.name, n.sfld, m.flds, m.tmpls
+                FROM notes n
+                JOIN cards c ON c.nid = n.id
+                JOIN notetypes m ON m.id = n.mid
+            """)
+
+            # Fetch all rows at once
+            rows = cursor.fetchall()
+
+        finally:
+            # Close cursor and connection explicitly
+            if cursor:
+                cursor.close()
+            if db_conn:
+                db_conn.close()
+
+        # Process the fetched data after closing database connection
+        for row in rows:
             note_id, fields, tags, card_type, model_id, model_name, sort_field, fields_json, templates_json = row
             fields_list = fields.split('\x1f')
             fields_config = json.loads(fields_json)
@@ -211,7 +232,6 @@ def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], s
 
             cards_data["cards"].append(card_data)
 
-        conn.close()
         return cards_data, deck_info, "APKG file processed successfully!"
 
     except sqlite3.Error as e:
@@ -221,7 +241,38 @@ def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], s
     except Exception as e:
         return None, None, f"Error processing APKG file: {str(e)}"
     finally:
-        shutil.rmtree(temp_dir)
+        # Ensure all database resources are closed
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if db_conn:
+            try:
+                db_conn.close()
+            except:
+                pass
+
+        # Clean up temporary directory
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                # Add small delay to ensure all file handles are released
+                import time
+                time.sleep(0.1)
+
+                # Try to remove read-only attribute if present
+                for root, dirs, files in os.walk(temp_dir):
+                    for fname in files:
+                        full_path = os.path.join(root, fname)
+                        try:
+                            os.chmod(full_path, 0o777)
+                        except:
+                            pass
+
+                # Remove directory and contents
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception as e:
+                print(f"Warning: Could not remove temporary directory {temp_dir}: {str(e)}")
 
 def validate_flashcards(content: str) -> Tuple[bool, str]:
     """Validate flashcard content with enhanced image support."""
@@ -248,24 +299,66 @@ def validate_flashcards(content: str) -> Tuple[bool, str]:
     except Exception as e:
         return False, f"Validation error: {str(e)}"
 
-
-def handle_file_upload(file: Any, input_type: str) -> Tuple[Optional[str], Optional[Dict], str]:
-    """Handle file upload based on input type."""
+def enhanced_file_upload(file: Any, input_type: str) -> Tuple[Optional[str], Optional[Dict], str, List[str]]:
+    """Enhanced file upload handler with better error handling."""
     if not file:
-        return None, None, "No file uploaded"
+        return None, None, "❌ No file uploaded", []
+
+    try:
+        if input_type == "APKG":
+            cards_data, deck_info, message = process_apkg_file(file)
+            if cards_data:
+                content = json.dumps(cards_data, indent=2)
+                choices = update_card_choices(content)
+                # Add count of successfully imported cards to message
+                card_count = len(cards_data.get("cards", []))
+                success_message = f"✅ Successfully imported {card_count} cards from APKG file"
+                return content, deck_info, success_message, choices
+            return None, None, f"❌ {message}", []
+        else:
+            # Original JSON file handling
+            content = file.read().decode('utf-8')
+            json.loads(content)  # Validate JSON
+            return content, None, "✅ JSON file loaded successfully!", update_card_choices(content)
+    except Exception as e:
+        return None, None, f"❌ Error processing file: {str(e)}", []
+
+def handle_file_upload(file: Any, input_type: str) -> Tuple[Optional[str], Optional[Dict], str, List[str]]:
+    """Handle file upload with proper validation message formatting and card choices update."""
+    if not file:
+        return None, None, "❌ No file uploaded", []
 
     if input_type == "APKG":
         cards_data, deck_info, message = process_apkg_file(file)
         if cards_data:
-            return json.dumps(cards_data, indent=2), deck_info, message
-        return None, None, message
+            content = json.dumps(cards_data, indent=2)
+            return (
+                content,
+                deck_info,
+                f"✅ {message}",
+                update_card_choices(content)
+            )
+        return None, None, f"❌ {message}", []
     else:  # JSON
         try:
             content = file.read().decode('utf-8')
             json.loads(content)  # Validate JSON
-            return content, None, "JSON file loaded successfully!"
+            return (
+                content,
+                None,
+                "✅ JSON file loaded successfully!",
+                update_card_choices(content)
+            )
         except Exception as e:
-            return None, None, f"Error loading JSON file: {str(e)}"
+            return None, None, f"❌ Error loading JSON file: {str(e)}", []
+
+def update_card_choices(content: str) -> List[str]:
+    """Update card choices for the dropdown."""
+    try:
+        data = json.loads(content)
+        return [f"{card['id']} - {card['front'][:50]}..." for card in data['cards']]
+    except:
+        return []
 
 
 def update_card_content(
@@ -277,7 +370,7 @@ def update_card_content(
         tags: str,
         notes: str
 ) -> Tuple[str, str]:
-    """Update card content and return updated JSON."""
+    """Update card content and return updated JSON and status message."""
     try:
         data = json.loads(current_content)
 
@@ -378,7 +471,128 @@ def generate_card_choices(content: str) -> list:
     except:
         return []
 
+def format_validation_result(content: str) -> str:
+    """Format validation results for display in Markdown component."""
+    try:
+        is_valid, message = validate_flashcards(content)
+        return f"✅ {message}" if is_valid else f"❌ {message}"
+    except Exception as e:
+        return f"❌ Error during validation: {str(e)}"
 
+
+def validate_for_ui(content: str) -> str:
+    """Validate flashcards and return a formatted string for UI display."""
+    if not content or not content.strip():
+        return "❌ No content to validate. Please enter some flashcard data."
+
+    try:
+        # First try to parse the JSON
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as je:
+            # Provide more specific JSON error feedback
+            line_col = f" (line {je.lineno}, column {je.colno})" if hasattr(je, 'lineno') else ""
+            return f"❌ Invalid JSON format: {str(je)}{line_col}"
+
+        # Check basic structure
+        if not isinstance(data, dict):
+            return "❌ Invalid format: Root element must be a JSON object"
+
+        if "cards" not in data:
+            return '❌ Invalid format: Missing "cards" array in root object'
+
+        if not isinstance(data["cards"], list):
+            return '❌ Invalid format: "cards" must be an array'
+
+        if not data["cards"]:
+            return "❌ No cards found in the data"
+
+        # If we get here, perform the full validation
+        is_valid, message = validate_flashcards(content)
+        if is_valid:
+            return f"✅ {message}"
+        else:
+            return f"❌ {message}"
+
+    except Exception as e:
+        return f"❌ Validation error: {str(e)}"
+
+
+def update_card_with_validation(
+        current_content: str,
+        card_selection: str,
+        card_type: str,
+        front: str,
+        back: str,
+        tags: str,
+        notes: str
+) -> Tuple[str, str, List[str]]:
+    """Update card and return properly formatted validation message and updated choices."""
+    try:
+        # Unpack the tuple returned by update_card_content
+        updated_content, message = update_card_content(
+            current_content,
+            card_selection.split(" - ")[0],
+            card_type,
+            front,
+            back,
+            tags,
+            notes
+        )
+
+        if "successfully" in message:
+            return (
+                updated_content,
+                f"✅ {message}",
+                update_card_choices(updated_content)
+            )
+        else:
+            return (
+                current_content,
+                f"❌ {message}",
+                update_card_choices(current_content)
+            )
+    except Exception as e:
+        return (
+            current_content,
+            f"❌ Error updating card: {str(e)}",
+            update_card_choices(current_content)
+        )
+
+
+def handle_validation(content: str, input_format: str) -> str:
+    """Handle validation for both JSON and APKG formats."""
+    if not content:
+        return "❌ No content to validate"
+
+    try:
+        data = json.loads(content)
+
+        if not isinstance(data, dict):
+            return "❌ Invalid format: Root element must be a JSON object"
+
+        if "cards" not in data:
+            return '❌ Invalid format: Missing "cards" array in root object'
+
+        if not isinstance(data["cards"], list):
+            return '❌ Invalid format: "cards" must be an array'
+
+        if not data["cards"]:
+            return "❌ No cards found in the data"
+
+        # If input is from APKG, we've already validated during import
+        if input_format == "APKG":
+            card_count = len(data["cards"])
+            return f"✅ Successfully validated {card_count} cards from APKG file"
+
+        # For JSON input, perform full validation
+        is_valid, message = validate_flashcards(content)
+        return f"✅ {message}" if is_valid else f"❌ {message}"
+
+    except json.JSONDecodeError as je:
+        return f"❌ Invalid JSON format: {str(je)}"
+    except Exception as e:
+        return f"❌ Validation error: {str(e)}"
 
 #
 # End of Anki.py
