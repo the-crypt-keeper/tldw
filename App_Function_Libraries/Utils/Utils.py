@@ -254,6 +254,8 @@ def load_and_log_configs():
         logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
         logging.debug(f"Loaded VLLM API URL: {vllm_api_url}")
 
+        # Retrieve default API choices from the configuration file
+        default_api = config.get('API', 'default_api', fallback='openai')
 
         # Retrieve output paths from the configuration file
         output_path = config.get('Paths', 'output_path', fallback='results')
@@ -340,12 +342,42 @@ def load_and_log_configs():
                 'embedding_api_key': embedding_api_key,
                 'chunk_size': chunk_size,
                 'overlap': overlap
-            }
+            },
+            'default_api': default_api
         }
 
     except Exception as e:
         logging.error(f"Error loading config: {str(e)}")
         return None
+
+global_api_endpoints = ["anthropic", "cohere", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
+
+# Setup Default API Endpoint
+loaded_config_data = load_and_log_configs()
+default_api_endpoint = loaded_config_data['default_api']
+
+def format_api_name(api):
+    name_mapping = {
+        "openai": "OpenAI",
+        "anthropic": "Anthropic",
+        "cohere": "Cohere",
+        "groq": "Groq",
+        "huggingface": "HuggingFace",
+        "openrouter": "OpenRouter",
+        "deepseek": "DeepSeek",
+        "mistral": "Mistral",
+        "custom_openai_api": "Custom-OpenAI-API",
+        "llama": "Llama.cpp",
+        "ooba": "Ooba",
+        "kobold": "Kobold",
+        "tabby": "Tabbyapi",
+        "vllm": "VLLM",
+        "ollama": "Ollama",
+        "aphrodite": "Aphrodite"
+    }
+    return name_mapping.get(api, api.title())
+print(f"Default API Endpoint: {default_api_endpoint}")
+
 
 
 #

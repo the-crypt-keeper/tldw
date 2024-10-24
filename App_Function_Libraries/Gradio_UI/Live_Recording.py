@@ -13,6 +13,8 @@ from App_Function_Libraries.Audio.Audio_Transcription_Lib import (record_audio, 
                                                                   stop_recording)
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+
 #
 #######################################################################################################################
 #
@@ -22,6 +24,16 @@ whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large",
                   "distil-large-v2", "distil-medium.en", "distil-small.en"]
 
 def create_live_recording_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.Tab("Live Recording and Transcription", visible=True):
         gr.Markdown("# Live Audio Recording and Transcription")
         with gr.Row():
@@ -34,6 +46,13 @@ def create_live_recording_tab():
                 custom_title = gr.Textbox(label="Custom Title (for database)", visible=False)
                 record_button = gr.Button("Start Recording")
                 stop_button = gr.Button("Stop Recording")
+                # FIXME - Add a button to perform analysis/summarization on the transcription
+                # Refactored API selection dropdown
+                # api_name_input = gr.Dropdown(
+                #     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                #     value=default_value,
+                #     label="API for Summarization (Optional)"
+                # )
             with gr.Column():
                 output = gr.Textbox(label="Transcription", lines=10)
                 audio_output = gr.Audio(label="Recorded Audio", visible=False)

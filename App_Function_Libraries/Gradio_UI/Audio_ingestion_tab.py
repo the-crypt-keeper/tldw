@@ -2,6 +2,7 @@
 # Description: Gradio UI for ingesting audio files into the database
 #
 # Imports
+import logging
 #
 # External Imports
 import gradio as gr
@@ -11,7 +12,8 @@ from App_Function_Libraries.Audio.Audio_Files import process_audio_files
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models
-from App_Function_Libraries.Utils.Utils import cleanup_temp_files
+from App_Function_Libraries.Utils.Utils import cleanup_temp_files, default_api_endpoint, global_api_endpoints, \
+    format_api_name
 # Import metrics logging
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.Metrics.logger_config import logger
@@ -22,6 +24,18 @@ from App_Function_Libraries.Metrics.logger_config import logger
 def create_audio_processing_tab():
     with gr.TabItem("Audio File Transcription + Summarization", visible=True):
         gr.Markdown("# Transcribe & Summarize Audio Files from URLs or Local Files!")
+        # Get and validate default value
+        try:
+            default_value = None
+            if default_api_endpoint:
+                if default_api_endpoint in global_api_endpoints:
+                    default_value = format_api_name(default_api_endpoint)
+                else:
+                    logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+        except Exception as e:
+            logging.error(f"Error setting default API endpoint: {str(e)}")
+            default_value = None
+
         with gr.Row():
             with gr.Column():
                 audio_url_input = gr.Textbox(label="Audio File URL(s)", placeholder="Enter the URL(s) of the audio file(s), one per line")
@@ -106,12 +120,11 @@ def create_audio_processing_tab():
                     inputs=preset_prompt,
                     outputs=[custom_prompt_input, system_prompt_input]
                 )
-
+                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],
-                    value=None,
-                    label="API for Summarization (Optional)"
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Summarization/Analysis (Optional)"
                 )
                 api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here", type="password")
                 custom_keywords_input = gr.Textbox(label="Custom Keywords", placeholder="Enter custom keywords, comma-separated")

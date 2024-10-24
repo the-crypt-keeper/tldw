@@ -17,10 +17,11 @@ import gradio as gr
 from playwright.async_api import TimeoutError, async_playwright
 from playwright.sync_api import sync_playwright
 
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
 #
 # Local Imports
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, \
-    scrape_article, collect_bookmarks, scrape_and_summarize_multiple
+    scrape_article, collect_bookmarks, scrape_and_summarize_multiple, collect_urls_from_file
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
@@ -254,6 +255,16 @@ async def scrape_with_retry(url: str, max_retries: int = 3, retry_delay: float =
 
 
 def create_website_scraping_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.TabItem("Website Scraping", visible=True):
         gr.Markdown("# Scrape Websites & Summarize Articles")
         with gr.Row():
@@ -340,13 +351,11 @@ def create_website_scraping_tab():
                         visible=False
                     )
 
+                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
-                    choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral",
-                             "OpenRouter",
-                             "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "ollama", "HuggingFace",
-                             "Custom-OpenAI-API"],
-                    value=None,
-                    label="API Name (Mandatory for Summarization)"
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Summarization/Analysis (Optional)"
                 )
                 api_key_input = gr.Textbox(
                     label="API Key (Mandatory if API Name is specified)",
@@ -365,19 +374,24 @@ def create_website_scraping_tab():
                     value="default,no_keyword_set",
                     visible=True
                 )
-                # Updated: Added output to display parsed URLs
                 bookmarks_file_input = gr.File(
-                    label="Upload Bookmarks File",
+                    label="Upload Bookmarks File/CSV",
                     type="filepath",
-                    file_types=[".json", ".html"],
+                    file_types=[".json", ".html", ".csv"],  # Added .csv
                     visible=True
                 )
+                gr.Markdown("""
+                Supported file formats:
+                - Chrome/Edge bookmarks (JSON)
+                - Firefox bookmarks (HTML)
+                - CSV file with 'url' column (optionally 'title' or 'name' column)
+                """)
                 parsed_urls_output = gr.Textbox(
-                    label="Parsed URLs from Bookmarks",
-                    placeholder="URLs will be displayed here after uploading a bookmarks file.",
+                    label="Parsed URLs",
+                    placeholder="URLs will be displayed here after uploading a file.",
                     lines=10,
                     interactive=False,
-                    visible=False  # Initially hidden, shown only when URLs are parsed
+                    visible=False
                 )
 
                 scrape_button = gr.Button("Scrape and Summarize")
@@ -454,21 +468,36 @@ def create_website_scraping_tab():
                 logging.error(f"Error parsing bookmarks file: {str(e)}")
                 return f"Error parsing bookmarks file: {str(e)}"
 
-        def show_parsed_urls(bookmarks_file):
+        def show_parsed_urls(urls_file):
             """
             Determines whether to show the parsed URLs output.
 
             Args:
-                bookmarks_file: Uploaded file object.
+                urls_file: Uploaded file object.
 
             Returns:
                 Tuple indicating visibility and content of parsed_urls_output.
             """
-            if bookmarks_file is None:
+            if urls_file is None:
                 return gr.update(visible=False), ""
-            file_path = bookmarks_file.name
-            parsed_urls = parse_bookmarks(file_path)
-            return gr.update(visible=True), parsed_urls
+
+            file_path = urls_file.name
+            try:
+                # Use the unified collect_urls_from_file function
+                parsed_urls = collect_urls_from_file(file_path)
+
+                # Format the URLs for display
+                formatted_urls = []
+                for name, urls in parsed_urls.items():
+                    if isinstance(urls, list):
+                        for url in urls:
+                            formatted_urls.append(f"{name}: {url}")
+                    else:
+                        formatted_urls.append(f"{name}: {urls}")
+
+                return gr.update(visible=True), "\n".join(formatted_urls)
+            except Exception as e:
+                return gr.update(visible=True), f"Error parsing file: {str(e)}"
 
         # Connect the parsing function to the file upload event
         bookmarks_file_input.change(
@@ -527,7 +556,6 @@ def create_website_scraping_tab():
                         return convert_json_to_markdown(json.dumps({"error": f"Invalid JSON format for custom cookies: {e}"}))
 
                 if scrape_method == "Individual URLs":
-                    # FIXME modify scrape_and_summarize_multiple to accept custom_cookies
                     result = await scrape_and_summarize_multiple(url_input, custom_prompt, api_name, api_key, keywords,
                                                                  custom_titles, system_prompt, summarize_checkbox, custom_cookies=custom_cookies_list)
                 elif scrape_method == "Sitemap":

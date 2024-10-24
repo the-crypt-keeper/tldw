@@ -1,9 +1,12 @@
 ###################################################################################################
 # Evaluations_Benchmarks_tab.py - Gradio code for G-Eval testing
 # We will use the G-Eval API to evaluate the quality of the generated summaries.
+import logging
 
 import gradio as gr
 from App_Function_Libraries.Benchmarks_Evaluations.ms_g_eval import run_geval
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+
 
 def create_geval_tab():
     with gr.Tab("G-Eval", visible=True):
@@ -31,13 +34,25 @@ def create_geval_tab():
 
 
 def create_infinite_bench_tab():
+    try:
+        default_value = None
+        if default_api_endpoint:
+            if default_api_endpoint in global_api_endpoints:
+                default_value = format_api_name(default_api_endpoint)
+            else:
+                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+    except Exception as e:
+        logging.error(f"Error setting default API endpoint: {str(e)}")
+        default_value = None
     with gr.Tab("Infinite Bench", visible=True):
         gr.Markdown("# Infinite Bench Evaluation (Coming Soon)")
         with gr.Row():
             with gr.Column():
+                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
-                    choices=["OpenAI", "Anthropic", "Cohere", "Groq", "OpenRouter", "DeepSeek", "HuggingFace", "Mistral", "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM", "Local-LLM", "Ollama"],
-                    label="Select API"
+                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                    value=default_value,
+                    label="API for Summarization (Optional)"
                 )
                 api_key_input = gr.Textbox(label="API Key (if required)", type="password")
                 evaluate_button = gr.Button("Evaluate Summary")
