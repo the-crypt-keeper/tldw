@@ -16,8 +16,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_db_config
-from App_Function_Libraries.Gradio_UI.Anki_Validation_tab import create_anki_validation_tab, \
-    create_anki_validation_tab_two
+from App_Function_Libraries.Gradio_UI.Anki_Validation_tab import create_anki_validation_tab
 from App_Function_Libraries.Gradio_UI.Arxiv_tab import create_arxiv_tab
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
@@ -383,7 +382,6 @@ def launch_ui(share_public=None, server_mode=False):
                 # FIXME
                 #create_anki_generation_tab()
                 create_anki_validation_tab()
-                create_anki_validation_tab_two()
                 create_utilities_yt_video_tab()
                 create_utilities_yt_audio_tab()
                 create_utilities_yt_timestamp_tab()
