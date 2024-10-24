@@ -11,7 +11,11 @@ import gradio as gr
 from App_Function_Libraries.DB.DB_Manager import view_database, get_all_document_versions, \
     fetch_paginated_data, fetch_item_details, get_latest_transcription, list_prompts, fetch_prompt_details, \
     load_preset_prompts
-from App_Function_Libraries.DB.SQLite_DB import get_document_version
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_keywords_for_note, search_conversations_by_keywords, \
+    get_notes_by_keywords, get_keywords_for_conversation, get_db_connection
+from App_Function_Libraries.DB.SQLite_DB import get_document_version, fetch_items_by_keyword, fetch_all_keywords
+
+
 #
 ####################################################################################################
 #
@@ -280,6 +284,140 @@ def create_view_all_mediadb_with_versions_tab():
         )
 
 
+def create_mediadb_keyword_search_tab():
+    with gr.TabItem("Search by Keyword", visible=True):
+        gr.Markdown("# Search Database Items by Keyword")
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                # Keyword selection dropdown - initialize with empty list, will be populated on load
+                keyword_dropdown = gr.Dropdown(
+                    label="Select Keyword",
+                    choices=fetch_all_keywords(),  # Initialize with keywords on creation
+                    value=None
+                )
+                entries_per_page = gr.Dropdown(
+                    choices=[10, 20, 50, 100],
+                    label="Entries per Page",
+                    value=10
+                )
+                page_number = gr.Number(
+                    value=1,
+                    label="Page Number",
+                    precision=0
+                )
+
+                # Navigation buttons
+                refresh_keywords_button = gr.Button("Refresh Keywords")
+                view_button = gr.Button("View Results")
+                next_page_button = gr.Button("Next Page")
+                previous_page_button = gr.Button("Previous Page")
+
+                # Pagination information
+                pagination_info = gr.Textbox(
+                    label="Pagination Info",
+                    interactive=False
+                )
+
+            with gr.Column(scale=2):
+                # Results area
+                results_table = gr.HTML(
+                    label="Search Results"
+                )
+                item_details = gr.HTML(
+                    label="Item Details",
+                    visible=True
+                )
+
+        def update_keyword_choices():
+            try:
+                keywords = fetch_all_keywords()
+                return gr.update(choices=keywords)
+            except Exception as e:
+                return gr.update(choices=[], value=None)
+
+        def search_items(keyword, page, entries_per_page):
+            try:
+                # Calculate offset for pagination
+                offset = (page - 1) * entries_per_page
+
+                # Fetch items for the selected keyword
+                items = fetch_items_by_keyword(keyword)
+                total_items = len(items)
+                total_pages = (total_items + entries_per_page - 1) // entries_per_page
+
+                # Paginate results
+                paginated_items = items[offset:offset + entries_per_page]
+
+                # Generate HTML table for results
+                table_html = "<table style='width:100%; border-collapse: collapse;'>"
+                table_html += "<tr><th style='border: 1px solid black; padding: 8px;'>Title</th>"
+                table_html += "<th style='border: 1px solid black; padding: 8px;'>URL</th></tr>"
+
+                for item_id, title, url in paginated_items:
+                    table_html += f"""
+                    <tr>
+                        <td style='border: 1px solid black; padding: 8px;'>{html.escape(title)}</td>
+                        <td style='border: 1px solid black; padding: 8px;'>{html.escape(url)}</td>
+                    </tr>
+                    """
+                table_html += "</table>"
+
+                # Update pagination info
+                pagination = f"Page {page} of {total_pages} (Total items: {total_items})"
+
+                # Determine button states
+                next_disabled = page >= total_pages
+                prev_disabled = page <= 1
+
+                return (
+                    table_html,
+                    pagination,
+                    gr.update(interactive=not next_disabled),
+                    gr.update(interactive=not prev_disabled)
+                )
+            except Exception as e:
+                return (
+                    f"<p>Error: {str(e)}</p>",
+                    "Error in pagination",
+                    gr.update(interactive=False),
+                    gr.update(interactive=False)
+                )
+
+        def go_to_next_page(keyword, current_page, entries_per_page):
+            next_page = current_page + 1
+            return search_items(keyword, next_page, entries_per_page) + (next_page,)
+
+        def go_to_previous_page(keyword, current_page, entries_per_page):
+            previous_page = max(1, current_page - 1)
+            return search_items(keyword, previous_page, entries_per_page) + (previous_page,)
+
+        # Event handlers
+        refresh_keywords_button.click(
+            fn=update_keyword_choices,
+            inputs=[],
+            outputs=[keyword_dropdown]
+        )
+
+        view_button.click(
+            fn=search_items,
+            inputs=[keyword_dropdown, page_number, entries_per_page],
+            outputs=[results_table, pagination_info, next_page_button, previous_page_button]
+        )
+
+        next_page_button.click(
+            fn=go_to_next_page,
+            inputs=[keyword_dropdown, page_number, entries_per_page],
+            outputs=[results_table, pagination_info, next_page_button, previous_page_button, page_number]
+        )
+
+        previous_page_button.click(
+            fn=go_to_previous_page,
+            inputs=[keyword_dropdown, page_number, entries_per_page],
+            outputs=[results_table, pagination_info, next_page_button, previous_page_button, page_number]
+        )
+
+
 # FIXME - cHange to work with RAG DB
 def create_view_all_rag_notes_tab():
     with gr.TabItem("View All RAG notes/Conversation Items", visible=True):
@@ -459,6 +597,10 @@ def create_viewing_mediadb_tab():
             outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
         )
 
+#####################################################################
+#
+# RAG DB Viewing Functions:
+
 # FIXME - change to work with RAG DB
 def create_viewing_ragdb_tab():
     with gr.TabItem("View RAG Database Entries", visible=True):
@@ -507,5 +649,204 @@ def create_viewing_ragdb_tab():
             outputs=[results_display, pagination_info, page_number, next_page_button, previous_page_button]
         )
 
+
+def create_ragdb_keyword_items_tab():
+    with gr.TabItem("View Items by Keyword", visible=True):
+        gr.Markdown("# View Conversations and Notes by Keyword")
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                # Keyword selection
+                keyword_dropdown = gr.Dropdown(
+                    label="Select Keyword",
+                    choices=[],
+                    value=None,
+                    multiselect=True
+                )
+                entries_per_page = gr.Dropdown(
+                    choices=[10, 20, 50, 100],
+                    label="Entries per Page",
+                    value=10
+                )
+                page_number = gr.Number(
+                    value=1,
+                    label="Page Number",
+                    precision=0
+                )
+
+                # Navigation buttons
+                refresh_keywords_button = gr.Button("Refresh Keywords")
+                view_button = gr.Button("View Items")
+                next_page_button = gr.Button("Next Page")
+                previous_page_button = gr.Button("Previous Page")
+                pagination_info = gr.Textbox(
+                    label="Pagination Info",
+                    interactive=False
+                )
+
+            with gr.Column(scale=2):
+                # Results tabs for conversations and notes
+                with gr.Tabs():
+                    with gr.Tab("Conversations"):
+                        conversation_results = gr.HTML()
+                    with gr.Tab("Notes"):
+                        notes_results = gr.HTML()
+
+        def update_keyword_choices():
+            """Fetch all available keywords for the dropdown."""
+            try:
+                query = "SELECT keyword FROM rag_qa_keywords ORDER BY keyword"
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(query)
+                    keywords = [row[0] for row in cursor.fetchall()]
+                return gr.update(choices=keywords)
+            except Exception as e:
+                return gr.update(choices=[], value=None)
+
+        def format_conversations_html(conversations_data):
+            """Format conversations data as HTML."""
+            if not conversations_data:
+                return "<p>No conversations found for selected keywords.</p>"
+
+            html_content = "<div class='results-container'>"
+            for conv_id, title in conversations_data:
+                html_content += f"""
+                <div style='border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;'>
+                    <h3>{html.escape(title)}</h3>
+                    <p>Conversation ID: {html.escape(conv_id)}</p>
+                    <p><strong>Keywords:</strong> {', '.join(html.escape(k) for k in get_keywords_for_conversation(conv_id))}</p>
+                </div>
+                """
+            html_content += "</div>"
+            return html_content
+
+        def format_notes_html(notes_data):
+            """Format notes data as HTML."""
+            if not notes_data:
+                return "<p>No notes found for selected keywords.</p>"
+
+            html_content = "<div class='results-container'>"
+            for note_id, title, content, timestamp in notes_data:
+                keywords = get_keywords_for_note(note_id)
+                html_content += f"""
+                <div style='border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;'>
+                    <h3>{html.escape(title)}</h3>
+                    <p><strong>Created:</strong> {timestamp}</p>
+                    <p><strong>Keywords:</strong> {', '.join(html.escape(k) for k in keywords)}</p>
+                    <div style='background: #f5f5f5; padding: 10px; margin-top: 10px;'>
+                        {html.escape(content)}
+                    </div>
+                </div>
+                """
+            html_content += "</div>"
+            return html_content
+
+        def view_items(keywords, page, entries_per_page):
+            if not keywords:
+                return (
+                    "<p>Please select at least one keyword.</p>",
+                    "<p>Please select at least one keyword.</p>",
+                    "No results",
+                    gr.update(interactive=False),
+                    gr.update(interactive=False)
+                )
+
+            try:
+                # Get conversations for selected keywords
+                conversations, conv_total_pages, conv_count = search_conversations_by_keywords(
+                    keywords, page, entries_per_page
+                )
+
+                # Get notes for selected keywords
+                notes, notes_total_pages, notes_count = get_notes_by_keywords(
+                    keywords, page, entries_per_page
+                )
+
+                # Format results as HTML
+                conv_html = format_conversations_html(conversations)
+                notes_html = format_notes_html(notes)
+
+                # Create pagination info
+                pagination = f"Page {page} of {max(conv_total_pages, notes_total_pages)} "
+                pagination += f"(Conversations: {conv_count}, Notes: {notes_count})"
+
+                # Determine button states
+                max_pages = max(conv_total_pages, notes_total_pages)
+                next_disabled = page >= max_pages
+                prev_disabled = page <= 1
+
+                return (
+                    conv_html,
+                    notes_html,
+                    pagination,
+                    gr.update(interactive=not next_disabled),
+                    gr.update(interactive=not prev_disabled)
+                )
+            except Exception as e:
+                return (
+                    f"<p>Error: {str(e)}</p>",
+                    f"<p>Error: {str(e)}</p>",
+                    "Error in retrieval",
+                    gr.update(interactive=False),
+                    gr.update(interactive=False)
+                )
+
+        def go_to_next_page(keywords, current_page, entries_per_page):
+            return view_items(keywords, current_page + 1, entries_per_page)
+
+        def go_to_previous_page(keywords, current_page, entries_per_page):
+            return view_items(keywords, max(1, current_page - 1), entries_per_page)
+
+        # Event handlers
+        refresh_keywords_button.click(
+            fn=update_keyword_choices,
+            inputs=[],
+            outputs=[keyword_dropdown]
+        )
+
+        view_button.click(
+            fn=view_items,
+            inputs=[keyword_dropdown, page_number, entries_per_page],
+            outputs=[
+                conversation_results,
+                notes_results,
+                pagination_info,
+                next_page_button,
+                previous_page_button
+            ]
+        )
+
+        next_page_button.click(
+            fn=go_to_next_page,
+            inputs=[keyword_dropdown, page_number, entries_per_page],
+            outputs=[
+                conversation_results,
+                notes_results,
+                pagination_info,
+                next_page_button,
+                previous_page_button
+            ]
+        )
+
+        previous_page_button.click(
+            fn=go_to_previous_page,
+            inputs=[keyword_dropdown, page_number, entries_per_page],
+            outputs=[
+                conversation_results,
+                notes_results,
+                pagination_info,
+                next_page_button,
+                previous_page_button
+            ]
+        )
+
+        # Initialize keyword dropdown on page load
+        keyword_dropdown.value = update_keyword_choices()
+
 #
-####################################################################################################
+# End of RAG DB Viewing tabs
+################################################################
+
+#
+#######################################################################################################################
