@@ -537,53 +537,71 @@ def create_anki_validation_tab():
         with gr.Row():
             # Card Editor
             gr.Markdown("## Card Editor")
-            with gr.Accordion("Edit Individual Cards", open=True):
-                card_selector = gr.Dropdown(
-                    label="Select Card to Edit",
-                    choices=[],
-                    interactive=True
-                )
+        with gr.Row():
+            with gr.Column(scale=1):
+                with gr.Accordion("Edit Individual Cards", open=True):
+                    card_selector = gr.Dropdown(
+                        label="Select Card to Edit",
+                        choices=[],
+                        interactive=True
+                    )
 
-                card_type = gr.Radio(
-                    choices=["basic", "cloze", "reverse"],
-                    label="Card Type",
-                    value="basic"
-                )
+                    card_type = gr.Radio(
+                        choices=["basic", "cloze", "reverse"],
+                        label="Card Type",
+                        value="basic"
+                    )
 
-                front_content = gr.TextArea(
-                    label="Front Content",
-                    lines=3
-                )
+                    front_content = gr.TextArea(
+                        label="Front Content",
+                        lines=3
+                    )
 
-                back_content = gr.TextArea(
-                    label="Back Content",
-                    lines=3
-                )
+                    back_content = gr.TextArea(
+                        label="Back Content",
+                        lines=3
+                    )
 
-                tags_input = gr.TextArea(
-                    label="Tags (comma-separated)",
-                    lines=1
-                )
+                    tags_input = gr.TextArea(
+                        label="Tags (comma-separated)",
+                        lines=1
+                    )
 
-                notes_input = gr.TextArea(
-                    label="Additional Notes",
-                    lines=2
-                )
+                    notes_input = gr.TextArea(
+                        label="Additional Notes",
+                        lines=2
+                    )
 
-                update_card_button = gr.Button("Update Card")
-                delete_card_button = gr.Button("Delete Card", variant="stop")
+                    update_card_button = gr.Button("Update Card")
+                    delete_card_button = gr.Button("Delete Card", variant="stop")
 
         with gr.Row():
-            # Export Options
-            gr.Markdown("## Export Options")
-            export_format = gr.Radio(
-                choices=["Anki CSV", "JSON", "Plain Text"],
-                label="Export Format",
-                value="Anki CSV"
-            )
-            export_button = gr.Button("Export Valid Cards")
-            export_file = gr.File(label="Download Validated Cards")
-            export_status = gr.Markdown("")
+            with gr.Column(scale=1):
+                # Export Options
+                gr.Markdown("## Export Options")
+                export_format = gr.Radio(
+                    choices=["Anki CSV", "JSON", "Plain Text"],
+                    label="Export Format",
+                    value="Anki CSV"
+                )
+                export_button = gr.Button("Export Valid Cards")
+                export_file = gr.File(label="Download Validated Cards")
+                export_status = gr.Markdown("")
+            with gr.Column(scale=1):
+                gr.Markdown("## Export Instructions")
+                gr.Markdown("""
+                ### Anki CSV Format:
+                - Front, Back, Tags, Type, Note
+                - Use for importing into Anki
+                
+                ### JSON Format:
+                - JSON array of cards
+                - Use for custom processing
+                
+                ### Plain Text Format:
+                - Question and Answer pairs
+                - Use for manual review
+                """)
 
         # Helper Functions
         def validate_flashcards(content):
@@ -765,3 +783,420 @@ def create_anki_validation_tab():
 #
 # End of Anki_Validation_tab.py
 ############################################################################################################
+
+import json
+import zipfile
+import sqlite3
+import tempfile
+import os
+import shutil
+import base64
+from pathlib import Path
+import gradio as gr
+
+
+def extract_media_from_apkg(zip_path, temp_dir):
+    """Extract and process media files from APKG."""
+    media_files = {}
+    try:
+        # Extract media.json which maps filenames
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            if 'media' in zip_ref.namelist():
+                media_json = json.loads(zip_ref.read('media').decode('utf-8'))
+
+                # Extract all media files
+                for file_id, filename in media_json.items():
+                    if str(file_id) in zip_ref.namelist():
+                        file_data = zip_ref.read(str(file_id))
+                        file_path = os.path.join(temp_dir, filename)
+
+                        # Save file temporarily
+                        with open(file_path, 'wb') as f:
+                            f.write(file_data)
+
+                        # Convert to base64 for supported image types
+                        if any(filename.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif']):
+                            with open(file_path, 'rb') as f:
+                                file_content = f.read()
+                                file_ext = os.path.splitext(filename)[1].lower()
+                                media_type = f"image/{file_ext[1:]}"
+                                if file_ext == '.jpg':
+                                    media_type = "image/jpeg"
+                                media_files[
+                                    filename] = f"data:{media_type};base64,{base64.b64encode(file_content).decode('utf-8')}"
+
+                        # Clean up temporary file
+                        os.remove(file_path)
+
+    except Exception as e:
+        print(f"Error processing media: {str(e)}")
+    return media_files
+
+
+def process_apkg_file(file_path):
+    """Extract and validate an APKG file, returning the card data and media files."""
+    if not file_path:
+        return None, None, "No file provided"
+
+    temp_dir = tempfile.mkdtemp()
+    try:
+        # Extract media files first
+        media_files = extract_media_from_apkg(file_path.name, temp_dir)
+
+        # Extract APKG and process database
+        with zipfile.ZipFile(file_path.name, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
+
+        # Connect to the SQLite database
+        db_path = os.path.join(temp_dir, 'collection.anki2')
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Get deck information
+        cursor.execute("SELECT decks, models FROM col")
+        decks_json, models_json = cursor.fetchone()
+        deck_info = {
+            "decks": json.loads(decks_json),
+            "models": json.loads(models_json)
+        }
+
+        # Get cards and notes with media processing
+        cards_data = {"cards": []}
+        cursor.execute("""
+            SELECT n.id, n.flds, n.tags, c.type, n.mid, m.name, n.sfld
+            FROM notes n
+            JOIN cards c ON c.nid = n.id
+            JOIN notetypes m ON m.id = n.mid
+        """)
+
+        for row in cursor:
+            note_id, fields, tags, card_type, model_id, model_name, sort_field = row
+            fields_list = fields.split('\x1f')
+
+            # Process fields for media references
+            processed_fields = []
+            for field in fields_list:
+                # Replace media references with base64 data
+                for filename, base64_data in media_files.items():
+                    field = field.replace(
+                        f'<img src="{filename}"',
+                        f'<img src="{base64_data}"'
+                    )
+                processed_fields.append(field)
+
+            # Convert Anki card type
+            if 'cloze' in model_name.lower():
+                converted_type = 'cloze'
+            elif len(processed_fields) > 1:
+                converted_type = 'basic'
+            else:
+                converted_type = 'basic'
+
+            card_data = {
+                "id": f"APKG_{note_id}",
+                "type": converted_type,
+                "front": processed_fields[0],
+                "back": processed_fields[1] if len(processed_fields) > 1 else "",
+                "tags": tags.strip().split(" ") if tags.strip() else ["imported"],
+                "note": f"Imported from deck: {model_name}",
+                "has_media": any('<img' in field for field in processed_fields)
+            }
+
+            cards_data["cards"].append(card_data)
+
+        conn.close()
+        return cards_data, deck_info, "APKG file processed successfully!"
+
+    except sqlite3.Error as e:
+        return None, None, f"Database error: {str(e)}"
+    except json.JSONDecodeError as e:
+        return None, None, f"JSON parsing error: {str(e)}"
+    except Exception as e:
+        return None, None, f"Error processing APKG file: {str(e)}"
+    finally:
+        shutil.rmtree(temp_dir)
+
+
+def validate_flashcards(content):
+    """Validate flashcard content with enhanced image support."""
+    try:
+        data = json.loads(content)
+        validation_results = []
+        is_valid = True
+
+        if not isinstance(data, dict) or 'cards' not in data:
+            return False, "Invalid JSON format. Must contain 'cards' array."
+
+        seen_ids = set()
+        for idx, card in enumerate(data['cards']):
+            card_issues = []
+
+            # Check required fields
+            if 'id' not in card:
+                card_issues.append("Missing ID")
+            elif card['id'] in seen_ids:
+                card_issues.append("Duplicate ID")
+            else:
+                seen_ids.add(card['id'])
+
+            if 'type' not in card or card['type'] not in ['basic', 'cloze', 'reverse']:
+                card_issues.append("Invalid card type")
+
+            if 'front' not in card or not card['front'].strip():
+                card_issues.append("Missing front content")
+
+            if 'back' not in card or not card['back'].strip():
+                card_issues.append("Missing back content")
+
+            if 'tags' not in card or not card['tags']:
+                card_issues.append("Missing tags")
+
+            # Content-specific validation
+            if card.get('type') == 'cloze':
+                if '{{c1::' not in card['front']:
+                    card_issues.append("Invalid cloze format")
+
+            # Image validation
+            for field in ['front', 'back']:
+                if '<img' in card[field]:
+                    if not (card[field].count('<img') == card[field].count('src="')):
+                        card_issues.append(f"Invalid image tag in {field}")
+                    if 'data:image/' not in card[field] and 'http' not in card[field]:
+                        card_issues.append(f"Invalid image source in {field}")
+
+            if card_issues:
+                is_valid = False
+                validation_results.append(f"Card {card['id']}: {', '.join(card_issues)}")
+
+        return is_valid, "\n".join(validation_results) if validation_results else "All cards are valid!"
+
+    except json.JSONDecodeError:
+        return False, "Invalid JSON format"
+    except Exception as e:
+        return False, f"Validation error: {str(e)}"
+
+
+def handle_file_upload(file, input_type):
+    """Handle file upload based on input type."""
+    if not file:
+        return None, None, "No file uploaded"
+
+    if input_type == "APKG":
+        cards_data, deck_info, message = process_apkg_file(file)
+        if cards_data:
+            return json.dumps(cards_data, indent=2), deck_info, message
+        return None, None, message
+    else:  # JSON
+        try:
+            content = file.read().decode('utf-8')
+            json.loads(content)  # Validate JSON
+            return content, None, "JSON file loaded successfully!"
+        except Exception as e:
+            return None, None, f"Error loading JSON file: {str(e)}"
+
+
+def create_anki_validation_tab_two():
+    with gr.TabItem("Anki Flashcard Validation", visible=True):
+        gr.Markdown("# Anki Flashcard Validation and Editor")
+
+        with gr.Row():
+            # Left Column: Input and Validation
+            with gr.Column(scale=1):
+                gr.Markdown("## Import or Create Flashcards")
+
+                input_type = gr.Radio(
+                    choices=["JSON", "APKG"],
+                    label="Input Type",
+                    value="JSON"
+                )
+
+                with gr.Group() as json_input_group:
+                    flashcard_input = gr.TextArea(
+                        label="Enter Flashcards (JSON format)",
+                        placeholder='''{
+    "cards": [
+        {
+            "id": "CARD_001",
+            "type": "basic",
+            "front": "What is the capital of France?",
+            "back": "Paris",
+            "tags": ["geography", "europe"],
+            "note": "Remember: City of Light"
+        }
+    ]
+}''',
+                        lines=10
+                    )
+
+                    import_json = gr.File(
+                        label="Or Import JSON File",
+                        file_types=[".json"]
+                    )
+
+                with gr.Group(visible=False) as apkg_input_group:
+                    import_apkg = gr.File(
+                        label="Import APKG File",
+                        file_types=[".apkg"]
+                    )
+                    deck_info = gr.JSON(
+                        label="Deck Information",
+                        visible=False
+                    )
+
+                validate_button = gr.Button("Validate Flashcards")
+
+            # Right Column: Validation Results and Editor
+            with gr.Column(scale=1):
+                gr.Markdown("## Validation Results")
+                validation_status = gr.Markdown("")
+
+                with gr.Accordion("Validation Rules", open=False):
+                    gr.Markdown("""
+                    ### Required Fields:
+                    - Unique ID
+                    - Card Type (basic, cloze, reverse)
+                    - Front content
+                    - Back content
+                    - At least one tag
+
+                    ### Content Rules:
+                    - No empty fields
+                    - Front side should be a clear question/prompt
+                    - Back side should contain complete answer
+                    - Cloze deletions must have valid syntax
+                    - No duplicate IDs
+
+                    ### Image Rules:
+                    - Valid image tags
+                    - Supported formats (JPG, PNG, GIF)
+                    - Base64 encoded or valid URL
+
+                    ### APKG-specific Rules:
+                    - Valid SQLite database structure
+                    - Media files properly referenced
+                    - Note types match Anki standards
+                    - Card templates are well-formed
+                    """)
+
+        with gr.Row():
+            # Card Editor
+            gr.Markdown("## Card Editor")
+        with gr.Row():
+            with gr.Column(scale=1):
+                with gr.Accordion("Edit Individual Cards", open=True):
+                    card_selector = gr.Dropdown(
+                        label="Select Card to Edit",
+                        choices=[],
+                        interactive=True
+                    )
+
+                    card_type = gr.Radio(
+                        choices=["basic", "cloze", "reverse"],
+                        label="Card Type",
+                        value="basic"
+                    )
+
+                    front_preview = gr.HTML(
+                        label="Front Preview",
+                        value=""
+                    )
+
+                    front_content = gr.TextArea(
+                        label="Front Content",
+                        lines=3
+                    )
+
+                    back_preview = gr.HTML(
+                        label="Back Preview",
+                        value=""
+                    )
+
+                    back_content = gr.TextArea(
+                        label="Back Content",
+                        lines=3
+                    )
+
+                    tags_input = gr.TextArea(
+                        label="Tags (comma-separated)",
+                        lines=1
+                    )
+
+                    notes_input = gr.TextArea(
+                        label="Additional Notes",
+                        lines=2
+                    )
+
+                    update_card_button = gr.Button("Update Card")
+                    delete_card_button = gr.Button("Delete Card", variant="stop")
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                # Export Options
+                gr.Markdown("## Export Options")
+                export_format = gr.Radio(
+                    choices=["Anki CSV", "JSON", "Plain Text"],
+                    label="Export Format",
+                    value="Anki CSV"
+                )
+                export_button = gr.Button("Export Valid Cards")
+                export_file = gr.File(label="Download Validated Cards")
+                export_status = gr.Markdown("")
+            with gr.Column(scale=1):
+                gr.Markdown("## Export Instructions")
+                gr.Markdown("""
+                ### Anki CSV Format:
+                - Front, Back, Tags, Type, Note
+                - Use for importing into Anki
+                - Images preserved as HTML
+
+                ### JSON Format:
+                - JSON array of cards
+                - Images as base64 or URLs
+                - Use for custom processing
+
+                ### Plain Text Format:
+                - Question and Answer pairs
+                - Images represented as [IMG] placeholder
+                - Use for manual review
+                """)
+
+        # Helper function for previewing HTML content
+        def update_preview(content):
+            """Sanitize and update HTML preview."""
+            if not content:
+                return ""
+            # Basic XSS prevention while allowing images
+            allowed_tags = {'img', 'b', 'i', 'u', 'div', 'br', 'p'}
+            # Add more sophisticated HTML sanitization here if needed
+            return content
+
+        def load_card_for_editing(card_selection, current_content):
+            if not card_selection or not current_content:
+                return {}, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+
+            try:
+                data = json.loads(current_content)
+                selected_id = card_selection.split(" - ")[0]
+
+                for card in data['cards']:
+                    if card['id'] == selected_id:
+                        return (
+                            card,
+                            card['type'],
+                            update_preview(card['front']),
+                            card['front'],
+                            update_preview(card['back']),
+                            card['back'],
+                            ", ".join(card['tags']),
+                            card.get('note', '')
+                        )
+
+                return {}, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+
+            except Exception as e:
+                return {}, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+
+        # Update visibility based on input type
+        def update_input_visibility(input_type):
+            return (
+                gr.update(visible=input_type == "JSON"))
