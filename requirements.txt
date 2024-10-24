@@ -26,6 +26,8 @@ nltk
 numpy
 onnxruntime
 openai
+# Requires rust compiler...
+#outlines
 pandas
 Pillow
 playwright
