@@ -2,11 +2,17 @@
 # Description: Gradio functions for the Anki Validation tab
 #
 # Imports
+from datetime import datetime
+import base64
 import json
 import logging
-from datetime import datetime
-from typing import Dict, Any
-
+import os
+from pathlib import Path
+import shutil
+import sqlite3
+import tempfile
+from typing import Dict, Any, Optional, Tuple
+import zipfile
 #
 # External Imports
 import gradio as gr
@@ -14,6 +20,8 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Gradio_UI.Chat_ui import chat_wrapper
+from App_Function_Libraries.Third_Party.Anki import sanitize_html, generate_card_choices, update_card_content, \
+    export_cards, load_card_for_editing
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints
 #
 ############################################################################################################
@@ -784,17 +792,6 @@ def create_anki_validation_tab():
 # End of Anki_Validation_tab.py
 ############################################################################################################
 
-import json
-import zipfile
-import sqlite3
-import tempfile
-import os
-import shutil
-import base64
-from pathlib import Path
-import gradio as gr
-
-
 def extract_media_from_apkg(zip_path, temp_dir):
     """Extract and process media files from APKG."""
     media_files = {}
@@ -833,79 +830,87 @@ def extract_media_from_apkg(zip_path, temp_dir):
     return media_files
 
 
-def process_apkg_file(file_path):
-    """Extract and validate an APKG file, returning the card data and media files."""
+def process_apkg_file(file_path: str) -> Tuple[Optional[Dict], Optional[Dict], str]:
+    """Process APKG file and extract cards, media, and deck information."""
     if not file_path:
         return None, None, "No file provided"
 
     temp_dir = tempfile.mkdtemp()
+    conn = None
+
     try:
         # Extract media files first
         media_files = extract_media_from_apkg(file_path.name, temp_dir)
 
-        # Extract APKG and process database
+        # Process database
         with zipfile.ZipFile(file_path.name, 'r') as zip_ref:
             zip_ref.extractall(temp_dir)
 
-        # Connect to the SQLite database
         db_path = os.path.join(temp_dir, 'collection.anki2')
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
 
-        # Get deck information
-        cursor.execute("SELECT decks, models FROM col")
-        decks_json, models_json = cursor.fetchone()
-        deck_info = {
-            "decks": json.loads(decks_json),
-            "models": json.loads(models_json)
-        }
+        # Use context manager for SQLite connection
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
 
-        # Get cards and notes with media processing
-        cards_data = {"cards": []}
-        cursor.execute("""
-            SELECT n.id, n.flds, n.tags, c.type, n.mid, m.name, n.sfld
-            FROM notes n
-            JOIN cards c ON c.nid = n.id
-            JOIN notetypes m ON m.id = n.mid
-        """)
-
-        for row in cursor:
-            note_id, fields, tags, card_type, model_id, model_name, sort_field = row
-            fields_list = fields.split('\x1f')
-
-            # Process fields for media references
-            processed_fields = []
-            for field in fields_list:
-                # Replace media references with base64 data
-                for filename, base64_data in media_files.items():
-                    field = field.replace(
-                        f'<img src="{filename}"',
-                        f'<img src="{base64_data}"'
-                    )
-                processed_fields.append(field)
-
-            # Convert Anki card type
-            if 'cloze' in model_name.lower():
-                converted_type = 'cloze'
-            elif len(processed_fields) > 1:
-                converted_type = 'basic'
-            else:
-                converted_type = 'basic'
-
-            card_data = {
-                "id": f"APKG_{note_id}",
-                "type": converted_type,
-                "front": processed_fields[0],
-                "back": processed_fields[1] if len(processed_fields) > 1 else "",
-                "tags": tags.strip().split(" ") if tags.strip() else ["imported"],
-                "note": f"Imported from deck: {model_name}",
-                "has_media": any('<img' in field for field in processed_fields)
+            # Get collection info
+            cursor.execute("SELECT decks, models FROM col")
+            decks_json, models_json = cursor.fetchone()
+            deck_info = {
+                "decks": json.loads(decks_json),
+                "models": json.loads(models_json)
             }
 
-            cards_data["cards"].append(card_data)
+            # Process cards and notes
+            cards_data = {"cards": []}
+            cursor.execute("""
+                SELECT 
+                    n.id, n.flds, n.tags, c.type, n.mid, 
+                    m.name, n.sfld, m.flds, m.tmpls
+                FROM notes n
+                JOIN cards c ON c.nid = n.id
+                JOIN notetypes m ON m.id = n.mid
+            """)
 
-        conn.close()
-        return cards_data, deck_info, "APKG file processed successfully!"
+            rows = cursor.fetchall()  # Fetch all rows before closing connection
+
+            for row in rows:
+                note_id, fields, tags, card_type, model_id, model_name, sort_field, fields_json, templates_json = row
+                fields_list = fields.split('\x1f')
+                fields_config = json.loads(fields_json)
+                templates = json.loads(templates_json)
+
+                # Process fields with media
+                processed_fields = []
+                for field in fields_list:
+                    field_html = field
+                    for filename, base64_data in media_files.items():
+                        field_html = field_html.replace(
+                            f'<img src="{filename}"',
+                            f'<img src="{base64_data}"'
+                        )
+                    processed_fields.append(sanitize_html(field_html))
+
+                # Determine card type
+                converted_type = 'basic'
+                if 'cloze' in model_name.lower():
+                    converted_type = 'cloze'
+                elif any('{{FrontSide}}' in t.get('afmt', '') for t in templates):
+                    converted_type = 'reverse'
+
+                card_data = {
+                    "id": f"APKG_{note_id}",
+                    "type": converted_type,
+                    "front": processed_fields[0],
+                    "back": processed_fields[1] if len(processed_fields) > 1 else "",
+                    "tags": tags.strip().split(" ") if tags.strip() else ["imported"],
+                    "note": f"Imported from deck: {model_name}",
+                    "has_media": any('<img' in field for field in processed_fields),
+                    "model_name": model_name,
+                    "field_names": [f['name'] for f in fields_config],
+                    "template_names": [t['name'] for t in templates]
+                }
+
+                cards_data["cards"].append(card_data)
 
     except sqlite3.Error as e:
         return None, None, f"Database error: {str(e)}"
@@ -914,7 +919,24 @@ def process_apkg_file(file_path):
     except Exception as e:
         return None, None, f"Error processing APKG file: {str(e)}"
     finally:
-        shutil.rmtree(temp_dir)
+        # Ensure connection is closed before cleanup
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
+        # Add a small delay to ensure file handles are released
+        import time
+        time.sleep(0.1)
+
+        # Use error handler for directory cleanup
+        try:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception as e:
+            print(f"Warning: Could not remove temporary directory: {str(e)}")
+
+    return cards_data, deck_info, "APKG file processed successfully!"
 
 
 def validate_flashcards(content):
@@ -998,6 +1020,10 @@ def handle_file_upload(file, input_type):
 def create_anki_validation_tab_two():
     with gr.TabItem("Anki Flashcard Validation", visible=True):
         gr.Markdown("# Anki Flashcard Validation and Editor")
+
+        # State variables for internal tracking
+        current_card_data = gr.State({})
+        preview_update_flag = gr.State(False)
 
         with gr.Row():
             # Left Column: Input and Validation
@@ -1096,25 +1122,27 @@ def create_anki_validation_tab_two():
                         value="basic"
                     )
 
-                    front_preview = gr.HTML(
-                        label="Front Preview",
-                        value=""
-                    )
+                    # Front content with preview
+                    with gr.Group():
+                        gr.Markdown("### Front Content")
+                        front_content = gr.TextArea(
+                            label="Content (HTML supported)",
+                            lines=3
+                        )
+                        front_preview = gr.HTML(
+                            label="Preview"
+                        )
 
-                    front_content = gr.TextArea(
-                        label="Front Content",
-                        lines=3
-                    )
-
-                    back_preview = gr.HTML(
-                        label="Back Preview",
-                        value=""
-                    )
-
-                    back_content = gr.TextArea(
-                        label="Back Content",
-                        lines=3
-                    )
+                    # Back content with preview
+                    with gr.Group():
+                        gr.Markdown("### Back Content")
+                        back_content = gr.TextArea(
+                            label="Content (HTML supported)",
+                            lines=3
+                        )
+                        back_preview = gr.HTML(
+                            label="Preview"
+                        )
 
                     tags_input = gr.TextArea(
                         label="Tags (comma-separated)",
@@ -1126,8 +1154,9 @@ def create_anki_validation_tab_two():
                         lines=2
                     )
 
-                    update_card_button = gr.Button("Update Card")
-                    delete_card_button = gr.Button("Delete Card", variant="stop")
+                    with gr.Row():
+                        update_card_button = gr.Button("Update Card")
+                        delete_card_button = gr.Button("Delete Card", variant="stop")
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -1160,43 +1189,172 @@ def create_anki_validation_tab_two():
                 - Use for manual review
                 """)
 
-        # Helper function for previewing HTML content
+        # Event handlers
         def update_preview(content):
-            """Sanitize and update HTML preview."""
+            """Update preview with sanitized content."""
             if not content:
                 return ""
-            # Basic XSS prevention while allowing images
-            allowed_tags = {'img', 'b', 'i', 'u', 'div', 'br', 'p'}
-            # Add more sophisticated HTML sanitization here if needed
-            return content
+            return sanitize_html(content)
 
-        def load_card_for_editing(card_selection, current_content):
+        def delete_card(card_selection, current_content):
+            """Delete selected card and return updated content."""
             if not card_selection or not current_content:
-                return {}, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+                return current_content, "No card selected", []
 
             try:
                 data = json.loads(current_content)
                 selected_id = card_selection.split(" - ")[0]
 
-                for card in data['cards']:
-                    if card['id'] == selected_id:
-                        return (
-                            card,
-                            card['type'],
-                            update_preview(card['front']),
-                            card['front'],
-                            update_preview(card['back']),
-                            card['back'],
-                            ", ".join(card['tags']),
-                            card.get('note', '')
-                        )
+                data['cards'] = [card for card in data['cards'] if card['id'] != selected_id]
+                new_content = json.dumps(data, indent=2)
 
-                return {}, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+                return (
+                    new_content,
+                    "Card deleted successfully!",
+                    generate_card_choices(new_content)
+                )
 
             except Exception as e:
-                return {}, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+                return current_content, f"Error deleting card: {str(e)}", []
 
-        # Update visibility based on input type
-        def update_input_visibility(input_type):
-            return (
-                gr.update(visible=input_type == "JSON"))
+        def process_validation_result(is_valid, message):
+            """Process validation result into a formatted markdown string."""
+            if is_valid:
+                return f"✅ {message}"
+            else:
+                return f"❌ {message}"
+
+        # Modified validation button callback
+        validate_button.click(
+            fn=lambda content: process_validation_result(*validate_flashcards(content)),
+            inputs=[flashcard_input],
+            outputs=[validation_status]
+        ).then(
+            fn=generate_card_choices,
+            inputs=[flashcard_input],
+            outputs=[card_selector]
+        )
+
+        # Register event handlers
+        input_type.change(
+            fn=lambda t: (
+                gr.update(visible=t == "JSON"),
+                gr.update(visible=t == "APKG"),
+                gr.update(visible=t == "APKG")
+            ),
+            inputs=[input_type],
+            outputs=[json_input_group, apkg_input_group, deck_info]
+        )
+
+        # File upload handlers
+        import_json.upload(
+            fn=handle_file_upload,
+            inputs=[import_json, input_type],
+            outputs=[flashcard_input, deck_info, validation_status]
+        )
+
+        import_apkg.upload(
+            fn=handle_file_upload,
+            inputs=[import_apkg, input_type],
+            outputs=[flashcard_input, deck_info, validation_status]
+        ).then(
+            fn=generate_card_choices,
+            inputs=[flashcard_input],
+            outputs=[card_selector]
+        )
+
+        # Validation handler
+        validate_button.click(
+            fn=validate_flashcards,
+            inputs=[flashcard_input],
+            outputs=[validation_status]
+        ).then(
+            fn=generate_card_choices,
+            inputs=[flashcard_input],
+            outputs=[card_selector]
+        )
+
+        # Card editing handlers
+        # Card selector change event
+        card_selector.change(
+            fn=load_card_for_editing,
+            inputs=[card_selector, flashcard_input],
+            outputs=[
+                card_type,
+                front_content,
+                back_content,
+                tags_input,
+                notes_input,
+                front_preview,
+                back_preview
+            ]
+        )
+
+        # Live preview updates
+        front_content.change(
+            fn=update_preview,
+            inputs=[front_content],
+            outputs=[front_preview]
+        )
+
+        back_content.change(
+            fn=update_preview,
+            inputs=[back_content],
+            outputs=[back_preview]
+        )
+
+        # Card update handler
+        update_card_button.click(
+            fn=update_card_content,
+            inputs=[
+                flashcard_input,
+                card_selector,
+                card_type,
+                front_content,
+                back_content,
+                tags_input,
+                notes_input
+            ],
+            outputs=[flashcard_input, validation_status]
+        ).then(
+            fn=generate_card_choices,
+            inputs=[flashcard_input],
+            outputs=[card_selector]
+        )
+
+        # Delete card handler
+        delete_card_button.click(
+            fn=delete_card,
+            inputs=[card_selector, flashcard_input],
+            outputs=[flashcard_input, validation_status, card_selector]
+        )
+
+        # Export handler
+        export_button.click(
+            fn=export_cards,
+            inputs=[flashcard_input, export_format],
+            outputs=[export_status, export_file]
+        )
+
+        return (
+            flashcard_input,
+            import_json,
+            import_apkg,
+            validate_button,
+            validation_status,
+            card_selector,
+            card_type,
+            front_content,
+            back_content,
+            front_preview,
+            back_preview,
+            tags_input,
+            notes_input,
+            update_card_button,
+            delete_card_button,
+            export_format,
+            export_button,
+            export_file,
+            export_status,
+            deck_info
+        )

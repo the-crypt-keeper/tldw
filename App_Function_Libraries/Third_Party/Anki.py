@@ -301,6 +301,44 @@ def update_card_content(
         return current_content, f"Error updating card: {str(e)}"
 
 
+def load_card_for_editing(card_selection: str, current_content: str) -> tuple:
+    """
+    Load a card for editing and generate previews.
+
+    Args:
+        card_selection (str): Selected card ID and preview text
+        current_content (str): Current JSON content
+
+    Returns:
+        tuple: (card_type, front_content, back_content, tags, notes, front_preview, back_preview)
+    """
+    if not card_selection or not current_content:
+        return "basic", "", "", "", "", "", ""
+
+    try:
+        data = json.loads(current_content)
+        selected_id = card_selection.split(" - ")[0]
+
+        for card in data['cards']:
+            if card['id'] == selected_id:
+                # Return all required fields with preview content
+                return (
+                    card['type'],
+                    card['front'],
+                    card['back'],
+                    ", ".join(card['tags']),
+                    card.get('note', ''),
+                    sanitize_html(card['front']),
+                    sanitize_html(card['back'])
+                )
+
+        return "basic", "", "", "", "", "", ""
+
+    except Exception as e:
+        print(f"Error loading card: {str(e)}")
+        return "basic", "", "", "", "", "", ""
+
+
 def export_cards(content: str, format_type: str) -> Tuple[str, Optional[Tuple[str, str, str]]]:
     """Export cards in the specified format."""
     try:
