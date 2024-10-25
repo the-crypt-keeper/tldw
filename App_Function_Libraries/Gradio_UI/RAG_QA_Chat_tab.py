@@ -199,31 +199,69 @@ def create_rag_qa_chat_tab():
 
         def save_notes_function(note_title_text, notes_content, keywords_content, note_state_value, state_value):
             """Save the notes and associated keywords to the database."""
-            conversation_id = state_value.get("conversation_id")
-            note_id = note_state_value["note_id"]
-            if conversation_id and notes_content:
+            logging.info(f"Starting save_notes_function with state: {state_value}")
+            logging.info(f"Note title: {note_title_text}")
+            logging.info(f"Notes content length: {len(notes_content) if notes_content else 0}")
+
+            try:
+                # Check current state
+                conversation_id = state_value.get("conversation_id")
+                logging.info(f"Current conversation_id: {conversation_id}")
+
+                # Create new conversation if none exists
+                if not conversation_id:
+                    logging.info("No conversation ID found, creating new conversation")
+                    conversation_title = note_title_text if note_title_text else "Untitled Conversation"
+                    conversation_id = start_new_conversation(title=conversation_title)
+                    state_value = state_value.copy()  # Create a new copy of the state
+                    state_value["conversation_id"] = conversation_id
+                    logging.info(f"Created new conversation with ID: {conversation_id}")
+
+                if not notes_content:
+                    logging.warning("No notes content provided")
+                    return notes_content, note_state_value, state_value, gr.update(
+                        value="<p style='color:red;'>Cannot save empty notes.</p>")
+
+                # Save or update note
+                note_id = note_state_value.get("note_id")
                 if note_id:
-                    # Update existing note
+                    logging.info(f"Updating existing note with ID: {note_id}")
                     update_note(note_id, note_title_text, notes_content)
                 else:
-                    # Save new note
-                    note_id = save_notes(conversation_id, note_title_text, notes_content)
-                    note_state_value["note_id"] = note_id
-                if keywords_content:
-                    # Clear existing keywords and add new ones
-                    clear_keywords_from_note(note_id)
-                    add_keywords_to_note(note_id, [kw.strip() for kw in keywords_content.split(',')])
+                    logging.info(f"Creating new note for conversation: {conversation_id}")
+                    note_id = save_notes(conversation_id, note_title_text or "Untitled Note", notes_content)
+                    note_state_value = {"note_id": note_id}
+                    logging.info(f"Created new note with ID: {note_id}")
 
-                logging.info("Notes and keywords saved successfully!")
-                return notes_content, note_state_value
-            else:
-                logging.warning("No conversation ID or notes to save.")
-                return "", note_state_value
+                # Handle keywords
+                if keywords_content:
+                    logging.info("Processing keywords")
+                    clear_keywords_from_note(note_id)
+                    keywords = [kw.strip() for kw in keywords_content.split(',')]
+                    add_keywords_to_note(note_id, keywords)
+                    logging.info(f"Added keywords: {keywords}")
+
+                logging.info("Notes saved successfully")
+                return (
+                    notes_content,
+                    note_state_value,
+                    state_value,
+                    gr.update(value="<p style='color:green;'>Notes saved successfully!</p>")
+                )
+
+            except Exception as e:
+                logging.error(f"Error in save_notes_function: {str(e)}", exc_info=True)
+                return (
+                    notes_content,
+                    note_state_value,
+                    state_value,
+                    gr.update(value=f"<p style='color:red;'>Error saving notes: {str(e)}</p>")
+                )
 
         save_notes_btn.click(
             save_notes_function,
             inputs=[note_title, notes, keywords_for_notes, note_state, state],
-            outputs=[notes, note_state]
+            outputs=[notes, note_state, state, status_message]
         )
 
         def clear_notes_function():
@@ -562,7 +600,6 @@ def create_rag_qa_notes_management_tab():
     # New Management Tab
     with gr.TabItem("Notes Management", visible=True):
         gr.Markdown("# RAG QA Notes Management")
-
         management_state = gr.State({
             "selected_conversation_id": None,
             "selected_note_id": None,

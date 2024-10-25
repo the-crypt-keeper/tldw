@@ -614,6 +614,24 @@ def update_conversation_title(conversation_id, new_title):
         logger.error(f"Error updating conversation title: {e}")
         raise
 
+def delete_messages_in_conversation(conversation_id):
+    """Helper function to delete all messages in a conversation."""
+    try:
+        execute_query("DELETE FROM rag_qa_chats WHERE conversation_id = ?", (conversation_id,))
+        logging.info(f"Messages in conversation '{conversation_id}' deleted successfully.")
+    except Exception as e:
+        logging.error(f"Error deleting messages in conversation '{conversation_id}': {e}")
+        raise
+
+def get_conversation_title(conversation_id):
+    """Helper function to get the conversation title."""
+    query = "SELECT title FROM conversation_metadata WHERE conversation_id = ?"
+    result = execute_query(query, (conversation_id,))
+    if result:
+        return result[0][0]
+    else:
+        return "Untitled Conversation"
+
 def delete_conversation(conversation_id):
     """Delete a conversation and its associated messages and notes."""
     try:

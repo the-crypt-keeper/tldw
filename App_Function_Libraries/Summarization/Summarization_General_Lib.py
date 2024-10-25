@@ -1111,79 +1111,144 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
     return current_progress, success_message, None, None, None, None
 
 
-
-def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False):
+def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False, overwrite=False):
     temp_files = []
     logging.info(f"Processing media: {video_path}")
     global segments_json_path
     audio_file_path = convert_to_wav(video_path, offset)
     logging.debug(f"Converted audio file: {audio_file_path}")
     temp_files.append(audio_file_path)
-    logging.debug("Replacing audio file with segments.json file")
-    segments_json_path = audio_file_path.replace('.wav', '.segments.json')
+    logging.debug("Setting up segments JSON path")
+
+    # Update path to include whisper model in filename
+    base_path = audio_file_path.replace('.wav', '')
+    segments_json_path = f"{base_path}-whisper_model-{whisper_model}.segments.json"
     temp_files.append(segments_json_path)
 
     if diarize:
-        diarized_json_path = audio_file_path.replace('.wav', '.diarized.json')
+        diarized_json_path = f"{base_path}-whisper_model-{whisper_model}.diarized.json"
 
-        # Check if diarized JSON already exists
+        # Check if diarized JSON already exists and is valid
         if os.path.exists(diarized_json_path):
             logging.info(f"Diarized file already exists: {diarized_json_path}")
             try:
-                with open(diarized_json_path, 'r') as file:
+                with open(diarized_json_path, 'r', encoding='utf-8') as file:
                     diarized_segments = json.load(file)
-                if not diarized_segments:
-                    logging.warning(f"Diarized JSON file is empty, re-generating: {diarized_json_path}")
-                    raise ValueError("Empty diarized JSON file")
-                logging.debug(f"Loaded diarized segments from {diarized_json_path}")
+                # Check if segments are empty or invalid
+                if not diarized_segments or not isinstance(diarized_segments, list):
+                    if not overwrite:
+                        logging.info("Overwrite flag not set. Existing file not overwritten.")
+                        return None, "Overwrite flag not set. Existing file not overwritten."
+                    logging.warning(f"Diarized JSON file is empty or invalid, re-generating: {diarized_json_path}")
+                    raise ValueError("Invalid diarized JSON file")
+                # Check if segments contain expected content
+                if not all('Text' in segment for segment in diarized_segments):
+                    if not overwrite:
+                        logging.info("Overwrite flag not set. Existing file not overwritten.")
+                        return None, "Overwrite flag not set. Existing file not overwritten."
+                    logging.warning(f"Diarized segments missing required fields, re-generating: {diarized_json_path}")
+                    raise ValueError("Invalid segment format")
+                logging.debug(f"Loaded valid diarized segments from {diarized_json_path}")
                 return audio_file_path, diarized_segments
             except (json.JSONDecodeError, ValueError) as e:
+                if not overwrite:
+                    logging.info("Overwrite flag not set. Existing file not overwritten.")
+                    return None, "Overwrite flag not set. Existing file not overwritten."
                 logging.error(f"Failed to read or parse the diarized JSON file: {e}")
-                os.remove(diarized_json_path)
+                if os.path.exists(diarized_json_path):
+                    os.remove(diarized_json_path)
 
-        # If diarized file doesn't exist or was corrupted, generate new diarized transcription
+        # Generate new diarized transcription
         logging.info(f"Generating diarized transcription for {audio_file_path}")
         diarized_segments = combine_transcription_and_diarization(audio_file_path)
 
+        # Validate diarized segments before saving
+        if not diarized_segments or not isinstance(diarized_segments, list):
+            logging.error("Generated diarized segments are empty or invalid")
+            return None, None
+
         # Save diarized segments
-        with open(diarized_json_path, 'w') as file:
-            json.dump(diarized_segments, file, indent=2)
+        json_str = json.dumps(diarized_segments, indent=2)
+        with open(diarized_json_path, 'w', encoding='utf-8') as f:
+            f.write(json_str)
 
         return audio_file_path, diarized_segments
 
     # Non-diarized transcription
-    if os.path.exists(segments_json_path):
-        logging.info(f"Segments file already exists: {segments_json_path}")
-        try:
-            with open(segments_json_path, 'r') as file:
-                segments = json.load(file)
-            if not segments:
-                logging.warning(f"Segments JSON file is empty, re-generating: {segments_json_path}")
-                raise ValueError("Empty segments JSON file")
-            logging.debug(f"Loaded segments from {segments_json_path}")
-        except (json.JSONDecodeError, ValueError) as e:
-            logging.error(f"Failed to read or parse the segments JSON file: {e}")
-            os.remove(segments_json_path)
-            logging.info(f"Re-generating transcription for {audio_file_path}")
-            audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
-            if segments is None:
-                return None, None
-    else:
-        audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
+    try:
+        # If segments file exists, try to load it
+        if os.path.exists(segments_json_path):
+            logging.info(f"Segments file already exists: {segments_json_path}")
+            try:
+                with open(segments_json_path, 'r', encoding='utf-8') as file:
+                    segments = json.load(file)
+                # Check if segments are empty or invalid
+                if not segments or not isinstance(segments, list):
+                    if not overwrite:
+                        logging.info("Overwrite flag not set. Existing file not overwritten.")
+                        return None, "Overwrite flag not set. Existing file not overwritten."
+                    raise ValueError("Invalid segments JSON file")
+                # Check if segments contain expected content
+                if not all(
+                        isinstance(segment, dict) and all(key in segment for key in ['Text', 'Time_Start', 'Time_End'])
+                        for segment in segments):
+                    if not overwrite:
+                        logging.info("Overwrite flag not set. Existing file not overwritten.")
+                        return None, "Overwrite flag not set. Existing file not overwritten."
+                    raise ValueError("Invalid segment format")
+                logging.debug(f"Loaded valid segments from {segments_json_path}")
+                return audio_file_path, segments
+            except (json.JSONDecodeError, ValueError, KeyError) as e:
+                if not overwrite:
+                    logging.info("Overwrite flag not set. Existing file not overwritten.")
+                    return None, "Overwrite flag not set. Existing file not overwritten."
+                logging.error(f"Failed to read or parse the segments JSON file: {str(e)}")
+                if os.path.exists(segments_json_path):
+                    os.remove(segments_json_path)
 
-    return audio_file_path, segments
+        # Generate new transcription if file doesn't exist
+        audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
+        if segments is None:
+            logging.error("Failed to generate new transcription")
+            return None, None
+
+        return audio_file_path, segments
+
+    except Exception as e:
+        logging.error(f"Error in perform_transcription: {str(e)}")
+        return None, None
 
 
 def re_generate_transcription(audio_file_path, whisper_model, vad_filter):
+    global segments_json_path
     try:
+        logging.info(f"Generating new transcription for {audio_file_path}")
         segments = speech_to_text(audio_file_path, whisper_model=whisper_model, vad_filter=vad_filter)
+
+        # Print the first few segments for debugging
+        logging.debug(f"First few segments from speech_to_text: {segments[:2] if segments else 'None'}")
+
+        # Validate segments before saving
+        if not segments or not isinstance(segments, list):
+            logging.error("Generated segments are empty or invalid")
+            return None, None
+
+        # More detailed validation
+        if not all(isinstance(segment, dict) and all(key in segment for key in ['Text', 'Time_Start', 'Time_End']) for
+                   segment in segments):
+            logging.error("Generated segments are missing required fields or have invalid format")
+            logging.debug(f"Segments structure: {segments[:2]}")  # Log first two segments for debugging
+            return None, None
+
         # Save segments to JSON
-        with open(segments_json_path, 'w') as file:
-            json.dump(segments, file, indent=2)
-        logging.debug(f"Transcription segments saved to {segments_json_path}")
+        json_str = json.dumps(segments, indent=2)
+        with open(segments_json_path, 'w', encoding='utf-8') as f:
+            f.write(json_str)
+
+        logging.debug(f"Valid transcription segments saved to {segments_json_path}")
         return audio_file_path, segments
     except Exception as e:
-        logging.error(f"Error in re-generating transcription: {str(e)}")
+        logging.error(f"Error in re_generate_transcription: {str(e)}")
         return None, None
 
 
@@ -1191,17 +1256,40 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
     try:
         video_title = sanitize_filename(info_dict.get('title', 'Untitled'))
 
+        # Handle different transcription_text formats
+        if isinstance(transcription_text, dict):
+            if 'transcription' in transcription_text:
+                # Handle the case where it's a dict with 'transcription' key
+                text_to_save = '\n'.join(segment['Text'] for segment in transcription_text['transcription'])
+            else:
+                # Handle other dictionary formats
+                text_to_save = str(transcription_text)
+        elif isinstance(transcription_text, list):
+            # Handle list of segments
+            text_to_save = '\n'.join(segment['Text'] for segment in transcription_text)
+        else:
+            # Handle string input
+            text_to_save = str(transcription_text)
+
+        # Validate the extracted text
+        if not text_to_save or not text_to_save.strip():
+            logging.error("Transcription text is empty or contains only whitespace")
+            return None, None
+
         # Save transcription
         transcription_file_path = os.path.join(download_path, f"{video_title}_transcription.txt")
         with open(transcription_file_path, 'w', encoding='utf-8') as f:
-            f.write(transcription_text)
+            f.write(text_to_save)
 
         # Save summary if available
         summary_file_path = None
         if summary_text:
-            summary_file_path = os.path.join(download_path, f"{video_title}_summary.txt")
-            with open(summary_file_path, 'w', encoding='utf-8') as f:
-                f.write(summary_text)
+            if isinstance(summary_text, str) and summary_text.strip():
+                summary_file_path = os.path.join(download_path, f"{video_title}_summary.txt")
+                with open(summary_file_path, 'w', encoding='utf-8') as f:
+                    f.write(summary_text)
+            else:
+                logging.warning("Summary text is not a string or contains only whitespace")
 
         return transcription_file_path, summary_file_path
     except Exception as e:
