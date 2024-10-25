@@ -195,6 +195,7 @@ Papers
 		* Perform multiple search methods and combine results together
 		1. Keyword Search(BM25) + Vector
 		2. f
+       	3. * https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking
 	8. **Query Construction**
 		- Create a query to interact with a specific DB
 		1. Text-to-SQL
