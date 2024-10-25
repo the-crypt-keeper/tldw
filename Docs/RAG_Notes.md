@@ -195,6 +195,7 @@ Papers
 		* Perform multiple search methods and combine results together
 		1. Keyword Search(BM25) + Vector
 		2. f
+       	3. * https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking
 	8. **Query Construction**
 		- Create a query to interact with a specific DB
 		1. Text-to-SQL
@@ -578,6 +579,7 @@ JSON file store Vector indexing
 			* `RRF, is a technique that combines the rankings of multiple search result lists to generate a single unified ranking. Developed in collaboration with the University of Waterloo (CAN) and Google, RRF produces results that are more effective than reordering chunks under any single branch.`
 			* https://towardsdatascience.com/forget-rag-the-future-is-rag-fusion-1147298d8ad1
 			* https://safjan.com/implementing-rank-fusion-in-python/
+			* https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking
 - Semantic dissonance
 	* `the discordance between your task’s intended meaning, the RAG’s understanding of it, and the underlying knowledge that’s stored.`
 - Poor explainability of embeddings
@@ -705,4 +707,3 @@ https://gist.github.com/Donavan/62e238aa0a40ca88191255a070e356a2
 	4. Simple Analysis questions
 	5. Complex Analysis
 	6. Research Level Questions
-	7. Multi-Document Analysis

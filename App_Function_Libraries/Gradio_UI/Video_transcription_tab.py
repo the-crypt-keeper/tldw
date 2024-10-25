@@ -6,8 +6,6 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Dict, Any
-
 #
 # External Imports
 import gradio as gr
@@ -210,7 +208,7 @@ def create_video_transcription_tab():
                                                    progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
                     # Start overall processing timer
-                    proc_start_time = datetime.utcnow()
+                    proc_start_time = datetime.now()
                     # FIXME - summarize_recursively is not being used...
                     logging.info("Entering process_videos_with_error_handling")
                     logging.info(f"Received inputs: {inputs}")
@@ -264,7 +262,7 @@ def create_video_transcription_tab():
 
                     # Start timing
                     # FIXME - utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-                    start_proc = datetime.utcnow()
+                    start_proc = datetime.now()
 
                     for i in range(0, len(all_inputs), batch_size):
                         batch = all_inputs[i:i + batch_size]
@@ -272,7 +270,7 @@ def create_video_transcription_tab():
 
                         for input_item in batch:
                             # Start individual video processing timer
-                            video_start_time = datetime.utcnow()
+                            video_start_time = datetime.now()
                             try:
                                 start_seconds = convert_to_seconds(start_time)
                                 end_seconds = convert_to_seconds(end_time) if end_time else None
@@ -377,7 +375,7 @@ def create_video_transcription_tab():
                                         )
 
                                         # Calculate processing time
-                                        video_end_time = datetime.utcnow()
+                                        video_end_time = datetime.now()
                                         processing_time = (video_end_time - video_start_time).total_seconds()
                                         log_histogram(
                                             metric_name="video_processing_time_seconds",
@@ -485,7 +483,7 @@ def create_video_transcription_tab():
                     total_inputs = len(all_inputs)
 
                     # End overall processing timer
-                    proc_end_time = datetime.utcnow()
+                    proc_end_time = datetime.now()
                     total_processing_time = (proc_end_time - proc_start_time).total_seconds()
                     log_histogram(
                         metric_name="total_processing_time_seconds",
@@ -714,8 +712,9 @@ def create_video_transcription_tab():
 
                     # Perform transcription
                     logging.info("process_url_with_metadata: Starting transcription...")
+                    logging.info(f"process_url_with_metadata: overwrite existing?: {overwrite_existing}")
                     audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
-                                                                      vad_filter, diarize)
+                                                                      vad_filter, diarize, overwrite_existing)
 
                     if audio_file_path is None or segments is None:
                         logging.error("process_url_with_metadata: Transcription failed or segments not available.")
@@ -871,3 +870,7 @@ def create_video_transcription_tab():
                 ],
                 outputs=[progress_output, error_output, results_output, download_transcription, download_summary, confabulation_output]
             )
+
+#
+# End of Video_transcription_tab.py
+#######################################################################################################################
