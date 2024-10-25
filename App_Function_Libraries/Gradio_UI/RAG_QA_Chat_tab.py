@@ -29,14 +29,12 @@ from App_Function_Libraries.DB.RAG_QA_Chat_DB import (
     update_note,
     clear_keywords_from_note, get_notes, get_keywords_for_note, delete_conversation, delete_note, execute_query,
     add_keywords_to_conversation, fetch_all_notes, fetch_all_conversations, fetch_conversations_by_ids,
-    fetch_notes_by_ids,
+    fetch_notes_by_ids, update_conversation_title, get_conversation_title, delete_messages_in_conversation,
 )
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, rag_qa_chat
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
-
-
 #
 ########################################################################################################################
 #
@@ -199,31 +197,60 @@ def create_rag_qa_chat_tab():
 
         def save_notes_function(note_title_text, notes_content, keywords_content, note_state_value, state_value):
             """Save the notes and associated keywords to the database."""
-            conversation_id = state_value.get("conversation_id")
-            note_id = note_state_value["note_id"]
-            if conversation_id and notes_content:
-                if note_id:
-                    # Update existing note
-                    update_note(note_id, note_title_text, notes_content)
-                else:
-                    # Save new note
-                    note_id = save_notes(conversation_id, note_title_text, notes_content)
-                    note_state_value["note_id"] = note_id
-                if keywords_content:
-                    # Clear existing keywords and add new ones
-                    clear_keywords_from_note(note_id)
-                    add_keywords_to_note(note_id, [kw.strip() for kw in keywords_content.split(',')])
+            try:
+                # Get the conversation ID from state, or create a new conversation if none exists
+                conversation_id = state_value.get("conversation_id")
+                if not conversation_id:
+                    # Create a new conversation with the note title as the conversation title
+                    conversation_title = note_title_text if note_title_text else "Untitled Conversation"
+                    conversation_id = start_new_conversation(conversation_title)
+                    # Update the state with the new conversation ID
+                    state_value["conversation_id"] = conversation_id
 
-                logging.info("Notes and keywords saved successfully!")
-                return notes_content, note_state_value
-            else:
-                logging.warning("No conversation ID or notes to save.")
-                return "", note_state_value
+                if notes_content:
+                    note_id = note_state_value.get("note_id")
+                    if note_id:
+                        # Update existing note
+                        update_note(note_id, note_title_text, notes_content)
+                    else:
+                        # Save new note
+                        note_id = save_notes(conversation_id, note_title_text, notes_content)
+                        note_state_value["note_id"] = note_id
+
+                    if keywords_content:
+                        # Clear existing keywords and add new ones
+                        clear_keywords_from_note(note_id)
+                        add_keywords_to_note(note_id, [kw.strip() for kw in keywords_content.split(',')])
+
+                    logging.info("Notes and keywords saved successfully!")
+                    return (
+                        notes_content,
+                        note_state_value,
+                        state_value,
+                        gr.update(value=f"<p style='color:green;'>Notes saved successfully!</p>")
+                    )
+                else:
+                    logging.warning("No notes content to save.")
+                    return (
+                        "",
+                        note_state_value,
+                        state_value,
+                        gr.update(value=f"<p style='color:red;'>Cannot save empty notes.</p>")
+                    )
+
+            except Exception as e:
+                logging.error(f"Error saving notes: {str(e)}")
+                return (
+                    notes_content,
+                    note_state_value,
+                    state_value,
+                    gr.update(value=f"<p style='color:red;'>Error saving notes: {str(e)}</p>")
+                )
 
         save_notes_btn.click(
             save_notes_function,
             inputs=[note_title, notes, keywords_for_notes, note_state, state],
-            outputs=[notes, note_state]
+            outputs=[notes, note_state, state, status_message]
         )
 
         def clear_notes_function():
@@ -889,25 +916,6 @@ def create_rag_qa_chat_management_tab():
             ]
         )
 
-        def delete_messages_in_conversation(conversation_id):
-            """Helper function to delete all messages in a conversation."""
-            try:
-                execute_query("DELETE FROM rag_qa_chats WHERE conversation_id = ?", (conversation_id,))
-                logging.info(f"Messages in conversation '{conversation_id}' deleted successfully.")
-            except Exception as e:
-                logging.error(f"Error deleting messages in conversation '{conversation_id}': {e}")
-                raise
-
-        def get_conversation_title(conversation_id):
-            """Helper function to get the conversation title."""
-            query = "SELECT title FROM conversation_metadata WHERE conversation_id = ?"
-            result = execute_query(query, (conversation_id,))
-            if result:
-                return result[0][0]
-            else:
-                return "Untitled Conversation"
-
-
 
 def create_export_data_tab():
     with gr.TabItem("Export Data"):
@@ -1029,19 +1037,6 @@ def create_export_data_tab():
             inputs=[export_option, conversations_checklist, notes_checklist],
             outputs=[download_link, download_link, status_message]
         )
-
-
-
-
-def update_conversation_title(conversation_id, new_title):
-    """Update the title of a conversation."""
-    try:
-        query = "UPDATE conversation_metadata SET title = ? WHERE conversation_id = ?"
-        execute_query(query, (new_title, conversation_id))
-        logging.info(f"Conversation '{conversation_id}' title updated to '{new_title}'")
-    except Exception as e:
-        logging.error(f"Error updating conversation title: {e}")
-        raise
 
 
 def convert_file_to_text(file_path):
