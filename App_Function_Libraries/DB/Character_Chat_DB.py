@@ -560,6 +560,7 @@ def delete_character_chat(chat_id: int) -> bool:
     finally:
         conn.close()
 
+
 def fetch_keywords_for_chats(keywords: List[str]) -> List[int]:
     """
     Fetch chat IDs associated with any of the specified keywords.
@@ -589,15 +590,13 @@ def fetch_keywords_for_chats(keywords: List[str]) -> List[int]:
     finally:
         conn.close()
 
+
 def save_chat_history_to_character_db(character_id: int, conversation_name: str, chat_history: List[Tuple[str, str]]) -> Optional[int]:
     """Save chat history to the CharacterChats table.
 
     Returns the ID of the inserted chat or None if failed.
     """
     return add_character_chat(character_id, conversation_name, chat_history)
-
-def migrate_chat_to_media_db():
-    pass
 
 
 def search_db(query: str, fields: List[str], where_clause: str = "", page: int = 1, results_per_page: int = 5) -> List[Dict[str, Any]]:

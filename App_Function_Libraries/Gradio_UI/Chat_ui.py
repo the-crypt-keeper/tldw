@@ -15,8 +15,8 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, chat, save_chat_history, \
     update_chat_content, save_chat_history_to_db_wrapper
-from App_Function_Libraries.DB.DB_Manager import add_chat_message, search_chat_conversations, create_chat_conversation, \
-    get_chat_messages, update_chat_message, delete_chat_message, load_preset_prompts, db
+from App_Function_Libraries.DB.DB_Manager import search_chat_conversations, update_chat_message, delete_chat_message, \
+    load_preset_prompts, db, load_chat_history, start_new_conversation, save_message
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints
 #
@@ -91,10 +91,9 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
                 # Create a new conversation
                 media_id = media_content.get('id', None)
                 conversation_name = f"Chat about {media_content.get('title', 'Unknown Media')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                conversation_id = create_chat_conversation(media_id, conversation_name)
-
+                conversation_id = start_new_conversation(title=conversation_name, media_id=media_id)
             # Add user message to the database
-            user_message_id = add_chat_message(conversation_id, "user", message)
+            user_message_id = save_message(conversation_id, role="user", content=message)
 
         # Include the selected parts and custom_prompt only for the first message
         if not history and selected_parts:
@@ -113,7 +112,7 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
 
         if save_conversation:
             # Add assistant message to the database
-            add_chat_message(conversation_id, "assistant", bot_message)
+            save_message(conversation_id, role="assistant", content=bot_message)
 
         # Update history
         new_history = history + [(message, bot_message)]
@@ -145,7 +144,7 @@ def load_conversation(conversation_id):
     if not conversation_id:
         return [], None
 
-    messages = get_chat_messages(conversation_id)
+    messages, _, _ = load_chat_history(conversation_id)
     history = [
         (msg['message'], None) if msg['sender'] == 'user' else (None, msg['message'])
         for msg in messages
@@ -1094,7 +1093,7 @@ def create_chat_management_tab():
             try:
                 if selected and selected in conversation_mapping:
                     conversation_id = conversation_mapping[selected]
-                    messages = get_chat_messages(conversation_id)
+                    messages, _, _ = load_chat_history(conversation_id)
                     conversation_data = {
                         "conversation_id": conversation_id,
                         "messages": messages
