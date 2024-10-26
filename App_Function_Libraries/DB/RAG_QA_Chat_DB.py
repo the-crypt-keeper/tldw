@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS conversation_metadata (
     conversation_id TEXT PRIMARY KEY,
     created_at DATETIME NOT NULL,
     last_updated DATETIME NOT NULL,
-    title TEXT NOT NULL
+    title TEXT NOT NULL,
+    media_id INTEGER
 );
 
 -- Table for storing keywords
