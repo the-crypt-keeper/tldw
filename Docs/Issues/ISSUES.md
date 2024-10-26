@@ -29,3 +29,8 @@ Create a blog post
 
 Linux Cuda
      export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/user/venv/lib/python3.X/site-packages/nvidia/cudnn/lib/
+
+
+Export/Import From google keep
+	https://takeout.google.com/
+	https://github.com/djsudduth/keep-it-markdown
