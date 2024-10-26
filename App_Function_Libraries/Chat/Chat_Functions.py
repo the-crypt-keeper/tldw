@@ -27,6 +27,16 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 #
 # Functions:
 
+def approximate_token_count(history):
+    total_text = ''
+    for user_msg, bot_msg in history:
+        if user_msg:
+            total_text += user_msg + ' '
+        if bot_msg:
+            total_text += bot_msg + ' '
+    total_tokens = len(total_text.split())
+    return total_tokens
+
 def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message=None):
     log_counter("chat_api_call_attempt", labels={"api_endpoint": api_endpoint})
     start_time = time.time()
