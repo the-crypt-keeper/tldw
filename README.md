@@ -23,12 +23,27 @@
 
 
 #### Key Features:
-- Full-text+RAG search across all ingested content (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking).
-- Local LLM inference for offline usage and chat (via `llamafile`/`HuggingFace Transformers`).
-- Local Embeddings generation for RAG search (via `llamafile`/`llama.cpp`/`HuggingFace Transformers`).
-- Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
+- Ingest(Transcribe/convert to markdown) content from (multiple) URLs or local files (video, audio, documents, web articles, books, mediawiki dumps) -> Summarize/Analyze -> Chat with/about the content.- Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
+- **Full Plaintext & RAG Search Capability** Search across all ingested content via RAG or 'old-fashioned non-LLM search' (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking + Contextual Retrieval).
+  - Search by content, title, author, URL, or tags, with support for meta-tags, so that you can have the equivalent of 'folders' for your content (and tags).
+  - If you'd like to see my notes on RAG: see `./Docs/RAG_Notes.md`
+- **Local LLM inference for offline usage and chat** - via `llamafile`/`HuggingFace Transformers`.
+- **4 Different Chat UI styles** - Regular chat, Stacked chat, Multi-Response chat(1 Prompt, 3 APIs) and 4 Separate API chats on one page.
+- **Local Embeddings Generation for RAG Search** - via `llamafile`/`llama.cpp`/`HuggingFace Transformers`.
 - Also writing tools! Grammar/Style checker, Tone Analyzer, Writing editor(feedback), and more.
-- Full Character Chat Support - Create/Edit & Import/Export Character Cards, and chat with them.
+- **Full Character Chat Support** - Create/Edit & Import/Export Character Cards, and chat with them.
+- **Arxiv API Integration** - Search and ingest papers from Arxiv.
+- **Chat Workflows** - A way to string together multiple questions and responses into a single chat. - Use it to create a 'workflow' for a specific task. Configured via a JSON file.
+- **Import Obsidian Notes/Vault** - Import Obsidian Vaults into the DB. (Imported notes are automatically parsed for tags and titles)
+- **Backup Management** - A way to back up the DBs, view backups, and restore from a backup. (4 SQLite DBs: Media, Character Chats, RAG Chats, Embeddings)
+- **Trashcan Support** - A way to 'soft' delete content, and restore it if needed. (Helps with accidental deletions) - Trashcan is only for the MediaDB.
+- **Support for 7 Local LLM APIs:** `Llama.cpp`, `Kobold.cpp`, `Oobabooga`, `TabbyAPI`, `vLLM`, Ollama`.
+- **Support for 8 Commercial APIs:** `Claude Sonnet 3.5`, `Cohere Command R+`, `DeepSeek`, `Groq`, `HuggingFace`, `Mistral`, `OpenAI`, `OpenRouter`.
+- **Local Audio Recording with Transcription** - Record audio locally and transcribe it.
+- **Structured Prompt Creation and Management** - Create prompts using a structured approach, and then edit and use them in your chats. Or delete them.
+  - Also have the ability to import prompts individually or in bulk. As well as export them as markdown documents.
+  - See `./Docs/Prompts/` for examples of prompts. and `./Docs/Propmts/TEMPLATE.md` for the prompt template used in tldw.
+- Features to come: Anki Flashcard creation, Mindmap creation from content(currently in under `Utilities`, uses PlantUML), better document handling, migration to a FastAPI backend, and more.
 #### The original scripts by `the-crypt-keeper` for transcribing and summarizing youtube videos are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 
 
@@ -321,16 +336,14 @@ You can view the full roadmap on the [GitHub Issues page](https://github.com/rmu
 - These are just the 'standard smaller' models I recommend, there are many more out there, and you can use any of them with this project.
   - One should also be aware that people create 'fine-tunes' and 'merges' of existing models, to create new models that are more suited to their needs.
   - This can result in models that may be better at some tasks but worse at others, so it's important to test and see what works best for you.
-- MS Phi-3.5-mini-128k(32k effective context, censored output): https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF
-  - Fine-tuned to be uncensored somewhat: https://huggingface.co/bartowski/Phi-3.5-mini-instruct_Uncensored-GGUF
-- AWS MegaBeam Mistral (32k effective context): https://huggingface.co/bartowski/MegaBeam-Mistral-7B-512k-GGUF
-- Mistral Nemo Instruct 2407 - https://huggingface.co/QuantFactory/Mistral-Nemo-Instruct-2407-GGUF
 - Llama 3.1 - The native llamas will give you censored output by default, but you can jailbreak them, or use a finetune which has attempted to tune out their refusals. 
   - 8B: https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF 
+- Mistral Nemo Instruct 2407 - https://huggingface.co/QuantFactory/Mistral-Nemo-Instruct-2407-GGUF
+- AWS MegaBeam Mistral (32k effective context): https://huggingface.co/bartowski/MegaBeam-Mistral-7B-512k-GGUF
 - Mistral Small: https://huggingface.co/bartowski/Mistral-Small-Instruct-2409-GGUF
 - Cohere Command-R
   - Command-R https://huggingface.co/bartowski/c4ai-command-r-v01-GGUF / Aug2024 version: https://huggingface.co/bartowski/c4ai-command-r-08-2024-GGUF
-- Qwen 2.5 Series(haven't tested these ones yet but they seem promising, almost certainly censored): https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e
+- Qwen 2.5 Series(Pretty powerful, less pop-culture knowledge and censored somewhat): https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e
   - 2.5-3B: https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF
   - 7B: https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF
   - 14B: https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF
