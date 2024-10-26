@@ -21,7 +21,7 @@ import gradio as gr
 from App_Function_Libraries.Character_Chat.Character_Chat_Lib import validate_character_book, validate_v2_card, \
     replace_placeholders, replace_user_placeholder, extract_json_from_image, parse_character_book, \
     load_chat_and_character, load_chat_history, load_character_and_image, extract_character_id, load_character_wrapper
-from App_Function_Libraries.Chat import chat
+from App_Function_Libraries.Chat.Chat_Functions import chat, approximate_token_count
 from App_Function_Libraries.DB.Character_Chat_DB import (
     add_character_card,
     get_character_cards,
@@ -36,8 +36,6 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
 )
 from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
     default_api_endpoint
-
-
 #
 ############################################################################################################
 #
@@ -317,6 +315,7 @@ def create_character_card_interaction_tab():
                 answer_for_me_button = gr.Button("Answer for Me")
                 continue_talking_button = gr.Button("Continue Talking")
                 regenerate_button = gr.Button("Regenerate Last Message")
+                token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
                 clear_chat_button = gr.Button("Clear Chat")
                 save_snapshot_button = gr.Button("Save Chat Snapshot")
                 update_chat_dropdown = gr.Dropdown(label="Select Chat to Update", choices=[], visible=False)
@@ -881,6 +880,10 @@ def create_character_card_interaction_tab():
                 auto_save_checkbox
             ],
             outputs=[chat_history, save_status]
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chat_history],
+            outputs=[token_count_display]
         )
 
         continue_talking_button.click(
@@ -895,6 +898,10 @@ def create_character_card_interaction_tab():
                 auto_save_checkbox
             ],
             outputs=[chat_history, save_status]
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chat_history],
+            outputs=[token_count_display]
         )
 
         import_card_button.click(
@@ -913,6 +920,10 @@ def create_character_card_interaction_tab():
             fn=clear_chat_history,
             inputs=[character_data, user_name_input],
             outputs=[chat_history, character_data]
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chat_history],
+            outputs=[token_count_display]
         )
 
         character_dropdown.change(
@@ -938,7 +949,13 @@ def create_character_card_interaction_tab():
                 auto_save_checkbox
             ],
             outputs=[chat_history, save_status]
-        ).then(lambda: "", outputs=user_input)
+        ).then(
+            lambda: "", outputs=user_input
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chat_history],
+            outputs=[token_count_display]
+        )
 
         regenerate_button.click(
             fn=regenerate_last_message,
@@ -952,6 +969,10 @@ def create_character_card_interaction_tab():
                 auto_save_checkbox
             ],
             outputs=[chat_history, save_status]
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chat_history],
+            outputs=[token_count_display]
         )
 
         import_chat_button.click(
@@ -961,8 +982,12 @@ def create_character_card_interaction_tab():
 
         chat_file_upload.change(
             fn=import_chat_history,
-            inputs=[chat_file_upload, chat_history, character_data],
+            inputs=[chat_file_upload, chat_history, character_data, user_name_input],
             outputs=[chat_history, character_data, save_status]
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chat_history],
+            outputs=[token_count_display]
         )
 
         save_chat_history_to_db.click(
@@ -1019,6 +1044,10 @@ def create_character_card_interaction_tab():
             fn=load_selected_chat_from_search,
             inputs=[chat_search_dropdown, user_name_input],
             outputs=[character_data, chat_history, character_image, save_status]
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chat_history],
+            outputs=[token_count_display]
         )
 
         # Show Load Chat Button when a chat is selected

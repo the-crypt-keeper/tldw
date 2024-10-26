@@ -1,4 +1,4 @@
-# Chat.py
+# Chat_Functions.py
 # Chat functions for interacting with the LLMs as chatbots
 import base64
 # Imports
