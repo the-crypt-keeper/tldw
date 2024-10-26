@@ -14,23 +14,12 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Books.Book_Ingestion_Lib import read_epub
-from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_files, add_media_with_keywords
-from App_Function_Libraries.DB.RAG_QA_Chat_DB import (
-    save_notes,
-    add_keywords_to_note,
-    start_new_conversation,
-    save_message,
-    search_conversations_by_keywords,
-    load_chat_history,
-    get_all_conversations,
-    get_note_by_id,
-    get_notes_by_keywords,
-    get_notes_by_keyword_collection,
-    update_note,
-    clear_keywords_from_note, get_notes, get_keywords_for_note, delete_conversation, delete_note, execute_query,
-    add_keywords_to_conversation, fetch_all_notes, fetch_all_conversations, fetch_conversations_by_ids,
-    fetch_notes_by_ids,
-)
+from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_files, add_media_with_keywords, \
+    get_all_conversations, get_note_by_id, get_notes_by_keywords, start_new_conversation, update_note, save_notes, \
+    clear_keywords_from_note, add_keywords_to_note, load_chat_history, save_message, add_keywords_to_conversation, \
+    get_keywords_for_note, delete_note, search_conversations_by_keywords, get_conversation_title, delete_conversation, \
+    update_conversation_title, fetch_all_conversations, fetch_all_notes, fetch_conversations_by_ids, fetch_notes_by_ids
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_notes, delete_messages_in_conversation
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, rag_qa_chat
@@ -67,7 +56,8 @@ def create_rag_qa_chat_tab():
         # Update the conversation list function
         def update_conversation_list():
             conversations, total_pages, total_count = get_all_conversations()
-            choices = [f"{title} (ID: {conversation_id})" for conversation_id, title in conversations]
+            choices = [f"{conversation['title']} (ID: {conversation['conversation_id']})" for conversation in
+                       conversations]
             return choices
 
         with gr.Row():
@@ -275,7 +265,8 @@ def create_rag_qa_chat_tab():
 
         def update_conversation_list():
             conversations, total_pages, total_count = get_all_conversations()
-            choices = [f"{title} (ID: {conversation_id})" for conversation_id, title in conversations]
+            choices = [f"{conversation['title']} (ID: {conversation['conversation_id']})" for conversation in
+                       conversations]
             return choices
 
         # Initialize the conversation list
@@ -926,19 +917,18 @@ def create_rag_qa_chat_management_tab():
             ]
         )
 
-        def delete_messages_in_conversation(conversation_id):
-            """Helper function to delete all messages in a conversation."""
+        def delete_messages_in_conversation_wrapper(conversation_id):
+            """Wrapper function to delete all messages in a conversation."""
             try:
-                execute_query("DELETE FROM rag_qa_chats WHERE conversation_id = ?", (conversation_id,))
+                delete_messages_in_conversation(conversation_id)
                 logging.info(f"Messages in conversation '{conversation_id}' deleted successfully.")
             except Exception as e:
                 logging.error(f"Error deleting messages in conversation '{conversation_id}': {e}")
                 raise
 
-        def get_conversation_title(conversation_id):
+        def get_conversation_title_wrapper(conversation_id):
             """Helper function to get the conversation title."""
-            query = "SELECT title FROM conversation_metadata WHERE conversation_id = ?"
-            result = execute_query(query, (conversation_id,))
+            result = get_conversation_title(conversation_id)
             if result:
                 return result[0][0]
             else:
@@ -1066,19 +1056,6 @@ def create_export_data_tab():
             inputs=[export_option, conversations_checklist, notes_checklist],
             outputs=[download_link, download_link, status_message]
         )
-
-
-
-
-def update_conversation_title(conversation_id, new_title):
-    """Update the title of a conversation."""
-    try:
-        query = "UPDATE conversation_metadata SET title = ? WHERE conversation_id = ?"
-        execute_query(query, (new_title, conversation_id))
-        logging.info(f"Conversation '{conversation_id}' title updated to '{new_title}'")
-    except Exception as e:
-        logging.error(f"Error updating conversation title: {e}")
-        raise
 
 
 def convert_file_to_text(file_path):

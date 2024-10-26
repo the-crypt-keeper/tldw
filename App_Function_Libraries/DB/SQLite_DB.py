@@ -2024,8 +2024,11 @@ def import_obsidian_note_to_db(note_data):
 #######################################################################################################################
 #
 # Chat-related Functions
+# FIXME - THESE ARE DEPRECATED!!!
 
+# DEAD CODE - TO BE REMOVED
 def create_chat_conversation(media_id, conversation_name):
+    # DEAD CODE - TO BE REMOVED
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -2040,7 +2043,9 @@ def create_chat_conversation(media_id, conversation_name):
         raise DatabaseError(f"Error creating chat conversation: {e}")
 
 
+# DEAD CODE - FIXME
 def add_chat_message(conversation_id: int, sender: str, message: str) -> int:
+    # DEAD CODE - FIXME
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -2055,7 +2060,9 @@ def add_chat_message(conversation_id: int, sender: str, message: str) -> int:
         raise DatabaseError(f"Error adding chat message: {e}")
 
 
+# FIXME - dead code
 def get_chat_messages(conversation_id: int) -> List[Dict[str, Any]]:
+    # FIXME - dead code
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -2211,6 +2218,40 @@ def get_conversation_name(conversation_id):
     except Exception as e:
         logging.error(f"Unexpected error in get_conversation_name: {e}")
         return None
+
+###################################################
+#
+# DB Migration functions
+
+
+
+def get_all_conversations_from_media_db():
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, media_id, media_name, conversation_name, created_at, updated_at
+                FROM ChatConversations
+            ''')
+            return cursor.fetchall()
+    except sqlite3.Error as e:
+        logging.error(f"Error retrieving conversations from media DB: {e}")
+        raise
+
+def get_messages_from_media_db(conversation_id):
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT sender, message, timestamp
+                FROM ChatMessages
+                WHERE conversation_id = ?
+                ORDER BY timestamp ASC
+            ''', (conversation_id,))
+            return cursor.fetchall()
+    except sqlite3.Error as e:
+        logging.error(f"Error retrieving messages from media DB: {e}")
+        raise
 
 #
 # End of Chat-related Functions

@@ -10,6 +10,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime
 
+from App_Function_Libraries.DB.SQLite_DB import get_all_conversations_from_media_db, get_messages_from_media_db
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path
 
 #
@@ -169,13 +170,36 @@ def execute_query(query, params=None, conn=None):
             conn.commit()
             return cursor.fetchall()
 
+
+# DIRTY HACK
+# FIXME - DELETE AND REMOVE
+def update_schema(conn):
+    cursor = conn.cursor()
+    # Check if 'media_id' column exists in 'conversation_metadata' table
+    cursor.execute("PRAGMA table_info(conversation_metadata);")
+    columns = [info[1] for info in cursor.fetchall()]
+    if 'media_id' not in columns:
+        # Add the 'media_id' column
+        cursor.execute("ALTER TABLE conversation_metadata ADD COLUMN media_id INTEGER;")
+        conn.commit()
+        logger.info("'media_id' column added to 'conversation_metadata' table.")
+    else:
+        logger.info("'media_id' column already exists in 'conversation_metadata' table.")
+
+
 def create_tables():
     with get_db_connection() as conn:
-        conn.executescript(SCHEMA_SQL)
-    logger.info("All RAG QA Chat tables created successfully")
+        cursor = conn.cursor()
+        # Execute the SCHEMA_SQL to create tables if they don't exist
+        cursor.executescript(SCHEMA_SQL)
+        logger.info("All RAG QA Chat tables created successfully")
+
+        # update the schema to ensure it includes any new columns
+        update_schema(conn)
 
 # Initialize the database
 create_tables()
+
 
 #
 # End of Setup
@@ -502,9 +526,10 @@ def delete_note(note_id):
 #
 # Chat-related functions
 
-def save_message(conversation_id, role, content):
+def save_message(conversation_id, role, content, timestamp=None):
     try:
-        timestamp = datetime.now().isoformat()
+        if timestamp is None:
+            timestamp = datetime.now().isoformat()
         query = "INSERT INTO rag_qa_chats (conversation_id, timestamp, role, content) VALUES (?, ?, ?, ?)"
         execute_query(query, (conversation_id, timestamp, role, content))
 
@@ -517,28 +542,38 @@ def save_message(conversation_id, role, content):
         logger.error(f"Error saving message for conversation '{conversation_id}': {e}")
         raise
 
-def start_new_conversation(title="Untitled Conversation"):
+
+def start_new_conversation(title="Untitled Conversation", media_id=None):
     try:
         conversation_id = str(uuid.uuid4())
-        query = "INSERT INTO conversation_metadata (conversation_id, created_at, last_updated, title) VALUES (?, ?, ?, ?)"
+        query = """
+        INSERT INTO conversation_metadata (conversation_id, created_at, last_updated, title, media_id)
+        VALUES (?, ?, ?, ?, ?)
+        """
         now = datetime.now().isoformat()
-        execute_query(query, (conversation_id, now, now, title))
-        logger.info(f"New conversation '{conversation_id}' started with title '{title}'")
+        execute_query(query, (conversation_id, now, now, title, media_id))
+        logger.info(f"New conversation '{conversation_id}' started with title '{title}' and media_id '{media_id}'")
         return conversation_id
     except Exception as e:
         logger.error(f"Error starting new conversation: {e}")
         raise
 
+
 def get_all_conversations(page=1, page_size=20):
     try:
-        query = "SELECT conversation_id, title FROM conversation_metadata ORDER BY last_updated DESC"
+        query = """
+        SELECT conversation_id, title, media_id
+        FROM conversation_metadata
+        ORDER BY last_updated DESC
+        """
         results, total_pages, total_count = get_paginated_results(query, page=page, page_size=page_size)
-        conversations = [(row[0], row[1]) for row in results]
+        conversations = [{'conversation_id': row[0], 'title': row[1], 'media_id': row[2]} for row in results]
         logger.info(f"Retrieved {len(conversations)} conversations (page {page} of {total_pages})")
         return conversations, total_pages, total_count
     except Exception as e:
         logger.error(f"Error getting conversations: {e}")
         raise
+
 
 # Pagination helper function
 def get_paginated_results(query, params=None, page=1, page_size=20):
@@ -565,6 +600,7 @@ def get_paginated_results(query, params=None, page=1, page_size=20):
         logger.error(f"Error retrieving paginated results: {e}")
         raise
 
+
 def get_all_collections(page=1, page_size=20):
     try:
         query = "SELECT name FROM rag_qa_keyword_collections"
@@ -575,6 +611,7 @@ def get_all_collections(page=1, page_size=20):
     except Exception as e:
         logger.error(f"Error getting collections: {e}")
         raise
+
 
 def search_conversations_by_keywords(keywords, page=1, page_size=20):
     try:
@@ -594,6 +631,7 @@ def search_conversations_by_keywords(keywords, page=1, page_size=20):
         logger.error(f"Error searching conversations by keywords {keywords}: {e}")
         raise
 
+
 def load_chat_history(conversation_id, page=1, page_size=50):
     try:
         query = "SELECT role, content FROM rag_qa_chats WHERE conversation_id = ? ORDER BY timestamp"
@@ -605,6 +643,7 @@ def load_chat_history(conversation_id, page=1, page_size=50):
         logger.error(f"Error loading chat history for conversation '{conversation_id}': {e}")
         raise
 
+
 def update_conversation_title(conversation_id, new_title):
     """Update the title of a conversation."""
     try:
@@ -615,6 +654,7 @@ def update_conversation_title(conversation_id, new_title):
         logger.error(f"Error updating conversation title: {e}")
         raise
 
+
 def delete_messages_in_conversation(conversation_id):
     """Helper function to delete all messages in a conversation."""
     try:
@@ -624,6 +664,7 @@ def delete_messages_in_conversation(conversation_id):
         logging.error(f"Error deleting messages in conversation '{conversation_id}': {e}")
         raise
 
+
 def get_conversation_title(conversation_id):
     """Helper function to get the conversation title."""
     query = "SELECT title FROM conversation_metadata WHERE conversation_id = ?"
@@ -632,6 +673,16 @@ def get_conversation_title(conversation_id):
         return result[0][0]
     else:
         return "Untitled Conversation"
+
+
+def get_conversation_details(conversation_id):
+    query = "SELECT title, media_id FROM conversation_metadata WHERE conversation_id = ?"
+    result = execute_query(query, (conversation_id,))
+    if result:
+        return {'title': result[0][0], 'media_id': result[0][1]}
+    else:
+        return {'title': "Untitled Conversation", 'media_id': None}
+
 
 def delete_conversation(conversation_id):
     """Delete a conversation and its associated messages and notes."""
@@ -735,6 +786,50 @@ def fetch_notes_by_ids(note_ids):
 #
 # End of Export functions
 ###################################################
+
+
+###################################################
+#
+# Migration Function
+def migrate_chat_messages(old_conversation_id, new_conversation_id):
+    try:
+        messages = get_messages_from_media_db(old_conversation_id)
+        for msg in messages:
+            sender, content, timestamp = msg
+            role = sender  # Assuming 'sender' is either 'user' or 'ai'
+            query = """
+            INSERT INTO rag_qa_chats (conversation_id, timestamp, role, content)
+            VALUES (?, ?, ?, ?)
+            """
+            execute_query(query, (new_conversation_id, timestamp, role, content))
+        logger.info(f"Messages migrated for conversation '{new_conversation_id}'.")
+    except Exception as e:
+        logging.error(f"Error migrating messages for conversation '{new_conversation_id}': {e}")
+        raise
+
+# FIXME - DELETE AND REMOVE SQLite_DB IMPORTS
+def migrate_data_to_rag_chat_db():
+    try:
+        conversations = get_all_conversations_from_media_db()
+        for conv in conversations:
+            old_conv_id, media_id, media_name, conversation_name, created_at, updated_at = conv
+            title = conversation_name or f"{media_name}-chat" if media_name else "Untitled Conversation"
+            # Start a new conversation in the RAG chat DB
+            conversation_id = start_new_conversation(title=title, media_id=media_id)
+            # Migrate messages
+            messages = get_messages_from_media_db(old_conv_id)
+            for msg in messages:
+                sender, content, timestamp = msg
+                save_message(conversation_id, sender, content, timestamp)
+        logging.info("Data migration completed successfully.")
+    except Exception as e:
+        logging.error(f"Error during data migration: {e}")
+        raise
+
+#
+# End of Migration Function
+###################################################
+
 
 #
 # End of RAG_QA_Chat_DB.py

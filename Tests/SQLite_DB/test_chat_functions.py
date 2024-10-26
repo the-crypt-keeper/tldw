@@ -1,23 +1,20 @@
 import pytest
 from App_Function_Libraries.DB.DB_Manager import (
-    create_chat_conversation,
-    add_chat_message,
-    get_chat_messages,
     update_chat_message,
     delete_chat_message,
-    search_chat_conversations,
-    get_conversation_name
+    search_chat_conversations, save_message, load_chat_history
 )
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import start_new_conversation
 
 
 @pytest.fixture
 def sample_conversation(empty_db):
-    conversation_id = create_chat_conversation(None, "Test Conversation")
+    conversation_id = start_new_conversation("Test Conversation", None)
     return conversation_id
 
 
-def test_create_chat_conversation(empty_db):
-    conversation_id = create_chat_conversation(None, "Test Conversation")
+def test_start_new_conversation(empty_db):
+    conversation_id = start_new_conversation("Test Conversation", None)
     assert conversation_id is not None
     assert isinstance(conversation_id, int)
 
@@ -26,46 +23,46 @@ def test_create_chat_conversation(empty_db):
     # assert name == "Test Conversation"
 
 
-def test_add_chat_message(empty_db, sample_conversation):
-    message_id = add_chat_message(sample_conversation, "user", "Hello, world!")
+def test_save_message(empty_db, sample_conversation):
+    message_id = save_message(conversation_id=sample_conversation, role="user", content="Hello, world!")
     assert message_id is not None
     assert isinstance(message_id, int)
 
 
-def test_get_chat_messages(empty_db, sample_conversation):
-    add_chat_message(sample_conversation, "user", "Hello, world!")
-    add_chat_message(sample_conversation, "ai", "Hi there!")
-    messages = get_chat_messages(sample_conversation)
+def test_load_chat_history(empty_db, sample_conversation):
+    save_message(conversation_id=sample_conversation, role="user", content="Hello, world!")
+    save_message(conversation_id=sample_conversation, role="ai", content="Hi there!")
+    messages = load_chat_history(sample_conversation)
     assert len(messages) == 2
     assert messages[0]['message'] == "Hello, world!"
     assert messages[1]['message'] == "Hi there!"
 
 
 def test_update_chat_message(empty_db, sample_conversation):
-    message_id = add_chat_message(sample_conversation, "user", "Hello, world!")
+    message_id = save_message(conversation_id=sample_conversation, role="user", content="Hello, world!")
     update_chat_message(message_id, "Updated message")
-    messages = get_chat_messages(sample_conversation)
+    messages = load_chat_history(sample_conversation)
     assert len(messages) == 1
     assert messages[0]['message'] == "Updated message"
 
 
 def test_delete_chat_message(empty_db, sample_conversation):
-    message_id = add_chat_message(sample_conversation, "user", "Hello, world!")
+    message_id = save_message(conversation_id=sample_conversation, role="user", content="Hello, world!")
     delete_chat_message(message_id)
-    messages = get_chat_messages(sample_conversation)
+    messages = load_chat_history(sample_conversation)
     assert len(messages) == 0
 
 
 def test_search_chat_conversations(empty_db):
     # Create conversations with names that will match our search queries
-    conv1_id = create_chat_conversation(None, "World Conversation")
-    conv2_id = create_chat_conversation(None, "Python Discussion")
-    conv3_id = create_chat_conversation(None, "Test Conversation")
+    conv1_id = start_new_conversation("World Conversation", None)
+    conv2_id = start_new_conversation("Python Discussion", None)
+    conv3_id = start_new_conversation("Test Conversation", None)
 
     # Add messages (these won't affect the search results based on the current implementation)
-    add_chat_message(conv1_id, "user", "Hello, world!")
-    add_chat_message(conv2_id, "user", "Python is great")
-    add_chat_message(conv3_id, "user", "This is a test message")
+    save_message(conversation_id=conv1_id, role="user", content="Hello, world!")
+    save_message(conversation_id=conv2_id, role="user", content="Python is great")
+    save_message(conv3_id, "user", "This is a test message")
 
     print(f"Created conversations: {conv1_id}, {conv2_id}, {conv3_id}")
 
@@ -100,3 +97,7 @@ def test_search_chat_conversations(empty_db):
     found_conversations = set(result['id'] for result in all_results)
     assert new_conversation_ids.issubset(
         found_conversations), "All newly created conversations should be in the search results"
+
+#
+# End of test_chat_functions.py
+#######################################################################################################################
