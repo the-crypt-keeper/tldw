@@ -42,6 +42,7 @@ from App_Function_Libraries.Gradio_UI.Llamafile_tab import create_chat_with_llam
 from App_Function_Libraries.Gradio_UI.Media_edit import create_prompt_clone_tab, create_prompt_edit_tab, \
     create_media_edit_and_clone_tab, create_media_edit_tab
 from App_Function_Libraries.Gradio_UI.Media_wiki_tab import create_mediawiki_import_tab, create_mediawiki_config_tab
+from App_Function_Libraries.Gradio_UI.Mind_Map_tab import create_mindmap_tab
 from App_Function_Libraries.Gradio_UI.PDF_ingestion_tab import create_pdf_ingestion_tab, create_pdf_ingestion_test_tab
 from App_Function_Libraries.Gradio_UI.Plaintext_tab_import import create_plain_text_import_tab
 from App_Function_Libraries.Gradio_UI.Podcast_tab import create_podcast_tab
@@ -384,6 +385,7 @@ def launch_ui(share_public=None, server_mode=False):
                 # FIXME
                 #create_anki_generation_tab()
                 create_anki_validation_tab()
+                create_mindmap_tab()
                 create_utilities_yt_video_tab()
                 create_utilities_yt_audio_tab()
                 create_utilities_yt_timestamp_tab()
