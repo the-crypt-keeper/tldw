@@ -13,14 +13,12 @@ from datetime import datetime
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.Chat import chat, save_chat_history, update_chat_content, save_chat_history_to_db_wrapper
-from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count
+from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, chat, save_chat_history, \
+    update_chat_content, save_chat_history_to_db_wrapper
 from App_Function_Libraries.DB.DB_Manager import add_chat_message, search_chat_conversations, create_chat_conversation, \
     get_chat_messages, update_chat_message, delete_chat_message, load_preset_prompts, db
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints
-
-
 #
 #
 ########################################################################################################################
@@ -201,6 +199,7 @@ def regenerate_last_message(history, media_content, selected_parts, api_endpoint
     new_history.append((last_user_message, bot_message))
 
     return new_history, "Last message regenerated successfully."
+
 
 def create_chat_interface():
     try:
@@ -511,6 +510,7 @@ def create_chat_interface_stacked():
             with gr.Column():
                 submit = gr.Button("Submit")
                 regenerate_button = gr.Button("Regenerate Last Message")
+                token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
                 clear_chat_button = gr.Button("Clear Chat")
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)", visible=True)
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
@@ -532,10 +532,14 @@ def create_chat_interface_stacked():
                 gr.update(value=prompts["system_prompt"], visible=True)
             )
 
+        def clear_chat():
+            return [], None, 0  # Empty history, conversation_id, and token count
+
         clear_chat_button.click(
             clear_chat,
-            outputs=[chatbot, conversation_id]
+            outputs=[chatbot, conversation_id, token_count_display]
         )
+
         preset_prompt.change(
             update_prompts,
             inputs=preset_prompt,
@@ -547,13 +551,17 @@ def create_chat_interface_stacked():
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
                     conversation_id, save_conversation, temp, system_prompt],
             outputs=[msg, chatbot, conversation_id]
-        ).then(  # Clear the message box after submission
+        ).then(
             lambda x: gr.update(value=""),
             inputs=[chatbot],
             outputs=[msg]
-        ).then(  # Clear the user prompt after the first message
+        ).then(
             lambda: gr.update(value=""),
             outputs=[user_prompt, system_prompt]
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chatbot],
+            outputs=[token_count_display]
         )
 
         items_output.change(
@@ -606,6 +614,10 @@ def create_chat_interface_stacked():
             regenerate_last_message,
             inputs=[chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, temp, system_prompt],
             outputs=[chatbot, gr.Textbox(label="Regenerate Status")]
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chatbot],
+            outputs=[token_count_display]
         )
 
 
@@ -656,6 +668,7 @@ def create_chat_interface_multi_api():
             api_keys = []
             temperatures = []
             regenerate_buttons = []
+            token_count_displays = []
             for i in range(3):
                 with gr.Column():
                     gr.Markdown(f"### Chat Window {i + 1}")
@@ -669,6 +682,9 @@ def create_chat_interface_multi_api():
                     temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.05,
                                             value=0.7)
                     chatbot = gr.Chatbot(height=800, elem_classes="chat-window")
+                    token_count_display = gr.Number(label=f"Approximate Token Count {i + 1}", value=0,
+                                                    interactive=False)
+                    token_count_displays.append(token_count_display)
                     regenerate_button = gr.Button(f"Regenerate Last Message {i + 1}")
                     chatbots.append(chatbot)
                     api_endpoints.append(api_endpoint)
@@ -696,14 +712,14 @@ def create_chat_interface_multi_api():
 
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
 
-
         def clear_all_chats():
-            return [[]] * 3 + [[]] * 3
+            return [[]] * 3 + [[]] * 3 + [0] * 3
 
         clear_chat_button.click(
             clear_all_chats,
-            outputs=chatbots + chat_history
+            outputs=chatbots + chat_history + token_count_displays
         )
+
         def chat_wrapper_multi(message, custom_prompt, system_prompt, *args):
             chat_histories = args[:3]
             chatbots = args[3:6]
@@ -733,6 +749,11 @@ def create_chat_interface_multi_api():
 
             return [gr.update(value="")] + new_chatbots + new_chat_histories
 
+        def update_token_counts(*histories):
+            token_counts = []
+            for history in histories:
+                token_counts.append(approximate_token_count(history))
+            return token_counts
 
         def regenerate_last_message(chat_history, chatbot, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature, system_prompt):
             if not chat_history:
@@ -769,8 +790,13 @@ def create_chat_interface_multi_api():
         for i in range(3):
             regenerate_buttons[i].click(
                 regenerate_last_message,
-                inputs=[chat_history[i], chatbots[i], media_content, selected_parts, api_endpoints[i], api_keys[i], user_prompt, temperatures[i], system_prompt],
+                inputs=[chat_history[i], chatbots[i], media_content, selected_parts, api_endpoints[i], api_keys[i],
+                        user_prompt, temperatures[i], system_prompt],
                 outputs=[chatbots[i], chat_history[i], gr.Textbox(label=f"Regenerate Status {i + 1}")]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chat_history[i]],
+                outputs=[token_count_displays[i]]
             )
 
         # In the create_chat_interface_multi_api function:
@@ -783,6 +809,10 @@ def create_chat_interface_multi_api():
         ).then(
             lambda: (gr.update(value=""), gr.update(value="")),
             outputs=[msg, user_prompt]
+        ).then(
+            update_token_counts,
+            inputs=chat_history,
+            outputs=token_count_displays
         )
 
         items_output.change(
@@ -797,7 +827,6 @@ def create_chat_interface_multi_api():
                 inputs=[use_content, use_summary, use_prompt],
                 outputs=[selected_parts]
             )
-
 
 
 def create_chat_interface_four():
@@ -864,7 +893,10 @@ def create_chat_interface_four():
                 msg = gr.Textbox(label=f"Enter your message for Chat {index + 1}")
                 submit = gr.Button(f"Submit to Chat {index + 1}")
                 regenerate_button = gr.Button(f"Regenerate Last Message {index + 1}")
+                token_count_display = gr.Number(label=f"Approximate Token Count {index + 1}", value=0,
+                                                interactive=False)
                 clear_chat_button = gr.Button(f"Clear Chat {index + 1}")
+
 
                 # State to maintain chat history
                 chat_history = gr.State([])
@@ -879,7 +911,8 @@ def create_chat_interface_four():
                     'submit': submit,
                     'regenerate_button': regenerate_button,
                     'clear_chat_button': clear_chat_button,
-                    'chat_history': chat_history
+                    'chat_history': chat_history,
+                    'token_count_display': token_count_display
                 })
 
         # Create four chat interfaces arranged in a 2x2 grid
@@ -973,6 +1006,10 @@ def create_chat_interface_four():
                     interface['chatbot'],
                     interface['chat_history']
                 ]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[interface['chat_history']],
+                outputs=[interface['token_count_display']]
             )
 
             interface['regenerate_button'].click(
@@ -989,13 +1026,20 @@ def create_chat_interface_four():
                     interface['chat_history'],
                     gr.Textbox(label="Regenerate Status")
                 ]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[interface['chat_history']],
+                outputs=[interface['token_count_display']]
             )
 
-            interface['clear_chat_button'].click(
-                clear_chat_single,
-                inputs=[],
-                outputs=[interface['chatbot'], interface['chat_history']]
-            )
+            def clear_chat_single():
+                return [], [], 0
+
+            for interface in chat_interfaces:
+                interface['clear_chat_button'].click(
+                    clear_chat_single,
+                    outputs=[interface['chatbot'], interface['chat_history'], interface['token_count_display']]
+                )
 
 
 def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, temperature, media_content,

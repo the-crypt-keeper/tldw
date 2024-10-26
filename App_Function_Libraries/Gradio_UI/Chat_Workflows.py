@@ -11,7 +11,7 @@ import gradio as gr
 #
 from App_Function_Libraries.Gradio_UI.Chat_ui import chat_wrapper, search_conversations, \
     load_conversation
-from App_Function_Libraries.Chat import save_chat_history_to_db_wrapper
+from App_Function_Libraries.Chat.Chat_Functions import save_chat_history_to_db_wrapper
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
 
 #
