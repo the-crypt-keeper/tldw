@@ -341,6 +341,7 @@ def create_tables(db) -> None:
             FOREIGN KEY (media_id) REFERENCES Media(id)
         )
         ''',
+        # This is to be deleted - FIXME
         '''
         CREATE TABLE IF NOT EXISTS ChatConversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2023,8 +2024,6 @@ def import_obsidian_note_to_db(note_data):
 #######################################################################################################################
 #
 # Chat-related Functions
-
-
 
 def create_chat_conversation(media_id, conversation_name):
     try:
