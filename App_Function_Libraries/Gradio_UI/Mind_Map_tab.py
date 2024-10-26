@@ -92,7 +92,7 @@ def create_mindmap_html(plantuml_text: str) -> str:
 
 # Create Gradio interface
 def create_mindmap_tab():
-    with gr.TabItem():
+    with gr.TabItem("PlantUML Mindmap"):
         gr.Markdown("# Collapsible PlantUML Mindmap Visualizer")
         gr.Markdown("Convert PlantUML mindmap syntax to a visual mindmap with collapsible nodes.")
         plantuml_input = gr.Textbox(

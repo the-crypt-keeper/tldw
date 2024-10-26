@@ -14,6 +14,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Chat import chat, save_chat_history, update_chat_content, save_chat_history_to_db_wrapper
+from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count
 from App_Function_Libraries.DB.DB_Manager import add_chat_message, search_chat_conversations, create_chat_conversation, \
     get_chat_messages, update_chat_message, delete_chat_message, load_preset_prompts, db
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
@@ -277,6 +278,7 @@ def create_chat_interface():
                 msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
                 regenerate_button = gr.Button("Regenerate Last Message")
+                token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
                 clear_chat_button = gr.Button("Clear Chat")
 
                 edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
@@ -326,21 +328,25 @@ def create_chat_interface():
             clear_chat,
             outputs=[chatbot, conversation_id]
         )
+
         preset_prompt.change(
             update_prompts,
             inputs=preset_prompt,
             outputs=[user_prompt, system_prompt_input]
         )
+
         custom_prompt_checkbox.change(
             fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
             inputs=[custom_prompt_checkbox],
             outputs=[user_prompt, system_prompt_input]
         )
+
         preset_prompt_checkbox.change(
             fn=lambda x: gr.update(visible=x),
             inputs=[preset_prompt_checkbox],
             outputs=[preset_prompt]
         )
+
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id,
@@ -353,6 +359,10 @@ def create_chat_interface():
         ).then(  # Clear the user prompt after the first message
             lambda: (gr.update(value=""), gr.update(value="")),
             outputs=[user_prompt, system_prompt_input]
+        ).then(
+        lambda history: approximate_token_count(history),
+        inputs=[chatbot],
+        outputs=[token_count_display]
         )
 
         items_output.change(
@@ -360,6 +370,7 @@ def create_chat_interface():
             inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
             outputs=[media_content, selected_parts]
         )
+
         use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
                            outputs=[selected_parts])
         use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
@@ -415,8 +426,13 @@ def create_chat_interface():
 
         regenerate_button.click(
             regenerate_last_message,
-            inputs=[chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, temperature, system_prompt_input],
+            inputs=[chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, temperature,
+                    system_prompt_input],
             outputs=[chatbot, save_status]
+        ).then(
+            lambda history: approximate_token_count(history),
+            inputs=[chatbot],
+            outputs=[token_count_display]
         )
 
         chatbot.select(show_edit_message, None, [edit_message_text, edit_message_id, update_message_button])
