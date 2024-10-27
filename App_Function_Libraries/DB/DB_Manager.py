@@ -79,7 +79,8 @@ from App_Function_Libraries.DB.RAG_QA_Chat_DB import start_new_conversation as s
     update_conversation_title as sqlite_update_conversation_title, \
     fetch_all_conversations as sqlite_fetch_all_conversations, fetch_all_notes as sqlite_fetch_all_notes, \
     fetch_conversations_by_ids as sqlite_fetch_conversations_by_ids, fetch_notes_by_ids as sqlite_fetch_notes_by_ids, \
-    delete_messages_in_conversation as sqlite_delete_messages_in_conversation
+    delete_messages_in_conversation as sqlite_delete_messages_in_conversation, \
+    get_conversation_text as sqlite_get_conversation_text
 from App_Function_Libraries.DB.Character_Chat_DB import (
     add_character_card as sqlite_add_character_card, get_character_cards as sqlite_get_character_cards, \
     get_character_card_by_id as sqlite_get_character_card_by_id, update_character_card as sqlite_update_character_card, \
@@ -876,6 +877,13 @@ def delete_messages_in_conversation(*args, **kwargs):
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of delete_messages_in_conversation not yet implemented")
+
+def get_conversation_text(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_conversation_text(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_conversation_text not yet implemented")
 
 #
 # End of Chat-related Functions

@@ -595,13 +595,75 @@ def get_all_conversations(page=1, page_size=20):
         SELECT conversation_id, title, media_id
         FROM conversation_metadata
         ORDER BY last_updated DESC
+        LIMIT ? OFFSET ?
         """
-        results, total_pages, total_count = get_paginated_results(query, page=page, page_size=page_size)
-        conversations = [{'conversation_id': row[0], 'title': row[1], 'media_id': row[2]} for row in results]
-        logger.info(f"Retrieved {len(conversations)} conversations (page {page} of {total_pages})")
+
+        count_query = "SELECT COUNT(*) FROM conversation_metadata"
+
+        with sqlite3.connect(rag_qa_db_path) as conn:
+            cursor = conn.cursor()
+
+            # Get total count
+            cursor.execute(count_query)
+            total_count = cursor.fetchone()[0]
+            total_pages = (total_count + page_size - 1) // page_size
+
+            # Get page of results
+            offset = (page - 1) * page_size
+            cursor.execute(query, (page_size, offset))
+            results = cursor.fetchall()
+
+            conversations = [{
+                'conversation_id': row[0],
+                'title': row[1],
+                'media_id': row[2]
+            } for row in results]
+
         return conversations, total_pages, total_count
     except Exception as e:
-        logger.error(f"Error getting conversations: {e}")
+        logging.error(f"Error getting conversations: {e}")
+        raise
+
+
+def get_all_notes(page=1, page_size=20):
+    try:
+        query = """
+        SELECT n.id, n.conversation_id, n.title, n.content, n.timestamp,
+               cm.title as conversation_title, cm.media_id
+        FROM rag_qa_notes n
+        LEFT JOIN conversation_metadata cm ON n.conversation_id = cm.conversation_id
+        ORDER BY n.timestamp DESC
+        LIMIT ? OFFSET ?
+        """
+
+        count_query = "SELECT COUNT(*) FROM rag_qa_notes"
+
+        with sqlite3.connect(rag_qa_db_path) as conn:
+            cursor = conn.cursor()
+
+            # Get total count
+            cursor.execute(count_query)
+            total_count = cursor.fetchone()[0]
+            total_pages = (total_count + page_size - 1) // page_size
+
+            # Get page of results
+            offset = (page - 1) * page_size
+            cursor.execute(query, (page_size, offset))
+            results = cursor.fetchall()
+
+            notes = [{
+                'id': row[0],
+                'conversation_id': row[1],
+                'title': row[2],
+                'content': row[3],
+                'timestamp': row[4],
+                'conversation_title': row[5],
+                'media_id': row[6]
+            } for row in results]
+
+        return notes, total_pages, total_count
+    except Exception as e:
+        logging.error(f"Error getting notes: {e}")
         raise
 
 
@@ -754,6 +816,28 @@ def get_conversation_title(conversation_id):
         return result[0][0]
     else:
         return "Untitled Conversation"
+
+
+def get_conversation_text(conversation_id):
+    try:
+        query = """
+        SELECT role, content
+        FROM rag_qa_chats
+        WHERE conversation_id = ?
+        ORDER BY timestamp ASC
+        """
+
+        messages = []
+        # Use the connection as a context manager
+        with sqlite3.connect(rag_qa_db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (conversation_id,))
+            messages = cursor.fetchall()
+
+        return "\n\n".join([f"{msg[0]}: {msg[1]}" for msg in messages])
+    except Exception as e:
+        logger.error(f"Error getting conversation text: {e}")
+        raise
 
 
 def get_conversation_details(conversation_id):

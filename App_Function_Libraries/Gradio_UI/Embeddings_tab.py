@@ -4,6 +4,7 @@
 # Imports
 import json
 import logging
+import os
 #
 # External Imports
 import gradio as gr
@@ -11,26 +12,58 @@ import numpy as np
 from tqdm import tqdm
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import get_all_content_from_database
+from App_Function_Libraries.DB.DB_Manager import get_all_content_from_database, get_all_conversations, \
+    get_conversation_text
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_all_notes
 from App_Function_Libraries.RAG.ChromaDB_Library import chroma_client, \
     store_in_chroma, situate_context
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, create_embeddings_batch
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process, chunk_for_embedding
+from App_Function_Libraries.Utils.Utils import load_and_log_configs
+
+
 #
 ########################################################################################################################
 #
 # Functions:
 
 def create_embeddings_tab():
+    # Load configuration first
+    config = load_and_log_configs()
+    if not config:
+        raise ValueError("Could not load configuration")
+
+    # Get database paths from config
+    db_config = config['db_config']
+    media_db_path = db_config['sqlite_path']
+    rag_qa_db_path = os.path.join(os.path.dirname(media_db_path), "rag_chat.db")
+    character_chat_db_path = os.path.join(os.path.dirname(media_db_path), "character_chat.db")
+    chroma_db_path = db_config['chroma_db_path']
+
     with gr.TabItem("Create Embeddings", visible=True):
         gr.Markdown("# Create Embeddings for All Content")
 
         with gr.Row():
             with gr.Column():
+                # Database selection at the top
+                database_selection = gr.Radio(
+                    choices=["Media DB", "RAG Chat", "Character Chat"],
+                    label="Select Content Source",
+                    value="Media DB",
+                    info="Choose which database to create embeddings from"
+                )
+
+                # Add database path display
+                current_db_path = gr.Textbox(
+                    label="Current Database Path",
+                    value=media_db_path,
+                    interactive=False
+                )
+
                 embedding_provider = gr.Radio(
                     choices=["huggingface", "local", "openai"],
                     label="Select Embedding Provider",
-                    value="huggingface"
+                    value=config['embedding_config']['embedding_provider'] or "huggingface"
                 )
                 gr.Markdown("Note: Local provider requires a running Llama.cpp/llamafile server.")
                 gr.Markdown("OpenAI provider requires a valid API key.")
@@ -65,22 +98,24 @@ def create_embeddings_tab():
 
                 embedding_api_url = gr.Textbox(
                     label="API URL (for local provider)",
-                    value="http://localhost:8080/embedding",
+                    value=config['embedding_config']['embedding_api_url'],
                     visible=False
                 )
 
-                # Add chunking options
+                # Add chunking options with config defaults
                 chunking_method = gr.Dropdown(
                     choices=["words", "sentences", "paragraphs", "tokens", "semantic"],
                     label="Chunking Method",
                     value="words"
                 )
                 max_chunk_size = gr.Slider(
-                    minimum=1, maximum=8000, step=1, value=500,
+                    minimum=1, maximum=8000, step=1,
+                    value=config['embedding_config']['chunk_size'],
                     label="Max Chunk Size"
                 )
                 chunk_overlap = gr.Slider(
-                    minimum=0, maximum=4000, step=1, value=200,
+                    minimum=0, maximum=4000, step=1,
+                    value=config['embedding_config']['overlap'],
                     label="Chunk Overlap"
                 )
                 adaptive_chunking = gr.Checkbox(
@@ -92,6 +127,7 @@ def create_embeddings_tab():
 
             with gr.Column():
                 status_output = gr.Textbox(label="Status", lines=10)
+                progress = gr.Progress()
 
         def update_provider_options(provider):
             if provider == "huggingface":
@@ -107,6 +143,112 @@ def create_embeddings_tab():
             else:
                 return gr.update(visible=False)
 
+        def update_database_path(database_type):
+            if database_type == "Media DB":
+                return media_db_path
+            elif database_type == "RAG Chat":
+                return rag_qa_db_path
+            else:  # Character Chat
+                return character_chat_db_path
+
+        def create_all_embeddings(provider, hf_model, openai_model, custom_model, api_url, method,
+                                max_size, overlap, adaptive, database_type, progress=gr.Progress()):
+            try:
+                # Initialize content based on database selection
+                if database_type == "Media DB":
+                    all_content = get_all_content_from_database()
+                    content_type = "media"
+                elif database_type == "RAG Chat":
+                    all_content = []
+                    page = 1
+                    while True:
+                        conversations, total_pages, _ = get_all_conversations(page=page)
+                        if not conversations:
+                            break
+                        all_content.extend([{
+                            'id': conv['conversation_id'],
+                            'content': get_conversation_text(conv['conversation_id']),
+                            'title': conv['title'],
+                            'type': 'conversation'
+                        } for conv in conversations])
+                        progress(page / total_pages, desc=f"Loading conversations... Page {page}/{total_pages}")
+                        page += 1
+                else:  # Character Chat
+                    all_content = []
+                    page = 1
+                    while True:
+                        notes, total_pages, _ = get_all_notes(page=page)
+                        if not notes:
+                            break
+                        all_content.extend([{
+                            'id': note['id'],
+                            'content': f"{note['title']}\n\n{note['content']}",
+                            'conversation_id': note['conversation_id'],
+                            'type': 'note'
+                        } for note in notes])
+                        progress(page / total_pages, desc=f"Loading notes... Page {page}/{total_pages}")
+                        page += 1
+
+                if not all_content:
+                    return "No content found in the selected database."
+
+                chunk_options = {
+                    'method': method,
+                    'max_size': max_size,
+                    'overlap': overlap,
+                    'adaptive': adaptive
+                }
+
+                collection_name = f"{database_type.lower().replace(' ', '_')}_embeddings"
+                collection = chroma_client.get_or_create_collection(name=collection_name)
+
+                # Determine the model to use
+                if provider == "huggingface":
+                    model = custom_model if hf_model == "custom" else hf_model
+                elif provider == "openai":
+                    model = openai_model
+                else:
+                    model = api_url
+
+                total_items = len(all_content)
+                for idx, item in enumerate(all_content):
+                    progress((idx + 1) / total_items, desc=f"Processing item {idx + 1} of {total_items}")
+
+                    content_id = item['id']
+                    text = item['content']
+
+                    chunks = improved_chunking_process(text, chunk_options)
+                    for chunk_idx, chunk in enumerate(chunks):
+                        chunk_text = chunk['text']
+                        chunk_id = f"{database_type.lower()}_{content_id}_chunk_{chunk_idx}"
+
+                        existing = collection.get(ids=[chunk_id])
+                        if existing['ids']:
+                            continue
+
+                        embedding = create_embedding(chunk_text, provider, model, api_url)
+                        metadata = {
+                            'content_id': str(content_id),
+                            'chunk_index': chunk_idx,
+                            'total_chunks': len(chunks),
+                            'chunking_method': method,
+                            'max_chunk_size': max_size,
+                            'chunk_overlap': overlap,
+                            'adaptive_chunking': adaptive,
+                            'embedding_model': model,
+                            'embedding_provider': provider,
+                            'content_type': item.get('type', 'media'),
+                            'conversation_id': item.get('conversation_id'),
+                            **chunk['metadata']
+                        }
+                        store_in_chroma(collection_name, [chunk_text], [embedding], [chunk_id], [metadata])
+
+                return f"Embeddings created and stored successfully for all {database_type} content."
+            except Exception as e:
+                logging.error(f"Error during embedding creation: {str(e)}")
+                return f"Error: {str(e)}"
+
+        # Event handlers
         embedding_provider.change(
             fn=update_provider_options,
             inputs=[embedding_provider],
@@ -119,69 +261,22 @@ def create_embeddings_tab():
             outputs=[custom_embedding_model]
         )
 
-        def create_all_embeddings(provider, hf_model, openai_model, custom_model, api_url, method, max_size, overlap, adaptive):
-            try:
-                all_content = get_all_content_from_database()
-                if not all_content:
-                    return "No content found in the database."
-
-                chunk_options = {
-                    'method': method,
-                    'max_size': max_size,
-                    'overlap': overlap,
-                    'adaptive': adaptive
-                }
-
-                collection_name = "all_content_embeddings"
-                collection = chroma_client.get_or_create_collection(name=collection_name)
-
-                # Determine the model to use
-                if provider == "huggingface":
-                    model = custom_model if hf_model == "custom" else hf_model
-                elif provider == "openai":
-                    model = openai_model
-                else:
-                    model = custom_model
-
-                for item in all_content:
-                    media_id = item['id']
-                    text = item['content']
-
-                    chunks = improved_chunking_process(text, chunk_options)
-                    for i, chunk in enumerate(chunks):
-                        chunk_text = chunk['text']
-                        chunk_id = f"doc_{media_id}_chunk_{i}"
-
-                        existing = collection.get(ids=[chunk_id])
-                        if existing['ids']:
-                            continue
-
-                        embedding = create_embedding(chunk_text, provider, model, api_url)
-                        metadata = {
-                            "media_id": str(media_id),
-                            "chunk_index": i,
-                            "total_chunks": len(chunks),
-                            "chunking_method": method,
-                            "max_chunk_size": max_size,
-                            "chunk_overlap": overlap,
-                            "adaptive_chunking": adaptive,
-                            "embedding_model": model,
-                            "embedding_provider": provider,
-                            **chunk['metadata']
-                        }
-                        store_in_chroma(collection_name, [chunk_text], [embedding], [chunk_id], [metadata])
-
-                return "Embeddings created and stored successfully for all content."
-            except Exception as e:
-                logging.error(f"Error during embedding creation: {str(e)}")
-                return f"Error: {str(e)}"
+        database_selection.change(
+            fn=update_database_path,
+            inputs=[database_selection],
+            outputs=[current_db_path]
+        )
 
         create_button.click(
             fn=create_all_embeddings,
-            inputs=[embedding_provider, huggingface_model, openai_model, custom_embedding_model, embedding_api_url,
-                    chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking],
+            inputs=[
+                embedding_provider, huggingface_model, openai_model, custom_embedding_model,
+                embedding_api_url, chunking_method, max_chunk_size, chunk_overlap,
+                adaptive_chunking, database_selection
+            ],
             outputs=status_output
         )
+
 
 
 def create_view_embeddings_tab():

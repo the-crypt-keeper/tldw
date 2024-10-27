@@ -729,7 +729,6 @@ def create_chat_interface_stacked():
         )
 
 
-# FIXME - System prompts
 def create_chat_interface_multi_api():
     try:
         default_value = None
