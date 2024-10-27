@@ -72,6 +72,54 @@ def initialize_database():
         );
         """)
 
+        # Create FTS5 virtual table for CharacterCards
+        cursor.execute("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS CharacterCards_fts USING fts5(
+            name,
+            description,
+            personality,
+            scenario,
+            system_prompt,
+            content='CharacterCards',
+            content_rowid='id'
+        );
+        """)
+
+        # Create triggers to keep FTS5 table in sync with CharacterCards
+        cursor.executescript("""
+        CREATE TRIGGER IF NOT EXISTS CharacterCards_ai AFTER INSERT ON CharacterCards BEGIN
+            INSERT INTO CharacterCards_fts(
+                rowid,
+                name,
+                description,
+                personality,
+                scenario,
+                system_prompt
+            ) VALUES (
+                new.id,
+                new.name,
+                new.description,
+                new.personality,
+                new.scenario,
+                new.system_prompt
+            );
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS CharacterCards_ad AFTER DELETE ON CharacterCards BEGIN
+            DELETE FROM CharacterCards_fts WHERE rowid = old.id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS CharacterCards_au AFTER UPDATE ON CharacterCards BEGIN
+            UPDATE CharacterCards_fts SET
+                name = new.name,
+                description = new.description,
+                personality = new.personality,
+                scenario = new.scenario,
+                system_prompt = new.system_prompt
+            WHERE rowid = new.id;
+        END;
+        """)
+
         # Create CharacterChats table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS CharacterChats (
@@ -154,6 +202,7 @@ def setup_chat_database():
         sys.exit(1)
 
 setup_chat_database()
+
 
 ########################################################################################################
 #
@@ -694,6 +743,152 @@ def fetch_all_chats() -> List[Dict[str, Any]]:
     except Exception as e:
         logging.error(f"Error fetching all chats: {str(e)}")
         return []
+
+
+def search_character_chat(query: str, fts_top_k: int = 10, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
+    """
+    Perform a full-text search on the Character Chat database.
+
+    Args:
+        query: Search query string.
+        fts_top_k: Maximum number of results to return.
+        relevant_media_ids: Optional list of character IDs to filter results.
+
+    Returns:
+        List of search results with content and metadata.
+    """
+    if not query.strip():
+        return []
+
+    try:
+        # Construct a WHERE clause to limit the search to relevant character IDs
+        where_clause = ""
+        if relevant_media_ids:
+            placeholders = ','.join(['?'] * len(relevant_media_ids))
+            where_clause = f"CharacterChats.character_id IN ({placeholders})"
+
+        # Perform full-text search using existing search_db function
+        results = search_db(query, ["conversation_name", "chat_history"], where_clause, results_per_page=fts_top_k)
+
+        # Format results
+        formatted_results = []
+        for r in results:
+            formatted_results.append({
+                "content": r['chat_history'],
+                "metadata": {
+                    "chat_id": r['id'],
+                    "conversation_name": r['conversation_name'],
+                    "character_id": r['character_id']
+                }
+            })
+
+        return formatted_results
+
+    except Exception as e:
+        logging.error(f"Error in search_character_chat: {e}")
+        return []
+
+
+def search_character_cards(query: str, fts_top_k: int = 10, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
+    """
+    Perform a full-text search on the Character Cards database.
+
+    Args:
+        query: Search query string.
+        fts_top_k: Maximum number of results to return.
+        relevant_media_ids: Optional list of character IDs to filter results.
+
+    Returns:
+        List of search results with content and metadata.
+    """
+    if not query.strip():
+        return []
+
+    try:
+        conn = sqlite3.connect(chat_DB_PATH)
+        cursor = conn.cursor()
+
+        # Construct the query
+        sql_query = """
+            SELECT CharacterCards.id, CharacterCards.name, CharacterCards.description, CharacterCards.personality, CharacterCards.scenario
+            FROM CharacterCards_fts
+            JOIN CharacterCards ON CharacterCards_fts.rowid = CharacterCards.id
+            WHERE CharacterCards_fts MATCH ?
+        """
+
+        params = [query]
+
+        # Add filtering by character IDs if provided
+        if relevant_media_ids:
+            placeholders = ','.join(['?'] * len(relevant_media_ids))
+            sql_query += f" AND CharacterCards.id IN ({placeholders})"
+            params.extend(relevant_media_ids)
+
+        sql_query += " LIMIT ?"
+        params.append(fts_top_k)
+
+        cursor.execute(sql_query, params)
+        rows = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+
+        results = [dict(zip(columns, row)) for row in rows]
+
+        # Format results
+        formatted_results = []
+        for r in results:
+            content = f"Name: {r['name']}\nDescription: {r['description']}\nPersonality: {r['personality']}\nScenario: {r['scenario']}"
+            formatted_results.append({
+                "content": content,
+                "metadata": {
+                    "character_id": r['id'],
+                    "name": r['name']
+                }
+            })
+
+        return formatted_results
+
+    except Exception as e:
+        logging.error(f"Error in search_character_cards: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def fetch_character_ids_by_keywords(keywords: List[str]) -> List[int]:
+    """
+    Fetch character IDs associated with any of the specified keywords.
+
+    Args:
+        keywords (List[str]): List of keywords to search for.
+
+    Returns:
+        List[int]: List of character IDs associated with the keywords.
+    """
+    if not keywords:
+        return []
+
+    conn = sqlite3.connect(chat_DB_PATH)
+    cursor = conn.cursor()
+    try:
+        # Assuming 'tags' column in CharacterCards table stores tags as JSON array
+        placeholders = ','.join(['?'] * len(keywords))
+        sql_query = f"""
+            SELECT DISTINCT id FROM CharacterCards
+            WHERE EXISTS (
+                SELECT 1 FROM json_each(tags)
+                WHERE json_each.value IN ({placeholders})
+            )
+        """
+        cursor.execute(sql_query, keywords)
+        rows = cursor.fetchall()
+        character_ids = [row[0] for row in rows]
+        return character_ids
+    except Exception as e:
+        logging.error(f"Error in fetch_character_ids_by_keywords: {e}")
+        return []
+    finally:
+        conn.close()
+
 
 #
 # End of Character_Chat_DB.py

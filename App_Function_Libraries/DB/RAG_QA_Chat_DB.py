@@ -9,6 +9,7 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 from datetime import datetime
+from typing import List, Dict, Any
 
 from App_Function_Libraries.DB.SQLite_DB import get_all_conversations_from_media_db, get_messages_from_media_db
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path
@@ -867,6 +868,120 @@ def delete_conversation(conversation_id):
     except Exception as e:
         logger.error(f"Error deleting conversation '{conversation_id}': {e}")
         raise
+
+def search_rag_chat(query: str, fts_top_k: int = 10, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
+    """
+    Perform a full-text search on the RAG Chat database.
+
+    Args:
+        query: Search query string.
+        fts_top_k: Maximum number of results to return.
+        relevant_media_ids: Optional list of media IDs to filter results.
+
+    Returns:
+        List of search results with content and metadata.
+    """
+    if not query.strip():
+        return []
+
+    try:
+        with sqlite3.connect(rag_qa_db_path) as conn:
+            cursor = conn.cursor()
+            # Perform the full-text search using the FTS virtual table
+            cursor.execute("""
+                SELECT rag_qa_chats.id, rag_qa_chats.conversation_id, rag_qa_chats.role, rag_qa_chats.content
+                FROM rag_qa_chats_fts
+                JOIN rag_qa_chats ON rag_qa_chats_fts.rowid = rag_qa_chats.id
+                WHERE rag_qa_chats_fts MATCH ?
+                LIMIT ?
+            """, (query, fts_top_k))
+
+            rows = cursor.fetchall()
+            columns = [description[0] for description in cursor.description]
+            results = [dict(zip(columns, row)) for row in rows]
+
+            # Filter by relevant_media_ids if provided
+            if relevant_media_ids is not None:
+                results = [
+                    r for r in results
+                    if get_conversation_details(r['conversation_id']).get('media_id') in relevant_media_ids
+                ]
+
+            # Format results
+            formatted_results = [
+                {
+                    "content": r['content'],
+                    "metadata": {
+                        "conversation_id": r['conversation_id'],
+                        "role": r['role'],
+                        "media_id": get_conversation_details(r['conversation_id']).get('media_id')
+                    }
+                }
+                for r in results
+            ]
+            return formatted_results
+
+    except Exception as e:
+        logging.error(f"Error in search_rag_chat: {e}")
+        return []
+
+
+def search_rag_notes(query: str, fts_top_k: int = 10, relevant_media_ids: List[str] = None) -> List[Dict[str, Any]]:
+    """
+    Perform a full-text search on the RAG Notes database.
+
+    Args:
+        query: Search query string.
+        fts_top_k: Maximum number of results to return.
+        relevant_media_ids: Optional list of media IDs to filter results.
+
+    Returns:
+        List of search results with content and metadata.
+    """
+    if not query.strip():
+        return []
+
+    try:
+        with sqlite3.connect(rag_qa_db_path) as conn:
+            cursor = conn.cursor()
+            # Perform the full-text search using the FTS virtual table
+            cursor.execute("""
+                SELECT rag_qa_notes.id, rag_qa_notes.title, rag_qa_notes.content, rag_qa_notes.conversation_id
+                FROM rag_qa_notes_fts
+                JOIN rag_qa_notes ON rag_qa_notes_fts.rowid = rag_qa_notes.id
+                WHERE rag_qa_notes_fts MATCH ?
+                LIMIT ?
+            """, (query, fts_top_k))
+
+            rows = cursor.fetchall()
+            columns = [description[0] for description in cursor.description]
+            results = [dict(zip(columns, row)) for row in rows]
+
+            # Filter by relevant_media_ids if provided
+            if relevant_media_ids is not None:
+                results = [
+                    r for r in results
+                    if get_conversation_details(r['conversation_id']).get('media_id') in relevant_media_ids
+                ]
+
+            # Format results
+            formatted_results = [
+                {
+                    "content": r['content'],
+                    "metadata": {
+                        "note_id": r['id'],
+                        "title": r['title'],
+                        "conversation_id": r['conversation_id'],
+                        "media_id": get_conversation_details(r['conversation_id']).get('media_id')
+                    }
+                }
+                for r in results
+            ]
+            return formatted_results
+
+    except Exception as e:
+        logging.error(f"Error in search_rag_notes: {e}")
+        return []
 
 #
 # End of Chat-related functions

@@ -12,7 +12,7 @@ import time
 from typing import List, Tuple, IO, Union
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import db, search_db, DatabaseError, get_media_content
+from App_Function_Libraries.DB.DB_Manager import db, search_media_db, DatabaseError, get_media_content
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
@@ -89,7 +89,7 @@ def search_database(query: str) -> List[Tuple[int, str]]:
         log_counter("search_database_attempt")
         start_time = time.time()
         # Implement database search functionality
-        results = search_db(query, ["title", "content"], "", page=1, results_per_page=10)
+        results = search_media_db(query, ["title", "content"], "", page=1, results_per_page=10)
         search_duration = time.time() - start_time
         log_histogram("search_database_duration", search_duration)
         log_counter("search_database_success", labels={"result_count": len(results)})
