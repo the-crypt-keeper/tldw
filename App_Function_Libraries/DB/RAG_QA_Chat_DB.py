@@ -124,13 +124,43 @@ CREATE INDEX IF NOT EXISTS idx_rag_qa_keyword_collections_parent_id ON rag_qa_ke
 CREATE INDEX IF NOT EXISTS idx_rag_qa_collection_keywords_collection_id ON rag_qa_collection_keywords(collection_id);
 CREATE INDEX IF NOT EXISTS idx_rag_qa_collection_keywords_keyword_id ON rag_qa_collection_keywords(keyword_id);
 
--- Full-text search virtual table for chat content
-CREATE VIRTUAL TABLE IF NOT EXISTS rag_qa_chats_fts USING fts5(conversation_id, timestamp, role, content);
+-- Full-text search virtual tables (using automatic content synchronization)
 
--- Trigger to keep the FTS table up to date
-CREATE TRIGGER IF NOT EXISTS rag_qa_chats_ai AFTER INSERT ON rag_qa_chats BEGIN
-  INSERT INTO rag_qa_chats_fts(conversation_id, timestamp, role, content) VALUES (new.conversation_id, new.timestamp, new.role, new.content);
-END;
+-- FTS table for chat messages
+CREATE VIRTUAL TABLE IF NOT EXISTS rag_qa_chats_fts USING fts5(
+    content,
+    content='rag_qa_chats',
+    content_rowid='id'
+);
+
+-- FTS table for conversation metadata
+CREATE VIRTUAL TABLE IF NOT EXISTS conversation_metadata_fts USING fts5(
+    title,
+    content='conversation_metadata',
+    content_rowid='rowid'
+);
+
+-- FTS table for keywords
+CREATE VIRTUAL TABLE IF NOT EXISTS rag_qa_keywords_fts USING fts5(
+    keyword,
+    content='rag_qa_keywords',
+    content_rowid='id'
+);
+
+-- FTS table for keyword collections
+CREATE VIRTUAL TABLE IF NOT EXISTS rag_qa_keyword_collections_fts USING fts5(
+    name,
+    content='rag_qa_keyword_collections',
+    content_rowid='id'
+);
+
+-- FTS table for notes
+CREATE VIRTUAL TABLE IF NOT EXISTS rag_qa_notes_fts USING fts5(
+    title,
+    content,
+    content='rag_qa_notes',
+    content_rowid='id'
+);
 '''
 
 # Database connection management
@@ -613,22 +643,73 @@ def get_all_collections(page=1, page_size=20):
         raise
 
 
-def search_conversations_by_keywords(keywords, page=1, page_size=20):
+def search_conversations_by_keywords(keywords=None, title_query=None, content_query=None, page=1, page_size=20):
     try:
-        placeholders = ','.join(['?' for _ in keywords])
-        query = f'''
-        SELECT DISTINCT cm.conversation_id, cm.title
+        # Base query starts with conversation metadata
+        query = """
+        SELECT DISTINCT cm.conversation_id, cm.title, cm.last_updated
         FROM conversation_metadata cm
-        JOIN rag_qa_conversation_keywords ck ON cm.conversation_id = ck.conversation_id
-        JOIN rag_qa_keywords k ON ck.keyword_id = k.id
-        WHERE k.keyword IN ({placeholders})
-        '''
-        results, total_pages, total_count = get_paginated_results(query, tuple(keywords), page, page_size)
-        logger.info(
-            f"Found {total_count} conversations matching keywords: {', '.join(keywords)} (page {page} of {total_pages})")
-        return results, total_pages, total_count
+        WHERE 1=1
+        """
+        params = []
+
+        # Add content search if provided
+        if content_query and content_query.strip():
+            query += """
+            AND EXISTS (
+                SELECT 1 FROM rag_qa_chats_fts
+                WHERE rag_qa_chats_fts.content MATCH ?
+                AND rag_qa_chats_fts.rowid IN (
+                    SELECT id FROM rag_qa_chats 
+                    WHERE conversation_id = cm.conversation_id
+                )
+            )
+            """
+            params.append(content_query.strip())
+
+        # Add title search if provided
+        if title_query and title_query.strip():
+            query += """
+            AND EXISTS (
+                SELECT 1 FROM conversation_metadata_fts
+                WHERE conversation_metadata_fts.title MATCH ?
+                AND conversation_metadata_fts.rowid = cm.rowid
+            )
+            """
+            params.append(title_query.strip())
+
+        # Add keyword search if provided
+        if keywords and isinstance(keywords, (list, tuple)) and any(k.strip() for k in keywords):
+            clean_keywords = [k.strip() for k in keywords if k.strip()]
+            placeholders = ','.join(['?' for _ in clean_keywords])
+            query += f"""
+            AND EXISTS (
+                SELECT 1 FROM rag_qa_conversation_keywords ck
+                JOIN rag_qa_keywords k ON ck.keyword_id = k.id
+                WHERE ck.conversation_id = cm.conversation_id
+                AND k.keyword IN ({placeholders})
+            )
+            """
+            params.extend(clean_keywords)
+
+        # Add ordering
+        query += " ORDER BY cm.last_updated DESC"
+
+        results, total_pages, total_count = get_paginated_results(query, tuple(params), page, page_size)
+
+        conversations = [
+            {
+                'conversation_id': row[0],
+                'title': row[1],
+                'last_updated': row[2]
+            }
+            for row in results
+        ]
+
+        return conversations, total_pages, total_count
+
     except Exception as e:
-        logger.error(f"Error searching conversations by keywords {keywords}: {e}")
+        logger.error(f"Error searching conversations: {e}")
         raise
 
 
