@@ -117,7 +117,7 @@ config.read('config.txt')
 
 # RAG Search with keyword filtering
 # FIXME - Update each called function to support modifiable top-k results
-def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top_k=10, apply_re_ranking=True) -> Dict[str, Any]:
+def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top_k=10, apply_re_ranking=True, db_selection="FIXME") -> Dict[str, Any]:
     log_counter("enhanced_rag_pipeline_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
     try:
@@ -136,6 +136,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top
         logging.debug(f"\n\nenhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
 
         # Perform vector search
+        # FIXME
         vector_results = perform_vector_search(query, relevant_media_ids)
         logging.debug(f"\n\nenhanced_rag_pipeline - Vector search results: {vector_results}")
 

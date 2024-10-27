@@ -13,7 +13,7 @@ from tqdm import tqdm
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_all_content_from_database, get_all_conversations, \
-    get_conversation_text
+    get_conversation_text, get_note_by_id
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_all_notes
 from App_Function_Libraries.RAG.ChromaDB_Library import chroma_client, \
     store_in_chroma, situate_context
@@ -222,26 +222,28 @@ def create_embeddings_tab():
                         chunk_text = chunk['text']
                         chunk_id = f"{database_type.lower()}_{content_id}_chunk_{chunk_idx}"
 
-                        existing = collection.get(ids=[chunk_id])
-                        if existing['ids']:
-                            continue
+                        try:
+                            embedding = create_embedding(chunk_text, provider, model, api_url)
+                            metadata = {
+                                'content_id': str(content_id),
+                                'chunk_index': int(chunk_idx),
+                                'total_chunks': int(len(chunks)),
+                                'chunking_method': method,
+                                'max_chunk_size': int(max_size),
+                                'chunk_overlap': int(overlap),
+                                'adaptive_chunking': bool(adaptive),
+                                'embedding_model': model,
+                                'embedding_provider': provider,
+                                'content_type': item.get('type', 'media'),
+                                'conversation_id': item.get('conversation_id'),
+                                **{k: (int(v) if isinstance(v, str) and v.isdigit() else v)
+                                   for k, v in chunk['metadata'].items()}
+                            }
+                            store_in_chroma(collection_name, [chunk_text], [embedding], [chunk_id], [metadata])
 
-                        embedding = create_embedding(chunk_text, provider, model, api_url)
-                        metadata = {
-                            'content_id': str(content_id),
-                            'chunk_index': chunk_idx,
-                            'total_chunks': len(chunks),
-                            'chunking_method': method,
-                            'max_chunk_size': max_size,
-                            'chunk_overlap': overlap,
-                            'adaptive_chunking': adaptive,
-                            'embedding_model': model,
-                            'embedding_provider': provider,
-                            'content_type': item.get('type', 'media'),
-                            'conversation_id': item.get('conversation_id'),
-                            **chunk['metadata']
-                        }
-                        store_in_chroma(collection_name, [chunk_text], [embedding], [chunk_id], [metadata])
+                        except Exception as e:
+                            logging.error(f"Error processing chunk {chunk_id}: {str(e)}")
+                            continue
 
                 return f"Embeddings created and stored successfully for all {database_type} content."
             except Exception as e:
@@ -278,13 +280,41 @@ def create_embeddings_tab():
         )
 
 
-
 def create_view_embeddings_tab():
+    # Load configuration first
+    config = load_and_log_configs()
+    if not config:
+        raise ValueError("Could not load configuration")
+
+    # Get database paths from config
+    db_config = config['db_config']
+    media_db_path = db_config['sqlite_path']
+    rag_qa_db_path = os.path.join(os.path.dirname(media_db_path), "rag_chat.db")
+    character_chat_db_path = os.path.join(os.path.dirname(media_db_path), "character_chat.db")
+    chroma_db_path = db_config['chroma_db_path']
+
     with gr.TabItem("View/Update Embeddings", visible=True):
         gr.Markdown("# View and Update Embeddings")
-        item_mapping = gr.State({})
+        # Initialize item_mapping as a Gradio State
+
+
         with gr.Row():
             with gr.Column():
+                # Add database selection
+                database_selection = gr.Radio(
+                    choices=["Media DB", "RAG Chat", "Character Chat"],
+                    label="Select Content Source",
+                    value="Media DB",
+                    info="Choose which database to view embeddings from"
+                )
+
+                # Add database path display
+                current_db_path = gr.Textbox(
+                    label="Current Database Path",
+                    value=media_db_path,
+                    interactive=False
+                )
+
                 item_dropdown = gr.Dropdown(label="Select Item", choices=[], interactive=True)
                 refresh_button = gr.Button("Refresh Item List")
                 embedding_status = gr.Textbox(label="Embedding Status", interactive=False)
@@ -331,9 +361,10 @@ def create_view_embeddings_tab():
 
                 embedding_api_url = gr.Textbox(
                     label="API URL (for local provider)",
-                    value="http://localhost:8080/embedding",
+                    value=config['embedding_config']['embedding_api_url'],
                     visible=False
                 )
+
                 chunking_method = gr.Dropdown(
                     choices=["words", "sentences", "paragraphs", "tokens", "semantic"],
                     label="Chunking Method",
@@ -362,15 +393,45 @@ def create_view_embeddings_tab():
                 )
                 contextual_api_key = gr.Textbox(label="API Key", lines=1)
 
-        def get_items_with_embedding_status():
+        item_mapping = gr.State(value={})
+
+        def update_database_path(database_type):
+            if database_type == "Media DB":
+                return media_db_path
+            elif database_type == "RAG Chat":
+                return rag_qa_db_path
+            else:  # Character Chat
+                return character_chat_db_path
+
+        def get_items_with_embedding_status(database_type):
             try:
-                items = get_all_content_from_database()
-                collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
+                # Get items based on database selection
+                if database_type == "Media DB":
+                    items = get_all_content_from_database()
+                elif database_type == "RAG Chat":
+                    conversations, _, _ = get_all_conversations(page=1)
+                    items = [{
+                        'id': conv['conversation_id'],
+                        'title': conv['title'],
+                        'type': 'conversation'
+                    } for conv in conversations]
+                else:  # Character Chat
+                    notes, _, _ = get_all_notes(page=1)
+                    items = [{
+                        'id': note['id'],
+                        'title': note['title'],
+                        'type': 'note'
+                    } for note in notes]
+
+                collection_name = f"{database_type.lower().replace(' ', '_')}_embeddings"
+                collection = chroma_client.get_or_create_collection(name=collection_name)
+
                 choices = []
                 new_item_mapping = {}
                 for item in items:
                     try:
-                        result = collection.get(ids=[f"doc_{item['id']}_chunk_0"])
+                        chunk_id = f"{database_type.lower()}_{item['id']}_chunk_0"
+                        result = collection.get(ids=[chunk_id])
                         embedding_exists = result is not None and result.get('ids') and len(result['ids']) > 0
                         status = "Embedding exists" if embedding_exists else "No embedding"
                     except Exception as e:
@@ -398,9 +459,16 @@ def create_view_embeddings_tab():
             else:
                 return gr.update(visible=False)
 
-        def check_embedding_status(selected_item, item_mapping):
+        def check_embedding_status(selected_item, database_type, item_mapping):
             if not selected_item:
                 return "Please select an item", "", ""
+
+            if item_mapping is None:
+                # If mapping is None, try to refresh it
+                try:
+                    _, item_mapping = get_items_with_embedding_status(database_type)
+                except Exception as e:
+                    return f"Error initializing item mapping: {str(e)}", "", ""
 
             try:
                 item_id = item_mapping.get(selected_item)
@@ -408,30 +476,45 @@ def create_view_embeddings_tab():
                     return f"Invalid item selected: {selected_item}", "", ""
 
                 item_title = selected_item.rsplit(' (', 1)[0]
-                collection = chroma_client.get_or_create_collection(name="all_content_embeddings")
+                collection_name = f"{database_type.lower().replace(' ', '_')}_embeddings"
+                collection = chroma_client.get_or_create_collection(name=collection_name)
+                chunk_id = f"{database_type.lower()}_{item_id}_chunk_0"
 
-                result = collection.get(ids=[f"doc_{item_id}_chunk_0"], include=["embeddings", "metadatas"])
-                logging.info(f"ChromaDB result for item '{item_title}' (ID: {item_id}): {result}")
+                try:
+                    result = collection.get(ids=[chunk_id], include=["embeddings", "metadatas"])
+                except Exception as e:
+                    logging.error(f"ChromaDB get error: {str(e)}")
+                    return f"Error retrieving embedding for '{item_title}': {str(e)}", "", ""
 
-                if not result['ids']:
+                # Check if result exists and has the expected structure
+                if not result or not isinstance(result, dict):
                     return f"No embedding found for item '{item_title}' (ID: {item_id})", "", ""
 
-                if not result['embeddings'] or not result['embeddings'][0]:
+                # Check if we have any results
+                if not result.get('ids') or len(result['ids']) == 0:
+                    return f"No embedding found for item '{item_title}' (ID: {item_id})", "", ""
+
+                # Check if embeddings exist
+                if not result.get('embeddings') or not result['embeddings'][0]:
                     return f"Embedding data missing for item '{item_title}' (ID: {item_id})", "", ""
 
                 embedding = result['embeddings'][0]
-                metadata = result['metadatas'][0] if result['metadatas'] else {}
+                metadata = result.get('metadatas', [{}])[0] if result.get('metadatas') else {}
                 embedding_preview = str(embedding[:50])
                 status = f"Embedding exists for item '{item_title}' (ID: {item_id})"
                 return status, f"First 50 elements of embedding:\n{embedding_preview}", json.dumps(metadata, indent=2)
 
             except Exception as e:
-                logging.error(f"Error in check_embedding_status: {str(e)}")
+                logging.error(f"Error in check_embedding_status: {str(e)}", exc_info=True)
                 return f"Error processing item: {selected_item}. Details: {str(e)}", "", ""
 
-        def create_new_embedding_for_item(selected_item, provider, hf_model, openai_model, custom_model, api_url,
-                                          method, max_size, overlap, adaptive,
-                                          item_mapping, use_contextual, contextual_api_choice=None):
+        def refresh_and_update(database_type):
+            choices_update, new_mapping = get_items_with_embedding_status(database_type)
+            return choices_update, new_mapping
+
+        def create_new_embedding_for_item(selected_item, database_type, provider, hf_model, openai_model,
+                                        custom_model, api_url, method, max_size, overlap, adaptive,
+                                        item_mapping, use_contextual, contextual_api_choice=None):
             if not selected_item:
                 return "Please select an item", "", ""
 
@@ -440,8 +523,26 @@ def create_view_embeddings_tab():
                 if item_id is None:
                     return f"Invalid item selected: {selected_item}", "", ""
 
-                items = get_all_content_from_database()
-                item = next((item for item in items if item['id'] == item_id), None)
+                # Get item content based on database type
+                if database_type == "Media DB":
+                    items = get_all_content_from_database()
+                    item = next((item for item in items if item['id'] == item_id), None)
+                elif database_type == "RAG Chat":
+                    item = {
+                        'id': item_id,
+                        'content': get_conversation_text(item_id),
+                        'title': selected_item.rsplit(' (', 1)[0],
+                        'type': 'conversation'
+                    }
+                else:  # Character Chat
+                    note = get_note_by_id(item_id)
+                    item = {
+                        'id': item_id,
+                        'content': f"{note['title']}\n\n{note['content']}",
+                        'title': note['title'],
+                        'type': 'note'
+                    }
+
                 if not item:
                     return f"Item not found: {item_id}", "", ""
 
@@ -454,11 +555,11 @@ def create_view_embeddings_tab():
 
                 logging.info(f"Chunking content for item: {item['title']} (ID: {item_id})")
                 chunks = chunk_for_embedding(item['content'], item['title'], chunk_options)
-                collection_name = "all_content_embeddings"
+                collection_name = f"{database_type.lower().replace(' ', '_')}_embeddings"
                 collection = chroma_client.get_or_create_collection(name=collection_name)
 
                 # Delete existing embeddings for this item
-                existing_ids = [f"doc_{item_id}_chunk_{i}" for i in range(len(chunks))]
+                existing_ids = [f"{database_type.lower()}_{item_id}_chunk_{i}" for i in range(len(chunks))]
                 collection.delete(ids=existing_ids)
                 logging.info(f"Deleted {len(existing_ids)} existing embeddings for item {item_id}")
 
@@ -476,7 +577,7 @@ def create_view_embeddings_tab():
                         contextualized_text = chunk_text
                         context = None
 
-                    chunk_id = f"doc_{item_id}_chunk_{i}"
+                    chunk_id = f"{database_type.lower()}_{item_id}_chunk_{i}"
 
                     # Determine the model to use
                     if provider == "huggingface":
@@ -487,7 +588,7 @@ def create_view_embeddings_tab():
                         model = custom_model
 
                     metadata = {
-                        "media_id": str(item_id),
+                        "content_id": str(item_id),
                         "chunk_index": i,
                         "total_chunks": len(chunks),
                         "chunking_method": method,
@@ -536,15 +637,25 @@ def create_view_embeddings_tab():
                 logging.error(f"Error in create_new_embedding_for_item: {str(e)}", exc_info=True)
                 return f"Error creating embedding: {str(e)}", "", ""
 
+        # Wire up all the event handlers
+        database_selection.change(
+            update_database_path,
+            inputs=[database_selection],
+            outputs=[current_db_path]
+        )
+
         refresh_button.click(
             get_items_with_embedding_status,
+            inputs=[database_selection],
             outputs=[item_dropdown, item_mapping]
         )
+
         item_dropdown.change(
             check_embedding_status,
-            inputs=[item_dropdown, item_mapping],
+            inputs=[item_dropdown, database_selection, item_mapping],
             outputs=[embedding_status, embedding_preview, embedding_metadata]
         )
+
         create_new_embedding_button.click(
             create_new_embedding_for_item,
             inputs=[item_dropdown, embedding_provider, huggingface_model, openai_model, custom_embedding_model, embedding_api_url,
@@ -564,9 +675,10 @@ def create_view_embeddings_tab():
         )
 
     return (item_dropdown, refresh_button, embedding_status, embedding_preview, embedding_metadata,
-            create_new_embedding_button, embedding_provider, huggingface_model, openai_model, custom_embedding_model, embedding_api_url,
-            chunking_method, max_chunk_size, chunk_overlap, adaptive_chunking,
-            use_contextual_embeddings, contextual_api_choice, contextual_api_key)
+            create_new_embedding_button, embedding_provider, huggingface_model, openai_model,
+            custom_embedding_model, embedding_api_url, chunking_method, max_chunk_size,
+            chunk_overlap, adaptive_chunking, use_contextual_embeddings,
+            contextual_api_choice, contextual_api_key)
 
 
 def create_purge_embeddings_tab():

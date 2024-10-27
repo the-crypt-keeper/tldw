@@ -233,7 +233,10 @@ def store_in_chroma(collection_name: str, texts: List[str], embeddings: Any, ids
     logging.info(f"Number of embeddings: {len(embeddings)}, Dimension: {embedding_dim}")
 
     try:
-        # Attempt to get or create the collection
+        # Clean metadata
+        cleaned_metadatas = [clean_metadata(metadata) for metadata in metadatas]
+
+        # Try to get or create the collection
         try:
             collection = chroma_client.get_collection(name=collection_name)
             logging.info(f"Existing collection '{collection_name}' found")
@@ -258,7 +261,7 @@ def store_in_chroma(collection_name: str, texts: List[str], embeddings: Any, ids
             documents=texts,
             embeddings=embeddings,
             ids=ids,
-            metadatas=metadatas
+            metadatas=cleaned_metadatas
         )
         logging.info(f"Successfully upserted {len(embeddings)} embeddings")
 
@@ -349,6 +352,21 @@ def schedule_embedding(media_id: int, content: str, media_name: str):
     except Exception as e:
         logging.error(f"Error scheduling embedding for media_id {media_id}: {str(e)}")
 
+
+def clean_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """Clean metadata by removing None values and converting to appropriate types"""
+    cleaned = {}
+    for key, value in metadata.items():
+        if value is not None:  # Skip None values
+            if isinstance(value, (str, int, float, bool)):
+                cleaned[key] = value
+            elif isinstance(value, (np.int32, np.int64)):
+                cleaned[key] = int(value)
+            elif isinstance(value, (np.float32, np.float64)):
+                cleaned[key] = float(value)
+            else:
+                cleaned[key] = str(value)  # Convert other types to string
+    return cleaned
 
 # Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite
 # def process_and_store_content(content: str, collection_name: str, media_id: int):
