@@ -2,11 +2,10 @@
 # Description: Chat interface functions for Gradio
 #
 # Imports
-import html
-import json
 import logging
 import os
 import sqlite3
+import time
 from datetime import datetime
 #
 # External Imports
@@ -16,8 +15,11 @@ import gradio as gr
 from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, chat, save_chat_history, \
     update_chat_content, save_chat_history_to_db_wrapper
 from App_Function_Libraries.DB.DB_Manager import search_chat_conversations, update_chat_message, delete_chat_message, \
-    load_preset_prompts, db, load_chat_history, start_new_conversation, save_message
+    load_preset_prompts, db, load_chat_history, start_new_conversation, save_message, search_conversations_by_keywords, \
+    get_all_conversations, delete_messages_in_conversation
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_db_connection
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints
 #
 #
@@ -122,34 +124,53 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
         logging.error(f"Error in chat wrapper: {str(e)}")
         return "An error occurred.", history, conversation_id
 
+
 def search_conversations(query):
+    """Convert existing chat search to use RAG chat functions"""
     try:
-        conversations = search_chat_conversations(query)
-        if not conversations:
-            print(f"Debug - Search Conversations - No results found for query: {query}")
+        # Use the RAG search function - search by title if given a query
+        if query and query.strip():
+            results, _, _ = search_conversations_by_keywords(
+                title_query=query.strip()
+            )
+        else:
+            # Get all conversations if no query
+            results, _, _ = get_all_conversations()
+
+        if not results:
             return gr.update(choices=[])
 
+        # Format choices to match existing UI format
         conversation_options = [
-            (f"{c['conversation_name']} (Media: {c['media_title']}, ID: {c['id']})", c['id'])
-            for c in conversations
+            (f"{conv['title']} (ID: {conv['conversation_id'][:8]})", conv['conversation_id'])
+            for conv in results
         ]
-        print(f"Debug - Search Conversations - Options: {conversation_options}")
+
         return gr.update(choices=conversation_options)
     except Exception as e:
-        print(f"Debug - Search Conversations - Error: {str(e)}")
+        logging.error(f"Error searching conversations: {str(e)}")
         return gr.update(choices=[])
 
 
 def load_conversation(conversation_id):
+    """Convert existing load to use RAG chat functions"""
     if not conversation_id:
         return [], None
 
-    messages, _, _ = load_chat_history(conversation_id)
-    history = [
-        (msg['message'], None) if msg['sender'] == 'user' else (None, msg['message'])
-        for msg in messages
-    ]
-    return history, conversation_id
+    try:
+        # Use RAG load function
+        messages, _, _ = load_chat_history(conversation_id)
+
+        # Convert to chatbot history format
+        history = [
+            (content, None) if role == 'user' else (None, content)
+            for role, content in messages
+        ]
+
+        return history, conversation_id
+    except Exception as e:
+        logging.error(f"Error loading conversation: {str(e)}")
+        return [], None
 
 
 def update_message_in_chat(message_id, new_text, history):
@@ -166,7 +187,8 @@ def delete_message_from_chat(message_id, history):
     return updated_history
 
 
-def regenerate_last_message(history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature, system_prompt):
+def regenerate_last_message(history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature,
+                            system_prompt):
     if not history:
         return history, "No messages to regenerate."
 
@@ -288,9 +310,9 @@ def create_chat_interface():
 
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
+                save_status = gr.Textbox(label="Save Status", interactive=False)
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
                 download_file = gr.File(label="Download Chat History")
-                save_status = gr.Textbox(label="Save Status", interactive=False)
 
         # Restore original functionality
         search_button.click(
@@ -448,6 +470,7 @@ def create_chat_interface_stacked():
     except Exception as e:
         logging.error(f"Error setting default API endpoint: {str(e)}")
         default_value = None
+
     custom_css = """
     .chatbot-container .message-wrap .message {
         font-size: 14px !important;
@@ -494,11 +517,11 @@ def create_chat_interface_stacked():
                                             visible=True)
                 system_prompt = gr.Textbox(label="System Prompt",
                                            value="You are a helpful AI assistant.",
-                                           lines=3,
+                                           lines=4,
                                            visible=True)
                 user_prompt = gr.Textbox(label="Custom User Prompt",
                                          placeholder="Enter custom prompt here",
-                                         lines=3,
+                                         lines=4,
                                          visible=True)
                 gr.Markdown("Scroll down for the chat window...")
         with gr.Row():
@@ -513,6 +536,7 @@ def create_chat_interface_stacked():
                 clear_chat_button = gr.Button("Clear Chat")
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)", visible=True)
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
+                save_status = gr.Textbox(label="Save Status", interactive=False)
                 save_chat_history_as_file = gr.Button("Save Chat History as File")
             with gr.Column():
                 download_file = gr.File(label="Download Chat History")
@@ -523,6 +547,94 @@ def create_chat_interface_stacked():
             inputs=[search_query_input, search_type_input],
             outputs=[items_output, item_mapping]
         )
+
+        def search_conversations(query):
+            try:
+                # Use RAG search with title search
+                if query and query.strip():
+                    results, _, _ = search_conversations_by_keywords(title_query=query.strip())
+                else:
+                    results, _, _ = get_all_conversations()
+
+                if not results:
+                    return gr.update(choices=[])
+
+                # Format choices to match UI
+                conversation_options = [
+                    (f"{conv['title']} (ID: {conv['conversation_id'][:8]})", conv['conversation_id'])
+                    for conv in results
+                ]
+
+                return gr.update(choices=conversation_options)
+            except Exception as e:
+                logging.error(f"Error searching conversations: {str(e)}")
+                return gr.update(choices=[])
+
+        def load_conversation(conversation_id):
+            if not conversation_id:
+                return [], None
+
+            try:
+                # Use RAG load function
+                messages, _, _ = load_chat_history(conversation_id)
+
+                # Convert to chatbot history format
+                history = [
+                    (content, None) if role == 'user' else (None, content)
+                    for role, content in messages
+                ]
+
+                return history, conversation_id
+            except Exception as e:
+                logging.error(f"Error loading conversation: {str(e)}")
+                return [], None
+
+        def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content, chat_name=None):
+            log_counter("save_chat_history_to_db_attempt")
+            start_time = time.time()
+            logging.info(f"Attempting to save chat history. Media content type: {type(media_content)}")
+
+            try:
+                # First check if we can access the database
+                try:
+                    with get_db_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT 1")
+                except sqlite3.DatabaseError as db_error:
+                    logging.error(f"Database is corrupted or inaccessible: {str(db_error)}")
+                    return conversation_id, gr.update(
+                        value="Database error: The database file appears to be corrupted. Please contact support.")
+
+                # For both new and existing conversations
+                try:
+                    if not conversation_id:
+                        title = chat_name if chat_name else "Untitled Conversation"
+                        conversation_id = start_new_conversation(title=title)
+                        logging.info(f"Created new conversation with ID: {conversation_id}")
+
+                    # Update existing messages
+                    delete_messages_in_conversation(conversation_id)
+                    for user_msg, assistant_msg in chatbot:
+                        if user_msg:
+                            save_message(conversation_id, "user", user_msg)
+                        if assistant_msg:
+                            save_message(conversation_id, "assistant", assistant_msg)
+                except sqlite3.DatabaseError as db_error:
+                    logging.error(f"Database error during message save: {str(db_error)}")
+                    return conversation_id, gr.update(
+                        value="Database error: Unable to save messages. Please try again or contact support.")
+
+                save_duration = time.time() - start_time
+                log_histogram("save_chat_history_to_db_duration", save_duration)
+                log_counter("save_chat_history_to_db_success")
+
+                return conversation_id, gr.update(value="Chat history saved successfully!")
+
+            except Exception as e:
+                log_counter("save_chat_history_to_db_error", labels={"error": str(e)})
+                error_message = f"Failed to save chat history: {str(e)}"
+                logging.error(error_message, exc_info=True)
+                return conversation_id, gr.update(value=error_message)
 
         def update_prompts(preset_name):
             prompts = update_user_prompt(preset_name)
@@ -554,9 +666,6 @@ def create_chat_interface_stacked():
             lambda x: gr.update(value=""),
             inputs=[chatbot],
             outputs=[msg]
-        ).then(
-            lambda: gr.update(value=""),
-            outputs=[user_prompt, system_prompt]
         ).then(
             lambda history: approximate_token_count(history),
             inputs=[chatbot],
@@ -606,7 +715,7 @@ def create_chat_interface_stacked():
         save_chat_history_to_db.click(
             save_chat_history_to_db_wrapper,
             inputs=[chatbot, conversation_id, media_content, chat_media_name],
-            outputs=[conversation_id, gr.Textbox(label="Save Status")]
+            outputs=[conversation_id, save_status]
         )
 
         regenerate_button.click(
@@ -659,7 +768,8 @@ def create_chat_interface_multi_api():
             with gr.Column():
                 preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
                 system_prompt = gr.Textbox(label="System Prompt", value="You are a helpful AI assistant.", lines=5)
-                user_prompt = gr.Textbox(label="Modify Prompt (Prefixed to your message every time)", lines=5, value="", visible=True)
+                user_prompt = gr.Textbox(label="Modify Prompt (Prefixed to your message every time)", lines=5,
+                                         value="", visible=True)
 
         with gr.Row():
             chatbots = []
@@ -1056,232 +1166,10 @@ def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, t
 
     return new_msg, updated_chatbot, new_history, new_conv_id
 
-
-# FIXME - Finish implementing functions + testing/valdidation
-def create_chat_management_tab():
-    with gr.TabItem("Chat Management", visible=True):
-        gr.Markdown("# Chat Management")
-
-        with gr.Row():
-            search_query = gr.Textbox(label="Search Conversations")
-            search_button = gr.Button("Search")
-
-        conversation_list = gr.Dropdown(label="Select Conversation", choices=[])
-        conversation_mapping = gr.State({})
-
-        with gr.Tabs():
-            with gr.TabItem("Edit", visible=True):
-                chat_content = gr.TextArea(label="Chat Content (JSON)", lines=20, max_lines=50)
-                save_button = gr.Button("Save Changes")
-                delete_button = gr.Button("Delete Conversation", variant="stop")
-
-            with gr.TabItem("Preview", visible=True):
-                chat_preview = gr.HTML(label="Chat Preview")
-        result_message = gr.Markdown("")
-
-        def search_conversations(query):
-            conversations = search_chat_conversations(query)
-            choices = [f"{conv['conversation_name']} (Media: {conv['media_title']}, ID: {conv['id']})" for conv in
-                       conversations]
-            mapping = {choice: conv['id'] for choice, conv in zip(choices, conversations)}
-            return gr.update(choices=choices), mapping
-
-        def load_conversations(selected, conversation_mapping):
-            logging.info(f"Selected: {selected}")
-            logging.info(f"Conversation mapping: {conversation_mapping}")
-
-            try:
-                if selected and selected in conversation_mapping:
-                    conversation_id = conversation_mapping[selected]
-                    messages, _, _ = load_chat_history(conversation_id)
-                    conversation_data = {
-                        "conversation_id": conversation_id,
-                        "messages": messages
-                    }
-                    json_content = json.dumps(conversation_data, indent=2)
-
-                    # Create HTML preview
-                    html_preview = "<div style='max-height: 500px; overflow-y: auto;'>"
-                    for msg in messages:
-                        sender_style = "background-color: #e6f3ff;" if msg[
-                                                                           'sender'] == 'user' else "background-color: #f0f0f0;"
-                        html_preview += f"<div style='margin-bottom: 10px; padding: 10px; border-radius: 5px; {sender_style}'>"
-                        html_preview += f"<strong>{msg['sender']}:</strong> {html.escape(msg['message'])}<br>"
-                        html_preview += f"<small>Timestamp: {msg['timestamp']}</small>"
-                        html_preview += "</div>"
-                    html_preview += "</div>"
-
-                    logging.info("Returning json_content and html_preview")
-                    return json_content, html_preview
-                else:
-                    logging.warning("No conversation selected or not in mapping")
-                    return "", "<p>No conversation selected</p>"
-            except Exception as e:
-                logging.error(f"Error in load_conversations: {str(e)}")
-                return f"Error: {str(e)}", "<p>Error loading conversation</p>"
-
-        def validate_conversation_json(content):
-            try:
-                data = json.loads(content)
-                if not isinstance(data, dict):
-                    return False, "Invalid JSON structure: root should be an object"
-                if "conversation_id" not in data or not isinstance(data["conversation_id"], int):
-                    return False, "Missing or invalid conversation_id"
-                if "messages" not in data or not isinstance(data["messages"], list):
-                    return False, "Missing or invalid messages array"
-                for msg in data["messages"]:
-                    if not all(key in msg for key in ["sender", "message"]):
-                        return False, "Invalid message structure: missing required fields"
-                return True, data
-            except json.JSONDecodeError as e:
-                return False, f"Invalid JSON: {str(e)}"
-
-        def save_conversation(selected, conversation_mapping, content):
-            if not selected or selected not in conversation_mapping:
-                return "Please select a conversation before saving.", "<p>No changes made</p>"
-
-            conversation_id = conversation_mapping[selected]
-            is_valid, result = validate_conversation_json(content)
-
-            if not is_valid:
-                return f"Error: {result}", "<p>No changes made due to error</p>"
-
-            conversation_data = result
-            if conversation_data["conversation_id"] != conversation_id:
-                return "Error: Conversation ID mismatch.", "<p>No changes made due to ID mismatch</p>"
-
-            try:
-                with db.get_connection() as conn:
-                    conn.execute("BEGIN TRANSACTION")
-                    cursor = conn.cursor()
-
-                    # Backup original conversation
-                    cursor.execute("SELECT * FROM ChatMessages WHERE conversation_id = ?", (conversation_id,))
-                    original_messages = cursor.fetchall()
-                    backup_data = json.dumps({"conversation_id": conversation_id, "messages": original_messages})
-
-                    # You might want to save this backup_data somewhere
-
-                    # Delete existing messages
-                    cursor.execute("DELETE FROM ChatMessages WHERE conversation_id = ?", (conversation_id,))
-
-                    # Insert updated messages
-                    for message in conversation_data["messages"]:
-                        cursor.execute('''
-                            INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
-                            VALUES (?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
-                        ''', (conversation_id, message["sender"], message["message"], message.get("timestamp")))
-
-                    conn.commit()
-
-                    # Create updated HTML preview
-                    html_preview = "<div style='max-height: 500px; overflow-y: auto;'>"
-                    for msg in conversation_data["messages"]:
-                        sender_style = "background-color: #e6f3ff;" if msg[
-                                                                           'sender'] == 'user' else "background-color: #f0f0f0;"
-                        html_preview += f"<div style='margin-bottom: 10px; padding: 10px; border-radius: 5px; {sender_style}'>"
-                        html_preview += f"<strong>{msg['sender']}:</strong> {html.escape(msg['message'])}<br>"
-                        html_preview += f"<small>Timestamp: {msg.get('timestamp', 'N/A')}</small>"
-                        html_preview += "</div>"
-                    html_preview += "</div>"
-
-                    return "Conversation updated successfully.", html_preview
-            except sqlite3.Error as e:
-                conn.rollback()
-                logging.error(f"Database error in save_conversation: {e}")
-                return f"Error updating conversation: {str(e)}", "<p>Error occurred while saving</p>"
-            except Exception as e:
-                conn.rollback()
-                logging.error(f"Unexpected error in save_conversation: {e}")
-                return f"Unexpected error: {str(e)}", "<p>Unexpected error occurred</p>"
-
-        def delete_conversation(selected, conversation_mapping):
-            if not selected or selected not in conversation_mapping:
-                return "Please select a conversation before deleting.", "<p>No changes made</p>", gr.update(choices=[])
-
-            conversation_id = conversation_mapping[selected]
-
-            try:
-                with db.get_connection() as conn:
-                    cursor = conn.cursor()
-
-                    # Delete messages associated with the conversation
-                    cursor.execute("DELETE FROM ChatMessages WHERE conversation_id = ?", (conversation_id,))
-
-                    # Delete the conversation itself
-                    cursor.execute("DELETE FROM ChatConversations WHERE id = ?", (conversation_id,))
-
-                    conn.commit()
-
-                # Update the conversation list
-                remaining_conversations = [choice for choice in conversation_mapping.keys() if choice != selected]
-                updated_mapping = {choice: conversation_mapping[choice] for choice in remaining_conversations}
-
-                return "Conversation deleted successfully.", "<p>Conversation deleted</p>", gr.update(choices=remaining_conversations)
-            except sqlite3.Error as e:
-                conn.rollback()
-                logging.error(f"Database error in delete_conversation: {e}")
-                return f"Error deleting conversation: {str(e)}", "<p>Error occurred while deleting</p>", gr.update()
-            except Exception as e:
-                conn.rollback()
-                logging.error(f"Unexpected error in delete_conversation: {e}")
-                return f"Unexpected error: {str(e)}", "<p>Unexpected error occurred</p>", gr.update()
-
-        def parse_formatted_content(formatted_content):
-            lines = formatted_content.split('\n')
-            conversation_id = int(lines[0].split(': ')[1])
-            timestamp = lines[1].split(': ')[1]
-            history = []
-            current_role = None
-            current_content = None
-            for line in lines[3:]:
-                if line.startswith("Role: "):
-                    if current_role is not None:
-                        history.append({"role": current_role, "content": ["", current_content]})
-                    current_role = line.split(': ')[1]
-                elif line.startswith("Content: "):
-                    current_content = line.split(': ', 1)[1]
-            if current_role is not None:
-                history.append({"role": current_role, "content": ["", current_content]})
-            return json.dumps({
-                "conversation_id": conversation_id,
-                "timestamp": timestamp,
-                "history": history
-            }, indent=2)
-
-        search_button.click(
-            search_conversations,
-            inputs=[search_query],
-            outputs=[conversation_list, conversation_mapping]
-        )
-
-        conversation_list.change(
-            load_conversations,
-            inputs=[conversation_list, conversation_mapping],
-            outputs=[chat_content, chat_preview]
-        )
-
-        save_button.click(
-            save_conversation,
-            inputs=[conversation_list, conversation_mapping, chat_content],
-            outputs=[result_message, chat_preview]
-        )
-
-        delete_button.click(
-            delete_conversation,
-            inputs=[conversation_list, conversation_mapping],
-            outputs=[result_message, chat_preview, conversation_list]
-        )
-
-    return search_query, search_button, conversation_list, conversation_mapping, chat_content, save_button, delete_button, result_message, chat_preview
-
-
-
 # Mock function to simulate LLM processing
 def process_with_llm(workflow, context, prompt, api_endpoint, api_key):
     api_key_snippet = api_key[:5] + "..." if api_key else "Not provided"
     return f"LLM output using {api_endpoint} (API Key: {api_key_snippet}) for {workflow} with context: {context[:30]}... and prompt: {prompt[:30]}..."
-
 
 #
 # End of Chat_ui.py
