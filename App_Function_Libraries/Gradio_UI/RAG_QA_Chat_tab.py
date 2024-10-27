@@ -15,12 +15,14 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Books.Book_Ingestion_Lib import read_epub
+from App_Function_Libraries.DB.Character_Chat_DB import search_character_chat, search_character_cards
 from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_files, add_media_with_keywords, \
     get_all_conversations, get_note_by_id, get_notes_by_keywords, start_new_conversation, update_note, save_notes, \
     clear_keywords_from_note, add_keywords_to_note, load_chat_history, save_message, add_keywords_to_conversation, \
     get_keywords_for_note, delete_note, search_conversations_by_keywords, get_conversation_title, delete_conversation, \
     update_conversation_title, fetch_all_conversations, fetch_all_notes, fetch_conversations_by_ids, fetch_notes_by_ids
-from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_notes, delete_messages_in_conversation
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_notes, delete_messages_in_conversation, search_rag_notes, \
+    search_rag_chat
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, rag_qa_chat
@@ -64,8 +66,7 @@ def create_rag_qa_chat_tab():
 
         with gr.Row():
             with gr.Column(scale=1):
-                # FIXME - RAG Search DB Specific UI elements
-                # FIXME - Should offer the user the option of searching Searching an entire DB (media DB), or for RAG/Character DBs, either the whole, or conversation, or note/character card.
+                # FIXME - Offer the user to search 2+ databases at once
                 database_types = ["Media DB", "RAG Chat", "RAG Notes", "Character Chat", "Character Cards"]
                 db_choice = gr.Dropdown(
                     label="Select Database",
@@ -91,7 +92,6 @@ def create_rag_qa_chat_tab():
                 #     page_number = gr.Number(value=1, label="Page", precision=0)
                 #     page_size = gr.Number(value=20, label="Items per page", precision=0)
                 #     total_pages = gr.Number(label="Total Pages", interactive=False)
-
 
                 search_query = gr.Textbox(label="Search Query", visible=False)
                 search_button = gr.Button("Search", visible=False)
@@ -397,9 +397,18 @@ def create_rag_qa_chat_tab():
         context_source.change(lambda choice: update_file_list(1) if choice == "Existing File" else (gr.update(), gr.update(), 1),
                               inputs=[context_source], outputs=[existing_file, page_info, file_page])
 
-        def perform_search(query):
+        def perform_search(query, database_type):
             try:
-                results = search_database(query)
+                if database_type == "Media DB":
+                    results = search_database(query)
+                elif database_type == "RAG Chat":
+                    results = search_rag_chat(query)
+                elif database_type == "RAG Notes":
+                    results = search_rag_notes(query)
+                elif database_type == "Character Chat":
+                    results = search_character_chat(query)
+                elif database_type == "Character Cards":
+                    results = search_character_cards(query)
                 return gr.update(choices=results)
             except Exception as e:
                 gr.Error(f"Error performing search: {str(e)}")
@@ -407,7 +416,7 @@ def create_rag_qa_chat_tab():
 
         search_button.click(
             perform_search,
-            inputs=[search_query],
+            inputs=[search_query, db_choice],
             outputs=[search_results]
         )
 
