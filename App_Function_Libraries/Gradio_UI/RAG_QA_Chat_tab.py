@@ -6,6 +6,7 @@ import csv
 import logging
 import json
 import os
+import re
 from datetime import datetime
 #
 # External Imports
@@ -49,6 +50,7 @@ def create_rag_qa_chat_tab():
             "page": 1,
             "context_source": "Entire Media Database",
             "conversation_messages": [],
+            "conversation_id": None
         })
 
         note_state = gr.State({"note_id": None})
@@ -263,35 +265,42 @@ def create_rag_qa_chat_tab():
             outputs=[notes, note_state]
         )
 
-        def update_conversation_list():
-            conversations, total_pages, total_count = get_all_conversations()
-            choices = [f"{conversation['title']} (ID: {conversation['conversation_id']})" for conversation in
-                       conversations]
-            return choices
-
         # Initialize the conversation list
         load_conversation.choices = update_conversation_list()
 
         def load_conversation_history(selected_conversation, state_value):
-            if selected_conversation:
-                conversation_id = selected_conversation.split('(ID: ')[1][:-1]
+            try:
+                if not selected_conversation:
+                    return [], state_value, ""
+
+                # Safely extract conversation ID
+                match = re.search(r'\(ID: (.*?)\)', selected_conversation)
+                if not match:
+                    logging.error(f"Invalid conversation format: {selected_conversation}")
+                    return [], state_value, ""
+
+                conversation_id = match.group(1)
                 chat_data, total_pages_val, _ = load_chat_history(conversation_id, 1, 50)
-                # Convert chat data to list of tuples (user_message, assistant_response)
+
+                # Update state with valid conversation id
+                updated_state = state_value.copy()
+                updated_state["conversation_id"] = conversation_id
+                updated_state["conversation_messages"] = chat_data
+
+                # Format chat history
                 history = []
                 for role, content in chat_data:
                     if role == 'user':
                         history.append((content, ''))
-                    else:
-                        if history:
-                            history[-1] = (history[-1][0], content)
-                        else:
-                            history.append(('', content))
-                # Retrieve notes
+                    elif history:
+                        history[-1] = (history[-1][0], content)
+
                 notes_content = get_notes(conversation_id)
-                updated_state = update_state(state_value, conversation_id=conversation_id, page=1,
-                                             conversation_messages=[])
-                return history, updated_state, "\n".join(notes_content)
-            return [], state_value, ""
+                return history, updated_state, "\n".join(notes_content) if notes_content else ""
+
+            except Exception as e:
+                logging.error(f"Error loading conversation: {str(e)}")
+                return [], state_value, ""
 
         load_conversation.change(
             load_conversation_history,
@@ -320,6 +329,7 @@ def create_rag_qa_chat_tab():
             updated_state = update_state(state_value, conversation_id=new_conversation_id)
             # Update the conversation list
             conversation_choices = update_conversation_list()
+            # FIXME - Change this so that it displays under the `Save Conversation` button
             return gr.update(
                 value="<p style='color:green;'>Conversation saved successfully.</p>"
             ), updated_state, gr.update(choices=conversation_choices)
@@ -727,7 +737,20 @@ def create_rag_qa_chat_management_tab():
         with gr.Row():
             with gr.Column(scale=1):
                 # Search Conversations
-                search_conversations_input = gr.Textbox(label="Search Conversations by Keywords")
+                with gr.Group():
+                    gr.Markdown("## Search Conversations")
+                    title_search = gr.Textbox(
+                        label="Search by Title",
+                        placeholder="Enter title to search..."
+                    )
+                    content_search = gr.Textbox(
+                        label="Search in Chat Content",
+                        placeholder="Enter text to search in messages..."
+                    )
+                    keyword_search = gr.Textbox(
+                        label="Filter by Keywords (comma-separated)",
+                        placeholder="keyword1, keyword2, ..."
+                    )
                 search_conversations_button = gr.Button("Search Conversations")
                 conversations_list = gr.Dropdown(label="Conversations", choices=[])
                 new_conversation_button = gr.Button("New Conversation")
@@ -741,26 +764,40 @@ def create_rag_qa_chat_management_tab():
                 status_message = gr.HTML()
 
         # Function Definitions
-        def search_conversations(keywords):
-            if keywords:
-                keywords_list = [kw.strip() for kw in keywords.split(',')]
-                conversations, total_pages, total_count = search_conversations_by_keywords(keywords_list)
-            else:
-                conversations, total_pages, total_count = get_all_conversations()
+        def search_conversations(title_query, content_query, keywords):
+            try:
+                # Parse keywords if provided
+                keywords_list = None
+                if keywords and keywords.strip():
+                    keywords_list = [kw.strip() for kw in keywords.split(',')]
 
-            # Build choices as list of titles (ensure uniqueness)
-            choices = []
-            mapping = {}
-            for conversation_id, title in conversations:
-                display_title = f"{title} (ID: {conversation_id[:8]})"
-                choices.append(display_title)
-                mapping[display_title] = conversation_id
+                # Search using existing search_conversations_by_keywords function with all criteria
+                results, total_pages, total_count = search_conversations_by_keywords(
+                    keywords=keywords_list,
+                    title_query=title_query if title_query.strip() else None,
+                    content_query=content_query if content_query.strip() else None
+                )
 
-            return gr.update(choices=choices), mapping
+                # Build choices as list of titles (ensure uniqueness)
+                choices = []
+                mapping = {}
+                for conv in results:
+                    conversation_id = conv['conversation_id']
+                    title = conv['title']
+                    display_title = f"{title} (ID: {conversation_id[:8]})"
+                    choices.append(display_title)
+                    mapping[display_title] = conversation_id
 
+                return gr.update(choices=choices), mapping
+
+            except Exception as e:
+                logging.error(f"Error in search_conversations: {str(e)}")
+                return gr.update(choices=[]), {}
+
+        # Update the search button click event
         search_conversations_button.click(
             search_conversations,
-            inputs=[search_conversations_input],
+            inputs=[title_search, content_search, keyword_search],
             outputs=[conversations_list, conversation_mapping]
         )
 
