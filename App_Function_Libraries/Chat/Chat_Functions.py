@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import tempfile
 import time
 from datetime import datetime
@@ -14,7 +15,9 @@ from pathlib import Path
 # External Imports
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import get_conversation_name, save_chat_history_to_database
+from App_Function_Libraries.DB.DB_Manager import get_conversation_name, save_chat_history_to_database, \
+    start_new_conversation, update_conversation_title, delete_messages_in_conversation, save_message
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_db_connection
 from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_cohere, \
     chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface
 from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
@@ -183,56 +186,58 @@ def save_chat_history_to_db_wrapper(chatbot, conversation_id, media_content, med
     log_counter("save_chat_history_to_db_attempt")
     start_time = time.time()
     logging.info(f"Attempting to save chat history. Media content type: {type(media_content)}")
+
     try:
-        # Extract the media_id and media_name from the media_content
-        media_id = None
-        if isinstance(media_content, dict):
+        # First check if we can access the database
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+        except sqlite3.DatabaseError as db_error:
+            logging.error(f"Database is corrupted or inaccessible: {str(db_error)}")
+            return conversation_id, "Database error: The database file appears to be corrupted. Please contact support."
+
+        # Now attempt the save
+        if not conversation_id:
+            # Only for new conversations, not updates
             media_id = None
-            logging.debug(f"Media content keys: {media_content.keys()}")
-            if 'content' in media_content:
+            if isinstance(media_content, dict) and 'content' in media_content:
                 try:
                     content = media_content['content']
-                    if isinstance(content, str):
-                        content_json = json.loads(content)
-                    elif isinstance(content, dict):
-                        content_json = content
-                    else:
-                        raise ValueError(f"Unexpected content type: {type(content)}")
-
-                    # Use the webpage_url as the media_id
+                    content_json = content if isinstance(content, dict) else json.loads(content)
                     media_id = content_json.get('webpage_url')
-                    # Use the title as the media_name
-                    media_name = content_json.get('title')
-
-                    logging.info(f"Extracted media_id: {media_id}, media_name: {media_name}")
-                except json.JSONDecodeError:
-                    logging.error("Failed to decode JSON from media_content['content']")
-                except Exception as e:
-                    logging.error(f"Error processing media_content: {str(e)}")
+                    media_name = media_name or content_json.get('title', 'Unnamed Media')
+                except (json.JSONDecodeError, AttributeError) as e:
+                    logging.error(f"Error processing media content: {str(e)}")
+                    media_id = "unknown_media"
+                    media_name = media_name or "Unnamed Media"
             else:
-                logging.warning("'content' key not found in media_content")
-        else:
-            logging.warning(f"media_content is not a dictionary. Type: {type(media_content)}")
+                media_id = "unknown_media"
+                media_name = media_name or "Unnamed Media"
 
-        if media_id is None:
-            # If we couldn't find a media_id, we'll use a placeholder
-            media_id = "unknown_media"
-            logging.warning(f"Unable to extract media_id from media_content. Using placeholder: {media_id}")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            conversation_title = f"{media_name}_{timestamp}"
+            conversation_id = start_new_conversation(title=conversation_title, media_id=media_id)
+            logging.info(f"Created new conversation with ID: {conversation_id}")
 
-        if media_name is None:
-            media_name = "Unnamed Media"
-            logging.warning(f"Unable to extract media_name from media_content. Using placeholder: {media_name}")
+        # For both new and existing conversations
+        try:
+            delete_messages_in_conversation(conversation_id)
+            for user_msg, assistant_msg in chatbot:
+                if user_msg:
+                    save_message(conversation_id, "user", user_msg)
+                if assistant_msg:
+                    save_message(conversation_id, "assistant", assistant_msg)
+        except sqlite3.DatabaseError as db_error:
+            logging.error(f"Database error during message save: {str(db_error)}")
+            return conversation_id, "Database error: Unable to save messages. Please try again or contact support."
 
-        # Generate a unique conversation name using media_id and current timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        conversation_name = f"{media_name}_{timestamp}"
-
-        new_conversation_id = save_chat_history_to_database(chatbot, conversation_id, media_id, media_name,
-                                                            conversation_name)
         save_duration = time.time() - start_time
         log_histogram("save_chat_history_to_db_duration", save_duration)
         log_counter("save_chat_history_to_db_success")
-        return new_conversation_id, f"Chat history saved successfully as {conversation_name}!"
+
+        return conversation_id, "Chat history saved successfully!"
+
     except Exception as e:
         log_counter("save_chat_history_to_db_error", labels={"error": str(e)})
         error_message = f"Failed to save chat history: {str(e)}"

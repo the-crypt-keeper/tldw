@@ -25,8 +25,8 @@ from App_Function_Libraries.Gradio_UI.Character_Chat_tab import create_character
     create_character_card_validation_tab, create_export_characters_tab
 from App_Function_Libraries.Gradio_UI.Character_interaction_tab import create_narrator_controlled_conversation_tab, \
     create_multiple_character_chat_tab
-from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_management_tab, \
-    create_chat_interface_four, create_chat_interface_multi_api, create_chat_interface_stacked, create_chat_interface
+from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_interface_four, create_chat_interface_multi_api, \
+    create_chat_interface_stacked, create_chat_interface
 from App_Function_Libraries.Gradio_UI.Config_tab import create_config_editor_tab
 from App_Function_Libraries.Gradio_UI.Explain_summarize_tab import create_summarize_explain_tab
 from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab
@@ -460,7 +460,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_chat_interface_multi_api()
                 create_chat_interface_four()
                 create_chat_with_llamafile_tab()
-                create_chat_management_tab()
                 chat_workflows_tab()
 
             with gr.TabItem("Character Chat", id="character chat group", visible=True):
