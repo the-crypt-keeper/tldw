@@ -46,7 +46,7 @@ from App_Function_Libraries.DB.SQLite_DB import (
     add_media_with_keywords as sqlite_add_media_with_keywords,
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model, \
     create_document_version as sqlite_create_document_version,
-    get_document_version as sqlite_get_document_version, sqlite_search_db, add_media_chunk as sqlite_add_media_chunk,
+    get_document_version as sqlite_get_document_version, search_media_db as sqlite_search_media_db, add_media_chunk as sqlite_add_media_chunk,
     sqlite_update_fts_for_media, get_unprocessed_media as sqlite_get_unprocessed_media, fetch_item_details as sqlite_fetch_item_details, \
     search_media_database as sqlite_search_media_database, mark_as_trash as sqlite_mark_as_trash, \
     get_media_transcripts as sqlite_get_media_transcripts, get_specific_transcript as sqlite_get_specific_transcript, \
@@ -224,9 +224,9 @@ print(f"Database path: {db.db_path}")
 #
 # DB Search functions
 
-def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
+def search_media_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
     if db_type == 'sqlite':
-        return sqlite_search_db(search_query, search_fields, keywords, page, results_per_page)
+        return sqlite_search_media_db(search_query, search_fields, keywords, page, results_per_page)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version when available
         raise NotImplementedError("Elasticsearch version of search_db not yet implemented")

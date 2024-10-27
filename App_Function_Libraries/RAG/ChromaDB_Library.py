@@ -293,12 +293,19 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
 
         # Fetch a sample of embeddings to check metadata
         sample_results = collection.get(limit=10, include=["metadatas"])
-        if not sample_results['metadatas']:
-            raise ValueError("No metadata found in the collection")
+        if not sample_results.get('metadatas') or not any(sample_results['metadatas']):
+            logging.warning(f"No metadata found in the collection '{collection_name}'. Skipping this collection.")
+            return []
 
         # Check if all embeddings use the same model and provider
-        embedding_models = [metadata.get('embedding_model') for metadata in sample_results['metadatas'] if metadata.get('embedding_model')]
-        embedding_providers = [metadata.get('embedding_provider') for metadata in sample_results['metadatas'] if metadata.get('embedding_provider')]
+        embedding_models = [
+            metadata.get('embedding_model') for metadata in sample_results['metadatas']
+            if metadata and metadata.get('embedding_model')
+        ]
+        embedding_providers = [
+            metadata.get('embedding_provider') for metadata in sample_results['metadatas']
+            if metadata and metadata.get('embedding_provider')
+        ]
 
         if not embedding_models or not embedding_providers:
             raise ValueError("Embedding model or provider information not found in metadata")
@@ -322,13 +329,13 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
         )
 
         if not results['documents'][0]:
-            logging.warning("No results found for the query")
+            logging.warning(f"No results found for the query in collection '{collection_name}'.")
             return []
 
         return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
     except Exception as e:
-        logging.error(f"Error in vector_search: {str(e)}", exc_info=True)
-        raise
+        logging.error(f"Error in vector_search for collection '{collection_name}': {str(e)}", exc_info=True)
+        return []
 
 
 def schedule_embedding(media_id: int, content: str, media_name: str):
