@@ -64,6 +64,14 @@ def create_rag_qa_chat_tab():
 
         with gr.Row():
             with gr.Column(scale=1):
+                # FIXME - RAG Search DB Specific UI elements
+                # FIXME - Should offer the user the option of searching Searching an entire DB (media DB), or for RAG/Character DBs, either the whole, or conversation, or note/character card.
+                database_types = ["Media DB", "RAG Chat", "RAG Notes", "Character Chat", "Character Cards"]
+                db_choice = gr.Dropdown(
+                    label="Select Database",
+                    choices=database_types,
+                    value="Media DB"  # Default value
+                )
                 context_source = gr.Radio(
                     ["All Files in the Database", "Search Database", "Upload File"],
                     label="Context Source",
@@ -421,9 +429,10 @@ Rewritten Question:"""
             logging.info(f"Rephrased question: {rephrased_question}")
             return rephrased_question.strip()
 
+        # FIXME - RAG DB selection
         def rag_qa_chat_wrapper(message, history, context_source, existing_file, search_results, file_upload,
                                 convert_to_text, keywords, api_choice, use_query_rewriting, state_value,
-                                keywords_input, top_k_input, use_re_ranking):
+                                keywords_input, top_k_input, use_re_ranking, db_choice):
             try:
                 logging.info(f"Starting rag_qa_chat_wrapper with message: {message}")
                 logging.info(f"Context source: {context_source}")
@@ -460,8 +469,8 @@ Rewritten Question:"""
                 if context_source == "All Files in the Database":
                     # Use the enhanced_rag_pipeline to search the entire database
                     context = enhanced_rag_pipeline(rephrased_question, api_choice, keywords_input, top_k_input,
-                                                    use_re_ranking)
-                    logging.info(f"Using enhanced_rag_pipeline for database search")
+                                                    use_re_ranking, database_type=db_choice)
+                    logging.info(f"Using enhanced_rag_pipeline for database searcsh")
                 elif context_source == "Search Database":
                     context = f"media_id:{search_results.split('(ID: ')[1][:-1]}"
                     logging.info(f"Using search result with context: {context}")
@@ -569,7 +578,9 @@ Rewritten Question:"""
                 use_query_rewriting,
                 state,
                 keywords_input,
-                top_k_input
+                top_k_input,
+                use_re_ranking,
+                db_choice
             ],
             outputs=[chatbot, msg, loading_indicator, state],
         )

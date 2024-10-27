@@ -148,45 +148,42 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
 
         relevant_ids = {}
 
-        database_types = ["Media DB", "RAG Chat", "RAG Notes", "Character Chat", "Character Cards"]
+        database_types = [database_type]
 
         # Fetch relevant IDs based on keywords if keywords are provided
         if keyword_list:
             try:
-                for db_type in database_types:
-                    if db_type == "Media DB":
-                        relevant_media_ids = fetch_relevant_media_ids(keyword_list)
-                        relevant_ids[db_type] = relevant_media_ids
-                        logging.debug(f"enhanced_rag_pipeline - {db_type} relevant media IDs: {relevant_media_ids}")
+                relevant_ids = {}
+                if database_type == "Media DB":
+                    relevant_media_ids = fetch_relevant_media_ids(keyword_list)
+                    relevant_ids[database_type] = relevant_media_ids
+                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant media IDs: {relevant_media_ids}")
 
-                    elif db_type == "RAG Chat":
-                        conversations, total_pages, total_count = search_conversations_by_keywords(
-                            keywords=keyword_list)
-                        relevant_conversation_ids = [conv['conversation_id'] for conv in conversations]
-                        relevant_ids[db_type] = relevant_conversation_ids
-                        logging.debug(
-                            f"enhanced_rag_pipeline - {db_type} relevant conversation IDs: {relevant_conversation_ids}")
+                elif database_type == "RAG Chat":
+                    conversations, total_pages, total_count = search_conversations_by_keywords(keywords=keyword_list)
+                    relevant_conversation_ids = [conv['conversation_id'] for conv in conversations]
+                    relevant_ids[database_type] = relevant_conversation_ids
+                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant conversation IDs: {relevant_conversation_ids}")
 
-                    elif db_type == "RAG Notes":
-                        notes, total_pages, total_count = get_notes_by_keywords(keyword_list)
-                        relevant_note_ids = [note_id for note_id, _, _, _ in notes]  # Unpack note_id from the tuple
-                        relevant_ids[db_type] = relevant_note_ids
-                        logging.debug(f"enhanced_rag_pipeline - {db_type} relevant note IDs: {relevant_note_ids}")
+                elif database_type == "RAG Notes":
+                    notes, total_pages, total_count = get_notes_by_keywords(keyword_list)
+                    relevant_note_ids = [note_id for note_id, _, _, _ in notes]
+                    relevant_ids[database_type] = relevant_note_ids
+                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant note IDs: {relevant_note_ids}")
 
-                    elif db_type == "Character Chat":
-                        relevant_chat_ids = fetch_keywords_for_chats(keyword_list)
-                        relevant_ids[db_type] = relevant_chat_ids
-                        logging.debug(f"enhanced_rag_pipeline - {db_type} relevant chat IDs: {relevant_chat_ids}")
+                elif database_type == "Character Chat":
+                    relevant_chat_ids = fetch_keywords_for_chats(keyword_list)
+                    relevant_ids[database_type] = relevant_chat_ids
+                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant chat IDs: {relevant_chat_ids}")
 
-                    elif db_type == "Character Cards":
-                        # Assuming we have a function to fetch character IDs by keywords
-                        relevant_character_ids = fetch_character_ids_by_keywords(keyword_list)
-                        relevant_ids[db_type] = relevant_character_ids
-                        logging.debug(
-                            f"enhanced_rag_pipeline - {db_type} relevant character IDs: {relevant_character_ids}")
+                elif database_type == "Character Cards":
+                    relevant_character_ids = fetch_character_ids_by_keywords(keyword_list)
+                    relevant_ids[database_type] = relevant_character_ids
+                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant character IDs: {relevant_character_ids}")
 
-                    else:
-                        logging.error(f"Unsupported database type: {db_type}")
+                else:
+                    logging.error(f"Unsupported database type: {database_type}")
+
 
             except Exception as e:
                 logging.error(f"Error fetching relevant IDs: {str(e)}")
