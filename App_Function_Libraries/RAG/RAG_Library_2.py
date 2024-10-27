@@ -117,7 +117,20 @@ config.read('config.txt')
 
 # RAG Search with keyword filtering
 # FIXME - Update each called function to support modifiable top-k results
-def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top_k=10, apply_re_ranking=True, db_selection="FIXME") -> Dict[str, Any]:
+def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts_top_k=10, apply_re_ranking=True, database_type: str = "Media DB") -> Dict[str, Any]:
+    """
+    Perform full text search across specified database type.
+
+    Args:
+        query: Search query string
+        api_choice: API to use for generating the response
+        top_k: Maximum number of results to return
+        keywords: Optional list of media IDs to filter results
+        database_type: Type of database to search ("Media DB", "RAG Chat", or "Character Chat")
+
+    Returns:
+        Dictionary containing search results with content
+    """
     log_counter("enhanced_rag_pipeline_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
     try:
@@ -132,8 +145,22 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top
         logging.debug(f"\n\nenhanced_rag_pipeline - Keywords: {keyword_list}")
 
         # Fetch relevant media IDs based on keywords if keywords are provided
-        relevant_media_ids = fetch_relevant_media_ids(keyword_list) if keyword_list else None
-        logging.debug(f"\n\nenhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
+        try:
+            # Different handling based on database type
+            if database_type == "Media DB":
+                relevant_media_ids = fetch_relevant_media_ids(keyword_list) if keyword_list else None
+                logging.debug(f"\n\nenhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
+
+            elif database_type == "RAG Chat":
+                relevant_media_ids = fetch_relevant_media_ids(keyword_list) if keyword_list else None
+                logging.debug(f"\n\nenhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
+
+            elif database_type == "Character Chat":
+                relevant_media_ids = fetch_relevant_media_ids(keyword_list) if keyword_list else None
+                logging.debug(f"\n\nenhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
+
+            else:
+                raise ValueError(f"Unsupported database type: {database_type}")
 
         # Perform vector search
         # FIXME
@@ -141,7 +168,20 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top
         logging.debug(f"\n\nenhanced_rag_pipeline - Vector search results: {vector_results}")
 
         # Perform full-text search
-        fts_results = perform_full_text_search(query, relevant_media_ids)
+        try:
+            # Different handling based on database type
+            if database_type == "Media DB":
+                fts_results = search_db(query, ["content"], "", page=1, results_per_page=fts_top_k or 10)
+
+            elif database_type == "RAG Chat":
+                fts_results = search_rag_chat_db(query, ["content"], "", page=1, results_per_page=fts_top_k or 10)
+
+            elif database_type == "Character Chat":
+                fts_results = search_character_chat_db(query, ["content"], "", page=1, results_per_page=fts_top_k or 10)
+
+            else:
+                raise ValueError(f"Unsupported database type: {database_type}")
+
         logging.debug("\n\nenhanced_rag_pipeline - Full-text search results:")
         logging.debug(
             "\n\nenhanced_rag_pipeline - Full-text search results:\n" + "\n".join(
@@ -177,7 +217,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top
                 all_results = [all_results[result['id']] for result in reranked_results]
 
         # Extract content from results (top 10 by default)
-        context = "\n".join([result['content'] for result in all_results[:top_k]])
+        context = "\n".join([result['content'] for result in all_results[:fts_top_k]])
         logging.debug(f"Context length: {len(context)}")
         logging.debug(f"Context: {context[:200]}")
 
