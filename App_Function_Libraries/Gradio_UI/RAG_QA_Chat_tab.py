@@ -413,7 +413,6 @@ def create_rag_qa_chat_tab():
                         results += search_media_db(query, search_fields, keywords, page=1, results_per_page=25)
                     elif database_type == "RAG Chat":
                         results += search_rag_chat(query)
-                            #def search_rag_chat(query: str, fts_top_k: int = 10, relevant_media_ids: List[str] = None) ->List[Dict[str, Any]]:
                     elif database_type == "RAG Notes":
                         results += search_rag_notes(query)
                     elif database_type == "Character Chat":
