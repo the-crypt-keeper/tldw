@@ -20,7 +20,8 @@ from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_fi
     get_all_conversations, get_note_by_id, get_notes_by_keywords, start_new_conversation, update_note, save_notes, \
     clear_keywords_from_note, add_keywords_to_note, load_chat_history, save_message, add_keywords_to_conversation, \
     get_keywords_for_note, delete_note, search_conversations_by_keywords, get_conversation_title, delete_conversation, \
-    update_conversation_title, fetch_all_conversations, fetch_all_notes, fetch_conversations_by_ids, fetch_notes_by_ids
+    update_conversation_title, fetch_all_conversations, fetch_all_notes, fetch_conversations_by_ids, fetch_notes_by_ids, \
+    search_media_db
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_notes, delete_messages_in_conversation, search_rag_notes, \
     search_rag_chat
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
@@ -68,10 +69,11 @@ def create_rag_qa_chat_tab():
             with gr.Column(scale=1):
                 # FIXME - Offer the user to search 2+ databases at once
                 database_types = ["Media DB", "RAG Chat", "RAG Notes", "Character Chat", "Character Cards"]
-                db_choice = gr.Dropdown(
-                    label="Select Database",
+                db_choice = gr.CheckboxGroup(
+                    label="Select Database(s)",
                     choices=database_types,
-                    value="Media DB"  # Default value
+                    value=["Media DB"],
+                    interactive=True
                 )
                 context_source = gr.Radio(
                     ["All Files in the Database", "Search Database", "Upload File"],
@@ -92,6 +94,7 @@ def create_rag_qa_chat_tab():
                 #     page_number = gr.Number(value=1, label="Page", precision=0)
                 #     page_size = gr.Number(value=20, label="Items per page", precision=0)
                 #     total_pages = gr.Number(label="Total Pages", interactive=False)
+
 
                 search_query = gr.Textbox(label="Search Query", visible=False)
                 search_button = gr.Button("Search", visible=False)
@@ -373,11 +376,12 @@ def create_rag_qa_chat_tab():
             return update_file_list(max(1, current_page - 1))
 
         def update_context_source(choice):
+            # Update visibility based on context source choice
             return {
                 existing_file: gr.update(visible=choice == "Existing File"),
-                prev_page_btn: gr.update(visible=choice == "Existing File"),
-                next_page_btn: gr.update(visible=choice == "Existing File"),
-                page_info: gr.update(visible=choice == "Existing File"),
+                prev_page_btn: gr.update(visible=choice == "Search Database"),
+                next_page_btn: gr.update(visible=choice == "Search Database"),
+                page_info: gr.update(visible=choice == "Search Database"),
                 search_query: gr.update(visible=choice == "Search Database"),
                 search_button: gr.update(visible=choice == "Search Database"),
                 search_results: gr.update(visible=choice == "Search Database"),
@@ -397,26 +401,37 @@ def create_rag_qa_chat_tab():
         context_source.change(lambda choice: update_file_list(1) if choice == "Existing File" else (gr.update(), gr.update(), 1),
                               inputs=[context_source], outputs=[existing_file, page_info, file_page])
 
-        def perform_search(query, database_type):
+        def perform_search(query, selected_databases, keywords):
             try:
-                if database_type == "Media DB":
-                    results = search_database(query)
-                elif database_type == "RAG Chat":
-                    results = search_rag_chat(query)
-                elif database_type == "RAG Notes":
-                    results = search_rag_notes(query)
-                elif database_type == "Character Chat":
-                    results = search_character_chat(query)
-                elif database_type == "Character Cards":
-                    results = search_character_cards(query)
+                results = []
+
+                # Iterate over selected database types and perform searches accordingly
+                for database_type in selected_databases:
+                    if database_type == "Media DB":
+                        # FIXME - check for existence of keywords before setting as search field
+                        search_fields = ["title", "content", "keywords"]
+                        results += search_media_db(query, search_fields, keywords, page=1, results_per_page=25)
+                    elif database_type == "RAG Chat":
+                        results += search_rag_chat(query)
+                            #def search_rag_chat(query: str, fts_top_k: int = 10, relevant_media_ids: List[str] = None) ->List[Dict[str, Any]]:
+                    elif database_type == "RAG Notes":
+                        results += search_rag_notes(query)
+                    elif database_type == "Character Chat":
+                        results += search_character_chat(query)
+                    elif database_type == "Character Cards":
+                        results += search_character_cards(query)
+
+                # Remove duplicate results if necessary
+                results = list(set(results))
                 return gr.update(choices=results)
             except Exception as e:
                 gr.Error(f"Error performing search: {str(e)}")
                 return gr.update(choices=[])
 
+        # Click Event for the DB Search Button
         search_button.click(
             perform_search,
-            inputs=[search_query, db_choice],
+            inputs=[search_query, db_choice, keywords_input],
             outputs=[search_results]
         )
 
@@ -441,12 +456,13 @@ Rewritten Question:"""
         # FIXME - RAG DB selection
         def rag_qa_chat_wrapper(message, history, context_source, existing_file, search_results, file_upload,
                                 convert_to_text, keywords, api_choice, use_query_rewriting, state_value,
-                                keywords_input, top_k_input, use_re_ranking, db_choice):
+                                keywords_input, top_k_input, use_re_ranking, db_choices):
             try:
                 logging.info(f"Starting rag_qa_chat_wrapper with message: {message}")
                 logging.info(f"Context source: {context_source}")
                 logging.info(f"API choice: {api_choice}")
                 logging.info(f"Query rewriting: {'enabled' if use_query_rewriting else 'disabled'}")
+                logging.info(f"Selected DB Choices: {db_choices}")
 
                 # Show loading indicator
                 yield history, "", gr.update(visible=True), state_value
@@ -476,10 +492,16 @@ Rewritten Question:"""
                     logging.info(f"Using original question: {message}")
 
                 if context_source == "All Files in the Database":
-                    # Use the enhanced_rag_pipeline to search the entire database
-                    context = enhanced_rag_pipeline(rephrased_question, api_choice, keywords_input, top_k_input,
-                                                    use_re_ranking, database_type=db_choice)
-                    logging.info(f"Using enhanced_rag_pipeline for database searcsh")
+                    # Use the enhanced_rag_pipeline to search the selected databases
+                    context = enhanced_rag_pipeline(
+                        rephrased_question,
+                        api_choice,
+                        keywords_input,
+                        top_k_input,
+                        use_re_ranking,
+                        database_types=db_choices  # Pass the list of selected databases
+                    )
+                    logging.info(f"Using enhanced_rag_pipeline for database search")
                 elif context_source == "Search Database":
                     context = f"media_id:{search_results.split('(ID: ')[1][:-1]}"
                     logging.info(f"Using search result with context: {context}")

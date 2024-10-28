@@ -119,7 +119,7 @@ config.read('config.txt')
 
 # RAG Search with keyword filtering
 # FIXME - Update each called function to support modifiable top-k results
-def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts_top_k=10, apply_re_ranking=True, database_type: str = "Media DB") -> Dict[str, Any]:
+def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts_top_k=10, apply_re_ranking=True, database_types: List[str] = "Media DB") -> Dict[str, Any]:
     """
     Perform full text search across specified database type.
 
@@ -128,7 +128,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
         api_choice: API to use for generating the response
         fts_top_k: Maximum number of results to return
         keywords: Optional list of media IDs to filter results
-        database_type: Type of database to search ("Media DB", "RAG Chat", or "Character Chat")
+        database_types: Type of database to search ("Media DB", "RAG Chat", or "Character Chat")
 
     Returns:
         Dictionary containing search results with content
@@ -148,57 +148,73 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
 
         relevant_ids = {}
 
-        database_types = [database_type]
-
         # Fetch relevant IDs based on keywords if keywords are provided
         if keyword_list:
             try:
-                relevant_ids = {}
-                if database_type == "Media DB":
-                    relevant_media_ids = fetch_relevant_media_ids(keyword_list)
-                    relevant_ids[database_type] = relevant_media_ids
-                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant media IDs: {relevant_media_ids}")
+                for db_type in database_types:
+                    if db_type == "Media DB":
+                        relevant_media_ids = fetch_relevant_media_ids(keyword_list)
+                        relevant_ids[db_type] = relevant_media_ids
+                        logging.debug(f"enhanced_rag_pipeline - {db_type} relevant media IDs: {relevant_media_ids}")
 
-                elif database_type == "RAG Chat":
-                    conversations, total_pages, total_count = search_conversations_by_keywords(keywords=keyword_list)
-                    relevant_conversation_ids = [conv['conversation_id'] for conv in conversations]
-                    relevant_ids[database_type] = relevant_conversation_ids
-                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant conversation IDs: {relevant_conversation_ids}")
+                    elif db_type == "RAG Chat":
+                        conversations, total_pages, total_count = search_conversations_by_keywords(
+                            keywords=keyword_list)
+                        relevant_conversation_ids = [conv['conversation_id'] for conv in conversations]
+                        relevant_ids[db_type] = relevant_conversation_ids
+                        logging.debug(
+                            f"enhanced_rag_pipeline - {db_type} relevant conversation IDs: {relevant_conversation_ids}")
 
-                elif database_type == "RAG Notes":
-                    notes, total_pages, total_count = get_notes_by_keywords(keyword_list)
-                    relevant_note_ids = [note_id for note_id, _, _, _ in notes]
-                    relevant_ids[database_type] = relevant_note_ids
-                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant note IDs: {relevant_note_ids}")
+                    elif db_type == "RAG Notes":
+                        notes, total_pages, total_count = get_notes_by_keywords(keyword_list)
+                        relevant_note_ids = [note_id for note_id, _, _, _ in notes]  # Unpack note_id from the tuple
+                        relevant_ids[db_type] = relevant_note_ids
+                        logging.debug(f"enhanced_rag_pipeline - {db_type} relevant note IDs: {relevant_note_ids}")
 
-                elif database_type == "Character Chat":
-                    relevant_chat_ids = fetch_keywords_for_chats(keyword_list)
-                    relevant_ids[database_type] = relevant_chat_ids
-                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant chat IDs: {relevant_chat_ids}")
+                    elif db_type == "Character Chat":
+                        relevant_chat_ids = fetch_keywords_for_chats(keyword_list)
+                        relevant_ids[db_type] = relevant_chat_ids
+                        logging.debug(f"enhanced_rag_pipeline - {db_type} relevant chat IDs: {relevant_chat_ids}")
 
-                elif database_type == "Character Cards":
-                    relevant_character_ids = fetch_character_ids_by_keywords(keyword_list)
-                    relevant_ids[database_type] = relevant_character_ids
-                    logging.debug(f"enhanced_rag_pipeline - {database_type} relevant character IDs: {relevant_character_ids}")
+                    elif db_type == "Character Cards":
+                        # Assuming we have a function to fetch character IDs by keywords
+                        relevant_character_ids = fetch_character_ids_by_keywords(keyword_list)
+                        relevant_ids[db_type] = relevant_character_ids
+                        logging.debug(
+                            f"enhanced_rag_pipeline - {db_type} relevant character IDs: {relevant_character_ids}")
 
-                else:
-                    logging.error(f"Unsupported database type: {database_type}")
-
+                    else:
+                        logging.error(f"Unsupported database type: {db_type}")
 
             except Exception as e:
                 logging.error(f"Error fetching relevant IDs: {str(e)}")
         else:
             relevant_ids = None
 
-        # Extract relevant media IDs for Media DB
+        # Extract relevant media IDs for each selected DB
+        # Prepare a dict to hold relevant_media_ids per DB
+        relevant_media_ids_dict = {}
         if relevant_ids:
-            relevant_media_ids = relevant_ids.get("Media DB", None)
+            for db_type in database_types:
+                relevant_media_ids = relevant_ids.get(db_type, None)
+                if relevant_media_ids:
+                    # Convert to List[str] if not None
+                    relevant_media_ids_dict[db_type] = [str(media_id) for media_id in relevant_media_ids]
+                else:
+                    relevant_media_ids_dict[db_type] = None
         else:
-            relevant_media_ids = None
+            relevant_media_ids_dict = {db_type: None for db_type in database_types}
 
-        # Convert relevant_media_ids to List[str] if not None
-        if relevant_media_ids is not None:
-            relevant_media_ids = [str(media_id) for media_id in relevant_media_ids]
+        # Perform vector search for all selected databases
+        vector_results = []
+        for db_type in database_types:
+            try:
+                db_relevant_ids = relevant_media_ids_dict.get(db_type)
+                results = perform_vector_search(query, db_relevant_ids, top_k=fts_top_k)
+                vector_results.extend(results)
+                logging.debug(f"\nenhanced_rag_pipeline - Vector search results for {db_type}: {results}")
+            except Exception as e:
+                logging.error(f"Error performing vector search on {db_type}: {str(e)}")
 
         # Perform vector search
         # FIXME
@@ -214,14 +230,10 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
         fts_results = []
         for db_type in database_types:
             try:
-                # Get relevant IDs for the current db_type
-                relevant_media_ids = relevant_ids.get(db_type) if relevant_ids else None
-
-                # Use the perform_full_text_search function for each database type
-                db_results = perform_full_text_search(query, db_type, relevant_media_ids, fts_top_k)
+                db_relevant_ids = relevant_ids.get(db_type) if relevant_ids else None
+                db_results = perform_full_text_search(query, db_type, db_relevant_ids, fts_top_k)
                 fts_results.extend(db_results)
                 logging.debug(f"enhanced_rag_pipeline - FTS results for {db_type}: {db_results}")
-
             except Exception as e:
                 logging.error(f"Error performing full-text search on {db_type}: {str(e)}")
 
@@ -259,7 +271,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
                 # Update all_results based on reranking
                 all_results = [all_results[result['id']] for result in reranked_results]
 
-        # Extract content from results (top 10 by default)
+        # Extract content from results (top fts_top_k by default)
         context = "\n".join([result['content'] for result in all_results[:fts_top_k]])
         logging.debug(f"Context length: {len(context)}")
         logging.debug(f"Context: {context[:200]}")
@@ -291,6 +303,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
             "answer": "An error occurred while processing your request.",
             "context": ""
         }
+
 
 
 # Need to write a test for this function FIXME
