@@ -9,12 +9,9 @@
 import logging
 import os
 import webbrowser
-
 #
 # Import 3rd-Party Libraries
 import gradio as gr
-
-from App_Function_Libraries.DB.DB_Backups import setup_backup_config
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_db_config, backup_dir
