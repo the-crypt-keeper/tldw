@@ -13,13 +13,16 @@ import webbrowser
 #
 # Import 3rd-Party Libraries
 import gradio as gr
+
+from App_Function_Libraries.DB.DB_Backups import setup_backup_config
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import get_db_config
+from App_Function_Libraries.DB.DB_Manager import get_db_config, backup_dir
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import create_tables
 from App_Function_Libraries.Gradio_UI.Anki_Validation_tab import create_anki_validation_tab
 from App_Function_Libraries.Gradio_UI.Arxiv_tab import create_arxiv_tab
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
+from App_Function_Libraries.Gradio_UI.Backup_RAG_Notes_Character_Chat_tab import create_database_management_interface
 from App_Function_Libraries.Gradio_UI.Book_Ingestion_tab import create_import_book_tab
 from App_Function_Libraries.Gradio_UI.Character_Chat_tab import create_character_card_interaction_tab, create_character_chat_mgmt_tab, create_custom_character_card_tab, \
     create_character_card_validation_tab, create_export_characters_tab
@@ -30,8 +33,8 @@ from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_interface_four,
 from App_Function_Libraries.Gradio_UI.Config_tab import create_config_editor_tab
 from App_Function_Libraries.Gradio_UI.Explain_summarize_tab import create_summarize_explain_tab
 from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab
-from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
-    create_restore_backup_tab
+#from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
+#    create_restore_backup_tab
 from App_Function_Libraries.Gradio_UI.Import_Functionality import create_import_single_prompt_tab, \
     create_import_obsidian_vault_tab, create_import_item_tab, create_import_multiple_prompts_tab
 from App_Function_Libraries.Gradio_UI.Introduction_tab import create_introduction_tab
@@ -74,6 +77,8 @@ from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_g
 from App_Function_Libraries.Gradio_UI.XML_Ingestion_Tab import create_xml_import_tab
 #from App_Function_Libraries.Local_LLM.Local_LLM_huggingface import create_huggingface_tab
 from App_Function_Libraries.Local_LLM.Local_LLM_ollama import create_ollama_tab
+from App_Function_Libraries.Utils.Utils import load_and_log_configs
+
 #
 #######################################################################################################################
 # Function Definitions
@@ -400,10 +405,12 @@ def launch_ui(share_public=None, server_mode=False):
     }
     """
 
-    # Paths to your databases
-    media_db_path = 'path_to_your_media_db.sqlite'       # Replace with actual path
-    rag_chat_db_path = 'path_to_your_rag_chat_db.sqlite' # Replace with actual path
-
+    config = load_and_log_configs()
+    # Get database paths from config
+    db_config = config['db_config']
+    media_db_path = db_config['sqlite_path']
+    character_chat_db_path = os.path.join(os.path.dirname(media_db_path), "chatDB.db")
+    rag_chat_db_path = os.path.join(os.path.dirname(media_db_path), "rag_qa.db")
     # Initialize the RAG Chat DB (create tables and update schema)
     create_tables()
 
@@ -528,10 +535,21 @@ def launch_ui(share_public=None, server_mode=False):
             with gr.TabItem("Export", id="export group", visible=True):
                 create_export_tab()
 
-            with gr.TabItem("Backup Management", id="backup group", visible=True):
-                create_backup_tab()
-                create_view_backups_tab()
-                create_restore_backup_tab()
+            with gr.TabItem("Database Management", id="database_management_group", visible=True):
+                create_database_management_interface(
+                    media_db_config={
+                        'db_path': media_db_path,
+                        'backup_dir': backup_dir
+                    },
+                    rag_db_config={
+                        'db_path': rag_chat_db_path,
+                        'backup_dir': backup_dir
+                    },
+                    char_db_config={
+                        'db_path': character_chat_db_path,
+                        'backup_dir': backup_dir
+                    }
+                )
 
             with gr.TabItem("Utilities", id="util group", visible=True):
                 # FIXME
