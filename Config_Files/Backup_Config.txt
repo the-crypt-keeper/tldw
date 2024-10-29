@@ -56,6 +56,8 @@ elasticsearch_port = 9200
 # Additionally you can use elasticsearch as the database type, just replace `sqlite` with `elasticsearch` for `type` and provide the `elasticsearch_host` and `elasticsearch_port` of your configured ES instance.
 chroma_db_path = Databases/chroma_db
 prompts_db_path = Databases/prompts.db
+rag_qa_db_path = Databases/rag_qa.db
+character_db_path = Databases/chatDB.db
 
 [Embeddings]
 embedding_provider = openai

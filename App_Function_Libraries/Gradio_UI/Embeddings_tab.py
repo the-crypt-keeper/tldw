@@ -36,8 +36,8 @@ def create_embeddings_tab():
     # Get database paths from config
     db_config = config['db_config']
     media_db_path = db_config['sqlite_path']
-    rag_qa_db_path = os.path.join(os.path.dirname(media_db_path), "rag_chat.db")
-    character_chat_db_path = os.path.join(os.path.dirname(media_db_path), "character_chat.db")
+    rag_qa_db_path = os.path.join(os.path.dirname(media_db_path), "rag_qa.db")
+    character_chat_db_path = os.path.join(os.path.dirname(media_db_path), "chatDB.db")
     chroma_db_path = db_config['chroma_db_path']
 
     with gr.TabItem("Create Embeddings", visible=True):

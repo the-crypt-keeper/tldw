@@ -74,11 +74,13 @@ def list_backups(backup_dir: str) -> str:
         return error_msg
 
 
-def restore_backup(db_path: str, backup_dir: str, db_name: str, backup_name: str) -> str:
+def restore_single_db_backup(db_path: str, backup_dir: str, db_name: str, backup_name: str) -> str:
     """Restore database from a backup file."""
     try:
+        logging.info(f"Restoring backup: {backup_name}")
         backup_path = os.path.join(backup_dir, backup_name)
         if not os.path.exists(backup_path):
+            logging.error(f"Backup file not found: {backup_name}")
             return f"Backup file not found: {backup_name}"
 
         # Create a timestamp for the current db
@@ -87,11 +89,14 @@ def restore_backup(db_path: str, backup_dir: str, db_name: str, backup_name: str
                                       f"{db_name}_pre_restore_{timestamp}.db")
 
         # Backup current database before restore
+        logging.info(f"Creating backup of current database: {current_backup}")
         shutil.copy2(db_path, current_backup)
 
         # Restore the backup
+        logging.info(f"Restoring database from {backup_name}")
         shutil.copy2(backup_path, db_path)
 
+        logging.info(f"Database restored from {backup_name}")
         return f"Database restored from {backup_name}"
     except Exception as e:
         error_msg = f"Failed to restore backup: {str(e)}"
@@ -106,15 +111,15 @@ def setup_backup_config():
     # RAG Chat DB configuration
     rag_db_config = {
         'db_path': rag_qa_db_path,
-        'backup_dir': init_backup_directory(backup_base_dir, 'rag_chat'),
-        'db_name': 'rag_chat'
+        'backup_dir': init_backup_directory(backup_base_dir, 'rag_qa'),
+        'db_name': 'rag_qa'
     }
 
     # Character Chat DB configuration
     char_db_config = {
         'db_path': chat_DB_PATH,
-        'backup_dir': init_backup_directory(backup_base_dir, 'character_chat'),
-        'db_name': 'character_chat'
+        'backup_dir': init_backup_directory(backup_base_dir, 'chatDB'),
+        'db_name': 'chatDB'
     }
 
     return rag_db_config, char_db_config
