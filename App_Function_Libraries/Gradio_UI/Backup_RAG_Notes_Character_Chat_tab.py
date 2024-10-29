@@ -5,11 +5,11 @@
 import os
 import shutil
 import gradio as gr
-from typing import Dict, Optional
+from typing import Dict
 #
 # Local Imports:
 from App_Function_Libraries.DB.DB_Manager import create_automated_backup
-from App_Function_Libraries.DB.DB_Backups import create_backup, create_incremental_backup, list_backups, restore_backup
+from App_Function_Libraries.DB.DB_Backups import create_backup, create_incremental_backup, restore_single_db_backup
 
 
 #
@@ -24,7 +24,7 @@ def create_backup_tab(db_path: str, backup_dir: str, db_name: str):
     gr.Markdown(f"This will create a backup in the directory: `{backup_dir}`")
     with gr.Row():
         with gr.Column():
-            automated_backup_btn = gr.Button("Create Simple Backup")
+            #automated_backup_btn = gr.Button("Create Simple Backup")
             full_backup_btn = gr.Button("Create Full Backup")
             incr_backup_btn = gr.Button("Create Incremental Backup")
         with gr.Column():
@@ -34,11 +34,11 @@ def create_backup_tab(db_path: str, backup_dir: str, db_name: str):
         backup_file = create_automated_backup(db_path, backup_dir)
         return f"Backup created: {backup_file}"
 
-    automated_backup_btn.click(
-        fn=create_db_backup,
-        inputs=[],
-        outputs=[backup_output]
-    )
+    # automated_backup_btn.click(
+    #     fn=create_db_backup,
+    #     inputs=[],
+    #     outputs=[backup_output]
+    # )
     full_backup_btn.click(
         fn=lambda: create_backup(db_path, backup_dir, db_name),
         inputs=[],
@@ -89,7 +89,7 @@ def create_restore_backup_tab(db_path: str, backup_dir: str, db_name: str):
 
         if backup_name.startswith(f"{db_name}_"):
             # Use managed backup restoration
-            return restore_backup(db_path, backup_dir, db_name, backup_name)
+            return restore_single_db_backup(db_path, backup_dir, db_name, backup_name)
         else:
             # Use automated backup restoration
             shutil.copy2(backup_path, db_path)
