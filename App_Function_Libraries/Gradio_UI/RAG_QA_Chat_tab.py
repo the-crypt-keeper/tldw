@@ -21,9 +21,10 @@ from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_fi
     clear_keywords_from_note, add_keywords_to_note, load_chat_history, save_message, add_keywords_to_conversation, \
     get_keywords_for_note, delete_note, search_conversations_by_keywords, get_conversation_title, delete_conversation, \
     update_conversation_title, fetch_all_conversations, fetch_all_notes, fetch_conversations_by_ids, fetch_notes_by_ids, \
-    search_media_db
+    search_media_db, load_preset_prompts
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_notes, delete_messages_in_conversation, search_rag_notes, \
     search_rag_chat
+from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, rag_qa_chat
@@ -90,6 +91,28 @@ def create_rag_qa_chat_tab():
                 keywords_input = gr.Textbox(label="Keywords (comma-separated) to filter results by)", visible=True)
                 use_query_rewriting = gr.Checkbox(label="Use Query Rewriting", value=True)
                 use_re_ranking = gr.Checkbox(label="Use Re-ranking", value=True)
+                preset_prompt_checkbox = gr.Checkbox(
+                    label="Use a pre-set Prompt",
+                    value=False,
+                    visible=True
+                )
+                preset_prompt = gr.Dropdown(
+                    label="Select Preset Prompt",
+                    choices=load_preset_prompts(),
+                    visible=False
+                )
+                user_prompt = gr.Textbox(
+                    label="Custom Prompt",
+                    placeholder="Enter custom prompt here",
+                    lines=3,
+                    visible=False
+                )
+                system_prompt_input = gr.Textbox(
+                    label="System Prompt",
+                    lines=3,
+                    visible=False
+                )
+
                 # with gr.Row():
                 #     page_number = gr.Number(value=1, label="Page", precision=0)
                 #     page_size = gr.Number(value=20, label="Items per page", precision=0)
@@ -155,6 +178,31 @@ def create_rag_qa_chat_tab():
         status_message = gr.HTML()
 
         # Function Definitions
+        def update_prompts(preset_name):
+            prompts = update_user_prompt(preset_name)
+            return (
+                gr.update(value=prompts["user_prompt"], visible=True),
+                gr.update(value=prompts["system_prompt"], visible=True)
+            )
+
+        def toggle_preset_prompt(checkbox_value):
+            return (
+                gr.update(visible=checkbox_value),  # preset_prompt dropdown
+                gr.update(visible=False),           # user_prompt
+                gr.update(visible=False)            # system_prompt_input
+            )
+
+        preset_prompt.change(
+            update_prompts,
+            inputs=preset_prompt,
+            outputs=[user_prompt, system_prompt_input]
+        )
+
+        preset_prompt_checkbox.change(
+            toggle_preset_prompt,
+            inputs=[preset_prompt_checkbox],
+            outputs=[preset_prompt, user_prompt, system_prompt_input]
+        )
 
         def update_state(state, **kwargs):
             new_state = state.copy()

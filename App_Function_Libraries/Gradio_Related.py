@@ -471,11 +471,9 @@ def launch_ui(share_public=None, server_mode=False):
                 create_narrator_controlled_conversation_tab()
                 create_export_characters_tab()
 
-            with gr.TabItem("Media DB Search", id="text search", visible=True):
+            with gr.TabItem("Search/View DB Items", id="view db items group", visible=True):
                 create_search_tab()
                 create_search_summaries_tab()
-
-            with gr.TabItem("View DB Items", id="view db items group", visible=True):
                 create_view_all_mediadb_with_versions_tab()
                 create_viewing_mediadb_tab()
                 create_mediadb_keyword_search_tab()
