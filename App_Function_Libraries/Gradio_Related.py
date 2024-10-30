@@ -16,7 +16,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_db_config, backup_dir
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import create_tables
-from App_Function_Libraries.Gradio_UI.Anki_Validation_tab import create_anki_validation_tab
+from App_Function_Libraries.Gradio_UI.Anki_Validation_tab import create_anki_validation_tab, create_anki_generator_tab
 from App_Function_Libraries.Gradio_UI.Arxiv_tab import create_arxiv_tab
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Backup_RAG_Notes_Character_Chat_tab import create_database_management_interface
@@ -250,100 +250,100 @@ import os
 from datetime import datetime
 import shutil
 
-def migrate_media_db_to_rag_chat_db(media_db_path, rag_chat_db_path):
-    # Check if migration is needed
-    if not os.path.exists(media_db_path):
-        logging.info("Media DB does not exist. No migration needed.")
-        return
-
-    # Optional: Check if migration has already been completed
-    migration_flag = os.path.join(os.path.dirname(rag_chat_db_path), 'migration_completed.flag')
-    if os.path.exists(migration_flag):
-        logging.info("Migration already completed. Skipping migration.")
-        return
-
-    # Backup databases
-    backup_database(media_db_path)
-    backup_database(rag_chat_db_path)
-
-    # Connect to both databases
-    try:
-        media_conn = sqlite3.connect(media_db_path)
-        rag_conn = sqlite3.connect(rag_chat_db_path)
-
-        # Enable foreign key support
-        media_conn.execute('PRAGMA foreign_keys = ON;')
-        rag_conn.execute('PRAGMA foreign_keys = ON;')
-
-        media_cursor = media_conn.cursor()
-        rag_cursor = rag_conn.cursor()
-
-        # Begin transaction
-        rag_conn.execute('BEGIN TRANSACTION;')
-
-        # Extract conversations from media DB
-        media_cursor.execute('''
-            SELECT id, media_id, media_name, conversation_name, created_at, updated_at
-            FROM ChatConversations
-        ''')
-        conversations = media_cursor.fetchall()
-
-        for conv in conversations:
-            old_conv_id, media_id, media_name, conversation_name, created_at, updated_at = conv
-
-            # Convert timestamps if necessary
-            created_at = parse_timestamp(created_at)
-            updated_at = parse_timestamp(updated_at)
-
-            # Generate a new conversation_id
-            conversation_id = str(uuid.uuid4())
-            title = conversation_name or (f"{media_name}-chat" if media_name else "Untitled Conversation")
-
-            # Insert into conversation_metadata
-            rag_cursor.execute('''
-                INSERT INTO conversation_metadata (conversation_id, created_at, last_updated, title, media_id)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (conversation_id, created_at, updated_at, title, media_id))
-
-            # Extract messages from media DB
-            media_cursor.execute('''
-                SELECT sender, message, timestamp
-                FROM ChatMessages
-                WHERE conversation_id = ?
-                ORDER BY timestamp ASC
-            ''', (old_conv_id,))
-            messages = media_cursor.fetchall()
-
-            for msg in messages:
-                sender, content, timestamp = msg
-
-                # Convert timestamp if necessary
-                timestamp = parse_timestamp(timestamp)
-
-                role = sender  # Assuming 'sender' is 'user' or 'ai'
-
-                # Insert message into rag_qa_chats
-                rag_cursor.execute('''
-                    INSERT INTO rag_qa_chats (conversation_id, timestamp, role, content)
-                    VALUES (?, ?, ?, ?)
-                ''', (conversation_id, timestamp, role, content))
-
-        # Commit transaction
-        rag_conn.commit()
-        logging.info("Migration completed successfully.")
-
-        # Mark migration as complete
-        with open(migration_flag, 'w') as f:
-            f.write('Migration completed on ' + datetime.now().isoformat())
-
-    except Exception as e:
-        # Rollback transaction in case of error
-        rag_conn.rollback()
-        logging.error(f"Error during migration: {e}")
-        raise
-    finally:
-        media_conn.close()
-        rag_conn.close()
+# def migrate_media_db_to_rag_chat_db(media_db_path, rag_chat_db_path):
+#     # Check if migration is needed
+#     if not os.path.exists(media_db_path):
+#         logging.info("Media DB does not exist. No migration needed.")
+#         return
+#
+#     # Optional: Check if migration has already been completed
+#     migration_flag = os.path.join(os.path.dirname(rag_chat_db_path), 'migration_completed.flag')
+#     if os.path.exists(migration_flag):
+#         logging.info("Migration already completed. Skipping migration.")
+#         return
+#
+#     # Backup databases
+#     backup_database(media_db_path)
+#     backup_database(rag_chat_db_path)
+#
+#     # Connect to both databases
+#     try:
+#         media_conn = sqlite3.connect(media_db_path)
+#         rag_conn = sqlite3.connect(rag_chat_db_path)
+#
+#         # Enable foreign key support
+#         media_conn.execute('PRAGMA foreign_keys = ON;')
+#         rag_conn.execute('PRAGMA foreign_keys = ON;')
+#
+#         media_cursor = media_conn.cursor()
+#         rag_cursor = rag_conn.cursor()
+#
+#         # Begin transaction
+#         rag_conn.execute('BEGIN TRANSACTION;')
+#
+#         # Extract conversations from media DB
+#         media_cursor.execute('''
+#             SELECT id, media_id, media_name, conversation_name, created_at, updated_at
+#             FROM ChatConversations
+#         ''')
+#         conversations = media_cursor.fetchall()
+#
+#         for conv in conversations:
+#             old_conv_id, media_id, media_name, conversation_name, created_at, updated_at = conv
+#
+#             # Convert timestamps if necessary
+#             created_at = parse_timestamp(created_at)
+#             updated_at = parse_timestamp(updated_at)
+#
+#             # Generate a new conversation_id
+#             conversation_id = str(uuid.uuid4())
+#             title = conversation_name or (f"{media_name}-chat" if media_name else "Untitled Conversation")
+#
+#             # Insert into conversation_metadata
+#             rag_cursor.execute('''
+#                 INSERT INTO conversation_metadata (conversation_id, created_at, last_updated, title, media_id)
+#                 VALUES (?, ?, ?, ?, ?)
+#             ''', (conversation_id, created_at, updated_at, title, media_id))
+#
+#             # Extract messages from media DB
+#             media_cursor.execute('''
+#                 SELECT sender, message, timestamp
+#                 FROM ChatMessages
+#                 WHERE conversation_id = ?
+#                 ORDER BY timestamp ASC
+#             ''', (old_conv_id,))
+#             messages = media_cursor.fetchall()
+#
+#             for msg in messages:
+#                 sender, content, timestamp = msg
+#
+#                 # Convert timestamp if necessary
+#                 timestamp = parse_timestamp(timestamp)
+#
+#                 role = sender  # Assuming 'sender' is 'user' or 'ai'
+#
+#                 # Insert message into rag_qa_chats
+#                 rag_cursor.execute('''
+#                     INSERT INTO rag_qa_chats (conversation_id, timestamp, role, content)
+#                     VALUES (?, ?, ?, ?)
+#                 ''', (conversation_id, timestamp, role, content))
+#
+#         # Commit transaction
+#         rag_conn.commit()
+#         logging.info("Migration completed successfully.")
+#
+#         # Mark migration as complete
+#         with open(migration_flag, 'w') as f:
+#             f.write('Migration completed on ' + datetime.now().isoformat())
+#
+#     except Exception as e:
+#         # Rollback transaction in case of error
+#         rag_conn.rollback()
+#         logging.error(f"Error during migration: {e}")
+#         raise
+#     finally:
+#         media_conn.close()
+#         rag_conn.close()
 
 def backup_database(db_path):
     backup_path = db_path + '.backup'
@@ -412,7 +412,7 @@ def launch_ui(share_public=None, server_mode=False):
     create_tables()
 
     # Migrate data from the media DB to the RAG Chat DB
-    migrate_media_db_to_rag_chat_db(media_db_path, rag_chat_db_path)
+    #migrate_media_db_to_rag_chat_db(media_db_path, rag_chat_db_path)
 
 
     with gr.Blocks(theme='bethecloud/storj_theme',css=css) as iface:
@@ -549,8 +549,7 @@ def launch_ui(share_public=None, server_mode=False):
                 )
 
             with gr.TabItem("Utilities", id="util group", visible=True):
-                # FIXME
-                #create_anki_generation_tab()
+                create_anki_generator_tab()
                 create_anki_validation_tab()
                 create_mindmap_tab()
                 create_utilities_yt_video_tab()

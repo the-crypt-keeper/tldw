@@ -11,6 +11,7 @@ faster_whisper
 fire
 FlashRank
 fugashi
+genanki
 # well fuck gradio. again.
 gradio==4.44.1
 html2text
