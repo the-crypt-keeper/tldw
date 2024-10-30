@@ -489,12 +489,10 @@ def launch_ui(share_public=None, server_mode=False):
                 create_prompt_clone_tab()
                 create_prompt_suggestion_tab()
 
-            with gr.TabItem("Manage / Edit Existing Items", id="manage group", visible=True):
+            with gr.TabItem("Manage Media DB Items", id="manage group", visible=True):
                 create_media_edit_tab()
                 create_manage_items_tab()
                 create_media_edit_and_clone_tab()
-                # FIXME
-                #create_compare_transcripts_tab()
 
             with gr.TabItem("Embeddings Management", id="embeddings group", visible=True):
                 create_embeddings_tab()
