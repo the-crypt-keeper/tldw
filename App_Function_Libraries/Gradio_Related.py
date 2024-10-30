@@ -64,7 +64,7 @@ from App_Function_Libraries.Gradio_UI.Utilities import create_utilities_yt_times
 from App_Function_Libraries.Gradio_UI.Video_transcription_tab import create_video_transcription_tab
 from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
-from App_Function_Libraries.Gradio_UI.Chat_Workflows import chat_workflows_tab
+from App_Function_Libraries.Gradio_UI.Workflows_tab import chat_workflows_tab
 from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_view_tab, \
     create_view_all_mediadb_with_versions_tab, create_viewing_mediadb_tab, create_view_all_rag_notes_tab, \
     create_viewing_ragdb_tab, create_mediadb_keyword_search_tab, create_ragdb_keyword_items_tab
