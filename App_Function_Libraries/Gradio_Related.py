@@ -549,12 +549,14 @@ def launch_ui(share_public=None, server_mode=False):
                 )
 
             with gr.TabItem("Utilities", id="util group", visible=True):
-                create_anki_generator_tab()
-                create_anki_validation_tab()
                 create_mindmap_tab()
                 create_utilities_yt_video_tab()
                 create_utilities_yt_audio_tab()
                 create_utilities_yt_timestamp_tab()
+
+            with gr.TabItem("Anki Deck Creation/Validation", id="anki group", visible=True):
+                create_anki_generator_tab()
+                create_anki_validation_tab()
 
             with gr.TabItem("Local LLM", id="local llm group", visible=True):
                 create_chat_with_llamafile_tab()
