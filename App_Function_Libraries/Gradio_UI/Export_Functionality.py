@@ -6,9 +6,11 @@ import math
 import logging
 import shutil
 import tempfile
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 import gradio as gr
-from App_Function_Libraries.DB.DB_Manager import DatabaseError
+from App_Function_Libraries.DB.DB_Manager import DatabaseError, fetch_all_notes, fetch_all_conversations, \
+    get_keywords_for_note, fetch_notes_by_ids, fetch_conversations_by_ids
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_keywords_for_conversation
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import fetch_item_details, fetch_items_by_keyword, browse_items
 
 logger = logging.getLogger(__name__)
@@ -36,7 +38,7 @@ def export_items_by_keyword(keyword: str) -> str:
         items = fetch_items_by_keyword(keyword)
         if not items:
             logger.warning(f"No items found for keyword: {keyword}")
-            return None
+            return f"No items found for keyword: {keyword}"
 
         # Create a temporary directory to store individual markdown files
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -66,7 +68,7 @@ def export_items_by_keyword(keyword: str) -> str:
         return final_zip_path
     except Exception as e:
         logger.error(f"Error exporting items for keyword '{keyword}': {str(e)}")
-        return None
+        return f"Error exporting items for keyword '{keyword}': {str(e)}"
 
 
 def export_selected_items(selected_items: List[Dict]) -> Tuple[Optional[str], str]:
@@ -146,121 +148,599 @@ def display_search_results_export_tab(search_query: str, search_type: str, page:
         logger.error(error_message)
         return [], error_message, 1, 1
 
-
-def create_export_tab():
-    with gr.Tab("Search and Export"):
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("# Search and Export Items")
-                gr.Markdown("Search for items and export them as markdown files")
-                gr.Markdown("You can also export items by keyword")
-                search_query = gr.Textbox(label="Search Query")
-                search_type = gr.Radio(["Title", "URL", "Keyword", "Content"], label="Search By")
-                search_button = gr.Button("Search")
-
-            with gr.Column():
-                prev_button = gr.Button("Previous Page")
-                next_button = gr.Button("Next Page")
-
-        current_page = gr.State(1)
-        total_pages = gr.State(1)
-
-        search_results = gr.CheckboxGroup(label="Search Results", choices=[])
-        export_selected_button = gr.Button("Export Selected Items")
-
-        keyword_input = gr.Textbox(label="Enter keyword for export")
-        export_by_keyword_button = gr.Button("Export items by keyword")
-
-        export_output = gr.File(label="Download Exported File")
-        error_output = gr.Textbox(label="Status/Error Messages", interactive=False)
-
-    def search_and_update(query, search_type, page):
-        results, message, current, total = display_search_results_export_tab(query, search_type, page)
-        logger.debug(f"search_and_update results: {results}")
-        return results, message, current, total, gr.update(choices=results)
-
-    search_button.click(
-        fn=search_and_update,
-        inputs=[search_query, search_type, current_page],
-        outputs=[search_results, error_output, current_page, total_pages, search_results],
-        show_progress="full"
-    )
+#
+# End of Media DB Export functionality
+################################################################
 
 
-    def update_page(current, total, direction):
-        new_page = max(1, min(total, current + direction))
-        return new_page
+################################################################
+#
+# Functions for RAG Chat DB Export functionality
 
-    prev_button.click(
-        fn=update_page,
-        inputs=[current_page, total_pages, gr.State(-1)],
-        outputs=[current_page]
-    ).then(
-        fn=search_and_update,
-        inputs=[search_query, search_type, current_page],
-        outputs=[search_results, error_output, current_page, total_pages],
-        show_progress=True
-    )
 
-    next_button.click(
-        fn=update_page,
-        inputs=[current_page, total_pages, gr.State(1)],
-        outputs=[current_page]
-    ).then(
-        fn=search_and_update,
-        inputs=[search_query, search_type, current_page],
-        outputs=[search_results, error_output, current_page, total_pages],
-        show_progress=True
-    )
+def export_rag_conversations_as_json(
+    selected_conversations: Optional[List[Dict[str, Any]]] = None
+) -> Tuple[Optional[str], str]:
+    """
+    Export conversations to a JSON file.
 
-    def handle_export_selected(selected_items):
-        logger.debug(f"Exporting selected items: {selected_items}")
-        return export_selected_items(selected_items)
+    Args:
+        selected_conversations: Optional list of conversation dictionaries
 
-    export_selected_button.click(
-        fn=handle_export_selected,
-        inputs=[search_results],
-        outputs=[export_output, error_output],
-        show_progress="full"
-    )
+    Returns:
+        Tuple of (filename or None, status message)
+    """
+    try:
+        if selected_conversations:
+            # Extract conversation IDs from selected items
+            conversation_ids = []
+            for item in selected_conversations:
+                if isinstance(item, str):
+                    item_data = json.loads(item)
+                elif isinstance(item, dict) and 'value' in item:
+                    item_data = item['value'] if isinstance(item['value'], dict) else json.loads(item['value'])
+                else:
+                    item_data = item
+                conversation_ids.append(item_data['conversation_id'])
 
-    export_by_keyword_button.click(
-        fn=export_items_by_keyword,
-        inputs=[keyword_input],
-        outputs=[export_output, error_output],
-        show_progress="full"
-    )
+            conversations = fetch_conversations_by_ids(conversation_ids)
+        else:
+            conversations = fetch_all_conversations()
 
-    def handle_item_selection(selected_items):
-        logger.debug(f"Selected items: {selected_items}")
-        if not selected_items:
-            return None, "No item selected"
+        export_data = []
+        for conversation_id, title, messages in conversations:
+            # Get keywords for the conversation
+            keywords = get_keywords_for_conversation(conversation_id)
 
-        try:
-            # Assuming selected_items is a list of dictionaries
-            selected_item = selected_items[0]
-            logger.debug(f"First selected item: {selected_item}")
+            conversation_data = {
+                "conversation_id": conversation_id,
+                "title": title,
+                "keywords": keywords,
+                "messages": [
+                    {"role": role, "content": content}
+                    for role, content in messages
+                ]
+            }
+            export_data.append(conversation_data)
 
-            # Check if 'value' is a string (JSON) or already a dictionary
-            if isinstance(selected_item['value'], str):
-                item_data = json.loads(selected_item['value'])
-            else:
-                item_data = selected_item['value']
+        filename = "rag_conversations_export.json"
+        with open(filename, "w", encoding='utf-8') as f:
+            json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-            logger.debug(f"Item data: {item_data}")
+        logger.info(f"Successfully exported {len(export_data)} conversations to {filename}")
+        return filename, f"Successfully exported {len(export_data)} conversations to {filename}"
+    except Exception as e:
+        error_message = f"Error exporting conversations: {str(e)}"
+        logger.error(error_message)
+        return None, error_message
 
-            item_id = item_data['id']
-            return export_item_as_markdown(item_id)
-        except Exception as e:
-            error_message = f"Error processing selected item: {str(e)}"
-            logger.error(error_message)
-            return None, error_message
 
-    search_results.select(
-        fn=handle_item_selection,
-        inputs=[search_results],
-        outputs=[export_output, error_output],
-        show_progress="full"
-    )
+def export_rag_notes_as_json(
+    selected_notes: Optional[List[Dict[str, Any]]] = None
+) -> Tuple[Optional[str], str]:
+    """
+    Export notes to a JSON file.
 
+    Args:
+        selected_notes: Optional list of note dictionaries
+
+    Returns:
+        Tuple of (filename or None, status message)
+    """
+    try:
+        if selected_notes:
+            # Extract note IDs from selected items
+            note_ids = []
+            for item in selected_notes:
+                if isinstance(item, str):
+                    item_data = json.loads(item)
+                elif isinstance(item, dict) and 'value' in item:
+                    item_data = item['value'] if isinstance(item['value'], dict) else json.loads(item['value'])
+                else:
+                    item_data = item
+                note_ids.append(item_data['id'])
+
+            notes = fetch_notes_by_ids(note_ids)
+        else:
+            notes = fetch_all_notes()
+
+        export_data = []
+        for note_id, title, content in notes:
+            # Get keywords for the note
+            keywords = get_keywords_for_note(note_id)
+
+            note_data = {
+                "note_id": note_id,
+                "title": title,
+                "content": content,
+                "keywords": keywords
+            }
+            export_data.append(note_data)
+
+        filename = "rag_notes_export.json"
+        with open(filename, "w", encoding='utf-8') as f:
+            json.dump(export_data, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Successfully exported {len(export_data)} notes to {filename}")
+        return filename, f"Successfully exported {len(export_data)} notes to {filename}"
+    except Exception as e:
+        error_message = f"Error exporting notes: {str(e)}"
+        logger.error(error_message)
+        return None, error_message
+
+
+def display_rag_conversations(search_query: str = "", page: int = 1, items_per_page: int = 10):
+    """Display conversations for selection in the export tab."""
+    try:
+        conversations = fetch_all_conversations()
+
+        if search_query:
+            # Simple search implementation - can be enhanced based on needs
+            conversations = [
+                conv for conv in conversations
+                if search_query.lower() in conv[1].lower()  # Search in title
+            ]
+
+        # Implement pagination
+        start_idx = (page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        paginated_conversations = conversations[start_idx:end_idx]
+        total_pages = (len(conversations) + items_per_page - 1) // items_per_page
+
+        # Format for checkbox group
+        checkbox_data = [
+            {
+                "name": f"Title: {title}\nMessages: {len(messages)}",
+                "value": {"conversation_id": conv_id, "title": title}
+            }
+            for conv_id, title, messages in paginated_conversations
+        ]
+
+        return (
+            checkbox_data,
+            f"Found {len(conversations)} conversations (showing page {page} of {total_pages})",
+            page,
+            total_pages
+        )
+    except Exception as e:
+        error_message = f"Error displaying conversations: {str(e)}"
+        logger.error(error_message)
+        return [], error_message, 1, 1
+
+
+def display_rag_notes(search_query: str = "", page: int = 1, items_per_page: int = 10):
+    """Display notes for selection in the export tab."""
+    try:
+        notes = fetch_all_notes()
+
+        if search_query:
+            # Simple search implementation - can be enhanced based on needs
+            notes = [
+                note for note in notes
+                if search_query.lower() in note[1].lower()  # Search in title
+                   or search_query.lower() in note[2].lower()  # Search in content
+            ]
+
+        # Implement pagination
+        start_idx = (page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        paginated_notes = notes[start_idx:end_idx]
+        total_pages = (len(notes) + items_per_page - 1) // items_per_page
+
+        # Format for checkbox group
+        checkbox_data = [
+            {
+                "name": f"Title: {title}\nContent preview: {content[:100]}...",
+                "value": {"id": note_id, "title": title}
+            }
+            for note_id, title, content in paginated_notes
+        ]
+
+        return (
+            checkbox_data,
+            f"Found {len(notes)} notes (showing page {page} of {total_pages})",
+            page,
+            total_pages
+        )
+    except Exception as e:
+        error_message = f"Error displaying notes: {str(e)}"
+        logger.error(error_message)
+        return [], error_message, 1, 1
+
+
+def create_rag_export_tab():
+    """Create the RAG QA Chat export tab interface."""
+    with gr.Tab("RAG QA Chat Export"):
+        with gr.Tabs():
+            # Conversations Export Tab
+            with gr.Tab("Export Conversations"):
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown("## Export RAG QA Chat Conversations")
+                        conversation_search = gr.Textbox(label="Search Conversations")
+                        conversation_search_button = gr.Button("Search")
+
+                    with gr.Column():
+                        conversation_prev_button = gr.Button("Previous Page")
+                        conversation_next_button = gr.Button("Next Page")
+
+                conversation_current_page = gr.State(1)
+                conversation_total_pages = gr.State(1)
+
+                conversation_results = gr.CheckboxGroup(label="Select Conversations to Export")
+                export_selected_conversations_button = gr.Button("Export Selected Conversations")
+                export_all_conversations_button = gr.Button("Export All Conversations")
+
+                conversation_export_output = gr.File(label="Download Exported Conversations")
+                conversation_status = gr.Textbox(label="Status", interactive=False)
+
+            # Notes Export Tab
+            with gr.Tab("Export Notes"):
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown("## Export RAG QA Chat Notes")
+                        notes_search = gr.Textbox(label="Search Notes")
+                        notes_search_button = gr.Button("Search")
+
+                    with gr.Column():
+                        notes_prev_button = gr.Button("Previous Page")
+                        notes_next_button = gr.Button("Next Page")
+
+                notes_current_page = gr.State(1)
+                notes_total_pages = gr.State(1)
+
+                notes_results = gr.CheckboxGroup(label="Select Notes to Export")
+                export_selected_notes_button = gr.Button("Export Selected Notes")
+                export_all_notes_button = gr.Button("Export All Notes")
+
+                notes_export_output = gr.File(label="Download Exported Notes")
+                notes_status = gr.Textbox(label="Status", interactive=False)
+
+        # Event handlers for conversations
+        def search_conversations(query, page):
+            return display_rag_conversations(query, page)
+
+        conversation_search_button.click(
+            fn=search_conversations,
+            inputs=[conversation_search, conversation_current_page],
+            outputs=[conversation_results, conversation_status, conversation_current_page, conversation_total_pages]
+        )
+
+        def update_conversation_page(current, total, direction):
+            new_page = max(1, min(total, current + direction))
+            return new_page
+
+        conversation_prev_button.click(
+            fn=update_conversation_page,
+            inputs=[conversation_current_page, conversation_total_pages, gr.State(-1)],
+            outputs=[conversation_current_page]
+        ).then(
+            fn=search_conversations,
+            inputs=[conversation_search, conversation_current_page],
+            outputs=[conversation_results, conversation_status, conversation_current_page, conversation_total_pages]
+        )
+
+        conversation_next_button.click(
+            fn=update_conversation_page,
+            inputs=[conversation_current_page, conversation_total_pages, gr.State(1)],
+            outputs=[conversation_current_page]
+        ).then(
+            fn=search_conversations,
+            inputs=[conversation_search, conversation_current_page],
+            outputs=[conversation_results, conversation_status, conversation_current_page, conversation_total_pages]
+        )
+
+        export_selected_conversations_button.click(
+            fn=export_rag_conversations_as_json,
+            inputs=[conversation_results],
+            outputs=[conversation_export_output, conversation_status]
+        )
+
+        export_all_conversations_button.click(
+            fn=lambda: export_rag_conversations_as_json(),
+            outputs=[conversation_export_output, conversation_status]
+        )
+
+        # Event handlers for notes
+        def search_notes(query, page):
+            return display_rag_notes(query, page)
+
+        notes_search_button.click(
+            fn=search_notes,
+            inputs=[notes_search, notes_current_page],
+            outputs=[notes_results, notes_status, notes_current_page, notes_total_pages]
+        )
+
+        def update_notes_page(current, total, direction):
+            new_page = max(1, min(total, current + direction))
+            return new_page
+
+        notes_prev_button.click(
+            fn=update_notes_page,
+            inputs=[notes_current_page, notes_total_pages, gr.State(-1)],
+            outputs=[notes_current_page]
+        ).then(
+            fn=search_notes,
+            inputs=[notes_search, notes_current_page],
+            outputs=[notes_results, notes_status, notes_current_page, notes_total_pages]
+        )
+
+        notes_next_button.click(
+            fn=update_notes_page,
+            inputs=[notes_current_page, notes_total_pages, gr.State(1)],
+            outputs=[notes_current_page]
+        ).then(
+            fn=search_notes,
+            inputs=[notes_search, notes_current_page],
+            outputs=[notes_results, notes_status, notes_current_page, notes_total_pages]
+        )
+
+        export_selected_notes_button.click(
+            fn=export_rag_notes_as_json,
+            inputs=[notes_results],
+            outputs=[notes_export_output, notes_status]
+        )
+
+        export_all_notes_button.click(
+            fn=lambda: export_rag_notes_as_json(),
+            outputs=[notes_export_output, notes_status]
+        )
+
+#
+# End of RAG Chat DB Export functionality
+#####################################################
+
+def create_export_tabs():
+    """Create the unified export interface with all export tabs."""
+    with gr.Tabs():
+        # Media DB Export Tab
+        with gr.Tab("Media DB Export"):
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("# Search and Export Items")
+                    gr.Markdown("Search for items and export them as markdown files")
+                    gr.Markdown("You can also export items by keyword")
+                    search_query = gr.Textbox(label="Search Query")
+                    search_type = gr.Radio(["Title", "URL", "Keyword", "Content"], label="Search By")
+                    search_button = gr.Button("Search")
+
+                with gr.Column():
+                    prev_button = gr.Button("Previous Page")
+                    next_button = gr.Button("Next Page")
+
+            current_page = gr.State(1)
+            total_pages = gr.State(1)
+
+            search_results = gr.CheckboxGroup(label="Search Results", choices=[])
+            export_selected_button = gr.Button("Export Selected Items")
+
+            keyword_input = gr.Textbox(label="Enter keyword for export")
+            export_by_keyword_button = gr.Button("Export items by keyword")
+
+            export_output = gr.File(label="Download Exported File")
+            error_output = gr.Textbox(label="Status/Error Messages", interactive=False)
+
+        # Conversations Export Tab
+        with gr.Tab("RAG Conversations Export"):
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("## Export RAG QA Chat Conversations")
+                    conversation_search = gr.Textbox(label="Search Conversations")
+                    conversation_search_button = gr.Button("Search")
+
+                with gr.Column():
+                    conversation_prev_button = gr.Button("Previous Page")
+                    conversation_next_button = gr.Button("Next Page")
+
+            conversation_current_page = gr.State(1)
+            conversation_total_pages = gr.State(1)
+
+            conversation_results = gr.CheckboxGroup(label="Select Conversations to Export")
+            export_selected_conversations_button = gr.Button("Export Selected Conversations")
+            export_all_conversations_button = gr.Button("Export All Conversations")
+
+            conversation_export_output = gr.File(label="Download Exported Conversations")
+            conversation_status = gr.Textbox(label="Status", interactive=False)
+
+        # Notes Export Tab
+        with gr.Tab("RAG Notes Export"):
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("## Export RAG QA Chat Notes")
+                    notes_search = gr.Textbox(label="Search Notes")
+                    notes_search_button = gr.Button("Search")
+
+                with gr.Column():
+                    notes_prev_button = gr.Button("Previous Page")
+                    notes_next_button = gr.Button("Next Page")
+
+            notes_current_page = gr.State(1)
+            notes_total_pages = gr.State(1)
+
+            notes_results = gr.CheckboxGroup(label="Select Notes to Export")
+            export_selected_notes_button = gr.Button("Export Selected Notes")
+            export_all_notes_button = gr.Button("Export All Notes")
+
+            notes_export_output = gr.File(label="Download Exported Notes")
+            notes_status = gr.Textbox(label="Status", interactive=False)
+
+        # Event handlers for media DB
+        def search_and_update(query, search_type, page):
+            results, message, current, total = display_search_results_export_tab(query, search_type, page)
+            logger.debug(f"search_and_update results: {results}")
+            return results, message, current, total, gr.update(choices=results)
+
+        def update_page(current, total, direction):
+            new_page = max(1, min(total, current + direction))
+            return new_page
+
+        def handle_export_selected(selected_items):
+            logger.debug(f"Exporting selected items: {selected_items}")
+            return export_selected_items(selected_items)
+
+        def handle_item_selection(selected_items):
+            logger.debug(f"Selected items: {selected_items}")
+            if not selected_items:
+                return None, "No item selected"
+
+            try:
+                selected_item = selected_items[0]
+                logger.debug(f"First selected item: {selected_item}")
+
+                if isinstance(selected_item['value'], str):
+                    item_data = json.loads(selected_item['value'])
+                else:
+                    item_data = selected_item['value']
+
+                logger.debug(f"Item data: {item_data}")
+                item_id = item_data['id']
+                return export_item_as_markdown(item_id)
+            except Exception as e:
+                error_message = f"Error processing selected item: {str(e)}"
+                logger.error(error_message)
+                return None, error_message
+
+        search_button.click(
+            fn=search_and_update,
+            inputs=[search_query, search_type, current_page],
+            outputs=[search_results, error_output, current_page, total_pages, search_results],
+            show_progress="full"
+        )
+
+        prev_button.click(
+            fn=update_page,
+            inputs=[current_page, total_pages, gr.State(-1)],
+            outputs=[current_page]
+        ).then(
+            fn=search_and_update,
+            inputs=[search_query, search_type, current_page],
+            outputs=[search_results, error_output, current_page, total_pages],
+            show_progress=True
+        )
+
+        next_button.click(
+            fn=update_page,
+            inputs=[current_page, total_pages, gr.State(1)],
+            outputs=[current_page]
+        ).then(
+            fn=search_and_update,
+            inputs=[search_query, search_type, current_page],
+            outputs=[search_results, error_output, current_page, total_pages],
+            show_progress=True
+        )
+
+        export_selected_button.click(
+            fn=handle_export_selected,
+            inputs=[search_results],
+            outputs=[export_output, error_output],
+            show_progress="full"
+        )
+
+        export_by_keyword_button.click(
+            fn=export_items_by_keyword,
+            inputs=[keyword_input],
+            outputs=[export_output, error_output],
+            show_progress="full"
+        )
+
+        search_results.select(
+            fn=handle_item_selection,
+            inputs=[search_results],
+            outputs=[export_output, error_output],
+            show_progress="full"
+        )
+
+        # Event handlers for conversations
+        def search_conversations(query, page):
+            return display_rag_conversations(query, page)
+
+        def update_conversation_page(current, total, direction):
+            new_page = max(1, min(total, current + direction))
+            return new_page
+
+        conversation_search_button.click(
+            fn=search_conversations,
+            inputs=[conversation_search, conversation_current_page],
+            outputs=[conversation_results, conversation_status, conversation_current_page, conversation_total_pages]
+        )
+
+        conversation_prev_button.click(
+            fn=update_conversation_page,
+            inputs=[conversation_current_page, conversation_total_pages, gr.State(-1)],
+            outputs=[conversation_current_page]
+        ).then(
+            fn=search_conversations,
+            inputs=[conversation_search, conversation_current_page],
+            outputs=[conversation_results, conversation_status, conversation_current_page, conversation_total_pages]
+        )
+
+        conversation_next_button.click(
+            fn=update_conversation_page,
+            inputs=[conversation_current_page, conversation_total_pages, gr.State(1)],
+            outputs=[conversation_current_page]
+        ).then(
+            fn=search_conversations,
+            inputs=[conversation_search, conversation_current_page],
+            outputs=[conversation_results, conversation_status, conversation_current_page, conversation_total_pages]
+        )
+
+        export_selected_conversations_button.click(
+            fn=export_rag_conversations_as_json,
+            inputs=[conversation_results],
+            outputs=[conversation_export_output, conversation_status]
+        )
+
+        export_all_conversations_button.click(
+            fn=lambda: export_rag_conversations_as_json(),
+            outputs=[conversation_export_output, conversation_status]
+        )
+
+        # Event handlers for notes
+        def search_notes(query, page):
+            return display_rag_notes(query, page)
+
+        def update_notes_page(current, total, direction):
+            new_page = max(1, min(total, current + direction))
+            return new_page
+
+        notes_search_button.click(
+            fn=search_notes,
+            inputs=[notes_search, notes_current_page],
+            outputs=[notes_results, notes_status, notes_current_page, notes_total_pages]
+        )
+
+        notes_prev_button.click(
+            fn=update_notes_page,
+            inputs=[notes_current_page, notes_total_pages, gr.State(-1)],
+            outputs=[notes_current_page]
+        ).then(
+            fn=search_notes,
+            inputs=[notes_search, notes_current_page],
+            outputs=[notes_results, notes_status, notes_current_page, notes_total_pages]
+        )
+
+        notes_next_button.click(
+            fn=update_notes_page,
+            inputs=[notes_current_page, notes_total_pages, gr.State(1)],
+            outputs=[notes_current_page]
+        ).then(
+            fn=search_notes,
+            inputs=[notes_search, notes_current_page],
+            outputs=[notes_results, notes_status, notes_current_page, notes_total_pages]
+        )
+
+        export_selected_notes_button.click(
+            fn=export_rag_notes_as_json,
+            inputs=[notes_results],
+            outputs=[notes_export_output, notes_status]
+        )
+
+        export_all_notes_button.click(
+            fn=lambda: export_rag_notes_as_json(),
+            outputs=[notes_export_output, notes_status]
+        )
+
+#
+# End of Export_Functionality.py
+######################################################################################################################
 

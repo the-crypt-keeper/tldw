@@ -123,3 +123,4 @@ def setup_backup_config():
     }
 
     return rag_db_config, char_db_config
+

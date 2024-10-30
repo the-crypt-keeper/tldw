@@ -29,7 +29,7 @@ from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_interface_four,
     create_chat_interface_stacked, create_chat_interface
 from App_Function_Libraries.Gradio_UI.Config_tab import create_config_editor_tab
 from App_Function_Libraries.Gradio_UI.Explain_summarize_tab import create_summarize_explain_tab
-from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tab
+from App_Function_Libraries.Gradio_UI.Export_Functionality import create_rag_export_tab, create_export_tabs
 #from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
 #    create_restore_backup_tab
 from App_Function_Libraries.Gradio_UI.Import_Functionality import create_import_single_prompt_tab, \
@@ -448,10 +448,6 @@ def launch_ui(share_public=None, server_mode=False):
                     create_arxiv_tab()
                     create_semantic_scholar_tab()
 
-            with gr.TabItem("Text Search", id="text search", visible=True):
-                create_search_tab()
-                create_search_summaries_tab()
-
             with gr.TabItem("RAG Chat/Search", id="RAG Chat Notes group", visible=True):
                 create_rag_tab()
                 create_rag_qa_chat_tab()
@@ -474,6 +470,10 @@ def launch_ui(share_public=None, server_mode=False):
                 create_multiple_character_chat_tab()
                 create_narrator_controlled_conversation_tab()
                 create_export_characters_tab()
+
+            with gr.TabItem("Media DB Search", id="text search", visible=True):
+                create_search_tab()
+                create_search_summaries_tab()
 
             with gr.TabItem("View DB Items", id="view db items group", visible=True):
                 create_view_all_mediadb_with_versions_tab()
@@ -530,7 +530,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_mediawiki_config_tab()
 
             with gr.TabItem("Export", id="export group", visible=True):
-                create_export_tab()
+                create_export_tabs()
 
             with gr.TabItem("Database Management", id="database_management_group", visible=True):
                 create_database_management_interface(
