@@ -367,7 +367,7 @@ def create_rag_qa_chat_tab():
                     return [], state_value, ""
 
                 # Safely extract conversation ID
-                match = re.search(r'\(ID: (.*?)\)', selected_conversation)
+                match = re.search(r'\(ID: ([0-9a-fA-F]+)\)', selected_conversation)
                 if not match:
                     logging.error(f"Invalid conversation format: {selected_conversation}")
                     return [], state_value, ""
