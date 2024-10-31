@@ -16,7 +16,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import get_db_config, backup_dir
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import create_tables
-from App_Function_Libraries.Gradio_UI.Anki_Validation_tab import create_anki_validation_tab, create_anki_generator_tab
+from App_Function_Libraries.Gradio_UI.Anki_tab import create_anki_validation_tab, create_anki_generator_tab
 from App_Function_Libraries.Gradio_UI.Arxiv_tab import create_arxiv_tab
 from App_Function_Libraries.Gradio_UI.Audio_ingestion_tab import create_audio_processing_tab
 from App_Function_Libraries.Gradio_UI.Backup_RAG_Notes_Character_Chat_tab import create_database_management_interface
@@ -471,6 +471,18 @@ def launch_ui(share_public=None, server_mode=False):
                 create_narrator_controlled_conversation_tab()
                 create_export_characters_tab()
 
+            with gr.TabItem("Writing Tools", id="writing_tools group", visible=True):
+                from App_Function_Libraries.Gradio_UI.Writing_tab import create_document_feedback_tab
+                create_document_feedback_tab()
+                from App_Function_Libraries.Gradio_UI.Writing_tab import create_grammar_style_check_tab
+                create_grammar_style_check_tab()
+                from App_Function_Libraries.Gradio_UI.Writing_tab import create_tone_adjustment_tab
+                create_tone_adjustment_tab()
+                from App_Function_Libraries.Gradio_UI.Writing_tab import create_creative_writing_tab
+                create_creative_writing_tab()
+                from App_Function_Libraries.Gradio_UI.Writing_tab import create_mikupad_tab
+                create_mikupad_tab()
+
             with gr.TabItem("Search/View DB Items", id="view db items group", visible=True):
                 create_search_tab()
                 create_search_summaries_tab()
@@ -498,18 +510,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_embeddings_tab()
                 create_view_embeddings_tab()
                 create_purge_embeddings_tab()
-
-            with gr.TabItem("Writing Tools", id="writing_tools group", visible=True):
-                from App_Function_Libraries.Gradio_UI.Writing_tab import create_document_feedback_tab
-                create_document_feedback_tab()
-                from App_Function_Libraries.Gradio_UI.Writing_tab import create_grammar_style_check_tab
-                create_grammar_style_check_tab()
-                from App_Function_Libraries.Gradio_UI.Writing_tab import create_tone_adjustment_tab
-                create_tone_adjustment_tab()
-                from App_Function_Libraries.Gradio_UI.Writing_tab import create_creative_writing_tab
-                create_creative_writing_tab()
-                from App_Function_Libraries.Gradio_UI.Writing_tab import create_mikupad_tab
-                create_mikupad_tab()
 
             with gr.TabItem("Keywords", id="keywords group", visible=True):
                 create_view_keywords_tab()

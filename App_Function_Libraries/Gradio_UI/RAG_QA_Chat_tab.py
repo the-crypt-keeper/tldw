@@ -28,7 +28,8 @@ from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, rag_qa_chat
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, \
+    load_comprehensive_config
 
 
 #
@@ -58,6 +59,29 @@ def create_rag_qa_chat_tab():
         })
 
         note_state = gr.State({"note_id": None})
+
+        def auto_save_conversation(message, response, state_value, auto_save_enabled):
+            """Automatically save the conversation if auto-save is enabled"""
+            try:
+                if not auto_save_enabled:
+                    return state_value
+
+                conversation_id = state_value.get("conversation_id")
+                if not conversation_id:
+                    # Create new conversation with default title
+                    title = "Auto-saved Conversation " + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    conversation_id = start_new_conversation(title=title)
+                    state_value = state_value.copy()
+                    state_value["conversation_id"] = conversation_id
+
+                # Save the messages
+                save_message(conversation_id, "user", message)
+                save_message(conversation_id, "assistant", response)
+
+                return state_value
+            except Exception as e:
+                logging.error(f"Error in auto-save: {str(e)}")
+                return state_value
 
         # Update the conversation list function
         def update_conversation_list():
@@ -91,6 +115,13 @@ def create_rag_qa_chat_tab():
                 keywords_input = gr.Textbox(label="Keywords (comma-separated) to filter results by)", visible=True)
                 use_query_rewriting = gr.Checkbox(label="Use Query Rewriting", value=True)
                 use_re_ranking = gr.Checkbox(label="Use Re-ranking", value=True)
+                config = load_comprehensive_config()
+                auto_save_value = config.getboolean('auto-save', 'save_character_chats', fallback=False)
+                auto_save_checkbox = gr.Checkbox(
+                    label="Save chats automatically",
+                    value=auto_save_value,
+                    info="When enabled, conversations will be saved automatically after each message"
+                )
                 preset_prompt_checkbox = gr.Checkbox(
                     label="Use a pre-set Prompt",
                     value=False,
@@ -176,6 +207,9 @@ def create_rag_qa_chat_tab():
 
         loading_indicator = gr.HTML("Loading...", visible=False)
         status_message = gr.HTML()
+        auto_save_status = gr.HTML()
+
+
 
         # Function Definitions
         def update_prompts(preset_name):
@@ -503,7 +537,7 @@ Rewritten Question:"""
         # FIXME - RAG DB selection
         def rag_qa_chat_wrapper(message, history, context_source, existing_file, search_results, file_upload,
                                 convert_to_text, keywords, api_choice, use_query_rewriting, state_value,
-                                keywords_input, top_k_input, use_re_ranking, db_choices):
+                                keywords_input, top_k_input, use_re_ranking, db_choices, auto_save_enabled):
             try:
                 logging.info(f"Starting rag_qa_chat_wrapper with message: {message}")
                 logging.info(f"Context source: {context_source}")
@@ -614,7 +648,8 @@ Rewritten Question:"""
                     state_value["conversation_messages"] = conversation_messages
 
                 # Update the state
-                state_value["conversation_messages"] = conversation_messages
+                updated_state = auto_save_conversation(message, response, state_value, auto_save_enabled)
+                updated_state["conversation_messages"] = conversation_messages
 
                 # Safely update history
                 if new_history:
@@ -624,7 +659,7 @@ Rewritten Question:"""
 
                 gr.Info("Response generated successfully")
                 logging.info("rag_qa_chat_wrapper completed successfully")
-                yield new_history, "", gr.update(visible=False), state_value  # Include state_value in outputs
+                yield new_history, "", gr.update(visible=False), updated_state
             except ValueError as e:
                 logging.error(f"Input error in rag_qa_chat_wrapper: {str(e)}")
                 gr.Error(f"Input error: {str(e)}")
@@ -658,7 +693,8 @@ Rewritten Question:"""
                 keywords_input,
                 top_k_input,
                 use_re_ranking,
-                db_choice
+                db_choice,
+                auto_save_checkbox
             ],
             outputs=[chatbot, msg, loading_indicator, state],
         )
