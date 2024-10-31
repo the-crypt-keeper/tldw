@@ -27,8 +27,21 @@ def init_backup_directory(backup_base_dir: str, db_name: str) -> str:
 def create_backup(db_path: str, backup_dir: str, db_name: str) -> str:
     """Create a full backup of the database."""
     try:
+        # Ensure we have absolute paths
+        db_path = os.path.abspath(db_path)
+        backup_dir = os.path.abspath(backup_dir)
+
+        logging.info(f"Creating backup:")
+        logging.info(f"  DB Path: {db_path}")
+        logging.info(f"  Backup Dir: {backup_dir}")
+        logging.info(f"  DB Name: {db_name}")
+
+        # Ensure backup directory exists
+        os.makedirs(backup_dir, exist_ok=True)
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_file = os.path.join(backup_dir, f"{db_name}_backup_{timestamp}.db")
+        logging.info(f"  Full backup path: {backup_file}")
 
         # Create a backup using SQLite's backup API
         with sqlite3.connect(db_path) as source, \
@@ -107,21 +120,41 @@ def restore_single_db_backup(db_path: str, backup_dir: str, db_name: str, backup
 def setup_backup_config():
     """Setup configuration for database backups."""
     backup_base_dir = get_project_relative_path('tldw_DB_Backups')
+    logging.info(f"Base backup directory: {os.path.abspath(backup_base_dir)}")
 
     # RAG Chat DB configuration
     rag_db_path = get_rag_qa_db_path()
+    rag_backup_dir = os.path.join(backup_base_dir, 'rag_chat')
+    os.makedirs(rag_backup_dir, exist_ok=True)
+    logging.info(f"RAG backup directory: {os.path.abspath(rag_backup_dir)}")
+
     rag_db_config = {
         'db_path': rag_db_path,
-        'backup_dir': init_backup_directory(backup_base_dir, 'rag_qa'),
+        'backup_dir': rag_backup_dir,  # Make sure we use the full path
         'db_name': 'rag_qa'
     }
 
     # Character Chat DB configuration
+    char_backup_dir = os.path.join(backup_base_dir, 'character_chat')
+    os.makedirs(char_backup_dir, exist_ok=True)
+    logging.info(f"Character backup directory: {os.path.abspath(char_backup_dir)}")
+
     char_db_config = {
         'db_path': chat_DB_PATH,
-        'backup_dir': init_backup_directory(backup_base_dir, 'chatDB'),
+        'backup_dir': char_backup_dir,  # Make sure we use the full path
         'db_name': 'chatDB'
     }
 
-    return rag_db_config, char_db_config
+    # Media DB configuration (based on your logs)
+    media_backup_dir = os.path.join(backup_base_dir, 'media')
+    os.makedirs(media_backup_dir, exist_ok=True)
+    logging.info(f"Media backup directory: {os.path.abspath(media_backup_dir)}")
+
+    media_db_config = {
+        'db_path': os.path.join(os.path.dirname(chat_DB_PATH), 'media_summary.db'),
+        'backup_dir': media_backup_dir,
+        'db_name': 'media'
+    }
+
+    return rag_db_config, char_db_config, media_db_config
 
