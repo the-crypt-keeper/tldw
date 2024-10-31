@@ -8,23 +8,18 @@
 #
 ####################
 # Imports
+import logging
 #
 # External Imports
-import logging
-
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.Books.Book_Ingestion_Lib import process_zip_file, import_epub, import_file_handler
+from App_Function_Libraries.Books.Book_Ingestion_Lib import import_file_handler
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
-
-
 #
 ########################################################################################################################
 #
 # Functions:
-
-
 
 def create_import_book_tab():
     try:
