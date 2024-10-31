@@ -10,6 +10,8 @@ from datetime import datetime
 # External Imports
 import gradio as gr
 import yt_dlp
+
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, add_media_to_database, \
@@ -209,7 +211,6 @@ def create_video_transcription_tab():
                 try:
                     # Start overall processing timer
                     proc_start_time = datetime.now()
-                    # FIXME - summarize_recursively is not being used...
                     logging.info("Entering process_videos_with_error_handling")
                     logging.info(f"Received inputs: {inputs}")
 
@@ -261,7 +262,6 @@ def create_video_transcription_tab():
                     all_summaries = ""
 
                     # Start timing
-                    # FIXME - utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
                     start_proc = datetime.now()
 
                     for i in range(0, len(all_inputs), batch_size):
@@ -323,7 +323,7 @@ def create_video_transcription_tab():
                                     input_item, 2, whisper_model,
                                     custom_prompt,
                                     start_seconds, api_name, api_key,
-                                    vad_use, False, False, False, 0.01, None, keywords, None, diarize,
+                                    vad_use, False, False, summarize_recursively, 0.01, None, keywords, None, diarize,
                                     end_time=end_seconds,
                                     include_timestamps=timestamp_option,
                                     metadata=video_metadata,
@@ -782,7 +782,54 @@ def create_video_transcription_tab():
                         # API key resolution handled at base of function if none provided
                         api_key = api_key if api_key else None
                         logging.info(f"process_url_with_metadata: Starting summarization with {api_name}...")
-                        summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key)
+
+                        # Perform Chunking if enabled
+                        # FIXME - Setup a proper prompt for Recursive Summarization
+                        if use_chunking:
+                            logging.info("process_url_with_metadata: Chunking enabled. Starting chunking...")
+                            chunked_texts = improved_chunking_process(full_text_with_metadata, chunk_options)
+
+                            if chunked_texts is None:
+                                logging.warning("Chunking failed, falling back to full text summarization")
+                                summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt,
+                                                                     api_key)
+                            else:
+                                logging.debug(
+                                    f"process_url_with_metadata: Chunking completed. Processing {len(chunked_texts)} chunks...")
+                                summaries = []
+
+                                if rolling_summarization:
+                                    # Perform recursive summarization on each chunk
+                                    for chunk in chunked_texts:
+                                        chunk_summary = perform_summarization(api_name, chunk['text'], custom_prompt,
+                                                                              api_key)
+                                        if chunk_summary:
+                                            summaries.append(
+                                                f"Chunk {chunk['metadata']['chunk_index']}/{chunk['metadata']['total_chunks']}: {chunk_summary}")
+                                            summary_text = "\n\n".join(summaries)
+                                        else:
+                                            logging.error("All chunk summarizations failed")
+                                            summary_text = None
+
+                                for chunk in chunked_texts:
+                                    # Perform Non-recursive summarization on each chunk
+                                    chunk_summary = perform_summarization(api_name, chunk['text'], custom_prompt,
+                                                                          api_key)
+                                    if chunk_summary:
+                                        summaries.append(
+                                            f"Chunk {chunk['metadata']['chunk_index']}/{chunk['metadata']['total_chunks']}: {chunk_summary}")
+
+                                    if summaries:
+                                        summary_text = "\n\n".join(summaries)
+                                        logging.info(f"Successfully summarized {len(summaries)} chunks")
+                                    else:
+                                        logging.error("All chunk summarizations failed")
+                                        summary_text = None
+                        else:
+                            # Regular summarization without chunking
+                            summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt,
+                                                                 api_key) if api_name else None
+
                         if summary_text is None:
                             logging.error("Summarization failed.")
                             return None, None, None, None, None, None
