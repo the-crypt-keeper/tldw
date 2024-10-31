@@ -27,7 +27,6 @@ def init_backup_directory(backup_base_dir: str, db_name: str) -> str:
 def create_backup(db_path: str, backup_dir: str, db_name: str) -> str:
     """Create a full backup of the database."""
     try:
-        # Ensure we have absolute paths
         db_path = os.path.abspath(db_path)
         backup_dir = os.path.abspath(backup_dir)
 
@@ -36,11 +35,12 @@ def create_backup(db_path: str, backup_dir: str, db_name: str) -> str:
         logging.info(f"  Backup Dir: {backup_dir}")
         logging.info(f"  DB Name: {db_name}")
 
-        # Ensure backup directory exists
-        os.makedirs(backup_dir, exist_ok=True)
+        # Create subdirectory based on db_name
+        specific_backup_dir = os.path.join(backup_dir, db_name)
+        os.makedirs(specific_backup_dir, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_file = os.path.join(backup_dir, f"{db_name}_backup_{timestamp}.db")
+        backup_file = os.path.join(specific_backup_dir, f"{db_name}_backup_{timestamp}.db")
         logging.info(f"  Full backup path: {backup_file}")
 
         # Create a backup using SQLite's backup API
