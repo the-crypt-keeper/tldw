@@ -623,7 +623,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     author = author or 'Unknown'
     ingestion_date = ingestion_date or datetime.now().strftime('%Y-%m-%d')
 
-    if media_type not in ['article', 'audio', 'document', 'mediawiki_article', 'mediawiki_dump', 'obsidian_note', 'podcast', 'text', 'video', 'unknown']:
+    if media_type not in ['article', 'audio', 'book', 'document', 'mediawiki_article', 'mediawiki_dump', 'obsidian_note', 'podcast', 'text', 'video', 'unknown']:
         raise InputError("Invalid media type. Allowed types: article, audio file, document, obsidian_note podcast, text, video, unknown.")
 
     if ingestion_date and not is_valid_date(ingestion_date):

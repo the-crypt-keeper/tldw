@@ -22,34 +22,51 @@ from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_metadata_from_p
 
 def create_pdf_ingestion_tab():
     with gr.TabItem("PDF Ingestion", visible=True):
-        # TODO - Add functionality to extract metadata from pdf as part of conversion process in marker
         gr.Markdown("# Ingest PDF Files and Extract Metadata")
         with gr.Row():
             with gr.Column():
-                pdf_file_input = gr.File(label="Uploaded PDF File", file_types=[".pdf"], visible=True)
-                pdf_upload_button = gr.UploadButton("Click to Upload PDF", file_types=[".pdf"])
-                pdf_title_input = gr.Textbox(label="Title (Optional)")
-                pdf_author_input = gr.Textbox(label="Author (Optional)")
+                # Changed to support multiple files
+                pdf_file_input = gr.File(
+                    label="Uploaded PDF Files",
+                    file_types=[".pdf"],
+                    visible=True,
+                    multiple=True  # Enable multiple file selection
+                )
+                pdf_upload_button = gr.UploadButton(
+                    "Click to Upload PDFs",
+                    file_types=[".pdf"],
+                    multiple=True  # Enable multiple file selection
+                )
+                # Common metadata for all files
                 pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
                 with gr.Row():
-                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-                                                     value=False,
-                                                     visible=True)
-                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
-                                                     value=False,
-                                                     visible=True)
+                    custom_prompt_checkbox = gr.Checkbox(
+                        label="Use a Custom Prompt",
+                        value=False,
+                        visible=True
+                    )
+                    preset_prompt_checkbox = gr.Checkbox(
+                        label="Use a pre-set Prompt",
+                        value=False,
+                        visible=True
+                    )
                 with gr.Row():
-                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                                choices=load_preset_prompts(),
-                                                visible=False)
+                    preset_prompt = gr.Dropdown(
+                        label="Select Preset Prompt",
+                        choices=load_preset_prompts(),
+                        visible=False
+                    )
                 with gr.Row():
-                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                     placeholder="Enter custom prompt here",
-                                                     lines=3,
-                                                     visible=False)
+                    custom_prompt_input = gr.Textbox(
+                        label="Custom Prompt",
+                        placeholder="Enter custom prompt here",
+                        lines=3,
+                        visible=False
+                    )
                 with gr.Row():
-                    system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="""
+                    system_prompt_input = gr.Textbox(
+                        label="System Prompt",
+                        value="""
 <s>You are a bulleted notes specialist.
 [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
 **Bulleted Note Creation Guidelines**
@@ -67,8 +84,9 @@ def create_pdf_ingestion_tab():
 **Review**:
 - Ensure adherence to specified format
 - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]""",
-                                                     lines=3,
-                                                     visible=False)
+                        lines=3,
+                        visible=False
+                    )
 
                 custom_prompt_checkbox.change(
                     fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
@@ -94,15 +112,58 @@ def create_pdf_ingestion_tab():
                     outputs=[custom_prompt_input, system_prompt_input]
                 )
 
-                pdf_ingest_button = gr.Button("Ingest PDF")
+                pdf_ingest_button = gr.Button("Ingest PDFs")
 
-                pdf_upload_button.upload(fn=lambda file: file, inputs=pdf_upload_button, outputs=pdf_file_input)
+                # Update the upload button handler for multiple files
+                pdf_upload_button.upload(
+                    fn=lambda files: files,
+                    inputs=pdf_upload_button,
+                    outputs=pdf_file_input
+                )
+
             with gr.Column():
-                pdf_result_output = gr.Textbox(label="Result")
+                pdf_result_output = gr.DataFrame(
+                    headers=["Filename", "Status", "Message"],
+                    label="Processing Results"
+                )
 
+            # Define a new function to handle multiple PDFs
+            def process_multiple_pdfs(pdf_files, keywords):
+                results = []
+                if pdf_files is None:
+                    return [["No files", "Error", "No files uploaded"]]
+
+                for pdf_file in pdf_files:
+                    try:
+                        # Extract metadata from PDF
+                        metadata = extract_metadata_from_pdf(pdf_file.name)
+
+                        # Process the PDF
+                        result = process_and_cleanup_pdf(
+                            pdf_file,
+                            metadata.get('title', os.path.splitext(os.path.basename(pdf_file.name))[0]),
+                            metadata.get('author', 'Unknown'),
+                            keywords
+                        )
+
+                        results.append([
+                            pdf_file.name,
+                            "Success" if "successfully" in result else "Error",
+                            result
+                        ])
+                    except Exception as e:
+                        results.append([
+                            pdf_file.name,
+                            "Error",
+                            str(e)
+                        ])
+
+                return results
+
+            # Update the ingest button click handler
             pdf_ingest_button.click(
-                fn=process_and_cleanup_pdf,
-                inputs=[pdf_file_input, pdf_title_input, pdf_author_input, pdf_keywords_input],
+                fn=process_multiple_pdfs,
+                inputs=[pdf_file_input, pdf_keywords_input],
                 outputs=pdf_result_output
             )
 
