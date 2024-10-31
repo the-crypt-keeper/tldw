@@ -22,7 +22,7 @@ from App_Function_Libraries.DB.RAG_QA_Chat_DB import view_rag_keywords, get_all_
 # Functions:
 
 def create_export_keywords_tab():
-    with gr.TabItem("Export Keywords", visible=True):
+    with gr.TabItem("Export MediaDB Keywords", visible=True):
         with gr.Row():
             with gr.Column():
                 export_keywords_button = gr.Button("Export Keywords")
@@ -36,8 +36,8 @@ def create_export_keywords_tab():
             )
 
 def create_view_keywords_tab():
-    with gr.TabItem("View Keywords", visible=True):
-        gr.Markdown("# Browse Keywords")
+    with gr.TabItem("View MediaDB Keywords", visible=True):
+        gr.Markdown("# Browse MediaDB Keywords")
         with gr.Column():
             browse_output = gr.Markdown()
             browse_button = gr.Button("View Existing Keywords")
@@ -45,7 +45,7 @@ def create_view_keywords_tab():
 
 
 def create_add_keyword_tab():
-    with gr.TabItem("Add Keywords", visible=True):
+    with gr.TabItem("Add MediaDB Keywords", visible=True):
         with gr.Row():
             with gr.Column():
                 gr.Markdown("# Add Keywords to the Database")
@@ -57,7 +57,7 @@ def create_add_keyword_tab():
 
 
 def create_delete_keyword_tab():
-    with gr.Tab("Delete Keywords", visible=True):
+    with gr.Tab("Delete MediaDB Keywords", visible=True):
         with gr.Row():
             with gr.Column():
                 gr.Markdown("# Delete Keywords from the Database")

@@ -36,7 +36,8 @@ from App_Function_Libraries.Gradio_UI.Import_Functionality import create_import_
     create_import_obsidian_vault_tab, create_import_item_tab, create_import_multiple_prompts_tab
 from App_Function_Libraries.Gradio_UI.Introduction_tab import create_introduction_tab
 from App_Function_Libraries.Gradio_UI.Keywords import create_view_keywords_tab, create_add_keyword_tab, \
-    create_delete_keyword_tab, create_export_keywords_tab
+    create_delete_keyword_tab, create_export_keywords_tab, create_rag_qa_keywords_tab, create_character_keywords_tab, \
+    create_meta_keywords_tab
 from App_Function_Libraries.Gradio_UI.Live_Recording import create_live_recording_tab
 from App_Function_Libraries.Gradio_UI.Llamafile_tab import create_chat_with_llamafile_tab
 #from App_Function_Libraries.Gradio_UI.MMLU_Pro_tab import create_mmlu_pro_tab
@@ -516,6 +517,9 @@ def launch_ui(share_public=None, server_mode=False):
                 create_add_keyword_tab()
                 create_delete_keyword_tab()
                 create_export_keywords_tab()
+                create_character_keywords_tab()
+                create_rag_qa_keywords_tab()
+                create_meta_keywords_tab()
 
             with gr.TabItem("Import", id="import group", visible=True):
                 create_import_item_tab()
