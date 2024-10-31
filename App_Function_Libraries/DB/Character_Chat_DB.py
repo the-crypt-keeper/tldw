@@ -896,7 +896,7 @@ def fetch_character_ids_by_keywords(keywords: List[str]) -> List[int]:
 
 def view_char_keywords():
     try:
-        with sqlite3.connect('character_chat.db') as conn:
+        with sqlite3.connect(chat_DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT DISTINCT keyword 

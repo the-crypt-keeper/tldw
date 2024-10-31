@@ -14,8 +14,8 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, chat, save_chat_history, \
     update_chat_content, save_chat_history_to_db_wrapper
-from App_Function_Libraries.DB.DB_Manager import search_chat_conversations, update_chat_message, delete_chat_message, \
-    load_preset_prompts, db, load_chat_history, start_new_conversation, save_message, search_conversations_by_keywords, \
+from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, db, load_chat_history, start_new_conversation,\
+    save_message, search_conversations_by_keywords, \
     get_all_conversations, delete_messages_in_conversation, search_media_db
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_db_connection
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
@@ -171,20 +171,6 @@ def load_conversation(conversation_id):
     except Exception as e:
         logging.error(f"Error loading conversation: {str(e)}")
         return [], None
-
-
-def update_message_in_chat(message_id, new_text, history):
-    update_chat_message(message_id, new_text)
-    updated_history = [(msg1, msg2) if msg1[1] != message_id and msg2[1] != message_id
-                       else ((new_text, msg1[1]) if msg1[1] == message_id else (new_text, msg2[1]))
-                       for msg1, msg2 in history]
-    return updated_history
-
-
-def delete_message_from_chat(message_id, history):
-    delete_chat_message(message_id)
-    updated_history = [(msg1, msg2) for msg1, msg2 in history if msg1[1] != message_id and msg2[1] != message_id]
-    return updated_history
 
 
 def regenerate_last_message(history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature,
@@ -349,13 +335,6 @@ def create_chat_interface():
                 token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
                 clear_chat_button = gr.Button("Clear Chat")
 
-                edit_message_id = gr.Number(label="Message ID to Edit", visible=False)
-                edit_message_text = gr.Textbox(label="Edit Message", visible=False)
-                update_message_button = gr.Button("Update Message", visible=False)
-
-                delete_message_id = gr.Number(label="Message ID to Delete", visible=False)
-                delete_message_button = gr.Button("Delete Message", visible=False)
-
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
                 save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
                 save_status = gr.Textbox(label="Save Status", interactive=False)
@@ -468,18 +447,6 @@ def create_chat_interface():
             outputs=[chat_history]
         )
 
-        update_message_button.click(
-            update_message_in_chat,
-            inputs=[edit_message_id, edit_message_text, chat_history],
-            outputs=[chatbot]
-        )
-
-        delete_message_button.click(
-            delete_message_from_chat,
-            inputs=[delete_message_id, chat_history],
-            outputs=[chatbot]
-        )
-
         save_chat_history_as_file.click(
             save_chat_history,
             inputs=[chatbot, conversation_id],
@@ -502,9 +469,6 @@ def create_chat_interface():
             inputs=[chatbot],
             outputs=[token_count_display]
         )
-
-        chatbot.select(show_edit_message, None, [edit_message_text, edit_message_id, update_message_button])
-        chatbot.select(show_delete_message, None, [delete_message_id, delete_message_button])
 
 
 def create_chat_interface_stacked():

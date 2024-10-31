@@ -23,7 +23,7 @@ from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_fi
     update_conversation_title, fetch_all_conversations, fetch_all_notes, fetch_conversations_by_ids, fetch_notes_by_ids, \
     search_media_db, load_preset_prompts
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_notes, delete_messages_in_conversation, search_rag_notes, \
-    search_rag_chat
+    search_rag_chat, get_conversation_rating, set_conversation_rating
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_text_and_format_from_pdf
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
@@ -86,8 +86,10 @@ def create_rag_qa_chat_tab():
         # Update the conversation list function
         def update_conversation_list():
             conversations, total_pages, total_count = get_all_conversations()
-            choices = [f"{conversation['title']} (ID: {conversation['conversation_id']})" for conversation in
-                       conversations]
+            choices = [
+                f"{conversation['title']} (ID: {conversation['conversation_id']}) - Rating: {conversation['rating'] or 'Not Rated'}"
+                for conversation in conversations
+            ]
             return choices
 
         with gr.Row():
@@ -112,7 +114,7 @@ def create_rag_qa_chat_tab():
                     next_page_btn = gr.Button("Next Page")
                     page_info = gr.HTML("Page 1")
                 top_k_input = gr.Number(value=10, label="Maximum amount of results to use (Default: 10)", minimum=1, maximum=50, step=1, precision=0, interactive=True)
-                keywords_input = gr.Textbox(label="Keywords (comma-separated) to filter results by)", visible=True)
+                keywords_input = gr.Textbox(label="Keywords (comma-separated) to filter results by)", value="rag_qa_default_keyword" ,visible=True)
                 use_query_rewriting = gr.Checkbox(label="Use Query Rewriting", value=True)
                 use_re_ranking = gr.Checkbox(label="Use Re-ranking", value=True)
                 config = load_comprehensive_config()
@@ -165,13 +167,22 @@ def create_rag_qa_chat_tab():
                 load_conversation = gr.Dropdown(
                     label="Load Conversation",
                     choices=update_conversation_list()
-                    )
+                )
                 new_conversation = gr.Button("New Conversation")
                 save_conversation_button = gr.Button("Save Conversation")
                 conversation_title = gr.Textbox(
-                    label="Conversation Title", placeholder="Enter a title for the new conversation"
+                    label="Conversation Title",
+                    placeholder="Enter a title for the new conversation"
                 )
                 keywords = gr.Textbox(label="Keywords (comma-separated)", visible=True)
+
+                # Add the rating display and input
+                rating_display = gr.Markdown(value="", visible=False)
+                rating_input = gr.Radio(
+                    choices=["1", "2", "3"],
+                    label="Rate this Conversation (1-3 stars)",
+                    visible=False
+                )
 
                 # Refactored API selection dropdown
                 api_choice = gr.Dropdown(
@@ -364,22 +375,18 @@ def create_rag_qa_chat_tab():
         def load_conversation_history(selected_conversation, state_value):
             try:
                 if not selected_conversation:
-                    return [], state_value, ""
-
-                # Safely extract conversation ID
-                match = re.search(r'\(ID: ([0-9a-fA-F]+)\)', selected_conversation)
+                    return [], state_value, "", gr.update(value="", visible=False), gr.update(visible=False)
+                # Extract conversation ID
+                match = re.search(r'\(ID: ([0-9a-fA-F\-]+)\)', selected_conversation)
                 if not match:
                     logging.error(f"Invalid conversation format: {selected_conversation}")
-                    return [], state_value, ""
-
+                    return [], state_value, "", gr.update(value="", visible=False), gr.update(visible=False)
                 conversation_id = match.group(1)
                 chat_data, total_pages_val, _ = load_chat_history(conversation_id, 1, 50)
-
                 # Update state with valid conversation id
                 updated_state = state_value.copy()
                 updated_state["conversation_id"] = conversation_id
                 updated_state["conversation_messages"] = chat_data
-
                 # Format chat history
                 history = []
                 for role, content in chat_data:
@@ -387,63 +394,87 @@ def create_rag_qa_chat_tab():
                         history.append((content, ''))
                     elif history:
                         history[-1] = (history[-1][0], content)
-
+                # Fetch and display the conversation rating
+                rating = get_conversation_rating(conversation_id)
+                if rating is not None:
+                    rating_text = f"**Current Rating:** {rating} star(s)"
+                    rating_display_update = gr.update(value=rating_text, visible=True)
+                    rating_input_update = gr.update(value=str(rating), visible=True)
+                else:
+                    rating_display_update = gr.update(value="**Current Rating:** Not Rated", visible=True)
+                    rating_input_update = gr.update(value=None, visible=True)
                 notes_content = get_notes(conversation_id)
-                return history, updated_state, "\n".join(notes_content) if notes_content else ""
-
+                return history, updated_state, "\n".join(
+                    notes_content) if notes_content else "", rating_display_update, rating_input_update
             except Exception as e:
                 logging.error(f"Error loading conversation: {str(e)}")
-                return [], state_value, ""
+                return [], state_value, "", gr.update(value="", visible=False), gr.update(visible=False)
 
         load_conversation.change(
             load_conversation_history,
             inputs=[load_conversation, state],
-            outputs=[chatbot, state, notes]
+            outputs=[chatbot, state, notes, rating_display, rating_input]
         )
 
         # Modify save_conversation_function to use gr.update()
-        def save_conversation_function(conversation_title_text, keywords_text, state_value):
+        def save_conversation_function(conversation_title_text, keywords_text, rating_value, state_value):
             conversation_messages = state_value.get("conversation_messages", [])
+            conversation_id = state_value.get("conversation_id")
             if not conversation_messages:
                 return gr.update(
                     value="<p style='color:red;'>No conversation to save.</p>"
-                ), state_value, gr.update()
-            # Start a new conversation in the database
-            new_conversation_id = start_new_conversation(
-                conversation_title_text if conversation_title_text else "Untitled Conversation"
-            )
+                ), state_value, gr.update(), gr.update(value="", visible=False), gr.update(visible=False)
+            # Start a new conversation in the database if not existing
+            if not conversation_id:
+                conversation_id = start_new_conversation(
+                    conversation_title_text if conversation_title_text else "Untitled Conversation"
+                )
+            else:
+                # Update the conversation title if it has changed
+                update_conversation_title(conversation_id, conversation_title_text)
             # Save the messages
             for role, content in conversation_messages:
-                save_message(new_conversation_id, role, content)
+                save_message(conversation_id, role, content)
             # Save keywords if provided
             if keywords_text:
-                add_keywords_to_conversation(new_conversation_id, [kw.strip() for kw in keywords_text.split(',')])
+                add_keywords_to_conversation(conversation_id, [kw.strip() for kw in keywords_text.split(',')])
+            # Save the rating if provided
+            try:
+                if rating_value:
+                    set_conversation_rating(conversation_id, int(rating_value))
+            except ValueError as ve:
+                logging.error(f"Invalid rating value: {ve}")
+                return gr.update(
+                    value=f"<p style='color:red;'>Invalid rating: {ve}</p>"
+                ), state_value, gr.update(), gr.update(value="", visible=False), gr.update(visible=False)
+
             # Update state
-            updated_state = update_state(state_value, conversation_id=new_conversation_id)
+            updated_state = update_state(state_value, conversation_id=conversation_id)
             # Update the conversation list
             conversation_choices = update_conversation_list()
-            # FIXME - Change this so that it displays under the `Save Conversation` button
+            # Reset rating display and input
+            rating_display_update = gr.update(value=f"**Current Rating:** {rating_value} star(s)", visible=True)
+            rating_input_update = gr.update(value=rating_value, visible=True)
             return gr.update(
                 value="<p style='color:green;'>Conversation saved successfully.</p>"
-            ), updated_state, gr.update(choices=conversation_choices)
+            ), updated_state, gr.update(choices=conversation_choices), rating_display_update, rating_input_update
 
         save_conversation_button.click(
             save_conversation_function,
-            inputs=[conversation_title, keywords, state],
-            outputs=[status_message, state, load_conversation]
+            inputs=[conversation_title, keywords, rating_input, state],
+            outputs=[status_message, state, load_conversation, rating_display, rating_input]
         )
 
         def start_new_conversation_wrapper(title, state_value):
-            # Reset the state with no conversation_id
-            updated_state = update_state(state_value, conversation_id=None, page=1,
-                                         conversation_messages=[])
-            # Clear the chat history
-            return [], updated_state
+            # Reset the state with no conversation_id and empty conversation messages
+            updated_state = update_state(state_value, conversation_id=None, page=1, conversation_messages=[])
+            # Clear the chat history and reset rating components
+            return [], updated_state, gr.update(value="", visible=False), gr.update(value=None, visible=False)
 
         new_conversation.click(
             start_new_conversation_wrapper,
             inputs=[conversation_title, state],
-            outputs=[chatbot, state]
+            outputs=[chatbot, state, rating_display, rating_input]
         )
 
         def update_file_list(page):
@@ -535,9 +566,11 @@ Rewritten Question:"""
             return rephrased_question.strip()
 
         # FIXME - RAG DB selection
-        def rag_qa_chat_wrapper(message, history, context_source, existing_file, search_results, file_upload,
-                                convert_to_text, keywords, api_choice, use_query_rewriting, state_value,
-                                keywords_input, top_k_input, use_re_ranking, db_choices, auto_save_enabled):
+        def rag_qa_chat_wrapper(
+                message, history, context_source, existing_file, search_results, file_upload,
+                convert_to_text, keywords, api_choice, use_query_rewriting, state_value,
+                keywords_input, top_k_input, use_re_ranking, db_choices, auto_save_enabled
+        ):
             try:
                 logging.info(f"Starting rag_qa_chat_wrapper with message: {message}")
                 logging.info(f"Context source: {context_source}")
@@ -546,7 +579,8 @@ Rewritten Question:"""
                 logging.info(f"Selected DB Choices: {db_choices}")
 
                 # Show loading indicator
-                yield history, "", gr.update(visible=True), state_value
+                yield history, "", gr.update(visible=True), state_value, gr.update(visible=False), gr.update(
+                    visible=False)
 
                 conversation_id = state_value.get("conversation_id")
                 conversation_messages = state_value.get("conversation_messages", [])
@@ -560,12 +594,12 @@ Rewritten Question:"""
                     state_value["conversation_messages"] = conversation_messages
 
                 # Ensure api_choice is a string
-                api_choice = api_choice.value if isinstance(api_choice, gr.components.Dropdown) else api_choice
-                logging.info(f"Resolved API choice: {api_choice}")
+                api_choice_str = api_choice.value if isinstance(api_choice, gr.components.Dropdown) else api_choice
+                logging.info(f"Resolved API choice: {api_choice_str}")
 
                 # Only rephrase the question if it's not the first query and query rewriting is enabled
                 if len(history) > 0 and use_query_rewriting:
-                    rephrased_question = rephrase_question(history, message, api_choice)
+                    rephrased_question = rephrase_question(history, message, api_choice_str)
                     logging.info(f"Original question: {message}")
                     logging.info(f"Rephrased question: {rephrased_question}")
                 else:
@@ -575,22 +609,18 @@ Rewritten Question:"""
                 if context_source == "All Files in the Database":
                     # Use the enhanced_rag_pipeline to search the selected databases
                     context = enhanced_rag_pipeline(
-                        rephrased_question,
-                        api_choice,
-                        keywords_input,
-                        top_k_input,
-                        use_re_ranking,
+                        rephrased_question, api_choice_str, keywords_input, top_k_input, use_re_ranking,
                         database_types=db_choices  # Pass the list of selected databases
                     )
                     logging.info(f"Using enhanced_rag_pipeline for database search")
                 elif context_source == "Search Database":
                     context = f"media_id:{search_results.split('(ID: ')[1][:-1]}"
                     logging.info(f"Using search result with context: {context}")
-                else:  # Upload File
+                else:
+                    # Upload File
                     logging.info("Processing uploaded file")
                     if file_upload is None:
                         raise ValueError("No file uploaded")
-
                     # Process the uploaded file
                     file_path = file_upload.name
                     file_name = os.path.basename(file_path)
@@ -603,7 +633,6 @@ Rewritten Question:"""
                         logging.info("Reading file content")
                         with open(file_path, 'r', encoding='utf-8') as f:
                             content = f.read()
-
                     logging.info(f"File content length: {len(content)} characters")
 
                     # Process keywords
@@ -625,18 +654,17 @@ Rewritten Question:"""
                         author='Unknown',
                         ingestion_date=datetime.now().strftime('%Y-%m-%d')
                     )
-
                     logging.info(f"Result from add_media_with_keywords: {result}")
                     if isinstance(result, tuple):
                         media_id, _ = result
                     else:
                         media_id = result
-
                     context = f"media_id:{media_id}"
                     logging.info(f"Context for uploaded file: {context}")
 
                 logging.info("Calling rag_qa_chat function")
-                new_history, response = rag_qa_chat(rephrased_question, history, context, api_choice)
+                new_history, response = rag_qa_chat(rephrased_question, history, context, api_choice_str)
+
                 # Log first 100 chars of response
                 logging.info(f"Response received from rag_qa_chat: {response[:100]}...")
 
@@ -657,24 +685,43 @@ Rewritten Question:"""
                 else:
                     new_history = [(message, response)]
 
+                # Get the current rating and update display
+                conversation_id = updated_state.get("conversation_id")
+                if conversation_id:
+                    rating = get_conversation_rating(conversation_id)
+                    if rating is not None:
+                        rating_display_update = gr.update(value=f"**Current Rating:** {rating} star(s)", visible=True)
+                        rating_input_update = gr.update(value=str(rating), visible=True)
+                    else:
+                        rating_display_update = gr.update(value="**Current Rating:** Not Rated", visible=True)
+                        rating_input_update = gr.update(value=None, visible=True)
+                else:
+                    rating_display_update = gr.update(value="", visible=False)
+                    rating_input_update = gr.update(value=None, visible=False)
+
                 gr.Info("Response generated successfully")
                 logging.info("rag_qa_chat_wrapper completed successfully")
-                yield new_history, "", gr.update(visible=False), updated_state
+                yield new_history, "", gr.update(
+                    visible=False), updated_state, rating_display_update, rating_input_update
+
             except ValueError as e:
                 logging.error(f"Input error in rag_qa_chat_wrapper: {str(e)}")
                 gr.Error(f"Input error: {str(e)}")
-                yield history, "", gr.update(visible=False), state_value
+                yield history, "", gr.update(visible=False), state_value, gr.update(visible=False), gr.update(
+                    visible=False)
             except DatabaseError as e:
                 logging.error(f"Database error in rag_qa_chat_wrapper: {str(e)}")
                 gr.Error(f"Database error: {str(e)}")
-                yield history, "", gr.update(visible=False), state_value
+                yield history, "", gr.update(visible=False), state_value, gr.update(visible=False), gr.update(
+                    visible=False)
             except Exception as e:
                 logging.error(f"Unexpected error in rag_qa_chat_wrapper: {e}", exc_info=True)
                 gr.Error("An unexpected error occurred. Please try again later.")
-                yield history, "", gr.update(visible=False), state_value
+                yield history, "", gr.update(visible=False), state_value, gr.update(visible=False), gr.update(
+                    visible=False)
 
         def clear_chat_history():
-            return [], ""
+            return [], "", gr.update(value="", visible=False), gr.update(value=None, visible=False)
 
         submit.click(
             rag_qa_chat_wrapper,
@@ -696,12 +743,12 @@ Rewritten Question:"""
                 db_choice,
                 auto_save_checkbox
             ],
-            outputs=[chatbot, msg, loading_indicator, state],
+            outputs=[chatbot, msg, loading_indicator, state, rating_display, rating_input],
         )
 
         clear_chat.click(
             clear_chat_history,
-            outputs=[chatbot, msg]
+            outputs=[chatbot, msg, rating_display, rating_input]
         )
 
     return (
@@ -743,7 +790,7 @@ def create_rag_qa_notes_management_tab():
                 delete_note_button = gr.Button("Delete Note")
                 note_title_input = gr.Textbox(label="Note Title")
                 note_content_input = gr.TextArea(label="Note Content", lines=20)
-                note_keywords_input = gr.Textbox(label="Note Keywords (comma-separated)")
+                note_keywords_input = gr.Textbox(label="Note Keywords (comma-separated)", value="default_note_keyword")
                 save_note_button = gr.Button("Save Note")
                 create_new_note_button = gr.Button("Create New Note")
                 status_message = gr.HTML()
