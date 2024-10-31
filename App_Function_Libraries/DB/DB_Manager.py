@@ -26,10 +26,6 @@ from App_Function_Libraries.DB.SQLite_DB import (
     add_media_to_database as sqlite_add_media_to_database,
     import_obsidian_note_to_db as sqlite_import_obsidian_note_to_db,
     add_prompt as sqlite_add_prompt,
-    delete_chat_message as sqlite_delete_chat_message,
-    update_chat_message as sqlite_update_chat_message,
-    search_chat_conversations as sqlite_search_chat_conversations,
-    save_chat_history_to_database as sqlite_save_chat_history_to_database,
     view_database as sqlite_view_database,
     get_transcripts as sqlite_get_transcripts,
     get_trashed_items as sqlite_get_trashed_items,
@@ -42,7 +38,6 @@ from App_Function_Libraries.DB.SQLite_DB import (
     insert_prompt_to_db as sqlite_insert_prompt_to_db,
     delete_prompt as sqlite_delete_prompt,
     search_and_display_items as sqlite_search_and_display_items,
-    get_conversation_name as sqlite_get_conversation_name,
     add_media_with_keywords as sqlite_add_media_with_keywords,
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model, \
     create_document_version as sqlite_create_document_version,
@@ -731,19 +726,6 @@ def fetch_keywords_for_media(*args, **kwargs):
 #
 # Chat-related Functions
 
-def delete_chat_message(*args, **kwargs):
-    if db_type == 'sqlite':
-        return sqlite_delete_chat_message(*args, **kwargs)
-    elif db_type == 'elasticsearch':
-        # Implement Elasticsearch version
-        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
-
-def update_chat_message(*args, **kwargs):
-    if db_type == 'sqlite':
-        return sqlite_update_chat_message(*args, **kwargs)
-    elif db_type == 'elasticsearch':
-        # Implement Elasticsearch version
-        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
 def save_message(*args, **kwargs):
     if db_type == 'sqlite':
@@ -759,30 +741,9 @@ def load_chat_history(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def search_chat_conversations(*args, **kwargs):
-    if db_type == 'sqlite':
-        return sqlite_search_chat_conversations(*args, **kwargs)
-    elif db_type == 'elasticsearch':
-        # Implement Elasticsearch version
-        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
-
 def start_new_conversation(*args, **kwargs):
     if db_type == 'sqlite':
         return sqlite_start_new_conversation(*args, **kwargs)
-    elif db_type == 'elasticsearch':
-        # Implement Elasticsearch version
-        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
-
-def save_chat_history_to_database(*args, **kwargs):
-    if db_type == 'sqlite':
-        return sqlite_save_chat_history_to_database(*args, **kwargs)
-    elif db_type == 'elasticsearch':
-        # Implement Elasticsearch version
-        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
-
-def get_conversation_name(*args, **kwargs):
-    if db_type == 'sqlite':
-        return sqlite_get_conversation_name(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
