@@ -16,7 +16,7 @@ from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, 
     update_chat_content, save_chat_history_to_db_wrapper
 from App_Function_Libraries.DB.DB_Manager import search_chat_conversations, update_chat_message, delete_chat_message, \
     load_preset_prompts, db, load_chat_history, start_new_conversation, save_message, search_conversations_by_keywords, \
-    get_all_conversations, delete_messages_in_conversation
+    get_all_conversations, delete_messages_in_conversation, search_media_db
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_db_connection
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
@@ -222,6 +222,44 @@ def regenerate_last_message(history, media_content, selected_parts, api_endpoint
     return new_history, "Last message regenerated successfully."
 
 
+def update_dropdown_multiple(query, search_type, keywords=""):
+    """Updated function to handle multiple search results using search_media_db"""
+    try:
+        # Define search fields based on search type
+        search_fields = []
+        if search_type.lower() == "keyword":
+            # When searching by keyword, we'll search across multiple fields
+            search_fields = ["title", "content", "author"]
+        else:
+            # Otherwise use the specific field
+            search_fields = [search_type.lower()]
+
+        # Perform the search
+        results = search_media_db(
+            search_query=query,
+            search_fields=search_fields,
+            keywords=keywords,
+            page=1,
+            results_per_page=50  # Adjust as needed
+        )
+
+        # Process results
+        item_map = {}
+        formatted_results = []
+
+        for row in results:
+            id, url, title, type_, content, author, date, prompt, summary = row
+            # Create a display text that shows relevant info
+            display_text = f"{title} - {author or 'Unknown'} ({date})"
+            formatted_results.append(display_text)
+            item_map[display_text] = id
+
+        return gr.update(choices=formatted_results), item_map
+    except Exception as e:
+        logging.error(f"Error in update_dropdown_multiple: {str(e)}")
+        return gr.update(choices=[]), {}
+
+
 def create_chat_interface():
     try:
         default_value = None
@@ -247,9 +285,19 @@ def create_chat_interface():
 
         with gr.Row():
             with gr.Column(scale=1):
-                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
-                                             label="Search By")
+                search_query_input = gr.Textbox(
+                    label="Search Query",
+                    placeholder="Enter your search query here..."
+                )
+                search_type_input = gr.Radio(
+                    choices=["Title", "Content", "Author", "Keyword"],
+                    value="Keyword",
+                    label="Search By"
+                )
+                keyword_filter_input = gr.Textbox(
+                    label="Filter by Keywords (comma-separated)",
+                    placeholder="ml, ai, python, etc..."
+                )
                 search_button = gr.Button("Search")
                 items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
                 item_mapping = gr.State({})
@@ -316,8 +364,8 @@ def create_chat_interface():
 
         # Restore original functionality
         search_button.click(
-            fn=update_dropdown,
-            inputs=[search_query_input, search_type_input],
+            fn=update_dropdown_multiple,
+            inputs=[search_query_input, search_type_input, keyword_filter_input],
             outputs=[items_output, item_mapping]
         )
 
@@ -485,9 +533,19 @@ def create_chat_interface_stacked():
 
         with gr.Row():
             with gr.Column():
-                search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
-                search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
-                                             label="Search By")
+                search_query_input = gr.Textbox(
+                    label="Search Query",
+                    placeholder="Enter your search query here..."
+                )
+                search_type_input = gr.Radio(
+                    choices=["Title", "Content", "Author", "Keyword"],
+                    value="Keyword",
+                    label="Search By"
+                )
+                keyword_filter_input = gr.Textbox(
+                    label="Filter by Keywords (comma-separated)",
+                    placeholder="ml, ai, python, etc..."
+                )
                 search_button = gr.Button("Search")
                 items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
                 item_mapping = gr.State({})
@@ -543,8 +601,8 @@ def create_chat_interface_stacked():
 
         # Restore original functionality
         search_button.click(
-            fn=update_dropdown,
-            inputs=[search_query_input, search_type_input],
+            fn=update_dropdown_multiple,
+            inputs=[search_query_input, search_type_input, keyword_filter_input],
             outputs=[items_output, item_mapping]
         )
 

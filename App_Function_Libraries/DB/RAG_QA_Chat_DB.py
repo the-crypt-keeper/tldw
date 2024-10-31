@@ -338,6 +338,22 @@ def add_keywords_to_conversation(conversation_id, keywords):
         logger.error(f"Error adding keywords to conversation '{conversation_id}': {e}")
         raise
 
+
+def view_rag_keywords():
+    try:
+        with sqlite3.connect('RAG_QA_Chat.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT keyword FROM rag_qa_keywords ORDER BY keyword")
+            keywords = cursor.fetchall()
+            if keywords:
+                keyword_list = [k[0] for k in keywords]
+                return "### Current RAG QA Keywords:\n" + "\n".join(
+                    [f"- {k}" for k in keyword_list])
+            return "No keywords found."
+    except Exception as e:
+        return f"Error retrieving keywords: {str(e)}"
+
+
 def get_keywords_for_conversation(conversation_id):
     try:
         query = '''

@@ -890,6 +890,62 @@ def fetch_character_ids_by_keywords(keywords: List[str]) -> List[int]:
         conn.close()
 
 
+###################################################################
+#
+# Character Keywords
+
+def view_char_keywords():
+    try:
+        with sqlite3.connect('character_chat.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT keyword 
+                FROM CharacterCards 
+                CROSS JOIN json_each(tags) 
+                WHERE json_valid(tags)
+                ORDER BY keyword
+            """)
+            keywords = cursor.fetchall()
+            if keywords:
+                keyword_list = [k[0] for k in keywords]
+                return "### Current Character Keywords:\n" + "\n".join(
+                    [f"- {k}" for k in keyword_list])
+            return "No keywords found."
+    except Exception as e:
+        return f"Error retrieving keywords: {str(e)}"
+
+
+def add_char_keywords(name: str, keywords: str):
+    try:
+        keywords_list = [k.strip() for k in keywords.split(",") if k.strip()]
+        with sqlite3.connect('character_chat.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT tags FROM CharacterCards WHERE name = ?",
+                (name,)
+            )
+            result = cursor.fetchone()
+            if not result:
+                return "Character not found."
+
+            current_tags = result[0] if result[0] else "[]"
+            current_keywords = set(current_tags[1:-1].split(',')) if current_tags != "[]" else set()
+            updated_keywords = current_keywords.union(set(keywords_list))
+
+            cursor.execute(
+                "UPDATE CharacterCards SET tags = ? WHERE name = ?",
+                (str(list(updated_keywords)), name)
+            )
+            conn.commit()
+            return f"Successfully added keywords to character {name}"
+    except Exception as e:
+        return f"Error adding keywords: {str(e)}"
+
+#
+# End of Character chat keyword functions
+######################################################
+
+
 #
 # End of Character_Chat_DB.py
 #######################################################################################################################
