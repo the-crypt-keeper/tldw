@@ -10,16 +10,12 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime
 from typing import List, Dict, Any
-
-from App_Function_Libraries.DB.SQLite_DB import get_all_conversations_from_media_db, get_messages_from_media_db
-from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path
-
 #
 # External Imports
 # (No external imports)
 #
 # Local Imports
-# (No additional local imports)
+from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path
 #
 ########################################################################################################################
 #
@@ -1082,50 +1078,6 @@ def fetch_notes_by_ids(note_ids):
 #
 # End of Export functions
 ###################################################
-
-
-###################################################
-#
-# Migration Function
-def migrate_chat_messages(old_conversation_id, new_conversation_id):
-    try:
-        messages = get_messages_from_media_db(old_conversation_id)
-        for msg in messages:
-            sender, content, timestamp = msg
-            role = sender  # Assuming 'sender' is either 'user' or 'ai'
-            query = """
-            INSERT INTO rag_qa_chats (conversation_id, timestamp, role, content)
-            VALUES (?, ?, ?, ?)
-            """
-            execute_query(query, (new_conversation_id, timestamp, role, content))
-        logger.info(f"Messages migrated for conversation '{new_conversation_id}'.")
-    except Exception as e:
-        logging.error(f"Error migrating messages for conversation '{new_conversation_id}': {e}")
-        raise
-
-# FIXME - DELETE AND REMOVE SQLite_DB IMPORTS
-def migrate_data_to_rag_chat_db():
-    try:
-        conversations = get_all_conversations_from_media_db()
-        for conv in conversations:
-            old_conv_id, media_id, media_name, conversation_name, created_at, updated_at = conv
-            title = conversation_name or f"{media_name}-chat" if media_name else "Untitled Conversation"
-            # Start a new conversation in the RAG chat DB
-            conversation_id = start_new_conversation(title=title, media_id=media_id)
-            # Migrate messages
-            messages = get_messages_from_media_db(old_conv_id)
-            for msg in messages:
-                sender, content, timestamp = msg
-                save_message(conversation_id, sender, content, timestamp)
-        logging.info("Data migration completed successfully.")
-    except Exception as e:
-        logging.error(f"Error during data migration: {e}")
-        raise
-
-#
-# End of Migration Function
-###################################################
-
 
 #
 # End of RAG_QA_Chat_DB.py
