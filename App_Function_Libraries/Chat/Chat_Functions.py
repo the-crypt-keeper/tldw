@@ -15,9 +15,8 @@ from pathlib import Path
 # External Imports
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import get_conversation_name, save_chat_history_to_database, \
-    start_new_conversation, update_conversation_title, delete_messages_in_conversation, save_message
-from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_db_connection
+from App_Function_Libraries.DB.DB_Manager import start_new_conversation, delete_messages_in_conversation, save_message
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_db_connection, get_conversation_name
 from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_cohere, \
     chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface
 from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \

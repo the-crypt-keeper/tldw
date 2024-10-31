@@ -9,7 +9,7 @@ import logging
 #
 # Local Imports:
 from App_Function_Libraries.DB.Character_Chat_DB import chat_DB_PATH
-from App_Function_Libraries.DB.RAG_QA_Chat_DB import rag_qa_db_path
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_rag_qa_db_path
 from App_Function_Libraries.Utils.Utils import get_project_relative_path
 #
 # End of Imports
@@ -109,8 +109,9 @@ def setup_backup_config():
     backup_base_dir = get_project_relative_path('tldw_DB_Backups')
 
     # RAG Chat DB configuration
+    rag_db_path = get_rag_qa_db_path()
     rag_db_config = {
-        'db_path': rag_qa_db_path,
+        'db_path': rag_db_path,
         'backup_dir': init_backup_directory(backup_base_dir, 'rag_qa'),
         'db_name': 'rag_qa'
     }
