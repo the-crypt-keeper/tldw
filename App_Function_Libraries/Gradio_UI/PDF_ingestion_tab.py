@@ -30,12 +30,12 @@ def create_pdf_ingestion_tab():
                     label="Uploaded PDF Files",
                     file_types=[".pdf"],
                     visible=True,
-                    multiple=True  # Enable multiple file selection
+                    file_count="multiple"
                 )
                 pdf_upload_button = gr.UploadButton(
                     "Click to Upload PDFs",
                     file_types=[".pdf"],
-                    multiple=True  # Enable multiple file selection
+                    file_count="multiple"
                 )
                 # Common metadata for all files
                 pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
