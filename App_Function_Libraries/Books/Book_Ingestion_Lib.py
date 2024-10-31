@@ -562,9 +562,9 @@ def ingest_text_file(file_path, title=None, author=None, keywords=None):
 
         # Add the text file to the database
         add_media_with_keywords(
-            url=file_path,
+            url="its_a_book",
             title=title,
-            media_type='document',
+            media_type='book',
             content=content,
             keywords=keywords,
             prompt='No prompt for text files',
