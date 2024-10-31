@@ -280,6 +280,10 @@ def load_and_log_configs():
         # Prompts - FIXME
         prompt_path = config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')
 
+        # Auto-Save Values
+        save_character_chats = config.get('Auto-Save', 'save_character_chats', fallback='False')
+        save_rag_chats = config.get('Auto-Save', 'save_rag_chats', fallback='False')
+
         return {
             'api_keys': {
                 'anthropic': anthropic_api_key,
@@ -342,6 +346,10 @@ def load_and_log_configs():
                 'embedding_api_key': embedding_api_key,
                 'chunk_size': chunk_size,
                 'overlap': overlap
+            },
+            'auto-save': {
+                'save_character_chats': save_character_chats,
+                'save_rag_chats': save_rag_chats,
             },
             'default_api': default_api
         }
