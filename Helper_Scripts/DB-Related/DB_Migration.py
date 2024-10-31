@@ -386,4 +386,247 @@ class EnhancedDatabaseMigrator:
 
         return len(errors) == 0, errors
 
+    def export_single_conversation(
+            self,
+            conn: Connection,
+            conv_id: int,
+            media_id: Optional[int],
+            media_name: Optional[str],
+            conv_name: Optional[str],
+            created_at: str
+    ) -> None:
+        """Export a single conversation to a markdown file."""
+        cursor: Cursor = conn.cursor()
 
+        try:
+            # Get messages for this conversation
+            cursor.execute("""
+                SELECT sender, message, timestamp 
+                FROM ChatMessages 
+                WHERE conversation_id = ? 
+                ORDER BY timestamp
+            """, (conv_id,))
+            messages = cursor.fetchall()
+
+            if not messages:
+                logging.warning(f"No messages found for conversation {conv_id}")
+                return
+
+            # Create chat export directory
+            chat_path = self.export_path / 'chats'
+            chat_path.mkdir(exist_ok=True)
+
+            # Generate filename
+            timestamp = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            safe_name = self.sanitize_filename(conv_name or f"conversation_{conv_id}")
+            filename = f"chat_{timestamp.strftime('%Y%m%d_%H%M%S')}_{safe_name}.md"
+
+            # Generate markdown content
+            content = [
+                f"# {conv_name or 'Untitled Conversation'}",
+                "",
+                "## Metadata",
+                f"- Conversation ID: {conv_id}",
+                f"- Created: {created_at}",
+                f"- Media ID: {media_id or 'None'}",
+                f"- Media Name: {media_name or 'None'}",
+                "",
+                "## Messages",
+                "",
+                self.format_chat_content(messages)
+            ]
+
+            # Write to file
+            filepath = chat_path / filename
+            filepath.write_text('\n'.join(content), encoding='utf-8')
+
+            # Generate metadata file
+            metadata = {
+                'conversation_id': conv_id,
+                'media_id': media_id,
+                'media_name': media_name,
+                'conversation_name': conv_name,
+                'created_at': created_at,
+                'message_count': len(messages),
+                'export_timestamp': datetime.utcnow().isoformat(),
+                'filename': filename
+            }
+
+            metadata_path = chat_path / f"{filename}.meta.json"
+            with open(metadata_path, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, indent=2)
+
+            logging.info(f"Exported conversation {conv_id} to {filename}")
+
+        except Exception as e:
+            logging.error(f"Error exporting conversation {conv_id}: {str(e)}")
+            raise
+        finally:
+            cursor.close()
+
+    def export_chats_to_markdown(self, conn: Connection, state: MigrationState) -> None:
+        """Export chat conversations with progress tracking and resume capability."""
+        cursor: Cursor = conn.cursor()
+
+        try:
+            # Get total conversations
+            cursor.execute("SELECT COUNT(*) FROM ChatConversations")
+            total_row = cursor.fetchone()
+            if not total_row:
+                raise ValueError("Could not get conversation count")
+            total_conversations = total_row[0]
+
+            # Get conversations not yet exported
+            completed_chats_str = ','.join(map(str, state.completed_chats)) if state.completed_chats else 'NULL'
+            cursor.execute(f"""
+                SELECT id, media_id, media_name, conversation_name, created_at 
+                FROM ChatConversations
+                WHERE id NOT IN ({completed_chats_str})
+                ORDER BY id
+            """)
+            conversations = cursor.fetchall()
+
+            with tqdm(total=total_conversations, initial=len(state.completed_chats),
+                      desc="Exporting chats") as pbar:
+                for conv in conversations:
+                    try:
+                        conv_id, media_id, media_name, conv_name, created_at = conv
+
+                        # Export conversation
+                        self.export_single_conversation(
+                            conn, conv_id, media_id, media_name, conv_name, created_at
+                        )
+
+                        # Update state
+                        state.completed_chats.add(conv_id)
+                        self.save_migration_state(state)
+                        pbar.update(1)
+
+                    except Exception as e:
+                        logging.error(f"Error exporting conversation {conv[0]}: {str(e)}")
+                        raise
+        finally:
+            cursor.close()
+
+    def migrate_data(self) -> None:
+        """Main migration function with resume capability."""
+        state = self.load_migration_state()
+
+        try:
+            with sqlite3.connect(self.source_db_path) as source_conn, \
+                    sqlite3.connect(self.target_db_path) as target_conn:
+
+                # Enable foreign keys
+                source_conn.execute("PRAGMA foreign_keys = ON")
+                target_conn.execute("PRAGMA foreign_keys = ON")
+
+                # Export chats first
+                if not state.completed_chats:
+                    self.export_chats_to_markdown(source_conn, state)
+
+                # Get remaining tables to migrate
+                cursor: Cursor = source_conn.cursor()
+                try:
+                    cursor.execute("""
+                        SELECT name FROM sqlite_master 
+                        WHERE type='table' 
+                        AND name NOT IN ('ChatConversations', 'ChatMessages')
+                        AND name NOT LIKE 'sqlite_%'
+                    """)
+
+                    tables = [t[0] for t in cursor.fetchall()
+                              if t[0] not in state.completed_tables]
+                finally:
+                    cursor.close()
+
+                # Migrate each table
+                for table_name in tables:
+                    try:
+                        # Verify table integrity
+                        current_checksum = self.calculate_table_checksum(source_conn, table_name)
+                        if (table_name in state.checksum and
+                                state.checksum[table_name] != current_checksum):
+                            raise Exception(f"Table {table_name} has changed during migration")
+
+                        state.checksum[table_name] = current_checksum
+
+                        # Migrate table data
+                        self.migrate_table_data(source_conn, target_conn, table_name, state)
+
+                        # Mark table as completed
+                        state.completed_tables.add(table_name)
+                        self.save_migration_state(state)
+
+                    except Exception as e:
+                        logging.error(f"Error migrating table {table_name}: {str(e)}")
+                        raise
+
+        except Exception as e:
+            logging.error(f"Migration failed: {str(e)}")
+            raise
+
+
+def main() -> None:
+    """Main entry point with command line argument parsing."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Database Migration Tool')
+    parser.add_argument('--source', required=True, help='Source database path')
+    parser.add_argument('--target', required=True, help='Target database path')
+    parser.add_argument('--export-path', required=True, help='Export directory path')
+    parser.add_argument('--batch-size', type=int, default=1000, help='Batch size for migration')
+    parser.add_argument('--verify-only', action='store_true', help='Only verify previous migration')
+    parser.add_argument('--report', action='store_true', help='Generate migration report')
+
+    args = parser.parse_args()
+
+    try:
+        migrator = EnhancedDatabaseMigrator(
+            args.source,
+            args.target,
+            args.export_path,
+            args.batch_size
+        )
+
+        if args.verify_only:
+            logging.info("Verifying previous migration...")
+            success, errors = migrator.verify_migration()
+            if success:
+                logging.info("Migration verification successful")
+            else:
+                logging.error("Migration verification failed:")
+                for error in errors:
+                    logging.error(f"  - {error}")
+            return
+
+        # Regular migration process
+        logging.info("Starting database migration")
+
+        # Validate schemas
+        valid, errors = migrator.validate_schemas()
+        if not valid:
+            logging.error("Schema validation failed:")
+            for error in errors:
+                logging.error(f"  - {error}")
+            return
+
+        # Perform migration
+        migrator.migrate_data()
+
+        logging.info("Migration completed successfully")
+
+    except Exception as e:
+        logging.error(f"Migration failed: {str(e)}")
+        raise
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        logging.error("Migration interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Unhandled exception: {str(e)}")
+        logging.error(traceback.format_exc())
+        sys.exit(1)
