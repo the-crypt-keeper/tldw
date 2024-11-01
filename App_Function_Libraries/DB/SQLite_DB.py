@@ -400,8 +400,6 @@ def create_tables(db) -> None:
         'CREATE INDEX IF NOT EXISTS idx_mediakeywords_keyword_id ON MediaKeywords(keyword_id)',
         'CREATE INDEX IF NOT EXISTS idx_media_version_media_id ON MediaVersion(media_id)',
         'CREATE INDEX IF NOT EXISTS idx_mediamodifications_media_id ON MediaModifications(media_id)',
-        'CREATE INDEX IF NOT EXISTS idx_chatconversations_media_id ON ChatConversations(media_id)',
-        'CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id)',
         'CREATE INDEX IF NOT EXISTS idx_media_is_trash ON Media(is_trash)',
         'CREATE INDEX IF NOT EXISTS idx_mediachunks_media_id ON MediaChunks(media_id)',
         'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_media_id ON UnvectorizedMediaChunks(media_id)',
@@ -2776,46 +2774,47 @@ def update_media_table(db):
 #
 # Workflow Functions
 
-def save_workflow_chat_to_db(chat_history, workflow_name, conversation_id=None):
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-
-            if conversation_id is None:
-                # Create a new conversation
-                conversation_name = f"{workflow_name}_Workflow_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                cursor.execute('''
-                    INSERT INTO ChatConversations (media_id, media_name, conversation_name, created_at, updated_at)
-                    VALUES (NULL, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (workflow_name, conversation_name))
-                conversation_id = cursor.lastrowid
-            else:
-                # Update existing conversation
-                cursor.execute('''
-                    UPDATE ChatConversations
-                    SET updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                ''', (conversation_id,))
-
-            # Save messages
-            for user_msg, ai_msg in chat_history:
-                if user_msg:
-                    cursor.execute('''
-                        INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
-                        VALUES (?, 'user', ?, CURRENT_TIMESTAMP)
-                    ''', (conversation_id, user_msg))
-                if ai_msg:
-                    cursor.execute('''
-                        INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
-                        VALUES (?, 'ai', ?, CURRENT_TIMESTAMP)
-                    ''', (conversation_id, ai_msg))
-
-            conn.commit()
-
-        return conversation_id, f"Chat saved successfully! Conversation ID: {conversation_id}"
-    except Exception as e:
-        logging.error(f"Error saving workflow chat to database: {str(e)}")
-        return None, f"Error saving chat to database: {str(e)}"
+#
+# def save_workflow_chat_to_db(chat_history, workflow_name, conversation_id=None):
+#     try:
+#         with db.get_connection() as conn:
+#             cursor = conn.cursor()
+#
+#             if conversation_id is None:
+#                 # Create a new conversation
+#                 conversation_name = f"{workflow_name}_Workflow_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+#                 cursor.execute('''
+#                     INSERT INTO ChatConversations (media_id, media_name, conversation_name, created_at, updated_at)
+#                     VALUES (NULL, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+#                 ''', (workflow_name, conversation_name))
+#                 conversation_id = cursor.lastrowid
+#             else:
+#                 # Update existing conversation
+#                 cursor.execute('''
+#                     UPDATE ChatConversations
+#                     SET updated_at = CURRENT_TIMESTAMP
+#                     WHERE id = ?
+#                 ''', (conversation_id,))
+#
+#             # Save messages
+#             for user_msg, ai_msg in chat_history:
+#                 if user_msg:
+#                     cursor.execute('''
+#                         INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+#                         VALUES (?, 'user', ?, CURRENT_TIMESTAMP)
+#                     ''', (conversation_id, user_msg))
+#                 if ai_msg:
+#                     cursor.execute('''
+#                         INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+#                         VALUES (?, 'ai', ?, CURRENT_TIMESTAMP)
+#                     ''', (conversation_id, ai_msg))
+#
+#             conn.commit()
+#
+#         return conversation_id, f"Chat saved successfully! Conversation ID: {conversation_id}"
+#     except Exception as e:
+#         logging.error(f"Error saving workflow chat to database: {str(e)}")
+#         return None, f"Error saving chat to database: {str(e)}"
 
 
 def get_workflow_chat(conversation_id):
