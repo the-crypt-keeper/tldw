@@ -49,36 +49,37 @@ embedding_api_url = config.get('Embeddings', 'api_url', fallback='')
 
 
 # Function to preprocess and store all existing content in the database
-def preprocess_all_content(database, create_contextualized=True, api_name="gpt-3.5-turbo"):
-    unprocessed_media = get_unprocessed_media(db=database)
-    total_media = len(unprocessed_media)
-
-    for index, row in enumerate(unprocessed_media, 1):
-        media_id, content, media_type, file_name = row
-        collection_name = f"{media_type}_{media_id}"
-
-        logger.info(f"Processing media {index} of {total_media}: ID {media_id}, Type {media_type}")
-
-        try:
-            process_and_store_content(
-                database=database,
-                content=content,
-                collection_name=collection_name,
-                media_id=media_id,
-                file_name=file_name or f"{media_type}_{media_id}",
-                create_embeddings=True,
-                create_contextualized=create_contextualized,
-                api_name=api_name
-            )
-
-            # Mark the media as processed in the database
-            mark_media_as_processed(database, media_id)
-
-            logger.info(f"Successfully processed media ID {media_id}")
-        except Exception as e:
-            logger.error(f"Error processing media ID {media_id}: {str(e)}")
-
-    logger.info("Finished preprocessing all unprocessed content")
+# FIXME - Deprecated
+# def preprocess_all_content(database, create_contextualized=True, api_name="gpt-3.5-turbo"):
+#     unprocessed_media = get_unprocessed_media(db=database)
+#     total_media = len(unprocessed_media)
+#
+#     for index, row in enumerate(unprocessed_media, 1):
+#         media_id, content, media_type, file_name = row
+#         collection_name = f"{media_type}_{media_id}"
+#
+#         logger.info(f"Processing media {index} of {total_media}: ID {media_id}, Type {media_type}")
+#
+#         try:
+#             process_and_store_content(
+#                 database=database,
+#                 content=content,
+#                 collection_name=collection_name,
+#                 media_id=media_id,
+#                 file_name=file_name or f"{media_type}_{media_id}",
+#                 create_embeddings=True,
+#                 create_contextualized=create_contextualized,
+#                 api_name=api_name
+#             )
+#
+#             # Mark the media as processed in the database
+#             mark_media_as_processed(database, media_id)
+#
+#             logger.info(f"Successfully processed media ID {media_id}")
+#         except Exception as e:
+#             logger.error(f"Error processing media ID {media_id}: {str(e)}")
+#
+#     logger.info("Finished preprocessing all unprocessed content")
 
 
 def batched(iterable, n):
