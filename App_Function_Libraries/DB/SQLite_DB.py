@@ -2774,8 +2774,9 @@ def update_media_table(db):
 #
 # Workflow Functions
 
-#
-# def save_workflow_chat_to_db(chat_history, workflow_name, conversation_id=None):
+# Workflow Functions
+def save_workflow_chat_to_db(chat_history, workflow_name, conversation_id=None):
+    pass
 #     try:
 #         with db.get_connection() as conn:
 #             cursor = conn.cursor()
