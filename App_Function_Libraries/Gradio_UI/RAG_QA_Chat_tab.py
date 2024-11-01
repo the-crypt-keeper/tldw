@@ -125,7 +125,7 @@ def create_rag_qa_chat_tab():
                     info="When enabled, conversations will be saved automatically after each message"
                 )
                 preset_prompt_checkbox = gr.Checkbox(
-                    label="Use a pre-set Prompt",
+                    label="View Custom Prompts(have to copy/paste them)",
                     value=False,
                     visible=True
                 )
