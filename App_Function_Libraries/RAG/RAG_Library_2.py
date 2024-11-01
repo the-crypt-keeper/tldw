@@ -42,6 +42,15 @@ config = configparser.ConfigParser()
 # Read the configuration file
 config.read('config.txt')
 
+
+search_functions = {
+    "Media DB": search_media_db,
+    "RAG Chat": search_rag_chat,
+    "RAG Notes": search_rag_notes,
+    "Character Chat": search_character_chat,
+    "Character Cards": search_character_cards
+}
+
 # RAG pipeline function for web scraping
 # def rag_web_scraping_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
 #     try:
@@ -483,14 +492,6 @@ def perform_full_text_search(query: str, database_type: str, relevant_ids: List[
             fts_top_k = 10
 
         # Call appropriate search function based on database type
-        search_functions = {
-            "Media DB": search_media_db,
-            "RAG Chat": search_rag_chat,
-            "RAG Notes": search_rag_notes,
-            "Character Chat": search_character_chat,
-            "Character Cards": search_character_cards
-        }
-
         if database_type not in search_functions:
             raise ValueError(f"Unsupported database type: {database_type}")
 
