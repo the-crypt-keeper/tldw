@@ -17,6 +17,7 @@ mistral_model = mistral-large-latest
 mistral_api_key = <mistral_api_key>>
 custom_openai_api_key = <key_here>
 custom_openai_api_ip = <api_ip_here>
+default_api = openai
 
 [Local-API]
 kobold_api_IP = http://127.0.0.1:5001/api/v1/generate
@@ -42,6 +43,11 @@ processing_choice = cuda
 chunk_duration = 30
 words_per_second = 3
 
+[Auto-Save]
+save_character_chats = False
+save_rag_chats = False
+
+
 [Prompts]
 prompt_sample = "What is the meaning of life?"
 video_summarize_prompt = "Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary."
@@ -56,7 +62,8 @@ elasticsearch_port = 9200
 # Additionally you can use elasticsearch as the database type, just replace `sqlite` with `elasticsearch` for `type` and provide the `elasticsearch_host` and `elasticsearch_port` of your configured ES instance.
 chroma_db_path = Databases/chroma_db
 prompts_db_path = Databases/prompts.db
-rag_qa_db_path = Databases/rag_qa.db
+rag_qa_db_path = Databases/RAG_QA_Chat.db
+character_db_path = Databases/chatDB.db
 
 [Embeddings]
 embedding_provider = openai
