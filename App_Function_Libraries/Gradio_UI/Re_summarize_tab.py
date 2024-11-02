@@ -10,16 +10,13 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
-from App_Function_Libraries.DB.DB_Manager import update_media_content, load_preset_prompts
+from App_Function_Libraries.DB.DB_Manager import update_media_content, list_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import fetch_item_details, fetch_items_by_keyword, \
     fetch_items_by_content, fetch_items_by_title_or_url
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_chunk
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config, default_api_endpoint, global_api_endpoints, \
     format_api_name
-
-
-#
 #
 ######################################################################################################################
 #
@@ -36,6 +33,10 @@ def create_resummary_tab():
     except Exception as e:
         logging.error(f"Error setting default API endpoint: {str(e)}")
         default_value = None
+
+    # Get initial prompts for first page
+    initial_prompts, total_pages, current_page = list_prompts(page=1, per_page=20)
+
     with gr.TabItem("Re-Summarize", visible=True):
         gr.Markdown("# Re-Summarize Existing Content")
         with gr.Row():
@@ -48,7 +49,6 @@ def create_resummary_tab():
                 item_mapping = gr.State({})
 
                 with gr.Row():
-                    # Refactored API selection dropdown
                     api_name_input = gr.Dropdown(
                         choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                         value=default_value,
@@ -70,9 +70,17 @@ def create_resummary_tab():
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
+
+                # Add pagination controls for preset prompts
+                with gr.Row(visible=False) as preset_prompt_controls:
+                    prev_page = gr.Button("Previous")
+                    current_page_text = gr.Text(f"Page {current_page} of {total_pages}")
+                    next_page = gr.Button("Next")
+                    current_page_state = gr.State(value=1)
+
                 with gr.Row():
                     preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                                choices=load_preset_prompts(),
+                                                choices=initial_prompts,
                                                 visible=False)
                 with gr.Row():
                     custom_prompt_input = gr.Textbox(label="Custom Prompt",
@@ -101,12 +109,34 @@ def create_resummary_tab():
                                                      lines=3,
                                                      visible=False)
 
+                def update_prompt_page(direction, current_page_val):
+                    new_page = max(1, min(total_pages, current_page_val + direction))
+                    prompts, _, _ = list_prompts(page=new_page, per_page=10)
+                    return (
+                        gr.update(choices=prompts),
+                        gr.update(value=f"Page {new_page} of {total_pages}"),
+                        new_page
+                    )
+
                 def update_prompts(preset_name):
                     prompts = update_user_prompt(preset_name)
                     return (
                         gr.update(value=prompts["user_prompt"], visible=True),
                         gr.update(value=prompts["system_prompt"], visible=True)
                     )
+
+                # Connect pagination buttons
+                prev_page.click(
+                    lambda x: update_prompt_page(-1, x),
+                    inputs=[current_page_state],
+                    outputs=[preset_prompt, current_page_text, current_page_state]
+                )
+
+                next_page.click(
+                    lambda x: update_prompt_page(1, x),
+                    inputs=[current_page_state],
+                    outputs=[preset_prompt, current_page_text, current_page_state]
+                )
 
                 preset_prompt.change(
                     update_prompts,
@@ -124,9 +154,9 @@ def create_resummary_tab():
             outputs=[custom_prompt_input, system_prompt_input]
         )
         preset_prompt_checkbox.change(
-            fn=lambda x: gr.update(visible=x),
+            fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
             inputs=[preset_prompt_checkbox],
-            outputs=[preset_prompt]
+            outputs=[preset_prompt, preset_prompt_controls]
         )
 
     # Connect the UI elements
@@ -155,7 +185,12 @@ def create_resummary_tab():
         outputs=result_output
     )
 
-    return search_query_input, search_type_input, search_button, items_output, item_mapping, api_name_input, api_key_input, chunking_options_checkbox, chunking_options_box, chunk_method, max_chunk_size, chunk_overlap, custom_prompt_checkbox, custom_prompt_input, resummarize_button, result_output
+    return (
+        search_query_input, search_type_input, search_button, items_output,
+        item_mapping, api_name_input, api_key_input, chunking_options_checkbox,
+        chunking_options_box, chunk_method, max_chunk_size, chunk_overlap,
+        custom_prompt_checkbox, custom_prompt_input, resummarize_button, result_output
+    )
 
 
 def update_resummarize_dropdown(search_query, search_type):

@@ -216,11 +216,6 @@ def format_content(content):
     return formatted_content
 
 
-def update_prompt_dropdown():
-    prompt_names = list_prompts()
-    return gr.update(choices=prompt_names)
-
-
 def display_prompt_details(selected_prompt):
     if selected_prompt:
         prompts = update_user_prompt(selected_prompt)

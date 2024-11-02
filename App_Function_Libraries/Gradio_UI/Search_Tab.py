@@ -11,8 +11,8 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items, get_all_document_versions, \
-    fetch_item_details_single, fetch_paginated_data, fetch_item_details, get_latest_transcription
-from App_Function_Libraries.DB.SQLite_DB import search_prompts, get_document_version
+    fetch_item_details_single, fetch_paginated_data, fetch_item_details, get_latest_transcription, search_prompts, \
+    get_document_version
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
 from App_Function_Libraries.Utils.Utils import get_database_path, format_text_with_line_breaks
 #
@@ -80,8 +80,8 @@ def format_as_html(content, title):
     """
 
 def create_search_tab():
-    with gr.TabItem("Search / Detailed View", visible=True):
-        gr.Markdown("# Search across all ingested items in the Database")
+    with gr.TabItem("Media DB Search / Detailed View", visible=True):
+        gr.Markdown("# Search across all ingested items in the Media Database")
         with gr.Row():
             with gr.Column(scale=1):
                 gr.Markdown("by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
@@ -150,8 +150,8 @@ def display_search_results(query):
 
 
 def create_search_summaries_tab():
-    with gr.TabItem("Search/View Title+Summary", visible=True):
-        gr.Markdown("# Search across all ingested items in the Database and review their summaries")
+    with gr.TabItem("Media DB Search/View Title+Summary", visible=True):
+        gr.Markdown("# Search across all ingested items in the Media Database and review their summaries")
         gr.Markdown("Search by Title / URL / Keyword / or Content via SQLite Full-Text-Search")
         with gr.Row():
             with gr.Column():

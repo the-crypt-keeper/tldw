@@ -10,7 +10,7 @@ import tempfile
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
+from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_metadata_from_pdf, extract_text_and_format_from_pdf, \
     process_and_cleanup_pdf
@@ -22,87 +22,218 @@ from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_metadata_from_p
 
 def create_pdf_ingestion_tab():
     with gr.TabItem("PDF Ingestion", visible=True):
-        # TODO - Add functionality to extract metadata from pdf as part of conversion process in marker
         gr.Markdown("# Ingest PDF Files and Extract Metadata")
         with gr.Row():
             with gr.Column():
-                pdf_file_input = gr.File(label="Uploaded PDF File", file_types=[".pdf"], visible=True)
-                pdf_upload_button = gr.UploadButton("Click to Upload PDF", file_types=[".pdf"])
-                pdf_title_input = gr.Textbox(label="Title (Optional)")
-                pdf_author_input = gr.Textbox(label="Author (Optional)")
+                # Changed to support multiple files
+                pdf_file_input = gr.File(
+                    label="Uploaded PDF Files",
+                    file_types=[".pdf"],
+                    visible=True,
+                    file_count="multiple"
+                )
+                pdf_upload_button = gr.UploadButton(
+                    "Click to Upload PDFs",
+                    file_types=[".pdf"],
+                    file_count="multiple"
+                )
+                # Common metadata for all files
                 pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
-                with gr.Row():
-                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-                                                     value=False,
-                                                     visible=True)
-                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
-                                                     value=False,
-                                                     visible=True)
-                with gr.Row():
-                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                                choices=load_preset_prompts(),
-                                                visible=False)
-                with gr.Row():
-                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                     placeholder="Enter custom prompt here",
-                                                     lines=3,
-                                                     visible=False)
-                with gr.Row():
-                    system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="""
-<s>You are a bulleted notes specialist.
-[INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
-**Bulleted Note Creation Guidelines**
+#                 with gr.Row():
+#                     custom_prompt_checkbox = gr.Checkbox(
+#                         label="Use a Custom Prompt",
+#                         value=False,
+#                         visible=True
+#                     )
+#                     preset_prompt_checkbox = gr.Checkbox(
+#                         label="Use a pre-set Prompt",
+#                         value=False,
+#                         visible=True
+#                     )
+#                 # Initialize state variables for pagination
+#                 current_page_state = gr.State(value=1)
+#                 total_pages_state = gr.State(value=1)
+#                 with gr.Row():
+#                     # Add pagination controls
+#                     preset_prompt = gr.Dropdown(
+#                         label="Select Preset Prompt",
+#                         choices=[],
+#                         visible=False
+#                     )
+#                     prev_page_button = gr.Button("Previous Page", visible=False)
+#                     page_display = gr.Markdown("Page 1 of X", visible=False)
+#                     next_page_button = gr.Button("Next Page", visible=False)
+#                 with gr.Row():
+#                     custom_prompt_input = gr.Textbox(
+#                         label="Custom Prompt",
+#                         placeholder="Enter custom prompt here",
+#                         lines=3,
+#                         visible=False
+#                     )
+#                 with gr.Row():
+#                     system_prompt_input = gr.Textbox(
+#                         label="System Prompt",
+#                         value="""
+# <s>You are a bulleted notes specialist.
+# [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+# **Bulleted Note Creation Guidelines**
+#
+# **Headings**:
+# - Based on referenced topics, not categories like quotes or terms
+# - Surrounded by **bold** formatting
+# - Not listed as bullet points
+# - No space between headings and list items underneath
+#
+# **Emphasis**:
+# - **Important terms** set in bold font
+# - **Text ending in a colon**: also bolded
+#
+# **Review**:
+# - Ensure adherence to specified format
+# - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]""",
+#                         lines=3,
+#                         visible=False
+#                     )
+#
+#                 custom_prompt_checkbox.change(
+#                     fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+#                     inputs=[custom_prompt_checkbox],
+#                     outputs=[custom_prompt_input, system_prompt_input]
+#                 )
+#
+#                 def on_preset_prompt_checkbox_change(is_checked):
+#                     if is_checked:
+#                         prompts, total_pages, current_page = list_prompts(page=1, per_page=10)
+#                         page_display_text = f"Page {current_page} of {total_pages}"
+#                         return (
+#                             gr.update(visible=True, interactive=True, choices=prompts),  # preset_prompt
+#                             gr.update(visible=True),  # prev_page_button
+#                             gr.update(visible=True),  # next_page_button
+#                             gr.update(value=page_display_text, visible=True),  # page_display
+#                             current_page,  # current_page_state
+#                             total_pages  # total_pages_state
+#                         )
+#                     else:
+#                         return (
+#                             gr.update(visible=False, interactive=False),  # preset_prompt
+#                             gr.update(visible=False),  # prev_page_button
+#                             gr.update(visible=False),  # next_page_button
+#                             gr.update(visible=False),  # page_display
+#                             1,  # current_page_state
+#                             1   # total_pages_state
+#                         )
+#
+#                 preset_prompt_checkbox.change(
+#                     fn=on_preset_prompt_checkbox_change,
+#                     inputs=[preset_prompt_checkbox],
+#                     outputs=[preset_prompt, prev_page_button, next_page_button, page_display, current_page_state, total_pages_state]
+#                 )
+#
+#                 def on_prev_page_click(current_page, total_pages):
+#                     new_page = max(current_page - 1, 1)
+#                     prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+#                     page_display_text = f"Page {current_page} of {total_pages}"
+#                     return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+#
+#                 prev_page_button.click(
+#                     fn=on_prev_page_click,
+#                     inputs=[current_page_state, total_pages_state],
+#                     outputs=[preset_prompt, page_display, current_page_state]
+#                 )
+#
+#                 def on_next_page_click(current_page, total_pages):
+#                     new_page = min(current_page + 1, total_pages)
+#                     prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+#                     page_display_text = f"Page {current_page} of {total_pages}"
+#                     return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+#
+#                 next_page_button.click(
+#                     fn=on_next_page_click,
+#                     inputs=[current_page_state, total_pages_state],
+#                     outputs=[preset_prompt, page_display, current_page_state]
+#                 )
+#
+#                 def update_prompts(preset_name):
+#                     prompts = update_user_prompt(preset_name)
+#                     return (
+#                         gr.update(value=prompts["user_prompt"], visible=True),
+#                         gr.update(value=prompts["system_prompt"], visible=True)
+#                     )
+#
+#                 preset_prompt.change(
+#                     update_prompts,
+#                     inputs=preset_prompt,
+#                     outputs=[custom_prompt_input, system_prompt_input]
+#                 )
 
-**Headings**:
-- Based on referenced topics, not categories like quotes or terms
-- Surrounded by **bold** formatting 
-- Not listed as bullet points
-- No space between headings and list items underneath
+                pdf_ingest_button = gr.Button("Ingest PDFs")
 
-**Emphasis**:
-- **Important terms** set in bold font
-- **Text ending in a colon**: also bolded
-
-**Review**:
-- Ensure adherence to specified format
-- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]""",
-                                                     lines=3,
-                                                     visible=False)
-
-                custom_prompt_checkbox.change(
-                    fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
-                    inputs=[custom_prompt_checkbox],
-                    outputs=[custom_prompt_input, system_prompt_input]
+                # Update the upload button handler for multiple files
+                pdf_upload_button.upload(
+                    fn=lambda files: files,
+                    inputs=pdf_upload_button,
+                    outputs=pdf_file_input
                 )
-                preset_prompt_checkbox.change(
-                    fn=lambda x: gr.update(visible=x),
-                    inputs=[preset_prompt_checkbox],
-                    outputs=[preset_prompt]
-                )
 
-                def update_prompts(preset_name):
-                    prompts = update_user_prompt(preset_name)
-                    return (
-                        gr.update(value=prompts["user_prompt"], visible=True),
-                        gr.update(value=prompts["system_prompt"], visible=True)
-                    )
-
-                preset_prompt.change(
-                    update_prompts,
-                    inputs=preset_prompt,
-                    outputs=[custom_prompt_input, system_prompt_input]
-                )
-
-                pdf_ingest_button = gr.Button("Ingest PDF")
-
-                pdf_upload_button.upload(fn=lambda file: file, inputs=pdf_upload_button, outputs=pdf_file_input)
             with gr.Column():
-                pdf_result_output = gr.Textbox(label="Result")
+                pdf_result_output = gr.DataFrame(
+                    headers=["Filename", "Status", "Message"],
+                    label="Processing Results"
+                )
 
+            # Define a new function to handle multiple PDFs
+            def process_multiple_pdfs(pdf_files, keywords, custom_prompt_checkbox_value, custom_prompt_text, system_prompt_text):
+                results = []
+                if pdf_files is None:
+                    return [["No files", "Error", "No files uploaded"]]
+
+                for pdf_file in pdf_files:
+                    try:
+                        # Extract metadata from PDF
+                        metadata = extract_metadata_from_pdf(pdf_file.name)
+
+                        # Use custom or system prompt if checkbox is checked
+                        if custom_prompt_checkbox_value:
+                            prompt = custom_prompt_text
+                            system_prompt = system_prompt_text
+                        else:
+                            prompt = None
+                            system_prompt = None
+
+                        # Process the PDF with prompts
+                        result = process_and_cleanup_pdf(
+                            pdf_file,
+                            metadata.get('title', os.path.splitext(os.path.basename(pdf_file.name))[0]),
+                            metadata.get('author', 'Unknown'),
+                            keywords,
+                            #prompt=prompt,
+                            #system_prompt=system_prompt
+                        )
+
+                        results.append([
+                            pdf_file.name,
+                            "Success" if "successfully" in result else "Error",
+                            result
+                        ])
+                    except Exception as e:
+                        results.append([
+                            pdf_file.name,
+                            "Error",
+                            str(e)
+                        ])
+
+                return results
+
+            # Update the ingest button click handler
             pdf_ingest_button.click(
-                fn=process_and_cleanup_pdf,
-                inputs=[pdf_file_input, pdf_title_input, pdf_author_input, pdf_keywords_input],
+                fn=process_multiple_pdfs,
+                inputs=[
+                    pdf_file_input,
+                    pdf_keywords_input,
+                    #custom_prompt_checkbox,
+                    #custom_prompt_input,
+                    #system_prompt_input
+                ],
                 outputs=pdf_result_output
             )
 

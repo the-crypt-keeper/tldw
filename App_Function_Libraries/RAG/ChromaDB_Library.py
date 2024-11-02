@@ -49,36 +49,37 @@ embedding_api_url = config.get('Embeddings', 'api_url', fallback='')
 
 
 # Function to preprocess and store all existing content in the database
-def preprocess_all_content(database, create_contextualized=True, api_name="gpt-3.5-turbo"):
-    unprocessed_media = get_unprocessed_media(db=database)
-    total_media = len(unprocessed_media)
-
-    for index, row in enumerate(unprocessed_media, 1):
-        media_id, content, media_type, file_name = row
-        collection_name = f"{media_type}_{media_id}"
-
-        logger.info(f"Processing media {index} of {total_media}: ID {media_id}, Type {media_type}")
-
-        try:
-            process_and_store_content(
-                database=database,
-                content=content,
-                collection_name=collection_name,
-                media_id=media_id,
-                file_name=file_name or f"{media_type}_{media_id}",
-                create_embeddings=True,
-                create_contextualized=create_contextualized,
-                api_name=api_name
-            )
-
-            # Mark the media as processed in the database
-            mark_media_as_processed(database, media_id)
-
-            logger.info(f"Successfully processed media ID {media_id}")
-        except Exception as e:
-            logger.error(f"Error processing media ID {media_id}: {str(e)}")
-
-    logger.info("Finished preprocessing all unprocessed content")
+# FIXME - Deprecated
+# def preprocess_all_content(database, create_contextualized=True, api_name="gpt-3.5-turbo"):
+#     unprocessed_media = get_unprocessed_media(db=database)
+#     total_media = len(unprocessed_media)
+#
+#     for index, row in enumerate(unprocessed_media, 1):
+#         media_id, content, media_type, file_name = row
+#         collection_name = f"{media_type}_{media_id}"
+#
+#         logger.info(f"Processing media {index} of {total_media}: ID {media_id}, Type {media_type}")
+#
+#         try:
+#             process_and_store_content(
+#                 database=database,
+#                 content=content,
+#                 collection_name=collection_name,
+#                 media_id=media_id,
+#                 file_name=file_name or f"{media_type}_{media_id}",
+#                 create_embeddings=True,
+#                 create_contextualized=create_contextualized,
+#                 api_name=api_name
+#             )
+#
+#             # Mark the media as processed in the database
+#             mark_media_as_processed(database, media_id)
+#
+#             logger.info(f"Successfully processed media ID {media_id}")
+#         except Exception as e:
+#             logger.error(f"Error processing media ID {media_id}: {str(e)}")
+#
+#     logger.info("Finished preprocessing all unprocessed content")
 
 
 def batched(iterable, n):
@@ -233,7 +234,10 @@ def store_in_chroma(collection_name: str, texts: List[str], embeddings: Any, ids
     logging.info(f"Number of embeddings: {len(embeddings)}, Dimension: {embedding_dim}")
 
     try:
-        # Attempt to get or create the collection
+        # Clean metadata
+        cleaned_metadatas = [clean_metadata(metadata) for metadata in metadatas]
+
+        # Try to get or create the collection
         try:
             collection = chroma_client.get_collection(name=collection_name)
             logging.info(f"Existing collection '{collection_name}' found")
@@ -258,7 +262,7 @@ def store_in_chroma(collection_name: str, texts: List[str], embeddings: Any, ids
             documents=texts,
             embeddings=embeddings,
             ids=ids,
-            metadatas=metadatas
+            metadatas=cleaned_metadatas
         )
         logging.info(f"Successfully upserted {len(embeddings)} embeddings")
 
@@ -290,12 +294,19 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
 
         # Fetch a sample of embeddings to check metadata
         sample_results = collection.get(limit=10, include=["metadatas"])
-        if not sample_results['metadatas']:
-            raise ValueError("No metadata found in the collection")
+        if not sample_results.get('metadatas') or not any(sample_results['metadatas']):
+            logging.warning(f"No metadata found in the collection '{collection_name}'. Skipping this collection.")
+            return []
 
         # Check if all embeddings use the same model and provider
-        embedding_models = [metadata.get('embedding_model') for metadata in sample_results['metadatas'] if metadata.get('embedding_model')]
-        embedding_providers = [metadata.get('embedding_provider') for metadata in sample_results['metadatas'] if metadata.get('embedding_provider')]
+        embedding_models = [
+            metadata.get('embedding_model') for metadata in sample_results['metadatas']
+            if metadata and metadata.get('embedding_model')
+        ]
+        embedding_providers = [
+            metadata.get('embedding_provider') for metadata in sample_results['metadatas']
+            if metadata and metadata.get('embedding_provider')
+        ]
 
         if not embedding_models or not embedding_providers:
             raise ValueError("Embedding model or provider information not found in metadata")
@@ -319,13 +330,13 @@ def vector_search(collection_name: str, query: str, k: int = 10) -> List[Dict[st
         )
 
         if not results['documents'][0]:
-            logging.warning("No results found for the query")
+            logging.warning(f"No results found for the query in collection '{collection_name}'.")
             return []
 
         return [{"content": doc, "metadata": meta} for doc, meta in zip(results['documents'][0], results['metadatas'][0])]
     except Exception as e:
-        logging.error(f"Error in vector_search: {str(e)}", exc_info=True)
-        raise
+        logging.error(f"Error in vector_search for collection '{collection_name}': {str(e)}", exc_info=True)
+        return []
 
 
 def schedule_embedding(media_id: int, content: str, media_name: str):
@@ -349,6 +360,21 @@ def schedule_embedding(media_id: int, content: str, media_name: str):
     except Exception as e:
         logging.error(f"Error scheduling embedding for media_id {media_id}: {str(e)}")
 
+
+def clean_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """Clean metadata by removing None values and converting to appropriate types"""
+    cleaned = {}
+    for key, value in metadata.items():
+        if value is not None:  # Skip None values
+            if isinstance(value, (str, int, float, bool)):
+                cleaned[key] = value
+            elif isinstance(value, (np.int32, np.int64)):
+                cleaned[key] = int(value)
+            elif isinstance(value, (np.float32, np.float64)):
+                cleaned[key] = float(value)
+            else:
+                cleaned[key] = str(value)  # Convert other types to string
+    return cleaned
 
 # Function to process content, create chunks, embeddings, and store in ChromaDB and SQLite
 # def process_and_store_content(content: str, collection_name: str, media_id: int):

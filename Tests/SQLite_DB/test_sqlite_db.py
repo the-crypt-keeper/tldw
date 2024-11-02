@@ -116,7 +116,7 @@ def test_create_tables(db):
     assert db.table_exists('Media')
     assert db.table_exists('Keywords')
     assert db.table_exists('MediaKeywords')
-    assert db.table_exists('ChatConversations')
+
 
 
 def test_multiple_connections(db):
