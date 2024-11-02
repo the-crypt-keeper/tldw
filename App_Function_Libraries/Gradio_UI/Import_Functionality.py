@@ -22,8 +22,8 @@ from chardet import detect
 
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import insert_prompt_to_db, load_preset_prompts, import_obsidian_note_to_db, \
-    add_media_to_database
+from App_Function_Libraries.DB.DB_Manager import insert_prompt_to_db, import_obsidian_note_to_db, \
+    add_media_to_database, list_prompts
 from App_Function_Libraries.Prompt_Handling import import_prompt_from_file, import_prompts_from_zip#
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
 #
@@ -210,15 +210,6 @@ def create_import_single_prompt_tab():
             outputs=save_output
         )
 
-        def update_prompt_dropdown():
-            return gr.update(choices=load_preset_prompts())
-
-        save_button.click(
-            fn=update_prompt_dropdown,
-            inputs=[],
-            outputs=[gr.Dropdown(label="Select Preset Prompt")]
-        )
-
 def create_import_item_tab():
     with gr.TabItem("Import Markdown/Text Files", visible=True):
         gr.Markdown("# Import a markdown file or text file into the database")
@@ -257,11 +248,18 @@ def create_import_multiple_prompts_tab():
         gr.Markdown("# Import multiple prompts into the database")
         gr.Markdown("Upload a zip file containing multiple prompt files (txt or md)")
 
+        # Initialize state variables for pagination
+        current_page_state = gr.State(value=1)
+        total_pages_state = gr.State(value=1)
+
         with gr.Row():
             with gr.Column():
                 zip_file = gr.File(label="Upload zip file for import", file_types=["zip"])
                 import_button = gr.Button("Import Prompts")
                 prompts_dropdown = gr.Dropdown(label="Select Prompt to Edit", choices=[])
+                prev_page_button = gr.Button("Previous Page", visible=False)
+                page_display = gr.Markdown("Page 1 of X", visible=False)
+                next_page_button = gr.Button("Next Page", visible=False)
                 title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
                 system_input = gr.Textbox(label="System", placeholder="Enter the system message for the prompt",
@@ -275,6 +273,10 @@ def create_import_multiple_prompts_tab():
                 save_output = gr.Textbox(label="Save Status")
                 prompts_display = gr.Textbox(label="Identified Prompts")
 
+        # State to store imported prompts
+        zip_import_state = gr.State([])
+
+        # Function to handle zip import
         def handle_zip_import(zip_file):
             result = import_prompts_from_zip(zip_file)
             if isinstance(result, list):
@@ -285,6 +287,13 @@ def create_import_multiple_prompts_tab():
             else:
                 return gr.update(value=result), [], gr.update(value=""), []
 
+        import_button.click(
+            fn=handle_zip_import,
+            inputs=[zip_file],
+            outputs=[import_output, prompts_dropdown, prompts_display, zip_import_state]
+        )
+
+        # Function to handle prompt selection from imported prompts
         def handle_prompt_selection(selected_title, prompts):
             selected_prompt = next((prompt for prompt in prompts if prompt['title'] == selected_title), None)
             if selected_prompt:
@@ -312,23 +321,68 @@ def create_import_multiple_prompts_tab():
             outputs=[title_input, author_input, system_input, user_input, keywords_input]
         )
 
+        # Function to save prompt to the database
         def save_prompt_to_db(title, author, system, user, keywords):
             keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
-            return insert_prompt_to_db(title, author, system, user, keyword_list)
+            result = insert_prompt_to_db(title, author, system, user, keyword_list)
+            return result
 
         save_button.click(
             fn=save_prompt_to_db,
             inputs=[title_input, author_input, system_input, user_input, keywords_input],
-            outputs=save_output
+            outputs=[save_output]
         )
 
-        def update_prompt_dropdown():
-            return gr.update(choices=load_preset_prompts())
+        # Adding pagination controls to navigate prompts in the database
+        def on_prev_page_click(current_page, total_pages):
+            new_page = max(current_page - 1, 1)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text),
+                current_page
+            )
 
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text),
+                current_page
+            )
+
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[prompts_dropdown, page_display, current_page_state]
+        )
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[prompts_dropdown, page_display, current_page_state]
+        )
+
+        # Function to update prompts dropdown after saving to the database
+        def update_prompt_dropdown():
+            prompts, total_pages, current_page = list_prompts(page=1, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(visible=True),
+                gr.update(value=page_display_text, visible=True),
+                current_page,
+                total_pages
+            )
+
+        # Update the dropdown after saving
         save_button.click(
             fn=update_prompt_dropdown,
             inputs=[],
-            outputs=[gr.Dropdown(label="Select Preset Prompt")]
+            outputs=[prompts_dropdown, prev_page_button, page_display, current_page_state, total_pages_state]
         )
 
 
@@ -532,8 +586,7 @@ class RAGQABatchImporter:
                     # Handle zip files
                     if filename.lower().endswith('.zip'):
                         zip_files = self.extract_zip(file_path)
-                        progress.tqdm(desc=f"Processing files from {filename}")
-                        for zip_filename, content in zip_files:
+                        for zip_filename, content in progress.tqdm(zip_files, desc=f"Processing files from {filename}"):
                             conv_id = self.import_single_file(
                                 db=db,
                                 content=content,
