@@ -55,12 +55,14 @@ import re
 import shutil
 import sqlite3
 import threading
+import time
 import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
 from urllib.parse import quote
 
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
     get_database_dir
@@ -583,7 +585,10 @@ def mark_media_as_processed(database, media_id):
 # Function to add media with keywords
 def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author,
                             ingestion_date):
+    log_counter("add_media_with_keywords_attempt")
+    start_time = time.time()
     logging.debug(f"Entering add_media_with_keywords: URL={url}, Title={title}")
+
     # Set default values for missing fields
     if url is None:
         url = 'localhost'
@@ -599,10 +604,17 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     author = author or 'Unknown'
     ingestion_date = ingestion_date or datetime.now().strftime('%Y-%m-%d')
 
-    if media_type not in ['article', 'audio', 'book', 'document', 'mediawiki_article', 'mediawiki_dump', 'obsidian_note', 'podcast', 'text', 'video', 'unknown']:
-        raise InputError("Invalid media type. Allowed types: article, audio file, document, obsidian_note podcast, text, video, unknown.")
+    if media_type not in ['article', 'audio', 'book', 'document', 'mediawiki_article', 'mediawiki_dump',
+                          'obsidian_note', 'podcast', 'text', 'video', 'unknown']:
+        log_counter("add_media_with_keywords_error", labels={"error_type": "InvalidMediaType"})
+        duration = time.time() - start_time
+        log_histogram("add_media_with_keywords_duration", duration)
+        raise InputError("Invalid media type. Allowed types: article, audio file, document, obsidian_note, podcast, text, video, unknown.")
 
     if ingestion_date and not is_valid_date(ingestion_date):
+        log_counter("add_media_with_keywords_error", labels={"error_type": "InvalidDateFormat"})
+        duration = time.time() - start_time
+        log_histogram("add_media_with_keywords_duration", duration)
         raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")
 
     # Handle keywords as either string or list
@@ -631,6 +643,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
             logging.debug(f"Existing media ID for {url}: {existing_media_id}")
 
             if existing_media_id:
+                # Update existing media
                 media_id = existing_media_id
                 logging.debug(f"Updating existing media with ID: {media_id}")
                 cursor.execute('''
@@ -638,7 +651,9 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
                 SET content = ?, transcription_model = ?, type = ?, author = ?, ingestion_date = ?
                 WHERE id = ?
                 ''', (content, transcription_model, media_type, author, ingestion_date, media_id))
+                log_counter("add_media_with_keywords_update")
             else:
+                # Insert new media
                 logging.debug("Inserting new media")
                 cursor.execute('''
                 INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
@@ -646,6 +661,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
                 ''', (url, title, media_type, content, author, ingestion_date, transcription_model))
                 media_id = cursor.lastrowid
                 logging.debug(f"New media inserted with ID: {media_id}")
+                log_counter("add_media_with_keywords_insert")
 
             cursor.execute('''
             INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
@@ -675,13 +691,23 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
             conn.commit()
             logging.info(f"Media '{title}' successfully added/updated with ID: {media_id}")
 
-        return media_id, f"Media '{title}' added/updated successfully with keywords: {', '.join(keyword_list)}"
+            duration = time.time() - start_time
+            log_histogram("add_media_with_keywords_duration", duration)
+            log_counter("add_media_with_keywords_success")
+
+            return media_id, f"Media '{title}' added/updated successfully with keywords: {', '.join(keyword_list)}"
 
     except sqlite3.Error as e:
         logging.error(f"SQL Error in add_media_with_keywords: {e}")
+        duration = time.time() - start_time
+        log_histogram("add_media_with_keywords_duration", duration)
+        log_counter("add_media_with_keywords_error", labels={"error_type": "SQLiteError"})
         raise DatabaseError(f"Error adding media with keywords: {e}")
     except Exception as e:
         logging.error(f"Unexpected Error in add_media_with_keywords: {e}")
+        duration = time.time() - start_time
+        log_histogram("add_media_with_keywords_duration", duration)
+        log_counter("add_media_with_keywords_error", labels={"error_type": type(e).__name__})
         raise DatabaseError(f"Unexpected error: {e}")
 
 
@@ -756,7 +782,13 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
 
 # Function to add a keyword
 def add_keyword(keyword: str) -> int:
+    log_counter("add_keyword_attempt")
+    start_time = time.time()
+
     if not keyword.strip():
+        log_counter("add_keyword_error", labels={"error_type": "EmptyKeyword"})
+        duration = time.time() - start_time
+        log_histogram("add_keyword_duration", duration)
         raise DatabaseError("Keyword cannot be empty")
 
     keyword = keyword.strip().lower()
@@ -778,18 +810,32 @@ def add_keyword(keyword: str) -> int:
 
             logging.info(f"Keyword '{keyword}' added or updated with ID: {keyword_id}")
             conn.commit()
+
+            duration = time.time() - start_time
+            log_histogram("add_keyword_duration", duration)
+            log_counter("add_keyword_success")
+
             return keyword_id
         except sqlite3.IntegrityError as e:
             logging.error(f"Integrity error adding keyword: {e}")
+            duration = time.time() - start_time
+            log_histogram("add_keyword_duration", duration)
+            log_counter("add_keyword_error", labels={"error_type": "IntegrityError"})
             raise DatabaseError(f"Integrity error adding keyword: {e}")
         except sqlite3.Error as e:
             logging.error(f"Error adding keyword: {e}")
+            duration = time.time() - start_time
+            log_histogram("add_keyword_duration", duration)
+            log_counter("add_keyword_error", labels={"error_type": "SQLiteError"})
             raise DatabaseError(f"Error adding keyword: {e}")
 
 
 
 # Function to delete a keyword
 def delete_keyword(keyword: str) -> str:
+    log_counter("delete_keyword_attempt")
+    start_time = time.time()
+
     keyword = keyword.strip().lower()
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -800,10 +846,23 @@ def delete_keyword(keyword: str) -> str:
                 cursor.execute('DELETE FROM Keywords WHERE keyword = ?', (keyword,))
                 cursor.execute('DELETE FROM keyword_fts WHERE rowid = ?', (keyword_id[0],))
                 conn.commit()
+
+                duration = time.time() - start_time
+                log_histogram("delete_keyword_duration", duration)
+                log_counter("delete_keyword_success")
+
                 return f"Keyword '{keyword}' deleted successfully."
             else:
+                duration = time.time() - start_time
+                log_histogram("delete_keyword_duration", duration)
+                log_counter("delete_keyword_not_found")
+
                 return f"Keyword '{keyword}' not found."
         except sqlite3.Error as e:
+            duration = time.time() - start_time
+            log_histogram("delete_keyword_duration", duration)
+            log_counter("delete_keyword_error", labels={"error_type": type(e).__name__})
+            logging.error(f"Error deleting keyword: {e}")
             raise DatabaseError(f"Error deleting keyword: {e}")
 
 
@@ -2319,29 +2378,42 @@ def process_chunks(database, chunks: List[Dict], media_id: int, batch_size: int 
     :param media_id: ID of the media these chunks belong to
     :param batch_size: Number of chunks to process in each batch
     """
+    log_counter("process_chunks_attempt", labels={"media_id": media_id})
+    start_time = time.time()
     total_chunks = len(chunks)
     processed_chunks = 0
 
-    for i in range(0, total_chunks, batch_size):
-        batch = chunks[i:i + batch_size]
-        chunk_data = [
-            (media_id, chunk['text'], chunk['start_index'], chunk['end_index'])
-            for chunk in batch
-        ]
+    try:
+        for i in range(0, total_chunks, batch_size):
+            batch = chunks[i:i + batch_size]
+            chunk_data = [
+                (media_id, chunk['text'], chunk['start_index'], chunk['end_index'])
+                for chunk in batch
+            ]
 
-        try:
-            database.execute_many(
-                "INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index) VALUES (?, ?, ?, ?)",
-                chunk_data
-            )
-            processed_chunks += len(batch)
-            logging.info(f"Processed {processed_chunks}/{total_chunks} chunks for media_id {media_id}")
-        except Exception as e:
-            logging.error(f"Error inserting chunk batch for media_id {media_id}: {e}")
-            # Optionally, you could raise an exception here to stop processing
-            # raise
+            try:
+                database.execute_many(
+                    "INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index) VALUES (?, ?, ?, ?)",
+                    chunk_data
+                )
+                processed_chunks += len(batch)
+                logging.info(f"Processed {processed_chunks}/{total_chunks} chunks for media_id {media_id}")
+                log_counter("process_chunks_batch_success", labels={"media_id": media_id})
+            except Exception as e:
+                logging.error(f"Error inserting chunk batch for media_id {media_id}: {e}")
+                log_counter("process_chunks_batch_error", labels={"media_id": media_id, "error_type": type(e).__name__})
+                # Optionally, you could raise an exception here to stop processing
+                # raise
 
-    logging.info(f"Finished processing all {total_chunks} chunks for media_id {media_id}")
+            logging.info(f"Finished processing all {total_chunks} chunks for media_id {media_id}")
+            duration = time.time() - start_time
+            log_histogram("process_chunks_duration", duration, labels={"media_id": media_id})
+            log_counter("process_chunks_success", labels={"media_id": media_id})
+    except Exception as e:
+        duration = time.time() - start_time
+        log_histogram("process_chunks_duration", duration, labels={"media_id": media_id})
+        log_counter("process_chunks_error", labels={"media_id": media_id, "error_type": type(e).__name__})
+        logging.error(f"Error processing chunks for media_id {media_id}: {e}")
 
 
 # Usage example:
