@@ -25,7 +25,7 @@
 
 
 #### ![Video Walkthrough of a Fresh Install](Docs/Screenshots/tldw-run-through-blank.webm)
-#### Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)`
+#### Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)
 
 
 
