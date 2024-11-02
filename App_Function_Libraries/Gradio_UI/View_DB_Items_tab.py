@@ -3,14 +3,15 @@
 #
 # Imports
 import html
+import logging
+
 #
 # External Imports
 import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import view_database, get_all_document_versions, \
-    fetch_paginated_data, fetch_item_details, get_latest_transcription, list_prompts, fetch_prompt_details, \
-    load_preset_prompts
+    fetch_paginated_data, fetch_item_details, get_latest_transcription, list_prompts, fetch_prompt_details
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_keywords_for_note, search_conversations_by_keywords, \
     get_notes_by_keywords, get_keywords_for_conversation, get_db_connection, get_all_conversations, load_chat_history, \
     get_notes
@@ -21,117 +22,6 @@ from App_Function_Libraries.DB.SQLite_DB import get_document_version, fetch_item
 ####################################################################################################
 #
 # Functions
-
-def create_prompt_view_tab():
-    with gr.TabItem("View Prompt Database", visible=True):
-        gr.Markdown("# View Prompt Database Entries")
-        with gr.Row():
-            with gr.Column():
-                entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
-                page_number = gr.Number(value=1, label="Page Number", precision=0)
-                view_button = gr.Button("View Page")
-                next_page_button = gr.Button("Next Page")
-                previous_page_button = gr.Button("Previous Page")
-                pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
-                prompt_selector = gr.Dropdown(label="Select Prompt to View", choices=[])
-            with gr.Column():
-                results_table = gr.HTML()
-                selected_prompt_display = gr.HTML()
-
-        def view_database(page, entries_per_page):
-            try:
-                prompts, total_pages, current_page = list_prompts(page, entries_per_page)
-
-                table_html = "<table style='width:100%; border-collapse: collapse;'>"
-                table_html += "<tr><th style='border: 1px solid black; padding: 8px;'>Title</th><th style='border: 1px solid black; padding: 8px;'>Author</th></tr>"
-                prompt_choices = []
-                for prompt_name in prompts:
-                    details = fetch_prompt_details(prompt_name)
-                    if details:
-                        title, _, _, _, _, _ = details
-                        author = "Unknown"  # Assuming author is not stored in the current schema
-                        table_html += f"<tr><td style='border: 1px solid black; padding: 8px;'>{html.escape(title)}</td><td style='border: 1px solid black; padding: 8px;'>{html.escape(author)}</td></tr>"
-                        prompt_choices.append((title, title))  # Using title as both label and value
-                table_html += "</table>"
-
-                total_prompts = len(load_preset_prompts())  # This might be inefficient for large datasets
-                pagination = f"Page {current_page} of {total_pages} (Total prompts: {total_prompts})"
-
-                return table_html, pagination, total_pages, prompt_choices
-            except Exception as e:
-                return f"<p>Error fetching prompts: {e}</p>", "Error", 0, []
-
-        def update_page(page, entries_per_page):
-            results, pagination, total_pages, prompt_choices = view_database(page, entries_per_page)
-            next_disabled = page >= total_pages
-            prev_disabled = page <= 1
-            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(
-                interactive=not prev_disabled), gr.update(choices=prompt_choices)
-
-        def go_to_next_page(current_page, entries_per_page):
-            next_page = current_page + 1
-            return update_page(next_page, entries_per_page)
-
-        def go_to_previous_page(current_page, entries_per_page):
-            previous_page = max(1, current_page - 1)
-            return update_page(previous_page, entries_per_page)
-
-        def display_selected_prompt(prompt_name):
-            details = fetch_prompt_details(prompt_name)
-            if details:
-                title, author, description, system_prompt, user_prompt, keywords = details
-                # Handle None values by converting them to empty strings
-                description = description or ""
-                system_prompt = system_prompt or ""
-                user_prompt = user_prompt or ""
-                author = author or "Unknown"
-                keywords = keywords or ""
-
-                html_content = f"""
-                <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
-                    <h3>{html.escape(title)}</h3> <h4>by {html.escape(author)}</h4>
-                    <p><strong>Description:</strong> {html.escape(description)}</p>
-                    <div style="margin-top: 10px;">
-                        <strong>System Prompt:</strong>
-                        <pre style="white-space: pre-wrap; word-wrap: break-word;">{html.escape(system_prompt)}</pre>
-                    </div>
-                    <div style="margin-top: 10px;">
-                        <strong>User Prompt:</strong>
-                        <pre style="white-space: pre-wrap; word-wrap: break-word;">{html.escape(user_prompt)}</pre>
-                    </div>
-                    <p><strong>Keywords:</strong> {html.escape(keywords)}</p>
-                </div>
-                """
-                return html_content
-            else:
-                return "<p>Prompt not found.</p>"
-
-        view_button.click(
-            fn=update_page,
-            inputs=[page_number, entries_per_page],
-            outputs=[results_table, pagination_info, page_number, next_page_button, previous_page_button,
-                     prompt_selector]
-        )
-
-        next_page_button.click(
-            fn=go_to_next_page,
-            inputs=[page_number, entries_per_page],
-            outputs=[results_table, pagination_info, page_number, next_page_button, previous_page_button,
-                     prompt_selector]
-        )
-
-        previous_page_button.click(
-            fn=go_to_previous_page,
-            inputs=[page_number, entries_per_page],
-            outputs=[results_table, pagination_info, page_number, next_page_button, previous_page_button,
-                     prompt_selector]
-        )
-
-        prompt_selector.change(
-            fn=display_selected_prompt,
-            inputs=[prompt_selector],
-            outputs=[selected_prompt_display]
-        )
 
 def format_as_html(content, title):
     escaped_content = html.escape(content)
@@ -491,18 +381,24 @@ def create_viewing_ragdb_tab():
                     <th style='border: 1px solid black; padding: 8px;'>Title</th>
                     <th style='border: 1px solid black; padding: 8px;'>Keywords</th>
                     <th style='border: 1px solid black; padding: 8px;'>Notes</th>
+                    <th style='border: 1px solid black; padding: 8px;'>Rating</th>
                 </tr>
             """
 
-            for conv_id, title in conversations:
+            for conversation in conversations:
+                conv_id = conversation['conversation_id']
+                title = conversation['title']
+                rating = conversation.get('rating', '')  # Use get() to handle cases where rating might not exist
+
                 keywords = get_keywords_for_conversation(conv_id)
                 notes = get_notes(conv_id)
 
                 table_html += f"""
                     <tr>
-                        <td style='border: 1px solid black; padding: 8px;'>{html.escape(title)}</td>
+                        <td style='border: 1px solid black; padding: 8px;'>{html.escape(str(title))}</td>
                         <td style='border: 1px solid black; padding: 8px;'>{html.escape(', '.join(keywords))}</td>
                         <td style='border: 1px solid black; padding: 8px;'>{len(notes)} note(s)</td>
+                        <td style='border: 1px solid black; padding: 8px;'>{html.escape(str(rating))}</td>
                     </tr>
                 """
             table_html += "</table>"
@@ -586,8 +482,12 @@ def create_view_all_rag_notes_tab():
                 conversations, total_pages, total_count = get_all_conversations(page, entries_per_page)
                 pagination = f"Page {page} of {total_pages} (Total conversations: {total_count})"
 
-                choices = [f"{title} (ID: {conv_id})" for conv_id, title in conversations]
-                new_item_mapping = {f"{title} (ID: {conv_id})": conv_id for conv_id, title in conversations}
+                # Handle the dictionary structure correctly
+                choices = [f"{conv['title']} (ID: {conv['conversation_id']})" for conv in conversations]
+                new_item_mapping = {
+                    f"{conv['title']} (ID: {conv['conversation_id']})": conv['conversation_id']
+                    for conv in conversations
+                }
 
                 next_disabled = page >= total_pages
                 prev_disabled = page <= 1
@@ -605,6 +505,7 @@ def create_view_all_rag_notes_tab():
                     new_item_mapping
                 )
             except Exception as e:
+                logging.error(f"Error in update_page: {str(e)}", exc_info=True)
                 return (
                     gr.update(choices=[], value=None),
                     f"Error: {str(e)}",
@@ -674,8 +575,18 @@ def create_view_all_rag_notes_tab():
         view_button.click(
             fn=update_page,
             inputs=[page_number, entries_per_page],
-            outputs=[items_output, pagination_info, page_number, next_page_button, previous_page_button,
-                     conversation_title, keywords_output, chat_history_output, notes_output, item_mapping]
+            outputs=[
+                items_output,
+                pagination_info,
+                page_number,
+                next_page_button,
+                previous_page_button,
+                conversation_title,
+                keywords_output,
+                chat_history_output,
+                notes_output,
+                item_mapping
+            ]
         )
 
         next_page_button.click(
@@ -792,7 +703,7 @@ def create_ragdb_keyword_items_tab():
             return html_content
 
         def view_items(keywords, page, entries_per_page):
-            if not keywords:
+            if not keywords or (isinstance(keywords, list) and len(keywords) == 0):
                 return (
                     "<p>Please select at least one keyword.</p>",
                     "<p>Please select at least one keyword.</p>",
@@ -802,14 +713,17 @@ def create_ragdb_keyword_items_tab():
                 )
 
             try:
+                # Ensure keywords is a list
+                keywords_list = keywords if isinstance(keywords, list) else [keywords]
+
                 # Get conversations for selected keywords
                 conversations, conv_total_pages, conv_count = search_conversations_by_keywords(
-                    keywords, page, entries_per_page
+                    keywords_list, page, entries_per_page
                 )
 
                 # Get notes for selected keywords
                 notes, notes_total_pages, notes_count = get_notes_by_keywords(
-                    keywords, page, entries_per_page
+                    keywords_list, page, entries_per_page
                 )
 
                 # Format results as HTML
@@ -833,6 +747,7 @@ def create_ragdb_keyword_items_tab():
                     gr.update(interactive=not prev_disabled)
                 )
             except Exception as e:
+                logging.error(f"Error in view_items: {str(e)}")
                 return (
                     f"<p>Error: {str(e)}</p>",
                     f"<p>Error: {str(e)}</p>",

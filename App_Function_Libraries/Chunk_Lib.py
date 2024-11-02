@@ -106,6 +106,7 @@ def load_document(file_path: str) -> str:
 
 def improved_chunking_process(text: str, chunk_options: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     logging.debug("Improved chunking process started...")
+    logging.debug(f"Received chunk_options: {chunk_options}")
 
     # Extract JSON metadata if present
     json_content = {}
@@ -125,49 +126,70 @@ def improved_chunking_process(text: str, chunk_options: Dict[str, Any] = None) -
         text = text[len(header_text):].strip()
         logging.debug(f"Extracted header text: {header_text}")
 
-    options = chunk_options.copy() if chunk_options else {}
+    # Make a copy of chunk_options and ensure values are correct types
+    options = {}
     if chunk_options:
-        options.update(chunk_options)
-
-    chunk_method = options.get('method', 'words')
-    max_size = options.get('max_size', 2000)
-    overlap = options.get('overlap', 0)
-    language = options.get('language', None)
-
-    if language is None:
-        language = detect_language(text)
-
-    if chunk_method == 'json':
-        chunks = chunk_text_by_json(text, max_size=max_size, overlap=overlap)
+        try:
+            options['method'] = str(chunk_options.get('method', 'words'))
+            options['max_size'] = int(chunk_options.get('max_size', 2000))
+            options['overlap'] = int(chunk_options.get('overlap', 0))
+            # Handle language specially - it can be None
+            lang = chunk_options.get('language')
+            options['language'] = str(lang) if lang is not None else None
+            logging.debug(f"Processed options: {options}")
+        except Exception as e:
+            logging.error(f"Error processing chunk options: {e}")
+            raise
     else:
-        chunks = chunk_text(text, chunk_method, max_size, overlap, language)
+        options = {'method': 'words', 'max_size': 2000, 'overlap': 0, 'language': None}
+        logging.debug("Using default options")
+
+    if options.get('language') is None:
+        detected_lang = detect_language(text)
+        options['language'] = str(detected_lang)
+        logging.debug(f"Detected language: {options['language']}")
+
+    try:
+        if options['method'] == 'json':
+            chunks = chunk_text_by_json(text, max_size=options['max_size'], overlap=options['overlap'])
+        else:
+            chunks = chunk_text(text, options['method'], options['max_size'], options['overlap'], options['language'])
+        logging.debug(f"Created {len(chunks)} chunks using method {options['method']}")
+    except Exception as e:
+        logging.error(f"Error in chunking process: {e}")
+        raise
 
     chunks_with_metadata = []
     total_chunks = len(chunks)
-    for i, chunk in enumerate(chunks):
-        metadata = {
-            'chunk_index': i + 1,
-            'total_chunks': total_chunks,
-            'chunk_method': chunk_method,
-            'max_size': max_size,
-            'overlap': overlap,
-            'language': language,
-            'relative_position': (i + 1) / total_chunks
-        }
-        metadata.update(json_content)  # Add the extracted JSON content to metadata
-        metadata['header_text'] = header_text  # Add the header text to metadata
+    try:
+        for i, chunk in enumerate(chunks):
+            metadata = {
+                'chunk_index': i + 1,
+                'total_chunks': total_chunks,
+                'chunk_method': options['method'],
+                'max_size': options['max_size'],
+                'overlap': options['overlap'],
+                'language': options['language'],
+                'relative_position': float((i + 1) / total_chunks)
+            }
+            metadata.update(json_content)
+            metadata['header_text'] = header_text
 
-        if chunk_method == 'json':
-            chunk_text_content = json.dumps(chunk['json'], ensure_ascii=False)
-        else:
-            chunk_text_content = chunk
+            if options['method'] == 'json':
+                chunk_text_content = json.dumps(chunk['json'], ensure_ascii=False)
+            else:
+                chunk_text_content = chunk
 
-        chunks_with_metadata.append({
-            'text': chunk_text_content,
-            'metadata': metadata
-        })
+            chunks_with_metadata.append({
+                'text': chunk_text_content,
+                'metadata': metadata
+            })
 
-    return chunks_with_metadata
+        logging.debug(f"Successfully created metadata for all chunks")
+        return chunks_with_metadata
+    except Exception as e:
+        logging.error(f"Error creating chunk metadata: {e}")
+        raise
 
 
 def multi_level_chunking(text: str, method: str, max_size: int, overlap: int, language: str) -> List[str]:
@@ -220,24 +242,35 @@ def determine_chunk_position(relative_position: float) -> str:
 
 def chunk_text_by_words(text: str, max_words: int = 300, overlap: int = 0, language: str = None) -> List[str]:
     logging.debug("chunk_text_by_words...")
-    if language is None:
-        language = detect_language(text)
+    logging.debug(f"Parameters: max_words={max_words}, overlap={overlap}, language={language}")
 
-    if language.startswith('zh'):  # Chinese
-        import jieba
-        words = list(jieba.cut(text))
-    elif language == 'ja':  # Japanese
-        import fugashi
-        tagger = fugashi.Tagger()
-        words = [word.surface for word in tagger(text)]
-    else:  # Default to simple splitting for other languages
-        words = text.split()
+    try:
+        if language is None:
+            language = detect_language(text)
+            logging.debug(f"Detected language: {language}")
 
-    chunks = []
-    for i in range(0, len(words), max_words - overlap):
-        chunk = ' '.join(words[i:i + max_words])
-        chunks.append(chunk)
-    return post_process_chunks(chunks)
+        if language.startswith('zh'):  # Chinese
+            import jieba
+            words = list(jieba.cut(text))
+        elif language == 'ja':  # Japanese
+            import fugashi
+            tagger = fugashi.Tagger()
+            words = [word.surface for word in tagger(text)]
+        else:  # Default to simple splitting for other languages
+            words = text.split()
+
+        logging.debug(f"Total words: {len(words)}")
+
+        chunks = []
+        for i in range(0, len(words), max_words - overlap):
+            chunk = ' '.join(words[i:i + max_words])
+            chunks.append(chunk)
+            logging.debug(f"Created chunk {len(chunks)} with {len(chunk.split())} words")
+
+        return post_process_chunks(chunks)
+    except Exception as e:
+        logging.error(f"Error in chunk_text_by_words: {e}")
+        raise
 
 
 def chunk_text_by_sentences(text: str, max_sentences: int = 10, overlap: int = 0, language: str = None) -> List[str]:
@@ -338,24 +371,24 @@ def get_chunk_metadata(chunk: str, full_text: str, chunk_type: str = "generic",
     """
     chunk_length = len(chunk)
     start_index = full_text.find(chunk)
-    end_index = start_index + chunk_length if start_index != -1 else None
+    end_index = start_index + chunk_length if start_index != -1 else -1
 
     # Calculate a hash for the chunk
     chunk_hash = hashlib.md5(chunk.encode()).hexdigest()
 
     metadata = {
-        'start_index': start_index,
-        'end_index': end_index,
-        'word_count': len(chunk.split()),
-        'char_count': chunk_length,
+        'start_index': int(start_index),
+        'end_index': int(end_index),
+        'word_count': int(len(chunk.split())),
+        'char_count': int(chunk_length),
         'chunk_type': chunk_type,
         'language': language,
         'chunk_hash': chunk_hash,
-        'relative_position': start_index / len(full_text) if len(full_text) > 0 and start_index != -1 else 0
+        'relative_position': float(start_index / len(full_text) if len(full_text) > 0 and start_index != -1 else 0)
     }
 
     if chunk_type == "chapter":
-        metadata['chapter_number'] = chapter_number
+        metadata['chapter_number'] = int(chapter_number) if chapter_number is not None else None
         metadata['chapter_pattern'] = chapter_pattern
 
     return metadata

@@ -20,7 +20,7 @@ print(f"Project root added to sys.path: {project_root}")
 
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import (
-    preprocess_all_content, process_and_store_content, check_embedding_status,
+    process_and_store_content, check_embedding_status,
     reset_chroma_collection, vector_search, store_in_chroma, batched, situate_context, schedule_embedding,
     embedding_api_url
 )
@@ -86,23 +86,6 @@ def mock_mark_media_processed(mocker):
     """Fixture to mock mark_media_as_processed."""
     return mocker.patch("App_Function_Libraries.RAG.ChromaDB_Library.mark_media_as_processed")
 
-def test_preprocess_all_content(mock_unprocessed_media, mock_process_and_store, mock_mark_media_processed, mock_database, mocker):
-    # Mock get_unprocessed_media to return unprocessed media
-    mocker.patch('App_Function_Libraries.RAG.ChromaDB_Library.get_unprocessed_media', return_value=mock_unprocessed_media)
-
-    preprocess_all_content(database=mock_database, create_contextualized=False)
-
-    mock_process_and_store.assert_called_once_with(
-        database=mock_database,
-        content="Test Content",
-        collection_name="video_1",
-        media_id=1,
-        file_name="test_file.mp4",
-        create_embeddings=True,
-        create_contextualized=False,
-        api_name="gpt-3.5-turbo"
-    )
-    mock_mark_media_processed.assert_called_once_with(mock_database, 1)
 
 ##############################
 # Test: process_and_store_content

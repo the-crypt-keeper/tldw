@@ -95,8 +95,6 @@ def cleanup_downloads():
 #######################################################################################################################
 # Config loading
 #
-
-
 def load_comprehensive_config():
     # Get the directory of the current script (Utils.py)
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -126,24 +124,32 @@ def load_comprehensive_config():
 
 
 def get_project_root():
-    # Get the directory of the current file (Utils.py)
+    """Get the absolute path to the project root directory."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    # Go up two levels to reach the project root
-    # Assuming the structure is: project_root/App_Function_Libraries/Utils/Utils.py
     project_root = os.path.dirname(os.path.dirname(current_dir))
+    logging.debug(f"Project root: {project_root}")
     return project_root
 
+
 def get_database_dir():
-    """Get the database directory (/tldw/Databases/)."""
+    """Get the absolute path to the database directory."""
     db_dir = os.path.join(get_project_root(), 'Databases')
+    os.makedirs(db_dir, exist_ok=True)
     logging.debug(f"Database directory: {db_dir}")
     return db_dir
 
-def get_database_path(db_name: Union[str, os.PathLike[AnyStr]]) -> str:
-    """Get the full path for a database file."""
-    path = os.path.join(get_database_dir(), str(db_name))
-    logging.debug(f"Database path for {db_name}: {path}")
+
+def get_database_path(db_name: str) -> str:
+    """
+    Get the full absolute path for a database file.
+    Ensures the path is always within the Databases directory.
+    """
+    # Remove any directory traversal attempts
+    safe_db_name = os.path.basename(db_name)
+    path = os.path.join(get_database_dir(), safe_db_name)
+    logging.debug(f"Database path for {safe_db_name}: {path}")
     return path
+
 
 def get_project_relative_path(relative_path: Union[str, os.PathLike[AnyStr]]) -> str:
     """Convert a relative path to a path relative to the project root."""
@@ -280,6 +286,10 @@ def load_and_log_configs():
         # Prompts - FIXME
         prompt_path = config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')
 
+        # Auto-Save Values
+        save_character_chats = config.get('Auto-Save', 'save_character_chats', fallback='False')
+        save_rag_chats = config.get('Auto-Save', 'save_rag_chats', fallback='False')
+
         return {
             'api_keys': {
                 'anthropic': anthropic_api_key,
@@ -342,6 +352,10 @@ def load_and_log_configs():
                 'embedding_api_key': embedding_api_key,
                 'chunk_size': chunk_size,
                 'overlap': overlap
+            },
+            'auto-save': {
+                'save_character_chats': save_character_chats,
+                'save_rag_chats': save_rag_chats,
             },
             'default_api': default_api
         }

@@ -17,23 +17,24 @@ mistral_model = mistral-large-latest
 mistral_api_key = <mistral_api_key>>
 custom_openai_api_key = <key_here>
 custom_openai_api_ip = <api_ip_here>
+default_api = openai
 
 [Local-API]
 kobold_api_IP = http://127.0.0.1:5001/api/v1/generate
-kobold_api_key = <kobold api key>
+kobold_api_key =
 llama_api_IP = http://127.0.0.1:8080/completion
-llama_api_key = <llama.cpp api key>
-ooba_api_key = <ooba api key>
+llama_api_key =
+ooba_api_key =
 ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
 tabby_api_IP = http://127.0.0.1:5000/v1/chat/completions
-tabby_api_key = <tabbyapi key>
+tabby_api_key =
 vllm_api_IP = http://127.0.0.1:8000/v1/chat/completions
-vllm_model = <vllm model>
-ollama_api_IP = http://127.0.0.1:11434/api/generate
-ollama_api_key = <ollama api key>
-ollama_model = <ollama model>
+vllm_model =
+ollama_api_IP = http://127.0.0.1:11434/v1/chat/completions
+ollama_api_key =
+ollama_model = llama3
 aphrodite_api_IP = http://127.0.0.1:8080/completion
-aphrodite_api_key = <aphrodite_api_key>
+aphrodite_api_key =
 
 [Processing]
 processing_choice = cuda
@@ -41,6 +42,12 @@ processing_choice = cuda
 [Settings]
 chunk_duration = 30
 words_per_second = 3
+save_character_chats = False
+save_rag_chats = False
+
+[Auto-Save]
+save_character_chats = False
+save_rag_chats = False
 
 [Prompts]
 prompt_sample = "What is the meaning of life?"
@@ -56,10 +63,14 @@ elasticsearch_port = 9200
 # Additionally you can use elasticsearch as the database type, just replace `sqlite` with `elasticsearch` for `type` and provide the `elasticsearch_host` and `elasticsearch_port` of your configured ES instance.
 chroma_db_path = Databases/chroma_db
 prompts_db_path = Databases/prompts.db
+rag_qa_db_path = Databases/RAG_QA_Chat.db
+character_db_path = Databases/chatDB.db
 
 [Embeddings]
 embedding_provider = openai
 embedding_model = text-embedding-3-small
+onnx_model_path = ./App_Function_Libraries/models/onnx_models/
+model_dir = ./App_Function_Libraries/models/embedding_models
 embedding_api_url = http://localhost:8080/v1/embeddings
 embedding_api_key = your_api_key_here
 chunk_size = 400
@@ -77,6 +88,14 @@ adaptive = false
 # Use ntlk+punkt to split text into sentences and then ID average sentence length and set that as the chunk size
 multi_level = false
 language = english
+
+[Metrics]
+log_file_path =
+#os.getenv("tldw_LOG_FILE_PATH", "tldw_app_logs.json")
+max_bytes =
+#int(os.getenv("tldw_LOG_MAX_BYTES", 10 * 1024 * 1024))  # 10 MB
+backup_count = 5
+#int(os.getenv("tldw_LOG_BACKUP_COUNT", 5))
 
 
 #[Comments]

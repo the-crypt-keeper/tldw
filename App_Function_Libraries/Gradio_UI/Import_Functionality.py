@@ -2,24 +2,31 @@
 # Functionality to import content into the DB
 #
 # Imports
+from datetime import datetime
 from time import sleep
 import logging
 import re
 import shutil
 import tempfile
 import os
+from pathlib import Path
+import sqlite3
 import traceback
+from typing import Optional, List, Dict, Tuple
+import uuid
 import zipfile
 #
 # External Imports
 import gradio as gr
+from chardet import detect
+
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import insert_prompt_to_db, load_preset_prompts, import_obsidian_note_to_db, \
-    add_media_to_database
+from App_Function_Libraries.DB.DB_Manager import insert_prompt_to_db, import_obsidian_note_to_db, \
+    add_media_to_database, list_prompts
 from App_Function_Libraries.Prompt_Handling import import_prompt_from_file, import_prompts_from_zip#
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
-
+#
 ###################################################################################################################
 #
 # Functions:
@@ -203,15 +210,6 @@ def create_import_single_prompt_tab():
             outputs=save_output
         )
 
-        def update_prompt_dropdown():
-            return gr.update(choices=load_preset_prompts())
-
-        save_button.click(
-            fn=update_prompt_dropdown,
-            inputs=[],
-            outputs=[gr.Dropdown(label="Select Preset Prompt")]
-        )
-
 def create_import_item_tab():
     with gr.TabItem("Import Markdown/Text Files", visible=True):
         gr.Markdown("# Import a markdown file or text file into the database")
@@ -250,11 +248,18 @@ def create_import_multiple_prompts_tab():
         gr.Markdown("# Import multiple prompts into the database")
         gr.Markdown("Upload a zip file containing multiple prompt files (txt or md)")
 
+        # Initialize state variables for pagination
+        current_page_state = gr.State(value=1)
+        total_pages_state = gr.State(value=1)
+
         with gr.Row():
             with gr.Column():
                 zip_file = gr.File(label="Upload zip file for import", file_types=["zip"])
                 import_button = gr.Button("Import Prompts")
                 prompts_dropdown = gr.Dropdown(label="Select Prompt to Edit", choices=[])
+                prev_page_button = gr.Button("Previous Page", visible=False)
+                page_display = gr.Markdown("Page 1 of X", visible=False)
+                next_page_button = gr.Button("Next Page", visible=False)
                 title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
                 author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
                 system_input = gr.Textbox(label="System", placeholder="Enter the system message for the prompt",
@@ -268,6 +273,10 @@ def create_import_multiple_prompts_tab():
                 save_output = gr.Textbox(label="Save Status")
                 prompts_display = gr.Textbox(label="Identified Prompts")
 
+        # State to store imported prompts
+        zip_import_state = gr.State([])
+
+        # Function to handle zip import
         def handle_zip_import(zip_file):
             result = import_prompts_from_zip(zip_file)
             if isinstance(result, list):
@@ -278,6 +287,13 @@ def create_import_multiple_prompts_tab():
             else:
                 return gr.update(value=result), [], gr.update(value=""), []
 
+        import_button.click(
+            fn=handle_zip_import,
+            inputs=[zip_file],
+            outputs=[import_output, prompts_dropdown, prompts_display, zip_import_state]
+        )
+
+        # Function to handle prompt selection from imported prompts
         def handle_prompt_selection(selected_title, prompts):
             selected_prompt = next((prompt for prompt in prompts if prompt['title'] == selected_title), None)
             if selected_prompt:
@@ -305,23 +321,68 @@ def create_import_multiple_prompts_tab():
             outputs=[title_input, author_input, system_input, user_input, keywords_input]
         )
 
+        # Function to save prompt to the database
         def save_prompt_to_db(title, author, system, user, keywords):
             keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
-            return insert_prompt_to_db(title, author, system, user, keyword_list)
+            result = insert_prompt_to_db(title, author, system, user, keyword_list)
+            return result
 
         save_button.click(
             fn=save_prompt_to_db,
             inputs=[title_input, author_input, system_input, user_input, keywords_input],
-            outputs=save_output
+            outputs=[save_output]
         )
 
-        def update_prompt_dropdown():
-            return gr.update(choices=load_preset_prompts())
+        # Adding pagination controls to navigate prompts in the database
+        def on_prev_page_click(current_page, total_pages):
+            new_page = max(current_page - 1, 1)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text),
+                current_page
+            )
 
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text),
+                current_page
+            )
+
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[prompts_dropdown, page_display, current_page_state]
+        )
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[prompts_dropdown, page_display, current_page_state]
+        )
+
+        # Function to update prompts dropdown after saving to the database
+        def update_prompt_dropdown():
+            prompts, total_pages, current_page = list_prompts(page=1, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(visible=True),
+                gr.update(value=page_display_text, visible=True),
+                current_page,
+                total_pages
+            )
+
+        # Update the dropdown after saving
         save_button.click(
             fn=update_prompt_dropdown,
             inputs=[],
-            outputs=[gr.Dropdown(label="Select Preset Prompt")]
+            outputs=[prompts_dropdown, prev_page_button, page_display, current_page_state, total_pages_state]
         )
 
 
@@ -386,3 +447,391 @@ def import_obsidian_vault(vault_path, progress=gr.Progress()):
         error_msg = f"Error scanning vault: {str(e)}\n{traceback.format_exc()}"
         logger.error(error_msg)
         return 0, 0, [error_msg]
+
+
+class RAGQABatchImporter:
+    def __init__(self, db_path: str):
+        self.db_path = Path(db_path)
+        self.setup_logging()
+        self.file_processor = FileProcessor()
+        self.zip_validator = ZipValidator()
+
+    def setup_logging(self):
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('rag_qa_import.log'),
+                logging.StreamHandler()
+            ]
+        )
+
+    def process_markdown_content(self, content: str) -> List[Dict[str, str]]:
+        """Process markdown content into a conversation format."""
+        messages = []
+        sections = content.split('\n\n')
+
+        for section in sections:
+            if section.strip():
+                messages.append({
+                    'role': 'user',
+                    'content': section.strip()
+                })
+
+        return messages
+
+    def process_keywords(self, db: sqlite3.Connection, conversation_id: str, keywords: str):
+        """Process and link keywords to a conversation."""
+        if not keywords:
+            return
+
+        keyword_list = [k.strip() for k in keywords.split(',')]
+        for keyword in keyword_list:
+            # Insert keyword if it doesn't exist
+            db.execute("""
+                INSERT OR IGNORE INTO rag_qa_keywords (keyword)
+                VALUES (?)
+            """, (keyword,))
+
+            # Get keyword ID
+            keyword_id = db.execute("""
+                SELECT id FROM rag_qa_keywords WHERE keyword = ?
+            """, (keyword,)).fetchone()[0]
+
+            # Link keyword to conversation
+            db.execute("""
+                INSERT INTO rag_qa_conversation_keywords 
+                (conversation_id, keyword_id)
+                VALUES (?, ?)
+            """, (conversation_id, keyword_id))
+
+    def import_single_file(
+            self,
+            db: sqlite3.Connection,
+            content: str,
+            filename: str,
+            keywords: str,
+            custom_prompt: Optional[str] = None,
+            rating: Optional[int] = None
+    ) -> str:
+        """Import a single file's content into the database"""
+        conversation_id = str(uuid.uuid4())
+        current_time = datetime.now().isoformat()
+
+        # Process filename into title
+        title = FileProcessor.process_filename_to_title(filename)
+        if title.lower().endswith(('.md', '.txt')):
+            title = title[:-3] if title.lower().endswith('.md') else title[:-4]
+
+        # Insert conversation metadata
+        db.execute("""
+            INSERT INTO conversation_metadata 
+            (conversation_id, created_at, last_updated, title, rating)
+            VALUES (?, ?, ?, ?, ?)
+        """, (conversation_id, current_time, current_time, title, rating))
+
+        # Process content and insert messages
+        messages = self.process_markdown_content(content)
+        for msg in messages:
+            db.execute("""
+                INSERT INTO rag_qa_chats 
+                (conversation_id, timestamp, role, content)
+                VALUES (?, ?, ?, ?)
+            """, (conversation_id, current_time, msg['role'], msg['content']))
+
+        # Process keywords
+        self.process_keywords(db, conversation_id, keywords)
+
+        return conversation_id
+
+    def extract_zip(self, zip_path: str) -> List[Tuple[str, str]]:
+        """Extract and validate files from zip"""
+        is_valid, error_msg, valid_files = self.zip_validator.validate_zip_file(zip_path)
+        if not is_valid:
+            raise ValueError(error_msg)
+
+        files = []
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            for filename in valid_files:
+                with zip_ref.open(filename) as f:
+                    content = f.read()
+                    # Try to decode with detected encoding
+                    try:
+                        detected_encoding = detect(content)['encoding'] or 'utf-8'
+                        content = content.decode(detected_encoding)
+                    except UnicodeDecodeError:
+                        content = content.decode('utf-8', errors='replace')
+
+                    filename = os.path.basename(filename)
+                    files.append((filename, content))
+        return files
+
+    def import_files(
+            self,
+            files: List[str],
+            keywords: str = "",
+            custom_prompt: Optional[str] = None,
+            rating: Optional[int] = None,
+            progress=gr.Progress()
+    ) -> Tuple[bool, str]:
+        """Import multiple files or zip files into the RAG QA database."""
+        try:
+            imported_files = []
+
+            with sqlite3.connect(self.db_path) as db:
+                # Process each file
+                for file_path in progress.tqdm(files, desc="Processing files"):
+                    filename = os.path.basename(file_path)
+
+                    # Handle zip files
+                    if filename.lower().endswith('.zip'):
+                        zip_files = self.extract_zip(file_path)
+                        for zip_filename, content in progress.tqdm(zip_files, desc=f"Processing files from {filename}"):
+                            conv_id = self.import_single_file(
+                                db=db,
+                                content=content,
+                                filename=zip_filename,
+                                keywords=keywords,
+                                custom_prompt=custom_prompt,
+                                rating=rating
+                            )
+                            imported_files.append(zip_filename)
+
+                    # Handle individual markdown/text files
+                    elif filename.lower().endswith(('.md', '.txt')):
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+
+                        conv_id = self.import_single_file(
+                            db=db,
+                            content=content,
+                            filename=filename,
+                            keywords=keywords,
+                            custom_prompt=custom_prompt,
+                            rating=rating
+                        )
+                        imported_files.append(filename)
+
+                db.commit()
+
+            return True, f"Successfully imported {len(imported_files)} files:\n" + "\n".join(imported_files)
+
+        except Exception as e:
+            logging.error(f"Import failed: {str(e)}")
+            return False, f"Import failed: {str(e)}"
+
+
+class FileProcessor:
+    """Handles file reading and name processing"""
+
+    VALID_EXTENSIONS = {'.md', '.txt', '.zip'}
+    ENCODINGS_TO_TRY = [
+        'utf-8',
+        'utf-16',
+        'windows-1252',
+        'iso-8859-1',
+        'ascii'
+    ]
+
+    @staticmethod
+    def detect_encoding(file_path: str) -> str:
+        """Detect the file encoding using chardet"""
+        with open(file_path, 'rb') as file:
+            raw_data = file.read()
+            result = detect(raw_data)
+            return result['encoding'] or 'utf-8'
+
+    @staticmethod
+    def read_file_content(file_path: str) -> str:
+        """Read file content with automatic encoding detection"""
+        detected_encoding = FileProcessor.detect_encoding(file_path)
+
+        # Try detected encoding first
+        try:
+            with open(file_path, 'r', encoding=detected_encoding) as f:
+                return f.read()
+        except UnicodeDecodeError:
+            # If detected encoding fails, try others
+            for encoding in FileProcessor.ENCODINGS_TO_TRY:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        return f.read()
+                except UnicodeDecodeError:
+                    continue
+
+            # If all encodings fail, use utf-8 with error handling
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                return f.read()
+
+    @staticmethod
+    def process_filename_to_title(filename: str) -> str:
+        """Convert filename to a readable title"""
+        # Remove extension
+        name = os.path.splitext(filename)[0]
+
+        # Look for date patterns
+        date_pattern = r'(\d{4}[-_]?\d{2}[-_]?\d{2})'
+        date_match = re.search(date_pattern, name)
+        date_str = ""
+        if date_match:
+            try:
+                date = datetime.strptime(date_match.group(1).replace('_', '-'), '%Y-%m-%d')
+                date_str = date.strftime("%b %d, %Y")
+                name = name.replace(date_match.group(1), '').strip('-_')
+            except ValueError:
+                pass
+
+        # Replace separators with spaces
+        name = re.sub(r'[-_]+', ' ', name)
+
+        # Remove redundant spaces
+        name = re.sub(r'\s+', ' ', name).strip()
+
+        # Capitalize words, excluding certain words
+        exclude_words = {'a', 'an', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'with'}
+        words = name.split()
+        capitalized = []
+        for i, word in enumerate(words):
+            if i == 0 or word not in exclude_words:
+                capitalized.append(word.capitalize())
+            else:
+                capitalized.append(word.lower())
+        name = ' '.join(capitalized)
+
+        # Add date if found
+        if date_str:
+            name = f"{name} - {date_str}"
+
+        return name
+
+
+class ZipValidator:
+    """Validates zip file contents and structure"""
+
+    MAX_ZIP_SIZE = 100 * 1024 * 1024  # 100MB
+    MAX_FILES = 100
+    VALID_EXTENSIONS = {'.md', '.txt'}
+
+    @staticmethod
+    def validate_zip_file(zip_path: str) -> Tuple[bool, str, List[str]]:
+        """
+        Validate zip file and its contents
+        Returns: (is_valid, error_message, valid_files)
+        """
+        try:
+            # Check zip file size
+            if os.path.getsize(zip_path) > ZipValidator.MAX_ZIP_SIZE:
+                return False, "Zip file too large (max 100MB)", []
+
+            valid_files = []
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                # Check number of files
+                if len(zip_ref.filelist) > ZipValidator.MAX_FILES:
+                    return False, f"Too many files in zip (max {ZipValidator.MAX_FILES})", []
+
+                # Check for directory traversal attempts
+                for file_info in zip_ref.filelist:
+                    if '..' in file_info.filename or file_info.filename.startswith('/'):
+                        return False, "Invalid file paths detected", []
+
+                # Validate each file
+                total_size = 0
+                for file_info in zip_ref.filelist:
+                    # Skip directories
+                    if file_info.filename.endswith('/'):
+                        continue
+
+                    # Check file size
+                    if file_info.file_size > ZipValidator.MAX_ZIP_SIZE:
+                        return False, f"File {file_info.filename} too large", []
+
+                    total_size += file_info.file_size
+                    if total_size > ZipValidator.MAX_ZIP_SIZE:
+                        return False, "Total uncompressed size too large", []
+
+                    # Check file extension
+                    ext = os.path.splitext(file_info.filename)[1].lower()
+                    if ext in ZipValidator.VALID_EXTENSIONS:
+                        valid_files.append(file_info.filename)
+
+            if not valid_files:
+                return False, "No valid markdown or text files found in zip", []
+
+            return True, "", valid_files
+
+        except zipfile.BadZipFile:
+            return False, "Invalid or corrupted zip file", []
+        except Exception as e:
+            return False, f"Error processing zip file: {str(e)}", []
+
+
+def create_conversation_import_tab() -> gr.Tab:
+    """Create the import tab for the Gradio interface"""
+    with gr.Tab("Import RAG Chats") as tab:
+        gr.Markdown("# Import RAG Chats into the Database")
+        gr.Markdown("""
+        Import your RAG Chat markdown/text files individually or as a zip archive
+
+        Supported file types:
+        - Markdown (.md)
+        - Text (.txt)
+        - Zip archives containing .md or .txt files
+
+        Maximum zip file size: 100MB
+        Maximum files per zip: 100
+        """)
+        with gr.Row():
+            with gr.Column():
+                import_files = gr.File(
+                    label="Upload Files",
+                    file_types=["txt", "md", "zip"],
+                    file_count="multiple"
+                )
+
+                keywords_input = gr.Textbox(
+                    label="Keywords",
+                    placeholder="Enter keywords to apply to all imported files (comma-separated)"
+                )
+
+                custom_prompt_input = gr.Textbox(
+                    label="Custom Prompt",
+                    placeholder="Enter a custom prompt for processing (optional)"
+                )
+
+                rating_input = gr.Slider(
+                    minimum=1,
+                    maximum=3,
+                    step=1,
+                    label="Rating (1-3)",
+                    value=None
+                )
+
+            with gr.Column():
+                import_button = gr.Button("Import Files")
+                import_output = gr.Textbox(
+                    label="Import Status",
+                    lines=10
+                )
+
+        def handle_import(files, keywords, custom_prompt, rating):
+            importer = RAGQABatchImporter("rag_qa.db")  # Update with your DB path
+            success, message = importer.import_files(
+                files=[f.name for f in files],
+                keywords=keywords,
+                custom_prompt=custom_prompt,
+                rating=rating
+            )
+            return message
+
+        import_button.click(
+            fn=handle_import,
+            inputs=[
+                import_files,
+                keywords_input,
+                custom_prompt_input,
+                rating_input
+            ],
+            outputs=import_output
+        )
+
+    return tab

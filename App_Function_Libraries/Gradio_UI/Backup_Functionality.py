@@ -14,7 +14,7 @@ from App_Function_Libraries.DB.DB_Manager import create_automated_backup, db_pat
 #
 # Functions:
 
-def create_backup():
+def create_db_backup():
     backup_file = create_automated_backup(db_path, backup_dir)
     return f"Backup created: {backup_file}"
 
@@ -42,18 +42,7 @@ def create_backup_tab():
                 create_button = gr.Button("Create Backup")
                 create_output = gr.Textbox(label="Result")
             with gr.Column():
-                create_button.click(create_backup, inputs=[], outputs=create_output)
-
-
-def create_view_backups_tab():
-    with gr.TabItem("View Backups", visible=True):
-        gr.Markdown("# Browse available backups")
-        with gr.Row():
-            with gr.Column():
-                view_button = gr.Button("View Backups")
-            with gr.Column():
-                backup_list = gr.Textbox(label="Available Backups")
-                view_button.click(list_backups, inputs=[], outputs=backup_list)
+                create_button.click(create_db_backup, inputs=[], outputs=create_output)
 
 
 def create_restore_backup_tab():

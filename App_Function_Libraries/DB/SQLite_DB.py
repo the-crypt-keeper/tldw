@@ -21,7 +21,7 @@ import configparser
 # 11. browse_items(search_query, search_type)
 # 12. fetch_item_details(media_id: int)
 # 13. add_media_version(media_id: int, prompt: str, summary: str)
-# 14. search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10)
+# 14. search_media_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10)
 # 15. search_and_display(search_query, search_fields, keywords, page)
 # 16. display_details(index, results)
 # 17. get_details(index, dataframe)
@@ -55,12 +55,14 @@ import re
 import shutil
 import sqlite3
 import threading
+import time
 import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
 from urllib.parse import quote
 
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
     get_database_dir
@@ -342,27 +344,6 @@ def create_tables(db) -> None:
         )
         ''',
         '''
-        CREATE TABLE IF NOT EXISTS ChatConversations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            media_id INTEGER,
-            media_name TEXT,
-            conversation_name TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (media_id) REFERENCES Media(id)
-        )
-        ''',
-        '''
-        CREATE TABLE IF NOT EXISTS ChatMessages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            conversation_id INTEGER,
-            sender TEXT,
-            message TEXT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (conversation_id) REFERENCES ChatConversations(id)
-        )
-        ''',
-        '''
         CREATE TABLE IF NOT EXISTS Transcripts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             media_id INTEGER,
@@ -421,8 +402,6 @@ def create_tables(db) -> None:
         'CREATE INDEX IF NOT EXISTS idx_mediakeywords_keyword_id ON MediaKeywords(keyword_id)',
         'CREATE INDEX IF NOT EXISTS idx_media_version_media_id ON MediaVersion(media_id)',
         'CREATE INDEX IF NOT EXISTS idx_mediamodifications_media_id ON MediaModifications(media_id)',
-        'CREATE INDEX IF NOT EXISTS idx_chatconversations_media_id ON ChatConversations(media_id)',
-        'CREATE INDEX IF NOT EXISTS idx_chatmessages_conversation_id ON ChatMessages(conversation_id)',
         'CREATE INDEX IF NOT EXISTS idx_media_is_trash ON Media(is_trash)',
         'CREATE INDEX IF NOT EXISTS idx_mediachunks_media_id ON MediaChunks(media_id)',
         'CREATE INDEX IF NOT EXISTS idx_unvectorized_media_chunks_media_id ON UnvectorizedMediaChunks(media_id)',
@@ -606,7 +585,10 @@ def mark_media_as_processed(database, media_id):
 # Function to add media with keywords
 def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author,
                             ingestion_date):
+    log_counter("add_media_with_keywords_attempt")
+    start_time = time.time()
     logging.debug(f"Entering add_media_with_keywords: URL={url}, Title={title}")
+
     # Set default values for missing fields
     if url is None:
         url = 'localhost'
@@ -622,10 +604,17 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     author = author or 'Unknown'
     ingestion_date = ingestion_date or datetime.now().strftime('%Y-%m-%d')
 
-    if media_type not in ['article', 'audio', 'document', 'mediawiki_article', 'mediawiki_dump', 'obsidian_note', 'podcast', 'text', 'video', 'unknown']:
-        raise InputError("Invalid media type. Allowed types: article, audio file, document, obsidian_note podcast, text, video, unknown.")
+    if media_type not in ['article', 'audio', 'book', 'document', 'mediawiki_article', 'mediawiki_dump',
+                          'obsidian_note', 'podcast', 'text', 'video', 'unknown']:
+        log_counter("add_media_with_keywords_error", labels={"error_type": "InvalidMediaType"})
+        duration = time.time() - start_time
+        log_histogram("add_media_with_keywords_duration", duration)
+        raise InputError("Invalid media type. Allowed types: article, audio file, document, obsidian_note, podcast, text, video, unknown.")
 
     if ingestion_date and not is_valid_date(ingestion_date):
+        log_counter("add_media_with_keywords_error", labels={"error_type": "InvalidDateFormat"})
+        duration = time.time() - start_time
+        log_histogram("add_media_with_keywords_duration", duration)
         raise InputError("Invalid ingestion date format. Use YYYY-MM-DD.")
 
     # Handle keywords as either string or list
@@ -654,6 +643,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
             logging.debug(f"Existing media ID for {url}: {existing_media_id}")
 
             if existing_media_id:
+                # Update existing media
                 media_id = existing_media_id
                 logging.debug(f"Updating existing media with ID: {media_id}")
                 cursor.execute('''
@@ -661,7 +651,9 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
                 SET content = ?, transcription_model = ?, type = ?, author = ?, ingestion_date = ?
                 WHERE id = ?
                 ''', (content, transcription_model, media_type, author, ingestion_date, media_id))
+                log_counter("add_media_with_keywords_update")
             else:
+                # Insert new media
                 logging.debug("Inserting new media")
                 cursor.execute('''
                 INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
@@ -669,6 +661,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
                 ''', (url, title, media_type, content, author, ingestion_date, transcription_model))
                 media_id = cursor.lastrowid
                 logging.debug(f"New media inserted with ID: {media_id}")
+                log_counter("add_media_with_keywords_insert")
 
             cursor.execute('''
             INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
@@ -698,13 +691,23 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
             conn.commit()
             logging.info(f"Media '{title}' successfully added/updated with ID: {media_id}")
 
-        return media_id, f"Media '{title}' added/updated successfully with keywords: {', '.join(keyword_list)}"
+            duration = time.time() - start_time
+            log_histogram("add_media_with_keywords_duration", duration)
+            log_counter("add_media_with_keywords_success")
+
+            return media_id, f"Media '{title}' added/updated successfully with keywords: {', '.join(keyword_list)}"
 
     except sqlite3.Error as e:
         logging.error(f"SQL Error in add_media_with_keywords: {e}")
+        duration = time.time() - start_time
+        log_histogram("add_media_with_keywords_duration", duration)
+        log_counter("add_media_with_keywords_error", labels={"error_type": "SQLiteError"})
         raise DatabaseError(f"Error adding media with keywords: {e}")
     except Exception as e:
         logging.error(f"Unexpected Error in add_media_with_keywords: {e}")
+        duration = time.time() - start_time
+        log_histogram("add_media_with_keywords_duration", duration)
+        log_counter("add_media_with_keywords_error", labels={"error_type": type(e).__name__})
         raise DatabaseError(f"Unexpected error: {e}")
 
 
@@ -779,7 +782,13 @@ def ingest_article_to_db(url, title, author, content, keywords, summary, ingesti
 
 # Function to add a keyword
 def add_keyword(keyword: str) -> int:
+    log_counter("add_keyword_attempt")
+    start_time = time.time()
+
     if not keyword.strip():
+        log_counter("add_keyword_error", labels={"error_type": "EmptyKeyword"})
+        duration = time.time() - start_time
+        log_histogram("add_keyword_duration", duration)
         raise DatabaseError("Keyword cannot be empty")
 
     keyword = keyword.strip().lower()
@@ -801,18 +810,32 @@ def add_keyword(keyword: str) -> int:
 
             logging.info(f"Keyword '{keyword}' added or updated with ID: {keyword_id}")
             conn.commit()
+
+            duration = time.time() - start_time
+            log_histogram("add_keyword_duration", duration)
+            log_counter("add_keyword_success")
+
             return keyword_id
         except sqlite3.IntegrityError as e:
             logging.error(f"Integrity error adding keyword: {e}")
+            duration = time.time() - start_time
+            log_histogram("add_keyword_duration", duration)
+            log_counter("add_keyword_error", labels={"error_type": "IntegrityError"})
             raise DatabaseError(f"Integrity error adding keyword: {e}")
         except sqlite3.Error as e:
             logging.error(f"Error adding keyword: {e}")
+            duration = time.time() - start_time
+            log_histogram("add_keyword_duration", duration)
+            log_counter("add_keyword_error", labels={"error_type": "SQLiteError"})
             raise DatabaseError(f"Error adding keyword: {e}")
 
 
 
 # Function to delete a keyword
 def delete_keyword(keyword: str) -> str:
+    log_counter("delete_keyword_attempt")
+    start_time = time.time()
+
     keyword = keyword.strip().lower()
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -823,10 +846,23 @@ def delete_keyword(keyword: str) -> str:
                 cursor.execute('DELETE FROM Keywords WHERE keyword = ?', (keyword,))
                 cursor.execute('DELETE FROM keyword_fts WHERE rowid = ?', (keyword_id[0],))
                 conn.commit()
+
+                duration = time.time() - start_time
+                log_histogram("delete_keyword_duration", duration)
+                log_counter("delete_keyword_success")
+
                 return f"Keyword '{keyword}' deleted successfully."
             else:
+                duration = time.time() - start_time
+                log_histogram("delete_keyword_duration", duration)
+                log_counter("delete_keyword_not_found")
+
                 return f"Keyword '{keyword}' not found."
         except sqlite3.Error as e:
+            duration = time.time() - start_time
+            log_histogram("delete_keyword_duration", duration)
+            log_counter("delete_keyword_error", labels={"error_type": type(e).__name__})
+            logging.error(f"Error deleting keyword: {e}")
             raise DatabaseError(f"Error deleting keyword: {e}")
 
 
@@ -1000,7 +1036,7 @@ def add_media_version(conn, media_id: int, prompt: str, summary: str) -> None:
 
 
 # Function to search the database with advanced options, including keyword search and full-text search
-def sqlite_search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10, connection=None):
+def search_media_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 20, connection=None):
     if page < 1:
         raise ValueError("Page number must be 1 or greater.")
 
@@ -1055,7 +1091,7 @@ def sqlite_search_db(search_query: str, search_fields: List[str], keywords: str,
 
 # Gradio function to handle user input and display results with pagination, with better feedback
 def search_and_display(search_query, search_fields, keywords, page):
-    results = sqlite_search_db(search_query, search_fields, keywords, page)
+    results = search_media_db(search_query, search_fields, keywords, page)
 
     if isinstance(results, pd.DataFrame):
         # Convert DataFrame to a list of tuples or lists
@@ -1133,7 +1169,7 @@ def format_results(results):
 # Function to export search results to CSV or markdown with pagination
 def export_to_file(search_query: str, search_fields: List[str], keyword: str, page: int = 1, results_per_file: int = 1000, export_format: str = 'csv'):
     try:
-        results = sqlite_search_db(search_query, search_fields, keyword, page, results_per_file)
+        results = search_media_db(search_query, search_fields, keyword, page, results_per_file)
         if not results:
             return "No results found to export."
 
@@ -1378,303 +1414,6 @@ def schedule_chunking(media_id: int, content: str, media_name: str):
 
 #
 # End of ....
-#######################################################################################################################
-
-
-#######################################################################################################################
-#
-# Functions to manage prompts DB
-
-def create_prompts_db():
-    logging.debug("create_prompts_db: Creating prompts database.")
-    with sqlite3.connect(get_database_path('prompts.db')) as conn:
-        cursor = conn.cursor()
-        cursor.executescript('''
-            CREATE TABLE IF NOT EXISTS Prompts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                author TEXT,
-                details TEXT,
-                system TEXT,
-                user TEXT
-            );
-            CREATE TABLE IF NOT EXISTS Keywords (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                keyword TEXT NOT NULL UNIQUE COLLATE NOCASE
-            );
-            CREATE TABLE IF NOT EXISTS PromptKeywords (
-                prompt_id INTEGER,
-                keyword_id INTEGER,
-                FOREIGN KEY (prompt_id) REFERENCES Prompts (id),
-                FOREIGN KEY (keyword_id) REFERENCES Keywords (id),
-                PRIMARY KEY (prompt_id, keyword_id)
-            );
-            CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON Keywords(keyword);
-            CREATE INDEX IF NOT EXISTS idx_promptkeywords_prompt_id ON PromptKeywords(prompt_id);
-            CREATE INDEX IF NOT EXISTS idx_promptkeywords_keyword_id ON PromptKeywords(keyword_id);
-        ''')
-
-# FIXME - dirty hack that should be removed later...
-# Migration function to add the 'author' column to the Prompts table
-def add_author_column_to_prompts():
-    with sqlite3.connect(get_database_path('prompts.db')) as conn:
-        cursor = conn.cursor()
-        # Check if 'author' column already exists
-        cursor.execute("PRAGMA table_info(Prompts)")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        if 'author' not in columns:
-            # Add the 'author' column
-            cursor.execute('ALTER TABLE Prompts ADD COLUMN author TEXT')
-            print("Author column added to Prompts table.")
-        else:
-            print("Author column already exists in Prompts table.")
-
-add_author_column_to_prompts()
-
-def normalize_keyword(keyword):
-    return re.sub(r'\s+', ' ', keyword.strip().lower())
-
-
-# FIXME - update calls to this function to use the new args
-def add_prompt(name, author, details, system=None, user=None, keywords=None):
-    logging.debug(f"add_prompt: Adding prompt with name: {name}, author: {author}, system: {system}, user: {user}, keywords: {keywords}")
-    if not name:
-        logging.error("add_prompt: A name is required.")
-        return "A name is required."
-
-    try:
-        with sqlite3.connect(get_database_path('prompts.db')) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO Prompts (name, author, details, system, user)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (name, author, details, system, user))
-            prompt_id = cursor.lastrowid
-
-            if keywords:
-                normalized_keywords = [normalize_keyword(k) for k in keywords if k.strip()]
-                for keyword in set(normalized_keywords):  # Use set to remove duplicates
-                    cursor.execute('''
-                        INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)
-                    ''', (keyword,))
-                    cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-                    keyword_id = cursor.fetchone()[0]
-                    cursor.execute('''
-                        INSERT OR IGNORE INTO PromptKeywords (prompt_id, keyword_id) VALUES (?, ?)
-                    ''', (prompt_id, keyword_id))
-        return "Prompt added successfully."
-    except sqlite3.IntegrityError:
-        return "Prompt with this name already exists."
-    except sqlite3.Error as e:
-        return f"Database error: {e}"
-
-
-def fetch_prompt_details(name):
-    logging.debug(f"fetch_prompt_details: Fetching details for prompt: {name}")
-    with sqlite3.connect(get_database_path('prompts.db')) as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT p.name, p.author, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
-            FROM Prompts p
-            LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
-            LEFT JOIN Keywords k ON pk.keyword_id = k.id
-            WHERE p.name = ?
-            GROUP BY p.id
-        ''', (name,))
-        return cursor.fetchone()
-
-
-def list_prompts(page=1, per_page=10):
-    logging.debug(f"list_prompts: Listing prompts for page {page} with {per_page} prompts per page.")
-    offset = (page - 1) * per_page
-    with sqlite3.connect(get_database_path('prompts.db')) as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT name FROM Prompts LIMIT ? OFFSET ?', (per_page, offset))
-        prompts = [row[0] for row in cursor.fetchall()]
-
-        # Get total count of prompts
-        cursor.execute('SELECT COUNT(*) FROM Prompts')
-        total_count = cursor.fetchone()[0]
-
-    total_pages = (total_count + per_page - 1) // per_page
-    return prompts, total_pages, page
-
-# This will not scale. For a large number of prompts, use a more efficient method.
-# FIXME - see above statement.
-def load_preset_prompts():
-    logging.debug("load_preset_prompts: Loading preset prompts.")
-    try:
-        with sqlite3.connect(get_database_path('prompts.db')) as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT name FROM Prompts ORDER BY name ASC')
-            prompts = [row[0] for row in cursor.fetchall()]
-        return prompts
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        return []
-
-
-def insert_prompt_to_db(title, author, description, system_prompt, user_prompt, keywords=None):
-    return add_prompt(title, author, description, system_prompt, user_prompt, keywords)
-
-
-def get_prompt_db_connection():
-    prompt_db_path = get_database_path('prompts.db')
-    return sqlite3.connect(prompt_db_path)
-
-
-def search_prompts(query):
-    logging.debug(f"search_prompts: Searching prompts with query: {query}")
-    try:
-        with get_prompt_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
-                FROM Prompts p
-                LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
-                LEFT JOIN Keywords k ON pk.keyword_id = k.id
-                WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
-                GROUP BY p.id
-                ORDER BY p.name
-            """, (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'))
-            return cursor.fetchall()
-    except sqlite3.Error as e:
-        logging.error(f"Error searching prompts: {e}")
-        return []
-
-
-def search_prompts_by_keyword(keyword, page=1, per_page=10):
-    logging.debug(f"search_prompts_by_keyword: Searching prompts by keyword: {keyword}")
-    normalized_keyword = normalize_keyword(keyword)
-    offset = (page - 1) * per_page
-    with sqlite3.connect(get_database_path('prompts.db')) as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT DISTINCT p.name
-            FROM Prompts p
-            JOIN PromptKeywords pk ON p.id = pk.prompt_id
-            JOIN Keywords k ON pk.keyword_id = k.id
-            WHERE k.keyword LIKE ?
-            LIMIT ? OFFSET ?
-        ''', ('%' + normalized_keyword + '%', per_page, offset))
-        prompts = [row[0] for row in cursor.fetchall()]
-
-        # Get total count of matching prompts
-        cursor.execute('''
-            SELECT COUNT(DISTINCT p.id)
-            FROM Prompts p
-            JOIN PromptKeywords pk ON p.id = pk.prompt_id
-            JOIN Keywords k ON pk.keyword_id = k.id
-            WHERE k.keyword LIKE ?
-        ''', ('%' + normalized_keyword + '%',))
-        total_count = cursor.fetchone()[0]
-
-    total_pages = (total_count + per_page - 1) // per_page
-    return prompts, total_pages, page
-
-
-def update_prompt_keywords(prompt_name, new_keywords):
-    logging.debug(f"update_prompt_keywords: Updating keywords for prompt: {prompt_name}")
-    try:
-        with sqlite3.connect(get_database_path('prompts.db')) as conn:
-            cursor = conn.cursor()
-
-            cursor.execute('SELECT id FROM Prompts WHERE name = ?', (prompt_name,))
-            prompt_id = cursor.fetchone()
-            if not prompt_id:
-                return "Prompt not found."
-            prompt_id = prompt_id[0]
-
-            cursor.execute('DELETE FROM PromptKeywords WHERE prompt_id = ?', (prompt_id,))
-
-            normalized_keywords = [normalize_keyword(k) for k in new_keywords if k.strip()]
-            for keyword in set(normalized_keywords):  # Use set to remove duplicates
-                cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
-                cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-                keyword_id = cursor.fetchone()[0]
-                cursor.execute('INSERT INTO PromptKeywords (prompt_id, keyword_id) VALUES (?, ?)',
-                               (prompt_id, keyword_id))
-
-            # Remove unused keywords
-            cursor.execute('''
-                DELETE FROM Keywords
-                WHERE id NOT IN (SELECT DISTINCT keyword_id FROM PromptKeywords)
-            ''')
-        return "Keywords updated successfully."
-    except sqlite3.Error as e:
-        return f"Database error: {e}"
-
-
-def add_or_update_prompt(title, author, description, system_prompt, user_prompt, keywords=None):
-    logging.debug(f"add_or_update_prompt: Adding or updating prompt: {title}")
-    if not title:
-        return "Error: Title is required."
-
-    existing_prompt = fetch_prompt_details(title)
-    if existing_prompt:
-        # Update existing prompt
-        result = update_prompt_in_db(title, author, description, system_prompt, user_prompt)
-        if "successfully" in result:
-            # Update keywords if the prompt update was successful
-            keyword_result = update_prompt_keywords(title, keywords or [])
-            result += f" {keyword_result}"
-    else:
-        # Insert new prompt
-        result = insert_prompt_to_db(title, author, description, system_prompt, user_prompt, keywords)
-
-    return result
-
-
-def load_prompt_details(selected_prompt):
-    logging.debug(f"load_prompt_details: Loading prompt details for {selected_prompt}")
-    if selected_prompt:
-        details = fetch_prompt_details(selected_prompt)
-        if details:
-            return details[0], details[1], details[2], details[3], details[4], details[5]
-    return "", "", "", "", "", ""
-
-
-def update_prompt_in_db(title, author, description, system_prompt, user_prompt):
-    logging.debug(f"update_prompt_in_db: Updating prompt: {title}")
-    try:
-        with sqlite3.connect(get_database_path('prompts.db')) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE Prompts SET author = ?, details = ?, system = ?, user = ? WHERE name = ?",
-                (author, description, system_prompt, user_prompt, title)
-            )
-            if cursor.rowcount == 0:
-                return "No prompt found with the given title."
-        return "Prompt updated successfully!"
-    except sqlite3.Error as e:
-        return f"Error updating prompt: {e}"
-
-
-create_prompts_db()
-
-def delete_prompt(prompt_id):
-    logging.debug(f"delete_prompt: Deleting prompt with ID: {prompt_id}")
-    try:
-        with sqlite3.connect(get_database_path('prompts.db')) as conn:
-            cursor = conn.cursor()
-
-            # Delete associated keywords
-            cursor.execute("DELETE FROM PromptKeywords WHERE prompt_id = ?", (prompt_id,))
-
-            # Delete the prompt
-            cursor.execute("DELETE FROM Prompts WHERE id = ?", (prompt_id,))
-
-            if cursor.rowcount == 0:
-                return f"No prompt found with ID {prompt_id}"
-            else:
-                conn.commit()
-                return f"Prompt with ID {prompt_id} has been successfully deleted"
-    except sqlite3.Error as e:
-        return f"An error occurred: {e}"
-
-#
-#
 #######################################################################################################################
 
 
@@ -2017,204 +1756,6 @@ def import_obsidian_note_to_db(note_data):
 
 #
 # End of Obsidian-related Functions
-#######################################################################################################################
-
-
-#######################################################################################################################
-#
-# Chat-related Functions
-
-
-
-def create_chat_conversation(media_id, conversation_name):
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO ChatConversations (media_id, conversation_name, created_at, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ''', (media_id, conversation_name))
-            conn.commit()
-            return cursor.lastrowid
-    except sqlite3.Error as e:
-        logging.error(f"Error creating chat conversation: {e}")
-        raise DatabaseError(f"Error creating chat conversation: {e}")
-
-
-def add_chat_message(conversation_id: int, sender: str, message: str) -> int:
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO ChatMessages (conversation_id, sender, message)
-                VALUES (?, ?, ?)
-            ''', (conversation_id, sender, message))
-            conn.commit()
-            return cursor.lastrowid
-    except sqlite3.Error as e:
-        logging.error(f"Error adding chat message: {e}")
-        raise DatabaseError(f"Error adding chat message: {e}")
-
-
-def get_chat_messages(conversation_id: int) -> List[Dict[str, Any]]:
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT id, sender, message, timestamp
-                FROM ChatMessages
-                WHERE conversation_id = ?
-                ORDER BY timestamp ASC
-            ''', (conversation_id,))
-            messages = cursor.fetchall()
-            return [
-                {
-                    'id': msg[0],
-                    'sender': msg[1],
-                    'message': msg[2],
-                    'timestamp': msg[3]
-                }
-                for msg in messages
-            ]
-    except sqlite3.Error as e:
-        logging.error(f"Error retrieving chat messages: {e}")
-        raise DatabaseError(f"Error retrieving chat messages: {e}")
-
-
-def search_chat_conversations(search_query: str) -> List[Dict[str, Any]]:
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT cc.id, cc.media_id, cc.conversation_name, cc.created_at, m.title as media_title
-                FROM ChatConversations cc
-                LEFT JOIN Media m ON cc.media_id = m.id
-                WHERE cc.conversation_name LIKE ? OR m.title LIKE ?
-                ORDER BY cc.updated_at DESC
-            ''', (f'%{search_query}%', f'%{search_query}%'))
-            conversations = cursor.fetchall()
-            return [
-                {
-                    'id': conv[0],
-                    'media_id': conv[1],
-                    'conversation_name': conv[2],
-                    'created_at': conv[3],
-                    'media_title': conv[4] or "Unknown Media"
-                }
-                for conv in conversations
-            ]
-    except sqlite3.Error as e:
-        logging.error(f"Error searching chat conversations: {e}")
-        return []
-
-
-def update_chat_message(message_id: int, new_message: str) -> None:
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE ChatMessages
-                SET message = ?, timestamp = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (new_message, message_id))
-            conn.commit()
-    except sqlite3.Error as e:
-        logging.error(f"Error updating chat message: {e}")
-        raise DatabaseError(f"Error updating chat message: {e}")
-
-
-def delete_chat_message(message_id: int) -> None:
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM ChatMessages WHERE id = ?', (message_id,))
-            conn.commit()
-    except sqlite3.Error as e:
-        logging.error(f"Error deleting chat message: {e}")
-        raise DatabaseError(f"Error deleting chat message: {e}")
-
-
-def save_chat_history_to_database(chatbot, conversation_id, media_id, media_name, conversation_name):
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-
-            # If conversation_id is None, create a new conversation
-            if conversation_id is None:
-                cursor.execute('''
-                    INSERT INTO ChatConversations (media_id, media_name, conversation_name, created_at, updated_at)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (media_id, media_name, conversation_name))
-                conversation_id = cursor.lastrowid
-            else:
-                # If conversation exists, update the media_name
-                cursor.execute('''
-                    UPDATE ChatConversations
-                    SET media_name = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                ''', (media_name, conversation_id))
-
-            # Save each message in the chatbot history
-            for i, (user_msg, ai_msg) in enumerate(chatbot):
-                cursor.execute('''
-                    INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ''', (conversation_id, 'user', user_msg))
-
-                cursor.execute('''
-                    INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ''', (conversation_id, 'ai', ai_msg))
-
-            # Update the conversation's updated_at timestamp
-            cursor.execute('''
-                UPDATE ChatConversations
-                SET updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (conversation_id,))
-
-            conn.commit()
-
-        return conversation_id
-    except Exception as e:
-        logging.error(f"Error saving chat history to database: {str(e)}")
-        raise
-
-
-def get_conversation_name(conversation_id):
-    if conversation_id is None:
-        return None
-
-    try:
-        with sqlite3.connect('media_summary.db') as conn:  # Replace with your actual database name
-            cursor = conn.cursor()
-
-            query = """
-            SELECT conversation_name, media_name
-            FROM ChatConversations
-            WHERE id = ?
-            """
-
-            cursor.execute(query, (conversation_id,))
-            result = cursor.fetchone()
-
-            if result:
-                conversation_name, media_name = result
-                if conversation_name:
-                    return conversation_name
-                elif media_name:
-                    return f"{media_name}-chat"
-
-            return None  # Return None if no result found
-    except sqlite3.Error as e:
-        logging.error(f"Database error in get_conversation_name: {e}")
-        return None
-    except Exception as e:
-        logging.error(f"Unexpected error in get_conversation_name: {e}")
-        return None
-
-#
-# End of Chat-related Functions
 #######################################################################################################################
 
 
@@ -2837,29 +2378,42 @@ def process_chunks(database, chunks: List[Dict], media_id: int, batch_size: int 
     :param media_id: ID of the media these chunks belong to
     :param batch_size: Number of chunks to process in each batch
     """
+    log_counter("process_chunks_attempt", labels={"media_id": media_id})
+    start_time = time.time()
     total_chunks = len(chunks)
     processed_chunks = 0
 
-    for i in range(0, total_chunks, batch_size):
-        batch = chunks[i:i + batch_size]
-        chunk_data = [
-            (media_id, chunk['text'], chunk['start_index'], chunk['end_index'])
-            for chunk in batch
-        ]
+    try:
+        for i in range(0, total_chunks, batch_size):
+            batch = chunks[i:i + batch_size]
+            chunk_data = [
+                (media_id, chunk['text'], chunk['start_index'], chunk['end_index'])
+                for chunk in batch
+            ]
 
-        try:
-            database.execute_many(
-                "INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index) VALUES (?, ?, ?, ?)",
-                chunk_data
-            )
-            processed_chunks += len(batch)
-            logging.info(f"Processed {processed_chunks}/{total_chunks} chunks for media_id {media_id}")
-        except Exception as e:
-            logging.error(f"Error inserting chunk batch for media_id {media_id}: {e}")
-            # Optionally, you could raise an exception here to stop processing
-            # raise
+            try:
+                database.execute_many(
+                    "INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index) VALUES (?, ?, ?, ?)",
+                    chunk_data
+                )
+                processed_chunks += len(batch)
+                logging.info(f"Processed {processed_chunks}/{total_chunks} chunks for media_id {media_id}")
+                log_counter("process_chunks_batch_success", labels={"media_id": media_id})
+            except Exception as e:
+                logging.error(f"Error inserting chunk batch for media_id {media_id}: {e}")
+                log_counter("process_chunks_batch_error", labels={"media_id": media_id, "error_type": type(e).__name__})
+                # Optionally, you could raise an exception here to stop processing
+                # raise
 
-    logging.info(f"Finished processing all {total_chunks} chunks for media_id {media_id}")
+            logging.info(f"Finished processing all {total_chunks} chunks for media_id {media_id}")
+            duration = time.time() - start_time
+            log_histogram("process_chunks_duration", duration, labels={"media_id": media_id})
+            log_counter("process_chunks_success", labels={"media_id": media_id})
+    except Exception as e:
+        duration = time.time() - start_time
+        log_histogram("process_chunks_duration", duration, labels={"media_id": media_id})
+        log_counter("process_chunks_error", labels={"media_id": media_id, "error_type": type(e).__name__})
+        logging.error(f"Error processing chunks for media_id {media_id}: {e}")
 
 
 # Usage example:
@@ -2995,46 +2549,48 @@ def update_media_table(db):
 #
 # Workflow Functions
 
+# Workflow Functions
 def save_workflow_chat_to_db(chat_history, workflow_name, conversation_id=None):
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-
-            if conversation_id is None:
-                # Create a new conversation
-                conversation_name = f"{workflow_name}_Workflow_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                cursor.execute('''
-                    INSERT INTO ChatConversations (media_id, media_name, conversation_name, created_at, updated_at)
-                    VALUES (NULL, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (workflow_name, conversation_name))
-                conversation_id = cursor.lastrowid
-            else:
-                # Update existing conversation
-                cursor.execute('''
-                    UPDATE ChatConversations
-                    SET updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                ''', (conversation_id,))
-
-            # Save messages
-            for user_msg, ai_msg in chat_history:
-                if user_msg:
-                    cursor.execute('''
-                        INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
-                        VALUES (?, 'user', ?, CURRENT_TIMESTAMP)
-                    ''', (conversation_id, user_msg))
-                if ai_msg:
-                    cursor.execute('''
-                        INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
-                        VALUES (?, 'ai', ?, CURRENT_TIMESTAMP)
-                    ''', (conversation_id, ai_msg))
-
-            conn.commit()
-
-        return conversation_id, f"Chat saved successfully! Conversation ID: {conversation_id}"
-    except Exception as e:
-        logging.error(f"Error saving workflow chat to database: {str(e)}")
-        return None, f"Error saving chat to database: {str(e)}"
+    pass
+#     try:
+#         with db.get_connection() as conn:
+#             cursor = conn.cursor()
+#
+#             if conversation_id is None:
+#                 # Create a new conversation
+#                 conversation_name = f"{workflow_name}_Workflow_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+#                 cursor.execute('''
+#                     INSERT INTO ChatConversations (media_id, media_name, conversation_name, created_at, updated_at)
+#                     VALUES (NULL, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+#                 ''', (workflow_name, conversation_name))
+#                 conversation_id = cursor.lastrowid
+#             else:
+#                 # Update existing conversation
+#                 cursor.execute('''
+#                     UPDATE ChatConversations
+#                     SET updated_at = CURRENT_TIMESTAMP
+#                     WHERE id = ?
+#                 ''', (conversation_id,))
+#
+#             # Save messages
+#             for user_msg, ai_msg in chat_history:
+#                 if user_msg:
+#                     cursor.execute('''
+#                         INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+#                         VALUES (?, 'user', ?, CURRENT_TIMESTAMP)
+#                     ''', (conversation_id, user_msg))
+#                 if ai_msg:
+#                     cursor.execute('''
+#                         INSERT INTO ChatMessages (conversation_id, sender, message, timestamp)
+#                         VALUES (?, 'ai', ?, CURRENT_TIMESTAMP)
+#                     ''', (conversation_id, ai_msg))
+#
+#             conn.commit()
+#
+#         return conversation_id, f"Chat saved successfully! Conversation ID: {conversation_id}"
+#     except Exception as e:
+#         logging.error(f"Error saving workflow chat to database: {str(e)}")
+#         return None, f"Error saving chat to database: {str(e)}"
 
 
 def get_workflow_chat(conversation_id):

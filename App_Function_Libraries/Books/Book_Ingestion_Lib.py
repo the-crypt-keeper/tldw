@@ -385,107 +385,101 @@ def process_markdown_content(markdown_content, file_path, title, author, keyword
     return f"Document '{title}' imported successfully. Database result: {result}"
 
 
-def import_file_handler(file,
-                        title,
-                        author,
-                        keywords,
-                        system_prompt,
-                        custom_prompt,
-                        auto_summarize,
-                        api_name,
-                        api_key,
-                        max_chunk_size,
-                        chunk_overlap,
-                        custom_chapter_pattern
-                        ):
+def import_file_handler(files,
+                       author,
+                       keywords,
+                       system_prompt,
+                       custom_prompt,
+                       auto_summarize,
+                       api_name,
+                       api_key,
+                       max_chunk_size,
+                       chunk_overlap,
+                       custom_chapter_pattern):
     try:
-        log_counter("file_import_attempt", labels={"file_name": file.name})
+        if not files:
+            return "No files uploaded."
 
-        # Handle max_chunk_size
-        if isinstance(max_chunk_size, str):
-            max_chunk_size = int(max_chunk_size) if max_chunk_size.strip() else 4000
-        elif not isinstance(max_chunk_size, int):
-            max_chunk_size = 4000  # Default value if not a string or int
+        # Convert single file to list for consistent processing
+        if not isinstance(files, list):
+            files = [files]
 
-        # Handle chunk_overlap
-        if isinstance(chunk_overlap, str):
-            chunk_overlap = int(chunk_overlap) if chunk_overlap.strip() else 0
-        elif not isinstance(chunk_overlap, int):
-            chunk_overlap = 0  # Default value if not a string or int
+        results = []
+        for file in files:
+            log_counter("file_import_attempt", labels={"file_name": file.name})
 
-        chunk_options = {
-            'method': 'chapter',
-            'max_size': max_chunk_size,
-            'overlap': chunk_overlap,
-            'custom_chapter_pattern': custom_chapter_pattern if custom_chapter_pattern else None
-        }
+            # Handle max_chunk_size and chunk_overlap
+            chunk_size = int(max_chunk_size) if isinstance(max_chunk_size, (str, int)) else 4000
+            overlap = int(chunk_overlap) if isinstance(chunk_overlap, (str, int)) else 0
 
-        if file is None:
-            log_counter("file_import_error", labels={"error": "No file uploaded"})
-            return "No file uploaded."
+            chunk_options = {
+                'method': 'chapter',
+                'max_size': chunk_size,
+                'overlap': overlap,
+                'custom_chapter_pattern': custom_chapter_pattern if custom_chapter_pattern else None
+            }
 
-        file_path = file.name
-        if not os.path.exists(file_path):
-            log_counter("file_import_error", labels={"error": "File not found", "file_name": file.name})
-            return "Uploaded file not found."
+            file_path = file.name
+            if not os.path.exists(file_path):
+                results.append(f"❌ File not found: {file.name}")
+                continue
 
-        start_time = datetime.now()
+            start_time = datetime.now()
 
-        if file_path.lower().endswith('.epub'):
-            status = import_epub(
-                file_path,
-                title,
-                author,
-                keywords,
-                custom_prompt=custom_prompt,
-                system_prompt=system_prompt,
-                summary=None,
-                auto_summarize=auto_summarize,
-                api_name=api_name,
-                api_key=api_key,
-                chunk_options=chunk_options,
-                custom_chapter_pattern=custom_chapter_pattern
-            )
-            log_counter("epub_import_success", labels={"file_name": file.name})
-            result = f"📚 EPUB Imported Successfully:\n{status}"
-        elif file.name.lower().endswith('.zip'):
-            status = process_zip_file(
-                zip_file=file,
-                title=title,
-                author=author,
-                keywords=keywords,
-                custom_prompt=custom_prompt,
-                system_prompt=system_prompt,
-                summary=None,
-                auto_summarize=auto_summarize,
-                api_name=api_name,
-                api_key=api_key,
-                chunk_options=chunk_options
-            )
-            log_counter("zip_import_success", labels={"file_name": file.name})
-            result = f"📦 ZIP Processed Successfully:\n{status}"
-        elif file.name.lower().endswith(('.chm', '.html', '.pdf', '.xml', '.opml')):
-            file_type = file.name.split('.')[-1].upper()
-            log_counter("unsupported_file_type", labels={"file_type": file_type})
-            result = f"{file_type} file import is not yet supported."
-        else:
-            log_counter("unsupported_file_type", labels={"file_type": file.name.split('.')[-1]})
-            result = "❌ Unsupported file type. Please upload an `.epub` file or a `.zip` file containing `.epub` files."
+            # Extract title from filename
+            title = os.path.splitext(os.path.basename(file_path))[0]
 
-        end_time = datetime.now()
-        processing_time = (end_time - start_time).total_seconds()
-        log_histogram("file_import_duration", processing_time, labels={"file_name": file.name})
+            if file_path.lower().endswith('.epub'):
+                status = import_epub(
+                    file_path,
+                    title=title,  # Use filename as title
+                    author=author,
+                    keywords=keywords,
+                    custom_prompt=custom_prompt,
+                    system_prompt=system_prompt,
+                    summary=None,
+                    auto_summarize=auto_summarize,
+                    api_name=api_name,
+                    api_key=api_key,
+                    chunk_options=chunk_options,
+                    custom_chapter_pattern=custom_chapter_pattern
+                )
+                log_counter("epub_import_success", labels={"file_name": file.name})
+                results.append(f"📚 {file.name}: {status}")
 
-        return result
+            elif file_path.lower().endswith('.zip'):
+                status = process_zip_file(
+                    zip_file=file,
+                    title=None,  # Let each file use its own name
+                    author=author,
+                    keywords=keywords,
+                    custom_prompt=custom_prompt,
+                    system_prompt=system_prompt,
+                    summary=None,
+                    auto_summarize=auto_summarize,
+                    api_name=api_name,
+                    api_key=api_key,
+                    chunk_options=chunk_options
+                )
+                log_counter("zip_import_success", labels={"file_name": file.name})
+                results.append(f"📦 {file.name}: {status}")
+            else:
+                results.append(f"❌ Unsupported file type: {file.name}")
+                continue
+
+            end_time = datetime.now()
+            processing_time = (end_time - start_time).total_seconds()
+            log_histogram("file_import_duration", processing_time, labels={"file_name": file.name})
+
+        return "\n\n".join(results)
 
     except ValueError as ve:
         logging.exception(f"Error parsing input values: {str(ve)}")
-        log_counter("file_import_error", labels={"error": "Invalid input", "file_name": file.name})
         return f"❌ Error: Invalid input for chunk size or overlap. Please enter valid numbers."
     except Exception as e:
         logging.exception(f"Error during file import: {str(e)}")
-        log_counter("file_import_error", labels={"error": str(e), "file_name": file.name})
         return f"❌ Error during import: {str(e)}"
+
 
 
 def read_epub(file_path):
@@ -568,9 +562,9 @@ def ingest_text_file(file_path, title=None, author=None, keywords=None):
 
         # Add the text file to the database
         add_media_with_keywords(
-            url=file_path,
+            url="its_a_book",
             title=title,
-            media_type='document',
+            media_type='book',
             content=content,
             keywords=keywords,
             prompt='No prompt for text files',

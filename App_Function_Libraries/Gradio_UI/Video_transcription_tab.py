@@ -10,10 +10,12 @@ from datetime import datetime
 # External Imports
 import gradio as gr
 import yt_dlp
+
+from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, add_media_to_database, \
-    check_media_and_whisper_model, check_existing_media, update_media_content_with_version
+from App_Function_Libraries.DB.DB_Manager import add_media_to_database, \
+    check_media_and_whisper_model, check_existing_media, update_media_content_with_version, list_prompts
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models, update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import error_handler
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_transcription, perform_summarization, \
@@ -65,15 +67,20 @@ def create_video_transcription_tab():
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                          value=False,
                                                          visible=True)
+
+                # Initialize state variables for pagination
+                current_page_state = gr.State(value=1)
+                total_pages_state = gr.State(value=1)
+
                 with gr.Row():
+                    # Add pagination controls
                     preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                                choices=load_preset_prompts(),
+                                                choices=[],
                                                 visible=False)
                 with gr.Row():
-                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                     placeholder="Enter custom prompt here",
-                                                     lines=3,
-                                                     visible=False)
+                    prev_page_button = gr.Button("Previous Page", visible=False)
+                    page_display = gr.Markdown("Page 1 of X", visible=False)
+                    next_page_button = gr.Button("Next Page", visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
                                                      value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
@@ -96,22 +103,75 @@ def create_video_transcription_tab():
                                                      lines=3,
                                                      visible=False,
                                                      interactive=True)
+                with gr.Row():
+                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                                     placeholder="Enter custom prompt here",
+                                                     lines=3,
+                                                     visible=False)
+
                 custom_prompt_checkbox.change(
-                    fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+                    fn=lambda x: (gr.update(visible=x, interactive=x), gr.update(visible=x, interactive=x)),
                     inputs=[custom_prompt_checkbox],
                     outputs=[custom_prompt_input, system_prompt_input]
                 )
+
+                def on_preset_prompt_checkbox_change(is_checked):
+                    if is_checked:
+                        prompts, total_pages, current_page = list_prompts(page=1, per_page=20)
+                        page_display_text = f"Page {current_page} of {total_pages}"
+                        return (
+                            gr.update(visible=True, interactive=True, choices=prompts),  # preset_prompt
+                            gr.update(visible=True),  # prev_page_button
+                            gr.update(visible=True),  # next_page_button
+                            gr.update(value=page_display_text, visible=True),  # page_display
+                            current_page,  # current_page_state
+                            total_pages  # total_pages_state
+                        )
+                    else:
+                        return (
+                            gr.update(visible=False, interactive=False),  # preset_prompt
+                            gr.update(visible=False),  # prev_page_button
+                            gr.update(visible=False),  # next_page_button
+                            gr.update(visible=False),  # page_display
+                            1,  # current_page_state
+                            1   # total_pages_state
+                        )
+
                 preset_prompt_checkbox.change(
-                    fn=lambda x: gr.update(visible=x),
+                    fn=on_preset_prompt_checkbox_change,
                     inputs=[preset_prompt_checkbox],
-                    outputs=[preset_prompt]
+                    outputs=[preset_prompt, prev_page_button, next_page_button, page_display, current_page_state, total_pages_state]
+                )
+
+                def on_prev_page_click(current_page, total_pages):
+                    new_page = max(current_page - 1, 1)
+                    prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+                    page_display_text = f"Page {current_page} of {total_pages}"
+                    return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+                prev_page_button.click(
+                    fn=on_prev_page_click,
+                    inputs=[current_page_state, total_pages_state],
+                    outputs=[preset_prompt, page_display, current_page_state]
+                )
+
+                def on_next_page_click(current_page, total_pages):
+                    new_page = min(current_page + 1, total_pages)
+                    prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+                    page_display_text = f"Page {current_page} of {total_pages}"
+                    return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+                next_page_button.click(
+                    fn=on_next_page_click,
+                    inputs=[current_page_state, total_pages_state],
+                    outputs=[preset_prompt, page_display, current_page_state]
                 )
 
                 def update_prompts(preset_name):
                     prompts = update_user_prompt(preset_name)
                     return (
-                        gr.update(value=prompts["user_prompt"], visible=True),
-                        gr.update(value=prompts["system_prompt"], visible=True)
+                        gr.update(value=prompts["user_prompt"], visible=True, interactive=True),
+                        gr.update(value=prompts["system_prompt"], visible=True, interactive=True)
                     )
 
                 preset_prompt.change(
@@ -209,7 +269,6 @@ def create_video_transcription_tab():
                 try:
                     # Start overall processing timer
                     proc_start_time = datetime.now()
-                    # FIXME - summarize_recursively is not being used...
                     logging.info("Entering process_videos_with_error_handling")
                     logging.info(f"Received inputs: {inputs}")
 
@@ -261,7 +320,6 @@ def create_video_transcription_tab():
                     all_summaries = ""
 
                     # Start timing
-                    # FIXME - utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
                     start_proc = datetime.now()
 
                     for i in range(0, len(all_inputs), batch_size):
@@ -323,7 +381,7 @@ def create_video_transcription_tab():
                                     input_item, 2, whisper_model,
                                     custom_prompt,
                                     start_seconds, api_name, api_key,
-                                    vad_use, False, False, False, 0.01, None, keywords, None, diarize,
+                                    vad_use, False, False, summarize_recursively, 0.01, None, keywords, None, diarize,
                                     end_time=end_seconds,
                                     include_timestamps=timestamp_option,
                                     metadata=video_metadata,
@@ -782,7 +840,54 @@ def create_video_transcription_tab():
                         # API key resolution handled at base of function if none provided
                         api_key = api_key if api_key else None
                         logging.info(f"process_url_with_metadata: Starting summarization with {api_name}...")
-                        summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key)
+
+                        # Perform Chunking if enabled
+                        # FIXME - Setup a proper prompt for Recursive Summarization
+                        if use_chunking:
+                            logging.info("process_url_with_metadata: Chunking enabled. Starting chunking...")
+                            chunked_texts = improved_chunking_process(full_text_with_metadata, chunk_options)
+
+                            if chunked_texts is None:
+                                logging.warning("Chunking failed, falling back to full text summarization")
+                                summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt,
+                                                                     api_key)
+                            else:
+                                logging.debug(
+                                    f"process_url_with_metadata: Chunking completed. Processing {len(chunked_texts)} chunks...")
+                                summaries = []
+
+                                if rolling_summarization:
+                                    # Perform recursive summarization on each chunk
+                                    for chunk in chunked_texts:
+                                        chunk_summary = perform_summarization(api_name, chunk['text'], custom_prompt,
+                                                                              api_key)
+                                        if chunk_summary:
+                                            summaries.append(
+                                                f"Chunk {chunk['metadata']['chunk_index']}/{chunk['metadata']['total_chunks']}: {chunk_summary}")
+                                            summary_text = "\n\n".join(summaries)
+                                        else:
+                                            logging.error("All chunk summarizations failed")
+                                            summary_text = None
+
+                                for chunk in chunked_texts:
+                                    # Perform Non-recursive summarization on each chunk
+                                    chunk_summary = perform_summarization(api_name, chunk['text'], custom_prompt,
+                                                                          api_key)
+                                    if chunk_summary:
+                                        summaries.append(
+                                            f"Chunk {chunk['metadata']['chunk_index']}/{chunk['metadata']['total_chunks']}: {chunk_summary}")
+
+                                    if summaries:
+                                        summary_text = "\n\n".join(summaries)
+                                        logging.info(f"Successfully summarized {len(summaries)} chunks")
+                                    else:
+                                        logging.error("All chunk summarizations failed")
+                                        summary_text = None
+                        else:
+                            # Regular summarization without chunking
+                            summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt,
+                                                                 api_key) if api_name else None
+
                         if summary_text is None:
                             logging.error("Summarization failed.")
                             return None, None, None, None, None, None
