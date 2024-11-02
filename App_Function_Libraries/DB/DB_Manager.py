@@ -533,9 +533,6 @@ def mark_as_trash(media_id: int) -> None:
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 
-def load_preset_prompts():
-    pass
-
 def get_latest_transcription(*args, **kwargs):
     if db_type == 'sqlite':
         return sqlite_get_latest_transcription(*args, **kwargs)
