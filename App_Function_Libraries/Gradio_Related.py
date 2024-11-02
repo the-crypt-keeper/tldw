@@ -462,7 +462,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_chat_interface_stacked()
                 create_chat_interface_multi_api()
                 create_chat_interface_four()
-                create_chat_with_llamafile_tab()
                 chat_workflows_tab()
 
             with gr.TabItem("Character Chat", id="character chat group", visible=True):
