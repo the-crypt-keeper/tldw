@@ -10,8 +10,8 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import add_prompt, update_media_content, db, add_or_update_prompt, \
-    load_prompt_details, fetch_keywords_for_media, update_keywords_for_media
-from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_prompt_dropdown
+    load_prompt_details, fetch_keywords_for_media, update_keywords_for_media, fetch_prompt_details, list_prompts
+from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown
 from App_Function_Libraries.DB.SQLite_DB import fetch_item_details
 
 
@@ -199,6 +199,11 @@ def create_media_edit_and_clone_tab():
 
 
 def create_prompt_edit_tab():
+    # Initialize state variables for pagination
+    current_page_state = gr.State(value=1)
+    total_pages_state = gr.State(value=1)
+    per_page = 10  # Number of prompts per page
+
     with gr.TabItem("Add & Edit Prompts", visible=True):
         with gr.Row():
             with gr.Column():
@@ -207,38 +212,145 @@ def create_prompt_edit_tab():
                     choices=[],
                     interactive=True
                 )
+                next_page_button = gr.Button("Next Page", visible=False)
+                page_display = gr.Markdown("Page 1 of X", visible=False)
+                prev_page_button = gr.Button("Previous Page", visible=False)
                 prompt_list_button = gr.Button("List Prompts")
 
             with gr.Column():
                 title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
-                author_input = gr.Textbox(label="Author", placeholder="Enter the prompt's author", lines=3)
+                author_input = gr.Textbox(label="Author", placeholder="Enter the prompt's author", lines=1)
                 description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
                 system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
                 user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
                 add_prompt_button = gr.Button("Add/Update Prompt")
                 add_prompt_output = gr.HTML()
 
-        # Event handlers
+        # Function to update the prompt dropdown with pagination
+        def update_prompt_dropdown(page=1):
+            prompts, total_pages, current_page = list_prompts(page=page, per_page=per_page)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            prev_button_visible = current_page > 1
+            next_button_visible = current_page < total_pages
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text, visible=True),
+                gr.update(visible=prev_button_visible),
+                gr.update(visible=next_button_visible),
+                current_page,
+                total_pages
+            )
+
+        # Event handler for listing prompts
         prompt_list_button.click(
             fn=update_prompt_dropdown,
-            outputs=prompt_dropdown
+            inputs=[],
+            outputs=[
+                prompt_dropdown,
+                page_display,
+                prev_page_button,
+                next_page_button,
+                current_page_state,
+                total_pages_state
+            ]
         )
 
+        # Functions to handle pagination
+        def on_prev_page_click(current_page):
+            new_page = max(current_page - 1, 1)
+            return update_prompt_dropdown(page=new_page)
+
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            return update_prompt_dropdown(page=new_page)
+
+        # Event handlers for pagination buttons
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state],
+            outputs=[
+                prompt_dropdown,
+                page_display,
+                prev_page_button,
+                next_page_button,
+                current_page_state,
+                total_pages_state
+            ]
+        )
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[
+                prompt_dropdown,
+                page_display,
+                prev_page_button,
+                next_page_button,
+                current_page_state,
+                total_pages_state
+            ]
+        )
+
+        # Event handler for adding or updating a prompt
         add_prompt_button.click(
             fn=add_or_update_prompt,
             inputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input],
-            outputs=add_prompt_output
+            outputs=[add_prompt_output]
+        ).then(
+            fn=update_prompt_dropdown,
+            inputs=[],
+            outputs=[
+                prompt_dropdown,
+                page_display,
+                prev_page_button,
+                next_page_button,
+                current_page_state,
+                total_pages_state
+            ]
         )
 
-        # Load prompt details when selected
+        # Function to load prompt details when a prompt is selected
+        def load_prompt_details(selected_prompt):
+            details = fetch_prompt_details(selected_prompt)
+            if details:
+                title, author, description, system_prompt, user_prompt, keywords = details
+                return (
+                    gr.update(value=title),
+                    gr.update(value=author or ""),
+                    gr.update(value=description or ""),
+                    gr.update(value=system_prompt or ""),
+                    gr.update(value=user_prompt or "")
+                )
+            else:
+                return (
+                    gr.update(value=""),
+                    gr.update(value=""),
+                    gr.update(value=""),
+                    gr.update(value=""),
+                    gr.update(value="")
+                )
+
+        # Event handler for prompt selection change
         prompt_dropdown.change(
             fn=load_prompt_details,
             inputs=[prompt_dropdown],
-            outputs=[title_input, author_input, system_prompt_input, user_prompt_input]
+            outputs=[
+                title_input,
+                author_input,
+                description_input,
+                system_prompt_input,
+                user_prompt_input
+            ]
         )
 
 
+
 def create_prompt_clone_tab():
+    # Initialize state variables for pagination
+    current_page_state = gr.State(value=1)
+    total_pages_state = gr.State(value=1)
+    per_page = 10  # Number of prompts per page
+
     with gr.TabItem("Clone and Edit Prompts", visible=True):
         with gr.Row():
             with gr.Column():
@@ -248,6 +360,9 @@ def create_prompt_clone_tab():
                     choices=[],
                     interactive=True
                 )
+                next_page_button = gr.Button("Next Page", visible=False)
+                page_display = gr.Markdown("Page 1 of X", visible=False)
+                prev_page_button = gr.Button("Previous Page", visible=False)
                 prompt_list_button = gr.Button("List Prompts")
 
             with gr.Column():
@@ -260,19 +375,99 @@ def create_prompt_clone_tab():
                 save_cloned_prompt_button = gr.Button("Save Cloned Prompt", visible=False)
                 add_prompt_output = gr.HTML()
 
-        # Event handlers
+        # Function to update the prompt dropdown with pagination
+        def update_prompt_dropdown(page=1):
+            prompts, total_pages, current_page = list_prompts(page=page, per_page=per_page)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            prev_button_visible = current_page > 1
+            next_button_visible = current_page < total_pages
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text, visible=True),
+                gr.update(visible=prev_button_visible),
+                gr.update(visible=next_button_visible),
+                current_page,
+                total_pages
+            )
+
+        # Event handler for listing prompts
         prompt_list_button.click(
             fn=update_prompt_dropdown,
-            outputs=prompt_dropdown
+            inputs=[],
+            outputs=[
+                prompt_dropdown,
+                page_display,
+                prev_page_button,
+                next_page_button,
+                current_page_state,
+                total_pages_state
+            ]
+        )
+
+        # Functions to handle pagination
+        def on_prev_page_click(current_page):
+            new_page = max(current_page - 1, 1)
+            return update_prompt_dropdown(page=new_page)
+
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            return update_prompt_dropdown(page=new_page)
+
+        # Event handlers for pagination buttons
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state],
+            outputs=[
+                prompt_dropdown,
+                page_display,
+                prev_page_button,
+                next_page_button,
+                current_page_state,
+                total_pages_state
+            ]
+        )
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[
+                prompt_dropdown,
+                page_display,
+                prev_page_button,
+                next_page_button,
+                current_page_state,
+                total_pages_state
+            ]
         )
 
         # Load prompt details when selected
+        def load_prompt_details(selected_prompt):
+            if selected_prompt:
+                details = fetch_prompt_details(selected_prompt)
+                if details:
+                    title, author, description, system_prompt, user_prompt, keywords = details
+                    return (
+                        gr.update(value=title),
+                        gr.update(value=author or ""),
+                        gr.update(value=description or ""),
+                        gr.update(value=system_prompt or ""),
+                        gr.update(value=user_prompt or "")
+                    )
+            return (
+                gr.update(value=""),
+                gr.update(value=""),
+                gr.update(value=""),
+                gr.update(value=""),
+                gr.update(value="")
+            )
+
         prompt_dropdown.change(
             fn=load_prompt_details,
             inputs=[prompt_dropdown],
             outputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input]
         )
 
+        # Prepare for cloning
         def prepare_for_cloning(selected_prompt):
             if selected_prompt:
                 return gr.update(value=f"Copy of {selected_prompt}"), gr.update(visible=True)
@@ -284,18 +479,21 @@ def create_prompt_clone_tab():
             outputs=[title_input, save_cloned_prompt_button]
         )
 
-        def save_cloned_prompt(title, description, system_prompt, user_prompt):
+        # Function to save cloned prompt
+        def save_cloned_prompt(title, author, description, system_prompt, user_prompt, current_page):
             try:
-                result = add_prompt(title, description, system_prompt, user_prompt)
+                result = add_prompt(title, author, description, system_prompt, user_prompt)
                 if result == "Prompt added successfully.":
-                    return result, gr.update(choices=update_prompt_dropdown())
+                    # After adding, refresh the prompt dropdown
+                    prompt_dropdown_update = update_prompt_dropdown(page=current_page)
+                    return (result, *prompt_dropdown_update)
                 else:
-                    return result, gr.update()
+                    return (result, gr.update(), gr.update(), gr.update(), gr.update(), current_page, total_pages_state.value)
             except Exception as e:
-                return f"Error saving cloned prompt: {str(e)}", gr.update()
+                return (f"Error saving cloned prompt: {str(e)}", gr.update(), gr.update(), gr.update(), gr.update(), current_page, total_pages_state.value)
 
         save_cloned_prompt_button.click(
             fn=save_cloned_prompt,
-            inputs=[title_input, description_input, system_prompt_input, user_prompt_input],
-            outputs=[add_prompt_output, prompt_dropdown]
+            inputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input, current_page_state],
+            outputs=[add_prompt_output, prompt_dropdown, page_display, prev_page_button, next_page_button, current_page_state, total_pages_state]
         )

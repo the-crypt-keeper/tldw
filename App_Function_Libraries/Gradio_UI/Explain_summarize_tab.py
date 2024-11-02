@@ -7,7 +7,7 @@ import logging
 # External Imports
 import gradio as gr
 
-from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
+from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 #
 # Local Imports
@@ -37,32 +37,52 @@ def create_summarize_explain_tab():
     except Exception as e:
         logging.error(f"Error setting default API endpoint: {str(e)}")
         default_value = None
+
     with gr.TabItem("Analyze Text", visible=True):
         gr.Markdown("# Analyze / Explain / Summarize Text without ingesting it into the DB")
+
+        # Initialize state variables for pagination
+        current_page_state = gr.State(value=1)
+        total_pages_state = gr.State(value=1)
+
         with gr.Row():
             with gr.Column():
                 with gr.Row():
-                    text_to_work_input = gr.Textbox(label="Text to be Explained or Summarized",
-                                                placeholder="Enter the text you want explained or summarized here",
-                                                lines=20)
+                    text_to_work_input = gr.Textbox(
+                        label="Text to be Explained or Summarized",
+                        placeholder="Enter the text you want explained or summarized here",
+                        lines=20
+                    )
                 with gr.Row():
                     explanation_checkbox = gr.Checkbox(label="Explain Text", value=True)
                     summarization_checkbox = gr.Checkbox(label="Summarize Text", value=True)
-                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
-                                                         value=False,
-                                                         visible=True)
-                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
-                                                         value=False,
-                                                         visible=True)
+                    custom_prompt_checkbox = gr.Checkbox(
+                        label="Use a Custom Prompt",
+                        value=False,
+                        visible=True
+                    )
+                    preset_prompt_checkbox = gr.Checkbox(
+                        label="Use a pre-set Prompt",
+                        value=False,
+                        visible=True
+                    )
                 with gr.Row():
-                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                                choices=load_preset_prompts(),
-                                                visible=False)
+                    # Add pagination controls
+                    preset_prompt = gr.Dropdown(
+                        label="Select Preset Prompt",
+                        choices=[],
+                        visible=False
+                    )
+                    prev_page_button = gr.Button("Previous Page", visible=False)
+                    page_display = gr.Markdown("Page 1 of X", visible=False)
+                    next_page_button = gr.Button("Next Page", visible=False)
                 with gr.Row():
-                    custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                                     placeholder="Enter custom prompt here",
-                                                     lines=3,
-                                                     visible=False)
+                    custom_prompt_input = gr.Textbox(
+                        label="Custom Prompt",
+                        placeholder="Enter custom prompt here",
+                        lines=10,
+                        visible=False
+                    )
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
                                                      value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
@@ -82,7 +102,7 @@ def create_summarize_explain_tab():
                     - Ensure adherence to specified format
                     - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
                     """,
-                                                     lines=3,
+                                                     lines=10,
                                                      visible=False,
                                                      interactive=True)
                     # Refactored API selection dropdown
@@ -92,8 +112,11 @@ def create_summarize_explain_tab():
                         label="API for Summarization/Analysis (Optional)"
                     )
                 with gr.Row():
-                    api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here",
-                                               type="password")
+                    api_key_input = gr.Textbox(
+                        label="API Key (if required)",
+                        placeholder="Enter your API key here",
+                        type="password"
+                    )
                 with gr.Row():
                     explain_summarize_button = gr.Button("Explain/Summarize")
 
@@ -102,17 +125,83 @@ def create_summarize_explain_tab():
                 explanation_output = gr.Textbox(label="Explanation:", lines=20)
                 custom_prompt_output = gr.Textbox(label="Custom Prompt:", lines=20, visible=True)
 
+        # Handle custom prompt checkbox change
         custom_prompt_checkbox.change(
             fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
             inputs=[custom_prompt_checkbox],
             outputs=[custom_prompt_input, system_prompt_input]
         )
+
+        # Handle preset prompt checkbox change
+        def on_preset_prompt_checkbox_change(is_checked):
+            if is_checked:
+                prompts, total_pages, current_page = list_prompts(page=1, per_page=20)
+                page_display_text = f"Page {current_page} of {total_pages}"
+                return (
+                    gr.update(visible=True, interactive=True, choices=prompts),  # preset_prompt
+                    gr.update(visible=True),  # prev_page_button
+                    gr.update(visible=True),  # next_page_button
+                    gr.update(value=page_display_text, visible=True),  # page_display
+                    current_page,  # current_page_state
+                    total_pages    # total_pages_state
+                )
+            else:
+                return (
+                    gr.update(visible=False, interactive=False),  # preset_prompt
+                    gr.update(visible=False),  # prev_page_button
+                    gr.update(visible=False),  # next_page_button
+                    gr.update(visible=False),  # page_display
+                    1,  # current_page_state
+                    1   # total_pages_state
+                )
+
         preset_prompt_checkbox.change(
-            fn=lambda x: gr.update(visible=x),
+            fn=on_preset_prompt_checkbox_change,
             inputs=[preset_prompt_checkbox],
-            outputs=[preset_prompt]
+            outputs=[
+                preset_prompt,
+                prev_page_button,
+                next_page_button,
+                page_display,
+                current_page_state,
+                total_pages_state
+            ]
         )
 
+        # Pagination button functions
+        def on_prev_page_click(current_page, total_pages):
+            new_page = max(current_page - 1, 1)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text),
+                current_page
+            )
+
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text),
+                current_page
+            )
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
+        # Update prompts when a preset is selected
         def update_prompts(preset_name):
             prompts = update_user_prompt(preset_name)
             return (
@@ -121,16 +210,25 @@ def create_summarize_explain_tab():
             )
 
         preset_prompt.change(
-            update_prompts,
-            inputs=preset_prompt,
+            fn=update_prompts,
+            inputs=[preset_prompt],
             outputs=[custom_prompt_input, system_prompt_input]
         )
 
         explain_summarize_button.click(
             fn=summarize_explain_text,
-            inputs=[text_to_work_input, api_endpoint, api_key_input, summarization_checkbox, explanation_checkbox, custom_prompt_input, system_prompt_input],
+            inputs=[
+                text_to_work_input,
+                api_endpoint,
+                api_key_input,
+                summarization_checkbox,
+                explanation_checkbox,
+                custom_prompt_input,
+                system_prompt_input
+            ],
             outputs=[summarization_output, explanation_output, custom_prompt_output]
         )
+
 
 
 def summarize_explain_text(message, api_endpoint, api_key, summarization, explanation, custom_prompt, custom_system_prompt,):

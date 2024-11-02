@@ -22,7 +22,7 @@ from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_
 # Local Imports
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, \
     scrape_article, collect_bookmarks, scrape_and_summarize_multiple, collect_urls_from_file
-from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
+from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
 
@@ -314,12 +314,22 @@ def create_website_scraping_tab():
                     preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt", value=False, visible=True)
                 with gr.Row():
                     temp_slider = gr.Slider(0.1, 2.0, 0.7, label="Temperature")
+
+                # Initialize state variables for pagination
+                current_page_state = gr.State(value=1)
+                total_pages_state = gr.State(value=1)
                 with gr.Row():
+                    # Add pagination controls
                     preset_prompt = gr.Dropdown(
                         label="Select Preset Prompt",
-                        choices=load_preset_prompts(),
+                        choices=[],
                         visible=False
                     )
+                with gr.Row():
+                    prev_page_button = gr.Button("Previous Page", visible=False)
+                    page_display = gr.Markdown("Page 1 of X", visible=False)
+                    next_page_button = gr.Button("Next Page", visible=False)
+
                 with gr.Row():
                     website_custom_prompt_input = gr.Textbox(
                         label="Custom Prompt",
@@ -421,10 +431,57 @@ def create_website_scraping_tab():
             inputs=[custom_prompt_checkbox],
             outputs=[website_custom_prompt_input, system_prompt_input]
         )
+
+        def on_preset_prompt_checkbox_change(is_checked):
+            if is_checked:
+                prompts, total_pages, current_page = list_prompts(page=1, per_page=20)
+                page_display_text = f"Page {current_page} of {total_pages}"
+                return (
+                    gr.update(visible=True, interactive=True, choices=prompts),  # preset_prompt
+                    gr.update(visible=True),  # prev_page_button
+                    gr.update(visible=True),  # next_page_button
+                    gr.update(value=page_display_text, visible=True),  # page_display
+                    current_page,  # current_page_state
+                    total_pages   # total_pages_state
+                )
+            else:
+                return (
+                    gr.update(visible=False, interactive=False),  # preset_prompt
+                    gr.update(visible=False),  # prev_page_button
+                    gr.update(visible=False),  # next_page_button
+                    gr.update(visible=False),  # page_display
+                    1,  # current_page_state
+                    1   # total_pages_state
+                )
+
         preset_prompt_checkbox.change(
-            fn=lambda x: gr.update(visible=x),
+            fn=on_preset_prompt_checkbox_change,
             inputs=[preset_prompt_checkbox],
-            outputs=[preset_prompt]
+            outputs=[preset_prompt, prev_page_button, next_page_button, page_display, current_page_state, total_pages_state]
+        )
+
+        def on_prev_page_click(current_page, total_pages):
+            new_page = max(current_page - 1, 1)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
         )
 
         def update_prompts(preset_name):

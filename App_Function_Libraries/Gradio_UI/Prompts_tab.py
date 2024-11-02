@@ -10,7 +10,7 @@ import logging
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import fetch_prompt_details, list_prompts, load_preset_prompts
+from App_Function_Libraries.DB.DB_Manager import fetch_prompt_details, list_prompts
 #
 ####################################################################################################
 #
@@ -24,17 +24,19 @@ def create_prompt_view_tab():
                 entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
                 page_number = gr.Number(value=1, label="Page Number", precision=0)
                 view_button = gr.Button("View Page")
-                next_page_button = gr.Button("Next Page")
-                previous_page_button = gr.Button("Previous Page")
+                previous_page_button = gr.Button("Previous Page", visible=True)
+                next_page_button = gr.Button("Next Page", visible=True)
                 pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
                 prompt_selector = gr.Dropdown(label="Select Prompt to View", choices=[])
             with gr.Column():
                 results_table = gr.HTML()
                 selected_prompt_display = gr.HTML()
 
+        # Function to view database entries
         def view_database(page, entries_per_page):
             try:
-                prompts, total_pages, current_page = list_prompts(page, entries_per_page)
+                # Use list_prompts to get prompts and total pages
+                prompts, total_pages, current_page = list_prompts(page=int(page), per_page=int(entries_per_page))
 
                 table_html = "<table style='width:100%; border-collapse: collapse;'>"
                 table_html += "<tr><th style='border: 1px solid black; padding: 8px;'>Title</th><th style='border: 1px solid black; padding: 8px;'>Author</th></tr>"
@@ -42,34 +44,47 @@ def create_prompt_view_tab():
                 for prompt_name in prompts:
                     details = fetch_prompt_details(prompt_name)
                     if details:
-                        title, _, _, _, _, _ = details
-                        author = "Unknown"  # Assuming author is not stored in the current schema
+                        title, author, _, _, _, _ = details
+                        author = author or "Unknown"  # Handle None author
                         table_html += f"<tr><td style='border: 1px solid black; padding: 8px;'>{html.escape(title)}</td><td style='border: 1px solid black; padding: 8px;'>{html.escape(author)}</td></tr>"
-                        prompt_choices.append((title, title))  # Using title as both label and value
+                        prompt_choices.append(prompt_name)  # Using prompt_name as value
                 table_html += "</table>"
 
-                total_prompts = len(load_preset_prompts())  # This might be inefficient for large datasets
+                # Get total prompts if possible
+                total_prompts = total_pages * int(entries_per_page)  # This might overestimate if the last page is not full
+
                 pagination = f"Page {current_page} of {total_pages} (Total prompts: {total_prompts})"
 
                 return table_html, pagination, total_pages, prompt_choices
             except Exception as e:
                 return f"<p>Error fetching prompts: {e}</p>", "Error", 0, []
 
+        # Function to update page content
         def update_page(page, entries_per_page):
             results, pagination, total_pages, prompt_choices = view_database(page, entries_per_page)
+            page = int(page)
             next_disabled = page >= total_pages
             prev_disabled = page <= 1
-            return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(
-                interactive=not prev_disabled), gr.update(choices=prompt_choices)
+            return (
+                results,
+                pagination,
+                page,
+                gr.update(visible=True, interactive=not prev_disabled),  # previous_page_button
+                gr.update(visible=True, interactive=not next_disabled),   # next_page_button
+                gr.update(choices=prompt_choices)
+            )
 
+        # Function to go to the next page
         def go_to_next_page(current_page, entries_per_page):
-            next_page = current_page + 1
+            next_page = int(current_page) + 1
             return update_page(next_page, entries_per_page)
 
+        # Function to go to the previous page
         def go_to_previous_page(current_page, entries_per_page):
-            previous_page = max(1, current_page - 1)
+            previous_page = max(1, int(current_page) - 1)
             return update_page(previous_page, entries_per_page)
 
+        # Function to display selected prompt details
         def display_selected_prompt(prompt_name):
             details = fetch_prompt_details(prompt_name)
             if details:
@@ -100,25 +115,23 @@ def create_prompt_view_tab():
             else:
                 return "<p>Prompt not found.</p>"
 
+        # Event handlers
         view_button.click(
             fn=update_page,
             inputs=[page_number, entries_per_page],
-            outputs=[results_table, pagination_info, page_number, next_page_button, previous_page_button,
-                     prompt_selector]
+            outputs=[results_table, pagination_info, page_number, previous_page_button, next_page_button, prompt_selector]
         )
 
         next_page_button.click(
             fn=go_to_next_page,
             inputs=[page_number, entries_per_page],
-            outputs=[results_table, pagination_info, page_number, next_page_button, previous_page_button,
-                     prompt_selector]
+            outputs=[results_table, pagination_info, page_number, previous_page_button, next_page_button, prompt_selector]
         )
 
         previous_page_button.click(
             fn=go_to_previous_page,
             inputs=[page_number, entries_per_page],
-            outputs=[results_table, pagination_info, page_number, next_page_button, previous_page_button,
-                     prompt_selector]
+            outputs=[results_table, pagination_info, page_number, previous_page_button, next_page_button, prompt_selector]
         )
 
         prompt_selector.change(
@@ -126,6 +139,7 @@ def create_prompt_view_tab():
             inputs=[prompt_selector],
             outputs=[selected_prompt_display]
         )
+
 
 
 def create_prompts_export_tab():
