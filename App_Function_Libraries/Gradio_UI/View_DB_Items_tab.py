@@ -483,8 +483,12 @@ def create_view_all_rag_notes_tab():
                 conversations, total_pages, total_count = get_all_conversations(page, entries_per_page)
                 pagination = f"Page {page} of {total_pages} (Total conversations: {total_count})"
 
-                choices = [f"{title} (ID: {conv_id})" for conv_id, title in conversations]
-                new_item_mapping = {f"{title} (ID: {conv_id})": conv_id for conv_id, title in conversations}
+                # Handle the dictionary structure correctly
+                choices = [f"{conv['title']} (ID: {conv['conversation_id']})" for conv in conversations]
+                new_item_mapping = {
+                    f"{conv['title']} (ID: {conv['conversation_id']})": conv['conversation_id']
+                    for conv in conversations
+                }
 
                 next_disabled = page >= total_pages
                 prev_disabled = page <= 1
@@ -502,6 +506,7 @@ def create_view_all_rag_notes_tab():
                     new_item_mapping
                 )
             except Exception as e:
+                logging.error(f"Error in update_page: {str(e)}", exc_info=True)
                 return (
                     gr.update(choices=[], value=None),
                     f"Error: {str(e)}",
@@ -571,8 +576,18 @@ def create_view_all_rag_notes_tab():
         view_button.click(
             fn=update_page,
             inputs=[page_number, entries_per_page],
-            outputs=[items_output, pagination_info, page_number, next_page_button, previous_page_button,
-                     conversation_title, keywords_output, chat_history_output, notes_output, item_mapping]
+            outputs=[
+                items_output,
+                pagination_info,
+                page_number,
+                next_page_button,
+                previous_page_button,
+                conversation_title,
+                keywords_output,
+                chat_history_output,
+                notes_output,
+                item_mapping
+            ]
         )
 
         next_page_button.click(
