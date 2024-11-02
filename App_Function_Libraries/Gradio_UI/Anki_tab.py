@@ -3,10 +3,18 @@
 #
 # Imports
 import json
+import logging
 from typing import Optional, Tuple, List
 #
 # External Imports
 import gradio as gr
+
+from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, update_chat_content, save_chat_history, \
+    save_chat_history_to_db_wrapper
+from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
+from App_Function_Libraries.Gradio_UI.Chat_ui import update_dropdown_multiple, chat_wrapper, update_selected_parts, \
+    search_conversations, regenerate_last_message, load_conversation, debug_output
+from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 #from outlines import models, prompts
 #
 # Local Imports
@@ -14,6 +22,9 @@ from App_Function_Libraries.Third_Party.Anki import sanitize_html, generate_card
     export_cards, load_card_for_editing, handle_file_upload, \
     validate_for_ui, update_card_with_validation, update_card_choices, enhanced_file_upload, \
     handle_validation
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+
+
 #
 ############################################################################################################
 #
@@ -370,6 +381,216 @@ def create_anki_generator_tab():
     import os
 
     with gr.TabItem("Anki Deck Generator", visible=True):
+        try:
+            default_value = None
+            if default_api_endpoint:
+                if default_api_endpoint in global_api_endpoints:
+                    default_value = format_api_name(default_api_endpoint)
+                else:
+                    logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+        except Exception as e:
+            logging.error(f"Error setting default API endpoint: {str(e)}")
+            default_value = None
+        custom_css = """
+        .chatbot-container .message-wrap .message {
+            font-size: 14px !important;
+        }
+        """
+        with gr.TabItem("LLM Chat & Anki Deck Creation", visible=True):
+            gr.Markdown("# Chat with an LLM to help you come up with Questions/Answers for an Anki Deck")
+            chat_history = gr.State([])
+            media_content = gr.State({})
+            selected_parts = gr.State([])
+            conversation_id = gr.State(None)
+
+            with gr.Row():
+                with gr.Column(scale=1):
+                    search_query_input = gr.Textbox(
+                        label="Search Query",
+                        placeholder="Enter your search query here..."
+                    )
+                    search_type_input = gr.Radio(
+                        choices=["Title", "Content", "Author", "Keyword"],
+                        value="Keyword",
+                        label="Search By"
+                    )
+                    keyword_filter_input = gr.Textbox(
+                        label="Filter by Keywords (comma-separated)",
+                        placeholder="ml, ai, python, etc..."
+                    )
+                    search_button = gr.Button("Search")
+                    items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                    item_mapping = gr.State({})
+                    with gr.Row():
+                        use_content = gr.Checkbox(label="Use Content")
+                        use_summary = gr.Checkbox(label="Use Summary")
+                        use_prompt = gr.Checkbox(label="Use Prompt")
+                        save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
+                    with gr.Row():
+                        temperature = gr.Slider(label="Temperature", minimum=0.00, maximum=1.0, step=0.05, value=0.7)
+                    with gr.Row():
+                        conversation_search = gr.Textbox(label="Search Conversations")
+                    with gr.Row():
+                        search_conversations_btn = gr.Button("Search Conversations")
+                    with gr.Row():
+                        previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
+                    with gr.Row():
+                        load_conversations_btn = gr.Button("Load Selected Conversation")
+
+                    # Refactored API selection dropdown
+                    api_endpoint = gr.Dropdown(
+                        choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                        value=default_value,
+                        label="API for Chat Interaction (Optional)"
+                    )
+                    api_key = gr.Textbox(label="API Key (if required)", type="password")
+                    custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                         value=False,
+                                                         visible=True)
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                         value=False,
+                                                         visible=True)
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=load_preset_prompts(),
+                                                visible=False)
+                    user_prompt = gr.Textbox(label="Custom Prompt",
+                                             placeholder="Enter custom prompt here",
+                                             lines=3,
+                                             visible=False)
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="You are a helpful AI assitant",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Column(scale=2):
+                    chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
+                    msg = gr.Textbox(label="Enter your message")
+                    submit = gr.Button("Submit")
+                    regenerate_button = gr.Button("Regenerate Last Message")
+                    token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
+                    clear_chat_button = gr.Button("Clear Chat")
+
+                    chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
+                    save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
+                    save_status = gr.Textbox(label="Save Status", interactive=False)
+                    save_chat_history_as_file = gr.Button("Save Chat History as File")
+                    download_file = gr.File(label="Download Chat History")
+
+            # Restore original functionality
+            search_button.click(
+                fn=update_dropdown_multiple,
+                inputs=[search_query_input, search_type_input, keyword_filter_input],
+                outputs=[items_output, item_mapping]
+            )
+
+            def update_prompts(preset_name):
+                prompts = update_user_prompt(preset_name)
+                return (
+                    gr.update(value=prompts["user_prompt"], visible=True),
+                    gr.update(value=prompts["system_prompt"], visible=True)
+                )
+
+            def clear_chat():
+                return [], None  # Return empty list for chatbot and None for conversation_id
+
+            clear_chat_button.click(
+                clear_chat,
+                outputs=[chatbot, conversation_id]
+            )
+
+            preset_prompt.change(
+                update_prompts,
+                inputs=preset_prompt,
+                outputs=[user_prompt, system_prompt_input]
+            )
+
+            custom_prompt_checkbox.change(
+                fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
+                inputs=[custom_prompt_checkbox],
+                outputs=[user_prompt, system_prompt_input]
+            )
+
+            preset_prompt_checkbox.change(
+                fn=lambda x: gr.update(visible=x),
+                inputs=[preset_prompt_checkbox],
+                outputs=[preset_prompt]
+            )
+
+            submit.click(
+                chat_wrapper,
+                inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
+                        conversation_id,
+                        save_conversation, temperature, system_prompt_input],
+                outputs=[msg, chatbot, conversation_id]
+            ).then(  # Clear the message box after submission
+                lambda x: gr.update(value=""),
+                inputs=[chatbot],
+                outputs=[msg]
+            ).then(  # Clear the user prompt after the first message
+                lambda: (gr.update(value=""), gr.update(value="")),
+                outputs=[user_prompt, system_prompt_input]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chatbot],
+                outputs=[token_count_display]
+            )
+
+            items_output.change(
+                update_chat_content,
+                inputs=[items_output, use_content, use_summary, use_prompt, item_mapping],
+                outputs=[media_content, selected_parts]
+            )
+
+            use_content.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                               outputs=[selected_parts])
+            use_summary.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                               outputs=[selected_parts])
+            use_prompt.change(update_selected_parts, inputs=[use_content, use_summary, use_prompt],
+                              outputs=[selected_parts])
+            items_output.change(debug_output, inputs=[media_content, selected_parts], outputs=[])
+
+            search_conversations_btn.click(
+                search_conversations,
+                inputs=[conversation_search],
+                outputs=[previous_conversations]
+            )
+
+            load_conversations_btn.click(
+                clear_chat,
+                outputs=[chatbot, chat_history]
+            ).then(
+                load_conversation,
+                inputs=[previous_conversations],
+                outputs=[chatbot, conversation_id]
+            )
+
+            previous_conversations.change(
+                load_conversation,
+                inputs=[previous_conversations],
+                outputs=[chat_history]
+            )
+
+            save_chat_history_as_file.click(
+                save_chat_history,
+                inputs=[chatbot, conversation_id],
+                outputs=[download_file]
+            )
+
+            save_chat_history_to_db.click(
+                save_chat_history_to_db_wrapper,
+                inputs=[chatbot, conversation_id, media_content, chat_media_name],
+                outputs=[conversation_id, gr.Textbox(label="Save Status")]
+            )
+
+            regenerate_button.click(
+                regenerate_last_message,
+                inputs=[chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, temperature,
+                        system_prompt_input],
+                outputs=[chatbot, save_status]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chatbot],
+                outputs=[token_count_display]
+            )
         gr.Markdown("# Create Anki Deck")
 
         with gr.Row():
