@@ -10,7 +10,8 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Dict, Any
+from pathlib import Path
+from typing import List, Dict, Any, Tuple, Optional
 #
 # External Imports
 # (No external imports)
@@ -121,9 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_rag_qa_keyword_collections_parent_id ON rag_qa_ke
 CREATE INDEX IF NOT EXISTS idx_rag_qa_collection_keywords_collection_id ON rag_qa_collection_keywords(collection_id);
 CREATE INDEX IF NOT EXISTS idx_rag_qa_collection_keywords_keyword_id ON rag_qa_collection_keywords(keyword_id);
 
--- Full-text search virtual tables (using automatic content synchronization)
-
--- FTS table for chat messages
+-- Full-text search virtual tables
 CREATE VIRTUAL TABLE IF NOT EXISTS rag_qa_chats_fts USING fts5(
     content,
     content='rag_qa_chats',
@@ -158,6 +157,95 @@ CREATE VIRTUAL TABLE IF NOT EXISTS rag_qa_notes_fts USING fts5(
     content='rag_qa_notes',
     content_rowid='id'
 );
+-- FTS table for notes (modified to include both title and content)
+CREATE VIRTUAL TABLE IF NOT EXISTS rag_qa_notes_fts USING fts5(
+    title,
+    content,
+    content='rag_qa_notes',
+    content_rowid='id'
+);
+
+-- Triggers for maintaining FTS indexes
+-- Triggers for rag_qa_chats
+CREATE TRIGGER IF NOT EXISTS rag_qa_chats_ai AFTER INSERT ON rag_qa_chats BEGIN
+    INSERT INTO rag_qa_chats_fts(rowid, content) 
+    VALUES (new.id, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS rag_qa_chats_au AFTER UPDATE ON rag_qa_chats BEGIN
+    UPDATE rag_qa_chats_fts 
+    SET content = new.content
+    WHERE rowid = old.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS rag_qa_chats_ad AFTER DELETE ON rag_qa_chats BEGIN
+    DELETE FROM rag_qa_chats_fts WHERE rowid = old.id;
+END;
+
+-- Triggers for conversation_metadata
+CREATE TRIGGER IF NOT EXISTS conversation_metadata_ai AFTER INSERT ON conversation_metadata BEGIN
+    INSERT INTO conversation_metadata_fts(rowid, title) 
+    VALUES (new.rowid, new.title);
+END;
+
+CREATE TRIGGER IF NOT EXISTS conversation_metadata_au AFTER UPDATE ON conversation_metadata BEGIN
+    UPDATE conversation_metadata_fts 
+    SET title = new.title
+    WHERE rowid = old.rowid;
+END;
+
+CREATE TRIGGER IF NOT EXISTS conversation_metadata_ad AFTER DELETE ON conversation_metadata BEGIN
+    DELETE FROM conversation_metadata_fts WHERE rowid = old.rowid;
+END;
+
+-- Triggers for rag_qa_keywords
+CREATE TRIGGER IF NOT EXISTS rag_qa_keywords_ai AFTER INSERT ON rag_qa_keywords BEGIN
+    INSERT INTO rag_qa_keywords_fts(rowid, keyword) 
+    VALUES (new.id, new.keyword);
+END;
+
+CREATE TRIGGER IF NOT EXISTS rag_qa_keywords_au AFTER UPDATE ON rag_qa_keywords BEGIN
+    UPDATE rag_qa_keywords_fts 
+    SET keyword = new.keyword
+    WHERE rowid = old.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS rag_qa_keywords_ad AFTER DELETE ON rag_qa_keywords BEGIN
+    DELETE FROM rag_qa_keywords_fts WHERE rowid = old.id;
+END;
+
+-- Triggers for rag_qa_keyword_collections
+CREATE TRIGGER IF NOT EXISTS rag_qa_keyword_collections_ai AFTER INSERT ON rag_qa_keyword_collections BEGIN
+    INSERT INTO rag_qa_keyword_collections_fts(rowid, name) 
+    VALUES (new.id, new.name);
+END;
+
+CREATE TRIGGER IF NOT EXISTS rag_qa_keyword_collections_au AFTER UPDATE ON rag_qa_keyword_collections BEGIN
+    UPDATE rag_qa_keyword_collections_fts 
+    SET name = new.name
+    WHERE rowid = old.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS rag_qa_keyword_collections_ad AFTER DELETE ON rag_qa_keyword_collections BEGIN
+    DELETE FROM rag_qa_keyword_collections_fts WHERE rowid = old.id;
+END;
+
+-- Triggers for rag_qa_notes
+CREATE TRIGGER IF NOT EXISTS rag_qa_notes_ai AFTER INSERT ON rag_qa_notes BEGIN
+    INSERT INTO rag_qa_notes_fts(rowid, title, content) 
+    VALUES (new.id, new.title, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS rag_qa_notes_au AFTER UPDATE ON rag_qa_notes BEGIN
+    UPDATE rag_qa_notes_fts 
+    SET title = new.title,
+        content = new.content
+    WHERE rowid = old.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS rag_qa_notes_ad AFTER DELETE ON rag_qa_notes BEGIN
+    DELETE FROM rag_qa_notes_fts WHERE rowid = old.id;
+END;
 '''
 
 # Database connection management
@@ -198,12 +286,42 @@ def execute_query(query, params=None, conn=None):
             conn.commit()
             return cursor.fetchall()
 
+
 def create_tables():
+    """Create database tables and initialize FTS indexes."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        # Execute the SCHEMA_SQL to create tables if they don't exist
+        # Execute the SCHEMA_SQL to create tables and triggers
         cursor.executescript(SCHEMA_SQL)
-        logger.info("All RAG QA Chat tables created successfully")
+
+        # Check and populate all FTS tables
+        fts_tables = [
+            ('rag_qa_notes_fts', 'rag_qa_notes', ['title', 'content']),
+            ('rag_qa_chats_fts', 'rag_qa_chats', ['content']),
+            ('conversation_metadata_fts', 'conversation_metadata', ['title']),
+            ('rag_qa_keywords_fts', 'rag_qa_keywords', ['keyword']),
+            ('rag_qa_keyword_collections_fts', 'rag_qa_keyword_collections', ['name'])
+        ]
+
+        for fts_table, source_table, columns in fts_tables:
+            # Check if FTS table needs population
+            cursor.execute(f"SELECT COUNT(*) FROM {fts_table}")
+            fts_count = cursor.fetchone()[0]
+            cursor.execute(f"SELECT COUNT(*) FROM {source_table}")
+            source_count = cursor.fetchone()[0]
+
+            if fts_count != source_count:
+                # Repopulate FTS table
+                logger.info(f"Repopulating {fts_table}")
+                cursor.execute(f"DELETE FROM {fts_table}")
+                columns_str = ', '.join(columns)
+                source_columns = ', '.join([f"id" if source_table != 'conversation_metadata' else "rowid"] + columns)
+                cursor.execute(f"""
+                    INSERT INTO {fts_table}(rowid, {columns_str})
+                    SELECT {source_columns} FROM {source_table}
+                """)
+
+        logger.info("All RAG QA Chat tables and triggers created successfully")
 
 # Initialize the database
 create_tables()
@@ -229,6 +347,7 @@ def validate_keyword(keyword):
         raise ValueError("Keyword contains invalid characters")
     return keyword.strip()
 
+
 def validate_collection_name(name):
     if not isinstance(name, str):
         raise ValueError("Collection name must be a string")
@@ -239,6 +358,7 @@ def validate_collection_name(name):
     if not re.match(r'^[a-zA-Z0-9\s\-_]+$', name):
         raise ValueError("Collection name contains invalid characters")
     return name.strip()
+
 
 # Core functions
 def add_keyword(keyword, conn=None):
@@ -254,6 +374,7 @@ def add_keyword(keyword, conn=None):
         logger.error(f"Error adding keyword '{keyword}': {e}")
         raise
 
+
 def create_keyword_collection(name, parent_id=None):
     try:
         validated_name = validate_collection_name(name)
@@ -266,6 +387,7 @@ def create_keyword_collection(name, parent_id=None):
     except Exception as e:
         logger.error(f"Error creating keyword collection '{name}': {e}")
         raise
+
 
 def add_keyword_to_collection(collection_name, keyword):
     try:
@@ -290,6 +412,7 @@ def add_keyword_to_collection(collection_name, keyword):
     except Exception as e:
         logger.error(f"Error adding keyword '{keyword}' to collection '{collection_name}': {e}")
         raise
+
 
 def add_keywords_to_conversation(conversation_id, keywords):
     if not isinstance(keywords, (list, tuple)):
@@ -347,6 +470,7 @@ def get_keywords_for_conversation(conversation_id):
         logger.error(f"Error getting keywords for conversation '{conversation_id}': {e}")
         raise
 
+
 def get_keywords_for_collection(collection_name):
     try:
         query = '''
@@ -363,6 +487,116 @@ def get_keywords_for_collection(collection_name):
     except Exception as e:
         logger.error(f"Error getting keywords for collection '{collection_name}': {e}")
         raise
+
+
+def delete_rag_keyword(keyword: str) -> str:
+    """
+    Delete a keyword from the RAG QA database and all its associations.
+
+    Args:
+        keyword (str): The keyword to delete
+
+    Returns:
+        str: Success/failure message
+    """
+    try:
+        # Validate the keyword
+        validated_keyword = validate_keyword(keyword)
+
+        with transaction() as conn:
+            # First, get the keyword ID
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM rag_qa_keywords WHERE keyword = ?", (validated_keyword,))
+            result = cursor.fetchone()
+
+            if not result:
+                return f"Keyword '{validated_keyword}' not found."
+
+            keyword_id = result[0]
+
+            # Delete from all associated tables
+            cursor.execute("DELETE FROM rag_qa_conversation_keywords WHERE keyword_id = ?", (keyword_id,))
+            cursor.execute("DELETE FROM rag_qa_collection_keywords WHERE keyword_id = ?", (keyword_id,))
+            cursor.execute("DELETE FROM rag_qa_note_keywords WHERE keyword_id = ?", (keyword_id,))
+
+            # Finally, delete the keyword itself
+            cursor.execute("DELETE FROM rag_qa_keywords WHERE id = ?", (keyword_id,))
+
+            logger.info(f"Keyword '{validated_keyword}' deleted successfully")
+            return f"Successfully deleted keyword '{validated_keyword}' and all its associations."
+
+    except ValueError as e:
+        error_msg = f"Invalid keyword: {str(e)}"
+        logger.error(error_msg)
+        return error_msg
+    except Exception as e:
+        error_msg = f"Error deleting keyword: {str(e)}"
+        logger.error(error_msg)
+        return error_msg
+
+
+def export_rag_keywords_to_csv() -> Tuple[str, str]:
+    """
+    Export all RAG QA keywords to a CSV file.
+
+    Returns:
+        Tuple[str, str]: (status_message, file_path)
+    """
+    import csv
+    from tempfile import NamedTemporaryFile
+    from datetime import datetime
+
+    try:
+        # Create a temporary CSV file
+        temp_file = NamedTemporaryFile(mode='w+', delete=False, suffix='.csv', newline='')
+
+        with transaction() as conn:
+            cursor = conn.cursor()
+
+            # Get all keywords and their associations
+            query = """
+            SELECT 
+                k.keyword,
+                GROUP_CONCAT(DISTINCT c.name) as collections,
+                COUNT(DISTINCT ck.conversation_id) as num_conversations,
+                COUNT(DISTINCT nk.note_id) as num_notes
+            FROM rag_qa_keywords k
+            LEFT JOIN rag_qa_collection_keywords col_k ON k.id = col_k.keyword_id
+            LEFT JOIN rag_qa_keyword_collections c ON col_k.collection_id = c.id
+            LEFT JOIN rag_qa_conversation_keywords ck ON k.id = ck.keyword_id
+            LEFT JOIN rag_qa_note_keywords nk ON k.id = nk.keyword_id
+            GROUP BY k.id, k.keyword
+            ORDER BY k.keyword
+            """
+
+            cursor.execute(query)
+            results = cursor.fetchall()
+
+            # Write to CSV
+            writer = csv.writer(temp_file)
+            writer.writerow(['Keyword', 'Collections', 'Number of Conversations', 'Number of Notes'])
+
+            for row in results:
+                writer.writerow([
+                    row[0],  # keyword
+                    row[1] if row[1] else '',  # collections (may be None)
+                    row[2],  # num_conversations
+                    row[3]  # num_notes
+                ])
+
+        temp_file.close()
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        status_msg = f"Successfully exported {len(results)} keywords to CSV."
+        logger.info(status_msg)
+
+        return status_msg, temp_file.name
+
+    except Exception as e:
+        error_msg = f"Error exporting keywords: {str(e)}"
+        logger.error(error_msg)
+        return error_msg, ""
+
 
 #
 # End of Keyword-related functions
@@ -388,6 +622,7 @@ def save_notes(conversation_id, title, content):
         logger.error(f"Error saving notes for conversation '{conversation_id}': {e}")
         raise
 
+
 def update_note(note_id, title, content):
     try:
         query = "UPDATE rag_qa_notes SET title = ?, content = ?, timestamp = ? WHERE id = ?"
@@ -397,6 +632,121 @@ def update_note(note_id, title, content):
     except Exception as e:
         logger.error(f"Error updating note ID '{note_id}': {e}")
         raise
+
+
+def search_notes_titles(search_term: str, page: int = 1, results_per_page: int = 20, connection=None) -> Tuple[
+    List[Tuple], int, int]:
+    """
+    Search note titles using full-text search. Returns all notes if search_term is empty.
+
+    Args:
+        search_term (str): The search term for note titles. If empty, returns all notes.
+        page (int, optional): Page number for pagination. Defaults to 1.
+        results_per_page (int, optional): Number of results per page. Defaults to 20.
+        connection (sqlite3.Connection, optional): Database connection. Uses new connection if not provided.
+
+    Returns:
+        Tuple[List[Tuple], int, int]: Tuple containing:
+            - List of tuples: (note_id, title, content, timestamp, conversation_id)
+            - Total number of pages
+            - Total count of matching records
+
+    Raises:
+        ValueError: If page number is less than 1
+        sqlite3.Error: If there's a database error
+    """
+    if page < 1:
+        raise ValueError("Page number must be 1 or greater.")
+
+    offset = (page - 1) * results_per_page
+
+    def execute_search(conn):
+        cursor = conn.cursor()
+
+        # Debug: Show table contents
+        cursor.execute("SELECT title FROM rag_qa_notes")
+        main_titles = cursor.fetchall()
+        logger.debug(f"Main table titles: {main_titles}")
+
+        cursor.execute("SELECT title FROM rag_qa_notes_fts")
+        fts_titles = cursor.fetchall()
+        logger.debug(f"FTS table titles: {fts_titles}")
+
+        if not search_term.strip():
+            # Query for all notes
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM rag_qa_notes
+                """
+            )
+            total_count = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                SELECT id, title, content, timestamp, conversation_id
+                FROM rag_qa_notes
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+                """,
+                (results_per_page, offset)
+            )
+            results = cursor.fetchall()
+        else:
+            # Search query
+            search_term_clean = search_term.strip().lower()
+
+            # Test direct FTS search
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM rag_qa_notes n
+                JOIN rag_qa_notes_fts fts ON n.id = fts.rowid
+                WHERE fts.title MATCH ?
+                """,
+                (search_term_clean,)
+            )
+            total_count = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                SELECT 
+                    n.id,
+                    n.title,
+                    n.content,
+                    n.timestamp,
+                    n.conversation_id
+                FROM rag_qa_notes n
+                JOIN rag_qa_notes_fts fts ON n.id = fts.rowid
+                WHERE fts.title MATCH ?
+                ORDER BY rank
+                LIMIT ? OFFSET ?
+                """,
+                (search_term_clean, results_per_page, offset)
+            )
+            results = cursor.fetchall()
+
+            logger.debug(f"Search term: {search_term_clean}")
+            logger.debug(f"Results: {results}")
+
+        total_pages = max(1, (total_count + results_per_page - 1) // results_per_page)
+        logger.info(f"Found {total_count} matching notes for search term '{search_term}'")
+
+        return results, total_pages, total_count
+
+    try:
+        if connection:
+            return execute_search(connection)
+        else:
+            with get_db_connection() as conn:
+                return execute_search(conn)
+
+    except sqlite3.Error as e:
+        logger.error(f"Database error in search_notes_titles: {str(e)}")
+        logger.error(f"Search term: {search_term}")
+        raise sqlite3.Error(f"Error searching notes: {str(e)}")
+
+
 
 def get_notes(conversation_id):
     """Retrieve notes for a given conversation."""
@@ -409,6 +759,7 @@ def get_notes(conversation_id):
     except Exception as e:
         logger.error(f"Error getting notes for conversation '{conversation_id}': {e}")
         raise
+
 
 def get_note_by_id(note_id):
     try:
@@ -1049,6 +1400,16 @@ def search_rag_notes(query: str, fts_top_k: int = 10, relevant_media_ids: List[s
 
 #
 # End of Chat-related functions
+###################################################
+
+
+###################################################
+#
+# Import functions
+
+
+#
+# End of Import functions
 ###################################################
 
 

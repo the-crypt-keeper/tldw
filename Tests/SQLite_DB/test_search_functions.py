@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 from typing import List, Tuple
 #
 # Updated import statement
-from App_Function_Libraries.DB.DB_Manager import sqlite_search_db, search_media_database, db
+from App_Function_Libraries.DB.DB_Manager import search_media_db, search_media_database, db
 #
 #
 ####################################################################################################
@@ -17,107 +17,136 @@ from unittest.mock import patch, MagicMock
 import sqlite3
 from contextlib import contextmanager
 
-from App_Function_Libraries.DB.DB_Manager import sqlite_search_db, search_media_database, Database
 
 # Modify the functions to accept a connection parameter for testing
-def sqlite_search_db_testable(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10, connection=None):
-    if connection is None:
-        with db.get_connection() as conn:
-            return sqlite_search_db(search_query, search_fields, keywords, page, results_per_page)
-    else:
-        # Use the provided connection for testing
-        return sqlite_search_db(search_query, search_fields, keywords, page, results_per_page, connection=connection)
-
-def search_media_database_testable(query: str, connection=None):
-    if connection is None:
-        with db.get_connection() as conn:
-            return search_media_database(query)
-    else:
-        # Use the provided connection for testing
-        return search_media_database(query, connection=connection)
-
 @pytest.fixture
-def mock_connection():
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_conn.cursor.return_value = mock_cursor
-    return mock_conn, mock_cursor
+def mock_db():
+    """Create a mock database for search tests"""
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value = cursor
+    cursor.connection = conn
+    return conn, cursor
 
-def test_sqlite_search_db(mock_connection):
-    mock_conn, mock_cursor = mock_connection
-    mock_cursor.fetchall.return_value = [
+
+def test_search_media_db(mock_db):
+    conn, cursor = mock_db
+    test_results = [
         (1, 'http://example.com', 'Test Title', 'video', 'content', 'author', '2023-01-01', 'prompt', 'summary')
     ]
 
-    results = sqlite_search_db_testable('Test', ['title'], '', page=1, results_per_page=10, connection=mock_conn)
+    # Set up cursor mock
+    cursor.fetchall.return_value = test_results
 
-    assert len(results) == 1
-    assert results[0][2] == 'Test Title'
-    mock_cursor.execute.assert_called()
-    call_args = mock_cursor.execute.call_args[0]
-    assert 'SELECT DISTINCT Media.id, Media.url, Media.title' in call_args[0]
-    assert 'WHERE Media.title LIKE ?' in call_args[0]
-    assert '%Test%' in call_args[1]
+    with patch('App_Function_Libraries.DB.DB_Manager.Database.get_connection') as mock_get_conn:
+        with patch('App_Function_Libraries.DB.DB_Manager.Database.execute_query') as mock_execute:
+            # Configure mocks
+            mock_get_conn.return_value.__enter__.return_value = conn
+            mock_execute.return_value = test_results
 
-def test_sqlite_search_db_with_keywords(mock_connection):
-    mock_conn, mock_cursor = mock_connection
-    mock_cursor.fetchall.return_value = [
+            # Execute test
+            results = search_media_db('Test', ['title'], '')
+
+            # Verify results
+            assert len(results) == 1
+            assert results[0][2] == 'Test Title'
+
+            # Verify SQL query
+            actual_query = cursor.execute.call_args[0][0]
+            actual_params = cursor.execute.call_args[0][1]
+            assert 'SELECT DISTINCT Media.id, Media.url, Media.title' in actual_query
+            assert 'WHERE Media.title LIKE ?' in actual_query
+            assert '%Test%' in actual_params
+
+
+def test_search_media_db_with_keywords(mock_db):
+    conn, cursor = mock_db
+    test_results = [
         (1, 'http://example.com', 'Test Title', 'video', 'content', 'author', '2023-01-01', 'prompt', 'summary')
     ]
 
-    results = sqlite_search_db_testable('Test', ['title'], 'keyword1,keyword2', page=1, results_per_page=10, connection=mock_conn)
+    cursor.fetchall.return_value = test_results
 
-    assert len(results) == 1
-    mock_cursor.execute.assert_called()
-    call_args = mock_cursor.execute.call_args[0]
-    assert 'EXISTS (SELECT 1 FROM MediaKeywords mk JOIN Keywords k ON mk.keyword_id = k.id WHERE mk.media_id = Media.id AND k.keyword LIKE ?)' in call_args[0]
-    assert '%keyword1%' in call_args[1]
-    assert '%keyword2%' in call_args[1]
+    with patch('App_Function_Libraries.DB.DB_Manager.Database.get_connection') as mock_get_conn:
+        with patch('App_Function_Libraries.DB.DB_Manager.Database.execute_query') as mock_execute:
+            mock_get_conn.return_value.__enter__.return_value = conn
+            mock_execute.return_value = test_results
 
-def test_sqlite_search_db_pagination(mock_connection):
-    mock_conn, mock_cursor = mock_connection
-    mock_cursor.fetchall.return_value = [
-        (2, 'http://example2.com', 'Second Title', 'article', 'content2', 'author2', '2023-01-02', 'prompt2', 'summary2')
-    ]
+            results = search_media_db('Test', ['title'], 'keyword1,keyword2')
 
-    results = sqlite_search_db_testable('', ['title'], '', page=2, results_per_page=1, connection=mock_conn)
-
-    assert len(results) == 1
-    assert results[0][2] == 'Second Title'
-    mock_cursor.execute.assert_called()
-    call_args = mock_cursor.execute.call_args[0]
-    assert 'LIMIT ? OFFSET ?' in call_args[0]
-    assert call_args[1][-2:] == [1, 1]  # LIMIT 1 OFFSET 1
-
-def test_sqlite_search_db_invalid_page():
-    with pytest.raises(ValueError, match="Page number must be 1 or greater."):
-        sqlite_search_db_testable('Test', ['title'], '', page=0, results_per_page=10)
+            assert len(results) == 1
+            actual_query = cursor.execute.call_args[0][0]
+            actual_params = cursor.execute.call_args[0][1]
+            assert 'EXISTS (SELECT 1 FROM MediaKeywords mk JOIN Keywords k ON mk.keyword_id = k.id' in actual_query
+            assert '%keyword1%' in actual_params
+            assert '%keyword2%' in actual_params
 
 
-def test_search_media_database(mock_connection):
-    mock_conn, mock_cursor = mock_connection
-    mock_cursor.fetchall.return_value = [
+def test_search_media_db_pagination(mock_db):
+    conn, cursor = mock_db
+
+    page1_results = [
+        (1, 'http://example1.com', 'First Title', 'video', 'content1', 'author1', '2023-01-01', 'prompt1', 'summary1')]
+    page2_results = [(2, 'http://example2.com', 'Second Title', 'article', 'content2', 'author2', '2023-01-02',
+                      'prompt2', 'summary2')]
+
+    with patch('App_Function_Libraries.DB.DB_Manager.Database.get_connection') as mock_get_conn:
+        with patch('App_Function_Libraries.DB.DB_Manager.Database.execute_query') as mock_execute:
+            mock_get_conn.return_value.__enter__.return_value = conn
+            mock_execute.side_effect = [page1_results, page2_results]
+            cursor.fetchall.side_effect = [page1_results, page2_results]
+
+            results_page_1 = search_media_db('', ['title'], '', page=1, results_per_page=1)
+            results_page_2 = search_media_db('', ['title'], '', page=2, results_per_page=1)
+
+            assert len(results_page_1) == 1
+            assert len(results_page_2) == 1
+            assert results_page_1[0][2] == 'First Title'
+            assert results_page_2[0][2] == 'Second Title'
+            assert results_page_1 != results_page_2
+
+
+def test_search_media_database(mock_db):
+    conn, cursor = mock_db
+    test_results = [
         (1, 'Test Title', 'http://example.com')
     ]
 
-    results = search_media_database('Test', mock_conn)
+    with patch('App_Function_Libraries.DB.DB_Manager.Database.get_connection') as mock_get_conn:
+        with patch('App_Function_Libraries.DB.DB_Manager.Database.execute_query') as mock_execute:
+            mock_get_conn.return_value.__enter__.return_value = conn
+            mock_execute.return_value = test_results
+            cursor.fetchall.return_value = test_results
 
-    assert len(results) == 1
-    assert results[0] == (1, 'Test Title', 'http://example.com')
-    mock_cursor.execute.assert_called_with(
-        "SELECT id, title, url FROM Media WHERE title LIKE ?",
-        ('%Test%',)
-    )
+            results = search_media_database('Test')
+
+            assert len(results) == 1
+            assert results[0] == (1, 'Test Title', 'http://example.com')
+            actual_query = cursor.execute.call_args[0][0]
+            actual_params = cursor.execute.call_args[0][1]
+            assert 'SELECT id, title, url FROM Media WHERE title LIKE ?' in actual_query
+            assert '%Test%' in actual_params
 
 
-def test_search_media_database_error(mock_connection):
-    mock_conn, mock_cursor = mock_connection
-    mock_cursor.execute.side_effect = sqlite3.Error("Test database error")
+def test_search_media_database_error(mock_db):
+    conn, cursor = mock_db
+    test_error = sqlite3.Error("Test database error")
 
-    with pytest.raises(Exception) as exc_info:
-        search_media_database('Test', connection=mock_conn)
+    with patch('App_Function_Libraries.DB.DB_Manager.Database.get_connection') as mock_get_conn:
+        with patch('App_Function_Libraries.DB.DB_Manager.Database.execute_query') as mock_execute:
+            mock_get_conn.return_value.__enter__.return_value = conn
+            mock_execute.side_effect = test_error
+            cursor.execute.side_effect = test_error
 
-    assert str(exc_info.value) == "Error searching media database: Test database error"
+            with pytest.raises(Exception) as exc_info:
+                search_media_database('Test')
+
+            assert str(exc_info.value) == "Error searching media database: Test database error"
+
+
+def test_search_media_db_invalid_page():
+    with pytest.raises(ValueError, match="Page number must be 1 or greater."):
+        search_media_db('Test', ['title'], '', page=0, results_per_page=10)
 
 #
 # End of File

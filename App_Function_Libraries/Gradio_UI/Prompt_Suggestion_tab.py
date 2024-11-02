@@ -6,7 +6,7 @@ import logging
 import gradio as gr
 
 from App_Function_Libraries.Chat.Chat_Functions import chat
-from App_Function_Libraries.DB.SQLite_DB import add_or_update_prompt
+from App_Function_Libraries.DB.DB_Manager import add_or_update_prompt
 from App_Function_Libraries.Prompt_Engineering.Prompt_Engineering import generate_prompt, test_generated_prompt
 from App_Function_Libraries.Utils.Utils import format_api_name, global_api_endpoints, default_api_endpoint
 

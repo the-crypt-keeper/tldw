@@ -13,11 +13,14 @@ from elasticsearch import Elasticsearch
 #
 # Import your existing SQLite functions
 from App_Function_Libraries.DB.SQLite_DB import DatabaseError
+from App_Function_Libraries.DB.Prompts_DB import list_prompts as sqlite_list_prompts, \
+    fetch_prompt_details as sqlite_fetch_prompt_details, add_prompt as sqlite_add_prompt, \
+    search_prompts as sqlite_search_prompts, add_or_update_prompt as sqlite_add_or_update_prompt, \
+    load_prompt_details as sqlite_load_prompt_details, load_preset_prompts as sqlite_load_preset_prompts, \
+    insert_prompt_to_db as sqlite_insert_prompt_to_db, delete_prompt as sqlite_delete_prompt
 from App_Function_Libraries.DB.SQLite_DB import (
     update_media_content as sqlite_update_media_content,
-    list_prompts as sqlite_list_prompts,
     search_and_display as sqlite_search_and_display,
-    fetch_prompt_details as sqlite_fetch_prompt_details,
     keywords_browser_interface as sqlite_keywords_browser_interface,
     add_keyword as sqlite_add_keyword,
     delete_keyword as sqlite_delete_keyword,
@@ -25,18 +28,12 @@ from App_Function_Libraries.DB.SQLite_DB import (
     ingest_article_to_db as sqlite_ingest_article_to_db,
     add_media_to_database as sqlite_add_media_to_database,
     import_obsidian_note_to_db as sqlite_import_obsidian_note_to_db,
-    add_prompt as sqlite_add_prompt,
     view_database as sqlite_view_database,
     get_transcripts as sqlite_get_transcripts,
     get_trashed_items as sqlite_get_trashed_items,
     user_delete_item as sqlite_user_delete_item,
     empty_trash as sqlite_empty_trash,
     create_automated_backup as sqlite_create_automated_backup,
-    add_or_update_prompt as sqlite_add_or_update_prompt,
-    load_prompt_details as sqlite_load_prompt_details,
-    load_preset_prompts as sqlite_load_preset_prompts,
-    insert_prompt_to_db as sqlite_insert_prompt_to_db,
-    delete_prompt as sqlite_delete_prompt,
     search_and_display_items as sqlite_search_and_display_items,
     add_media_with_keywords as sqlite_add_media_with_keywords,
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model, \
@@ -52,12 +49,11 @@ from App_Function_Libraries.DB.SQLite_DB import (
     delete_specific_prompt as sqlite_delete_specific_prompt,
     fetch_keywords_for_media as sqlite_fetch_keywords_for_media, \
     update_keywords_for_media as sqlite_update_keywords_for_media, check_media_exists as sqlite_check_media_exists, \
-    search_prompts as sqlite_search_prompts, get_media_content as sqlite_get_media_content, \
-    get_paginated_files as sqlite_get_paginated_files, get_media_title as sqlite_get_media_title, \
-    get_all_content_from_database as sqlite_get_all_content_from_database,
-    get_next_media_id as sqlite_get_next_media_id, \
-    batch_insert_chunks as sqlite_batch_insert_chunks, Database, save_workflow_chat_to_db as sqlite_save_workflow_chat_to_db, \
-    get_workflow_chat as sqlite_get_workflow_chat, update_media_content_with_version as sqlite_update_media_content_with_version, \
+    get_media_content as sqlite_get_media_content, get_paginated_files as sqlite_get_paginated_files, \
+    get_media_title as sqlite_get_media_title, get_all_content_from_database as sqlite_get_all_content_from_database, \
+    get_next_media_id as sqlite_get_next_media_id, batch_insert_chunks as sqlite_batch_insert_chunks, Database, \
+    save_workflow_chat_to_db as sqlite_save_workflow_chat_to_db, get_workflow_chat as sqlite_get_workflow_chat, \
+    update_media_content_with_version as sqlite_update_media_content_with_version, \
     check_existing_media as sqlite_check_existing_media, get_all_document_versions as sqlite_get_all_document_versions, \
     fetch_paginated_data as sqlite_fetch_paginated_data, get_latest_transcription as sqlite_get_latest_transcription, \
     mark_media_as_processed as sqlite_mark_media_as_processed,
@@ -75,7 +71,7 @@ from App_Function_Libraries.DB.RAG_QA_Chat_DB import start_new_conversation as s
     fetch_all_conversations as sqlite_fetch_all_conversations, fetch_all_notes as sqlite_fetch_all_notes, \
     fetch_conversations_by_ids as sqlite_fetch_conversations_by_ids, fetch_notes_by_ids as sqlite_fetch_notes_by_ids, \
     delete_messages_in_conversation as sqlite_delete_messages_in_conversation, \
-    get_conversation_text as sqlite_get_conversation_text
+    get_conversation_text as sqlite_get_conversation_text, search_notes_titles as sqlite_search_notes_titles
 from App_Function_Libraries.DB.Character_Chat_DB import (
     add_character_card as sqlite_add_character_card, get_character_cards as sqlite_get_character_cards, \
     get_character_card_by_id as sqlite_get_character_card_by_id, update_character_card as sqlite_update_character_card, \
@@ -726,6 +722,12 @@ def fetch_keywords_for_media(*args, **kwargs):
 #
 # Chat-related Functions
 
+def search_notes_titles(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_search_notes_titles(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
 def save_message(*args, **kwargs):
     if db_type == 'sqlite':

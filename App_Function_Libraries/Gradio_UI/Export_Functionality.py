@@ -740,6 +740,154 @@ def create_export_tabs():
             outputs=[notes_export_output, notes_status]
         )
 
+        with gr.TabItem("Export Prompts", visible=True):
+            gr.Markdown("# Export Prompts Database Content")
+
+            with gr.Row():
+                with gr.Column():
+                    export_type = gr.Radio(
+                        choices=["All Prompts", "Prompts by Keyword"],
+                        label="Export Type",
+                        value="All Prompts"
+                    )
+
+                    # Keyword selection for filtered export
+                    with gr.Column(visible=False) as keyword_col:
+                        keyword_input = gr.Textbox(
+                            label="Enter Keywords (comma-separated)",
+                            placeholder="Enter keywords to filter prompts..."
+                        )
+
+                    # Export format selection
+                    export_format = gr.Radio(
+                        choices=["CSV", "Markdown (ZIP)"],
+                        label="Export Format",
+                        value="CSV"
+                    )
+
+                    # Export options
+                    include_options = gr.CheckboxGroup(
+                        choices=[
+                            "Include System Prompts",
+                            "Include User Prompts",
+                            "Include Details",
+                            "Include Author",
+                            "Include Keywords"
+                        ],
+                        label="Export Options",
+                        value=["Include Keywords", "Include Author"]
+                    )
+
+                    # Markdown-specific options (only visible when Markdown is selected)
+                    with gr.Column(visible=False) as markdown_options_col:
+                        markdown_template = gr.Radio(
+                            choices=[
+                                "Basic Template",
+                                "Detailed Template",
+                                "Custom Template"
+                            ],
+                            label="Markdown Template",
+                            value="Basic Template"
+                        )
+                        custom_template = gr.Textbox(
+                            label="Custom Template",
+                            placeholder="Use {title}, {author}, {details}, {system}, {user}, {keywords} as placeholders",
+                            visible=False
+                        )
+
+                    export_button = gr.Button("Export Prompts")
+
+                with gr.Column():
+                    export_status = gr.Textbox(label="Export Status", interactive=False)
+                    export_file = gr.File(label="Download Export")
+
+            def update_ui_visibility(export_type, format_choice, template_choice):
+                """Update UI elements visibility based on selections"""
+                show_keywords = export_type == "Prompts by Keyword"
+                show_markdown_options = format_choice == "Markdown (ZIP)"
+                show_custom_template = template_choice == "Custom Template" and show_markdown_options
+
+                return [
+                    gr.update(visible=show_keywords),  # keyword_col
+                    gr.update(visible=show_markdown_options),  # markdown_options_col
+                    gr.update(visible=show_custom_template)  # custom_template
+                ]
+
+            def handle_export(export_type, keywords, export_format, options, markdown_template, custom_template):
+                """Handle the export process based on selected options"""
+                try:
+                    # Parse options
+                    include_system = "Include System Prompts" in options
+                    include_user = "Include User Prompts" in options
+                    include_details = "Include Details" in options
+                    include_author = "Include Author" in options
+                    include_keywords = "Include Keywords" in options
+
+                    # Handle keyword filtering
+                    keyword_list = None
+                    if export_type == "Prompts by Keyword" and keywords:
+                        keyword_list = [k.strip() for k in keywords.split(",") if k.strip()]
+
+                    # Get the appropriate template
+                    template = None
+                    if export_format == "Markdown (ZIP)":
+                        if markdown_template == "Custom Template":
+                            template = custom_template
+                        else:
+                            template = markdown_template
+
+                    # Perform export
+                    from App_Function_Libraries.DB.Prompts_DB import export_prompts
+                    status, file_path = export_prompts(
+                        export_format=export_format.split()[0].lower(),  # 'csv' or 'markdown'
+                        filter_keywords=keyword_list,
+                        include_system=include_system,
+                        include_user=include_user,
+                        include_details=include_details,
+                        include_author=include_author,
+                        include_keywords=include_keywords,
+                        markdown_template=template
+                    )
+
+                    return status, file_path
+
+                except Exception as e:
+                    error_msg = f"Export failed: {str(e)}"
+                    logging.error(error_msg)
+                    return error_msg, None
+
+            # Event handlers
+            export_type.change(
+                fn=lambda t, f, m: update_ui_visibility(t, f, m),
+                inputs=[export_type, export_format, markdown_template],
+                outputs=[keyword_col, markdown_options_col, custom_template]
+            )
+
+            export_format.change(
+                fn=lambda t, f, m: update_ui_visibility(t, f, m),
+                inputs=[export_type, export_format, markdown_template],
+                outputs=[keyword_col, markdown_options_col, custom_template]
+            )
+
+            markdown_template.change(
+                fn=lambda t, f, m: update_ui_visibility(t, f, m),
+                inputs=[export_type, export_format, markdown_template],
+                outputs=[keyword_col, markdown_options_col, custom_template]
+            )
+
+            export_button.click(
+                fn=handle_export,
+                inputs=[
+                    export_type,
+                    keyword_input,
+                    export_format,
+                    include_options,
+                    markdown_template,
+                    custom_template
+                ],
+                outputs=[export_status, export_file]
+            )
+
 #
 # End of Export_Functionality.py
 ######################################################################################################################

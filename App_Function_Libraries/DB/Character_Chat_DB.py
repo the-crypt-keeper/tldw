@@ -941,6 +941,114 @@ def add_char_keywords(name: str, keywords: str):
     except Exception as e:
         return f"Error adding keywords: {str(e)}"
 
+
+def delete_char_keyword(char_name: str, keyword: str) -> str:
+    """
+    Delete a keyword from a character's tags.
+
+    Args:
+        char_name (str): The name of the character
+        keyword (str): The keyword to delete
+
+    Returns:
+        str: Success/failure message
+    """
+    try:
+        with sqlite3.connect(chat_DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # First, check if the character exists
+            cursor.execute("SELECT tags FROM CharacterCards WHERE name = ?", (char_name,))
+            result = cursor.fetchone()
+
+            if not result:
+                return f"Character '{char_name}' not found."
+
+            # Parse existing tags
+            current_tags = json.loads(result[0]) if result[0] else []
+
+            if keyword not in current_tags:
+                return f"Keyword '{keyword}' not found in character '{char_name}' tags."
+
+            # Remove the keyword
+            updated_tags = [tag for tag in current_tags if tag != keyword]
+
+            # Update the character's tags
+            cursor.execute(
+                "UPDATE CharacterCards SET tags = ? WHERE name = ?",
+                (json.dumps(updated_tags), char_name)
+            )
+            conn.commit()
+
+            logging.info(f"Keyword '{keyword}' deleted from character '{char_name}'")
+            return f"Successfully deleted keyword '{keyword}' from character '{char_name}'."
+
+    except Exception as e:
+        error_msg = f"Error deleting keyword: {str(e)}"
+        logging.error(error_msg)
+        return error_msg
+
+
+def export_char_keywords_to_csv() -> Tuple[str, str]:
+    """
+    Export all character keywords to a CSV file with associated metadata.
+
+    Returns:
+        Tuple[str, str]: (status_message, file_path)
+    """
+    import csv
+    from tempfile import NamedTemporaryFile
+    from datetime import datetime
+
+    try:
+        # Create a temporary CSV file
+        temp_file = NamedTemporaryFile(mode='w+', delete=False, suffix='.csv', newline='')
+
+        with sqlite3.connect(chat_DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # Get all characters and their tags
+            cursor.execute("""
+                SELECT 
+                    name,
+                    tags,
+                    (SELECT COUNT(*) FROM CharacterChats WHERE CharacterChats.character_id = CharacterCards.id) as chat_count
+                FROM CharacterCards
+                WHERE json_valid(tags)
+                ORDER BY name
+            """)
+
+            results = cursor.fetchall()
+
+            # Process the results to create rows for the CSV
+            csv_rows = []
+            for name, tags_json, chat_count in results:
+                tags = json.loads(tags_json) if tags_json else []
+                for tag in tags:
+                    csv_rows.append([
+                        tag,  # keyword
+                        name,  # character name
+                        chat_count  # number of chats
+                    ])
+
+            # Write to CSV
+            writer = csv.writer(temp_file)
+            writer.writerow(['Keyword', 'Character Name', 'Number of Chats'])
+            writer.writerows(csv_rows)
+
+        temp_file.close()
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        status_msg = f"Successfully exported {len(csv_rows)} character keyword entries to CSV."
+        logging.info(status_msg)
+
+        return status_msg, temp_file.name
+
+    except Exception as e:
+        error_msg = f"Error exporting keywords: {str(e)}"
+        logging.error(error_msg)
+        return error_msg, ""
+
 #
 # End of Character chat keyword functions
 ######################################################

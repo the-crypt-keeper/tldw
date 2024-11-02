@@ -33,11 +33,12 @@ from App_Function_Libraries.Gradio_UI.Export_Functionality import create_rag_exp
 #from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
 #    create_restore_backup_tab
 from App_Function_Libraries.Gradio_UI.Import_Functionality import create_import_single_prompt_tab, \
-    create_import_obsidian_vault_tab, create_import_item_tab, create_import_multiple_prompts_tab
+    create_import_obsidian_vault_tab, create_import_item_tab, create_import_multiple_prompts_tab, \
+    create_conversation_import_tab
 from App_Function_Libraries.Gradio_UI.Introduction_tab import create_introduction_tab
 from App_Function_Libraries.Gradio_UI.Keywords import create_view_keywords_tab, create_add_keyword_tab, \
     create_delete_keyword_tab, create_export_keywords_tab, create_rag_qa_keywords_tab, create_character_keywords_tab, \
-    create_meta_keywords_tab
+    create_meta_keywords_tab, create_prompt_keywords_tab
 from App_Function_Libraries.Gradio_UI.Live_Recording import create_live_recording_tab
 from App_Function_Libraries.Gradio_UI.Llamafile_tab import create_chat_with_llamafile_tab
 #from App_Function_Libraries.Gradio_UI.MMLU_Pro_tab import create_mmlu_pro_tab
@@ -66,9 +67,10 @@ from App_Function_Libraries.Gradio_UI.Video_transcription_tab import create_vide
 from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
 from App_Function_Libraries.Gradio_UI.Workflows_tab import chat_workflows_tab
-from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_prompt_view_tab, \
-    create_view_all_mediadb_with_versions_tab, create_viewing_mediadb_tab, create_view_all_rag_notes_tab, \
-    create_viewing_ragdb_tab, create_mediadb_keyword_search_tab, create_ragdb_keyword_items_tab
+from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_view_all_mediadb_with_versions_tab, \
+    create_viewing_mediadb_tab, create_view_all_rag_notes_tab, create_viewing_ragdb_tab, \
+    create_mediadb_keyword_search_tab, create_ragdb_keyword_items_tab
+from App_Function_Libraries.Gradio_UI.Prompts_tab import create_prompt_view_tab, create_prompts_export_tab
 #
 # Gradio UI Imports
 from App_Function_Libraries.Gradio_UI.Evaluations_Benchmarks_tab import create_geval_tab, create_infinite_bench_tab
@@ -493,7 +495,6 @@ def launch_ui(share_public=None, server_mode=False):
                 create_view_all_rag_notes_tab()
                 create_viewing_ragdb_tab()
                 create_ragdb_keyword_items_tab()
-                create_prompt_view_tab()
 
             with gr.TabItem("Prompts", id='view prompts group', visible=True):
                 create_prompt_view_tab()
@@ -501,6 +502,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_prompt_edit_tab()
                 create_prompt_clone_tab()
                 create_prompt_suggestion_tab()
+                create_prompts_export_tab()
 
             with gr.TabItem("Manage Media DB Items", id="manage group", visible=True):
                 create_media_edit_tab()
@@ -520,6 +522,7 @@ def launch_ui(share_public=None, server_mode=False):
                 create_character_keywords_tab()
                 create_rag_qa_keywords_tab()
                 create_meta_keywords_tab()
+                create_prompt_keywords_tab()
 
             with gr.TabItem("Import", id="import group", visible=True):
                 create_import_item_tab()
@@ -528,9 +531,11 @@ def launch_ui(share_public=None, server_mode=False):
                 create_import_multiple_prompts_tab()
                 create_mediawiki_import_tab()
                 create_mediawiki_config_tab()
+                create_conversation_import_tab()
 
             with gr.TabItem("Export", id="export group", visible=True):
                 create_export_tabs()
+
 
             with gr.TabItem("Database Management", id="database_management_group", visible=True):
                 create_database_management_interface(
