@@ -4,27 +4,25 @@
 # Imports
 import json
 import logging
-from typing import Optional, Tuple, List
+import os
+import tempfile
+from typing import Optional, Tuple, List, Dict
 #
 # External Imports
+import genanki
 import gradio as gr
-
-from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, update_chat_content, save_chat_history, \
-    save_chat_history_to_db_wrapper
-from App_Function_Libraries.DB.DB_Manager import load_preset_prompts
-from App_Function_Libraries.Gradio_UI.Chat_ui import update_dropdown_multiple, chat_wrapper, update_selected_parts, \
-    search_conversations, regenerate_last_message, load_conversation, debug_output
-from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
-#from outlines import models, prompts
 #
 # Local Imports
+from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, update_chat_content, save_chat_history, \
+    save_chat_history_to_db_wrapper
+from App_Function_Libraries.DB.DB_Manager import list_prompts
+from App_Function_Libraries.Gradio_UI.Chat_ui import update_dropdown_multiple, chat_wrapper, update_selected_parts, \
+    search_conversations, regenerate_last_message, load_conversation, debug_output
 from App_Function_Libraries.Third_Party.Anki import sanitize_html, generate_card_choices, \
     export_cards, load_card_for_editing, handle_file_upload, \
     validate_for_ui, update_card_with_validation, update_card_choices, enhanced_file_upload, \
     handle_validation
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
-
-
 #
 ############################################################################################################
 #
@@ -374,12 +372,6 @@ def create_anki_validation_tab():
 
 
 def create_anki_generator_tab():
-    import genanki
-    import json
-    from typing import List, Dict, Any
-    import tempfile
-    import os
-
     with gr.TabItem("Anki Deck Generator", visible=True):
         try:
             default_value = None
@@ -402,6 +394,7 @@ def create_anki_generator_tab():
             media_content = gr.State({})
             selected_parts = gr.State([])
             conversation_id = gr.State(None)
+            initial_prompts, total_pages, current_page = list_prompts(page=1, per_page=10)
 
             with gr.Row():
                 with gr.Column(scale=1):
@@ -447,12 +440,19 @@ def create_anki_generator_tab():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
                                                          value=False,
                                                          visible=True)
-                    preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                    preset_prompt_checkbox = gr.Checkbox(label="Use a Pre-set Prompt",
                                                          value=False,
                                                          visible=True)
-                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                                choices=load_preset_prompts(),
-                                                visible=False)
+                    with gr.Row(visible=False) as preset_prompt_controls:
+                        prev_prompt_page = gr.Button("Previous")
+                        next_prompt_page = gr.Button("Next")
+                        current_prompt_page_text = gr.Text(f"Page {current_page} of {total_pages}")
+                        current_prompt_page_state = gr.State(value=1)
+
+                    preset_prompt = gr.Dropdown(
+                        label="Select Preset Prompt",
+                        choices=initial_prompts
+                    )
                     user_prompt = gr.Textbox(label="Custom Prompt",
                                              placeholder="Enter custom prompt here",
                                              lines=3,
@@ -475,44 +475,63 @@ def create_anki_generator_tab():
                     save_chat_history_as_file = gr.Button("Save Chat History as File")
                     download_file = gr.File(label="Download Chat History")
 
-            # Restore original functionality
             search_button.click(
                 fn=update_dropdown_multiple,
                 inputs=[search_query_input, search_type_input, keyword_filter_input],
                 outputs=[items_output, item_mapping]
             )
 
-            def update_prompts(preset_name):
-                prompts = update_user_prompt(preset_name)
+            def update_prompt_visibility(custom_prompt_checked, preset_prompt_checked):
+                user_prompt_visible = custom_prompt_checked
+                system_prompt_visible = custom_prompt_checked
+                preset_prompt_visible = preset_prompt_checked
+                preset_prompt_controls_visible = preset_prompt_checked
                 return (
-                    gr.update(value=prompts["user_prompt"], visible=True),
-                    gr.update(value=prompts["system_prompt"], visible=True)
+                    gr.update(visible=user_prompt_visible, interactive=user_prompt_visible),
+                    gr.update(visible=system_prompt_visible, interactive=system_prompt_visible),
+                    gr.update(visible=preset_prompt_visible, interactive=preset_prompt_visible),
+                    gr.update(visible=preset_prompt_controls_visible)
+                )
+
+            def update_prompt_page(direction, current_page_val):
+                new_page = current_page_val + direction
+                if new_page < 1:
+                    new_page = 1
+                prompts, total_pages, _ = list_prompts(page=new_page, per_page=20)
+                if new_page > total_pages:
+                    new_page = total_pages
+                    prompts, total_pages, _ = list_prompts(page=new_page, per_page=20)
+                return (
+                    gr.update(choices=prompts),
+                    gr.update(value=f"Page {new_page} of {total_pages}"),
+                    new_page
                 )
 
             def clear_chat():
                 return [], None  # Return empty list for chatbot and None for conversation_id
 
-            clear_chat_button.click(
-                clear_chat,
-                outputs=[chatbot, conversation_id]
-            )
-
-            preset_prompt.change(
-                update_prompts,
-                inputs=preset_prompt,
-                outputs=[user_prompt, system_prompt_input]
-            )
-
             custom_prompt_checkbox.change(
-                fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
-                inputs=[custom_prompt_checkbox],
-                outputs=[user_prompt, system_prompt_input]
+                update_prompt_visibility,
+                inputs=[custom_prompt_checkbox, preset_prompt_checkbox],
+                outputs=[user_prompt, system_prompt_input, preset_prompt, preset_prompt_controls]
             )
 
             preset_prompt_checkbox.change(
-                fn=lambda x: gr.update(visible=x),
-                inputs=[preset_prompt_checkbox],
-                outputs=[preset_prompt]
+                update_prompt_visibility,
+                inputs=[custom_prompt_checkbox, preset_prompt_checkbox],
+                outputs=[user_prompt, system_prompt_input, preset_prompt, preset_prompt_controls]
+            )
+
+            prev_prompt_page.click(
+                lambda x: update_prompt_page(-1, x),
+                inputs=[current_prompt_page_state],
+                outputs=[preset_prompt, current_prompt_page_text, current_prompt_page_state]
+            )
+
+            next_prompt_page.click(
+                lambda x: update_prompt_page(1, x),
+                inputs=[current_prompt_page_state],
+                outputs=[preset_prompt, current_prompt_page_text, current_prompt_page_state]
             )
 
             submit.click(
@@ -532,6 +551,12 @@ def create_anki_generator_tab():
                 lambda history: approximate_token_count(history),
                 inputs=[chatbot],
                 outputs=[token_count_display]
+            )
+
+
+            clear_chat_button.click(
+                clear_chat,
+                outputs=[chatbot, conversation_id]
             )
 
             items_output.change(
