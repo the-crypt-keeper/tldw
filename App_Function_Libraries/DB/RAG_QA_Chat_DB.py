@@ -323,6 +323,7 @@ def create_tables():
 
         logger.info("All RAG QA Chat tables and triggers created successfully")
 
+
 # Initialize the database
 create_tables()
 
@@ -770,9 +771,21 @@ def get_note_by_id(note_id):
         logger.error(f"Error getting note by ID '{note_id}': {e}")
         raise
 
+
 def get_notes_by_keywords(keywords, page=1, page_size=20):
     try:
-        placeholders = ','.join(['?'] * len(keywords))
+        # Handle empty or invalid keywords
+        if not keywords or not isinstance(keywords, (list, tuple)) or len(keywords) == 0:
+            return [], 0, 0
+
+        # Convert all keywords to strings and strip them
+        clean_keywords = [str(k).strip() for k in keywords if k is not None and str(k).strip()]
+
+        # If no valid keywords after cleaning, return empty result
+        if not clean_keywords:
+            return [], 0, 0
+
+        placeholders = ','.join(['?'] * len(clean_keywords))
         query = f'''
         SELECT n.id, n.title, n.content, n.timestamp
         FROM rag_qa_notes n
@@ -781,13 +794,14 @@ def get_notes_by_keywords(keywords, page=1, page_size=20):
         WHERE k.keyword IN ({placeholders})
         ORDER BY n.timestamp DESC
         '''
-        results, total_pages, total_count = get_paginated_results(query, tuple(keywords), page, page_size)
-        logger.info(f"Retrieved {len(results)} notes matching keywords: {', '.join(keywords)} (page {page} of {total_pages})")
+        results, total_pages, total_count = get_paginated_results(query, tuple(clean_keywords), page, page_size)
+        logger.info(f"Retrieved {len(results)} notes matching keywords: {', '.join(clean_keywords)} (page {page} of {total_pages})")
         notes = [(row[0], row[1], row[2], row[3]) for row in results]
         return notes, total_pages, total_count
     except Exception as e:
         logger.error(f"Error getting notes by keywords: {e}")
         raise
+
 
 def get_notes_by_keyword_collection(collection_name, page=1, page_size=20):
     try:
@@ -1063,7 +1077,7 @@ def search_conversations_by_keywords(keywords=None, title_query=None, content_qu
         params = []
 
         # Add content search if provided
-        if content_query and content_query.strip():
+        if content_query and isinstance(content_query, str) and content_query.strip():
             query += """
             AND EXISTS (
                 SELECT 1 FROM rag_qa_chats_fts
@@ -1077,7 +1091,7 @@ def search_conversations_by_keywords(keywords=None, title_query=None, content_qu
             params.append(content_query.strip())
 
         # Add title search if provided
-        if title_query and title_query.strip():
+        if title_query and isinstance(title_query, str) and title_query.strip():
             query += """
             AND EXISTS (
                 SELECT 1 FROM conversation_metadata_fts
@@ -1088,18 +1102,20 @@ def search_conversations_by_keywords(keywords=None, title_query=None, content_qu
             params.append(title_query.strip())
 
         # Add keyword search if provided
-        if keywords and isinstance(keywords, (list, tuple)) and any(k.strip() for k in keywords):
-            clean_keywords = [k.strip() for k in keywords if k.strip()]
-            placeholders = ','.join(['?' for _ in clean_keywords])
-            query += f"""
-            AND EXISTS (
-                SELECT 1 FROM rag_qa_conversation_keywords ck
-                JOIN rag_qa_keywords k ON ck.keyword_id = k.id
-                WHERE ck.conversation_id = cm.conversation_id
-                AND k.keyword IN ({placeholders})
-            )
-            """
-            params.extend(clean_keywords)
+        if keywords and isinstance(keywords, (list, tuple)) and len(keywords) > 0:
+            # Convert all keywords to strings and strip them
+            clean_keywords = [str(k).strip() for k in keywords if k is not None and str(k).strip()]
+            if clean_keywords:  # Only add to query if we have valid keywords
+                placeholders = ','.join(['?' for _ in clean_keywords])
+                query += f"""
+                AND EXISTS (
+                    SELECT 1 FROM rag_qa_conversation_keywords ck
+                    JOIN rag_qa_keywords k ON ck.keyword_id = k.id
+                    WHERE ck.conversation_id = cm.conversation_id
+                    AND k.keyword IN ({placeholders})
+                )
+                """
+                params.extend(clean_keywords)
 
         # Add ordering
         query += " ORDER BY cm.last_updated DESC"
