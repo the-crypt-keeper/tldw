@@ -14,9 +14,9 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, chat, save_chat_history, \
     update_chat_content, save_chat_history_to_db_wrapper
-from App_Function_Libraries.DB.DB_Manager import load_preset_prompts, db, load_chat_history, start_new_conversation,\
+from App_Function_Libraries.DB.DB_Manager import db, load_chat_history, start_new_conversation, \
     save_message, search_conversations_by_keywords, \
-    get_all_conversations, delete_messages_in_conversation, search_media_db
+    get_all_conversations, delete_messages_in_conversation, search_media_db, list_prompts
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_db_connection
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
@@ -310,23 +310,35 @@ def create_chat_interface():
                     label="API for Chat Interaction (Optional)"
                 )
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
+
+                # Initialize state variables for pagination
+                current_page_state = gr.State(value=1)
+                total_pages_state = gr.State(value=1)
+
                 custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
                                                      value=False,
                                                      visible=True)
                 preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
                                                      value=False,
                                                      visible=True)
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                            choices=load_preset_prompts(),
-                                            visible=False)
-                user_prompt = gr.Textbox(label="Custom Prompt",
-                                         placeholder="Enter custom prompt here",
-                                         lines=3,
-                                         visible=False)
-                system_prompt_input = gr.Textbox(label="System Prompt",
-                                                 value="You are a helpful AI assitant",
-                                                 lines=3,
-                                                 visible=False)
+                with gr.Row():
+                    # Add pagination controls
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=[],
+                                                visible=False)
+                with gr.Row():
+                    prev_page_button = gr.Button("Previous Page", visible=False)
+                    page_display = gr.Markdown("Page 1 of X", visible=False)
+                    next_page_button = gr.Button("Next Page", visible=False)
+                    system_prompt_input = gr.Textbox(label="System Prompt",
+                                                     value="You are a helpful AI assistant",
+                                                     lines=3,
+                                                     visible=False)
+                with gr.Row():
+                    user_prompt = gr.Textbox(label="Custom Prompt",
+                                             placeholder="Enter custom prompt here",
+                                             lines=3,
+                                             visible=False)
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
@@ -376,9 +388,62 @@ def create_chat_interface():
             outputs=[chatbot, conversation_id]
         )
 
+        # Function to handle preset prompt checkbox change
+        def on_preset_prompt_checkbox_change(is_checked):
+            if is_checked:
+                prompts, total_pages, current_page = list_prompts(page=1, per_page=20)
+                page_display_text = f"Page {current_page} of {total_pages}"
+                return (
+                    gr.update(visible=True, interactive=True, choices=prompts),  # preset_prompt
+                    gr.update(visible=True),  # prev_page_button
+                    gr.update(visible=True),  # next_page_button
+                    gr.update(value=page_display_text, visible=True),  # page_display
+                    current_page,  # current_page_state
+                    total_pages   # total_pages_state
+                )
+            else:
+                return (
+                    gr.update(visible=False, interactive=False),  # preset_prompt
+                    gr.update(visible=False),  # prev_page_button
+                    gr.update(visible=False),  # next_page_button
+                    gr.update(visible=False),  # page_display
+                    1,  # current_page_state
+                    1   # total_pages_state
+                )
+
+        preset_prompt_checkbox.change(
+            fn=on_preset_prompt_checkbox_change,
+            inputs=[preset_prompt_checkbox],
+            outputs=[preset_prompt, prev_page_button, next_page_button, page_display, current_page_state, total_pages_state]
+        )
+
+        def on_prev_page_click(current_page, total_pages):
+            new_page = max(current_page - 1, 1)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
         preset_prompt.change(
             update_prompts,
-            inputs=preset_prompt,
+            inputs=[preset_prompt],
             outputs=[user_prompt, system_prompt_input]
         )
 
@@ -386,12 +451,6 @@ def create_chat_interface():
             fn=lambda x: (gr.update(visible=x), gr.update(visible=x)),
             inputs=[custom_prompt_checkbox],
             outputs=[user_prompt, system_prompt_input]
-        )
-
-        preset_prompt_checkbox.change(
-            fn=lambda x: gr.update(visible=x),
-            inputs=[preset_prompt_checkbox],
-            outputs=[preset_prompt]
         )
 
         submit.click(
@@ -407,9 +466,9 @@ def create_chat_interface():
             lambda: (gr.update(value=""), gr.update(value="")),
             outputs=[user_prompt, system_prompt_input]
         ).then(
-        lambda history: approximate_token_count(history),
-        inputs=[chatbot],
-        outputs=[token_count_display]
+            lambda history: approximate_token_count(history),
+            inputs=[chatbot],
+            outputs=[token_count_display]
         )
 
         items_output.change(
@@ -534,17 +593,45 @@ def create_chat_interface_stacked():
                     label="API for Chat Interaction (Optional)"
                 )
                 api_key = gr.Textbox(label="API Key (if required)", type="password")
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt",
-                                            choices=load_preset_prompts(),
-                                            visible=True)
-                system_prompt = gr.Textbox(label="System Prompt",
-                                           value="You are a helpful AI assistant.",
-                                           lines=4,
-                                           visible=True)
-                user_prompt = gr.Textbox(label="Custom User Prompt",
-                                         placeholder="Enter custom prompt here",
-                                         lines=4,
-                                         visible=True)
+
+                # Initialize state variables for pagination
+                current_page_state = gr.State(value=1)
+                total_pages_state = gr.State(value=1)
+
+                custom_prompt_checkbox = gr.Checkbox(
+                    label="Use a Custom Prompt",
+                    value=False,
+                    visible=True
+                )
+                preset_prompt_checkbox = gr.Checkbox(
+                    label="Use a pre-set Prompt",
+                    value=False,
+                    visible=True
+                )
+
+                with gr.Row():
+                    preset_prompt = gr.Dropdown(
+                        label="Select Preset Prompt",
+                        choices=[],
+                        visible=False
+                    )
+                with gr.Row():
+                    prev_page_button = gr.Button("Previous Page", visible=False)
+                    page_display = gr.Markdown("Page 1 of X", visible=False)
+                    next_page_button = gr.Button("Next Page", visible=False)
+
+                system_prompt = gr.Textbox(
+                    label="System Prompt",
+                    value="You are a helpful AI assistant.",
+                    lines=4,
+                    visible=False
+                )
+                user_prompt = gr.Textbox(
+                    label="Custom User Prompt",
+                    placeholder="Enter custom prompt here",
+                    lines=4,
+                    visible=False
+                )
                 gr.Markdown("Scroll down for the chat window...")
         with gr.Row():
             with gr.Column(scale=1):
@@ -673,9 +760,77 @@ def create_chat_interface_stacked():
             outputs=[chatbot, conversation_id, token_count_display]
         )
 
+        # Handle custom prompt checkbox change
+        def on_custom_prompt_checkbox_change(is_checked):
+            return (
+                gr.update(visible=is_checked),
+                gr.update(visible=is_checked)
+            )
+
+        custom_prompt_checkbox.change(
+            fn=on_custom_prompt_checkbox_change,
+            inputs=[custom_prompt_checkbox],
+            outputs=[user_prompt, system_prompt]
+        )
+
+        # Handle preset prompt checkbox change
+        def on_preset_prompt_checkbox_change(is_checked):
+            if is_checked:
+                prompts, total_pages, current_page = list_prompts(page=1, per_page=20)
+                page_display_text = f"Page {current_page} of {total_pages}"
+                return (
+                    gr.update(visible=True, interactive=True, choices=prompts),  # preset_prompt
+                    gr.update(visible=True),  # prev_page_button
+                    gr.update(visible=True),  # next_page_button
+                    gr.update(value=page_display_text, visible=True),  # page_display
+                    current_page,  # current_page_state
+                    total_pages   # total_pages_state
+                )
+            else:
+                return (
+                    gr.update(visible=False, interactive=False),  # preset_prompt
+                    gr.update(visible=False),  # prev_page_button
+                    gr.update(visible=False),  # next_page_button
+                    gr.update(visible=False),  # page_display
+                    1,  # current_page_state
+                    1   # total_pages_state
+                )
+
+        preset_prompt_checkbox.change(
+            fn=on_preset_prompt_checkbox_change,
+            inputs=[preset_prompt_checkbox],
+            outputs=[preset_prompt, prev_page_button, next_page_button, page_display, current_page_state, total_pages_state]
+        )
+
+        # Pagination button functions
+        def on_prev_page_click(current_page, total_pages):
+            new_page = max(current_page - 1, 1)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
+        # Update prompts when a preset is selected
         preset_prompt.change(
             update_prompts,
-            inputs=preset_prompt,
+            inputs=[preset_prompt],
             outputs=[user_prompt, system_prompt]
         )
 
@@ -787,8 +942,29 @@ def create_chat_interface_multi_api():
                     use_summary = gr.Checkbox(label="Use Summary")
                     use_prompt = gr.Checkbox(label="Use Prompt")
             with gr.Column():
-                preset_prompt = gr.Dropdown(label="Select Preset Prompt", choices=load_preset_prompts(), visible=True)
-                system_prompt = gr.Textbox(label="System Prompt", value="You are a helpful AI assistant.", lines=5)
+                # Initialize state variables for pagination
+                current_page_state = gr.State(value=1)
+                total_pages_state = gr.State(value=1)
+
+                custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
+                                                     value=False,
+                                                     visible=True)
+                preset_prompt_checkbox = gr.Checkbox(label="Use a pre-set Prompt",
+                                                     value=False,
+                                                     visible=True)
+                with gr.Row():
+                    # Add pagination controls
+                    preset_prompt = gr.Dropdown(label="Select Preset Prompt",
+                                                choices=[],
+                                                visible=False)
+                with gr.Row():
+                    prev_page_button = gr.Button("Previous Page", visible=False)
+                    page_display = gr.Markdown("Page 1 of X", visible=False)
+                    next_page_button = gr.Button("Next Page", visible=False)
+                system_prompt = gr.Textbox(label="System Prompt",
+                                           value="You are a helpful AI assistant.",
+                                           lines=5,
+                                           visible=True)
                 user_prompt = gr.Textbox(label="Modify Prompt (Prefixed to your message every time)", lines=5,
                                          value="", visible=True)
 
@@ -840,7 +1016,94 @@ def create_chat_interface_multi_api():
             outputs=[items_output, item_mapping]
         )
 
+        def update_prompts(preset_name):
+            prompts = update_user_prompt(preset_name)
+            return (
+                gr.update(value=prompts["user_prompt"], visible=True),
+                gr.update(value=prompts["system_prompt"], visible=True)
+            )
+
+        def on_custom_prompt_checkbox_change(is_checked):
+            return (
+                gr.update(visible=is_checked),
+                gr.update(visible=is_checked)
+            )
+
+        custom_prompt_checkbox.change(
+            fn=on_custom_prompt_checkbox_change,
+            inputs=[custom_prompt_checkbox],
+            outputs=[user_prompt, system_prompt]
+        )
+
+        def clear_all_chats():
+            return [[]] * 3 + [[]] * 3 + [0] * 3
+
+        clear_chat_button.click(
+            clear_all_chats,
+            outputs=chatbots + chat_history + token_count_displays
+        )
+
+        def on_preset_prompt_checkbox_change(is_checked):
+            if is_checked:
+                prompts, total_pages, current_page = list_prompts(page=1, per_page=10)
+                page_display_text = f"Page {current_page} of {total_pages}"
+                return (
+                    gr.update(visible=True, interactive=True, choices=prompts),  # preset_prompt
+                    gr.update(visible=True),  # prev_page_button
+                    gr.update(visible=True),  # next_page_button
+                    gr.update(value=page_display_text, visible=True),  # page_display
+                    current_page,  # current_page_state
+                    total_pages   # total_pages_state
+                )
+            else:
+                return (
+                    gr.update(visible=False, interactive=False),  # preset_prompt
+                    gr.update(visible=False),  # prev_page_button
+                    gr.update(visible=False),  # next_page_button
+                    gr.update(visible=False),  # page_display
+                    1,  # current_page_state
+                    1   # total_pages_state
+                )
+
         preset_prompt.change(update_user_prompt, inputs=preset_prompt, outputs=user_prompt)
+
+        preset_prompt_checkbox.change(
+            fn=on_preset_prompt_checkbox_change,
+            inputs=[preset_prompt_checkbox],
+            outputs=[preset_prompt, prev_page_button, next_page_button, page_display, current_page_state,
+                     total_pages_state]
+        )
+
+        def on_prev_page_click(current_page, total_pages):
+            new_page = max(current_page - 1, 1)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return gr.update(choices=prompts), gr.update(value=page_display_text), current_page
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
+        # Update prompts when a preset is selected
+        preset_prompt.change(
+            update_prompts,
+            inputs=[preset_prompt],
+            outputs=[user_prompt, system_prompt]
+        )
 
         def clear_all_chats():
             return [[]] * 3 + [[]] * 3 + [0] * 3
@@ -983,17 +1246,32 @@ def create_chat_interface_four():
     with gr.TabItem("Four Independent API Chats", visible=True):
         gr.Markdown("# Four Independent API Chat Interfaces")
 
+        # Initialize prompts during component creation
+        prompts, total_pages, current_page = list_prompts(page=1, per_page=10)
+        current_page_state = gr.State(value=current_page)
+        total_pages_state = gr.State(value=total_pages)
+        page_display_text = f"Page {current_page} of {total_pages}"
+
         with gr.Row():
             with gr.Column():
                 preset_prompt = gr.Dropdown(
-                    label="Select Preset Prompt",
-                    choices=load_preset_prompts(),
+                    label="Select Preset Prompt (This will be prefixed to your messages, recommend copy/pasting and then clearing the User Prompt box)",
+                    choices=prompts,
                     visible=True
                 )
+                prev_page_button = gr.Button("Previous Page", visible=True)
+                page_display = gr.Markdown(page_display_text, visible=True)
+                next_page_button = gr.Button("Next Page", visible=True)
                 user_prompt = gr.Textbox(
-                    label="Modify Prompt",
+                    label="Modify User Prompt",
                     lines=3
                 )
+                system_prompt = gr.Textbox(
+                    label="System Prompt",
+                    value="You are a helpful AI assistant.",
+                    lines=3
+                )
+
             with gr.Column():
                 gr.Markdown("Scroll down for the chat windows...")
 
@@ -1027,7 +1305,6 @@ def create_chat_interface_four():
                                                 interactive=False)
                 clear_chat_button = gr.Button(f"Clear Chat {index + 1}")
 
-
                 # State to maintain chat history
                 chat_history = gr.State([])
 
@@ -1053,10 +1330,47 @@ def create_chat_interface_four():
                         create_single_chat_interface(i * 2 + j, user_prompt)
 
         # Update user_prompt based on preset_prompt selection
+        def update_prompts(preset_name):
+            prompts = update_user_prompt(preset_name)
+            return gr.update(value=prompts["user_prompt"]), gr.update(value=prompts["system_prompt"])
+
         preset_prompt.change(
-            fn=update_user_prompt,
-            inputs=preset_prompt,
-            outputs=user_prompt
+            fn=update_prompts,
+            inputs=[preset_prompt],
+            outputs=[user_prompt, system_prompt]
+        )
+
+        # Pagination button functions
+        def on_prev_page_click(current_page, total_pages):
+            new_page = max(current_page - 1, 1)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text),
+                current_page
+            )
+
+        prev_page_button.click(
+            fn=on_prev_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
+        )
+
+        def on_next_page_click(current_page, total_pages):
+            new_page = min(current_page + 1, total_pages)
+            prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
+            page_display_text = f"Page {current_page} of {total_pages}"
+            return (
+                gr.update(choices=prompts),
+                gr.update(value=page_display_text),
+                current_page
+            )
+
+        next_page_button.click(
+            fn=on_next_page_click,
+            inputs=[current_page_state, total_pages_state],
+            outputs=[preset_prompt, page_display, current_page_state]
         )
 
         def chat_wrapper_single(message, chat_history, api_endpoint, api_key, temperature, user_prompt):
@@ -1165,11 +1479,10 @@ def create_chat_interface_four():
             def clear_chat_single():
                 return [], [], 0
 
-            for interface in chat_interfaces:
-                interface['clear_chat_button'].click(
-                    clear_chat_single,
-                    outputs=[interface['chatbot'], interface['chat_history'], interface['token_count_display']]
-                )
+            interface['clear_chat_button'].click(
+                clear_chat_single,
+                outputs=[interface['chatbot'], interface['chat_history'], interface['token_count_display']]
+            )
 
 
 def chat_wrapper_single(message, chat_history, chatbot, api_endpoint, api_key, temperature, media_content,

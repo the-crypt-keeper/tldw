@@ -496,12 +496,13 @@ def launch_ui(share_public=None, server_mode=False):
                 create_ragdb_keyword_items_tab()
 
             with gr.TabItem("Prompts", id='view prompts group', visible=True):
-                create_prompt_view_tab()
-                create_prompt_search_tab()
-                create_prompt_edit_tab()
-                create_prompt_clone_tab()
-                create_prompt_suggestion_tab()
-                create_prompts_export_tab()
+                with gr.Tabs():
+                    create_prompt_view_tab()
+                    create_prompt_search_tab()
+                    create_prompt_edit_tab()
+                    create_prompt_clone_tab()
+                    create_prompt_suggestion_tab()
+                    create_prompts_export_tab()
 
             with gr.TabItem("Manage Media DB Items", id="manage group", visible=True):
                 create_media_edit_tab()
