@@ -13,11 +13,14 @@ from elasticsearch import Elasticsearch
 #
 # Import your existing SQLite functions
 from App_Function_Libraries.DB.SQLite_DB import DatabaseError
+from App_Function_Libraries.DB.Prompts_DB import list_prompts as sqlite_list_prompts, \
+    fetch_prompt_details as sqlite_fetch_prompt_details, add_prompt as sqlite_add_prompt, \
+    search_prompts as sqlite_search_prompts, add_or_update_prompt as sqlite_add_or_update_prompt, \
+    load_prompt_details as sqlite_load_prompt_details, load_preset_prompts as sqlite_load_preset_prompts, \
+    insert_prompt_to_db as sqlite_insert_prompt_to_db, delete_prompt as sqlite_delete_prompt
 from App_Function_Libraries.DB.SQLite_DB import (
     update_media_content as sqlite_update_media_content,
-    list_prompts as sqlite_list_prompts,
     search_and_display as sqlite_search_and_display,
-    fetch_prompt_details as sqlite_fetch_prompt_details,
     keywords_browser_interface as sqlite_keywords_browser_interface,
     add_keyword as sqlite_add_keyword,
     delete_keyword as sqlite_delete_keyword,
@@ -25,31 +28,17 @@ from App_Function_Libraries.DB.SQLite_DB import (
     ingest_article_to_db as sqlite_ingest_article_to_db,
     add_media_to_database as sqlite_add_media_to_database,
     import_obsidian_note_to_db as sqlite_import_obsidian_note_to_db,
-    add_prompt as sqlite_add_prompt,
-    delete_chat_message as sqlite_delete_chat_message,
-    update_chat_message as sqlite_update_chat_message,
-    add_chat_message as sqlite_add_chat_message,
-    get_chat_messages as sqlite_get_chat_messages,
-    search_chat_conversations as sqlite_search_chat_conversations,
-    create_chat_conversation as sqlite_create_chat_conversation,
-    save_chat_history_to_database as sqlite_save_chat_history_to_database,
     view_database as sqlite_view_database,
     get_transcripts as sqlite_get_transcripts,
     get_trashed_items as sqlite_get_trashed_items,
     user_delete_item as sqlite_user_delete_item,
     empty_trash as sqlite_empty_trash,
     create_automated_backup as sqlite_create_automated_backup,
-    add_or_update_prompt as sqlite_add_or_update_prompt,
-    load_prompt_details as sqlite_load_prompt_details,
-    load_preset_prompts as sqlite_load_preset_prompts,
-    insert_prompt_to_db as sqlite_insert_prompt_to_db,
-    delete_prompt as sqlite_delete_prompt,
     search_and_display_items as sqlite_search_and_display_items,
-    get_conversation_name as sqlite_get_conversation_name,
     add_media_with_keywords as sqlite_add_media_with_keywords,
     check_media_and_whisper_model as sqlite_check_media_and_whisper_model, \
     create_document_version as sqlite_create_document_version,
-    get_document_version as sqlite_get_document_version, sqlite_search_db, add_media_chunk as sqlite_add_media_chunk,
+    get_document_version as sqlite_get_document_version, search_media_db as sqlite_search_media_db, add_media_chunk as sqlite_add_media_chunk,
     sqlite_update_fts_for_media, get_unprocessed_media as sqlite_get_unprocessed_media, fetch_item_details as sqlite_fetch_item_details, \
     search_media_database as sqlite_search_media_database, mark_as_trash as sqlite_mark_as_trash, \
     get_media_transcripts as sqlite_get_media_transcripts, get_specific_transcript as sqlite_get_specific_transcript, \
@@ -60,23 +49,35 @@ from App_Function_Libraries.DB.SQLite_DB import (
     delete_specific_prompt as sqlite_delete_specific_prompt,
     fetch_keywords_for_media as sqlite_fetch_keywords_for_media, \
     update_keywords_for_media as sqlite_update_keywords_for_media, check_media_exists as sqlite_check_media_exists, \
-    search_prompts as sqlite_search_prompts, get_media_content as sqlite_get_media_content, \
-    get_paginated_files as sqlite_get_paginated_files, get_media_title as sqlite_get_media_title, \
-    get_all_content_from_database as sqlite_get_all_content_from_database,
-    get_next_media_id as sqlite_get_next_media_id, \
-    batch_insert_chunks as sqlite_batch_insert_chunks, Database, save_workflow_chat_to_db as sqlite_save_workflow_chat_to_db, \
-    get_workflow_chat as sqlite_get_workflow_chat, update_media_content_with_version as sqlite_update_media_content_with_version, \
+    get_media_content as sqlite_get_media_content, get_paginated_files as sqlite_get_paginated_files, \
+    get_media_title as sqlite_get_media_title, get_all_content_from_database as sqlite_get_all_content_from_database, \
+    get_next_media_id as sqlite_get_next_media_id, batch_insert_chunks as sqlite_batch_insert_chunks, Database, \
+    save_workflow_chat_to_db as sqlite_save_workflow_chat_to_db, get_workflow_chat as sqlite_get_workflow_chat, \
+    update_media_content_with_version as sqlite_update_media_content_with_version, \
     check_existing_media as sqlite_check_existing_media, get_all_document_versions as sqlite_get_all_document_versions, \
     fetch_paginated_data as sqlite_fetch_paginated_data, get_latest_transcription as sqlite_get_latest_transcription, \
     mark_media_as_processed as sqlite_mark_media_as_processed,
 )
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import start_new_conversation as sqlite_start_new_conversation, \
+    save_message as sqlite_save_message, load_chat_history as sqlite_load_chat_history, \
+    get_all_conversations as sqlite_get_all_conversations, get_notes_by_keywords as sqlite_get_notes_by_keywords, \
+    get_note_by_id as sqlite_get_note_by_id, update_note as sqlite_update_note, save_notes as sqlite_save_notes, \
+    clear_keywords_from_note as sqlite_clear_keywords_from_note, add_keywords_to_note as sqlite_add_keywords_to_note, \
+    add_keywords_to_conversation as sqlite_add_keywords_to_conversation, \
+    get_keywords_for_note as sqlite_get_keywords_for_note, delete_note as sqlite_delete_note, \
+    search_conversations_by_keywords as sqlite_search_conversations_by_keywords, \
+    delete_conversation as sqlite_delete_conversation, get_conversation_title as sqlite_get_conversation_title, \
+    update_conversation_title as sqlite_update_conversation_title, \
+    fetch_all_conversations as sqlite_fetch_all_conversations, fetch_all_notes as sqlite_fetch_all_notes, \
+    fetch_conversations_by_ids as sqlite_fetch_conversations_by_ids, fetch_notes_by_ids as sqlite_fetch_notes_by_ids, \
+    delete_messages_in_conversation as sqlite_delete_messages_in_conversation, \
+    get_conversation_text as sqlite_get_conversation_text, search_notes_titles as sqlite_search_notes_titles
 from App_Function_Libraries.DB.Character_Chat_DB import (
     add_character_card as sqlite_add_character_card, get_character_cards as sqlite_get_character_cards, \
     get_character_card_by_id as sqlite_get_character_card_by_id, update_character_card as sqlite_update_character_card, \
     delete_character_card as sqlite_delete_character_card, add_character_chat as sqlite_add_character_chat, \
     get_character_chats as sqlite_get_character_chats, get_character_chat_by_id as sqlite_get_character_chat_by_id, \
-    update_character_chat as sqlite_update_character_chat, delete_character_chat as sqlite_delete_character_chat, \
-    migrate_chat_to_media_db as sqlite_migrate_chat_to_media_db,
+    update_character_chat as sqlite_update_character_chat, delete_character_chat as sqlite_delete_character_chat
 )
 #
 # Local Imports
@@ -214,9 +215,9 @@ print(f"Database path: {db.db_path}")
 #
 # DB Search functions
 
-def search_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
+def search_media_db(search_query: str, search_fields: List[str], keywords: str, page: int = 1, results_per_page: int = 10):
     if db_type == 'sqlite':
-        return sqlite_search_db(search_query, search_fields, keywords, page, results_per_page)
+        return sqlite_search_media_db(search_query, search_fields, keywords, page, results_per_page)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version when available
         raise NotImplementedError("Elasticsearch version of search_db not yet implemented")
@@ -721,61 +722,131 @@ def fetch_keywords_for_media(*args, **kwargs):
 #
 # Chat-related Functions
 
-def delete_chat_message(*args, **kwargs):
+def search_notes_titles(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_delete_chat_message(*args, **kwargs)
+        return sqlite_search_notes_titles(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def update_chat_message(*args, **kwargs):
+def save_message(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_update_chat_message(*args, **kwargs)
+        return sqlite_save_message(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def add_chat_message(*args, **kwargs):
+def load_chat_history(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_add_chat_message(*args, **kwargs)
+        return sqlite_load_chat_history(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def get_chat_messages(*args, **kwargs):
+def start_new_conversation(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_get_chat_messages(*args, **kwargs)
+        return sqlite_start_new_conversation(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def search_chat_conversations(*args, **kwargs):
+def get_all_conversations(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_search_chat_conversations(*args, **kwargs)
+        return sqlite_get_all_conversations(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def create_chat_conversation(*args, **kwargs):
+def get_notes_by_keywords(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_create_chat_conversation(*args, **kwargs)
+        return sqlite_get_notes_by_keywords(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def save_chat_history_to_database(*args, **kwargs):
+def get_note_by_id(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_save_chat_history_to_database(*args, **kwargs)
+        return sqlite_get_note_by_id(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def get_conversation_name(*args, **kwargs):
+def add_keywords_to_conversation(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_get_conversation_name(*args, **kwargs)
+        return sqlite_add_keywords_to_conversation(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def get_keywords_for_note(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_keywords_for_note(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def delete_note(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_delete_note(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def search_conversations_by_keywords(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_search_conversations_by_keywords(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def delete_conversation(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_delete_conversation(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def get_conversation_title(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_conversation_title(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def update_conversation_title(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_update_conversation_title(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def fetch_all_conversations(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_fetch_all_conversations()
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def fetch_all_notes(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_fetch_all_notes()
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
+
+def delete_messages_in_conversation(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_delete_messages_in_conversation(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of delete_messages_in_conversation not yet implemented")
+
+def get_conversation_text(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_get_conversation_text(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of get_conversation_text not yet implemented")
 
 #
 # End of Chat-related Functions
@@ -856,12 +927,54 @@ def delete_character_chat(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of delete_character_chat not yet implemented")
 
-def migrate_chat_to_media_db(*args, **kwargs):
+def update_note(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_migrate_chat_to_media_db(*args, **kwargs)
+        return sqlite_update_note(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
-        raise NotImplementedError("Elasticsearch version of migrate_chat_to_media_db not yet implemented")
+        raise NotImplementedError("Elasticsearch version of update_note not yet implemented")
+
+def save_notes(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_save_notes(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of save_notes not yet implemented")
+
+def clear_keywords(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_clear_keywords_from_note(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of clear_keywords not yet implemented")
+
+def clear_keywords_from_note(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_clear_keywords_from_note(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of clear_keywords_from_note not yet implemented")
+
+def add_keywords_to_note(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_add_keywords_to_note(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of add_keywords_to_note not yet implemented")
+
+def fetch_conversations_by_ids(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_fetch_conversations_by_ids(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of fetch_conversations_by_ids not yet implemented")
+
+def fetch_notes_by_ids(*args, **kwargs):
+    if db_type == 'sqlite':
+        return sqlite_fetch_notes_by_ids(*args, **kwargs)
+    elif db_type == 'elasticsearch':
+        # Implement Elasticsearch version
+        raise NotImplementedError("Elasticsearch version of fetch_notes_by_ids not yet implemented")
 
 #
 # End of Character Chat-related Functions

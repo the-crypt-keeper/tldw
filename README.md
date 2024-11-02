@@ -14,6 +14,13 @@
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark) - Demo is broken due to a bug in Huggingface spaces/Gradio
 - **Please Note:** YouTube blocks requests from the demo. You have to provide a logged-in session cookie to bypass it :frowning_face: 
 - Placeholder content is included for the demo. HuggingFace API is also setup in it, so you can select that as your API.)
+- **HEADS UP:** If you're updating from a prior version, your Media DB is not compatible with the new version. You'll need to start fresh.
+  - I've written a script to help you migrate your data from the old DB to the new one. `Helper_Scripts/DB-Related/migrate_db.py`.
+  - Process to migrate your data:
+    1. Install/run the new version of the app. This will create a new `media_summary.db` file in the `Databases` directory.
+    2. Run the `migrate_db.py` script with the old and new DB paths as arguments. - `python migrate_db.py --source media_summary_old.db --target media_summary_new.db --export-path .\`
+    3. This will migrate all your data from the old DB to the new one, and export the saved conversations to the `export-path` you specify.
+    4. Re-import any/all saved conversations into the new RAG_QA_Chat.db 
 
 
 
@@ -23,12 +30,28 @@
 
 
 #### Key Features:
-- Full-text+RAG search across all ingested content (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking).
-- Local LLM inference for offline usage and chat (via `llamafile`/`HuggingFace Transformers`).
-- Local Embeddings generation for RAG search (via `llamafile`/`llama.cpp`/`HuggingFace Transformers`).
-- Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
+- Ingest(Transcribe/convert to markdown) content from (multiple) URLs or local files (video, audio, documents, web articles, books, mediawiki dumps) -> Summarize/Analyze -> Chat with/about the content.- Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
+- **Full Plaintext & RAG Search Capability** Search across all ingested content via RAG or 'old-fashioned non-LLM search' (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking + Contextual Retrieval).
+  - Search by content, title, author, URL, or tags, with support for meta-tags, so that you can have the equivalent of 'folders' for your content (and tags).
+  - If you'd like to see my notes on RAG: see `./Docs/RAG_Notes.md`
+  - Notes support, ala NotebookLM, so you can keep track of your thoughts and ideas while chatting/learning, with the ability to search across them or use them for RAG.
+- **Local LLM inference for offline usage and chat** - via `llamafile`/`HuggingFace Transformers`.
+- **4 Different Chat UI styles** - Regular chat, Stacked chat, Multi-Response chat(1 Prompt, 3 APIs) and 4 Separate API chats on one page.
+- **Local Embeddings Generation for RAG Search** - via `llamafile`/`llama.cpp`/`HuggingFace Transformers`.
 - Also writing tools! Grammar/Style checker, Tone Analyzer, Writing editor(feedback), and more.
-- Full Character Chat Support - Create/Edit & Import/Export Character Cards, and chat with them.
+- **Full Character Chat Support** - Create/Edit & Import/Export Character Cards, and chat with them.
+- **Arxiv API Integration** - Search and ingest papers from Arxiv.
+- **Chat Workflows** - A way to string together multiple questions and responses into a single chat. - Use it to create a 'workflow' for a specific task. Configured via a JSON file.
+- **Import Obsidian Notes/Vault** - Import Obsidian Vaults into the DB. (Imported notes are automatically parsed for tags and titles)
+- **Backup Management** - A way to back up the DBs, view backups, and restore from a backup. (4 SQLite DBs: Media, Character Chats, RAG Chats, Embeddings)
+- **Trashcan Support** - A way to 'soft' delete content, and restore it if needed. (Helps with accidental deletions) - Trashcan is only for the MediaDB.
+- **Support for 7 Local LLM APIs:** `Llama.cpp`, `Kobold.cpp`, `Oobabooga`, `TabbyAPI`, `vLLM`, Ollama`.
+- **Support for 8 Commercial APIs:** `Claude Sonnet 3.5`, `Cohere Command R+`, `DeepSeek`, `Groq`, `HuggingFace`, `Mistral`, `OpenAI`, `OpenRouter`.
+- **Local Audio Recording with Transcription** - Record audio locally and transcribe it.
+- **Structured Prompt Creation and Management** - Create prompts using a structured approach, and then edit and use them in your chats. Or delete them.
+  - Also have the ability to import prompts individually or in bulk. As well as export them as markdown documents.
+  - See `./Docs/Prompts/` for examples of prompts. and `./Docs/Propmts/TEMPLATE.md` for the prompt template used in tldw.
+- Features to come: Anki Flashcard creation, Mindmap creation from content(currently in under `Utilities`, uses PlantUML), better document handling, migration to a FastAPI backend, and more.
 #### The original scripts by `the-crypt-keeper` for transcribing and summarizing youtube videos are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 
 
@@ -321,16 +344,14 @@ You can view the full roadmap on the [GitHub Issues page](https://github.com/rmu
 - These are just the 'standard smaller' models I recommend, there are many more out there, and you can use any of them with this project.
   - One should also be aware that people create 'fine-tunes' and 'merges' of existing models, to create new models that are more suited to their needs.
   - This can result in models that may be better at some tasks but worse at others, so it's important to test and see what works best for you.
-- MS Phi-3.5-mini-128k(32k effective context, censored output): https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF
-  - Fine-tuned to be uncensored somewhat: https://huggingface.co/bartowski/Phi-3.5-mini-instruct_Uncensored-GGUF
-- AWS MegaBeam Mistral (32k effective context): https://huggingface.co/bartowski/MegaBeam-Mistral-7B-512k-GGUF
-- Mistral Nemo Instruct 2407 - https://huggingface.co/QuantFactory/Mistral-Nemo-Instruct-2407-GGUF
 - Llama 3.1 - The native llamas will give you censored output by default, but you can jailbreak them, or use a finetune which has attempted to tune out their refusals. 
   - 8B: https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF 
+- Mistral Nemo Instruct 2407 - https://huggingface.co/QuantFactory/Mistral-Nemo-Instruct-2407-GGUF
+- AWS MegaBeam Mistral (32k effective context): https://huggingface.co/bartowski/MegaBeam-Mistral-7B-512k-GGUF
 - Mistral Small: https://huggingface.co/bartowski/Mistral-Small-Instruct-2409-GGUF
 - Cohere Command-R
   - Command-R https://huggingface.co/bartowski/c4ai-command-r-v01-GGUF / Aug2024 version: https://huggingface.co/bartowski/c4ai-command-r-08-2024-GGUF
-- Qwen 2.5 Series(haven't tested these ones yet but they seem promising, almost certainly censored): https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e
+- Qwen 2.5 Series(Pretty powerful, less pop-culture knowledge and censored somewhat): https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e
   - 2.5-3B: https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF
   - 7B: https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF
   - 14B: https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF
@@ -466,20 +487,23 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   1. Lost in the Middle: How Language Models Use Long Contexts(2023)
     - https://arxiv.org/abs/2307.03172 
     - `We analyze the performance of language models on two tasks that require identifying relevant information in their input contexts: multi-document question answering and key-value retrieval. We find that performance can degrade significantly when changing the position of relevant information, indicating that current language models do not robustly make use of information in long input contexts. In particular, we observe that performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts, even for explicitly long-context models`
-  2. [RULER: What's the Real Context Size of Your Long-Context Language Models?(2024)](https://arxiv.org/abs/2404.06654)
-    - `The needle-in-a-haystack (NIAH) test, which examines the ability to retrieve a piece of information (the "needle") from long distractor texts (the "haystack"), has been widely adopted to evaluate long-context language models (LMs). However, this simple retrieval-based test is indicative of only a superficial form of long-context understanding. To provide a more comprehensive evaluation of long-context LMs, we create a new synthetic benchmark RULER with flexible configurations for customized sequence length and task complexity. RULER expands upon the vanilla NIAH test to encompass variations with diverse types and quantities of needles. Moreover, RULER introduces new task categories multi-hop tracing and aggregation to test behaviors beyond searching from context. We evaluate ten long-context LMs with 13 representative tasks in RULER. Despite achieving nearly perfect accuracy in the vanilla NIAH test, all models exhibit large performance drops as the context length increases. While these models all claim context sizes of 32K tokens or greater, only four models (GPT-4, Command-R, Yi-34B, and Mixtral) can maintain satisfactory performance at the length of 32K. Our analysis of Yi-34B, which supports context length of 200K, reveals large room for improvement as we increase input length and task complexity.`
-  3. [Same Task, More Tokens: the Impact of Input Length on the Reasoning Performance of Large Language Models(2024)](https://arxiv.org/abs/2402.14848)
+  2. [Same Task, More Tokens: the Impact of Input Length on the Reasoning Performance of Large Language Models(2024)](https://arxiv.org/abs/2402.14848)
      - `Our findings show a notable degradation in LLMs' reasoning performance at much shorter input lengths than their technical maximum. We show that the degradation trend appears in every version of our dataset, although at different intensities. Additionally, our study reveals that the traditional metric of next word prediction correlates negatively with performance of LLMs' on our reasoning dataset. We analyse our results and identify failure modes that can serve as useful guides for future research, potentially informing strategies to address the limitations observed in LLMs.`
-  4. Abliteration (Uncensoring LLMs)
+  3. Why Does the Effective Context Length of LLMs Fall Short?(2024)
+    - https://arxiv.org/abs/2410.18745
+    - `     Advancements in distributed training and efficient attention mechanisms have significantly expanded the context window sizes of large language models (LLMs). However, recent work reveals that the effective context lengths of open-source LLMs often fall short, typically not exceeding half of their training lengths. In this work, we attribute this limitation to the left-skewed frequency distribution of relative positions formed in LLMs pretraining and post-training stages, which impedes their ability to effectively gather distant information. To address this challenge, we introduce ShifTed Rotray position embeddING (STRING). STRING shifts well-trained positions to overwrite the original ineffective positions during inference, enhancing performance within their existing training lengths. Experimental results show that without additional training, STRING dramatically improves the performance of the latest large-scale models, such as Llama3.1 70B and Qwen2 72B, by over 10 points on popular long-context benchmarks RULER and InfiniteBench, establishing new state-of-the-art results for open-source LLMs. Compared to commercial models, Llama 3.1 70B with \method even achieves better performance than GPT-4-128K and clearly surpasses Claude 2 and Kimi-chat.`
+  4. [RULER: What's the Real Context Size of Your Long-Context Language Models?(2024)](https://arxiv.org/abs/2404.06654)
+    - `The needle-in-a-haystack (NIAH) test, which examines the ability to retrieve a piece of information (the "needle") from long distractor texts (the "haystack"), has been widely adopted to evaluate long-context language models (LMs). However, this simple retrieval-based test is indicative of only a superficial form of long-context understanding. To provide a more comprehensive evaluation of long-context LMs, we create a new synthetic benchmark RULER with flexible configurations for customized sequence length and task complexity. RULER expands upon the vanilla NIAH test to encompass variations with diverse types and quantities of needles. Moreover, RULER introduces new task categories multi-hop tracing and aggregation to test behaviors beyond searching from context. We evaluate ten long-context LMs with 13 representative tasks in RULER. Despite achieving nearly perfect accuracy in the vanilla NIAH test, all models exhibit large performance drops as the context length increases. While these models all claim context sizes of 32K tokens or greater, only four models (GPT-4, Command-R, Yi-34B, and Mixtral) can maintain satisfactory performance at the length of 32K. Our analysis of Yi-34B, which supports context length of 200K, reveals large room for improvement as we increase input length and task complexity.`
+  5. Abliteration (Uncensoring LLMs)
      - [Uncensor any LLM with abliteration - Maxime Labonne(2024)](https://huggingface.co/blog/mlabonne/abliteration)
-  5. Retrieval-Augmented-Generation
+  6. Retrieval-Augmented-Generation
         - [Retrieval-Augmented Generation for Large Language Models: A Survey](https://arxiv.org/abs/2312.10997)
           - https://arxiv.org/abs/2312.10997
           - `Retrieval-Augmented Generation (RAG) has emerged as a promising solution by incorporating knowledge from external databases. This enhances the accuracy and credibility of the generation, particularly for knowledge-intensive tasks, and allows for continuous knowledge updates and integration of domain-specific information. RAG synergistically merges LLMs' intrinsic knowledge with the vast, dynamic repositories of external databases. This comprehensive review paper offers a detailed examination of the progression of RAG paradigms, encompassing the Naive RAG, the Advanced RAG, and the Modular RAG. It meticulously scrutinizes the tripartite foundation of RAG frameworks, which includes the retrieval, the generation and the augmentation techniques. The paper highlights the state-of-the-art technologies embedded in each of these critical components, providing a profound understanding of the advancements in RAG systems. Furthermore, this paper introduces up-to-date evaluation framework and benchmark. At the end, this article delineates the challenges currently faced and points out prospective avenues for research and development. `
-  6. Prompt Engineering
+  7. Prompt Engineering
      - Prompt Engineering Guide: https://www.promptingguide.ai/ & https://github.com/dair-ai/Prompt-Engineering-Guide
      - 'The Prompt Report' - https://arxiv.org/abs/2406.06608
-  7. Bias and Fairness in LLMs
+  8. Bias and Fairness in LLMs
      - [ChatGPT Doesn't Trust Chargers Fans: Guardrail Sensitivity in Context](https://arxiv.org/abs/2407.06866)
        - `While the biases of language models in production are extensively documented, the biases of their guardrails have been neglected. This paper studies how contextual information about the user influences the likelihood of an LLM to refuse to execute a request. By generating user biographies that offer ideological and demographic information, we find a number of biases in guardrail sensitivity on GPT-3.5. Younger, female, and Asian-American personas are more likely to trigger a refusal guardrail when requesting censored or illegal information. Guardrails are also sycophantic, refusing to comply with requests for a political position the user is likely to disagree with. We find that certain identity groups and seemingly innocuous information, e.g., sports fandom, can elicit changes in guardrail sensitivity similar to direct statements of political ideology. For each demographic category and even for American football team fandom, we find that ChatGPT appears to infer a likely political ideology and modify guardrail behavior accordingly.`
 - **Tools & Libraries**

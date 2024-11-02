@@ -9,14 +9,16 @@ import time
 from typing import Dict, Any, List, Optional
 
 from App_Function_Libraries.DB.Character_Chat_DB import get_character_chats, perform_full_text_search_chat, \
-    fetch_keywords_for_chats
+    fetch_keywords_for_chats, search_character_chat, search_character_cards, fetch_character_ids_by_keywords
+from App_Function_Libraries.DB.RAG_QA_Chat_DB import search_rag_chat, search_rag_notes
 #
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
 from App_Function_Libraries.RAG.RAG_Persona_Chat import perform_vector_search_chat
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_custom_openai
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
-from App_Function_Libraries.DB.DB_Manager import search_db, fetch_keywords_for_media
+from App_Function_Libraries.DB.DB_Manager import fetch_keywords_for_media, search_media_db, get_notes_by_keywords, \
+    search_conversations_by_keywords
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
@@ -39,6 +41,15 @@ config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
 config = configparser.ConfigParser()
 # Read the configuration file
 config.read('config.txt')
+
+
+search_functions = {
+    "Media DB": search_media_db,
+    "RAG Chat": search_rag_chat,
+    "RAG Notes": search_rag_notes,
+    "Character Chat": search_character_chat,
+    "Character Cards": search_character_cards
+}
 
 # RAG pipeline function for web scraping
 # def rag_web_scraping_pipeline(url: str, query: str, api_choice=None) -> Dict[str, Any]:
@@ -117,7 +128,20 @@ config.read('config.txt')
 
 # RAG Search with keyword filtering
 # FIXME - Update each called function to support modifiable top-k results
-def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top_k=10, apply_re_ranking=True) -> Dict[str, Any]:
+def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts_top_k=10, apply_re_ranking=True, database_types: List[str] = "Media DB") -> Dict[str, Any]:
+    """
+    Perform full text search across specified database type.
+
+    Args:
+        query: Search query string
+        api_choice: API to use for generating the response
+        fts_top_k: Maximum number of results to return
+        keywords: Optional list of media IDs to filter results
+        database_types: Type of database to search ("Media DB", "RAG Chat", or "Character Chat")
+
+    Returns:
+        Dictionary containing search results with content
+    """
     log_counter("enhanced_rag_pipeline_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
     try:
@@ -131,16 +155,97 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top
         keyword_list = [k.strip().lower() for k in keywords.split(',')] if keywords else []
         logging.debug(f"\n\nenhanced_rag_pipeline - Keywords: {keyword_list}")
 
-        # Fetch relevant media IDs based on keywords if keywords are provided
-        relevant_media_ids = fetch_relevant_media_ids(keyword_list) if keyword_list else None
-        logging.debug(f"\n\nenhanced_rag_pipeline - relevant media IDs: {relevant_media_ids}")
+        relevant_ids = {}
+
+        # Fetch relevant IDs based on keywords if keywords are provided
+        if keyword_list:
+            try:
+                for db_type in database_types:
+                    if db_type == "Media DB":
+                        relevant_media_ids = fetch_relevant_media_ids(keyword_list)
+                        relevant_ids[db_type] = relevant_media_ids
+                        logging.debug(f"enhanced_rag_pipeline - {db_type} relevant media IDs: {relevant_media_ids}")
+
+                    elif db_type == "RAG Chat":
+                        conversations, total_pages, total_count = search_conversations_by_keywords(
+                            keywords=keyword_list)
+                        relevant_conversation_ids = [conv['conversation_id'] for conv in conversations]
+                        relevant_ids[db_type] = relevant_conversation_ids
+                        logging.debug(
+                            f"enhanced_rag_pipeline - {db_type} relevant conversation IDs: {relevant_conversation_ids}")
+
+                    elif db_type == "RAG Notes":
+                        notes, total_pages, total_count = get_notes_by_keywords(keyword_list)
+                        relevant_note_ids = [note_id for note_id, _, _, _ in notes]  # Unpack note_id from the tuple
+                        relevant_ids[db_type] = relevant_note_ids
+                        logging.debug(f"enhanced_rag_pipeline - {db_type} relevant note IDs: {relevant_note_ids}")
+
+                    elif db_type == "Character Chat":
+                        relevant_chat_ids = fetch_keywords_for_chats(keyword_list)
+                        relevant_ids[db_type] = relevant_chat_ids
+                        logging.debug(f"enhanced_rag_pipeline - {db_type} relevant chat IDs: {relevant_chat_ids}")
+
+                    elif db_type == "Character Cards":
+                        # Assuming we have a function to fetch character IDs by keywords
+                        relevant_character_ids = fetch_character_ids_by_keywords(keyword_list)
+                        relevant_ids[db_type] = relevant_character_ids
+                        logging.debug(
+                            f"enhanced_rag_pipeline - {db_type} relevant character IDs: {relevant_character_ids}")
+
+                    else:
+                        logging.error(f"Unsupported database type: {db_type}")
+
+            except Exception as e:
+                logging.error(f"Error fetching relevant IDs: {str(e)}")
+        else:
+            relevant_ids = None
+
+        # Extract relevant media IDs for each selected DB
+        # Prepare a dict to hold relevant_media_ids per DB
+        relevant_media_ids_dict = {}
+        if relevant_ids:
+            for db_type in database_types:
+                relevant_media_ids = relevant_ids.get(db_type, None)
+                if relevant_media_ids:
+                    # Convert to List[str] if not None
+                    relevant_media_ids_dict[db_type] = [str(media_id) for media_id in relevant_media_ids]
+                else:
+                    relevant_media_ids_dict[db_type] = None
+        else:
+            relevant_media_ids_dict = {db_type: None for db_type in database_types}
+
+        # Perform vector search for all selected databases
+        vector_results = []
+        for db_type in database_types:
+            try:
+                db_relevant_ids = relevant_media_ids_dict.get(db_type)
+                results = perform_vector_search(query, db_relevant_ids, top_k=fts_top_k)
+                vector_results.extend(results)
+                logging.debug(f"\nenhanced_rag_pipeline - Vector search results for {db_type}: {results}")
+            except Exception as e:
+                logging.error(f"Error performing vector search on {db_type}: {str(e)}")
 
         # Perform vector search
+        # FIXME
         vector_results = perform_vector_search(query, relevant_media_ids)
         logging.debug(f"\n\nenhanced_rag_pipeline - Vector search results: {vector_results}")
 
         # Perform full-text search
-        fts_results = perform_full_text_search(query, relevant_media_ids)
+        #v1
+        #fts_results = perform_full_text_search(query, database_type, relevant_media_ids, fts_top_k)
+
+        # v2
+        # Perform full-text search across specified databases
+        fts_results = []
+        for db_type in database_types:
+            try:
+                db_relevant_ids = relevant_ids.get(db_type) if relevant_ids else None
+                db_results = perform_full_text_search(query, db_type, db_relevant_ids, fts_top_k)
+                fts_results.extend(db_results)
+                logging.debug(f"enhanced_rag_pipeline - FTS results for {db_type}: {db_results}")
+            except Exception as e:
+                logging.error(f"Error performing full-text search on {db_type}: {str(e)}")
+
         logging.debug("\n\nenhanced_rag_pipeline - Full-text search results:")
         logging.debug(
             "\n\nenhanced_rag_pipeline - Full-text search results:\n" + "\n".join(
@@ -175,8 +280,8 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top
                 # Update all_results based on reranking
                 all_results = [all_results[result['id']] for result in reranked_results]
 
-        # Extract content from results (top 10 by default)
-        context = "\n".join([result['content'] for result in all_results[:top_k]])
+        # Extract content from results (top fts_top_k by default)
+        context = "\n".join([result['content'] for result in all_results[:fts_top_k]])
         logging.debug(f"Context length: {len(context)}")
         logging.debug(f"Context: {context[:200]}")
 
@@ -207,6 +312,8 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, top
             "answer": "An error occurred while processing your request.",
             "context": ""
         }
+
+
 
 # Need to write a test for this function FIXME
 def generate_answer(api_choice: str, context: str, query: str) -> str:
@@ -336,6 +443,7 @@ def generate_answer(api_choice: str, context: str, query: str) -> str:
         logging.error(f"Error in generate_answer: {str(e)}")
         return "An error occurred while generating the answer."
 
+
 def perform_vector_search(query: str, relevant_media_ids: List[str] = None, top_k=10) -> List[Dict[str, Any]]:
     log_counter("perform_vector_search_attempt")
     start_time = time.time()
@@ -344,6 +452,8 @@ def perform_vector_search(query: str, relevant_media_ids: List[str] = None, top_
     try:
         for collection in all_collections:
             collection_results = vector_search(collection.name, query, k=top_k)
+            if not collection_results:
+                continue  # Skip empty results
             filtered_results = [
                 result for result in collection_results
                 if relevant_media_ids is None or result['metadata'].get('media_id') in relevant_media_ids
@@ -358,27 +468,73 @@ def perform_vector_search(query: str, relevant_media_ids: List[str] = None, top_
         logging.error(f"Error in perform_vector_search: {str(e)}")
         raise
 
-def perform_full_text_search(query: str, relevant_media_ids: List[str] = None, fts_top_k=None) -> List[Dict[str, Any]]:
-    log_counter("perform_full_text_search_attempt")
+
+# V2
+def perform_full_text_search(query: str, database_type: str, relevant_ids: List[str] = None, fts_top_k=None) -> List[Dict[str, Any]]:
+    """
+    Perform full-text search on a specified database type.
+
+    Args:
+        query: Search query string
+        database_type: Type of database to search ("Media DB", "RAG Chat", "RAG Notes", "Character Chat", "Character Cards")
+        relevant_ids: Optional list of media IDs to filter results
+        fts_top_k: Maximum number of results to return
+
+    Returns:
+        List of search results with content and metadata
+    """
+    log_counter("perform_full_text_search_attempt", labels={"database_type": database_type})
     start_time = time.time()
+
     try:
-        fts_results = search_db(query, ["content"], "", page=1, results_per_page=fts_top_k or 10)
-        filtered_fts_results = [
-            {
-                "content": result['content'],
-                "metadata": {"media_id": result['id']}
-            }
-            for result in fts_results
-            if relevant_media_ids is None or result['id'] in relevant_media_ids
-        ]
+        # Set default for fts_top_k
+        if fts_top_k is None:
+            fts_top_k = 10
+
+        # Call appropriate search function based on database type
+        if database_type not in search_functions:
+            raise ValueError(f"Unsupported database type: {database_type}")
+
+        # Call the appropriate search function
+        results = search_functions[database_type](query, fts_top_k, relevant_ids)
+
         search_duration = time.time() - start_time
-        log_histogram("perform_full_text_search_duration", search_duration)
-        log_counter("perform_full_text_search_success", labels={"result_count": len(filtered_fts_results)})
-        return filtered_fts_results
+        log_histogram("perform_full_text_search_duration", search_duration,
+                      labels={"database_type": database_type})
+        log_counter("perform_full_text_search_success",
+                    labels={"database_type": database_type, "result_count": len(results)})
+
+        return results
+
     except Exception as e:
-        log_counter("perform_full_text_search_error", labels={"error": str(e)})
-        logging.error(f"Error in perform_full_text_search: {str(e)}")
+        log_counter("perform_full_text_search_error",
+                    labels={"database_type": database_type, "error": str(e)})
+        logging.error(f"Error in perform_full_text_search ({database_type}): {str(e)}")
         raise
+
+
+# v1
+# def perform_full_text_search(query: str, relevant_media_ids: List[str] = None, fts_top_k=None) -> List[Dict[str, Any]]:
+#     log_counter("perform_full_text_search_attempt")
+#     start_time = time.time()
+#     try:
+#         fts_results = search_db(query, ["content"], "", page=1, results_per_page=fts_top_k or 10)
+#         filtered_fts_results = [
+#             {
+#                 "content": result['content'],
+#                 "metadata": {"media_id": result['id']}
+#             }
+#             for result in fts_results
+#             if relevant_media_ids is None or result['id'] in relevant_media_ids
+#         ]
+#         search_duration = time.time() - start_time
+#         log_histogram("perform_full_text_search_duration", search_duration)
+#         log_counter("perform_full_text_search_success", labels={"result_count": len(filtered_fts_results)})
+#         return filtered_fts_results
+#     except Exception as e:
+#         log_counter("perform_full_text_search_error", labels={"error": str(e)})
+#         logging.error(f"Error in perform_full_text_search: {str(e)}")
+#         raise
 
 
 def fetch_relevant_media_ids(keywords: List[str], top_k=10) -> List[int]:
@@ -502,6 +658,7 @@ def enhanced_rag_pipeline_chat(query: str, api_choice: str, character_id: int, k
         logging.debug(f"enhanced_rag_pipeline_chat - Vector search results: {vector_results}")
 
         # Perform full-text search within the relevant chats
+        # FIXME - Update for DB Selection
         fts_results = perform_full_text_search_chat(query, relevant_chat_ids)
         logging.debug("enhanced_rag_pipeline_chat - Full-text search results:")
         logging.debug("\n".join([str(item) for item in fts_results]))
