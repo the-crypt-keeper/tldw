@@ -46,17 +46,17 @@ def grammar_style_check(input_text, custom_prompt, api_name, api_key, system_pro
 
 
 def create_grammar_style_check_tab():
-    try:
-        default_value = None
-        if default_api_endpoint:
-            if default_api_endpoint in global_api_endpoints:
-                default_value = format_api_name(default_api_endpoint)
-            else:
-                logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
-    except Exception as e:
-        logging.error(f"Error setting default API endpoint: {str(e)}")
-        default_value = None
     with gr.TabItem("Grammar and Style Check", visible=True):
+        try:
+            default_value = None
+            if default_api_endpoint:
+                if default_api_endpoint in global_api_endpoints:
+                    default_value = format_api_name(default_api_endpoint)
+                else:
+                    logging.warning(f"Default API endpoint '{default_api_endpoint}' not found in global_api_endpoints")
+        except Exception as e:
+            logging.error(f"Error setting default API endpoint: {str(e)}")
+            default_value = None
         with gr.Row():
             with gr.Column():
                 gr.Markdown("# Grammar and Style Check")
@@ -317,63 +317,63 @@ def create_document_feedback_tab():
         with gr.Row():
             compare_button = gr.Button("Compare Feedback")
 
-    feedback_history = gr.State([])
+        feedback_history = gr.State([])
 
-    def add_custom_persona(name, description):
-        updated_choices = persona_dropdown.choices + [name]
-        persona_prompts[name] = f"As {name}, {description}, provide feedback on the following text:"
-        return gr.update(choices=updated_choices)
+        def add_custom_persona(name, description):
+            updated_choices = persona_dropdown.choices + [name]
+            persona_prompts[name] = f"As {name}, {description}, provide feedback on the following text:"
+            return gr.update(choices=updated_choices)
 
-    def update_feedback_history(current_text, persona, feedback):
-        # Ensure feedback_history.value is initialized and is a list
-        if feedback_history.value is None:
-            feedback_history.value = []
+        def update_feedback_history(current_text, persona, feedback):
+            # Ensure feedback_history.value is initialized and is a list
+            if feedback_history.value is None:
+                feedback_history.value = []
 
-        history = feedback_history.value
+            history = feedback_history.value
 
-        # Append the new entry to the history
-        history.append({"text": current_text, "persona": persona, "feedback": feedback})
+            # Append the new entry to the history
+            history.append({"text": current_text, "persona": persona, "feedback": feedback})
 
-        # Keep only the last 5 entries in the history
-        feedback_history.value = history[-10:]
+            # Keep only the last 5 entries in the history
+            feedback_history.value = history[-10:]
 
-        # Generate and return the updated HTML
-        return generate_feedback_history_html(feedback_history.value)
+            # Generate and return the updated HTML
+            return generate_feedback_history_html(feedback_history.value)
 
-    def compare_feedback(text, selected_personas, api_name, api_key):
-        results = []
-        for persona in selected_personas:
-            feedback = generate_writing_feedback(text, persona, "Overall", api_name, api_key)
-            results.append(f"### {persona}'s Feedback:\n{feedback}\n\n")
-        return "\n".join(results)
+        def compare_feedback(text, selected_personas, api_name, api_key):
+            results = []
+            for persona in selected_personas:
+                feedback = generate_writing_feedback(text, persona, "Overall", api_name, api_key)
+                results.append(f"### {persona}'s Feedback:\n{feedback}\n\n")
+            return "\n".join(results)
 
-    add_custom_persona_button.click(
-        fn=add_custom_persona,
-        inputs=[custom_persona_name, custom_persona_description],
-        outputs=persona_dropdown
-    )
+        add_custom_persona_button.click(
+            fn=add_custom_persona,
+            inputs=[custom_persona_name, custom_persona_description],
+            outputs=persona_dropdown
+        )
 
-    get_feedback_button.click(
-        fn=lambda text, persona, aspect, api_name, api_key: (
-            generate_writing_feedback(text, persona, aspect, api_name, api_key),
-            calculate_readability(text),
-            update_feedback_history(text, persona, generate_writing_feedback(text, persona, aspect, api_name, api_key))
-        ),
-        inputs=[input_text, persona_dropdown, aspect_dropdown, api_name_input, api_key_input],
-        outputs=[feedback_output, readability_output, feedback_history_display]
-    )
+        get_feedback_button.click(
+            fn=lambda text, persona, aspect, api_name, api_key: (
+                generate_writing_feedback(text, persona, aspect, api_name, api_key),
+                calculate_readability(text),
+                update_feedback_history(text, persona, generate_writing_feedback(text, persona, aspect, api_name, api_key))
+            ),
+            inputs=[input_text, persona_dropdown, aspect_dropdown, api_name_input, api_key_input],
+            outputs=[feedback_output, readability_output, feedback_history_display]
+        )
 
-    compare_button.click(
-        fn=compare_feedback,
-        inputs=[input_text, compare_personas, api_name_input, api_key_input],
-        outputs=feedback_output
-    )
+        compare_button.click(
+            fn=compare_feedback,
+            inputs=[input_text, compare_personas, api_name_input, api_key_input],
+            outputs=feedback_output
+        )
 
-    generate_prompt_button.click(
-        fn=generate_writing_prompt,
-        inputs=[persona_dropdown, api_name_input, api_key_input],
-        outputs=input_text
-    )
+        generate_prompt_button.click(
+            fn=generate_writing_prompt,
+            inputs=[persona_dropdown, api_name_input, api_key_input],
+            outputs=input_text
+        )
 
     return input_text, feedback_output, readability_output, feedback_history_display
 

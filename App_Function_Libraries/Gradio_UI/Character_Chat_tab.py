@@ -32,10 +32,12 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     update_character_chat,
     delete_character_chat,
     delete_character_card,
-    update_character_card, search_character_chats,
+    update_character_card, search_character_chats, save_chat_history_to_character_db,
 )
 from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
-    default_api_endpoint
+    default_api_endpoint, load_comprehensive_config
+
+
 #
 ############################################################################################################
 #
@@ -267,6 +269,25 @@ def create_character_card_interaction_tab():
         gr.Markdown("# Chat with a Character Card")
         with gr.Row():
             with gr.Column(scale=1):
+                # Checkbox to Decide Whether to Save Chats by Default
+                config = load_comprehensive_config()
+                auto_save_value = config.get('auto-save', 'save_character_chats', fallback='False')
+                auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=auto_save_value)
+                chat_media_name = gr.Textbox(label="Custom Chat Name (optional)", visible=True)
+                save_chat_history_to_db = gr.Button("Save Chat History to Database")
+                save_status = gr.Textbox(label="Status", interactive=False)
+            with gr.Column(scale=2):
+                gr.Markdown("## Search and Load Existing Chats")
+                chat_search_query = gr.Textbox(
+                    label="Search Chats",
+                    placeholder="Enter chat name or keywords to search"
+                )
+                chat_search_button = gr.Button("Search Chats")
+                chat_search_dropdown = gr.Dropdown(label="Search Results", choices=[], visible=False)
+                load_chat_button = gr.Button("Load Selected Chat", visible=False)
+
+        with gr.Row():
+            with gr.Column(scale=1):
                 character_image = gr.Image(label="Character Image", type="pil")
                 character_card_upload = gr.File(
                     label="Upload Character Card (PNG, WEBP, JSON)",
@@ -289,24 +310,8 @@ def create_character_card_interaction_tab():
                 temperature_slider = gr.Slider(
                     minimum=0.0, maximum=2.0, value=0.7, step=0.05, label="Temperature"
                 )
-                import_chat_button = gr.Button("Import Chat History")
                 chat_file_upload = gr.File(label="Upload Chat History JSON", visible=True)
-
-                # Chat History Import and Search
-                gr.Markdown("## Search and Load Existing Chats")
-                chat_search_query = gr.Textbox(
-                    label="Search Chats",
-                    placeholder="Enter chat name or keywords to search"
-                )
-                chat_search_button = gr.Button("Search Chats")
-                chat_search_dropdown = gr.Dropdown(label="Search Results", choices=[], visible=False)
-                load_chat_button = gr.Button("Load Selected Chat", visible=False)
-
-                # Checkbox to Decide Whether to Save Chats by Default
-                auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=True)
-                chat_media_name = gr.Textbox(label="Custom Chat Name (optional)", visible=True)
-                save_chat_history_to_db = gr.Button("Save Chat History to Database")
-                save_status = gr.Textbox(label="Status", interactive=False)
+                import_chat_button = gr.Button("Import Chat History")
 
             with gr.Column(scale=2):
                 chat_history = gr.Chatbot(label="Conversation", height=800)
@@ -500,23 +505,114 @@ def create_character_card_interaction_tab():
 
             return history, save_status
 
+        def validate_chat_history(chat_history: List[Tuple[Optional[str], str]]) -> bool:
+            """
+            Validate the chat history format and content.
+
+            Args:
+                chat_history: List of message tuples (user_message, bot_message)
+
+            Returns:
+                bool: True if valid, False if invalid
+            """
+            if not isinstance(chat_history, list):
+                return False
+
+            for entry in chat_history:
+                if not isinstance(entry, tuple) or len(entry) != 2:
+                    return False
+                # First element can be None (for system messages) or str
+                if not (entry[0] is None or isinstance(entry[0], str)):
+                    return False
+                # Second element (bot response) must be str and not empty
+                if not isinstance(entry[1], str) or not entry[1].strip():
+                    return False
+
+            return True
+
+        def sanitize_conversation_name(name: str) -> str:
+            """
+            Sanitize the conversation name.
+
+            Args:
+                name: Raw conversation name
+
+            Returns:
+                str: Sanitized conversation name
+            """
+            # Remove any non-alphanumeric characters except spaces and basic punctuation
+            sanitized = re.sub(r'[^a-zA-Z0-9\s\-_.]', '', name)
+            # Limit length
+            sanitized = sanitized[:100]
+            # Ensure it's not empty
+            if not sanitized.strip():
+                sanitized = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            return sanitized
+
         def save_chat_history_to_db_wrapper(
-            chat_history, conversation_id, media_content,
-            chat_media_name, char_data, auto_save
-        ):
-            if not char_data or not chat_history:
-                return "No character or chat history available.", ""
+                chat_history: List[Tuple[Optional[str], str]],
+                conversation_id: str,
+                media_content: Dict,
+                chat_media_name: str,
+                char_data: Dict,
+                auto_save: bool
+        ) -> Tuple[str, str]:
+            """
+            Save chat history to the database with validation.
 
-            character_id = char_data.get('id')
-            if not character_id:
-                return "Character ID not found.", ""
+            Args:
+                chat_history: List of message tuples
+                conversation_id: Current conversation ID
+                media_content: Media content metadata
+                chat_media_name: Custom name for the chat
+                char_data: Character data dictionary
+                auto_save: Auto-save flag
 
-            conversation_name = chat_media_name or f"Chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            chat_id = add_character_chat(character_id, conversation_name, chat_history)
-            if chat_id:
-                return f"Chat saved successfully with ID {chat_id}.", ""
-            else:
-                return "Failed to save chat.", ""
+            Returns:
+                Tuple[str, str]: (status message, detail message)
+            """
+            try:
+                # Basic input validation
+                if not chat_history:
+                    return "No chat history to save.", ""
+
+                if not validate_chat_history(chat_history):
+                    return "Invalid chat history format.", "Please ensure the chat history is valid."
+
+                if not char_data:
+                    return "No character selected.", "Please select a character first."
+
+                character_id = char_data.get('id')
+                if not character_id:
+                    return "Invalid character data: No character ID found.", ""
+
+                # Sanitize and prepare conversation name
+                conversation_name = sanitize_conversation_name(
+                    chat_media_name if chat_media_name.strip()
+                    else f"Chat with {char_data.get('name', 'Unknown')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+
+                # Save to the database using your existing function
+                chat_id = save_chat_history_to_character_db(
+                    character_id=character_id,
+                    conversation_name=conversation_name,
+                    chat_history=chat_history
+                )
+
+                if chat_id:
+                    success_message = (
+                        f"Chat saved successfully!\n"
+                        f"ID: {chat_id}\n"
+                        f"Name: {conversation_name}\n"
+                        f"Messages: {len(chat_history)}"
+                    )
+                    return success_message, ""
+                else:
+                    return "Failed to save chat to database.", "Database operation failed."
+
+            except Exception as e:
+                logging.error(f"Error saving chat history: {str(e)}", exc_info=True)
+                return f"Error saving chat: {str(e)}", "Please check the logs for more details."
 
         def update_character_info(name):
             return load_character_and_image(name, user_name.value)
@@ -1062,8 +1158,8 @@ def create_character_card_interaction_tab():
 
 
 def create_character_chat_mgmt_tab():
-    with gr.TabItem("Character and Chat Management", visible=True):
-        gr.Markdown("# Character and Chat Management")
+    with gr.TabItem("Character Chat Management", visible=True):
+        gr.Markdown("# Character Chat Management")
 
         with gr.Row():
             # Left Column: Character Import and Chat Management

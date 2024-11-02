@@ -117,16 +117,15 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
     progress = []
     all_transcriptions = []
     all_summaries = []
-    #v2
+    temp_files = []  # Keep track of temporary files
+
     def format_transcription_with_timestamps(segments):
         if keep_timestamps:
             formatted_segments = []
             for segment in segments:
                 start = segment.get('Time_Start', 0)
                 end = segment.get('Time_End', 0)
-                text = segment.get('Text', '').strip()  # Ensure text is stripped of leading/trailing spaces
-
-                # Add the formatted timestamp and text to the list, followed by a newline
+                text = segment.get('Text', '').strip()
                 formatted_segments.append(f"[{start:.2f}-{end:.2f}] {text}")
 
             # Join the segments with a newline to ensure proper formatting
@@ -191,205 +190,64 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
             'language': chunk_language
         }
 
-        # Process multiple URLs
-        urls = [url.strip() for url in audio_urls.split('\n') if url.strip()]
-
-        for i, url in enumerate(urls):
-            update_progress(f"Processing URL {i + 1}/{len(urls)}: {url}")
-
-            # Download and process audio file
-            audio_file_path = download_audio_file(url, use_cookies, cookies)
-            if not os.path.exists(audio_file_path):
-                update_progress(f"Downloaded file not found: {audio_file_path}")
-                failed_count += 1
-                log_counter(
-                    metric_name="audio_files_failed_total",
-                    labels={"whisper_model": whisper_model, "api_name": api_name},
-                    value=1
-                )
-                continue
-
-            temp_files.append(audio_file_path)
-            update_progress("Audio file downloaded successfully.")
-
-            # Re-encode MP3 to fix potential issues
-            reencoded_mp3_path = reencode_mp3(audio_file_path)
-            if not os.path.exists(reencoded_mp3_path):
-                update_progress(f"Re-encoded file not found: {reencoded_mp3_path}")
-                failed_count += 1
-                log_counter(
-                    metric_name="audio_files_failed_total",
-                    labels={"whisper_model": whisper_model, "api_name": api_name},
-                    value=1
-                )
-                continue
-
-            temp_files.append(reencoded_mp3_path)
-
-            # Convert re-encoded MP3 to WAV
-            wav_file_path = convert_mp3_to_wav(reencoded_mp3_path)
-            if not os.path.exists(wav_file_path):
-                update_progress(f"Converted WAV file not found: {wav_file_path}")
-                failed_count += 1
-                log_counter(
-                    metric_name="audio_files_failed_total",
-                    labels={"whisper_model": whisper_model, "api_name": api_name},
-                    value=1
-                )
-                continue
-
-            temp_files.append(wav_file_path)
-
-            # Initialize transcription
-            transcription = ""
-
-            # Transcribe audio
-            if diarize:
-                segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=True)
-            else:
-                segments = speech_to_text(wav_file_path, whisper_model=whisper_model)
-
-            # Handle segments nested under 'segments' key
-            if isinstance(segments, dict) and 'segments' in segments:
-                segments = segments['segments']
-
-            if isinstance(segments, list):
-                # Log first 5 segments for debugging
-                logging.debug(f"Segments before formatting: {segments[:5]}")
-                transcription = format_transcription_with_timestamps(segments)
-                logging.debug(f"Formatted transcription (first 500 chars): {transcription[:500]}")
-                update_progress("Audio transcribed successfully.")
-            else:
-                update_progress("Unexpected segments format received from speech_to_text.")
-                logging.error(f"Unexpected segments format: {segments}")
-                failed_count += 1
-                log_counter(
-                    metric_name="audio_files_failed_total",
-                    labels={"whisper_model": whisper_model, "api_name": api_name},
-                    value=1
-                )
-                continue
-
-            if not transcription.strip():
-                update_progress("Transcription is empty.")
-                failed_count += 1
-                log_counter(
-                    metric_name="audio_files_failed_total",
-                    labels={"whisper_model": whisper_model, "api_name": api_name},
-                    value=1
-                )
-            else:
-                # Apply chunking
-                chunked_text = improved_chunking_process(transcription, chunk_options)
-
-                # Summarize
-                logging.debug(f"Audio Transcription API Name: {api_name}")
-                if api_name:
-                    try:
-                        summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
-                        update_progress("Audio summarized successfully.")
-                    except Exception as e:
-                        logging.error(f"Error during summarization: {str(e)}")
-                        summary = "Summary generation failed"
-                        failed_count += 1
-                        log_counter(
-                            metric_name="audio_files_failed_total",
-                            labels={"whisper_model": whisper_model, "api_name": api_name},
-                            value=1
-                        )
-                else:
-                    summary = "No summary available (API not provided)"
-
-                all_transcriptions.append(transcription)
-                all_summaries.append(summary)
-
-                # Use custom_title if provided, otherwise use the original filename
-                title = custom_title if custom_title else os.path.basename(wav_file_path)
-
-                # Add to database
-                add_media_with_keywords(
-                    url=url,
-                    title=title,
-                    media_type='audio',
-                    content=transcription,
-                    keywords=custom_keywords,
-                    prompt=custom_prompt_input,
-                    summary=summary,
-                    transcription_model=whisper_model,
-                    author="Unknown",
-                    ingestion_date=datetime.now().strftime('%Y-%m-%d')
-                )
-                update_progress("Audio file processed and added to database.")
-                processed_count += 1
-                log_counter(
-                    metric_name="audio_files_processed_total",
-                    labels={"whisper_model": whisper_model, "api_name": api_name},
-                    value=1
-                )
-
-        # Process uploaded file if provided
-        if audio_file:
-            url = generate_unique_id()
-            if os.path.getsize(audio_file.name) > MAX_FILE_SIZE:
-                update_progress(
-                    f"Uploaded file size exceeds the maximum limit of {MAX_FILE_SIZE / (1024 * 1024):.2f}MB. Skipping this file.")
-            else:
+        # Process URLs if provided
+        if audio_urls:
+            urls = [url.strip() for url in audio_urls.split('\n') if url.strip()]
+            for i, url in enumerate(urls):
                 try:
-                    # Re-encode MP3 to fix potential issues
-                    reencoded_mp3_path = reencode_mp3(audio_file.name)
-                    if not os.path.exists(reencoded_mp3_path):
-                        update_progress(f"Re-encoded file not found: {reencoded_mp3_path}")
-                        return update_progress("Processing failed: Re-encoded file not found"), "", ""
+                    update_progress(f"Processing URL {i + 1}/{len(urls)}: {url}")
 
+                    # Download and process audio file
+                    audio_file_path = download_audio_file(url, use_cookies, cookies)
+                    if not audio_file_path:
+                        raise FileNotFoundError(f"Failed to download audio from URL: {url}")
+
+                    temp_files.append(audio_file_path)
+
+                    # Process the audio file
+                    reencoded_mp3_path = reencode_mp3(audio_file_path)
                     temp_files.append(reencoded_mp3_path)
 
-                    # Convert re-encoded MP3 to WAV
                     wav_file_path = convert_mp3_to_wav(reencoded_mp3_path)
-                    if not os.path.exists(wav_file_path):
-                        update_progress(f"Converted WAV file not found: {wav_file_path}")
-                        return update_progress("Processing failed: Converted WAV file not found"), "", ""
-
                     temp_files.append(wav_file_path)
 
-                    # Initialize transcription
-                    transcription = ""
+                    # Transcribe audio
+                    segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=diarize)
 
-                    if diarize:
-                        segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=True)
-                    else:
-                        segments = speech_to_text(wav_file_path, whisper_model=whisper_model)
-
-                    # Handle segments nested under 'segments' key
+                    # Handle segments format
                     if isinstance(segments, dict) and 'segments' in segments:
                         segments = segments['segments']
 
-                    if isinstance(segments, list):
-                        transcription = format_transcription_with_timestamps(segments)
-                    else:
-                        update_progress("Unexpected segments format received from speech_to_text.")
-                        logging.error(f"Unexpected segments format: {segments}")
+                    if not isinstance(segments, list):
+                        raise ValueError("Unexpected segments format received from speech_to_text")
 
-                    chunked_text = improved_chunking_process(transcription, chunk_options)
+                    transcription = format_transcription_with_timestamps(segments)
+                    if not transcription.strip():
+                        raise ValueError("Empty transcription generated")
 
-                    logging.debug(f"Audio Transcription API Name: {api_name}")
-                    if api_name:
+                    # Initialize summary with default value
+                    summary = "No summary available"
+
+                    # Attempt summarization if API is provided
+                    if api_name and api_name.lower() != "none":
                         try:
-                            summary = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
+                            chunked_text = improved_chunking_process(transcription, chunk_options)
+                            summary_result = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
+                            if summary_result:
+                                summary = summary_result
                             update_progress("Audio summarized successfully.")
                         except Exception as e:
-                            logging.error(f"Error during summarization: {str(e)}")
+                            logging.error(f"Summarization failed: {str(e)}")
                             summary = "Summary generation failed"
-                    else:
-                        summary = "No summary available (API not provided)"
 
+                    # Add to results
                     all_transcriptions.append(transcription)
                     all_summaries.append(summary)
 
-                    # Use custom_title if provided, otherwise use the original filename
+                    # Add to database
                     title = custom_title if custom_title else os.path.basename(wav_file_path)
-
                     add_media_with_keywords(
-                        url="Uploaded File",
+                        url=url,
                         title=title,
                         media_type='audio',
                         content=transcription,
@@ -400,65 +258,112 @@ def process_audio_files(audio_urls, audio_file, whisper_model, api_name, api_key
                         author="Unknown",
                         ingestion_date=datetime.now().strftime('%Y-%m-%d')
                     )
-                    update_progress("Uploaded file processed and added to database.")
+
                     processed_count += 1
-                    log_counter(
-                        metric_name="audio_files_processed_total",
-                        labels={"whisper_model": whisper_model, "api_name": api_name},
-                        value=1
-                    )
+                    update_progress(f"Successfully processed URL {i + 1}")
+                    log_counter("audio_files_processed_total", 1, {"whisper_model": whisper_model, "api_name": api_name})
+
                 except Exception as e:
-                    update_progress(f"Error processing uploaded file: {str(e)}")
-                    logging.error(f"Error processing uploaded file: {str(e)}")
                     failed_count += 1
-                    log_counter(
-                        metric_name="audio_files_failed_total",
-                        labels={"whisper_model": whisper_model, "api_name": api_name},
-                        value=1
-                    )
-                    return update_progress("Processing failed: Error processing uploaded file"), "", ""
-        # Final cleanup
+                    update_progress(f"Failed to process URL {i + 1}: {str(e)}")
+                    log_counter("audio_files_failed_total", 1, {"whisper_model": whisper_model, "api_name": api_name})
+                    continue
+
+        # Process uploaded file if provided
+        if audio_file:
+            try:
+                update_progress("Processing uploaded file...")
+                if os.path.getsize(audio_file.name) > MAX_FILE_SIZE:
+                    raise ValueError(f"File size exceeds maximum limit of {MAX_FILE_SIZE / (1024 * 1024):.2f}MB")
+
+                reencoded_mp3_path = reencode_mp3(audio_file.name)
+                temp_files.append(reencoded_mp3_path)
+
+                wav_file_path = convert_mp3_to_wav(reencoded_mp3_path)
+                temp_files.append(wav_file_path)
+
+                # Transcribe audio
+                segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=diarize)
+
+                if isinstance(segments, dict) and 'segments' in segments:
+                    segments = segments['segments']
+
+                if not isinstance(segments, list):
+                    raise ValueError("Unexpected segments format received from speech_to_text")
+
+                transcription = format_transcription_with_timestamps(segments)
+                if not transcription.strip():
+                    raise ValueError("Empty transcription generated")
+
+                # Initialize summary with default value
+                summary = "No summary available"
+
+                # Attempt summarization if API is provided
+                if api_name and api_name.lower() != "none":
+                    try:
+                        chunked_text = improved_chunking_process(transcription, chunk_options)
+                        summary_result = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)
+                        if summary_result:
+                            summary = summary_result
+                        update_progress("Audio summarized successfully.")
+                    except Exception as e:
+                        logging.error(f"Summarization failed: {str(e)}")
+                        summary = "Summary generation failed"
+
+                # Add to results
+                all_transcriptions.append(transcription)
+                all_summaries.append(summary)
+
+                # Add to database
+                title = custom_title if custom_title else os.path.basename(wav_file_path)
+                add_media_with_keywords(
+                    url="Uploaded File",
+                    title=title,
+                    media_type='audio',
+                    content=transcription,
+                    keywords=custom_keywords,
+                    prompt=custom_prompt_input,
+                    summary=summary,
+                    transcription_model=whisper_model,
+                    author="Unknown",
+                    ingestion_date=datetime.now().strftime('%Y-%m-%d')
+                )
+
+                processed_count += 1
+                update_progress("Successfully processed uploaded file")
+                log_counter("audio_files_processed_total", 1, {"whisper_model": whisper_model, "api_name": api_name})
+
+            except Exception as e:
+                failed_count += 1
+                update_progress(f"Failed to process uploaded file: {str(e)}")
+                log_counter("audio_files_failed_total", 1, {"whisper_model": whisper_model, "api_name": api_name})
+
+        # Cleanup temporary files
         if not keep_original:
             cleanup_files()
 
-        end_time = time.time()
-        processing_time = end_time - start_time
-        # Log processing time
-        log_histogram(
-            metric_name="audio_processing_time_seconds",
-            value=processing_time,
-            labels={"whisper_model": whisper_model, "api_name": api_name}
-        )
+        # Log processing metrics
+        processing_time = time.time() - start_time
+        log_histogram("audio_processing_time_seconds", processing_time,
+                     {"whisper_model": whisper_model, "api_name": api_name})
+        log_counter("total_audio_files_processed", processed_count,
+                   {"whisper_model": whisper_model, "api_name": api_name})
+        log_counter("total_audio_files_failed", failed_count,
+                   {"whisper_model": whisper_model, "api_name": api_name})
 
-        # Optionally, log total counts
-        log_counter(
-            metric_name="total_audio_files_processed",
-            labels={"whisper_model": whisper_model, "api_name": api_name},
-            value=processed_count
-        )
-
-        log_counter(
-            metric_name="total_audio_files_failed",
-            labels={"whisper_model": whisper_model, "api_name": api_name},
-            value=failed_count
-        )
-
-
-        final_progress = update_progress("All processing complete.")
-        final_transcriptions = "\n\n".join(all_transcriptions)
-        final_summaries = "\n\n".join(all_summaries)
+        # Prepare final output
+        final_progress = update_progress(f"Processing complete. Processed: {processed_count}, Failed: {failed_count}")
+        final_transcriptions = "\n\n".join(all_transcriptions) if all_transcriptions else "No transcriptions available"
+        final_summaries = "\n\n".join(all_summaries) if all_summaries else "No summaries available"
 
         return final_progress, final_transcriptions, final_summaries
 
     except Exception as e:
-        logging.error(f"Error processing audio files: {str(e)}")
-        log_counter(
-            metric_name="audio_files_failed_total",
-            labels={"whisper_model": whisper_model, "api_name": api_name},
-            value=1
-        )
-        cleanup_files()
-        return update_progress(f"Processing failed: {str(e)}"), "", ""
+        logging.error(f"Error in process_audio_files: {str(e)}")
+        log_counter("audio_files_failed_total", 1, {"whisper_model": whisper_model, "api_name": api_name})
+        if not keep_original:
+            cleanup_files()
+        return update_progress(f"Processing failed: {str(e)}"), "No transcriptions available", "No summaries available"
 
 
 def format_transcription_with_timestamps(segments, keep_timestamps):
