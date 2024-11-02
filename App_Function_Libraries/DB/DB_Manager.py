@@ -16,8 +16,8 @@ from App_Function_Libraries.DB.SQLite_DB import DatabaseError
 from App_Function_Libraries.DB.Prompts_DB import list_prompts as sqlite_list_prompts, \
     fetch_prompt_details as sqlite_fetch_prompt_details, add_prompt as sqlite_add_prompt, \
     search_prompts as sqlite_search_prompts, add_or_update_prompt as sqlite_add_or_update_prompt, \
-    load_prompt_details as sqlite_load_prompt_details, load_preset_prompts as sqlite_load_preset_prompts, \
-    insert_prompt_to_db as sqlite_insert_prompt_to_db, delete_prompt as sqlite_delete_prompt
+    load_prompt_details as sqlite_load_prompt_details, insert_prompt_to_db as sqlite_insert_prompt_to_db, \
+    delete_prompt as sqlite_delete_prompt
 from App_Function_Libraries.DB.SQLite_DB import (
     update_media_content as sqlite_update_media_content,
     search_and_display as sqlite_search_and_display,
@@ -501,13 +501,6 @@ def load_prompt_details(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def load_preset_prompts(*args, **kwargs):
-    if db_type == 'sqlite':
-        return sqlite_load_preset_prompts()
-    elif db_type == 'elasticsearch':
-        # Implement Elasticsearch version
-        raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
-
 def insert_prompt_to_db(*args, **kwargs):
     if db_type == 'sqlite':
         return sqlite_insert_prompt_to_db(*args, **kwargs)
@@ -540,6 +533,8 @@ def mark_as_trash(media_id: int) -> None:
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 
+def load_preset_prompts():
+    pass
 
 def get_latest_transcription(*args, **kwargs):
     if db_type == 'sqlite':

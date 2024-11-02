@@ -131,20 +131,6 @@ def list_prompts(page=1, per_page=10):
     total_pages = (total_count + per_page - 1) // per_page
     return prompts, total_pages, page
 
-# This will not scale. For a large number of prompts, use a more efficient method.
-# FIXME - see above statement.
-def load_preset_prompts():
-    logging.debug("load_preset_prompts: Loading preset prompts.")
-    try:
-        with sqlite3.connect(get_database_path('prompts.db')) as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT name FROM Prompts ORDER BY name ASC')
-            prompts = [row[0] for row in cursor.fetchall()]
-        return prompts
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        return []
-
 
 def insert_prompt_to_db(title, author, description, system_prompt, user_prompt, keywords=None):
     return add_prompt(title, author, description, system_prompt, user_prompt, keywords)
