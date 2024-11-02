@@ -591,7 +591,7 @@ In order of attempts:
 ------------
 
 ### <a name="credits"></a>Credits
-- [The original version of this project by @the-crypt-keeper](https://github.com/the-crypt-keeper/tldw)
+- [The original version of this project by @the-crypt-keeper](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 - [ffmpeg](https://github.com/FFmpeg/FFmpeg)
 - [faster_whisper](https://github.com/SYSTRAN/faster-whisper)

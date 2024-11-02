@@ -3,6 +3,8 @@
 #
 # Imports
 import html
+import logging
+
 #
 # External Imports
 import gradio as gr
@@ -380,18 +382,24 @@ def create_viewing_ragdb_tab():
                     <th style='border: 1px solid black; padding: 8px;'>Title</th>
                     <th style='border: 1px solid black; padding: 8px;'>Keywords</th>
                     <th style='border: 1px solid black; padding: 8px;'>Notes</th>
+                    <th style='border: 1px solid black; padding: 8px;'>Rating</th>
                 </tr>
             """
 
-            for conv_id, title in conversations:
+            for conversation in conversations:
+                conv_id = conversation['conversation_id']
+                title = conversation['title']
+                rating = conversation.get('rating', '')  # Use get() to handle cases where rating might not exist
+
                 keywords = get_keywords_for_conversation(conv_id)
                 notes = get_notes(conv_id)
 
                 table_html += f"""
                     <tr>
-                        <td style='border: 1px solid black; padding: 8px;'>{html.escape(title)}</td>
+                        <td style='border: 1px solid black; padding: 8px;'>{html.escape(str(title))}</td>
                         <td style='border: 1px solid black; padding: 8px;'>{html.escape(', '.join(keywords))}</td>
                         <td style='border: 1px solid black; padding: 8px;'>{len(notes)} note(s)</td>
+                        <td style='border: 1px solid black; padding: 8px;'>{html.escape(str(rating))}</td>
                     </tr>
                 """
             table_html += "</table>"
@@ -681,7 +689,7 @@ def create_ragdb_keyword_items_tab():
             return html_content
 
         def view_items(keywords, page, entries_per_page):
-            if not keywords:
+            if not keywords or (isinstance(keywords, list) and len(keywords) == 0):
                 return (
                     "<p>Please select at least one keyword.</p>",
                     "<p>Please select at least one keyword.</p>",
@@ -691,14 +699,17 @@ def create_ragdb_keyword_items_tab():
                 )
 
             try:
+                # Ensure keywords is a list
+                keywords_list = keywords if isinstance(keywords, list) else [keywords]
+
                 # Get conversations for selected keywords
                 conversations, conv_total_pages, conv_count = search_conversations_by_keywords(
-                    keywords, page, entries_per_page
+                    keywords_list, page, entries_per_page
                 )
 
                 # Get notes for selected keywords
                 notes, notes_total_pages, notes_count = get_notes_by_keywords(
-                    keywords, page, entries_per_page
+                    keywords_list, page, entries_per_page
                 )
 
                 # Format results as HTML
@@ -722,6 +733,7 @@ def create_ragdb_keyword_items_tab():
                     gr.update(interactive=not prev_disabled)
                 )
             except Exception as e:
+                logging.error(f"Error in view_items: {str(e)}")
                 return (
                     f"<p>Error: {str(e)}</p>",
                     f"<p>Error: {str(e)}</p>",
