@@ -212,9 +212,9 @@ def create_prompt_edit_tab():
                     choices=[],
                     interactive=True
                 )
-                prev_page_button = gr.Button("Previous Page", visible=False)
-                page_display = gr.Markdown("Page 1 of X", visible=False)
                 next_page_button = gr.Button("Next Page", visible=False)
+                page_display = gr.Markdown("Page 1 of X", visible=False)
+                prev_page_button = gr.Button("Previous Page", visible=False)
                 prompt_list_button = gr.Button("List Prompts")
 
             with gr.Column():
@@ -360,9 +360,9 @@ def create_prompt_clone_tab():
                     choices=[],
                     interactive=True
                 )
-                prev_page_button = gr.Button("Previous Page", visible=False)
-                page_display = gr.Markdown("Page 1 of X", visible=False)
                 next_page_button = gr.Button("Next Page", visible=False)
+                page_display = gr.Markdown("Page 1 of X", visible=False)
+                prev_page_button = gr.Button("Previous Page", visible=False)
                 prompt_list_button = gr.Button("List Prompts")
 
             with gr.Column():
