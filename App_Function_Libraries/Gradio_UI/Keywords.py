@@ -8,12 +8,16 @@
 # External Imports
 import gradio as gr
 
-from App_Function_Libraries.DB.Character_Chat_DB import view_char_keywords, add_char_keywords
+from App_Function_Libraries.DB.Character_Chat_DB import view_char_keywords, add_char_keywords, delete_char_keyword, \
+    export_char_keywords_to_csv
 #
 # Internal Imports
 from App_Function_Libraries.DB.DB_Manager import add_keyword, delete_keyword, keywords_browser_interface, export_keywords_to_csv
+from App_Function_Libraries.DB.Prompts_DB import view_prompt_keywords, delete_prompt_keyword, \
+    export_prompt_keywords_to_csv
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import view_rag_keywords, get_all_collections, \
-    get_keywords_for_collection, create_keyword_collection, add_keyword_to_collection
+    get_keywords_for_collection, create_keyword_collection, add_keyword_to_collection, delete_rag_keyword, \
+    export_rag_keywords_to_csv
 
 
 #
@@ -107,6 +111,32 @@ def create_character_keywords_tab():
                         outputs=add_char_result
                     )
 
+            # Delete Character Keywords Tab (New)
+            with gr.TabItem("Delete Keywords"):
+                with gr.Column():
+                    delete_char_name = gr.Textbox(label="Character Name")
+                    delete_char_keyword_input = gr.Textbox(label="Keyword to Delete")
+                    delete_char_keyword_btn = gr.Button("Delete Keyword")
+                    delete_char_result = gr.Markdown()
+
+                    delete_char_keyword_btn.click(
+                        fn=delete_char_keyword,
+                        inputs=[delete_char_name, delete_char_keyword_input],
+                        outputs=delete_char_result
+                    )
+
+            # Export Character Keywords Tab (New)
+            with gr.TabItem("Export Keywords"):
+                with gr.Column():
+                    export_char_keywords_btn = gr.Button("Export Character Keywords")
+                    export_char_file = gr.File(label="Download Exported Keywords")
+                    export_char_status = gr.Textbox(label="Export Status")
+
+                    export_char_keywords_btn.click(
+                        fn=export_char_keywords_to_csv,
+                        outputs=[export_char_status, export_char_file]
+                    )
+
 #
 # End of Character Keywords tab
 ##########################################################
@@ -147,9 +177,97 @@ def create_rag_qa_keywords_tab():
                         outputs=add_rag_result
                     )
 
+            # Delete RAG QA Keywords Tab (New)
+            with gr.TabItem("Delete Keywords"):
+                with gr.Column():
+                    delete_rag_keyword_input = gr.Textbox(label="Keyword to Delete")
+                    delete_rag_keyword_btn = gr.Button("Delete Keyword")
+                    delete_rag_result = gr.Markdown()
+
+                    delete_rag_keyword_btn.click(
+                        fn=delete_rag_keyword,
+                        inputs=delete_rag_keyword_input,
+                        outputs=delete_rag_result
+                    )
+
+            # Export RAG QA Keywords Tab (New)
+            with gr.TabItem("Export Keywords"):
+                with gr.Column():
+                    export_rag_keywords_btn = gr.Button("Export RAG QA Keywords")
+                    export_rag_file = gr.File(label="Download Exported Keywords")
+                    export_rag_status = gr.Textbox(label="Export Status")
+
+                    export_rag_keywords_btn.click(
+                        fn=export_rag_keywords_to_csv,
+                        outputs=[export_rag_status, export_rag_file]
+                    )
+
 #
 # End of RAG QA Keywords tab
 ##########################################################
+
+
+############################################################
+#
+# Prompt Keywords functions
+
+def create_prompt_keywords_tab():
+    """Creates the Prompt Keywords management tab"""
+    with gr.Tab("Prompt Keywords"):
+        gr.Markdown("# Prompt Keywords Management")
+
+        with gr.Tabs():
+            # View Keywords Tab
+            with gr.TabItem("View Keywords"):
+                with gr.Column():
+                    refresh_prompt_keywords = gr.Button("Refresh Prompt Keywords")
+                    prompt_keywords_output = gr.Markdown()
+
+                    refresh_prompt_keywords.click(
+                        fn=view_prompt_keywords,
+                        outputs=prompt_keywords_output
+                    )
+
+            # Add Keywords Tab (using existing prompt management functions)
+            with gr.TabItem("Add Keywords"):
+                gr.Markdown("""
+                    To add keywords to prompts, please use the Prompt Management interface.
+                    Keywords can be added when creating or editing a prompt.
+                """)
+
+            # Delete Keywords Tab
+            with gr.TabItem("Delete Keywords"):
+                with gr.Column():
+                    delete_prompt_keyword_input = gr.Textbox(label="Keyword to Delete")
+                    delete_prompt_keyword_btn = gr.Button("Delete Keyword")
+                    delete_prompt_result = gr.Markdown()
+
+                    delete_prompt_keyword_btn.click(
+                        fn=delete_prompt_keyword,
+                        inputs=delete_prompt_keyword_input,
+                        outputs=delete_prompt_result
+                    )
+
+            # Export Keywords Tab
+            with gr.TabItem("Export Keywords"):
+                with gr.Column():
+                    export_prompt_keywords_btn = gr.Button("Export Prompt Keywords")
+                    export_prompt_status = gr.Textbox(label="Export Status", interactive=False)
+                    export_prompt_file = gr.File(label="Download Exported Keywords", interactive=False)
+
+                    def handle_export():
+                        status, file_path = export_prompt_keywords_to_csv()
+                        if file_path:
+                            return status, file_path
+                        return status, None
+
+                    export_prompt_keywords_btn.click(
+                        fn=handle_export,
+                        outputs=[export_prompt_status, export_prompt_file]
+                    )
+#
+# End of Prompt Keywords tab
+############################################################
 
 
 ############################################################

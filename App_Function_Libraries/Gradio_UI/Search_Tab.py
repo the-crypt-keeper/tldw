@@ -11,8 +11,8 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items, get_all_document_versions, \
-    fetch_item_details_single, fetch_paginated_data, fetch_item_details, get_latest_transcription
-from App_Function_Libraries.DB.SQLite_DB import search_prompts, get_document_version
+    fetch_item_details_single, fetch_paginated_data, fetch_item_details, get_latest_transcription, search_prompts, \
+    get_document_version
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
 from App_Function_Libraries.Utils.Utils import get_database_path, format_text_with_line_breaks
 #

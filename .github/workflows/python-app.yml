@@ -42,6 +42,12 @@ jobs:
         cd ./Tests/RAG
         pytest test_RAG_Library_2.py
     
+    - name: Test RAG Notes functions with pytest
+      run: |
+        pwd
+        cd ./Tests/RAG_QA_Chat
+        pytest test_notes_search.py
+
     - name: Test SQLite lib functions with pytest
       run: |
         pwd

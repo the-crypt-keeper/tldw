@@ -21,7 +21,7 @@ from App_Function_Libraries.DB.DB_Manager import DatabaseError, get_paginated_fi
     clear_keywords_from_note, add_keywords_to_note, load_chat_history, save_message, add_keywords_to_conversation, \
     get_keywords_for_note, delete_note, search_conversations_by_keywords, get_conversation_title, delete_conversation, \
     update_conversation_title, fetch_all_conversations, fetch_all_notes, fetch_conversations_by_ids, fetch_notes_by_ids, \
-    search_media_db, load_preset_prompts
+    search_media_db, load_preset_prompts, search_notes_titles
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_notes, delete_messages_in_conversation, search_rag_notes, \
     search_rag_chat, get_conversation_rating, set_conversation_rating
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
@@ -211,6 +211,8 @@ def create_rag_qa_chat_tab():
                 clear_notes_btn = gr.Button("Clear Current Note text")
 
                 new_note_btn = gr.Button("New Note")
+                # FIXME - Change from only keywords to generalized search
+                search_notes_title = gr.Textbox(label="Search Notes by Title")
                 search_notes_by_keyword = gr.Textbox(label="Search Notes by Keyword")
                 search_notes_button = gr.Button("Search Notes")
                 note_results = gr.Dropdown(label="Notes", choices=[])
@@ -262,18 +264,28 @@ def create_rag_qa_chat_tab():
             outputs=[note_title, notes, note_state]
         )
 
-        def search_notes(keywords):
+        def search_notes(search_notes_title, keywords):
             if keywords:
                 keywords_list = [kw.strip() for kw in keywords.split(',')]
                 notes_data, total_pages, total_count = get_notes_by_keywords(keywords_list)
-                choices = [f"Note {note_id} ({timestamp})" for note_id, title, content, timestamp in notes_data]
-                return gr.update(choices=choices)
+                choices = [f"Note {note_id} - {title} ({timestamp})" for
+                           note_id, title, content, timestamp, conversation_id in notes_data]
+                return gr.update(choices=choices, label=f"Found {total_count} notes")
+            elif search_notes_title:
+                notes_data, total_pages, total_count = search_notes_titles(search_notes_title)
+                choices = [f"Note {note_id} - {title} ({timestamp})" for
+                           note_id, title, content, timestamp, conversation_id in notes_data]
+                return gr.update(choices=choices, label=f"Found {total_count} notes")
             else:
-                return gr.update(choices=[])
+                # This will now return all notes, ordered by timestamp
+                notes_data, total_pages, total_count = search_notes_titles("")
+                choices = [f"Note {note_id} - {title} ({timestamp})" for
+                           note_id, title, content, timestamp, conversation_id in notes_data]
+                return gr.update(choices=choices, label=f"All notes ({total_count} total)")
 
         search_notes_button.click(
             search_notes,
-            inputs=[search_notes_by_keyword],
+            inputs=[search_notes_title, search_notes_by_keyword],
             outputs=[note_results]
         )
 
@@ -781,7 +793,8 @@ def create_rag_qa_notes_management_tab():
         with gr.Row():
             with gr.Column(scale=1):
                 # Search Notes
-                search_notes_input = gr.Textbox(label="Search Notes by Keywords")
+                search_notes_title = gr.Textbox(label="Search Notes by Title")
+                search_notes_by_keyword = gr.Textbox(label="Search Notes by Keywords")
                 search_notes_button = gr.Button("Search Notes")
                 notes_list = gr.Dropdown(label="Notes", choices=[])
 
@@ -796,18 +809,28 @@ def create_rag_qa_notes_management_tab():
                 status_message = gr.HTML()
 
         # Function Definitions
-        def search_notes(keywords):
+        def search_notes(search_notes_title, keywords):
             if keywords:
                 keywords_list = [kw.strip() for kw in keywords.split(',')]
                 notes_data, total_pages, total_count = get_notes_by_keywords(keywords_list)
-                choices = [f"{title} (ID: {note_id})" for note_id, title, content, timestamp in notes_data]
-                return gr.update(choices=choices)
+                choices = [f"Note {note_id} - {title} ({timestamp})" for
+                           note_id, title, content, timestamp, conversation_id in notes_data]
+                return gr.update(choices=choices, label=f"Found {total_count} notes")
+            elif search_notes_title:
+                notes_data, total_pages, total_count = search_notes_titles(search_notes_title)
+                choices = [f"Note {note_id} - {title} ({timestamp})" for
+                           note_id, title, content, timestamp, conversation_id in notes_data]
+                return gr.update(choices=choices, label=f"Found {total_count} notes")
             else:
-                return gr.update(choices=[])
+                # This will now return all notes, ordered by timestamp
+                notes_data, total_pages, total_count = search_notes_titles("")
+                choices = [f"Note {note_id} - {title} ({timestamp})" for
+                           note_id, title, content, timestamp, conversation_id in notes_data]
+                return gr.update(choices=choices, label=f"All notes ({total_count} total)")
 
         search_notes_button.click(
             search_notes,
-            inputs=[search_notes_input],
+            inputs=[search_notes_title, search_notes_by_keyword],
             outputs=[notes_list]
         )
 

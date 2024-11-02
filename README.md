@@ -14,6 +14,13 @@
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark) - Demo is broken due to a bug in Huggingface spaces/Gradio
 - **Please Note:** YouTube blocks requests from the demo. You have to provide a logged-in session cookie to bypass it :frowning_face: 
 - Placeholder content is included for the demo. HuggingFace API is also setup in it, so you can select that as your API.)
+- **HEADS UP:** If you're updating from a prior version, your Media DB is not compatible with the new version. You'll need to start fresh.
+  - I've written a script to help you migrate your data from the old DB to the new one. `Helper_Scripts/DB-Related/migrate_db.py`.
+  - Process to migrate your data:
+    1. Install/run the new version of the app. This will create a new `media_summary.db` file in the `Databases` directory.
+    2. Run the `migrate_db.py` script with the old and new DB paths as arguments. - `python migrate_db.py --source media_summary_old.db --target media_summary_new.db --export-path .\`
+    3. This will migrate all your data from the old DB to the new one, and export the saved conversations to the `export-path` you specify.
+    4. Re-import any/all saved conversations into the new RAG_QA_Chat.db 
 
 
 
