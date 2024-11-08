@@ -148,7 +148,7 @@ echo "Installation/Update completed successfully!"
 echo "To run TLDW, use the run_tldw.sh script"
 echo "Which is what I'm doing for you now..."
 # Run TLDW
-cd "$install_dir" || exit
+cd "tldw" || exit
 source venv/bin/activate
 python3 summarize.py -gui
 deactivate
