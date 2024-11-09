@@ -67,6 +67,7 @@
 - **Bash/Batch Script:**
   - **Use the Installer Script! Download and run it to install the necessary packages + launch tl/dw**
     - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
+      - Install the necessary packages: `ffmpeg portaudio19-dev gcc build-essential python3-dev`
       - `chmod +x Linux_Install_Update.sh && ./Linux_Run_tldw.sh`
       - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
     - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh`
@@ -164,16 +165,16 @@ All features are designed to run **locally** on your device, ensuring privacy an
     - As such, I would say you want at least 12GB of free space on your system to devote to the app.
     - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
 - **Linux**
-    1. Download necessary packages (Python3, ffmpeg - `sudo apt install ffmpeg` or `dnf install ffmpeg`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
+    1. Download necessary packages (Python3, ffmpeg, portaudio19-dev - `sudo apt install ffmpeg portaudio19-dev gcc build-essential python3-dev` or `dnf install ffmpeg portaudio19-dev gcc build-essential python3-dev`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
+       * `portaudio19-dev` for pyaudio, `python3-dev gcc build-essential` for building it.
     2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`
     5. Create a virtual env: `sudo python3 -m venv ./`
     6. Launch/activate your virtual environment: `source ./bin/activate`
-    7. Setup the necessary python packages:
-       * Following is from: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
-       * If you don't already have cuda installed, `py -m pip install --upgrade pip wheel` & `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118` 
-       * Or CPU Only: `pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu`
+    7. Setup the necessary python packages (Make sure to use the appropriate cuda version: https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
+       * If you don't already have cuda installed, `python -m pip install --upgrade pip wheel` & `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124` 
+       * Or CPU Only: `pip3 install torch torchvision torchaudio`
          * Also be sure to change `cuda` to `cpu` in `config.txt`
        * https://pytorch.org/get-started/previous-versions/#linux-and-windows-3
     8. Then see `Linux && Windows`

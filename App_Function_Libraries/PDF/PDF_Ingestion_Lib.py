@@ -12,13 +12,17 @@
 #
 ####################
 # Import necessary libraries
-import re
+from datetime import datetime
+import logging
 import os
+import re
 import shutil
 import tempfile
-from datetime import datetime
+#
+# Import External Libs
 import pymupdf
-import logging
+import pymupdf4llm
+from docling.document_converter import DocumentConverter
 #
 # Import Local
 from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords
@@ -104,6 +108,28 @@ def extract_text_and_format_from_pdf(pdf_path):
         raise
 
 
+def pymupdf4llm_parse_pdf(pdf_path):
+    """
+    Extract text from a PDF file and convert it to Markdown, preserving formatting.
+    """
+    try:
+        log_counter("pdf_text_extraction_attempt", labels={"file_path": pdf_path})
+        start_time = datetime.now()
+
+        markdown_text = pymupdf4llm.to_markdown(pdf_path)
+
+        end_time = datetime.now()
+        processing_time = (end_time - start_time).total_seconds()
+        log_histogram("pdf_text_extraction_duration", processing_time, labels={"file_path": pdf_path})
+        log_counter("pdf_text_extraction_success", labels={"file_path": pdf_path})
+
+        return markdown_text
+    except Exception as e:
+        logging.error(f"Error extracting text and formatting from PDF: {str(e)}")
+        log_counter("pdf_text_extraction_error", labels={"file_path": pdf_path, "error": str(e)})
+        raise
+
+
 def extract_metadata_from_pdf(pdf_path):
     """
     Extract metadata from a PDF file using PyMuPDF.
@@ -120,7 +146,7 @@ def extract_metadata_from_pdf(pdf_path):
         return {}
 
 
-def process_and_ingest_pdf(file, title, author, keywords):
+def process_and_ingest_pdf(file, title, author, keywords, parser='pymupdf4llm'):
     if file is None:
         log_counter("pdf_ingestion_error", labels={"error": "No file uploaded"})
         return "Please select a PDF file to upload."
@@ -137,8 +163,19 @@ def process_and_ingest_pdf(file, title, author, keywords):
             # Copy the contents of the uploaded file to the temporary file
             shutil.copy(file.name, temp_path)
 
-            # Extract text and convert to Markdown
-            markdown_text = extract_text_and_format_from_pdf(temp_path)
+            if parser == 'pymupdf':
+                # Extract text and convert to Markdown
+                markdown_text = extract_text_and_format_from_pdf(temp_path)
+
+            elif parser == 'pymupdf4llm':
+                # Extract text and convert to Markdown
+                markdown_text = pymupdf4llm_parse_pdf(temp_path)
+
+            elif parser == 'docling':
+                # Extract text and convert to Markdown using Docling
+                converter = DocumentConverter()
+                parsed_pdf = converter.convert(temp_path)
+                markdown_text = parsed_pdf.document.export_to_markdown()
 
             # Extract metadata from PDF
             metadata = extract_metadata_from_pdf(temp_path)
@@ -185,7 +222,7 @@ def process_and_ingest_pdf(file, title, author, keywords):
         return f"Error ingesting PDF file: {str(e)}"
 
 
-def process_and_cleanup_pdf(file, title, author, keywords):
+def process_and_cleanup_pdf(file, title, author, keywords, parser='pymupdf4llm'):
     if file is None:
         log_counter("pdf_processing_error", labels={"error": "No file uploaded"})
         return "No file uploaded. Please upload a PDF file."
@@ -194,7 +231,7 @@ def process_and_cleanup_pdf(file, title, author, keywords):
         log_counter("pdf_processing_attempt", labels={"file_name": file.name})
         start_time = datetime.now()
 
-        result = process_and_ingest_pdf(file, title, author, keywords)
+        result = process_and_ingest_pdf(file, title, author, keywords, parser)
 
         end_time = datetime.now()
         processing_time = (end_time - start_time).total_seconds()

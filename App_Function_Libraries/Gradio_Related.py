@@ -434,7 +434,7 @@ def launch_ui(share_public=None, server_mode=False):
         gr.Markdown(f"# tl/dw: Your LLM-powered Research Multi-tool")
         gr.Markdown(f"(Using {db_type.capitalize()} Database)")
         with gr.Tabs():
-            with gr.TabItem("Transcription / Summarization / Ingestion", id="ingestion-grouping", visible=True):
+            with gr.TabItem("Transcribe / Analyze / Ingestion", id="ingestion-grouping", visible=True):
                 with gr.Tabs():
                     create_video_transcription_tab()
                     create_audio_processing_tab()
