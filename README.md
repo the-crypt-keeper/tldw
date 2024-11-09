@@ -11,25 +11,47 @@
 ## All Automated. All Local. All Yours.
 </div>
 
-### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark) - Demo is broken due to a bug in Huggingface spaces/Gradio
-- **Please Note:** YouTube blocks requests from the demo. You have to provide a logged-in session cookie to bypass it :frowning_face: 
-- Placeholder content is included for the demo. HuggingFace API is also setup in it, so you can select that as your API.)
-- **HEADS UP:** If you're updating from a prior version, your Media DB is not compatible with the new version. You'll need to start fresh.
-  - I've written a script to help you migrate your data from the old DB to the new one. `Helper_Scripts/DB-Related/migrate_db.py`.
-  - Process to migrate your data:
-    1. Install/run the new version of the app. This will create a new `media_summary.db` file in the `Databases` directory.
-    2. Run the `migrate_db.py` script with the old and new DB paths as arguments. - `python migrate_db.py --source media_summary_old.db --target media_summary_new.db --export-path .\`
-    3. This will migrate all your data from the old DB to the new one, and export the saved conversations to the `export-path` you specify.
-    4. Re-import any/all saved conversations into the new RAG_QA_Chat.db 
+### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark) - Demo is now working!(I have no idea when it started working...)
+<details> 
+<summary>Public Demo Info</summary>
 
+- Please note that YouTube blocks requests from the demo. You have to provide a logged-in session cookie to bypass it :frowning_face: 
+- Placeholder content is included for the demo. HuggingFace API is also setup in it, so you can select that as your API.)
+</details>
+
+
+#### About this Project
+<details>
+<summary>About this Project</summary>
+
+- This project started as a tool by `the-crypt-keeper` to perform summarization of YouTube videos.
+- I forked it, to add a couple features, and then I kept adding/improving things and now it's a fully different tool/focus.
+- You can find the original scripts by `the-crypt-keeper` in the `tldw-original-scripts` directory, a snapshot of the files before I made my changes.
+</details>
+
+### Updating from a version installed prior to Nov 1st:
+<details>
+
+- If you're updating from a prior version, your Media DB is not compatible with the new version. You'll need to start fresh.
+- I've written a script to help you migrate your data from the old DB to the new one. `Helper_Scripts/DB-Related/migrate_db.py`.
+- Process to migrate your data:
+  1. Install/run the new version of the app. This will create a new `media_summary.db` file in the `Databases` directory.
+  2. Run the `migrate_db.py` script with the old and new DB paths as arguments. - `python migrate_db.py --source media_summary_old.db --target media_summary_new.db --export-path .\`
+  3. This will migrate all your data from the old DB to the new one, and export the saved conversations to the `export-path` you specify.
+  4. Re-import any/all saved conversations into the new RAG_QA_Chat.db 
+</details>
 
 
 #### ![Video Walkthrough of a Fresh Install](Docs/Screenshots/tldw-run-through-blank.webm)
-#### Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)
 
+### Screenshots of the UI
+Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)
 
 
 #### Key Features:
+<details>
+<summary>Key Features</summary>
+
 - Ingest(Transcribe/convert to markdown) content from (multiple) URLs or local files (video, audio, documents, web articles, books, mediawiki dumps) -> Summarize/Analyze -> Chat with/about the content.- Build up a personal knowledge archive, then turn around and use the LLM to help you learn it at a pace your comfortable with.
 - **Full Plaintext & RAG Search Capability** Search across all ingested content via RAG or 'old-fashioned non-LLM search' (RAG being BM25 + Vector Search/Contextual embeddings + Re-ranking + Contextual Retrieval).
   - Search by content, title, author, URL, or tags, with support for meta-tags, so that you can have the equivalent of 'folders' for your content (and tags).
@@ -52,6 +74,8 @@
   - Also have the ability to import prompts individually or in bulk. As well as export them as markdown documents.
   - See `./Docs/Prompts/` for examples of prompts. and `./Docs/Propmts/TEMPLATE.md` for the prompt template used in tldw.
 - Features to come: Anki Flashcard Deck Editing (Creation is in), Mindmap creation from content(currently in under `Utilities`, uses PlantUML), better document handling, migration to a FastAPI backend(Gradio is a placeholder UI), and more.
+</details>
+
 #### The original scripts by `the-crypt-keeper` for transcribing and summarizing youtube videos are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
 
 
