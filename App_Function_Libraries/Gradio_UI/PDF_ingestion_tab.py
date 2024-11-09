@@ -8,6 +8,9 @@ import tempfile
 #
 # External Imports
 import gradio as gr
+import pymupdf4llm
+from docling.document_converter import DocumentConverter
+
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import list_prompts
@@ -36,6 +39,11 @@ def create_pdf_ingestion_tab():
                     "Click to Upload PDFs",
                     file_types=[".pdf"],
                     file_count="multiple"
+                )
+                parser_selection = gr.Radio(
+                    choices=["pymupdf", "pymupdf4llm", "docling"],
+                    label="Select Parser",
+                    value="pymupdf"  # default value
                 )
                 # Common metadata for all files
                 pdf_keywords_input = gr.Textbox(label="Keywords (Optional, comma-separated)")
@@ -230,6 +238,7 @@ def create_pdf_ingestion_tab():
                 inputs=[
                     pdf_file_input,
                     pdf_keywords_input,
+                    parser_selection,
                     #custom_prompt_checkbox,
                     #custom_prompt_input,
                     #system_prompt_input
@@ -238,7 +247,36 @@ def create_pdf_ingestion_tab():
             )
 
 
-def test_pdf_ingestion(pdf_file):
+def test_pymupdf4llm_pdf_ingestion(pdf_file):
+    if pdf_file is None:
+        return "No file uploaded", ""
+
+    try:
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create a path for the temporary PDF file
+            temp_path = os.path.join(temp_dir, "temp.pdf")
+
+            # Copy the contents of the uploaded file to the temporary file
+            shutil.copy(pdf_file.name, temp_path)
+
+            # Extract text and convert to Markdown
+            markdown_text = pymupdf4llm.to_markdown(temp_path)
+
+            # Extract metadata from PDF
+            metadata = extract_metadata_from_pdf(temp_path)
+
+            # Use metadata for title and author if not provided
+            title = metadata.get('title', os.path.splitext(os.path.basename(pdf_file.name))[0])
+            author = metadata.get('author', 'Unknown')
+
+        result = f"PDF '{title}' by {author} processed successfully by pymupdf4llm."
+        return result, markdown_text
+    except Exception as e:
+        return f"Error ingesting PDF: {str(e)}", ""
+
+
+def test_pymupdf_pdf_ingestion(pdf_file):
     if pdf_file is None:
         return "No file uploaded", ""
 
@@ -261,7 +299,37 @@ def test_pdf_ingestion(pdf_file):
             title = metadata.get('title', os.path.splitext(os.path.basename(pdf_file.name))[0])
             author = metadata.get('author', 'Unknown')
 
-        result = f"PDF '{title}' by {author} processed successfully."
+        result = f"PDF '{title}' by {author} processed successfully by pymupdf."
+        return result, markdown_text
+    except Exception as e:
+        return f"Error ingesting PDF: {str(e)}", ""
+
+
+def test_docling_pdf_ingestion(pdf_file):
+    if pdf_file is None:
+        return "No file uploaded", ""
+
+    try:
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create a path for the temporary PDF file
+            temp_path = os.path.join(temp_dir, "temp.pdf")
+
+            # Copy the contents of the uploaded file to the temporary file
+            shutil.copy(pdf_file.name, temp_path)
+
+            # Extract text and convert to Markdown
+            converter = DocumentConverter()
+            parsed_pdf = converter.convert(temp_path)
+            markdown_text = parsed_pdf.document.export_to_markdown()
+            # Extract metadata from PDF
+            metadata = extract_metadata_from_pdf(temp_path)
+
+            # Use metadata for title and author if not provided
+            title = metadata.get('title', os.path.splitext(os.path.basename(pdf_file.name))[0])
+            author = metadata.get('author', 'Unknown')
+
+        result = f"PDF '{title}' by {author} processed successfully by pymupdf."
         return result, markdown_text
     except Exception as e:
         return f"Error ingesting PDF: {str(e)}", ""
@@ -271,12 +339,24 @@ def create_pdf_ingestion_test_tab():
         with gr.Row():
             with gr.Column():
                 pdf_file_input = gr.File(label="Upload PDF for testing")
-                test_button = gr.Button("Test PDF Ingestion")
+                test_button = gr.Button("Test pymupdf PDF Ingestion")
+                test_button_2 = gr.Button("Test pymupdf4llm PDF Ingestion")
+                test_button_3 = gr.Button("Test Docling PDF Ingestion")
             with gr.Column():
                 test_output = gr.Textbox(label="Test Result")
                 pdf_content_output = gr.Textbox(label="PDF Content", lines=200)
         test_button.click(
-            fn=test_pdf_ingestion,
+            fn=test_pymupdf_pdf_ingestion,
+            inputs=[pdf_file_input],
+            outputs=[test_output, pdf_content_output]
+        )
+        test_button_2.click(
+            fn=test_pymupdf4llm_pdf_ingestion,
+            inputs=[pdf_file_input],
+            outputs=[test_output, pdf_content_output]
+        )
+        test_button_3.click(
+            fn=test_docling_pdf_ingestion,
             inputs=[pdf_file_input],
             outputs=[test_output, pdf_content_output]
         )
