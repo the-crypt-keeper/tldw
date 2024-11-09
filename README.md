@@ -11,7 +11,8 @@
 ## All Automated. All Local. All Yours.
 </div>
 
-### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark) - Demo is now working!(I have no idea when it started working...)
+### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)- Demo is now working!
+- (I have no idea when it started working... Checked the other day and it was rendering properly...
 <details> 
 <summary>Public Demo Info</summary>
 
