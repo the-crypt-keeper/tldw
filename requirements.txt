@@ -42,6 +42,8 @@ PyAudio
 pycookiecheat
 pydub
 pymupdf
+pymupdf4llm
+docling
 pypandoc
 pypandoc_binary
 pytest
