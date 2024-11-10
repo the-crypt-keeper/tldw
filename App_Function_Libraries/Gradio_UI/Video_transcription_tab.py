@@ -468,13 +468,13 @@ def create_video_transcription_tab():
                                 errors.append(error_message)
 
                         results.extend(batch_results)
-                        logging.debug(f"Processed {len(batch_results)} videos in batch")
+                        logging.info(f"Processed {len(batch_results)} videos in batch")
                         if isinstance(progress, gr.Progress):
                             progress((i + len(batch)) / len(all_inputs),
                                      f"Processed {i + len(batch)}/{len(all_inputs)} videos")
 
                     # Generate HTML for results
-                    logging.debug(f"Generating HTML for {len(results)} results")
+                    logging.info(f"Generating HTML for {len(results)} results")
                     for url, transcription, status, metadata, json_file, summary_file in results:
                         if status == "Success":
                             title = metadata.get('title', 'Unknown Title')
@@ -500,6 +500,7 @@ def create_video_transcription_tab():
                             # Format the summary
                             formatted_summary = format_transcription(summary)
 
+                            logging.info("Creating HTML for results")
                             results_html += f"""
                             <div class="result-box">
                                 <gradio-accordion>
@@ -520,6 +521,7 @@ def create_video_transcription_tab():
                             logging.debug(f"Transcription for {url}: {transcription[:200]}...")
                             all_transcriptions[url] = transcription
                             all_summaries += f"Title: {title}\nURL: {url}\n\n{metadata_text}\n\nTranscription:\n{transcription_text}\n\nSummary:\n{summary}\n\n---\n\n"
+                            logging.info(f"HTML created for {title}")
                         else:
                             results_html += f"""
                             <div class="result-box error">
