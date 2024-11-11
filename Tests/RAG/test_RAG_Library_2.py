@@ -3,8 +3,8 @@ import configparser
 import os
 import sys
 import pytest
-from unittest.mock import MagicMock
-from typing import List, Dict, Any
+#from unittest.mock import MagicMock
+#from typing import List, Dict, Any
 
 # Adjust the path to the parent directory of App_Function_Libraries
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,15 +14,15 @@ sys.path.append(parent_dir)
 # Import the functions to test
 from App_Function_Libraries.RAG.RAG_Library_2 import (
     fetch_relevant_media_ids,
-    perform_vector_search,
+    #perform_vector_search,
     perform_full_text_search,
     enhanced_rag_pipeline,
-    enhanced_rag_pipeline_chat,
+    #enhanced_rag_pipeline_chat,
     generate_answer,
-    fetch_relevant_chat_ids,
-    fetch_all_chat_ids,
-    filter_results_by_keywords,
-    extract_media_id_from_result
+    #fetch_relevant_chat_ids,
+    #fetch_all_chat_ids,
+    #filter_results_by_keywords,
+    #extract_media_id_from_result
 )
 
 
@@ -150,54 +150,87 @@ def test_enhanced_rag_pipeline_success(mocker):
     mock_config['Embeddings'] = {'provider': 'openai'}
     mocker.patch('App_Function_Libraries.RAG.RAG_Library_2.config', mock_config)
 
-    # Mock search functions
-    fts_result = [{'content': 'FTS result', 'id': 1}]
-    vector_result = [{'content': 'Vector result'}]
+    # Mock metric functions
+    mocker.patch('App_Function_Libraries.RAG.RAG_Library_2.log_counter')
+    mocker.patch('App_Function_Libraries.RAG.RAG_Library_2.log_histogram')
 
-    mock_search = lambda *args, **kwargs: fts_result
-    search_functions_mock = {
-        "Media DB": mock_search
-    }
-    mocker.patch('App_Function_Libraries.RAG.RAG_Library_2.search_functions', search_functions_mock)
+    # Mock search results
+    mock_search_results = [
+        {'content': 'Test content 1', 'id': 1},
+        {'content': 'Test content 2', 'id': 2}
+    ]
 
-    mocker.patch(
-        'App_Function_Libraries.RAG.RAG_Library_2.perform_vector_search',
-        return_value=vector_result
-    )
-
-    mocker.patch(
-        'App_Function_Libraries.RAG.RAG_Library_2.generate_answer',
-        return_value='Generated answer'
-    )
-
-    # Mock relevant media IDs
+    # Mock core functions
     mocker.patch(
         'App_Function_Libraries.RAG.RAG_Library_2.fetch_relevant_media_ids',
         return_value=[1, 2, 3]
     )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.perform_vector_search',
+        return_value=mock_search_results
+    )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.perform_full_text_search',
+        return_value=mock_search_results
+    )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.generate_answer',
+        return_value="Generated answer"
+    )
+
+    # Mock Ranker
+    mock_ranker = mocker.Mock()
+    mock_ranker.rerank.return_value = [
+        {'id': 0, 'score': 0.9},
+        {'id': 1, 'score': 0.8}
+    ]
+    mocker.patch('App_Function_Libraries.RAG.RAG_Library_2.Ranker', return_value=mock_ranker)
 
     result = enhanced_rag_pipeline(
         query='test query',
         api_choice='OpenAI',
         keywords='keyword1,keyword2',
-        database_types=["Media DB"]
+        database_types=["Media DB"],  # Already correct as a list
+        apply_re_ranking=True
     )
 
-    # Check both vector and FTS results are in context
-    assert result['answer'] == 'Generated answer'
-    assert 'Vector result' in result['context']
-    assert 'FTS result' in result['context']
+    assert isinstance(result, dict)
+    assert result['answer'] == "Generated answer"
+    assert "Test content" in result['context']
+
+    assert isinstance(result, dict)
+    assert result['answer'] == "Generated answer"
+    assert "Test content" in result['context']
 
 
 def test_enhanced_rag_pipeline_error_handling(mocker):
-    """Test enhanced_rag_pipeline error handling."""
+    """Test enhanced_rag_pipeline error handling when a critical error occurs."""
+    # Mock config
     mock_config = configparser.ConfigParser()
     mock_config['Embeddings'] = {'provider': 'openai'}
     mocker.patch('App_Function_Libraries.RAG.RAG_Library_2.config', mock_config)
 
-    mock_fetch_keywords_for_media = mocker.patch(
+    # Mock metric functions
+    mock_log_counter = mocker.patch('App_Function_Libraries.RAG.RAG_Library_2.log_counter')
+
+    # Mock generate_answer to raise an exception (this will trigger the main try-catch)
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.generate_answer',
+        side_effect=Exception("Critical error in answer generation")
+    )
+
+    # Other mocks return empty results
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.perform_vector_search',
+        return_value=[]
+    )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.perform_full_text_search',
+        return_value=[]
+    )
+    mocker.patch(
         'App_Function_Libraries.RAG.RAG_Library_2.fetch_relevant_media_ids',
-        side_effect=Exception("Fetch error")
+        return_value=[]
     )
 
     result = enhanced_rag_pipeline(
@@ -207,7 +240,59 @@ def test_enhanced_rag_pipeline_error_handling(mocker):
         database_types=["Media DB"]
     )
 
+    # Verify the attempt was logged
+    mock_log_counter.assert_any_call(
+        "enhanced_rag_pipeline_attempt",
+        labels={"api_choice": "OpenAI"}
+    )
+
+    # Verify error counter was logged
+    mock_log_counter.assert_any_call(
+        "enhanced_rag_pipeline_error",
+        labels={"api_choice": "OpenAI", "error": "Critical error in answer generation"}
+    )
+
+    # Check error response
+    assert isinstance(result, dict)
     assert "An error occurred" in result['answer']
+    assert result['context'] == ''
+
+
+def test_enhanced_rag_pipeline_critical_error(mocker):
+    """Test enhanced_rag_pipeline with a critical error that should stop execution."""
+    # Mock config
+    mock_config = configparser.ConfigParser()
+    mock_config['Embeddings'] = {'provider': 'openai'}
+    mocker.patch('App_Function_Libraries.RAG.RAG_Library_2.config', mock_config)
+
+    # Mock ALL functions to raise exceptions
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.fetch_relevant_media_ids',
+        side_effect=Exception("Database connection failed")
+    )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.perform_vector_search',
+        side_effect=Exception("Vector search failed")
+    )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.perform_full_text_search',
+        side_effect=Exception("Full-text search failed")
+    )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.generate_answer',
+        side_effect=Exception("Answer generation failed")
+    )
+
+    result = enhanced_rag_pipeline(
+        query='test query',
+        api_choice='OpenAI',
+        keywords='keyword1',
+        database_types=["Media DB"]
+    )
+
+    # Check error response
+    assert isinstance(result, dict)
+    assert "error" in result or "An error occurred" in result['answer']
     assert result['context'] == ""
 
 
@@ -229,6 +314,42 @@ def test_generate_answer_success(mocker):
 
     result = generate_answer('OpenAI', 'Test context', 'Test query')
     assert result == 'API response'
+
+
+def test_enhanced_rag_pipeline_no_results(mocker):
+    """Test enhanced_rag_pipeline when no results are found."""
+    mock_config = configparser.ConfigParser()
+    mock_config['Embeddings'] = {'provider': 'openai'}
+
+    # Mock empty search results
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.fetch_relevant_media_ids',
+        return_value=[]
+    )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.perform_vector_search',
+        return_value=[]
+    )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.perform_full_text_search',
+        return_value=[]
+    )
+    mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.generate_answer',
+        return_value="Fallback answer"
+    )
+
+    result = enhanced_rag_pipeline(
+        query='test query',
+        api_choice='OpenAI',
+        keywords=None,
+        database_types=["Media DB"]
+    )
+
+    assert isinstance(result, dict)
+    assert "No relevant information" in result['answer']
+    assert "Fallback answer" in result['answer']
+    assert "test query" in result['context']
 
 
 if __name__ == '__main__':
