@@ -329,7 +329,7 @@ def test_docling_pdf_ingestion(pdf_file):
             title = metadata.get('title', os.path.splitext(os.path.basename(pdf_file.name))[0])
             author = metadata.get('author', 'Unknown')
 
-        result = f"PDF '{title}' by {author} processed successfully by pymupdf."
+        result = f"PDF '{title}' by {author} processed successfully by Docling."
         return result, markdown_text
     except Exception as e:
         return f"Error ingesting PDF: {str(e)}", ""
