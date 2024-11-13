@@ -291,7 +291,7 @@ def load_and_log_configs():
         save_rag_chats = config.get('Auto-Save', 'save_rag_chats', fallback='False')
 
         # Ollama Timeout
-        ollama_timeout = config.get('Local-API', 'ollama_timeout', fallback='90')
+        local_api_timeout = config.get('Local-API', 'local_api_timeout', fallback='90')
 
         return {
             'api_keys': {
@@ -361,7 +361,7 @@ def load_and_log_configs():
                 'save_rag_chats': save_rag_chats,
             },
             'default_api': default_api,
-            'ollama_timeout': ollama_timeout
+            'local_api_timeout': local_api_timeout
         }
 
     except Exception as e:

@@ -33,7 +33,6 @@ vllm_model =
 ollama_api_IP = http://127.0.0.1:11434/v1/chat/completions
 ollama_api_key =
 ollama_model = llama3
-ollama_timeout = 90
 aphrodite_api_IP = http://127.0.0.1:8080/completion
 aphrodite_api_key =
 
@@ -43,6 +42,7 @@ processing_choice = cuda
 [Settings]
 chunk_duration = 30
 words_per_second = 3
+local_api_timeout = 90
 
 [Auto-Save]
 save_character_chats = False
