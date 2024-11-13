@@ -290,6 +290,9 @@ def load_and_log_configs():
         save_character_chats = config.get('Auto-Save', 'save_character_chats', fallback='False')
         save_rag_chats = config.get('Auto-Save', 'save_rag_chats', fallback='False')
 
+        # Ollama Timeout
+        local_api_timeout = config.get('Local-API', 'local_api_timeout', fallback='90')
+
         return {
             'api_keys': {
                 'anthropic': anthropic_api_key,
@@ -357,7 +360,8 @@ def load_and_log_configs():
                 'save_character_chats': save_character_chats,
                 'save_rag_chats': save_rag_chats,
             },
-            'default_api': default_api
+            'default_api': default_api,
+            'local_api_timeout': local_api_timeout
         }
 
     except Exception as e:

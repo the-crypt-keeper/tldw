@@ -532,7 +532,9 @@ def chat_with_ollama(
             logging.debug("Ollama: Submitting request to API endpoint")
             print("Ollama: Submitting request to API endpoint")
             try:
-                response = requests.post(api_url, headers=headers, json=data_payload, timeout=30)
+                config = load_and_log_configs()
+                local_api_timeout = config['local_api_timeout']
+                response = requests.post(api_url, headers=headers, json=data_payload, timeout=local_api_timeout)
                 response.raise_for_status()  # Raises HTTPError for bad responses
                 response_data = response.json()
             except requests.exceptions.Timeout:
