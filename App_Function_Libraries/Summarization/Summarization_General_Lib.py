@@ -1022,6 +1022,122 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
         logging.error(f"Mistral: Error in processing: {str(e)}", exc_info=True)
         return f"Mistral: Error occurred while processing summary: {str(e)}"
 
+
+def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+    loaded_config_data = load_and_log_configs()
+    try:
+        # API key validation
+        if not api_key or api_key.strip() == "":
+            logging.info("Google: #1 API key not provided as parameter")
+            logging.info("Google: Attempting to use API key from config file")
+            api_key = loaded_config_data['api_keys']['google']
+
+        if not api_key or api_key.strip() == "":
+            logging.error("Google: #2 API key not found or is empty")
+            return "Google: API Key Not Provided/Found in Config file or is empty"
+
+        google_api_key = api_key
+        logging.debug(f"Google: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        # Input data handling
+        logging.debug(f"Google: Raw input data type: {type(input_data)}")
+        logging.debug(f"Google: Raw input data (first 500 chars): {str(input_data)[:500]}...")
+
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                # It's likely a JSON string
+                logging.debug("Google: Parsing provided JSON string data for summarization")
+                try:
+                    data = json.loads(input_data)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Google: Error parsing JSON string: {str(e)}")
+                    return f"Google: Error parsing JSON input: {str(e)}"
+            elif os.path.isfile(input_data):
+                logging.debug("Google: Loading JSON data from file for summarization")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                logging.debug("Google: Using provided string data for summarization")
+                data = input_data
+        else:
+            data = input_data
+
+        logging.debug(f"Google: Processed data type: {type(data)}")
+        logging.debug(f"Google: Processed data (first 500 chars): {str(data)[:500]}...")
+
+        # Text extraction
+        if isinstance(data, dict):
+            if 'summary' in data:
+                logging.debug("Google: Summary already exists in the loaded data")
+                return data['summary']
+            elif 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)  # Convert dict to string if no specific format
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError(f"Google: Invalid input data format: {type(data)}")
+
+        logging.debug(f"Google: Extracted text (first 500 chars): {text[:500]}...")
+        logging.debug(f"Google: Custom prompt: {custom_prompt_arg}")
+
+        google_model = loaded_config_data['models']['google'] or "gemini-1.5-pro"
+        logging.debug(f"Google: Using model: {google_model}")
+
+        headers = {
+            'Authorization': f'Bearer {google_api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        logging.debug(
+            f"Google API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
+        logging.debug("openai: Preparing data + prompt for submittal")
+        google_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        #if temp is None:
+        #    temp = 0.7
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+        #temp = float(temp)
+        data = {
+            "model": google_model,
+            "messages": [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": google_prompt}
+            ],
+            #"max_tokens": 4096,
+            #"temperature": temp
+        }
+
+        logging.debug("Google: Posting request")
+        response = requests.post('https://generativelanguage.googleapis.com/v1beta/', headers=headers, json=data)
+
+        if response.status_code == 200:
+            response_data = response.json()
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                summary = response_data['choices'][0]['message']['content'].strip()
+                logging.debug("Google: Summarization successful")
+                logging.debug(f"Google: Summary (first 500 chars): {summary[:500]}...")
+                return summary
+            else:
+                logging.warning("Google: Summary not found in the response data")
+                return "Google: Summary not available"
+        else:
+            logging.error(f"Google: Summarization failed with status code {response.status_code}")
+            logging.error(f"Google: Error response: {response.text}")
+            return f"Google: Failed to process summary. Status code: {response.status_code}"
+    except json.JSONDecodeError as e:
+        logging.error(f"Google: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"Google: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"Google: Error making API request: {str(e)}", exc_info=True)
+        return f"Google: Error making API request: {str(e)}"
+    except Exception as e:
+        logging.error(f"Google: Unexpected error: {str(e)}", exc_info=True)
+        return f"Google: Unexpected error occurred: {str(e)}"
+
 #
 #
 #######################################################################################################################
@@ -1620,6 +1736,10 @@ def process_url(
                     summary = summarize_with_deepseek(api_key, chunk, custom_prompt_input, temp, system_message)
                 elif api_name == "OpenRouter":
                     summary = summarize_with_openrouter(api_key, chunk, custom_prompt_input, temp, system_message)
+                elif api_name == "Mistral":
+                    summary = summarize_with_mistral(api_key, chunk, custom_prompt_input, temp, system_message)
+                elif api_name == "Google":
+                    summary = summarize_with_google(api_key, chunk, custom_prompt_input, temp, system_message)
                 # Local LLM APIs
                 elif api_name == "Llama.cpp":
                     summary = summarize_with_llama(chunk, custom_prompt_input, api_key, temp, system_message)
