@@ -18,7 +18,7 @@ from pathlib import Path
 from App_Function_Libraries.DB.DB_Manager import start_new_conversation, delete_messages_in_conversation, save_message
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_db_connection, get_conversation_name
 from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_cohere, \
-    chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface
+    chat_with_groq, chat_with_openrouter, chat_with_deepseek, chat_with_mistral, chat_with_huggingface, chat_with_google
 from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
     chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi, chat_with_vllm, chat_with_custom_openai
 from App_Function_Libraries.DB.SQLite_DB import load_media_content
@@ -85,6 +85,9 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
 
         elif api_endpoint.lower() == "mistral":
             response = chat_with_mistral(api_key, input_data, prompt, temp, system_message)
+
+        elif api_endpoint.lower() == "google":
+            response = chat_with_google(api_key, input_data, prompt, temp, system_message)
 
         elif api_endpoint.lower() == "llama.cpp":
             response = chat_with_llama(input_data, prompt, temp, None, api_key, system_message)
