@@ -8,13 +8,15 @@ groq_model = llama3-70b-8192
 openai_api_key = <openai_api_key>
 openai_model = gpt-4o
 huggingface_api_key = <huggingface_api_token>
-huggingface_model = mistralai/Mistral-Nemo-Instruct-2407
+huggingface_model = CohereForAI/c4ai-command-r-plus
 openrouter_api_key = <openrouter_api_key>
 openrouter_model = mistralai/mistral-7b-instruct:free
 deepseek_api_key = <deepseek-api-key>
 deepseek_model = deepseek-chat
 mistral_model = mistral-large-latest
-mistral_api_key = <mistral_api_key>>
+mistral_api_key = <mistral_api_key>
+google_api_key =
+google_model = gemini-1.5-pro
 custom_openai_api_key = <key_here>
 custom_openai_api_ip = <api_ip_here>
 default_api = openai
@@ -42,12 +44,13 @@ processing_choice = cuda
 [Settings]
 chunk_duration = 30
 words_per_second = 3
+save_character_chats = False
+save_rag_chats = False
 local_api_timeout = 90
 
 [Auto-Save]
 save_character_chats = False
 save_rag_chats = False
-
 
 [Prompts]
 prompt_sample = "What is the meaning of life?"
@@ -118,3 +121,11 @@ backup_count = 5
 #    open-mixtral-8x7b
 #    open-mixtral-8x22b
 #    open-codestral-mamba
+# Google's Models (11/15/2024): https://ai.google.dev/gemini-api/docs/models/gemini
+#   gemini-1.5-pro
+#   gemini-1.5-flash
+#   gemini-1.5-flash-8b
+#   aqa
+#   text-embedding-004
+
+
