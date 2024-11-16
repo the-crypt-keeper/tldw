@@ -10,6 +10,17 @@
 ----------------------------------------------------------------------------------------------------------------
 
 
+Benchmarking with distilabel
+    https://distilabel.argilla.io/latest/sections/pipeline_samples/examples/benchmarking_with_distilabel/
+
+
+Chat arena
+    https://github.com/lm-sys/FastChat
+LLM-as-judge
+    https://huggingface.co/learn/cookbook/en/llm_judge
+
+
+
 ----------------------------------------------------------------------------------------------------------------
 ### Introduction
 
@@ -18,6 +29,7 @@
 
 ----------------------------------------------------------------------------------------------------------------
 ### Evaluation Plan
+- Model Evaluation
 - Search Evaluation (Assuming test data set)
   - Retrieval Evaluation First
     - Identify keyword search success rate
@@ -33,6 +45,25 @@
 - Evaluation Metrics
 - Things to look out for
   - https://arxiv.org/abs/2411.03923
+- **Reproducability**
+  - https://github.com/huggingface/evaluation-guidebook/blob/main/contents/troubleshooting/troubleshooting-reproducibility.md
+- **Designing Evaluations**
+  - https://github.com/huggingface/evaluation-guidebook/blob/main/contents/model-as-a-judge/designing-your-evaluation-prompt.md
+  - https://eugeneyan.com/assets/llm-eval-tree.jpg
+- Human Evaluation
+  - https://github.com/huggingface/evaluation-guidebook/blob/main/contents/human-evaluation/using-human-annotators.md
+----------------------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------------------
+### Model Evaluation
+- 
+MMLU
+    https://huggingface.co/blog/open-llm-leaderboard-mmlu
+
+- **Links**
+  - https://github.com/huggingface/evaluation-guidebook/blob/main/contents/automated-benchmarks/tips-and-tricks.md
+
 
 ----------------------------------------------------------------------------------------------------------------
 
@@ -55,6 +86,8 @@
 https://arxiv.org/abs/2411.03538
 https://archive.is/OtPVh
 https://docs.ragas.io/en/stable/getstarted/rag_testset_generation/
+
+https://github.com/D-Star-AI/KITE
 
 RAG Eval Plan:
     The generic idea however: you take a (full, unchunked) document and ask an LLM to generate a question with that document as well as give the factual answer to it. Enforce via prompts to make it use the document only and make it as hard as you want (eg. maybe sometimes you want it to consider 2 documents and make a question that uses bits of both). This gives you a ground truth dataset.
@@ -117,13 +150,3 @@ Quant Eval
 https://arxiv.org/abs/2411.02355
 
 
-
-
-Demo Setup Process:
-3. Add/Ingest Defcon 32 War Stories: https://www.youtube.com/playlist?list=PL9fPq3eQfaaDo7as-xxbY6r9ts86lxkwc
-3. Add/Ingest Defcon 32 Villages talks:
-   - RF Village: https://www.youtube.com/playlist?list=PLd8C1LGNy4UF-BhdT4583mV5xVPcHXMTw
-   - VR Village: https://www.youtube.com/playlist?list=PLD2EdZEOJAKfa2qvqLHuLpyptg0Vnwtoq
-   - Red Team Village: https://www.youtube.com/playlist?list=PLruly0ngXhPFIXuS_FwKi3vLUXvxz2-iv
-   - Policy: https://www.youtube.com/playlist?list=PL9fPq3eQfaaBVQMmIp3EUhYsUpxXiwI63
-   - Video Team: https://www.youtube.com/playlist?list=PL9fPq3eQfaaD_2THtBVamFKcNv-5Bl8xP
