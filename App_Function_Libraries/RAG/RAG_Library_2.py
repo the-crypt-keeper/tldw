@@ -128,75 +128,74 @@ search_functions = {
 
 # RAG Search with keyword filtering
 # FIXME - Update each called function to support modifiable top-k results
-def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts_top_k=10, apply_re_ranking=True, database_types: List[str] = "Media DB") -> Dict[str, Any]:
+def enhanced_rag_pipeline(
+    query: str,
+    api_choice: str,
+    keywords: Optional[str] = None,
+    fts_top_k: int = 10,
+    apply_re_ranking: bool = True,
+    database_types: List[str] = ["Media DB"]
+) -> Dict[str, Any]:
     """
     Perform full text search across specified database type.
 
     Args:
         query: Search query string
         api_choice: API to use for generating the response
-        fts_top_k: Maximum number of results to return
         keywords: Optional list of media IDs to filter results
-        database_types: Type of database to search ("Media DB", "RAG Chat", or "Character Chat")
+        fts_top_k: Maximum number of results to return
+        apply_re_ranking: Whether to apply re-ranking to results
+        database_types: Type of database to search
 
     Returns:
         Dictionary containing search results with content
     """
     log_counter("enhanced_rag_pipeline_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
+
     try:
         # Load embedding provider from config, or fallback to 'openai'
         embedding_provider = config.get('Embeddings', 'provider', fallback='openai')
         logging.debug(f"Using embedding provider: {embedding_provider}")
 
+        # Initialize relevant IDs dictionary
+        relevant_ids: Dict[str, Optional[List[str]]] = {}
+
         # Process keywords if provided
-        keyword_list = [k.strip().lower() for k in keywords.split(',')] if keywords else []
-        logging.debug(f"\n\nenhanced_rag_pipeline - Keywords: {keyword_list}")
+        if keywords:
+            keyword_list = [k.strip().lower() for k in keywords.split(',')]
+            logging.debug(f"enhanced_rag_pipeline - Keywords: {keyword_list}")
 
-        relevant_ids = {}
-
-        # Fetch relevant IDs based on keywords if keywords are provided
-        if keyword_list:
             try:
                 for db_type in database_types:
                     if db_type == "Media DB":
-                        relevant_media_ids = fetch_relevant_media_ids(keyword_list)
-                        relevant_ids[db_type] = relevant_media_ids
+                        media_ids = fetch_relevant_media_ids(keyword_list)
+                        relevant_ids[db_type] = [str(id_) for id_ in media_ids]
                     elif db_type == "RAG Chat":
-                        conversations, total_pages, total_count = search_conversations_by_keywords(keywords=keyword_list)
-                        relevant_ids[db_type] = [conv['conversation_id'] for conv in conversations]
+                        conversations, _, _ = search_conversations_by_keywords(keywords=keyword_list)
+                        relevant_ids[db_type] = [str(conv['conversation_id']) for conv in conversations]
                     elif db_type == "RAG Notes":
-                        notes, total_pages, total_count = get_notes_by_keywords(keyword_list)
-                        relevant_ids[db_type] = [note_id for note_id, _, _, _ in notes]
+                        notes, _, _ = get_notes_by_keywords(keyword_list)
+                        relevant_ids[db_type] = [str(note_id) for note_id, _, _, _ in notes]
                     elif db_type == "Character Chat":
-                        relevant_ids[db_type] = fetch_keywords_for_chats(keyword_list)
+                        relevant_ids[db_type] = [str(id_) for id_ in fetch_keywords_for_chats(keyword_list)]
                     elif db_type == "Character Cards":
-                        relevant_ids[db_type] = fetch_character_ids_by_keywords(keyword_list)
+                        relevant_ids[db_type] = [str(id_) for id_ in fetch_character_ids_by_keywords(keyword_list)]
                     else:
                         logging.error(f"Unsupported database type: {db_type}")
 
                     logging.debug(f"enhanced_rag_pipeline - {db_type} relevant IDs: {relevant_ids[db_type]}")
             except Exception as e:
                 logging.error(f"Error fetching relevant IDs: {str(e)}")
+                relevant_ids = {db_type: None for db_type in database_types}
         else:
-            relevant_ids = None
+            relevant_ids = {db_type: None for db_type in database_types}
 
-        # Prepare relevant IDs for each database type
-        relevant_ids_dict = {}
-        if relevant_ids:
-            for db_type in database_types:
-                if db_type in relevant_ids and relevant_ids[db_type]:
-                    relevant_ids_dict[db_type] = [str(id_) for id_ in relevant_ids[db_type]]
-                else:
-                    relevant_ids_dict[db_type] = None
-        else:
-            relevant_ids_dict = {db_type: None for db_type in database_types}
-
-        # Perform vector search for all selected databases
+        # Perform vector search
         vector_results = []
         for db_type in database_types:
             try:
-                db_relevant_ids = relevant_ids_dict.get(db_type)
+                db_relevant_ids = relevant_ids.get(db_type)
                 results = perform_vector_search(query, db_relevant_ids, top_k=fts_top_k)
                 vector_results.extend(results)
                 logging.debug(f"\nenhanced_rag_pipeline - Vector search results for {db_type}: {results}")
@@ -217,7 +216,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
         fts_results = []
         for db_type in database_types:
             try:
-                db_relevant_ids = relevant_ids.get(db_type) if relevant_ids else None
+                db_relevant_ids = relevant_ids.get(db_type)
                 db_results = perform_full_text_search(query, db_type, db_relevant_ids, fts_top_k)
                 fts_results.extend(db_results)
                 logging.debug(f"enhanced_rag_pipeline - FTS results for {db_type}: {db_results}")
@@ -233,12 +232,12 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
         # Combine results
         all_results = vector_results + fts_results
 
+        # FIXME - specify model + add param to modify at call time
+        # You can specify a model if necessary, e.g., model_name="ms-marco-MiniLM-L-12-v2"
+        # Apply re-ranking if enabled and results exist
         if apply_re_ranking and all_results:
             logging.debug(f"\nenhanced_rag_pipeline - Applying Re-Ranking")
-            # FIXME - add option to use re-ranking at call time
-            # FIXME - specify model + add param to modify at call time
-            # FIXME - add option to set a custom top X results
-            # You can specify a model if necessary, e.g., model_name="ms-marco-MiniLM-L-12-v2"
+
             if all_results:
                 ranker = Ranker()
 
@@ -273,7 +272,7 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
                 "context": "No relevant information based on your query and keywords were found in the database. The only context used was your query: \n\n" + query
             }
 
-        # Metrics
+        # Log metrics
         pipeline_duration = time.time() - start_time
         log_histogram("enhanced_rag_pipeline_duration", pipeline_duration, labels={"api_choice": api_choice})
         log_counter("enhanced_rag_pipeline_success", labels={"api_choice": api_choice})
@@ -284,7 +283,6 @@ def enhanced_rag_pipeline(query: str, api_choice: str, keywords: str = None, fts
         }
 
     except Exception as e:
-        # Metrics
         log_counter("enhanced_rag_pipeline_error", labels={"api_choice": api_choice, "error": str(e)})
         logging.error(f"Error in enhanced_rag_pipeline: {str(e)}")
         logging.error(f"Error in enhanced_rag_pipeline: {str(e)}")
