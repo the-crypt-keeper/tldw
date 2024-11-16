@@ -55,7 +55,7 @@ def create_video_transcription_tab():
                 url_input = gr.Textbox(label="URL(s) (Mandatory)",
                                        placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, other video sites and Youtube playlists.",
                                        lines=5)
-                video_file_input = gr.File(label="Upload Video File (Optional)", file_types=["video/*"])
+                video_files = gr.File(label="Upload Video File(s) (Optional)", file_types=[".mp4", ".avi", ".mov", ".mkv", ".webm"], file_count="multiple")
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 vad_checkbox = gr.Checkbox(label="Enable Voice-Audio-Detection(VAD)", value=True)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
@@ -576,7 +576,7 @@ def create_video_transcription_tab():
                         None
                     )
 
-            def process_videos_wrapper(url_input, video_file, start_time, end_time, diarize, vad_use, whisper_model,
+            def process_videos_wrapper(url_input, video_files, start_time, end_time, diarize, vad_use, whisper_model,
                                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                                        use_multi_level_chunking, chunk_language, summarize_recursively, api_name,
@@ -599,16 +599,34 @@ def create_video_transcription_tab():
                         except Exception as e:
                             logging.warning(f"Failed to delete file {file_path}: {str(e)}")
 
-                    # Handle both URL input and file upload
+                    # Handle both URL input and multiple file uploads
                     inputs = []
+
+                    # Process URLs if provided
                     if url_input:
                         inputs.extend([url.strip() for url in url_input.split('\n') if url.strip()])
-                    if video_file is not None:
-                        # Assuming video_file is a file object with a 'name' attribute
-                        inputs.append(video_file.name)
+
+                    # Process multiple video files if provided
+                    if video_files is not None:
+                        files_list = video_files if isinstance(video_files, list) else [video_files]
+
+                        for file_obj in files_list:
+                            if isinstance(file_obj, str):
+                                inputs.append(file_obj)
+                            elif hasattr(file_obj, 'path'):
+                                inputs.append(file_obj.path)
+                            elif isinstance(file_obj, dict) and 'path' in file_obj:
+                                inputs.append(file_obj['path'])
+                            elif hasattr(file_obj, 'name'):
+                                inputs.append(file_obj.name)
+                            else:
+                                logging.warning(f"Unhandled file object type: {type(file_obj)}")
+                                continue
 
                     if not inputs:
-                        raise ValueError("No input provided. Please enter URLs or upload a video file.")
+                        raise ValueError("No input provided. Please enter URLs or upload video files.")
+
+                    logging.info(f"Processing inputs: {inputs}")
 
                     result = process_videos_with_error_handling(
                         inputs, start_time, end_time, diarize, vad_use, whisper_model,
@@ -948,7 +966,7 @@ def create_video_transcription_tab():
                 fn=process_videos_wrapper,
                 inputs=[
                     url_input,
-                    video_file_input,
+                    video_files,
                     start_time_input,
                     end_time_input,
                     diarize_input,

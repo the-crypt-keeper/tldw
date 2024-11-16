@@ -205,6 +205,10 @@ def load_and_log_configs():
         logging.debug(
             f"Loaded Mistral API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
 
+        google_api_key = config.get('API', 'google_api_key', fallback=None)
+        logging.debug(
+            f"Loaded Mistral API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
+
         # Models
         anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
         cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
@@ -214,6 +218,7 @@ def load_and_log_configs():
         openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
         deepseek_model = config.get('API', 'deepseek_model', fallback='deepseek-chat')
         mistral_model = config.get('API', 'mistral_model', fallback='mistral-large-latest')
+        google_model = config.get('API', 'google_model', fallback='gemini-1.5-pro')
 
         logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
         logging.debug(f"Loaded Cohere Model: {cohere_model}")
@@ -290,7 +295,7 @@ def load_and_log_configs():
         save_character_chats = config.get('Auto-Save', 'save_character_chats', fallback='False')
         save_rag_chats = config.get('Auto-Save', 'save_rag_chats', fallback='False')
 
-        # Ollama Timeout
+        # Local API Timeout
         local_api_timeout = config.get('Local-API', 'local_api_timeout', fallback='90')
 
         return {
@@ -303,6 +308,7 @@ def load_and_log_configs():
                 'openrouter': openrouter_api_key,
                 'deepseek': deepseek_api_key,
                 'mistral': mistral_api_key,
+                'google': google_api_key,
                 'kobold': kobold_api_key,
                 'llama': llama_api_key,
                 'ooba': ooba_api_key,
@@ -321,6 +327,7 @@ def load_and_log_configs():
                 'openrouter': openrouter_model,
                 'deepseek': deepseek_model,
                 'mistral': mistral_model,
+                'google': google_model,
                 'vllm': vllm_model,
                 'tabby': tabby_model,
                 'ollama': ollama_model
@@ -368,7 +375,7 @@ def load_and_log_configs():
         logging.error(f"Error loading config: {str(e)}")
         return None
 
-global_api_endpoints = ["anthropic", "cohere", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
+global_api_endpoints = ["anthropic", "cohere", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "google", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
 
 # Setup Default API Endpoint
 loaded_config_data = load_and_log_configs()
@@ -384,6 +391,7 @@ def format_api_name(api):
         "openrouter": "OpenRouter",
         "deepseek": "DeepSeek",
         "mistral": "Mistral",
+        "google": "Google",
         "custom_openai_api": "Custom-OpenAI-API",
         "llama": "Llama.cpp",
         "ooba": "Ooba",
