@@ -14,7 +14,9 @@ openrouter_model = mistralai/mistral-7b-instruct:free
 deepseek_api_key = <deepseek-api-key>
 deepseek_model = deepseek-chat
 mistral_model = mistral-large-latest
-mistral_api_key = <mistral_api_key>>
+mistral_api_key = <mistral_api_key>
+google_api_key =
+google_model = gemini-1.5-pro
 custom_openai_api_key = <key_here>
 custom_openai_api_ip = <api_ip_here>
 default_api = openai
@@ -44,6 +46,7 @@ chunk_duration = 30
 words_per_second = 3
 save_character_chats = False
 save_rag_chats = False
+local_api_timeout = 90
 
 [Auto-Save]
 save_character_chats = False
@@ -118,6 +121,11 @@ backup_count = 5
 #    open-mixtral-8x7b
 #    open-mixtral-8x22b
 #    open-codestral-mamba
-
+# Google's Models (11/15/2024): https://ai.google.dev/gemini-api/docs/models/gemini
+#   gemini-1.5-pro
+#   gemini-1.5-flash
+#   gemini-1.5-flash-8b
+#   aqa
+#   text-embedding-004
 
 
