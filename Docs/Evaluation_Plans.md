@@ -57,10 +57,67 @@ LLM-as-judge
 
 ----------------------------------------------------------------------------------------------------------------
 ### Model Evaluation
-- 
-MMLU
-    https://huggingface.co/blog/open-llm-leaderboard-mmlu
+- **Metrics**
+  1. Answer Relevancy
+     * Does the LLM give a relevant answer to the question?
+  2. Correctness
+     - Is the LLM output correct regarding a 'ground truth'
+  3. Confabulation-Rate
+     - How often does the LLM make up information?
+  4. Contextual Relevancy
+     - How relevant is the returned content to the context of the question?
+  5. Bias
+  6. Task-Specific
 
+- **Metrics should be:**
+  1. Quantifiable
+  2. Reproducible
+  3. Sensitive
+  4. Specific
+  5. Interpretable
+
+- **Evaluation Methodologies**
+    - G-Eval
+
+- **Frameworks**
+    - OpenCompass
+    - DeepEval
+    - lm-eval-harness
+    - https://github.com/EleutherAI/lm-evaluation-harness
+    - https://github.com/nexusflowai/NexusBench
+- Pop Culture
+- 'Reasoning'
+    - MMLU-Pro
+        - https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro
+        - https://github.com/TIGER-AI-Lab/MMLU-Pro/tree/main
+- **Role Play**
+  - Discussion from different PoV Facilitation
+    - https://github.com/Neph0s/awesome-llm-role-playing-with-persona?tab=readme-ov-file
+    - https://github.com/lawraa/LLM-Discussion
+    - https://github.com/InteractiveNLP-Team/RoleLLM-public
+  - Role Adherence
+    - StickToYourRole
+      - https://huggingface.co/datasets/flowers-team/StickToYourRole
+      - https://huggingface.co/datasets/flowers-team/StickToYourRole
+      - https://arxiv.org/abs/2402.14846
+      - https://flowers-team-sticktoyourroleleaderboard.hf.space/about
+    - PingPong Bench
+      - https://github.com/IlyaGusev/ping_pong_bench
+      - https://ilyagusev.github.io/ping_pong_bench/
+    - DeepEval
+      - https://docs.confident-ai.com/docs/metrics-role-adherence
+    - General Research / Unsorted
+      - https://arxiv.org/html/2406.00627v1
+      - https://mp.weixin.qq.com/s/H2KNDGRNHktHiQc3sayFsA
+      - https://mp.weixin.qq.com/s/2lbCMo64-nU5yRz1cLQxYA
+      - https://mp.weixin.qq.com/s/E5qp5YPYPVaLM07OumDTRw
+      - https://mp.weixin.qq.com/s/yoM-srJYGGfyd1VXirg_Hg
+    - RP-Bench
+      - https://boson.ai/rpbench-blog/
+  - Collections of research
+    - https://github.com/MiuLab/PersonaLLM-Survey
+  - Notes
+    - https://ianbicking.org/blog/2024/04/roleplaying-by-llm
 - **Links**
   - https://github.com/huggingface/evaluation-guidebook/blob/main/contents/automated-benchmarks/tips-and-tricks.md
 
@@ -86,8 +143,28 @@ MMLU
 https://arxiv.org/abs/2411.03538
 https://archive.is/OtPVh
 https://docs.ragas.io/en/stable/getstarted/rag_testset_generation/
-
+https://github.com/TonicAI/tonic_validate
 https://github.com/D-Star-AI/KITE
+
+- **Metrics**
+    1. Answer Consistency
+       * Whether there is information in the LLM answer that does not come from the context.
+    2. Answer relevancy
+    3. Answer Similarity Score
+       * How well the reference answer matches the LLM answer.
+    4. Retrieval Precision
+       * Whether the context retrieved is relevant to answer the given question.
+    5. Augmentation precision
+       * Whether the relevant context is in the LLM answer.
+    6. Augmentation Accuracy
+       * Whether all the context is in the LLM answer.
+    7. Contextual Recall
+    8. Latency
+       * How long it takes for the LLM to complete a request.
+    9. Contains Text
+         * Whether the LLM answer contains the specific text.
+
+
 
 RAG Eval Plan:
     The generic idea however: you take a (full, unchunked) document and ask an LLM to generate a question with that document as well as give the factual answer to it. Enforce via prompts to make it use the document only and make it as hard as you want (eg. maybe sometimes you want it to consider 2 documents and make a question that uses bits of both). This gives you a ground truth dataset.
@@ -150,3 +227,10 @@ Quant Eval
 https://arxiv.org/abs/2411.02355
 
 
+Finetuning
+    https://huggingface.co/learn/cookbook/enterprise_cookbook_argilla
+    https://aclanthology.org/2024.cl-3.1/
+    https://scale.com/guides/data-labeling-annotation-guide
+    https://aclanthology.org/2024.naacl-long.126/
+    https://distilabel.argilla.io/latest/
+    https://distilabel.argilla.io/latest/sections/pipeline_samples/papers/ultrafeedback/
