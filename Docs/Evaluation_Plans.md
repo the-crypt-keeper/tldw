@@ -58,26 +58,33 @@ LLM-as-judge
 ----------------------------------------------------------------------------------------------------------------
 ### Model Evaluation
 - **Metrics**
-  1. Answer Relevancy
-     * Does the LLM give a relevant answer to the question?
-  2. Correctness
-     - Is the LLM output correct regarding a 'ground truth'
-  3. Confabulation-Rate
-     - How often does the LLM make up information?
-  4. Contextual Relevancy
-     - How relevant is the returned content to the context of the question?
-  5. Bias
-  6. Task-Specific
+    1. Answer Relevancy
+         * Does the LLM give a relevant answer to the question?
+         * DeepEval https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/answer_relevancy
+    2. Correctness
+         - Is the LLM output correct regarding a 'ground truth'
+    3. Confabulation-Rate
+         - How often does the LLM make up information?
+   4. Contextual Relevancy
+         - How relevant is the returned content to the context of the question?
+         * DeepEval https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/contextual_relevancy
+   5. Bias
+         - DeepEval https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/bias
+   6. Task-Specific
+  7. Conversation Intent
+     * DeepEval https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/conversation_relevancy
 
 - **Metrics should be:**
-  1. Quantifiable
-  2. Reproducible
-  3. Sensitive
-  4. Specific
-  5. Interpretable
+    1. Quantifiable
+    2. Reproducible
+    3. Sensitive
+    4. Specific
+    5. Interpretable
 
 - **Evaluation Methodologies**
     - G-Eval
+    - QAG - QA Generation
+          - https://www.confident-ai.com/blog/a-step-by-step-guide-to-evaluating-an-llm-text-summarization-task
 
 - **Frameworks**
     - OpenCompass
@@ -85,41 +92,64 @@ LLM-as-judge
     - lm-eval-harness
     - https://github.com/EleutherAI/lm-evaluation-harness
     - https://github.com/nexusflowai/NexusBench
+    - https://docs.athina.ai/evals/preset-evals/overview
 - Pop Culture
 - 'Reasoning'
     - MMLU-Pro
         - https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro
         - https://github.com/TIGER-AI-Lab/MMLU-Pro/tree/main
 - **Role Play**
-  - Discussion from different PoV Facilitation
-    - https://github.com/Neph0s/awesome-llm-role-playing-with-persona?tab=readme-ov-file
-    - https://github.com/lawraa/LLM-Discussion
-    - https://github.com/InteractiveNLP-Team/RoleLLM-public
-  - Role Adherence
-    - StickToYourRole
-      - https://huggingface.co/datasets/flowers-team/StickToYourRole
-      - https://huggingface.co/datasets/flowers-team/StickToYourRole
-      - https://arxiv.org/abs/2402.14846
-      - https://flowers-team-sticktoyourroleleaderboard.hf.space/about
-    - PingPong Bench
-      - https://github.com/IlyaGusev/ping_pong_bench
-      - https://ilyagusev.github.io/ping_pong_bench/
+    - **Conversation Relevancy**
+        - DeepEval
+            - https://docs.confident-ai.com/docs/metrics-conversation-relevancy
+    - Discussion from different PoV Facilitation
+          - https://github.com/Neph0s/awesome-llm-role-playing-with-persona?tab=readme-ov-file
+          - https://github.com/lawraa/LLM-Discussion
+          - https://github.com/InteractiveNLP-Team/RoleLLM-public
+    - Role Adherence
+        - StickToYourRole
+              - https://huggingface.co/datasets/flowers-team/StickToYourRole
+              - https://huggingface.co/datasets/flowers-team/StickToYourRole
+              - https://arxiv.org/abs/2402.14846
+              - https://flowers-team-sticktoyourroleleaderboard.hf.space/about
+        - PingPong Bench
+            - https://github.com/IlyaGusev/ping_pong_bench
+            - https://ilyagusev.github.io/ping_pong_bench/
+        - DeepEval
+            - https://docs.confident-ai.com/docs/metrics-role-adherence
+            - https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/role_adherence
+        - General Research / Unsorted
+            - https://arxiv.org/html/2406.00627v1
+            - https://mp.weixin.qq.com/s/H2KNDGRNHktHiQc3sayFsA
+            - https://mp.weixin.qq.com/s/2lbCMo64-nU5yRz1cLQxYA
+            - https://mp.weixin.qq.com/s/E5qp5YPYPVaLM07OumDTRw 
+            - https://mp.weixin.qq.com/s/yoM-srJYGGfyd1VXirg_Hg
+        - RP-Bench
+            - https://boson.ai/rpbench-blog/
+        - Collections of research
+            - https://github.com/MiuLab/PersonaLLM-Survey
+        - Notes
+            - https://ianbicking.org/blog/2024/04/roleplaying-by-llm
+    - **Conversation Relevancy**
+         * `assesses whether your LLM chatbot is able to generate relevant responses throughout a conversation. It is calculated by looping through each turn individually and adopts a sliding window approach to take the last min(0, current turn number — window size) turns into account to determine whether it is relevant or not. The final conversation relevancy metric score is simply the number of turn responses that is relevant divided by the total number of turns in a conversational test case.` 
+         * https://docs.confident-ai.com/docs/metrics-conversation-relevancy
+    - **Knowledge Retention**
+         - `chatbot is able to retain information presented to it throughout a conversation. It is calculated by first extracting a list of knowledges presented to it up to the certain turn in a conversation, and determining whether the LLM is asking for information that is already present in the turn response. The knowledge retention score is simply the number of turns without knowledge attritions divided by the total number of turns.`
+         - https://docs.confident-ai.com/docs/metrics-knowledge-retention
+    - **Conversation Completeness**
+        - `chatbot is able to fulfill user requests throughout a conversation. It is useful because conversation completeness can be used as a proxy to measure user satisfaction and chatbot effectiveness. It is calculated by first using an LLM to extract a list of high level user intentions found in the conversation turns, before using the same LLM to determine whether each intention was met and/or satisfied throughout the conversation.`
+        - https://docs.confident-ai.com/docs/metrics-conversation-completeness
+- **Summarization**
+    - https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/summarization
+    - https://www.confident-ai.com/blog/a-step-by-step-guide-to-evaluating-an-llm-text-summarization-task
+- **Tool Calling**
     - DeepEval
-      - https://docs.confident-ai.com/docs/metrics-role-adherence
-    - General Research / Unsorted
-      - https://arxiv.org/html/2406.00627v1
-      - https://mp.weixin.qq.com/s/H2KNDGRNHktHiQc3sayFsA
-      - https://mp.weixin.qq.com/s/2lbCMo64-nU5yRz1cLQxYA
-      - https://mp.weixin.qq.com/s/E5qp5YPYPVaLM07OumDTRw
-      - https://mp.weixin.qq.com/s/yoM-srJYGGfyd1VXirg_Hg
-    - RP-Bench
-      - https://boson.ai/rpbench-blog/
-  - Collections of research
-    - https://github.com/MiuLab/PersonaLLM-Survey
-  - Notes
-    - https://ianbicking.org/blog/2024/04/roleplaying-by-llm
+        - https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/tool_correctness
+- **Toxicity Testing**
+    - DeepEval
+       - https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/toxicity
 - **Links**
-  - https://github.com/huggingface/evaluation-guidebook/blob/main/contents/automated-benchmarks/tips-and-tricks.md
+    - https://github.com/huggingface/evaluation-guidebook/blob/main/contents/automated-benchmarks/tips-and-tricks.md
 
 
 ----------------------------------------------------------------------------------------------------------------
