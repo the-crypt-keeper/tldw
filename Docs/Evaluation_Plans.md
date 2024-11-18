@@ -505,7 +505,6 @@ Finetuning embedding model
     https://newsletter.kaitchup.com/p/llama-32-embeddings-training
 
 
-
 Generating Embeddings
     https://future.mozilla.org/builders/news_insights/llamafiles-for-embeddings-in-local-rag-applications/
 
