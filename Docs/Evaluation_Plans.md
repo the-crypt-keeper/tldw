@@ -11,7 +11,7 @@
 - [VLM Evaluations](#vlm-evals)
 ----------------------------------------------------------------------------------------------------------------
 
-
+https://eugeneyan.com/writing/evals/
 Benchmarking with distilabel
     https://distilabel.argilla.io/latest/sections/pipeline_samples/examples/benchmarking_with_distilabel/
 
@@ -250,6 +250,7 @@ Finetuning
         - https://stackoverflow.com/questions/9879276/how-do-i-evaluate-a-text-summarization-tool
     - https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/summarization
     - https://www.confident-ai.com/blog/a-step-by-step-guide-to-evaluating-an-llm-text-summarization-task
+    - https://arxiv.org/abs/2009.01325
     - https://arxiv.org/abs/2407.01370v1
     - https://arxiv.org/html/2403.19889v1
     - https://github.com/salesforce/summary-of-a-haystack
@@ -334,7 +335,7 @@ Retrieval Granularity
 
 ----------------------------------------------------------------------------------------------------------------
 ### <a name="rag-eval"></a> RAG Evaluation
-
+https://blog.streamlit.io/ai21_grounded_multi_doc_q-a/
 https://archive.is/OtPVh
 https://towardsdatascience.com/how-to-create-a-rag-evaluation-dataset-from-documents-140daa3cbe71
 - **101**
