@@ -36,6 +36,10 @@ Finetuning
 ----------------------------------------------------------------------------------------------------------------
 ### <a name="introduction"></a> Introduction
 
+
+- **101**
+    https://hamel.dev/blog/posts/evals/
+    
 ----------------------------------------------------------------------------------------------------------------
 
 
@@ -309,6 +313,10 @@ Finetuning
 
 ----------------------------------------------------------------------------------------------------------------
 ### <a name="search-eval"></a> Search Evaluation
+
+https://arxiv.org/abs/2304.01982
+
+
 - **101**
   - F
 - **Basic Search Eval via swyx**
@@ -326,6 +334,9 @@ Retrieval Granularity
 
 ----------------------------------------------------------------------------------------------------------------
 ### <a name="rag-eval"></a> RAG Evaluation
+
+https://archive.is/OtPVh
+https://towardsdatascience.com/how-to-create-a-rag-evaluation-dataset-from-documents-140daa3cbe71
 - **101**
 - **RAG Eval Plan:**
     - The generic idea however: you take a (full, unchunked) document and ask an LLM to generate a question with that document as well as give the factual answer to it. Enforce via prompts to make it use the document only and make it as hard as you want (eg. maybe sometimes you want it to consider 2 documents and make a question that uses bits of both). This gives you a ground truth dataset.
@@ -338,11 +349,17 @@ Retrieval Granularity
         - Growing set of real user examples
 - **Metrics**
     - 3 General Categories
-       1. Retrieval Metric
-       2. Generation-Specific Metric
-       3. RAG-specific Metric
-- 
-- 
+        1. Retrieval Metrics
+            - Accuracy
+                * `the proportion of correct predictions (both true positives and true negatives) among the total number of cases examined.`
+            - Precision
+                * `measures the proportion of retrieved documents that are relevant to the user query. It answers the question, “Of all the documents that were retrieved, how many were actually relevant?”` 
+            - Precision@k
+                * `Precision@k is a variation of precision that measures the proportion of relevant documents amongst the top ‘k’ retrieved results. It is particularly important because it focusses on the top results rather than all the retrieved documents. For RAG it is important because only the top results are most likely to be used for augmentation. For example, if our RAG system considers top 5 documents for augmentation, then Precision@5 becomes important.`
+            - Recall
+                - `measures the proportion of the relevant documents retrieved from all the relevant documents in the corpus. It answers the question, “Of all the relevant documents, how many were actually retrieved?”`
+        2. Generation-Specific Metric
+        3. RAG-specific Metric
     1. Answer Consistency
        * Whether there is information in the LLM answer that does not come from the context.
     2. Answer relevancy
@@ -367,6 +384,15 @@ Retrieval Granularity
         - https://huggingface.co/datasets/rungalileo/ragbench
 - **Generating Synthetic Data**
     - https://www.turingpost.com/p/sytheticdata
+    - https://arxiv.org/html/2404.07503v1
+    - https://arxiv.org/pdf/2210.14348
+    - https://arxiv.org/pdf/2401.02524
+    - https://d1qx31qr3h6wln.cloudfront.net/publications/Nemotron_4_340B_8T_0.pdf
+    - https://arxiv.org/pdf/2402.10379
+    - https://arxiv.org/pdf/2403.04190
+    - https://arxiv.org/pdf/2406.20094
+    - https://arxiv.org/pdf/2407.01490
+    - https://www.turingpost.com/p/synthetic
 
 - **RAG-Specific Tuning/Modfications**
     - **Pre-Training/Finetuning**
@@ -440,6 +466,159 @@ Evaluating RAG Cohere
 
 ----------------------------------------------------------------------------------------------------------------
 ### <a name="embeddings-retrieval-eval"></a> Embeddings Retrieval Evaluation
+
+
+Benchmarking
+    https://github.com/Marker-Inc-Korea/AutoRAG-example-korean-embedding-benchmark
+    https://huggingface.co/datasets/allganize/RAG-Evaluation-Dataset-KO
+    https://medium.com/@vici0549/it-is-crucial-to-properly-set-the-batch-size-when-using-sentence-transformers-for-embedding-models-3d41a3f8b649
+
+
+Databases
+    https://www.timescale.com/blog/pgvector-vs-pinecone/
+    https://www.timescale.com/blog/how-we-made-postgresql-as-fast-as-pinecone-for-vector-data/
+    https://nextword.substack.com/p/vector-database-is-not-a-separate
+    SQLite
+        https://github.com/asg017/sqlite-lembed
+        https://github.com/asg017/sqlite-vec
+        https://turso.tech/blog/turso-brings-native-vector-search-to-sqlite
+        https://stephencollins.tech/posts/how-to-use-sqLite-to-store-and-query-vector-embeddings
+        https://turso.tech/blog/sqlite-retrieval-augmented-generation-and-vector-search
+
+
+Embedding Models
+    https://emschwartz.me/binary-vector-embeddings-are-so-cool/
+    https://arxiv.org/pdf/2409.10173
+    https://huggingface.co/dunzhang/stella_en_1.5B_v5
+    https://huggingface.co/dunzhang/stella_en_400M_v5
+
+
+Finetuning embedding model
+    https://docs.llamaindex.ai/en/stable/examples/finetuning/embeddings/finetune_embedding/
+    https://modal.com/blog/fine-tuning-embeddings
+    https://www.reddit.com/r/LocalLLaMA/comments/1686ul6/some_lessons_learned_from_building_a_fine_tuned/
+    https://huggingface.co/blog/train-sentence-transformers
+    https://www.philschmid.de/fine-tune-embedding-model-for-rag
+    https://www.philschmid.de/fine-tune-embedding-model-for-rag
+    https://blog.gopenai.com/fine-tuning-embeddings-for-specific-domains-a-comprehensive-guide-5e4298b42185
+    https://generativeai.pub/a-beginners-guide-to-fine-tuning-an-embedding-model-38bb4b4ae664
+    https://newsletter.kaitchup.com/p/llama-32-embeddings-training
+
+
+
+Generating Embeddings
+    https://future.mozilla.org/builders/news_insights/llamafiles-for-embeddings-in-local-rag-applications/
+
+Research
+    https://research.trychroma.com/embedding-adapters
+    https://arxiv.org/pdf/2409.15700
+    https://arxiv.org/pdf/2410.02525
+    Contextual document embeddings
+        https://huggingface.co/jxm/cde-small-v1
+    Vector graph
+        https://towardsdatascience.com/vector-embeddings-are-lossy-heres-what-to-do-about-it-4f9a8ee58bb7
+    MoE embeddings
+        https://github.com/tianyi-lab/MoE-Embedding
+    Run-time-lookup
+        https://arxiv.org/abs/2406.15241
+    Compression
+        https://arxiv.org/abs/2407.09252
+    MRL
+        https://towardsdatascience.com/how-to-reduce-embedding-size-and-increase-rag-retrieval-speed-7f903d3cecf7
+    Multi-Vector Retrieval
+        https://huggingface.co/google/xtr-base-multilingual
+    Hyperbolic Embeddings
+        https://github.com/amazon-science/hyperbolic-embeddings
+
+
+Quantization
+    https://jkatz05.com/post/postgres/pgvector-scalar-binary-quantization/
+    https://jkatz05.com/post/postgres/pgvector-quantization/
+
+RAG
+    https://medium.com/intel-tech/optimize-vector-databases-enhance-rag-driven-generative-ai-90c10416cb9c
+
+
+`The basic gist is that we first use the LLM to generate better, more precise keywords that the RAG’s embedding model will be able to use to create an embedding vector closer to relevant matches. The LLM is run again with the more relevant info that the RAG found to hopefully generate a more accurate response.`
+
+Evaluate swapping from Chroma to https://github.com/neuml/txtai
+Also eval swapping to vec-sql
+
+https://www.reddit.com/r/LocalLLaMA/comments/15oome9/our_workflow_for_a_custom_questionanswering_app/
+```
+Last year my team worked on a fine tuned open source model, trained on US military doctrine and pubs ([workflow](https://www.reddit.com/r/LocalLLaMA/comments/15oome9/our_workflow_for_a_custom_questionanswering_app/) and [follow-up](https://www.reddit.com/r/LocalLLaMA/comments/1686ul6/some_lessons_learned_from_building_a_fine_tuned/) posts). Bottom line is that the fine tuned 7b model worked really well, especially on conceptual questions (like how maneuver and mission command interact): better than GPT-3.5 and about even with GPT-4 based on human ratings from military members.
+
+Been itching to try fine tuning embeddings, and my team finally got a chance. We ran a series of experiments, but the big picture takeaway was that our first approach collapsed the embeddings space and made retrieval accuracy plummet, but a second approach using train+eval worked well and substantially improved retrieval.
+
+We started with our model training data: a context+question column and answer column. We took the context chunk (500 tokens from a military publication) and the question generated from it, reversed their order and used them as the training data for the embeddings fine-tuning. So basically "When you see "What are the principles of air defense in urban areas?" then retrieve <some chunk about urban defense that has some sentences on air defense principles>.
+
+We used Sentence Transformers and FSDP, because we had to shard the embedding model and data across multiple GPUs. To our distress however, each epoch of training made the model perform worse and worse, until at 5 epochs it was just random retrieval. Our intuition was that the model was overfitting and collapsing the embedding space until all documents were crammed next to each other. We used [WizMap](https://github.com/poloclub/wizmap/blob/main/LICENSE) to visualize embedded docs, and sure enough the base model showed clear clusters of docs, 2 epochs showed them kind of crammed closer, and at 5 epochs a giant blob with two camel humps.
+
+We then switched to DDP from FSDP, which allows you to use an evaluator parameter during fine tuning, so we could use the eval data during training, not just post-hoc, something like:
+
+    num_train_epochs=2,
+
+    per_device_train_batch_size=32,
+
+    per_device_eval_batch_size=32,
+
+    During training, would train on a batch from the “TRAIN” dataset, and then evaluate on a batch from the “EVAL” dataet
+
+    Use that train/eval comparison to inform the loss function
+
+    Train for 2 or 5 epochs
+
+    Post-training, ran our eval pipeline.
+
+Success! Using BGE Small w. 384 dimensions, we went from:
+
+    Base model top 20 accuracy of 54.4%.
+
+    2 epochs fine-tuned model: Top 20 retrieval accuracy 70.8%.
+
+    5 epochs fine-tuned model: Top 20 retrieval accuracy 73%.
+
+We then tried Stella-400M 1024 dimensions:
+
+    Base model top 20 accuracy of 62.9%.
+
+    2 epochs fine-tuned model (train batch-size 4, gradient accumulation
+
+    steps 20): Top 20 retrieval accuracy was 73.3%.
+
+    3 epochs fine-tuned model (train batch-size 3, gradient accumulation
+
+    steps 40): Top 20 retrieval accuracy was 72.4%
+
+    Increased batch size (train batch size 8, grad accumulation steps 25) with 2
+
+    epochs fine-tuning on 8 GPU clusters: Top 20 retrieval accuracy was 74.4%
+```
+
+```
+This is a really tricky area of the field right now, because the current performance metrics we look for in embedding models are based on a set of ad-hoc metrics and random datasets that just so happened to be in vogue when the LLM sub-field started dominating the conversation a few years ago.
+
+I’ve spent more hours the last two years than I can even describe on this, both personally and professionally, and here is how I currently think about this:
+
+    The three axes to consider are concept obscurity, term volume, and top N precision.
+
+    A model that performs well generally, aka on the MTEB leaderboard, is good at differentiating common concepts, when you have fewer terms to compare to one another, and when you’re comfortable with a “match” being in the top few results, not explicitly the first or second result.
+
+    A more specialized model is the exact inverse, better on a set of highly specific, more obscure concepts, when you have a lot of them all at once, and when you need the top 1 or 2 matches to be “correct”.
+
+Now, this gets even more fascinating, because there actually are real limits to how “good” a model can be on more common domains. And so, from my perspective, one simply considers the average term frequency of one’s domain relative to the dataset the model was trained on and can infer fitness from there.
+
+Thus, models now are getting “better” at some more specialized domains because the datasets are larger and more inclusive of those sub-distributions. However, this scaling in “quality” does, from my testing, fall apart when the other two constraints come in.
+
+So, long story short, use general models when you either have a “small” number of items to compare, OR are operating in a common domain, OR top N precision needs are loose. For most people, this is fine. For those of us in highly specialized domains where scale and precision are make or break factors, use a specialized model, up to and including creating your own.
+```
+- **101**
+    https://www.youtube.com/watch?v=viZrOnJclY0
+    https://aclanthology.org/W13-2322.pdf
+- **Leaderboards**
+    - https://huggingface.co/spaces/mteb/leaderboard
+
+
 
 
 ----------------------------------------------------------------------------------------------------------------
