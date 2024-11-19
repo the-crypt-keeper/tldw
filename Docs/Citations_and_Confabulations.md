@@ -54,7 +54,10 @@ Detecting Hallucinations using Semantic Entropy:
     https://github.com/jlko/semantic_uncertainty
     https://github.com/jlko/long_hallucinations
     https://arxiv.org/abs/2406.15927
-
+    https://www.amazon.science/publications/knowledge-centric-hallucination-detection
+    https://www.amazon.science/publications/hallumeasure-fine-grained-hallucination-measurement-using-chain-of-thought-reasoning
+    https://arxiv.org/abs/1910.12840
+    https://aclanthology.org/2020.emnlp-main.750/
 
 Evals:
 - https://github.com/yanhong-lbh/LLM-SelfReflection-Eval

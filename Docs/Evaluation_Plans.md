@@ -257,6 +257,8 @@ Finetuning
     - https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/summarization
     - https://www.confident-ai.com/blog/a-step-by-step-guide-to-evaluating-an-llm-text-summarization-task
     - https://arxiv.org/abs/2009.01325
+    - https://www.amazon.science/publications/salient-information-prompting-to-steer-content-in-prompt-based-abstractive-summarization
+    - 
     - https://arxiv.org/abs/2407.01370v1
     - https://arxiv.org/html/2403.19889v1
     - https://github.com/salesforce/summary-of-a-haystack
