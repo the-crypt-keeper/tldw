@@ -608,6 +608,7 @@ In order of attempts:
 - https://github.com/lifan0127/ai-research-assistant
 - Open Source:
   * https://github.com/lfnovo/open_notebook
+  * https://github.com/siyuan-note/siyuan
 - Commercial offerings:
   * Bit.ai 
   * typeset.io/
