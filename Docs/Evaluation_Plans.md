@@ -472,8 +472,8 @@ Below we are importing both traditional metrics and LLM as a judge metric from t
 - **Evaluation Benchmarks**
     - KITE
         - https://github.com/D-Star-AI/KITE
-
-
+    - https://arxiv.org/abs/2411.09213
+    
 
 Evaluating RAG Cohere
     https://docs.cohere.com/page/rag-evaluation-deep-dive#generation-evaluation
@@ -498,7 +498,7 @@ Evaluating RAG Cohere
 - Papers
   - https://arxiv.org/abs/2309.01431
   - https://arxiv.org/abs/2411.03538
-
+https://arxiv.org/abs/2411.11767
 
 
 
@@ -669,6 +669,7 @@ So, long story short, use general models when you either have a “small” numb
 https://arxiv.org/abs/2411.04075
 https://arxiv.org/abs/2411.02571
 https://github.com/TRI-ML/vlm-evaluation
+https://github.com/illuin-tech/vidore-benchmark
 - xkcd bench: https://github.com/arnokha/explain-xkcd-with-llms
 
 - Document Understanding
