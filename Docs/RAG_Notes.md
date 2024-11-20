@@ -1,6 +1,15 @@
 # RAG Notes
 
 
+Unsorted
+	https://github.com/plageon/HtmlRAG
+		https://arxiv.org/abs/2411.02959v1
+	https://github.com/run-llama/llama_parse/blob/main/examples/multimodal/multimodal_report_generation.ipynb
+	https://www.youtube.com/watch?v=aqtX-sGbevw
+	
+
+
+
 ### Links
 - RAG 101
   * https://www.youtube.com/watch?v=nc0BupOkrhI
