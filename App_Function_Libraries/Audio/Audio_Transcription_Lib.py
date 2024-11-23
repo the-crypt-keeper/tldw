@@ -16,6 +16,7 @@
 import gc
 import json
 import logging
+from memory_profiler import profile
 import multiprocessing
 import os
 import queue
@@ -42,6 +43,30 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 #   ffmpeg -i "example.mp4" -ar 16000 -ac 1 -c:a pcm_s16le "output.wav"
 #       https://www.gyan.dev/ffmpeg/builds/
 #
+
+# FIXME
+# 1. Implement chunking for large audio files
+# def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, chunk_size=30):
+#     # ... existing code ...
+#     segments = []
+#     for segment_chunk in whisper_model_instance.transcribe(audio_file_path, beam_size=10, best_of=10, vad_filter=vad_filter, chunk_size=chunk_size):
+#         # Process each chunk
+#         # ... existing code ...
+#
+# 2. Use generators
+#     def generate_segments(segments_raw):
+#         for segment_chunk in segments_raw:
+#             yield {
+#                 "Time_Start": segment_chunk.start,
+#                 "Time_End": segment_chunk.end,
+#                 "Text": segment_chunk.text
+#             }
+#     # Usage
+#     segments = list(generate_segments(segments_raw))
+#
+# 3. Use subprocess instead of os.system for ffmpeg
+# 4. Adjust CPU threads properly
+# 5. Use quantized models - compute_type="int8"
 
 
 whisper_model_instance = None
@@ -108,16 +133,26 @@ class WhisperModel(OriginalWhisperModel):
 #            **model_kwargs
         )
 
-def get_whisper_model(model_name, device):
+# Implement FIXME
+def unload_whisper_model():
+    global whisper_model_instance
+    if whisper_model_instance is not None:
+        del whisper_model_instance
+        whisper_model_instance = None
+        gc.collect()
+
+
+def get_whisper_model(model_name, device, ):
     global whisper_model_instance
     if whisper_model_instance is None:
         logging.info(f"Initializing new WhisperModel with size {model_name} on device {device}")
+        # FIXME - add compute_type="int8"
         whisper_model_instance = WhisperModel(model_name, device=device)
     return whisper_model_instance
 
 # os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
 #DEBUG
-#@profile
+@profile
 def convert_to_wav(video_file_path, offset=0, overwrite=False):
     log_counter("convert_to_wav_attempt", labels={"file_path": video_file_path})
     start_time = time.time()
@@ -186,7 +221,7 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 
 # Transcribe .wav into .segments.json
 #DEBUG
-#@profile
+@profile
 # FIXME - I feel like the `vad_filter` shoudl be enabled by default....
 def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, diarize=False):
     log_counter("speech_to_text_attempt", labels={"file_path": audio_file_path, "model": whisper_model})
@@ -204,7 +239,6 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         if os.path.exists(out_file):
             logging.info("speech-to-text: Segments file already exists: %s", out_file)
             with open(out_file) as f:
-                global segments
                 segments = json.load(f)
             return segments
 
@@ -251,13 +285,16 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         if save_json:
             logging.info("speech-to-text: Saving segments to JSON file")
             output_data = {'segments': segments}
-            logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
-            with open(prettified_out_file, 'w') as f:
-                json.dump(output_data, f, indent=2)
-
             logging.info("speech-to-text: Saving JSON to %s", out_file)
             with open(out_file, 'w') as f:
                 json.dump(output_data, f)
+            del output_data
+            gc.collect()
+            with open(prettified_out_file, 'w') as f:
+                logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
+                json.dump({'segments': segments}, f, indent=2)
+
+
 
         logging.debug(f"speech-to-text: returning {segments[:500]}")
         gc.collect()

@@ -39,8 +39,13 @@ def create_audio_processing_tab():
         with gr.Row():
             with gr.Column():
                 audio_url_input = gr.Textbox(label="Audio File URL(s)", placeholder="Enter the URL(s) of the audio file(s), one per line")
-                audio_file_input = gr.File(label="Upload Audio File", file_types=["audio/*"])
-                custom_title_input = gr.Textbox(label="Custom Title/Name", placeholder="Enter a custom title or name for the audio file")
+                # Updated to support multiple files
+                audio_file_input = gr.Files(
+                    label="Upload Audio Files (Supported formats: MP3, WAV, M4A, FLAC, AAC, OGG)",
+                    #file_types=[".mp3", ".ogg", ".aac", ".flac", ".wav", ".m4a", ".flac", ".wma", ".aiff", ".alac"],
+                    file_count="multiple"
+                )
+                custom_title_input = gr.Textbox(label="Custom Title Prefix", placeholder="Enter a prefix for the audio files (individual files will be numbered)")
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
                 cookies_input = gr.Textbox(
                     label="Audio Download Cookies",
@@ -207,7 +212,7 @@ def create_audio_processing_tab():
                 )
                 api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here", type="password")
                 custom_keywords_input = gr.Textbox(label="Custom Keywords", placeholder="Enter custom keywords, comma-separated")
-                keep_original_input = gr.Checkbox(label="Keep original audio file", value=False)
+                keep_original_input = gr.Checkbox(label="Keep original audio files", value=False)
 
                 chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
                 with gr.Row(visible=False) as chunking_options_box:
@@ -229,9 +234,9 @@ def create_audio_processing_tab():
                 process_audio_button = gr.Button("Process Audio File(s)")
 
             with gr.Column():
-                audio_progress_output = gr.Textbox(label="Progress")
-                audio_transcription_output = gr.Textbox(label="Transcription")
-                audio_summary_output = gr.Textbox(label="Summary")
+                audio_progress_output = gr.Textbox(label="Progress", lines=10)
+                audio_transcription_output = gr.Textbox(label="Transcriptions", lines=10)
+                audio_summary_output = gr.Textbox(label="Summaries", lines=10)
                 download_transcription = gr.File(label="Download All Transcriptions as JSON")
                 download_summary = gr.File(label="Download All Summaries as Text")
 
@@ -244,8 +249,8 @@ def create_audio_processing_tab():
             outputs=[audio_progress_output, audio_transcription_output, audio_summary_output]
         )
 
-        def on_file_clear(file):
-            if file is None:
+        def on_file_clear(files):
+            if not files:
                 cleanup_temp_files()
 
         audio_file_input.clear(
