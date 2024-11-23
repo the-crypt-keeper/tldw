@@ -20,15 +20,21 @@ Chat arena
     https://github.com/lm-sys/FastChat
 LLM-as-judge
     https://huggingface.co/learn/cookbook/en/llm_judge
-  https://hamel.dev/blog/posts/llm-judge
+    https://github.com/open-compass/CompassJudger
+    https://hamel.dev/blog/posts/llm-judge
+    https://huggingface.co/spaces/AtlaAI/judge-arena
 Quant Eval
 https://arxiv.org/abs/2411.02355
 
 
 Creating Datasets
     https://github.com/Kiln-AI/Kiln
-https://github.com/argilla-io/argilla
-    
+    https://github.com/argilla-io/argilla
+        https://www.youtube.com/watch?v=ZsCqrAhzkFU
+        https://www.youtube.com/watch?v=jWrtgf2w4VU
+        https://www.youtube.com/watch?v=ZsCqrAhzkFU
+
+
 Finetuning
     https://huggingface.co/learn/cookbook/enterprise_cookbook_argilla
     https://aclanthology.org/2024.cl-3.1/
@@ -346,6 +352,9 @@ Retrieval Granularity
 https://blog.streamlit.io/ai21_grounded_multi_doc_q-a/
 https://archive.is/OtPVh
 https://towardsdatascience.com/how-to-create-a-rag-evaluation-dataset-from-documents-140daa3cbe71
+https://github.com/jonathan-roberts1/needle-threading/
+https://huggingface.co/datasets/jonathan-roberts1/needle-threading
+https://arxiv.org/abs/2411.03538
 - **101**
 - **RAG Eval Plan:**
     - The generic idea however: you take a (full, unchunked) document and ask an LLM to generate a question with that document as well as give the factual answer to it. Enforce via prompts to make it use the document only and make it as hard as you want (eg. maybe sometimes you want it to consider 2 documents and make a question that uses bits of both). This gives you a ground truth dataset.
@@ -669,6 +678,8 @@ So, long story short, use general models when you either have a “small” numb
 https://arxiv.org/abs/2411.04075
 https://arxiv.org/abs/2411.02571
 https://github.com/TRI-ML/vlm-evaluation
+https://arxiv.org/abs/2411.13211
+https://videoautoarena.github.io/
 https://github.com/illuin-tech/vidore-benchmark
 - xkcd bench: https://github.com/arnokha/explain-xkcd-with-llms
 
