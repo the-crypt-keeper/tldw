@@ -40,9 +40,9 @@ def create_audio_processing_tab():
             with gr.Column():
                 audio_url_input = gr.Textbox(label="Audio File URL(s)", placeholder="Enter the URL(s) of the audio file(s), one per line")
                 # Updated to support multiple files
-                audio_file_input = gr.Files(
-                    label="Upload Audio Files (Supported formats: MP3, WAV, M4A, FLAC, AAC, OGG)",
-                    #file_types=[".mp3", ".ogg", ".aac", ".flac", ".wav", ".m4a", ".flac", ".wma", ".aiff", ".alac"],
+                audio_file_input = gr.File(
+                    label="Upload Audio Files (Supported formats: MP3, WAV, M4A, FLAC, AAC, ALAC, OGG, OPUS)",
+                    file_types=["audio", ".mp3", ".wav", ".m4a", ".flac", ".aac", ".alac", ".ogg", ".opus"],
                     file_count="multiple"
                 )
                 custom_title_input = gr.Textbox(label="Custom Title Prefix", placeholder="Enter a prefix for the audio files (individual files will be numbered)")
