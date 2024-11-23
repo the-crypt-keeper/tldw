@@ -20,9 +20,20 @@ Chat arena
     https://github.com/lm-sys/FastChat
 LLM-as-judge
     https://huggingface.co/learn/cookbook/en/llm_judge
-  https://hamel.dev/blog/posts/llm-judge
+    https://github.com/open-compass/CompassJudger
+    https://hamel.dev/blog/posts/llm-judge
+    https://huggingface.co/spaces/AtlaAI/judge-arena
 Quant Eval
 https://arxiv.org/abs/2411.02355
+
+
+Creating Datasets
+    https://github.com/Kiln-AI/Kiln
+    https://github.com/argilla-io/argilla
+        https://www.youtube.com/watch?v=ZsCqrAhzkFU
+        https://www.youtube.com/watch?v=jWrtgf2w4VU
+        https://www.youtube.com/watch?v=ZsCqrAhzkFU
+
 
 Finetuning
     https://huggingface.co/learn/cookbook/enterprise_cookbook_argilla
@@ -109,6 +120,7 @@ Finetuning
 
 - **Frameworks**
     - OpenCompass
+        - https://github.com/open-compass/opencompass
     - DeepEval
     - lm-eval-harness
         - https://github.com/EleutherAI/lm-evaluation-harness
@@ -251,6 +263,8 @@ Finetuning
     - https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/summarization
     - https://www.confident-ai.com/blog/a-step-by-step-guide-to-evaluating-an-llm-text-summarization-task
     - https://arxiv.org/abs/2009.01325
+    - https://www.amazon.science/publications/salient-information-prompting-to-steer-content-in-prompt-based-abstractive-summarization
+    - 
     - https://arxiv.org/abs/2407.01370v1
     - https://arxiv.org/html/2403.19889v1
     - https://github.com/salesforce/summary-of-a-haystack
@@ -338,6 +352,9 @@ Retrieval Granularity
 https://blog.streamlit.io/ai21_grounded_multi_doc_q-a/
 https://archive.is/OtPVh
 https://towardsdatascience.com/how-to-create-a-rag-evaluation-dataset-from-documents-140daa3cbe71
+https://github.com/jonathan-roberts1/needle-threading/
+https://huggingface.co/datasets/jonathan-roberts1/needle-threading
+https://arxiv.org/abs/2411.03538
 - **101**
 - **RAG Eval Plan:**
     - The generic idea however: you take a (full, unchunked) document and ask an LLM to generate a question with that document as well as give the factual answer to it. Enforce via prompts to make it use the document only and make it as hard as you want (eg. maybe sometimes you want it to consider 2 documents and make a question that uses bits of both). This gives you a ground truth dataset.
@@ -359,6 +376,38 @@ https://towardsdatascience.com/how-to-create-a-rag-evaluation-dataset-from-docum
                 * `Precision@k is a variation of precision that measures the proportion of relevant documents amongst the top ‘k’ retrieved results. It is particularly important because it focusses on the top results rather than all the retrieved documents. For RAG it is important because only the top results are most likely to be used for augmentation. For example, if our RAG system considers top 5 documents for augmentation, then Precision@5 becomes important.`
             - Recall
                 - `measures the proportion of the relevant documents retrieved from all the relevant documents in the corpus. It answers the question, “Of all the relevant documents, how many were actually retrieved?”`
+            - F1-Score
+              - `F1-score is the harmonic mean of precision and recall. It provides a single metric that balances both the quality and coverage of the retriever.`
+              - `F1-score = 2 x (Precision x Recall) / (Precision + Recall)`
+              - `The equation is such that F1-score penalizes either variable having a low score; a High F1 score is only possible when both recall and precision values are high. This means that the score cannot be positively skewed by a single variable`
+              - `F1-score provides and single, balanced measure that can be used to easily compare different systems. However, it does not take ranking into account and gives equal weightage to precision and recall which might not always be ideal.`
+            - 
+            - 
+            - Ranking Metrics(lol copilot)
+                - MRR Mean Reciprocal Rank
+                    - `It measures the reciprocal of the ranks of the first relevant document in the list of results. MRR is calculated over a set of queries.`
+                    - `MRR = 1/N x [Summation i=1 to N (1/rank(i))]`
+                      - `where N is the total number of queries and rank(i) is the rank of the first relevant document of the i-th query`
+                - MAP Mean Average Precision
+                    - `Mean Average Precision or MAP is a metric that combines precision and recall at different cut-off levels of ‘k’ i.e. the cut-off number for the top results. It calculates a measure called Average Precision and then averages it across all queries.`
+                    - `Average Precision for a single query (i) = 1/R(i) x [Summation k=1 to n (Precision@k x relevance of k-th document)]`
+                        - where R(i) is the number of relevant documents for query(i)
+                        - Precision@k is the precision at cut-off ‘k’
+                        - rel@k is a binary flag indicating the relevance of the document at rank ‘k’
+                    - Mean Average Precision is the mean of the average precision (shown above) over all the ’N’ queries
+                    - `MAP = 1/N x [Summation i=1 to N (Average Precision (i)]`
+                - 7. Normalized Discounted Cumulative Gain (nDCG)
+                    - `nDCG evaluates the ranking quality by considering the position of relevant documents in the result list and assigning higher scores to relevant documents appearing earlier.`
+                    - `It is particularly effective for scenarios where documents have varying degrees of relevance.`
+                    - `To calculate discounted cumulative gain (DCG), each document in the retrieved list is assigned a relevance score, rel and a discount factor reduces the weight of documents as their rank position increases.`
+                    - `DCG =[Summation i=1 to n ((2 ^ rel(i) — 1)/log(i+1))`
+                      - Here rel(i) is the graded relevance of document at position i. IDCG is the ideal DCG which is the DCG for perfect ranking. nDCG is calculated as the ratio between actual discounted cumulative gain (DCG) and the ideal discounted cumulative gain (IDCG)
+                    - `nDCG = DCG/IDCG`
+                      - `nDCG is quite a complex metric to calculate. It requires documents to have a relevance score which may lead to subjectivity and the choice of the discount factor affects the values significantly, but it accounts for varying degrees of relevance in documents and gives more weightage to higher ranked items.`
+                - MAP
+                    - `Mean Average Precision (MAP) is a ranking metric that computes the mean precision across all relevant documents retrieved. It considers the rank of each relevant document in the ranked list.`
+                    - `MAP = Σ(Precision_i * Rel_i) / N`
+                    - `where Precision_i is the precision at the i-th relevant document, Rel_i is the relevance of the i-th document, and N is the total number of relevant documents.`
         2. Generation-Specific Metric
         3. RAG-specific Metric
     1. Answer Consistency
@@ -432,8 +481,8 @@ Below we are importing both traditional metrics and LLM as a judge metric from t
 - **Evaluation Benchmarks**
     - KITE
         - https://github.com/D-Star-AI/KITE
-
-
+    - https://arxiv.org/abs/2411.09213
+    
 
 Evaluating RAG Cohere
     https://docs.cohere.com/page/rag-evaluation-deep-dive#generation-evaluation
@@ -458,7 +507,7 @@ Evaluating RAG Cohere
 - Papers
   - https://arxiv.org/abs/2309.01431
   - https://arxiv.org/abs/2411.03538
-
+https://arxiv.org/abs/2411.11767
 
 
 
@@ -629,6 +678,9 @@ So, long story short, use general models when you either have a “small” numb
 https://arxiv.org/abs/2411.04075
 https://arxiv.org/abs/2411.02571
 https://github.com/TRI-ML/vlm-evaluation
+https://arxiv.org/abs/2411.13211
+https://videoautoarena.github.io/
+https://github.com/illuin-tech/vidore-benchmark
 - xkcd bench: https://github.com/arnokha/explain-xkcd-with-llms
 
 - Document Understanding
