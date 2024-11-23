@@ -64,6 +64,8 @@ Evals:
   - https://eugeneyan.com/writing/evals/
   https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/hallucination
 
+Explainability
+  https://towardsdatascience.com/explaining-llms-for-rag-and-summarization-067e486020b4
 
 Research
   https://github.com/EdinburghNLP/awesome-hallucination-detection
@@ -113,6 +115,8 @@ Lynx/patronus
 - https://github.com/NVIDIA/NeMo-Guardrails/blob/develop/docs/user_guides/community/patronus-lynx.md
 - https://huggingface.co/PatronusAI/Llama-3-Patronus-Lynx-8B-Instruct-Q4_K_M-GGUF
 - https://arxiv.org/abs/2407.08488
+
+
 
 
 ----------------------------------------------------------------------------------------------------------------
