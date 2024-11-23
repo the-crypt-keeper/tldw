@@ -19,10 +19,10 @@ Benchmarking with distilabel
 Chat arena
     https://github.com/lm-sys/FastChat
 LLM-as-judge
+    https://huggingface.co/spaces/AtlaAI/judge-arena
     https://huggingface.co/learn/cookbook/en/llm_judge
     https://github.com/open-compass/CompassJudger
     https://hamel.dev/blog/posts/llm-judge
-    https://huggingface.co/spaces/AtlaAI/judge-arena
 Quant Eval
 https://arxiv.org/abs/2411.02355
 
@@ -33,7 +33,7 @@ Creating Datasets
         https://www.youtube.com/watch?v=ZsCqrAhzkFU
         https://www.youtube.com/watch?v=jWrtgf2w4VU
         https://www.youtube.com/watch?v=ZsCqrAhzkFU
-
+        https://github.com/argilla-io/argilla-cookbook/blob/main/domain-eval/README.md
 
 Finetuning
     https://huggingface.co/learn/cookbook/enterprise_cookbook_argilla
@@ -173,6 +173,7 @@ Finetuning
     - HelloBench
         - https://github.com/Quehry/HelloBench
         - https://arxiv.org/abs/2409.16191
+    - https://github.com/jonathan-roberts1/needle-threading/
 - **Creative Writing**
     - EQ Bench
         - https://eqbench.com/creative_writing.html
@@ -185,6 +186,8 @@ Finetuning
     - https://huggingface.co/spaces/HuggingFaceFW/blogpost-fine-tasks
 - **Deceptiveness/Gullibility**
     - https://github.com/lechmazur/deception
+- **Game Playing**
+    - https://github.com/balrog-ai/BALROG
 - **Math Eval**
     - https://arxiv.org/abs/2411.04872
     - GSM8K
@@ -316,6 +319,8 @@ Finetuning
     - TruthfulQA
         - https://arxiv.org/abs/2109.07958v2
         - https://github.com/sylinrl/TruthfulQA
+    - Other
+        - https://arxiv.org/abs/2410.01524
 - **Vibes**
     - AidanBench
         - https://github.com/aidanmclaughlin/AidanBench

@@ -560,28 +560,21 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 <summary>Potential Issues - Click-Here</summary>
 
 ### Potential Issues
-```
-#   1. Something about cuda nn library missing, even though cuda is installed...
-#       https://github.com/tensorflow/tensorflow/issues/54784 - Basically, installing zlib made it go away. idk.
-#       Or https://github.com/SYSTRAN/faster-whisper/issues/85
-```
-From the thread, 
-for ubuntu: 
-
-    For me installing the cuDNN 8 libraries using sudo apt install libcudnn8 on Ubuntu 22.04 fixed the issue!
-
-Alternatively include the in your PATH the path to torch:
-```
-export LD_LIBRARY_PATH=`python3 -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; import torch; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__) + ":" + os.path.dirname(torch.__file__) +"/lib")'`
-```
-
-For Windows:
-In order of attempts:
-1. https://github.com/SYSTRAN/faster-whisper/issues/85
-2. Install specific cuda version: `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 --force-reinstall --no-cache`
-3. Download/copy the already installed DLLs: https://forums.developer.nvidia.com/t/could-not-load-library-cudnn-cnn-infer64-8-dll-error-code-193/218437/16
-4. Just install outside of a venv. That is what I had to do on my windows machine. (I actually ended up 'fixing' this by copying the two dlls to the tldw folder, and it worked fine after that. https://github.com/Purfview/whisper-standalone-win/releases/tag/Faster-Whisper-XXL)
-
+1. Something about cuda nn library missing, even though cuda is installed...
+    * https://github.com/tensorflow/tensorflow/issues/54784 - Basically, installing zlib made it go away. idk.
+    - Linux:
+        - https://github.com/SYSTRAN/faster-whisper/issues/85
+        * "For me installing the cuDNN 8 libraries using sudo apt install libcudnn8 on Ubuntu 22.04 fixed the issue!" (on Ubuntu)
+            * export LD_LIBRARY_PATH=`python3 -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; import torch; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__) + ":" + os.path.dirname(torch.__file__) +"/lib")'`
+        * Or: `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/user/venv/lib/python3.X/site-packages/nvidia/cudnn/lib/`
+    - Windows:
+        - In order of attempts:
+            1. https://github.com/SYSTRAN/faster-whisper/issues/85
+            2. Install specific cuda version: `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 --force-reinstall --no-cache`
+            3. Download/copy the already installed DLLs: https://forums.developer.nvidia.com/t/could-not-load-library-cudnn-cnn-infer64-8-dll-error-code-193/218437/16
+            4. Just install outside of a venv. That is what I had to do on my windows machine. (I actually ended up 'fixing' this by copying the two dlls to the tldw folder, and it worked fine after that. https://github.com/Purfview/whisper-standalone-win/releases/tag/Faster-Whisper-XXL)
+2. `ModuleNotFoundError: No module named 'X'` - I forgot to update the requirements.txt or pushed debug code.
+    - `pip install "module_name_here"`
 </details>
 
 
@@ -609,6 +602,8 @@ In order of attempts:
 - Open Source:
   * https://github.com/lfnovo/open_notebook
   * https://github.com/siyuan-note/siyuan
+  * https://github.com/US-Artificial-Intelligence/abbey/tree/main
+  * https://github.com/lfnovo/open-notebook
 - Commercial offerings:
   * Bit.ai 
   * typeset.io/
