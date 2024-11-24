@@ -49,6 +49,78 @@ LLMs.txt
 Logits
     https://github.com/NVIDIA/logits-processor-zoo
 
+PDF Parsing
+    https://github.com/pdf2htmlEX/pdf2htmlEX
+    https://camelot-py.readthedocs.io/en/master/
+    https://github.com/kermitt2/grobid
+    https://arxiv.org/html/2410.09871v1#S6
+    https://github.com/Filimoa/open-parse/
+    https://github.com/nlmatics/nlm-ingestor
+    https://github.com/conjuncts/gmft
+    https://github.com/xavctn/img2table
+    Benchmarks
+        https://github.com/py-pdf/benchmarks
+    Pipeline
+        https://ai.gopubby.com/demystifying-pdf-parsing-02-pipeline-based-method-82619dbcbddf
+        https://ai.gopubby.com/demystifying-pdf-parsing-04-ocr-free-large-multimodal-model-based-method-0fdab50db048
+        https://pub.towardsai.net/demystifying-pdf-parsing-05-unifying-separate-tasks-into-a-small-model-d3739db021f7
+        https://ai.gopubby.com/demystifying-pdf-parsing-06-representative-industry-solutions-5d4a1cfe311b
 
+ETL
+    https://arxiv.org/abs/2410.12189
+    https://ucbepic.github.io/docetl/concepts/optimization/
+
+
+
+Manga
+https://github.com/ragavsachdeva/magi
+Emails:
+https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/email.py
+ODT:
+https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/odt.py
+Docx:
+https://github.com/ankushshah89/python-docx2txt
+https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/word_document.py
+Obsidian:
+https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/obsidian.py
+Evernote:
+https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/evernote.py
+Excel:
+https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/excel.py
+Notion:
+https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/notion.py
+CSV
+https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/csv_loader.py#L185
+CHM:
+https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/chm.py
+
+
+Flashcard prompt
+Fantastic-End9783@reddit
+```
+I want you to create comprehensive and easy to consume Anki flashcards. They must thoroughly cover REPLACEWITHLECTURE
+Do not do this until you I ask you after you  output the following request .
+Thoroughly go through the provided sources and divide them into parts. This is so you can compressively cover the lecture and not skip information. The parts do not have to have the exact same split of questions made for them.
+Please list the overall topic of the part and then their sub-topics.
+Here is an example:
+Part 1: (Insert title here)
+- (Topic 1)
+- (Topic 2)
+```
+```
+Create comprehensive and easy to consume Anki flashcards for Part 1 of REPLACEWITHLECTURE. If there is embedded questions or topics per question, split them up into their own individual questions. Start each question on a new line. 
+Use the following as a scaffold for the expected output:
+What noise does a cow make? ; Moo
+What is the capital of Australia? ; Canberra
+```
+
+
+#1: `Do not start writing yet, First explain everything I wanted you to do in this Prompt in Detail?`
+#2: `I need this written in human tone. Humans have fun when they write — robots don’t. Chat GPT, engagement is the highest priority. Be conversational, empathetic, and occasionally humorous. Use idioms, metaphors, anecdotes, and natural dialogue.`
+#3: `Before you answer, I want you to ask me all the missing information that I didn’t provide but it will help you better understand my needs and the specific output I want.`
+#4: `Criticize yourself/your answer.`
+#5: `Why did you write what you wrote? Give me all the reasons, Plus I want a full detailed analysis and breakdown of everything in a tabular format. Also add How could this be made better. Use my prompt as reference to further clarify the ‘Why’.`
+#6: `Before you answer this, Highlight 20 potential risks or blind spots I might not have considered based on my request.`
+#7: `Identify areas in this article where examples, analogies, or case studies would improve understanding.`
 
 
