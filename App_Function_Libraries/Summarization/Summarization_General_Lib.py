@@ -1430,7 +1430,7 @@ def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, sys
         if streaming:
             logging.debug("Google: Posting streaming request")
             response = requests.post(
-                'https://api.google.com/v1/chat/completions',
+                'https://generativelanguage.googleapis.com/v1beta/openai/',
                 headers=headers,
                 json=data,
                 stream=True
@@ -1460,7 +1460,7 @@ def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, sys
             return stream_generator()
         else:
             logging.debug("Google: Posting request")
-            response = requests.post('https://generativelanguage.googleapis.com/v1beta/', headers=headers, json=data)
+            response = requests.post('https://generativelanguage.googleapis.com/v1beta/openai/', headers=headers, json=data)
 
             if response.status_code == 200:
                 response_data = response.json()
