@@ -348,7 +348,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
 
         data = {
             "model": model,
-            "max_tokens": 4096,  # max _possible_ tokens to return
+            "max_tokens": 4096,  # max possible tokens to return
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
             "temperature": temp,
@@ -406,11 +406,17 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
                         logging.debug("Anthropic: Post submittal successful")
                         response_data = response.json()
                         try:
-                            summary = response_data['messages'][0]['content'].strip()
+                            # Extract the assistant's reply from the 'content' field
+                            content_blocks = response_data.get('content', [])
+                            summary = ''
+                            for block in content_blocks:
+                                if block.get('type') == 'text':
+                                    summary += block.get('text', '')
+                            summary = summary.strip()
                             logging.debug("Anthropic: Summarization successful")
                             logging.debug(f"Anthropic: Summary (first 500 chars): {summary[:500]}...")
                             return summary
-                        except (IndexError, KeyError) as e:
+                        except Exception as e:
                             logging.debug("Anthropic: Unexpected data in response")
                             logging.error(f"Unexpected response format from Anthropic API: {response.text}")
                             return None
