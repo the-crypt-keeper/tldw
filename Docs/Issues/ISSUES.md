@@ -69,30 +69,41 @@ PDF Parsing
 ETL
     https://arxiv.org/abs/2410.12189
     https://ucbepic.github.io/docetl/concepts/optimization/
+    https://arxiv.org/abs/2410.21169
+
+UX
+    https://arxiv.org/abs/2410.22370
+    https://archive.is/h8w61
+	https://uxdesign.cc/how-the-right-ux-metrics-show-game-changing-value-9d95c46b0479?sk=2b9d400046e4484f858a409cc56b355a&utm_source=substack&utm_medium=email
+	https://uxdesign.cc/embracing-playing-as-the-core-of-design-92215f031bed?utm_source=substack&utm_medium=email
 
 
-
+Import HTML Files
+    
 Manga
 https://github.com/ragavsachdeva/magi
 Emails:
 https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/email.py
-ODT:
-https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/odt.py
-Docx:
-https://github.com/ankushshah89/python-docx2txt
-https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/word_document.py
-Obsidian:
-https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/obsidian.py
+ODT, Docx, csv
+    pypandoc
 Evernote:
-https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/evernote.py
+    https://help.evernote.com/hc/en-us/articles/209005557-Export-notes-and-notebooks-as-ENEX-or-HTML
 Excel:
-https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/excel.py
-Notion:
-https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/notion.py
+    https://ajac-zero.com/posts/how-to-create-accurate-fast-rag-with-excel-files/
+    https://github.com/ajac-zero/excel-rag-example
+    https://github.com/sivadhulipala1999/SheetSimplify_with_RAG
 CSV
-https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/csv_loader.py#L185
+    CSV -> HTML https://blog.finxter.com/5-best-ways-to-convert-csv-to-html-in-python/
+    https://github.com/jazzband/tablib
 CHM:
-https://github.com/langchain-ai/langchain/blob/master/libs/community/langchain_community/document_loaders/chm.py
+    https://github.com/dottedmag/archmage
+
+
+
+URL Shortener
+    https://realpython.com/fastapi-python-web-apis/
+    https://realpython.com/build-a-python-url-shortener-with-fastapi/
+
 
 
 Flashcard prompt
@@ -122,5 +133,16 @@ What is the capital of Australia? ; Canberra
 #5: `Why did you write what you wrote? Give me all the reasons, Plus I want a full detailed analysis and breakdown of everything in a tabular format. Also add How could this be made better. Use my prompt as reference to further clarify the ‘Why’.`
 #6: `Before you answer this, Highlight 20 potential risks or blind spots I might not have considered based on my request.`
 #7: `Identify areas in this article where examples, analogies, or case studies would improve understanding.`
+
+
+Jailbreaks
+    https://arxiv.org/abs/2311.16119
+    https://www.lakera.ai/blog/visual-prompt-injections
+    https://github.com/0xk1h0/ChatGPT_DAN
+    https://arxiv.org/pdf/2409.17458
+    https://github.com/verazuo/jailbreak_llms
+    https://arxiv.org/pdf/2308.03825
+    https://arxiv.org/pdf/2409.00137
+    https://arxiv.org/pdf/2409.11445
 
 

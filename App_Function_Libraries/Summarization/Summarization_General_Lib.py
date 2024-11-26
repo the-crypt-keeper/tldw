@@ -52,44 +52,47 @@ def summarize(
     api_name: str,
     api_key: Optional[str],
     temp: Optional[float],
-    system_message: Optional[str]
+    system_message: Optional[str],
+    streaming: Optional[bool] = False
 ) -> str:
     try:
         logging.debug(f"api_name type: {type(api_name)}, value: {api_name}")
         if api_name.lower() == "openai":
-            return summarize_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "anthropic":
-            return summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "cohere":
-            return summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "groq":
-            return summarize_with_groq(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_groq(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "huggingface":
-            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp)
+            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp, streaming)
         elif api_name.lower() == "openrouter":
-            return summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "deepseek":
-            return summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "mistral":
-            return summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "llama.cpp":
-            return summarize_with_llama(input_data, custom_prompt_arg, api_key, temp, system_message)
+            return summarize_with_llama(input_data, custom_prompt_arg, api_key, temp, system_message, streaming)
         elif api_name.lower() == "kobold":
-            return summarize_with_kobold(input_data, api_key, custom_prompt_arg, temp, system_message)
+            return summarize_with_kobold(input_data, api_key, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "ooba":
-            return summarize_with_oobabooga(input_data, api_key, custom_prompt_arg, temp, system_message)
+            return summarize_with_oobabooga(input_data, api_key, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "tabbyapi":
-            return summarize_with_tabbyapi(input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_tabbyapi(input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "vllm":
-            return summarize_with_vllm(input_data, custom_prompt_arg, None, system_message)
+            return summarize_with_vllm(input_data, custom_prompt_arg, None, system_message, streaming)
         elif api_name.lower() == "local-llm":
-            return summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "huggingface":
-            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp, )#system_message)
+            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp, streaming)#system_message)
         elif api_name.lower() == "custom-openai":
-            return summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
+        elif api_name.lower() == "custom-openai_2":
+            return summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "ollama":
-            return summarize_with_ollama(input_data, custom_prompt_arg, None, api_key, temp, system_message)
+            return summarize_with_ollama(input_data, custom_prompt_arg, None, api_key, temp, system_message, streaming)
         else:
             return f"Error: Invalid API Name {api_name}"
 
@@ -118,7 +121,7 @@ def extract_text_from_segments(segments):
     return text.strip()
 
 
-def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -234,7 +237,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, max_retries=3, retry_delay=5):
+def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, max_retries=3, retry_delay=5):
     logging.debug("Anthropic: Summarization process starting...")
     try:
         logging.debug("Anthropic: Loading and validating configurations")
@@ -328,6 +331,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
             "system": system_message
         }
 
+        # FIXME - add streaming logic
         for attempt in range(max_retries):
             try:
                 logging.debug("anthropic: Posting request to API")
@@ -374,7 +378,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
 
 
 # Summarize with Cohere
-def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,):
     logging.debug("Cohere: Summarization process starting...")
     try:
         logging.debug("Cohere: Loading and validating configurations")
@@ -461,10 +465,14 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
             "temperature": temp
         }
 
-        logging.debug("cohere: Submitting request to API endpoint")
-        response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+        if streaming:
+            # FIXME - Implement streaming logic
+            pass
+        else:
+            logging.debug("cohere: Submitting request to API endpoint")
+            response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
+            response_data = response.json()
+            logging.debug("API Response Data: %s", response_data)
 
         if response.status_code == 200:
             if 'text' in response_data:
@@ -486,7 +494,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,):
     logging.debug("Groq: Summarization process starting...")
     try:
         logging.debug("Groq: Loading and validating configurations")
@@ -577,30 +585,34 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, syste
 
         logging.debug("groq: Submitting request to API endpoint")
         print("groq: Submitting request to API endpoint")
-        response = requests.post('https://api.groq.com/openai/v1/chat/completions', headers=headers, json=data)
-
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
-
-        if response.status_code == 200:
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("groq: Summarization successful")
-                print("Summarization successful.")
-                return summary
-            else:
-                logging.error("Expected data not found in API response.")
-                return "Expected data not found in API response."
+        if streaming:
+            # FIXME - Implement streaming logic
+            pass
         else:
-            logging.error(f"groq: API request failed with status code {response.status_code}: {response.text}")
-            return f"groq: API request failed: {response.text}"
+            response = requests.post('https://api.groq.com/openai/v1/chat/completions', headers=headers, json=data)
+
+            response_data = response.json()
+            logging.debug("API Response Data: %s", response_data)
+
+            if response.status_code == 200:
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("groq: Summarization successful")
+                    print("Summarization successful.")
+                    return summary
+                else:
+                    logging.error("Expected data not found in API response.")
+                    return "Expected data not found in API response."
+            else:
+                logging.error(f"groq: API request failed with status code {response.status_code}: {response.text}")
+                return f"groq: API request failed: {response.text}"
 
     except Exception as e:
         logging.error("groq: Error in processing: %s", str(e))
         return f"groq: Error occurred while processing summary with groq: {str(e)}"
 
 
-def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,):
     import requests
     import json
     global openrouter_model, openrouter_api_key
@@ -675,45 +687,49 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None,
     if system_message is None:
         system_message = "You are a helpful AI assistant who does whatever the user requests."
 
-    try:
-        logging.debug("OpenRouter: Submitting request to API endpoint")
-        print("OpenRouter: Submitting request to API endpoint")
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {openrouter_api_key}",
-            },
-            data=json.dumps({
-                "model": openrouter_model,
-                "messages": [
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": openrouter_prompt}
-                ],
-                "temperature": temp
-            })
-        )
+    if streaming:
+        # FIXME - Implement streaming logic
+        pass
+    else:
+        try:
+            logging.debug("OpenRouter: Submitting request to API endpoint")
+            print("OpenRouter: Submitting request to API endpoint")
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {openrouter_api_key}",
+                },
+                data=json.dumps({
+                    "model": openrouter_model,
+                    "messages": [
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": openrouter_prompt}
+                    ],
+                    "temperature": temp
+                })
+            )
 
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+            response_data = response.json()
+            logging.debug("API Response Data: %s", response_data)
 
-        if response.status_code == 200:
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("openrouter: Summarization successful")
-                print("openrouter: Summarization successful.")
-                return summary
+            if response.status_code == 200:
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("openrouter: Summarization successful")
+                    print("openrouter: Summarization successful.")
+                    return summary
+                else:
+                    logging.error("openrouter: Expected data not found in API response.")
+                    return "openrouter: Expected data not found in API response."
             else:
-                logging.error("openrouter: Expected data not found in API response.")
-                return "openrouter: Expected data not found in API response."
-        else:
-            logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
-            return f"openrouter: API request failed: {response.text}"
-    except Exception as e:
-        logging.error("openrouter: Error in processing: %s", str(e))
-        return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
+                logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
+                return f"openrouter: API request failed: {response.text}"
+        except Exception as e:
+            logging.error("openrouter: Error in processing: %s", str(e))
+            return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
 
 
-def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None):
+def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None, streaming=False,):
     loaded_config_data = load_and_log_configs()
     logging.debug("HuggingFace: Summarization process starting...")
     try:
@@ -788,17 +804,21 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
         }
 
         logging.debug("huggingface: Submitting request...")
-        response = requests.post(API_URL, headers=headers, json=data)
-
-        if response.status_code == 200:
-            print(response.json())
-            chat_response = response.json()[0]['generated_text'].strip()
-            logging.debug("huggingface: Summarization successful")
-            print("Chat request successful.")
-            return chat_response
+        if streaming:
+            # FIXME - Implement streaming logic
+            pass
         else:
-            logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
-            return f"Failed to process summary, status code {response.status_code}: {response.text}"
+            response = requests.post(API_URL, headers=headers, json=data)
+
+            if response.status_code == 200:
+                print(response.json())
+                chat_response = response.json()[0]['generated_text'].strip()
+                logging.debug("huggingface: Summarization successful")
+                print("Chat request successful.")
+                return chat_response
+            else:
+                logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
+                return f"Failed to process summary, status code {response.status_code}: {response.text}"
 
     except Exception as e:
         logging.error("huggingface: Error in processing: %s", str(e))
@@ -806,7 +826,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
         return None
 
 
-def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     logging.debug("DeepSeek: Summarization process starting...")
     try:
         logging.debug("DeepSeek: Loading and validating configurations")
@@ -891,28 +911,32 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
             "temperature": temp
         }
 
-        logging.debug("DeepSeek: Posting request")
-        response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=data)
-
-        if response.status_code == 200:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("DeepSeek: Summarization successful")
-                return summary
-            else:
-                logging.warning("DeepSeek: Summary not found in the response data")
-                return "DeepSeek: Summary not available"
+        if streaming:
+            # FIXME - Implement streaming logic
+            pass
         else:
-            logging.error(f"DeepSeek: Summarization failed with status code {response.status_code}")
-            logging.error(f"DeepSeek: Error response: {response.text}")
-            return f"DeepSeek: Failed to process summary. Status code: {response.status_code}"
+            logging.debug("DeepSeek: Posting request")
+            response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=data)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("DeepSeek: Summarization successful")
+                    return summary
+                else:
+                    logging.warning("DeepSeek: Summary not found in the response data")
+                    return "DeepSeek: Summary not available"
+            else:
+                logging.error(f"DeepSeek: Summarization failed with status code {response.status_code}")
+                logging.error(f"DeepSeek: Error response: {response.text}")
+                return f"DeepSeek: Failed to process summary. Status code: {response.status_code}"
     except Exception as e:
         logging.error(f"DeepSeek: Error in processing: {str(e)}", exc_info=True)
         return f"DeepSeek: Error occurred while processing summary: {str(e)}"
 
 
-def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,):
     logging.debug("Mistral: Summarization process starting...")
     try:
         logging.debug("Mistral: Loading and validating configurations")
@@ -1002,28 +1026,32 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
             "safe_prompt": "false"
         }
 
-        logging.debug("Mistral: Posting request")
-        response = requests.post('https://api.mistral.ai/v1/chat/completions', headers=headers, json=data)
-
-        if response.status_code == 200:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Mistral: Summarization successful")
-                return summary
-            else:
-                logging.warning("Mistral: Summary not found in the response data")
-                return "Mistral: Summary not available"
+        if streaming:
+            # FIXME - Implement streaming logic
+            pass
         else:
-            logging.error(f"Mistral: Summarization failed with status code {response.status_code}")
-            logging.error(f"Mistral: Error response: {response.text}")
-            return f"Mistral: Failed to process summary. Status code: {response.status_code}"
+            logging.debug("Mistral: Posting non-streaming request")
+            response = requests.post('https://api.mistral.ai/v1/chat/completions', headers=headers, json=data)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Mistral: Summarization successful")
+                    return summary
+                else:
+                    logging.warning("Mistral: Summary not found in the response data")
+                    return "Mistral: Summary not available"
+            else:
+                logging.error(f"Mistral: Summarization failed with status code {response.status_code}")
+                logging.error(f"Mistral: Error response: {response.text}")
+                return f"Mistral: Failed to process summary. Status code: {response.status_code}"
     except Exception as e:
         logging.error(f"Mistral: Error in processing: {str(e)}", exc_info=True)
         return f"Mistral: Error occurred while processing summary: {str(e)}"
 
 
-def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -1111,23 +1139,27 @@ def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, sys
             #"temperature": temp
         }
 
-        logging.debug("Google: Posting request")
-        response = requests.post('https://generativelanguage.googleapis.com/v1beta/', headers=headers, json=data)
-
-        if response.status_code == 200:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Google: Summarization successful")
-                logging.debug(f"Google: Summary (first 500 chars): {summary[:500]}...")
-                return summary
-            else:
-                logging.warning("Google: Summary not found in the response data")
-                return "Google: Summary not available"
+        if streaming:
+            # FIXME - Implement streaming logic
+            pass
         else:
-            logging.error(f"Google: Summarization failed with status code {response.status_code}")
-            logging.error(f"Google: Error response: {response.text}")
-            return f"Google: Failed to process summary. Status code: {response.status_code}"
+            logging.debug("Google: Posting request")
+            response = requests.post('https://generativelanguage.googleapis.com/v1beta/', headers=headers, json=data)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Google: Summarization successful")
+                    logging.debug(f"Google: Summary (first 500 chars): {summary[:500]}...")
+                    return summary
+                else:
+                    logging.warning("Google: Summary not found in the response data")
+                    return "Google: Summary not available"
+            else:
+                logging.error(f"Google: Summarization failed with status code {response.status_code}")
+                logging.error(f"Google: Error response: {response.text}")
+                return f"Google: Failed to process summary. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
         logging.error(f"Google: Error decoding JSON: {str(e)}", exc_info=True)
         return f"Google: Error decoding JSON input: {str(e)}"
@@ -1611,7 +1643,8 @@ def process_url(
         diarize=False,
         recursive_summarization=False,
         temp=None,
-        system_message=None):
+        system_message=None,
+        streaming=False,):
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
     set_max_txt_chunk_words = max_words
@@ -1725,36 +1758,39 @@ def process_url(
             for chunk in chunked_transcriptions:
                 summarized_chunks = []
                 if api_name == "anthropic":
-                    summary = summarize_with_anthropic(api_key, chunk, custom_prompt_input)
+                    summary = summarize_with_anthropic(api_key, chunk, custom_prompt_input, streaming=False)
                 elif api_name == "cohere":
-                    summary = summarize_with_cohere(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_cohere(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "openai":
-                    summary = summarize_with_openai(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_openai(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "Groq":
-                    summary = summarize_with_groq(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_groq(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "DeepSeek":
-                    summary = summarize_with_deepseek(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_deepseek(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "OpenRouter":
-                    summary = summarize_with_openrouter(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_openrouter(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "Mistral":
-                    summary = summarize_with_mistral(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_mistral(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "Google":
-                    summary = summarize_with_google(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_google(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 # Local LLM APIs
                 elif api_name == "Llama.cpp":
-                    summary = summarize_with_llama(chunk, custom_prompt_input, api_key, temp, system_message)
+                    summary = summarize_with_llama(chunk, custom_prompt_input, api_key, temp, system_message, streaming)
                 elif api_name == "Kobold":
-                    summary = summarize_with_kobold(chunk, None, custom_prompt_input, system_message, temp)
+                    summary = summarize_with_kobold(chunk, None, custom_prompt_input, system_message, temp, streaming)
                 elif api_name == "Ooba":
-                    summary = summarize_with_oobabooga(chunk, None, custom_prompt_input, system_message, temp)
+                    summary = summarize_with_oobabooga(chunk, None, custom_prompt_input, system_message, temp, streaming)
                 elif api_name == "Tabbyapi":
-                    summary = summarize_with_tabbyapi(chunk, custom_prompt_input, system_message, None, temp)
+                    summary = summarize_with_tabbyapi(chunk, custom_prompt_input, system_message, None, temp, streaming)
                 elif api_name == "VLLM":
-                    summary = summarize_with_vllm(chunk, custom_prompt_input, None, None, system_message)
+                    summary = summarize_with_vllm(chunk, custom_prompt_input, None, None, system_message, streaming)
                 elif api_name == "Ollama":
-                    summary = summarize_with_ollama(chunk, custom_prompt_input, api_key, temp, system_message, None)
+                    summary = summarize_with_ollama(chunk, custom_prompt_input, api_key, temp, system_message, None, streaming)
                 elif api_name == "custom_openai_api":
-                    summary = summarize_with_custom_openai(chunk, custom_prompt_input, api_key, temp=None, system_message=None)
+                    summary = summarize_with_custom_openai(chunk, custom_prompt_input, api_key, temp=None, system_message=None, streaming=streaming)
+                #elif api_name == "custom_openai_api_2":
+                    #summary = summarize_with_custom_openai_2(chunk, custom_prompt_input, api_key, temp=None,
+                    #                                       system_message=None, streaming)
 
                 summarized_chunk_transcriptions.append(summary)
 

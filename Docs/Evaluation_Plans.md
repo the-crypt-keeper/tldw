@@ -238,6 +238,7 @@ Finetuning
         - PingPong Bench
             - https://github.com/IlyaGusev/ping_pong_bench
             - https://ilyagusev.github.io/ping_pong_bench/
+            - https://arxiv.org/pdf/2409.06820
         - DeepEval
             - https://docs.confident-ai.com/docs/metrics-role-adherence
             - https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/role_adherence
