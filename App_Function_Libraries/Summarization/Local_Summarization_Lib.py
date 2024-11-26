@@ -56,7 +56,7 @@ summarizer_prompt = """
                     """
 
 # FIXME - temp is not used
-def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None):
+def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None, streaming=False):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Local LLM: Loading json data for summarization")
@@ -105,30 +105,35 @@ def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message
             ],
             "max_tokens": 28000,  # Adjust tokens as needed
         }
-        logging.debug("Local LLM: Posting request")
-        response = requests.post('http://127.0.0.1:8080/v1/chat/completions', headers=headers, json=data)
 
-        if response.status_code == 200:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Local LLM: Summarization successful")
-                print("Local LLM: Summarization successful.")
-                return summary
-            else:
-                logging.warning("Local LLM: Summary not found in the response data")
-                return "Local LLM: Summary not available"
+        if streaming:
+            # FIXME - add streaming support
+            pass
         else:
-            logging.debug("Local LLM: Summarization failed")
-            print("Local LLM: Failed to process summary:", response.text)
-            return "Local LLM: Failed to process summary"
+            logging.debug("Local LLM: Posting request")
+            response = requests.post('http://127.0.0.1:8080/v1/chat/completions', headers=headers, json=data)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Local LLM: Summarization successful")
+                    print("Local LLM: Summarization successful.")
+                    return summary
+                else:
+                    logging.warning("Local LLM: Summary not found in the response data")
+                    return "Local LLM: Summary not available"
+            else:
+                logging.debug("Local LLM: Summarization failed")
+                print("Local LLM: Failed to process summary:", response.text)
+                return "Local LLM: Failed to process summary"
     except Exception as e:
         logging.debug("Local LLM: Error in processing: %s", str(e))
         print("Error occurred while processing summary with Local LLM:", str(e))
         return "Local LLM: Error occurred while processing summary"
 
 
-def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, system_message=None, api_url="http://127.0.0.1:8080/completion",):
+def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, system_message=None, api_url="http://127.0.0.1:8080/completion", streaming=False):
     try:
         logging.debug("Llama.cpp: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -202,22 +207,26 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
             "temperature": temp
         }
 
-        logging.debug("llama: Submitting request to API endpoint")
-        print("llama: Submitting request to API endpoint")
-        response = requests.post(api_url, headers=headers, json=data)
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
-
-        if response.status_code == 200:
-            # if 'X' in response_data:
-            logging.debug(response_data)
-            summary = response_data['content'].strip()
-            logging.debug("llama: Summarization successful")
-            print("Summarization successful.")
-            return summary
+        if streaming:
+            # FIXME - add streaming support
+            pass
         else:
-            logging.error(f"Llama: API request failed with status code {response.status_code}: {response.text}")
-            return f"Llama: API request failed: {response.text}"
+            logging.debug("llama: Submitting request to API endpoint")
+            print("llama: Submitting request to API endpoint")
+            response = requests.post(api_url, headers=headers, json=data)
+            response_data = response.json()
+            logging.debug("API Response Data: %s", response_data)
+
+            if response.status_code == 200:
+                # if 'X' in response_data:
+                logging.debug(response_data)
+                summary = response_data['content'].strip()
+                logging.debug("llama: Summarization successful")
+                print("Summarization successful.")
+                return summary
+            else:
+                logging.error(f"Llama: API request failed with status code {response.status_code}: {response.text}")
+                return f"Llama: API request failed: {response.text}"
 
     except Exception as e:
         logging.error("Llama: Error in processing: %s", str(e))
@@ -225,7 +234,7 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_message=None, temp=None, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate"):
+def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_message=None, temp=None, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", streaming=False):
     logging.debug("Kobold: Summarization process starting...")
     try:
         logging.debug("Kobold: Loading and validating configurations")
@@ -296,41 +305,45 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_mess
             #"rep_penalty": 1.0,
         }
 
-        logging.debug("Kobold Summarization: Submitting request to API endpoint")
-        print("Kobold Summarization: Submitting request to API endpoint")
-        kobold_api_ip = loaded_config_data['local_api_ip']['kobold']
-        try:
-            response = requests.post(kobold_api_ip, headers=headers, json=data)
-            logging.debug("Kobold Summarization: API Response Status Code: %d", response.status_code)
+        if streaming:
+            # FIXME - add streaming support
+            pass
+        else:
+            logging.debug("Kobold Summarization: Submitting request to API endpoint")
+            print("Kobold Summarization: Submitting request to API endpoint")
+            kobold_api_ip = loaded_config_data['local_api_ip']['kobold']
+            try:
+                response = requests.post(kobold_api_ip, headers=headers, json=data)
+                logging.debug("Kobold Summarization: API Response Status Code: %d", response.status_code)
 
-            if response.status_code == 200:
-                try:
-                    response_data = response.json()
-                    logging.debug("kobold: API Response Data: %s", response_data)
+                if response.status_code == 200:
+                    try:
+                        response_data = response.json()
+                        logging.debug("kobold: API Response Data: %s", response_data)
 
-                    if response_data and 'results' in response_data and len(response_data['results']) > 0:
-                        summary = response_data['results'][0]['text'].strip()
-                        logging.debug("kobold: Summarization successful")
-                        return summary
-                    else:
-                        logging.error("Expected data not found in API response.")
-                        return "Expected data not found in API response."
-                except ValueError as e:
-                    logging.error("kobold: Error parsing JSON response: %s", str(e))
-                    return f"Error parsing JSON response: {str(e)}"
-            else:
-                logging.error(f"kobold: API request failed with status code {response.status_code}: {response.text}")
-                return f"kobold: API request failed: {response.text}"
-        except Exception as e:
-            logging.error("kobold: Error in processing: %s", str(e))
-            return f"kobold: Error occurred while processing summary with kobold: {str(e)}"
+                        if response_data and 'results' in response_data and len(response_data['results']) > 0:
+                            summary = response_data['results'][0]['text'].strip()
+                            logging.debug("kobold: Summarization successful")
+                            return summary
+                        else:
+                            logging.error("Expected data not found in API response.")
+                            return "Expected data not found in API response."
+                    except ValueError as e:
+                        logging.error("kobold: Error parsing JSON response: %s", str(e))
+                        return f"Error parsing JSON response: {str(e)}"
+                else:
+                    logging.error(f"kobold: API request failed with status code {response.status_code}: {response.text}")
+                    return f"kobold: API request failed: {response.text}"
+            except Exception as e:
+                logging.error("kobold: Error in processing: %s", str(e))
+                return f"kobold: Error occurred while processing summary with kobold: {str(e)}"
     except Exception as e:
         logging.error("kobold: Error in processing: %s", str(e))
         return f"kobold: Error occurred while processing summary with kobold: {str(e)}"
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=None, temp=None, api_url="http://127.0.0.1:5000/v1/chat/completions"):
+def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=None, temp=None, api_url="http://127.0.0.1:5000/v1/chat/completions", streaming=False):
     logging.debug("Oobabooga: Summarization process starting...")
     try:
         logging.debug("Oobabooga: Loading and validating configurations")
@@ -403,27 +416,31 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=
             "system_message": system_message,
         }
 
-        logging.debug("ooba: Submitting request to API endpoint")
-        print("ooba: Submitting request to API endpoint")
-        response = requests.post(api_url, headers=headers, json=data, verify=False)
-        logging.debug("ooba: API Response Data: %s", response)
-
-        if response.status_code == 200:
-            response_data = response.json()
-            summary = response.json()['choices'][0]['message']['content']
-            logging.debug("ooba: Summarization successful")
-            print("Summarization successful.")
-            return summary
+        if streaming:
+            # FIXME - add streaming support
+            pass
         else:
-            logging.error(f"oobabooga: API request failed with status code {response.status_code}: {response.text}")
-            return f"ooba: API request failed with status code {response.status_code}: {response.text}"
+            logging.debug("ooba: Submitting request to API endpoint")
+            print("ooba: Submitting request to API endpoint")
+            response = requests.post(api_url, headers=headers, json=data, verify=False)
+            logging.debug("ooba: API Response Data: %s", response)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                summary = response.json()['choices'][0]['message']['content']
+                logging.debug("ooba: Summarization successful")
+                print("Summarization successful.")
+                return summary
+            else:
+                logging.error(f"oobabooga: API request failed with status code {response.status_code}: {response.text}")
+                return f"ooba: API request failed with status code {response.status_code}: {response.text}"
 
     except Exception as e:
         logging.error("ooba: Error in processing: %s", str(e))
         return f"ooba: Error occurred while processing summary with oobabooga: {str(e)}"
 
 
-def summarize_with_tabbyapi(input_data, custom_prompt_input, system_message=None, api_key=None, temp=None, api_IP="http://127.0.0.1:5000/v1/chat/completions"):
+def summarize_with_tabbyapi(input_data, custom_prompt_input, system_message=None, api_key=None, temp=None, api_IP="http://127.0.0.1:5000/v1/chat/completions", streaming=False):
     logging.debug("TabbyAPI: Summarization process starting...")
     try:
         logging.debug("TabbyAPI: Loading and validating configurations")
@@ -501,26 +518,30 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, system_message=None
             'messages': input_data
         }
 
-        response = requests.post(tabby_api_ip, headers=headers, json=data2)
-
-        if response.status_code == 200:
-            response_json = response.json()
-
-            # Validate the response structure
-            if all(key in response_json for key in ['id', 'choices', 'created', 'model', 'object', 'usage']):
-                logging.info("TabbyAPI: Received a valid 200 response")
-                summary = response_json['choices'][0].get('message', {}).get('content', '')
-                return summary
-            else:
-                logging.error("TabbyAPI: Received a 200 response, but the structure is invalid")
-                return "Error: Received an invalid response structure from TabbyAPI."
-
-        elif response.status_code == 422:
-            logging.error(f"TabbyAPI: Received a 422 error. Details: {response.json()}")
-            return "Error: Invalid request sent to TabbyAPI."
-
+        if streaming:
+            # FIXME - add streaming support
+            pass
         else:
-            response.raise_for_status()  # This will raise an exception for other status codes
+            response = requests.post(tabby_api_ip, headers=headers, json=data2)
+
+            if response.status_code == 200:
+                response_json = response.json()
+
+                # Validate the response structure
+                if all(key in response_json for key in ['id', 'choices', 'created', 'model', 'object', 'usage']):
+                    logging.info("TabbyAPI: Received a valid 200 response")
+                    summary = response_json['choices'][0].get('message', {}).get('content', '')
+                    return summary
+                else:
+                    logging.error("TabbyAPI: Received a 200 response, but the structure is invalid")
+                    return "Error: Received an invalid response structure from TabbyAPI."
+
+            elif response.status_code == 422:
+                logging.error(f"TabbyAPI: Received a 422 error. Details: {response.json()}")
+                return "Error: Invalid request sent to TabbyAPI."
+
+            else:
+                response.raise_for_status()  # This will raise an exception for other status codes
 
     except requests.exceptions.RequestException as e:
         logging.error(f"Error summarizing with TabbyAPI: {e}")
@@ -532,14 +553,16 @@ def summarize_with_tabbyapi(input_data, custom_prompt_input, system_message=None
         logging.error(f"Unexpected error in summarize_with_tabbyapi: {e}")
         return f"Unexpected error in summarization process: {str(e)}"
 
+
 def summarize_with_vllm(
         input_data: Union[str, dict, list],
         custom_prompt_input: str,
         api_key: str = None,
         model: str = None,
         system_prompt: str = None,
-        temp: float = 0.7,
-        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions"
+        temp: float = 0.7, # FIXME - Add TEMP Argument
+        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions",
+        streaming=False
 ) -> str:
     logging.debug("vLLM: Summarization process starting...")
     try:
@@ -613,22 +636,26 @@ def summarize_with_vllm(
             ]
         }
 
-        # Make the API call
-        logging.debug(f"vLLM: Sending request to {vllm_api_url}")
-        response = requests.post(vllm_api_url, headers=headers, json=payload)
-
-        # Check for successful response
-        response.raise_for_status()
-
-        # Extract and return the summary
-        response_data = response.json()
-        if 'choices' in response_data and len(response_data['choices']) > 0:
-            summary = response_data['choices'][0]['message']['content']
-            logging.debug("vLLM: Summarization successful")
-            logging.debug(f"vLLM: Summary (first 500 chars): {summary[:500]}...")
-            return summary
+        if streaming:
+            # FIXME - add streaming support
+            pass
         else:
-            raise ValueError("Unexpected response format from vLLM API")
+            # Make the API call
+            logging.debug(f"vLLM: Sending request to {vllm_api_url}")
+            response = requests.post(vllm_api_url, headers=headers, json=payload)
+
+            # Check for successful response
+            response.raise_for_status()
+
+            # Extract and return the summary
+            response_data = response.json()
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                summary = response_data['choices'][0]['message']['content']
+                logging.debug("vLLM: Summarization successful")
+                logging.debug(f"vLLM: Summary (first 500 chars): {summary[:500]}...")
+                return summary
+            else:
+                raise ValueError("Unexpected response format from vLLM API")
 
     except requests.RequestException as e:
         logging.error(f"vLLM: API request failed: {str(e)}")
@@ -650,7 +677,8 @@ def summarize_with_ollama(
     system_message=None,
     model=None,
     max_retries=5,
-    retry_delay=20
+    retry_delay=20,
+    streaming=False
 ):
     try:
         logging.debug("Ollama: Loading and validating configurations")
@@ -739,61 +767,65 @@ def summarize_with_ollama(
             'temperature': temp
         }
 
-        for attempt in range(1, max_retries + 1):
-            logging.debug("Ollama: Submitting request to API endpoint")
-            print("Ollama: Submitting request to API endpoint")
-            try:
-                response = requests.post(api_url, headers=headers, json=data_payload, timeout=30)
-                response.raise_for_status()  # Raises HTTPError for bad responses
-                response_data = response.json()
-            except requests.exceptions.Timeout:
-                logging.error("Ollama: Request timed out.")
-                return "Ollama: Request timed out."
-            except requests.exceptions.HTTPError as http_err:
-                logging.error(f"Ollama: HTTP error occurred: {http_err}")
-                return f"Ollama: HTTP error occurred: {http_err}"
-            except requests.exceptions.RequestException as req_err:
-                logging.error(f"Ollama: Request exception: {req_err}")
-                return f"Ollama: Request exception: {req_err}"
-            except json.JSONDecodeError:
-                logging.error("Ollama: Failed to decode JSON response")
-                return "Ollama: Failed to decode JSON response."
-            except Exception as e:
-                logging.error(f"Ollama: An unexpected error occurred: {str(e)}")
-                return f"Ollama: An unexpected error occurred: {str(e)}"
+        if streaming:
+            # FIXME - add streaming support
+            pass
+        else:
+            for attempt in range(1, max_retries + 1):
+                logging.debug("Ollama: Submitting request to API endpoint")
+                print("Ollama: Submitting request to API endpoint")
+                try:
+                    response = requests.post(api_url, headers=headers, json=data_payload, timeout=30)
+                    response.raise_for_status()  # Raises HTTPError for bad responses
+                    response_data = response.json()
+                except requests.exceptions.Timeout:
+                    logging.error("Ollama: Request timed out.")
+                    return "Ollama: Request timed out."
+                except requests.exceptions.HTTPError as http_err:
+                    logging.error(f"Ollama: HTTP error occurred: {http_err}")
+                    return f"Ollama: HTTP error occurred: {http_err}"
+                except requests.exceptions.RequestException as req_err:
+                    logging.error(f"Ollama: Request exception: {req_err}")
+                    return f"Ollama: Request exception: {req_err}"
+                except json.JSONDecodeError:
+                    logging.error("Ollama: Failed to decode JSON response")
+                    return "Ollama: Failed to decode JSON response."
+                except Exception as e:
+                    logging.error(f"Ollama: An unexpected error occurred: {str(e)}")
+                    return f"Ollama: An unexpected error occurred: {str(e)}"
 
-            logging.debug(f"API Response Data: {response_data}")
+                logging.debug(f"API Response Data: {response_data}")
 
-            if response.status_code == 200:
-                # Inspect available keys
-                available_keys = list(response_data.keys())
-                logging.debug(f"Ollama: Available keys in response: {available_keys}")
+                if response.status_code == 200:
+                    # Inspect available keys
+                    available_keys = list(response_data.keys())
+                    logging.debug(f"Ollama: Available keys in response: {available_keys}")
 
-                # Attempt to retrieve 'response'
-                summary = None
-                if 'response' in response_data and response_data['response']:
-                    summary = response_data['response'].strip()
-                elif 'choices' in response_data and len(response_data['choices']) > 0:
-                    choice = response_data['choices'][0]
-                    if 'message' in choice and 'content' in choice['message']:
-                        summary = choice['message']['content'].strip()
+                    # Attempt to retrieve 'response'
+                    summary = None
+                    if 'response' in response_data and response_data['response']:
+                        summary = response_data['response'].strip()
+                    elif 'choices' in response_data and len(response_data['choices']) > 0:
+                        choice = response_data['choices'][0]
+                        if 'message' in choice and 'content' in choice['message']:
+                            summary = choice['message']['content'].strip()
 
-                if summary:
-                    logging.debug("Ollama: Chat request successful")
-                    print("\n\nChat request successful.")
-                    return summary
-                elif response_data.get('done_reason') == 'load':
-                    logging.warning(f"Ollama: Model is loading. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
+                    if summary:
+                        logging.debug("Ollama: Chat request successful")
+                        print("\n\nChat request successful.")
+                        return summary
+                    elif response_data.get('done_reason') == 'load':
+                        logging.warning(f"Ollama: Model is loading. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        logging.error("Ollama: API response does not contain 'response' or 'choices'.")
+                        return "Ollama: API response does not contain 'response' or 'choices'."
                 else:
-                    logging.error("Ollama: API response does not contain 'response' or 'choices'.")
-                    return "Ollama: API response does not contain 'response' or 'choices'."
-            else:
-                logging.error(f"Ollama: API request failed with status code {response.status_code}: {response.text}")
-                return f"Ollama: API request failed: {response.text}"
+                    logging.error(f"Ollama: API request failed with status code {response.status_code}: {response.text}")
+                    return f"Ollama: API request failed: {response.text}"
 
-        logging.error("Ollama: Maximum retry attempts reached. Model is still loading.")
-        return "Ollama: Maximum retry attempts reached. Model is still loading."
+            logging.error("Ollama: Maximum retry attempts reached. Model is still loading.")
+            return "Ollama: Maximum retry attempts reached. Model is still loading."
 
     except Exception as e:
         logging.error("\n\nOllama: Error in processing: %s", str(e))
@@ -801,7 +833,7 @@ def summarize_with_ollama(
 
 
 # FIXME - update to be a summarize request
-def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     custom_openai_api_key = api_key
     try:
@@ -896,24 +928,28 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
 
         custom_openai_url = loaded_config_data['Local_api_ip']['custom_openai_api_ip']
 
-        logging.debug("Custom OpenAI API: Posting request")
-        response = requests.post(custom_openai_url, headers=headers, json=data)
-        logging.debug(f"Custom OpenAI API full API response data: {response}")
-        if response.status_code == 200:
-            response_data = response.json()
-            logging.debug(response_data)
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                chat_response = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Custom OpenAI API: Chat Sent successfully")
-                logging.debug(f"Custom OpenAI API: Chat response: {chat_response}")
-                return chat_response
-            else:
-                logging.warning("Custom OpenAI API: Chat response not found in the response data")
-                return "Custom OpenAI API: Chat not available"
+        if streaming:
+            # FIXME - add streaming support
+            pass
         else:
-            logging.error(f"Custom OpenAI API: Chat request failed with status code {response.status_code}")
-            logging.error(f"Custom OpenAI API: Error response: {response.text}")
-            return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
+            logging.debug("Custom OpenAI API: Posting request")
+            response = requests.post(custom_openai_url, headers=headers, json=data)
+            logging.debug(f"Custom OpenAI API full API response data: {response}")
+            if response.status_code == 200:
+                response_data = response.json()
+                logging.debug(response_data)
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    chat_response = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Custom OpenAI API: Chat Sent successfully")
+                    logging.debug(f"Custom OpenAI API: Chat response: {chat_response}")
+                    return chat_response
+                else:
+                    logging.warning("Custom OpenAI API: Chat response not found in the response data")
+                    return "Custom OpenAI API: Chat not available"
+            else:
+                logging.error(f"Custom OpenAI API: Chat request failed with status code {response.status_code}")
+                logging.error(f"Custom OpenAI API: Error response: {response.text}")
+                return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
         logging.error(f"Custom OpenAI API: Error decoding JSON: {str(e)}", exc_info=True)
         return f"Custom OpenAI API: Error decoding JSON input: {str(e)}"

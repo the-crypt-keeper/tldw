@@ -6,6 +6,14 @@ Unsorted
 		https://arxiv.org/abs/2411.02959v1
 	https://github.com/run-llama/llama_parse/blob/main/examples/multimodal/multimodal_report_generation.ipynb
 	https://www.youtube.com/watch?v=aqtX-sGbevw
+	https://arxiv.org/abs/2410.21012
+	https://arxiv.org/abs/2410.20088
+	https://arxiv.org/abs/2410.13765
+	https://arxiv.org/pdf/2409.15699v1
+	https://aibyhand.substack.com/p/beginners-guide-to-graph-rag
+	https://aibyhand.substack.com/p/beginners-guide-to-rag-evaluation
+	https://www.louisbouchard.ai/indexing-methods/
+
 
 GraphRAG
 	https://www.microsoft.com/en-us/research/blog/introducing-drift-search-combining-global-and-local-search-methods-to-improve-quality-and-efficiency/	
