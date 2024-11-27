@@ -6,7 +6,8 @@
    * https://stackoverflow.com/questions/66083545/could-not-load-dynamic-library-cudnn64-8-dll-dlerror-cudnn64-8-dll-not-found
 
 Create a blog post
-    tldwproject.com
+    tldwproject.com - Done
+    Make a nicer homepage - https://vitepress.dev/guide/getting-started
     https://www.open-notebook.ai/features/podcast.html
 
 HF Embedding API - https://huggingface.co/BAAI/bge-large-en-v1.5
@@ -29,17 +30,6 @@ Help Llama.cpp
         -Blind testing ala ChatArena where users are given two completions for a task and asked to choose the better one, created from two different random presets.
         -Use a model to generate multiple completions for a task with different seeds. Then rate/judge teh completions in terms of quality & diversity
         -Establish which sampling methods incur the smallest quality loss for a given target diversity.
-
-
-Prompts
-    Dspy
-        https://pub.towardsai.net/dspy-machine-learning-attitude-towards-llm-prompting-0d45056fd9b7
-        https://pub.towardsai.net/dspy-venture-into-automatic-prompt-optimization-d37b892091be
-    https://github.com/f/awesome-chatgpt-prompts
-    https://www.reddit.com/r/ChatGPTPro/comments/1g0aetb/turn_meeting_transcripts_into_valuable_insights/
-    https://github.com/MaxsPrompts/Marketing-Prompts
-    https://github.com/MIATECHPARTNERS/PromptChains
-    https://github.com/zacfrulloni/Prompt-Engineering-Holy-Grail
 
 
 LLMs.txt
@@ -66,17 +56,6 @@ PDF Parsing
         https://pub.towardsai.net/demystifying-pdf-parsing-05-unifying-separate-tasks-into-a-small-model-d3739db021f7
         https://ai.gopubby.com/demystifying-pdf-parsing-06-representative-industry-solutions-5d4a1cfe311b
 
-ETL
-    https://arxiv.org/abs/2410.12189
-    https://ucbepic.github.io/docetl/concepts/optimization/
-    https://arxiv.org/abs/2410.21169
-
-UX
-    https://arxiv.org/abs/2410.22370
-    https://archive.is/h8w61
-	https://uxdesign.cc/how-the-right-ux-metrics-show-game-changing-value-9d95c46b0479?sk=2b9d400046e4484f858a409cc56b355a&utm_source=substack&utm_medium=email
-	https://uxdesign.cc/embracing-playing-as-the-core-of-design-92215f031bed?utm_source=substack&utm_medium=email
-
 
 Import HTML Files
     
@@ -92,6 +71,7 @@ Excel:
     https://ajac-zero.com/posts/how-to-create-accurate-fast-rag-with-excel-files/
     https://github.com/ajac-zero/excel-rag-example
     https://github.com/sivadhulipala1999/SheetSimplify_with_RAG
+    https://openpyxl.readthedocs.io/en/stable/index.html
 CSV
     CSV -> HTML https://blog.finxter.com/5-best-ways-to-convert-csv-to-html-in-python/
     https://github.com/jazzband/tablib

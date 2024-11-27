@@ -13,6 +13,7 @@ Unsorted
 	https://aibyhand.substack.com/p/beginners-guide-to-graph-rag
 	https://aibyhand.substack.com/p/beginners-guide-to-rag-evaluation
 	https://www.louisbouchard.ai/indexing-methods/
+	https://github.com/circlemind-ai/fast-graphrag
 
 
 GraphRAG
