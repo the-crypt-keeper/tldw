@@ -269,7 +269,7 @@ def resummarize_content(selected_item, item_mapping, content, api_name, api_key=
 
     # Use default prompt if not provided
     if not summarization_prompt:
-        summarization_prompt = config.get('Prompts', 'default_summary_prompt', fallback="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+        summarization_prompt = config.get('Prompts', 'default_summary_prompt', fallback="""<s>You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
 **Bulleted Note Creation Guidelines**
 
 **Headings**:
@@ -284,7 +284,7 @@ def resummarize_content(selected_item, item_mapping, content, api_name, api_key=
 
 **Review**:
 - Ensure adherence to specified format
-- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]""")
+- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }}""")
 
     # Summarization logic
     summaries = []
