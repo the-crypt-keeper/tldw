@@ -31,6 +31,11 @@ LLM-as-judge
     https://huggingface.co/learn/cookbook/en/llm_judge
     https://github.com/open-compass/CompassJudger
     https://hamel.dev/blog/posts/llm-judge
+    https://llm-as-a-judge.github.io/
+    https://github.com/llm-as-a-judge/Awesome-LLM-as-a-judge
+    https://deepmind.google/research/publications/85420/
+    https://arxiv.org/abs/2411.16646
+
 Quant Eval
 https://arxiv.org/abs/2411.02355
 
@@ -143,6 +148,8 @@ Finetuning
     - EvalAI
     - FlashRAG
         - https://github.com/RUC-NLPIR/FlashRAG
+    - Olmes
+        - https://github.com/allenai/olmes
 
 - **Citations**
     - L-CiteEval
@@ -189,6 +196,7 @@ Finetuning
     - https://arxiv.org/html/2305.14328v2
     - https://arxiv.org/abs/2411.06032
     - https://arxiv.org/abs/2410.02677
+    - https://mbzuai-oryx.github.io/ALM-Bench/
     - User-Centric Evaluation of LLMs
         - https://github.com/Alice1998/URS
     - https://huggingface.co/spaces/HuggingFaceFW/blogpost-fine-tasks
@@ -225,6 +233,8 @@ Finetuning
         - DeepEval
             * `assesses whether your LLM chatbot is able to generate relevant responses throughout a conversation. It is calculated by looping through each turn individually and adopts a sliding window approach to take the last min(0, current turn number — window size) turns into account to determine whether it is relevant or not. The final conversation relevancy metric score is simply the number of turn responses that is relevant divided by the total number of turns in a conversational test case.` 
             * https://docs.confident-ai.com/docs/metrics-conversation-relevancy
+    - **Debating**
+        - https://huggingface.co/blog/debate
     - Discussion from different PoV Facilitation
           - https://github.com/Neph0s/awesome-llm-role-playing-with-persona?tab=readme-ov-file
           - https://github.com/lawraa/LLM-Discussion

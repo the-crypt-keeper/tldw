@@ -19,6 +19,17 @@ Finetuning:
     - https://mattyyeung.github.io/deterministic-quoting#7-conclusion-is-this-really-ready-for-healthcare
 
 
+
+Anthropic:
+```
+Draft a press release for our new cybersecurity product, AcmeSecurity Pro, using only information from these product briefs and market reports.
+<documents>
+{{DOCUMENTS}}
+</documents>
+
+After drafting, review each claim in your press release. For each claim, find a direct quote from the documents that supports it. If you can’t find a supporting quote for a claim, remove that claim from the press release and mark where it was removed with empty [] brackets.
+```
+
 Attributions
   https://github.com/aws-samples/llm-based-advanced-summarization/blob/main/detect_attribution.ipynb
 
@@ -75,10 +86,14 @@ Research
   https://www.lycee.ai/blog/rag-ragallucinations-and-how-to-fight-them
   https://arxiv.org/abs/2407.16557
   https://arxiv.org/abs/2407.16604
+  https://arxiv.org/pdf/2309.11495
+  https://deepmind.google/research/publications/85420/
   https://thetechoasis.beehiiv.com/p/eliminating-hallucinations-robots-imitate-us
   https://arxiv.org/abs/2407.19825
+  https://arxiv.org/abs/2411.14257
   https://arxiv.org/pdf/2406.02543
   https://arxiv.org/abs/2406.10279
+  https://arxiv.org/abs/2402.17811
   https://arxiv.org/pdf/2409.18475
   https://llm-editing.github.io/
   https://arxiv.org/abs/2411.14257

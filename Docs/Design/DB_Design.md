@@ -6,7 +6,7 @@
 - [SQLite DB Design](#sqlite-db-design)
 - [Interesting/Relevant Later](#interesting-relevant-later)
 
-
+https://kerkour.com/sqlite-for-servers
 https://wafris.org/blog/rearchitecting-for-sqlite
     General DB:
     https://en.wikipedia.org/wiki/Database_normalization
