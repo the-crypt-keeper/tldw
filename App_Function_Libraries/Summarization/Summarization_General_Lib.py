@@ -1166,8 +1166,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
                             except KeyError as e:
                                 logging.error(f"DeepSeek: Key error: {str(e)} in line: {decoded_line}")
                                 continue
-                # Optionally, you can return the full collected text at the end
-                # yield collected_text
+                yield collected_text
             return stream_generator()
         else:
             logging.debug("DeepSeek: Posting request")
@@ -1341,7 +1340,6 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
     except Exception as e:
         logging.error(f"Mistral: Error in processing: {str(e)}", exc_info=True)
         return f"Mistral: Error occurred while processing summary: {str(e)}"
-
 
 
 def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,):
