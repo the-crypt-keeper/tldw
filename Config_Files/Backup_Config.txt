@@ -38,6 +38,7 @@ ollama_api_key =
 ollama_model = llama3
 aphrodite_api_IP = http://127.0.0.1:8080/completion
 aphrodite_api_key =
+max_tokens = 4096
 
 [Processing]
 processing_choice = cuda
@@ -48,6 +49,13 @@ words_per_second = 3
 save_character_chats = False
 save_rag_chats = False
 local_api_timeout = 90
+local_api_retries = 3
+local_api_retry_delay = 5
+streaming = True
+temperature = 0.7
+top_p = 0.9
+min_p = 0.05
+# https://artefact2.github.io/llm-sampling/
 
 [Auto-Save]
 save_character_chats = False
