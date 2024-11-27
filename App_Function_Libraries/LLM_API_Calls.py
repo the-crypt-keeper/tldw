@@ -906,7 +906,8 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
                         {"role": "user", "content": openrouter_prompt}
                     ],
                     "temperature": temp
-                })
+                },
+                streaming=False)
             )
 
             response_data = response.json()

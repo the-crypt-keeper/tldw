@@ -114,7 +114,6 @@ def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message
             'http://127.0.0.1:8080/v1/chat/completions',
             headers=headers,
             json=data,
-            stream=streaming  # Enable streaming if 'streaming' is True
         )
 
         if response.status_code == 200:
@@ -280,7 +279,6 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
     except Exception as e:
         logging.error("Llama: Error in processing: %s", str(e))
         return f"Llama: Error occurred while processing summary with Llama: {str(e)}"
-
 
 
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
@@ -762,7 +760,6 @@ def summarize_with_tabbyapi(
             return f"TabbyAPI: Unexpected error in summarization process: {str(e)}"
 
 
-
 def summarize_with_vllm(
         input_data: Union[str, dict, list],
         custom_prompt_input: str,
@@ -918,7 +915,6 @@ def summarize_with_vllm(
             return f"Error: Unexpected error during vLLM summarization - {str(e)}"
 
 
-
 def summarize_with_ollama(
     input_data,
     custom_prompt,
@@ -1015,7 +1011,8 @@ def summarize_with_ollama(
                     "content": ollama_prompt
                 }
             ],
-            'temperature': temp
+            'temperature': temp,
+            'stream': streaming
         }
 
         if streaming:
@@ -1120,7 +1117,6 @@ def summarize_with_ollama(
         return f"Ollama: Error occurred while processing summary with Ollama: {str(e)}"
 
 
-# FIXME - update to be a summarize request
 def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,
                                  custom_openai_api_url=None):
     loaded_config_data = load_and_log_configs()
@@ -1212,7 +1208,8 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
                 {"role": "user", "content": openai_prompt}
             ],
             "max_tokens": 4096,
-            "temperature": temp
+            "temperature": temp,
+            "streaming": streaming
         }
 
         custom_openai_url = loaded_config_data['Local_api_ip']['custom_openai_api_ip']
@@ -1246,7 +1243,7 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
                         except json.JSONDecodeError:
                             logging.error(f"OpenAI: Error decoding JSON from line: {line}")
                             continue
-
+                yield collected_messages
             return stream_generator()
         else:
             logging.debug("Custom OpenAI API: Posting request")
@@ -1291,6 +1288,3 @@ def save_summary_to_file(summary, file_path):
 #
 #
 #######################################################################################################################
-
-
-
