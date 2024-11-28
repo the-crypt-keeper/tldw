@@ -5,6 +5,15 @@
 2. cudnn8dlops.dll or whatever is missing/not in PATH
    * https://stackoverflow.com/questions/66083545/could-not-load-dynamic-library-cudnn64-8-dll-dlerror-cudnn64-8-dll-not-found
 
+
+Inspo
+    https://github.com/hoarder-app/hoarder
+
+Testing
+    https://tox.wiki/en/4.23.2/
+    https://flake8.pycqa.org/en/latest/
+
+
 Create a blog post
     tldwproject.com - Done
     Make a nicer homepage - https://vitepress.dev/guide/getting-started
@@ -56,7 +65,6 @@ PDF Parsing
         https://pub.towardsai.net/demystifying-pdf-parsing-05-unifying-separate-tasks-into-a-small-model-d3739db021f7
         https://ai.gopubby.com/demystifying-pdf-parsing-06-representative-industry-solutions-5d4a1cfe311b
 
-
 Import HTML Files
     
 Manga
@@ -78,6 +86,9 @@ CSV
 CHM:
     https://github.com/dottedmag/archmage
 
+
+SQLite studio
+    https://github.com/pawelsalawa/sqlitestudio
 
 
 URL Shortener
