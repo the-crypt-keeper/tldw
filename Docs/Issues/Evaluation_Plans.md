@@ -713,6 +713,8 @@ https://arxiv.org/abs/2411.02571
 https://github.com/TRI-ML/vlm-evaluation
 https://arxiv.org/abs/2411.13211
 https://videoautoarena.github.io/
+https://arxiv.org/abs/2411.17451
+https://huggingface.co/spaces/MMInstruction/VL-RewardBench
 https://github.com/illuin-tech/vidore-benchmark
 - xkcd bench: https://github.com/arnokha/explain-xkcd-with-llms
 
@@ -720,3 +722,14 @@ https://github.com/illuin-tech/vidore-benchmark
     - https://arxiv.org/html/2411.01106v1
 
 ----------------------------------------------------------------------------------------------------------------
+
+
+
+----------------------------------------------------------------------------------------------------------------
+### <a name="mllm-evals"></a> MLLM Evaluations
+
+https://arxiv.org/abs/2411.15296
+https://arxiv.org/abs/2411.06284
+----------------------------------------------------------------------------------------------------------------
+
+

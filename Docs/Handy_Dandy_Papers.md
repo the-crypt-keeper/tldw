@@ -28,7 +28,7 @@
 
 ### Storytelling
     https://dreamrunner-story2video.github.io/
-
+    https://ieeexplore.ieee.org/document/10734853
 
 ### Structured Generation
     https://arxiv.org/abs/2411.15100
