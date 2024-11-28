@@ -8,14 +8,13 @@
 # Function List
 #
 # 1. extract_text_from_segments(segments: List[Dict]) -> str
-# 2. chat_with_openai(api_key, file_path, custom_prompt_arg)
-# 3. chat_with_anthropic(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5)
-# 4. chat_with_cohere(api_key, file_path, model, custom_prompt_arg)
-# 5. chat_with_groq(api_key, input_data, custom_prompt_arg, system_prompt=None):
-# 6. chat_with_openrouter(api_key, input_data, custom_prompt_arg, system_prompt=None)
-# 7. chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None)
-# 8. chat_with_deepseek(api_key, input_data, custom_prompt_arg, system_prompt=None)
-# 9. chat_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions", system_prompt=None)
+# 2. chat_with_openai(api_key, file_path, custom_prompt_arg, streaming=None)
+# 3. chat_with_anthropic(api_key, file_path, model, custom_prompt_arg, max_retries=3, retry_delay=5, streaming=None)
+# 4. chat_with_cohere(api_key, file_path, model, custom_prompt_arg, streaming=None)
+# 5. chat_with_groq(api_key, input_data, custom_prompt_arg, system_prompt=None, streaming=None):
+# 6. chat_with_openrouter(api_key, input_data, custom_prompt_arg, system_prompt=None, streaming=None)
+# 7. chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None, streaming=None)
+# 8. chat_with_deepseek(api_key, input_data, custom_prompt_arg, system_prompt=None, streaming=None)
 #
 #
 ####################
@@ -38,7 +37,7 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs
 # Function Definitions
 #
 
-#FIXME: Update to include full arguments
+# FIXME: Update to include full arguments
 
 def extract_text_from_segments(segments):
     logging.debug(f"Segments received: {segments}")
@@ -58,7 +57,6 @@ def extract_text_from_segments(segments):
         logging.warning(f"Unexpected type of 'segments': {type(segments)}")
 
     return text.strip()
-
 
 
 def get_openai_embeddings(input_data: str, model: str) -> List[float]:
@@ -118,7 +116,7 @@ def get_openai_embeddings(input_data: str, model: str) -> List[float]:
         raise ValueError(f"OpenAI: Unexpected error occurred: {str(e)}")
 
 
-def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     openai_api_key = api_key
     try:
@@ -203,27 +201,60 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_m
                 {"role": "user", "content": openai_prompt}
             ],
             "max_tokens": 4096,
-            "temperature": temp
+            "temperature": temp,
+            "streaming": streaming
         }
+        if streaming:
+            logging.debug("OpenAI: Posting request (streaming")
+            response = requests.post(
+                'https://api.openai.com/v1/chat/completions',
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            response.raise_for_status()
 
-        logging.debug("OpenAI: Posting request")
-        response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
-        logging.debug(f"Full API response data: {response}")
-        if response.status_code == 200:
-            response_data = response.json()
-            logging.debug(response_data)
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                chat_response = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("openai: Chat Sent successfully")
-                logging.debug(f"openai: Chat response: {chat_response}")
-                return chat_response
-            else:
-                logging.warning("openai: Chat response not found in the response data")
-                return "openai: Chat not available"
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
+
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"OpenAI: Error decoding JSON from line: {line}")
+                            continue
+
+            return stream_generator()
         else:
-            logging.error(f"OpenAI: Chat request failed with status code {response.status_code}")
-            logging.error(f"OpenAI: Error response: {response.text}")
-            return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
+            logging.debug("OpenAI: Posting request (non-streaming")
+            response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+            logging.debug(f"Full API response data: {response}")
+            if response.status_code == 200:
+                response_data = response.json()
+                logging.debug(response_data)
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    chat_response = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("openai: Chat Sent successfully")
+                    logging.debug(f"openai: Chat response: {chat_response}")
+                    return chat_response
+                else:
+                    logging.warning("openai: Chat response not found in the response data")
+                    return "openai: Chat not available"
+            else:
+                logging.error(f"OpenAI: Chat request failed with status code {response.status_code}")
+                logging.error(f"OpenAI: Error response: {response.text}")
+                return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
         logging.error(f"OpenAI: Error decoding JSON: {str(e)}", exc_info=True)
         return f"OpenAI: Error decoding JSON input: {str(e)}"
@@ -235,7 +266,7 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_m
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None, temp=None):
+def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None, temp=None, streaming=False):
     try:
         loaded_config_data = load_and_log_configs()
 
@@ -325,49 +356,93 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
         for attempt in range(max_retries):
             try:
                 logging.debug("Anthropic: Posting request to API")
-                response = requests.post('https://api.anthropic.com/v1/messages', headers=headers, json=data)
-                logging.debug(f"Anthropic: Full API response data: {response}")
+                response = requests.post(
+                    'https://api.anthropic.com/v1/messages',
+                    headers=headers,
+                    json=data,
+                    stream=streaming
+                )
 
                 # Check if the status code indicates success
                 if response.status_code == 200:
-                    logging.debug("Anthropic: Post submittal successful")
-                    response_data = response.json()
+                    if streaming:
+                        # Handle streaming response
+                        def stream_generator():
+                            collected_text = ""
+                            event_type = None
+                            for line in response.iter_lines():
+                                line = line.decode('utf-8').strip()
+                                if line == '':
+                                    continue
+                                if line.startswith('event:'):
+                                    event_type = line[len('event:'):].strip()
+                                elif line.startswith('data:'):
+                                    data_str = line[len('data:'):].strip()
+                                    if data_str == '[DONE]':
+                                        break
+                                    try:
+                                        data_json = json.loads(data_str)
+                                        if event_type == 'content_block_delta' and data_json.get(
+                                                'type') == 'content_block_delta':
+                                            delta = data_json.get('delta', {})
+                                            text_delta = delta.get('text', '')
+                                            collected_text += text_delta
+                                            yield text_delta
+                                    except json.JSONDecodeError:
+                                        logging.error(f"Anthropic: Error decoding JSON from line: {line}")
+                                        continue
+                            # Optionally, return the full collected text at the end
+                            # yield collected_text
 
-                    # Corrected path to access the assistant's reply
-                    if 'content' in response_data and isinstance(response_data['content'], list) and len(response_data['content']) > 0:
-                        chat_response = response_data['content'][0]['text'].strip()
-                        logging.debug("Anthropic: Chat request successful")
-                        print("Chat request processed successfully.")
-                        return chat_response
+                        return stream_generator()
                     else:
-                        logging.error("Anthropic: Unexpected data structure in response.")
-                        print("Unexpected response format from Anthropic API:", response.text)
-                        return "Anthropic: Unexpected response format from API."
+                        # Non-streaming response
+                        logging.debug("Anthropic: Post submittal successful")
+                        response_data = response.json()
+                        try:
+                            # Extract the assistant's reply from the 'content' field
+                            content_blocks = response_data.get('content', [])
+                            summary = ''
+                            for block in content_blocks:
+                                if block.get('type') == 'text':
+                                    summary += block.get('text', '')
+                            summary = summary.strip()
+                            logging.debug("Anthropic: Summarization successful")
+                            logging.debug(f"Anthropic: Summary (first 500 chars): {summary[:500]}...")
+                            return summary
+                        except Exception as e:
+                            logging.debug("Anthropic: Unexpected data in response")
+                            logging.error(f"Unexpected response format from Anthropic API: {response.text}")
+                            return None
                 elif response.status_code == 500:  # Handle internal server error specifically
                     logging.debug("Anthropic: Internal server error")
-                    print("Internal server error from API. Retrying may be necessary.")
+                    logging.error("Internal server error from API. Retrying may be necessary.")
                     time.sleep(retry_delay)
                 else:
                     logging.debug(
-                        f"Anthropic: Failed to process chat request, status code {response.status_code}: {response.text}")
-                    print(f"Failed to process chat request, status code {response.status_code}: {response.text}")
-                    return f"Anthropic: Failed to process chat request, status code {response.status_code}: {response.text}"
+                        f"Anthropic: Failed to summarize, status code {response.status_code}: {response.text}")
+                    logging.error(f"Failed to process summary, status code {response.status_code}: {response.text}")
+                    return None
 
             except requests.RequestException as e:
                 logging.error(f"Anthropic: Network error during attempt {attempt + 1}/{max_retries}: {str(e)}")
                 if attempt < max_retries - 1:
-                    logging.debug(f"Anthropic: Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                 else:
                     return f"Anthropic: Network error: {str(e)}"
-
+    except FileNotFoundError as e:
+        logging.error(f"Anthropic: File not found: {input_data}")
+        return f"Anthropic: File not found: {input_data}"
+    except json.JSONDecodeError as e:
+        logging.error(f"Anthropic: Invalid JSON format in file: {input_data}")
+        return f"Anthropic: Invalid JSON format in file: {input_data}"
     except Exception as e:
         logging.error(f"Anthropic: Error in processing: {str(e)}")
         return f"Anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
 
 
 # Summarize with Cohere
-def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, system_prompt=None, temp=None):
+def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, system_prompt=None, temp=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     cohere_api_key = None
 
@@ -439,55 +514,90 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
         logging.debug("cohere chat: Submitting request to API endpoint")
         print("cohere chat: Submitting request to API endpoint")
 
-        try:
-            response = requests.post('https://api.cohere.ai/v2/chat', headers=headers, json=data)
-            logging.debug(f"Cohere Chat: Raw API response: {response.text}")
-        except requests.RequestException as e:
-            logging.error(f"Cohere Chat: Error making API request: {str(e)}")
-            return f"Cohere Chat: Error making API request: {str(e)}"
+        if streaming:
+            logging.debug("Cohere: Submitting streaming request to API endpoint")
+            response = requests.post(
+                'https://api.cohere.ai/v1/chat',
+                headers=headers,
+                json=data,
+                stream=True  # Enable response streaming
+            )
+            response.raise_for_status()
 
-        if response.status_code == 200:
-            try:
-                response_data = response.json()
-            except json.JSONDecodeError:
-                logging.error("Cohere Chat: Failed to decode JSON response")
-                return "Cohere Chat: Failed to decode JSON response"
+            def stream_generator():
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        try:
+                            data_json = json.loads(decoded_line)
+                            if 'response' in data_json:
+                                chunk = data_json['response']
+                                yield chunk
+                            elif 'token' in data_json:
+                                # For token-based streaming (if applicable)
+                                chunk = data_json['token']
+                                yield chunk
+                            elif 'text' in data_json:
+                                # For text-based streaming
+                                chunk = data_json['text']
+                                yield chunk
+                            else:
+                                logging.debug(f"Cohere: Unhandled streaming data: {data_json}")
+                        except json.JSONDecodeError:
+                            logging.error(f"Cohere: Error decoding JSON from line: {decoded_line}")
+                            continue
 
-            if response_data is None:
-                logging.error("Cohere Chat: No response data received.")
-                return "Cohere Chat: No response data received."
-
-            logging.debug(f"cohere chat: Full API response data: {json.dumps(response_data, indent=2)}")
-
-            if 'message' in response_data and 'content' in response_data['message']:
-                content = response_data['message']['content']
-                if isinstance(content, list) and len(content) > 0:
-                    # Extract text from the first content block
-                    text = content[0].get('text', '').strip()
-                    if text:
-                        logging.debug("Cohere Chat: Chat request successful")
-                        print("Cohere Chat request processed successfully.")
-                        return text
-                    else:
-                        logging.error("Cohere Chat: 'text' field is empty in response content.")
-                        return "Cohere Chat: 'text' field is empty in response content."
-                else:
-                    logging.error("Cohere Chat: 'content' field is not a list or is empty.")
-                    return "Cohere Chat: 'content' field is not a list or is empty."
-            else:
-                logging.error("Cohere Chat: 'message' or 'content' field not found in API response.")
-                return "Cohere Chat: 'message' or 'content' field not found in API response."
-
-        elif response.status_code == 401:
-            error_message = "Cohere Chat: Unauthorized - Invalid API key"
-            logging.warning(error_message)
-            print(error_message)
-            return error_message
-
+            return stream_generator()
         else:
-            logging.error(f"Cohere Chat: API request failed with status code {response.status_code}: {response.text}")
-            print(f"Cohere Chat: Failed to process chat response, status code {response.status_code}: {response.text}")
-            return f"Cohere Chat: API request failed: {response.text}"
+            try:
+                response = requests.post('https://api.cohere.ai/v2/chat', headers=headers, json=data)
+                logging.debug(f"Cohere Chat: Raw API response: {response.text}")
+            except requests.RequestException as e:
+                logging.error(f"Cohere Chat: Error making API request: {str(e)}")
+                return f"Cohere Chat: Error making API request: {str(e)}"
+
+            if response.status_code == 200:
+                try:
+                    response_data = response.json()
+                except json.JSONDecodeError:
+                    logging.error("Cohere Chat: Failed to decode JSON response")
+                    return "Cohere Chat: Failed to decode JSON response"
+
+                if response_data is None:
+                    logging.error("Cohere Chat: No response data received.")
+                    return "Cohere Chat: No response data received."
+
+                logging.debug(f"cohere chat: Full API response data: {json.dumps(response_data, indent=2)}")
+
+                if 'message' in response_data and 'content' in response_data['message']:
+                    content = response_data['message']['content']
+                    if isinstance(content, list) and len(content) > 0:
+                        # Extract text from the first content block
+                        text = content[0].get('text', '').strip()
+                        if text:
+                            logging.debug("Cohere Chat: Chat request successful")
+                            print("Cohere Chat request processed successfully.")
+                            return text
+                        else:
+                            logging.error("Cohere Chat: 'text' field is empty in response content.")
+                            return "Cohere Chat: 'text' field is empty in response content."
+                    else:
+                        logging.error("Cohere Chat: 'content' field is not a list or is empty.")
+                        return "Cohere Chat: 'content' field is not a list or is empty."
+                else:
+                    logging.error("Cohere Chat: 'message' or 'content' field not found in API response.")
+                    return "Cohere Chat: 'message' or 'content' field not found in API response."
+
+            elif response.status_code == 401:
+                error_message = "Cohere Chat: Unauthorized - Invalid API key"
+                logging.warning(error_message)
+                print(error_message)
+                return error_message
+
+            else:
+                logging.error(f"Cohere Chat: API request failed with status code {response.status_code}: {response.text}")
+                print(f"Cohere Chat: Failed to process chat response, status code {response.status_code}: {response.text}")
+                return f"Cohere Chat: API request failed: {response.text}"
 
     except Exception as e:
         logging.error(f"Cohere Chat: Error in processing: {str(e)}", exc_info=True)
@@ -495,7 +605,7 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
 
 
 # https://console.groq.com/docs/quickstart
-def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     logging.debug("Groq: Summarization process starting...")
     try:
         logging.debug("Groq: Loading and validating configurations")
@@ -585,31 +695,67 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
 
         logging.debug("groq: Submitting request to API endpoint")
         print("groq: Submitting request to API endpoint")
-        response = requests.post('https://api.groq.com/openai/v1/chat/completions', headers=headers, json=data)
+        if streaming:
+            response = requests.post(
+                'https://api.groq.com/openai/v1/chat/completions',
+                headers=headers,
+                json=data,
+                stream=True  # Enable response streaming
+            )
+            response.raise_for_status()
 
-        response_data = response.json()
-        logging.debug(f"Full API response data: {response_data}")
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
 
-        if response.status_code == 200:
-            logging.debug(response_data)
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("groq: Chat request successful")
-                print("Groq: Chat request successful.")
-                return summary
-            else:
-                logging.error("Groq(chat): Expected data not found in API response.")
-                return "Groq(chat): Expected data not found in API response."
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"Groq: Error decoding JSON from line: {line}")
+                            continue
+                # Optionally, you can return the full collected message at the end
+                # yield collected_messages
+
+            return stream_generator()
         else:
-            logging.error(f"groq: API request failed with status code {response.status_code}: {response.text}")
-            return f"groq: API request failed: {response.text}"
+            response = requests.post(
+                'https://api.groq.com/openai/v1/chat/completions',
+                headers=headers,
+                json=data
+            )
+
+            response_data = response.json()
+            logging.debug("API Response Data: %s", response_data)
+
+            if response.status_code == 200:
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Groq: Summarization successful")
+                    return summary
+                else:
+                    logging.error("Groq: Expected data not found in API response.")
+                    return "Groq: Expected data not found in API response."
+            else:
+                logging.error(f"Groq: API request failed with status code {response.status_code}: {response.text}")
+                return f"Groq: API request failed: {response.text}"
 
     except Exception as e:
-        logging.error("groq: Error in processing: %s", str(e))
-        return f"groq: Error occurred while processing summary with groq: {str(e)}"
+        logging.error("Groq: Error in processing: %s", str(e), exc_info=True)
+        return f"Groq: Error occurred while processing summary with Groq: {str(e)}"
 
 
-def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     import requests
     import json
     global openrouter_model, openrouter_api_key
@@ -685,46 +831,107 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
     if system_message is None:
         system_message = "You are a helpful AI assistant who does whatever the user requests."
 
-    try:
-        logging.debug("OpenRouter: Submitting request to API endpoint")
-        print("OpenRouter: Submitting request to API endpoint")
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {openrouter_api_key}",
-            },
-            data=json.dumps({
-                "model": openrouter_model,
-                "messages": [
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": openrouter_prompt}
-                ],
-                "temperature": temp
-            })
-        )
+    if streaming:
+        try:
+            logging.debug("OpenRouter: Submitting streaming request to API endpoint")
+            print("OpenRouter: Submitting streaming request to API endpoint")
 
-        response_data = response.json()
-        logging.debug("Full API Response Data: %s", response_data)
+            # Make streaming request
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {openrouter_api_key}",
+                    "Accept": "text/event-stream",  # Important for streaming
+                },
+                data=json.dumps({
+                    "model": openrouter_model,
+                    "messages": [
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": openrouter_prompt}
+                    ],
+                    #"max_tokens": 4096,
+                    #"top_p": 1.0,
+                    "temperature": temp,
+                    "stream": True
+                }),
+                stream=True  # Enable streaming in requests
+            )
 
-        if response.status_code == 200:
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("openrouter: Chat request successful")
-                print("openrouter: Chat request successful.")
-                return summary
+            if response.status_code == 200:
+                full_response = ""
+                # Process the streaming response
+                for line in response.iter_lines():
+                    if line:
+                        # Remove "data: " prefix and parse JSON
+                        line = line.decode('utf-8')
+                        if line.startswith('data: '):
+                            json_str = line[6:]  # Remove "data: " prefix
+                            if json_str.strip() == '[DONE]':
+                                break
+                            try:
+                                json_data = json.loads(json_str)
+                                if 'choices' in json_data and len(json_data['choices']) > 0:
+                                    delta = json_data['choices'][0].get('delta', {})
+                                    if 'content' in delta:
+                                        content = delta['content']
+                                        print(content, end='', flush=True)  # Print streaming output
+                                        full_response += content
+                            except json.JSONDecodeError:
+                                continue
+
+                logging.debug("openrouter: Streaming completed successfully")
+                return full_response.strip()
             else:
-                logging.error("openrouter: Expected data not found in API response.")
-                return "openrouter: Expected data not found in API response."
-        else:
-            logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
-            return f"openrouter: API request failed: {response.text}"
-    except Exception as e:
-        logging.error("openrouter: Error in processing: %s", str(e))
-        return f"openrouter: Error occurred while processing chat request with openrouter: {str(e)}"
+                error_msg = f"openrouter: Streaming API request failed with status code {response.status_code}: {response.text}"
+                logging.error(error_msg)
+                return error_msg
+
+        except Exception as e:
+            error_msg = f"openrouter: Error occurred while processing stream: {str(e)}"
+            logging.error(error_msg)
+            return error_msg
+    else:
+        try:
+            logging.debug("OpenRouter: Submitting request to API endpoint")
+            print("OpenRouter: Submitting request to API endpoint")
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {openrouter_api_key}",
+                },
+                data=json.dumps({
+                    "model": openrouter_model,
+                    "messages": [
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": openrouter_prompt}
+                    ],
+                    "temperature": temp
+                },
+                streaming=False)
+            )
+
+            response_data = response.json()
+            logging.debug("Full API Response Data: %s", response_data)
+
+            if response.status_code == 200:
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("openrouter: Chat request successful")
+                    print("openrouter: Chat request successful.")
+                    return summary
+                else:
+                    logging.error("openrouter: Expected data not found in API response.")
+                    return "openrouter: Expected data not found in API response."
+            else:
+                logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
+                return f"openrouter: API request failed: {response.text}"
+        except Exception as e:
+            logging.error("openrouter: Error in processing: %s", str(e))
+            return f"openrouter: Error occurred while processing chat request with openrouter: {str(e)}"
 
 
 # FIXME: This function is not yet implemented properly
-def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None, temp=None):
+def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None, temp=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     logging.debug(f"huggingface Chat: Chat request process starting...")
     try:
@@ -763,30 +970,61 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
         }
 
         logging.debug("HuggingFace Chat: Submitting request...")
-        response = requests.post(API_URL, headers=headers, json=data)
-        logging.debug(f"Full API response data: {response.text}")
+        if streaming:
+            response = requests.post(API_URL, headers=headers, json=data, stream=True)
+            response.raise_for_status()
 
-        if response.status_code == 200:
-            response_json = response.json()
-            if "choices" in response_json and len(response_json["choices"]) > 0:
-                generated_text = response_json["choices"][0]["message"]["content"]
-                logging.debug("HuggingFace Chat: Chat request successful")
-                print("HuggingFace Chat: Chat request successful.")
-                return generated_text.strip()
-            else:
-                logging.error("HuggingFace Chat: No generated text in the response")
-                return "HuggingFace Chat: No generated text in the response"
+            def stream_generator():
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line.startswith('data:'):
+                            data_str = decoded_line[len('data:'):].strip()
+                            if data_str == '[DONE]':
+                                break
+                            try:
+                                data_json = json.loads(data_str)
+                                if 'token' in data_json:
+                                    token_text = data_json['token'].get('text', '')
+                                    yield token_text
+                                elif 'generated_text' in data_json:
+                                    # Some models may send the full generated text
+                                    generated_text = data_json['generated_text']
+                                    yield generated_text
+                                else:
+                                    logging.debug(f"HuggingFace: Unhandled streaming data: {data_json}")
+                            except json.JSONDecodeError:
+                                logging.error(f"HuggingFace: Error decoding JSON from line: {decoded_line}")
+                                continue
+                # Optionally, yield the final collected text
+                # yield collected_text
+
+            return stream_generator()
         else:
-            logging.error(
-                f"HuggingFace Chat: Chat request failed with status code {response.status_code}: {response.text}")
-            return f"HuggingFace Chat: Failed to process chat request, status code {response.status_code}: {response.text}"
+            response = requests.post(API_URL, headers=headers, json=data)
+            logging.debug(f"Full API response data: {response.text}")
+
+            if response.status_code == 200:
+                response_json = response.json()
+                if "choices" in response_json and len(response_json["choices"]) > 0:
+                    generated_text = response_json["choices"][0]["message"]["content"]
+                    logging.debug("HuggingFace Chat: Chat request successful")
+                    print("HuggingFace Chat: Chat request successful.")
+                    return generated_text.strip()
+                else:
+                    logging.error("HuggingFace Chat: No generated text in the response")
+                    return "HuggingFace Chat: No generated text in the response"
+            else:
+                logging.error(
+                    f"HuggingFace Chat: Chat request failed with status code {response.status_code}: {response.text}")
+                return f"HuggingFace Chat: Failed to process chat request, status code {response.status_code}: {response.text}"
     except Exception as e:
         logging.error(f"HuggingFace Chat: Error in processing: {str(e)}")
         print(f"HuggingFace Chat: Error occurred while processing chat request with huggingface: {str(e)}")
         return None
 
 
-def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_message="You are a helpful AI assistant who does whatever the user requests.", max_retries=3, retry_delay=5):
+def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_message="You are a helpful AI assistant who does whatever the user requests.", max_retries=3, retry_delay=5, streaming=False):
     """
     Interacts with the DeepSeek API to generate summaries based on input data.
 
@@ -912,29 +1150,65 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
         logging.debug("DeepSeek: Posting request to API")
         for attempt in range(1, max_retries + 1):
             try:
-                response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=payload, timeout=30)
-                logging.debug(f"DeepSeek: Full API response: {response.status_code} - {response.text}")
+                if streaming:
+                    logging.debug("DeepSeek: Posting streaming request")
+                    response = requests.post(
+                        'https://api.deepseek.com/chat/completions',
+                        headers=headers,
+                        json=data,
+                        stream=True
+                    )
+                    response.raise_for_status()
 
-                if response.status_code == 200:
-                    response_data = response.json()
-                    logging.debug(f"DeepSeek: Response JSON: {json.dumps(response_data, indent=2)}")
+                    def stream_generator():
+                        collected_text = ""
+                        for line in response.iter_lines():
+                            if line:
+                                decoded_line = line.decode('utf-8').strip()
+                                if decoded_line == '':
+                                    continue
+                                if decoded_line.startswith('data: '):
+                                    data_str = decoded_line[len('data: '):]
+                                    if data_str == '[DONE]':
+                                        break
+                                    try:
+                                        data_json = json.loads(data_str)
+                                        delta_content = data_json['choices'][0]['delta'].get('content', '')
+                                        collected_text += delta_content
+                                        yield delta_content
+                                    except json.JSONDecodeError:
+                                        logging.error(f"DeepSeek: Error decoding JSON from line: {decoded_line}")
+                                        continue
+                                    except KeyError as e:
+                                        logging.error(f"DeepSeek: Key error: {str(e)} in line: {decoded_line}")
+                                        continue
+                        yield collected_text
 
-                    # Adjust parsing based on actual API response structure
-                    if 'choices' in response_data:
-                        if len(response_data['choices']) > 0:
-                            summary = response_data['choices'][0]['message']['content'].strip()
-                            logging.debug("DeepSeek: Chat request successful")
-                            return summary
-                        else:
-                            logging.error("DeepSeek: 'choices' key is empty in response")
-                    else:
-                        logging.error("DeepSeek: 'choices' key missing in response")
-                    return "DeepSeek: Unexpected response format from API."
-                elif 500 <= response.status_code < 600:
-                    logging.error(f"DeepSeek: Server error (status code {response.status_code}). Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
+                    return stream_generator()
                 else:
-                    logging.error(f"DeepSeek: Request failed with status code {response.status_code}. Response: {response.text}")
-                    return f"DeepSeek: Failed to process chat request. Status code: {response.status_code}"
+                    response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=payload, timeout=30)
+                    logging.debug(f"DeepSeek: Full API response: {response.status_code} - {response.text}")
+
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        logging.debug(f"DeepSeek: Response JSON: {json.dumps(response_data, indent=2)}")
+
+                        # Adjust parsing based on actual API response structure
+                        if 'choices' in response_data:
+                            if len(response_data['choices']) > 0:
+                                summary = response_data['choices'][0]['message']['content'].strip()
+                                logging.debug("DeepSeek: Chat request successful")
+                                return summary
+                            else:
+                                logging.error("DeepSeek: 'choices' key is empty in response")
+                        else:
+                            logging.error("DeepSeek: 'choices' key missing in response")
+                        return "DeepSeek: Unexpected response format from API."
+                    elif 500 <= response.status_code < 600:
+                        logging.error(f"DeepSeek: Server error (status code {response.status_code}). Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
+                    else:
+                        logging.error(f"DeepSeek: Request failed with status code {response.status_code}. Response: {response.text}")
+                        return f"DeepSeek: Failed to process chat request. Status code: {response.status_code}"
 
             except requests.Timeout:
                 logging.error(f"DeepSeek: Request timed out. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
@@ -952,9 +1226,7 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
         return f"DeepSeek: Error occurred while processing chat request: {str(e)}"
 
 
-
-
-def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     logging.debug("Mistral: Chat request made")
     try:
         logging.debug("Mistral: Loading and validating configurations")
@@ -978,7 +1250,7 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
         # Final check to ensure we have a valid API key
         if not mistral_api_key or not mistral_api_key.strip():
             logging.error("Mistral: No valid API key available")
-            return "Mistral: No valid API key available"
+            return "Mistral: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"Mistral: Using API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:]}")
 
@@ -995,7 +1267,9 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
 
         mistral_model = loaded_config_data['models'].get('mistral', "mistral-large-latest")
 
-        temp = float(temp) if temp is not None else 0.2
+        if temp is None:
+            temp = 0.2
+        temp = float(temp)
         if system_message is None:
             system_message = "You are a helpful AI assistant who does whatever the user requests."
 
@@ -1019,33 +1293,80 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
             "temperature": temp,
             "top_p": 1,
             "max_tokens": 4096,
-            "stream": False,
+            "stream": streaming,
             "safe_prompt": False
         }
 
-        logging.debug("Mistral: Posting request")
-        response = requests.post('https://api.mistral.ai/v1/chat/completions', headers=headers, json=data)
-        logging.debug(f"Full API response data: {response}")
-        if response.status_code == 200:
-            response_data = response.json()
-            logging.debug(response_data)
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Mistral: request successful")
-                return summary
-            else:
-                logging.warning("Mistral: Chat response not found in the response data")
-                return "Mistral: Chat response not available"
+        if streaming:
+            logging.debug("Mistral: Posting streaming request")
+            response = requests.post(
+                'https://api.mistral.ai/v1/chat/completions',
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            response.raise_for_status()
+
+            def stream_generator():
+                collected_text = ""
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line == '':
+                            continue
+                        try:
+                            # Assuming the response is in SSE format
+                            if decoded_line.startswith('data:'):
+                                data_str = decoded_line[len('data:'):].strip()
+                                if data_str == '[DONE]':
+                                    break
+                                data_json = json.loads(data_str)
+                                if 'choices' in data_json and len(data_json['choices']) > 0:
+                                    delta_content = data_json['choices'][0]['delta'].get('content', '')
+                                    collected_text += delta_content
+                                    yield delta_content
+                                else:
+                                    logging.error(f"Mistral: Unexpected data format: {data_json}")
+                                    continue
+                            else:
+                                # Handle other event types if necessary
+                                continue
+                        except json.JSONDecodeError:
+                            logging.error(f"Mistral: Error decoding JSON from line: {decoded_line}")
+                            continue
+                        except KeyError as e:
+                            logging.error(f"Mistral: Key error: {str(e)} in line: {decoded_line}")
+                            continue
+                # Optionally, you can return the full collected text at the end
+                # yield collected_text
+            return stream_generator()
         else:
-            logging.error(f"Mistral: Chat request failed with status code {response.status_code}")
-            logging.error(f"Mistral: Error response: {response.text}")
-            return f"Mistral: Failed to process summary. Status code: {response.status_code}. Error: {response.text}"
+            logging.debug("Mistral: Posting non-streaming request")
+            response = requests.post(
+                'https://api.mistral.ai/v1/chat/completions',
+                headers=headers,
+                json=data
+            )
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Mistral: Chat Request successful")
+                    return summary
+                else:
+                    logging.warning("Mistral: Chat response not found in the response data")
+                    return "Mistral: Chat response not available"
+            else:
+                logging.error(f"Mistral: Chat request failed with status code {response.status_code}")
+                logging.error(f"Mistral: Error response: {response.text}")
+                return f"Mistral: Failed to process Chat response. Status code: {response.status_code}"
     except Exception as e:
         logging.error(f"Mistral: Error in processing: {str(e)}", exc_info=True)
         return f"Mistral: Error occurred while processing Chat: {str(e)}"
 
 
-def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     # https://ai.google.dev/api/generate-content#v1beta.GenerationConfig
     loaded_config_data = load_and_log_configs()
     google_api_key = api_key
@@ -1134,24 +1455,56 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
             #"temperature": temp
         }
 
-        logging.debug("Google: Posting request")
-        response = requests.post('https://generativelanguage.googleapis.com/v1beta/chat/completions', headers=headers, json=data)
-        logging.debug(f"Full API response data: {response}")
-        if response.status_code == 200:
-            response_data = response.json()
-            logging.debug(response_data)
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                chat_response = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Google: Chat Sent successfully")
-                logging.debug(f"Google: Chat response: {chat_response}")
-                return chat_response
-            else:
-                logging.warning("Google: Chat response not found in the response data")
-                return "Google: Chat not available"
+        if streaming:
+            logging.debug("Google: Posting streaming request")
+            response = requests.post(
+                'https://generativelanguage.googleapis.com/v1beta/openai/',
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            response.raise_for_status()
+
+            def stream_generator():
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line == '':
+                            continue
+                        if decoded_line.startswith('data: '):
+                            data_str = decoded_line[len('data: '):]
+                            if data_str == '[DONE]':
+                                break
+                            try:
+                                data_json = json.loads(data_str)
+                                chunk = data_json["choices"][0]["delta"].get("content", "")
+                                yield chunk
+                            except json.JSONDecodeError:
+                                logging.error(f"Google: Error decoding JSON from line: {decoded_line}")
+                                continue
+                            except KeyError as e:
+                                logging.error(f"Google: Key error: {str(e)} in line: {decoded_line}")
+                                continue
+            return stream_generator()
         else:
-            logging.error(f"Google: Chat request failed with status code {response.status_code}")
-            logging.error(f"Google: Error response: {response.text}")
-            return f"Google: Failed to process chat response. Status code: {response.status_code}"
+            logging.debug("Google: Posting request")
+            response = requests.post('https://generativelanguage.googleapis.com/v1beta/chat/completions', headers=headers, json=data)
+            logging.debug(f"Full API response data: {response}")
+            if response.status_code == 200:
+                response_data = response.json()
+                logging.debug(response_data)
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    chat_response = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Google: Chat Sent successfully")
+                    logging.debug(f"Google: Chat response: {chat_response}")
+                    return chat_response
+                else:
+                    logging.warning("Google: Chat response not found in the response data")
+                    return "Google: Chat not available"
+            else:
+                logging.error(f"Google: Chat request failed with status code {response.status_code}")
+                logging.error(f"Google: Error response: {response.text}")
+                return f"Google: Failed to process chat response. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
         logging.error(f"Google: Error decoding JSON: {str(e)}", exc_info=True)
         return f"Google: Error decoding JSON input: {str(e)}"
@@ -1161,65 +1514,6 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
     except Exception as e:
         logging.error(f"Google: Unexpected error: {str(e)}", exc_info=True)
         return f"Google: Unexpected error occurred: {str(e)}"
-
-
-# Stashed in here since OpenAI usage.... #FIXME
-# FIXME - https://docs.vllm.ai/en/latest/getting_started/quickstart.html .... Great docs.
-# def chat_with_vllm(input_data, custom_prompt_input, api_key=None, vllm_api_url="http://127.0.0.1:8000/v1/chat/completions", system_prompt=None):
-#     loaded_config_data = load_and_log_configs()
-#     llm_model = loaded_config_data['models']['vllm']
-#     # API key validation
-#     if api_key is None:
-#         logging.info("vLLM: API key not provided as parameter")
-#         logging.info("vLLM: Attempting to use API key from config file")
-#         api_key = loaded_config_data['api_keys']['llama']
-#
-#     if api_key is None or api_key.strip() == "":
-#         logging.info("vLLM: API key not found or is empty")
-#     vllm_client = OpenAI(
-#         base_url=vllm_api_url,
-#         api_key=custom_prompt_input
-#     )
-#
-#     if isinstance(input_data, str) and os.path.isfile(input_data):
-#         logging.debug("vLLM: Loading json data for summarization")
-#         with open(input_data, 'r') as file:
-#             data = json.load(file)
-#     else:
-#         logging.debug("vLLM: Using provided string data for summarization")
-#         data = input_data
-#
-#     logging.debug(f"vLLM: Loaded data: {data}")
-#     logging.debug(f"vLLM: Type of data: {type(data)}")
-#
-#     if isinstance(data, dict) and 'summary' in data:
-#         # If the loaded data is a dictionary and already contains a summary, return it
-#         logging.debug("vLLM: Summary already exists in the loaded data")
-#         return data['summary']
-#
-#     # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-#     if isinstance(data, list):
-#         segments = data
-#         text = extract_text_from_segments(segments)
-#     elif isinstance(data, str):
-#         text = data
-#     else:
-#         raise ValueError("Invalid input data format")
-#
-#
-#     custom_prompt = custom_prompt_input
-#
-#     completion = client.chat.completions.create(
-#         model=llm_model,
-#         messages=[
-#             {"role": "system", "content": f"{system_prompt}"},
-#             {"role": "user", "content": f"{text} \n\n\n\n{custom_prompt}"}
-#         ]
-#     )
-#     vllm_summary = completion.choices[0].message.content
-#     return vllm_summary
-
-
 
 #
 #

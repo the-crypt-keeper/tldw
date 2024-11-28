@@ -52,44 +52,47 @@ def summarize(
     api_name: str,
     api_key: Optional[str],
     temp: Optional[float],
-    system_message: Optional[str]
+    system_message: Optional[str],
+    streaming: Optional[bool] = False
 ) -> str:
     try:
         logging.debug(f"api_name type: {type(api_name)}, value: {api_name}")
         if api_name.lower() == "openai":
-            return summarize_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "anthropic":
-            return summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "cohere":
-            return summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "groq":
-            return summarize_with_groq(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_groq(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "huggingface":
-            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp)
+            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp, streaming)
         elif api_name.lower() == "openrouter":
-            return summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "deepseek":
-            return summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "mistral":
-            return summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "llama.cpp":
-            return summarize_with_llama(input_data, custom_prompt_arg, api_key, temp, system_message)
+            return summarize_with_llama(input_data, custom_prompt_arg, api_key, temp, system_message, streaming)
         elif api_name.lower() == "kobold":
-            return summarize_with_kobold(input_data, api_key, custom_prompt_arg, temp, system_message)
+            return summarize_with_kobold(input_data, api_key, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "ooba":
-            return summarize_with_oobabooga(input_data, api_key, custom_prompt_arg, temp, system_message)
+            return summarize_with_oobabooga(input_data, api_key, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "tabbyapi":
-            return summarize_with_tabbyapi(input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_tabbyapi(input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "vllm":
-            return summarize_with_vllm(input_data, custom_prompt_arg, None, system_message)
+            return summarize_with_vllm(input_data, custom_prompt_arg, None, system_message, streaming)
         elif api_name.lower() == "local-llm":
-            return summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "huggingface":
-            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp, )#system_message)
+            return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp, streaming)#system_message)
         elif api_name.lower() == "custom-openai":
-            return summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp, system_message)
+            return summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
+        elif api_name.lower() == "custom-openai_2":
+            return summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "ollama":
-            return summarize_with_ollama(input_data, custom_prompt_arg, None, api_key, temp, system_message)
+            return summarize_with_ollama(input_data, custom_prompt_arg, None, api_key, temp, system_message, streaming)
         else:
             return f"Error: Invalid API Name {api_name}"
 
@@ -118,7 +121,7 @@ def extract_text_from_segments(segments):
     return text.strip()
 
 
-def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -203,26 +206,59 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
                 {"role": "user", "content": openai_prompt}
             ],
             "max_tokens": 4096,
-            "temperature": temp
+            "temperature": temp,
+            "stream": streaming
         }
 
-        logging.debug("OpenAI: Posting request")
-        response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+        if streaming:
+            response = requests.post(
+                'https://api.openai.com/v1/chat/completions',
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            response.raise_for_status()
 
-        if response.status_code == 200:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("OpenAI: Summarization successful")
-                logging.debug(f"OpenAI: Summary (first 500 chars): {summary[:500]}...")
-                return summary
-            else:
-                logging.warning("OpenAI: Summary not found in the response data")
-                return "OpenAI: Summary not available"
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
+
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"OpenAI: Error decoding JSON from line: {line}")
+                            continue
+
+            return stream_generator()
         else:
-            logging.error(f"OpenAI: Summarization failed with status code {response.status_code}")
-            logging.error(f"OpenAI: Error response: {response.text}")
-            return f"OpenAI: Failed to process summary. Status code: {response.status_code}"
+            logging.debug("OpenAI: Posting request")
+            response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("OpenAI: Summarization successful")
+                    logging.debug(f"OpenAI: Summary (first 500 chars): {summary[:500]}...")
+                    return summary
+                else:
+                    logging.warning("OpenAI: Summary not found in the response data")
+                    return "OpenAI: Summary not available"
+            else:
+                logging.error(f"OpenAI: Summarization failed with status code {response.status_code}")
+                logging.error(f"OpenAI: Error response: {response.text}")
+                return f"OpenAI: Failed to process summary. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
         logging.error(f"OpenAI: Error decoding JSON: {str(e)}", exc_info=True)
         return f"OpenAI: Error decoding JSON input: {str(e)}"
@@ -234,7 +270,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, max_retries=3, retry_delay=5):
+def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, max_retries=3, retry_delay=5):
     logging.debug("Anthropic: Summarization process starting...")
     try:
         logging.debug("Anthropic: Loading and validating configurations")
@@ -258,10 +294,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
         # Final check to ensure we have a valid API key
         if not anthropic_api_key or not anthropic_api_key.strip():
             logging.error("Anthropic: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            #FIXME
-            # For example: raise ValueError("No valid Anthropic API key available")
-
+            return "Anthropic: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"Anthropic: Using API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
 
@@ -274,7 +307,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
             data = input_data
 
         # DEBUG - Debug logging to identify sent data
-        logging.debug(f"AnthropicAI: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        logging.debug(f"AnthropicAI: Loaded data: {str(data)[:500]}...(snipped to first 500 chars)")
         logging.debug(f"AnthropicAI: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -315,7 +348,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
 
         data = {
             "model": model,
-            "max_tokens": 4096,  # max _possible_ tokens to return
+            "max_tokens": 4096,  # max possible tokens to return
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
             "temperature": temp,
@@ -324,57 +357,97 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
             "metadata": {
                 "user_id": "example_user_id",
             },
-            "stream": False,
+            "stream": streaming,
             "system": system_message
         }
 
         for attempt in range(max_retries):
             try:
-                logging.debug("anthropic: Posting request to API")
-                response = requests.post('https://api.anthropic.com/v1/messages', headers=headers, json=data)
+                logging.debug("Anthropic: Posting request to API")
+                response = requests.post(
+                    'https://api.anthropic.com/v1/messages',
+                    headers=headers,
+                    json=data,
+                    stream=streaming
+                )
 
                 # Check if the status code indicates success
                 if response.status_code == 200:
-                    logging.debug("anthropic: Post submittal successful")
-                    response_data = response.json()
-                    try:
-                        summary = response_data['content'][0]['text'].strip()
-                        logging.debug("anthropic: Summarization successful")
-                        print("Summary processed successfully.")
-                        return summary
-                    except (IndexError, KeyError) as e:
-                        logging.debug("anthropic: Unexpected data in response")
-                        print("Unexpected response format from Anthropic API:", response.text)
-                        return None
+                    if streaming:
+                        # Handle streaming response
+                        def stream_generator():
+                            collected_text = ""
+                            event_type = None
+                            for line in response.iter_lines():
+                                line = line.decode('utf-8').strip()
+                                if line == '':
+                                    continue
+                                if line.startswith('event:'):
+                                    event_type = line[len('event:'):].strip()
+                                elif line.startswith('data:'):
+                                    data_str = line[len('data:'):].strip()
+                                    if data_str == '[DONE]':
+                                        break
+                                    try:
+                                        data_json = json.loads(data_str)
+                                        if event_type == 'content_block_delta' and data_json.get('type') == 'content_block_delta':
+                                            delta = data_json.get('delta', {})
+                                            text_delta = delta.get('text', '')
+                                            collected_text += text_delta
+                                            yield text_delta
+                                    except json.JSONDecodeError:
+                                        logging.error(f"Anthropic: Error decoding JSON from line: {line}")
+                                        continue
+                            # Optionally, return the full collected text at the end
+                            # yield collected_text
+                        return stream_generator()
+                    else:
+                        # Non-streaming response
+                        logging.debug("Anthropic: Post submittal successful")
+                        response_data = response.json()
+                        try:
+                            # Extract the assistant's reply from the 'content' field
+                            content_blocks = response_data.get('content', [])
+                            summary = ''
+                            for block in content_blocks:
+                                if block.get('type') == 'text':
+                                    summary += block.get('text', '')
+                            summary = summary.strip()
+                            logging.debug("Anthropic: Summarization successful")
+                            logging.debug(f"Anthropic: Summary (first 500 chars): {summary[:500]}...")
+                            return summary
+                        except Exception as e:
+                            logging.debug("Anthropic: Unexpected data in response")
+                            logging.error(f"Unexpected response format from Anthropic API: {response.text}")
+                            return None
                 elif response.status_code == 500:  # Handle internal server error specifically
-                    logging.debug("anthropic: Internal server error")
-                    print("Internal server error from API. Retrying may be necessary.")
+                    logging.debug("Anthropic: Internal server error")
+                    logging.error("Internal server error from API. Retrying may be necessary.")
                     time.sleep(retry_delay)
                 else:
-                    logging.debug(
-                        f"anthropic: Failed to summarize, status code {response.status_code}: {response.text}")
-                    print(f"Failed to process summary, status code {response.status_code}: {response.text}")
+                    logging.debug(f"Anthropic: Failed to summarize, status code {response.status_code}: {response.text}")
+                    logging.error(f"Failed to process summary, status code {response.status_code}: {response.text}")
                     return None
 
-            except RequestException as e:
-                logging.error(f"anthropic: Network error during attempt {attempt + 1}/{max_retries}: {str(e)}")
+            except requests.RequestException as e:
+                logging.error(f"Anthropic: Network error during attempt {attempt + 1}/{max_retries}: {str(e)}")
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
                 else:
-                    return f"anthropic: Network error: {str(e)}"
+                    return f"Anthropic: Network error: {str(e)}"
     except FileNotFoundError as e:
-        logging.error(f"anthropic: File not found: {input_data}")
-        return f"anthropic: File not found: {input_data}"
+        logging.error(f"Anthropic: File not found: {input_data}")
+        return f"Anthropic: File not found: {input_data}"
     except json.JSONDecodeError as e:
-        logging.error(f"anthropic: Invalid JSON format in file: {input_data}")
-        return f"anthropic: Invalid JSON format in file: {input_data}"
+        logging.error(f"Anthropic: Invalid JSON format in file: {input_data}")
+        return f"Anthropic: Invalid JSON format in file: {input_data}"
     except Exception as e:
-        logging.error(f"anthropic: Error in processing: {str(e)}")
-        return f"anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
+        logging.error(f"Anthropic: Error in processing: {str(e)}")
+        return f"Anthropic: Error occurred while processing summary with Anthropic: {str(e)}"
 
 
 # Summarize with Cohere
-def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     logging.debug("Cohere: Summarization process starting...")
     try:
         logging.debug("Cohere: Loading and validating configurations")
@@ -398,9 +471,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         # Final check to ensure we have a valid API key
         if not cohere_api_key or not cohere_api_key.strip():
             logging.error("Cohere: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # FIXME
-            # For example: raise ValueError("No valid Anthropic API key available")
+            return "Cohere: API Key Not Provided/Found in Config file or is empty"
 
         if custom_prompt_arg is None:
             custom_prompt_arg = ""
@@ -408,7 +479,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         if system_message is None:
             system_message = ""
 
-        logging.debug(f"Cohere: Using API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:]}")
+        logging.debug(f"Cohere: Using API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:] if cohere_api_key else None}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Cohere: Loading json data for summarization")
@@ -419,7 +490,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
             data = input_data
 
         # DEBUG - Debug logging to identify sent data
-        logging.debug(f"Cohere: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        logging.debug(f"Cohere: Loaded data: {str(data)[:500]}...(snipped to first 500 chars)")
         logging.debug(f"Cohere: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
@@ -434,7 +505,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         elif isinstance(data, str):
             text = data
         else:
-            raise ValueError("Invalid input data format")
+            raise ValueError("Cohere: Invalid input data format")
 
         cohere_model = loaded_config_data['models']['cohere']
 
@@ -451,42 +522,82 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         }
 
         cohere_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
-        logging.debug(f"cohere: Prompt being sent is {cohere_prompt}")
+        logging.debug(f"Cohere: Prompt being sent is {cohere_prompt}")
 
         data = {
             "preamble": system_message,
             "message": cohere_prompt,
             "model": cohere_model,
 #            "connectors": [{"id": "web-search"}],
-            "temperature": temp
+            "temperature": temp,
+            "streaming": streaming
         }
 
-        logging.debug("cohere: Submitting request to API endpoint")
-        response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+        if streaming:
+            logging.debug("Cohere: Submitting streaming request to API endpoint")
+            response = requests.post(
+                'https://api.cohere.ai/v1/chat',
+                headers=headers,
+                json=data,
+                stream=True  # Enable response streaming
+            )
+            response.raise_for_status()
 
-        if response.status_code == 200:
-            if 'text' in response_data:
-                summary = response_data['text'].strip()
-                logging.debug("cohere: Summarization successful")
-                print("Summary processed successfully.")
-                return summary
-            else:
-                logging.error("Expected data not found in API response.")
-                return "Expected data not found in API response."
+            def stream_generator():
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        try:
+                            data_json = json.loads(decoded_line)
+                            if 'response' in data_json:
+                                chunk = data_json['response']
+                                yield chunk
+                            elif 'token' in data_json:
+                                # For token-based streaming (if applicable)
+                                chunk = data_json['token']
+                                yield chunk
+                            elif 'text' in data_json:
+                                # For text-based streaming
+                                chunk = data_json['text']
+                                yield chunk
+                            else:
+                                logging.debug(f"Cohere: Unhandled streaming data: {data_json}")
+                        except json.JSONDecodeError:
+                            logging.error(f"Cohere: Error decoding JSON from line: {decoded_line}")
+                            continue
+
+            return stream_generator()
         else:
-            logging.error(f"cohere: API request failed with status code {response.status_code}: {response.text}")
-            print(f"Failed to process summary, status code {response.status_code}: {response.text}")
-            return f"cohere: API request failed: {response.text}"
+            logging.debug("Cohere: Submitting request to API endpoint")
+            response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
+            response_data = response.json()
+            logging.debug("API Response Data: %s", response_data)
+
+            if response.status_code == 200:
+                if 'text' in response_data:
+                    summary = response_data['text'].strip()
+                    logging.debug("Cohere: Summarization successful")
+                    return summary
+                elif 'response' in response_data:
+                    # Adjust if the API returns 'response' field instead of 'text'
+                    summary = response_data['response'].strip()
+                    logging.debug("Cohere: Summarization successful")
+                    return summary
+                else:
+                    logging.error("Cohere: Expected data not found in API response.")
+                    return "Cohere: Expected data not found in API response."
+            else:
+                logging.error(f"Cohere: API request failed with status code {response.status_code}: {response.text}")
+                return f"Cohere: API request failed: {response.text}"
 
     except Exception as e:
-        logging.error("cohere: Error in processing: %s", str(e))
-        return f"cohere: Error occurred while processing summary with Cohere: {str(e)}"
+        logging.error("Cohere: Error in processing: %s", str(e), exc_info=True)
+        return f"Cohere: Error occurred while processing summary with Cohere: {str(e)}"
+
 
 
 # https://console.groq.com/docs/quickstart
-def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     logging.debug("Groq: Summarization process starting...")
     try:
         logging.debug("Groq: Loading and validating configurations")
@@ -509,32 +620,29 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, syste
 
         # Final check to ensure we have a valid API key
         if not groq_api_key or not groq_api_key.strip():
-            logging.error("Anthropic: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # FIXME
-            # For example: raise ValueError("No valid Anthropic API key available")
+            logging.error("Groq: No valid API key available")
+            return "Groq: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"Groq: Using API Key: {groq_api_key[:5]}...{groq_api_key[-5:]}")
 
-        # Transcript data handling & Validation
+        # Input data handling
         if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("Groq: Loading json data for summarization")
+            logging.debug("Groq: Loading JSON data for summarization")
             with open(input_data, 'r') as file:
                 data = json.load(file)
         else:
             logging.debug("Groq: Using provided string data for summarization")
             data = input_data
 
-        # DEBUG - Debug logging to identify sent data
-        logging.debug(f"Groq: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        # Debug logging to identify sent data
+        logging.debug(f"Groq: Loaded data: {str(data)[:500]}...(snipped to first 500 chars)")
         logging.debug(f"Groq: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
             logging.debug("Groq: Summary already exists in the loaded data")
             return data['summary']
 
-        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        # Text extraction
         if isinstance(data, list):
             segments = data
             text = extract_text_from_segments(segments)
@@ -558,7 +666,7 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, syste
         }
 
         groq_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
-        logging.debug("groq: Prompt being sent is {groq_prompt}")
+        logging.debug(f"Groq: Prompt being sent is {groq_prompt}")
 
         data = {
             "messages": [
@@ -572,35 +680,72 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, syste
                 }
             ],
             "model": groq_model,
-            "temperature": temp
+            "temperature": temp,
+            "stream": streaming
         }
 
-        logging.debug("groq: Submitting request to API endpoint")
-        print("groq: Submitting request to API endpoint")
-        response = requests.post('https://api.groq.com/openai/v1/chat/completions', headers=headers, json=data)
+        logging.debug("Groq: Submitting request to API endpoint")
+        if streaming:
+            response = requests.post(
+                'https://api.groq.com/openai/v1/chat/completions',
+                headers=headers,
+                json=data,
+                stream=True  # Enable response streaming
+            )
+            response.raise_for_status()
 
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
 
-        if response.status_code == 200:
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("groq: Summarization successful")
-                print("Summarization successful.")
-                return summary
-            else:
-                logging.error("Expected data not found in API response.")
-                return "Expected data not found in API response."
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"Groq: Error decoding JSON from line: {line}")
+                            continue
+                # Optionally, you can return the full collected message at the end
+                # yield collected_messages
+
+            return stream_generator()
         else:
-            logging.error(f"groq: API request failed with status code {response.status_code}: {response.text}")
-            return f"groq: API request failed: {response.text}"
+            response = requests.post(
+                'https://api.groq.com/openai/v1/chat/completions',
+                headers=headers,
+                json=data
+            )
+
+            response_data = response.json()
+            logging.debug("API Response Data: %s", response_data)
+
+            if response.status_code == 200:
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Groq: Summarization successful")
+                    return summary
+                else:
+                    logging.error("Groq: Expected data not found in API response.")
+                    return "Groq: Expected data not found in API response."
+            else:
+                logging.error(f"Groq: API request failed with status code {response.status_code}: {response.text}")
+                return f"Groq: API request failed: {response.text}"
 
     except Exception as e:
-        logging.error("groq: Error in processing: %s", str(e))
-        return f"groq: Error occurred while processing summary with groq: {str(e)}"
+        logging.error("Groq: Error in processing: %s", str(e), exc_info=True)
+        return f"Groq: Error occurred while processing summary with Groq: {str(e)}"
 
 
-def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,):
     import requests
     import json
     global openrouter_model, openrouter_api_key
@@ -675,45 +820,109 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None,
     if system_message is None:
         system_message = "You are a helpful AI assistant who does whatever the user requests."
 
-    try:
-        logging.debug("OpenRouter: Submitting request to API endpoint")
-        print("OpenRouter: Submitting request to API endpoint")
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {openrouter_api_key}",
-            },
-            data=json.dumps({
-                "model": openrouter_model,
-                "messages": [
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": openrouter_prompt}
-                ],
-                "temperature": temp
-            })
-        )
+    if streaming:
+        try:
+            logging.debug("OpenRouter: Submitting streaming request to API endpoint")
+            print("OpenRouter: Submitting streaming request to API endpoint")
 
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+            # Make streaming request
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {openrouter_api_key}",
+                    "Accept": "text/event-stream",  # Important for streaming
+                },
+                data=json.dumps({
+                    "model": openrouter_model,
+                    "messages": [
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": openrouter_prompt}
+                    ],
+                    #"max_tokens": 4096,
+                    #"top_p": 1.0,
+                    "temperature": temp,
+                    "stream": True
+                }),
+                stream=True  # Enable streaming in requests
+            )
 
-        if response.status_code == 200:
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("openrouter: Summarization successful")
-                print("openrouter: Summarization successful.")
-                return summary
+            if response.status_code == 200:
+                full_response = ""
+                # Process the streaming response
+                for line in response.iter_lines():
+                    if line:
+                        # Remove "data: " prefix and parse JSON
+                        line = line.decode('utf-8')
+                        if line.startswith('data: '):
+                            json_str = line[6:]  # Remove "data: " prefix
+                            if json_str.strip() == '[DONE]':
+                                break
+                            try:
+                                json_data = json.loads(json_str)
+                                if 'choices' in json_data and len(json_data['choices']) > 0:
+                                    delta = json_data['choices'][0].get('delta', {})
+                                    if 'content' in delta:
+                                        content = delta['content']
+                                        print(content, end='', flush=True)  # Print streaming output
+                                        full_response += content
+                            except json.JSONDecodeError:
+                                continue
+
+                logging.debug("openrouter: Streaming completed successfully")
+                return full_response.strip()
             else:
-                logging.error("openrouter: Expected data not found in API response.")
-                return "openrouter: Expected data not found in API response."
-        else:
-            logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
-            return f"openrouter: API request failed: {response.text}"
-    except Exception as e:
-        logging.error("openrouter: Error in processing: %s", str(e))
-        return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
+                error_msg = f"openrouter: Streaming API request failed with status code {response.status_code}: {response.text}"
+                logging.error(error_msg)
+                return error_msg
+
+        except Exception as e:
+            error_msg = f"openrouter: Error occurred while processing stream: {str(e)}"
+            logging.error(error_msg)
+            return error_msg
+    else:
+        try:
+            logging.debug("OpenRouter: Submitting request to API endpoint")
+            print("OpenRouter: Submitting request to API endpoint")
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {openrouter_api_key}",
+                },
+                data=json.dumps({
+                    "model": openrouter_model,
+                    "messages": [
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": openrouter_prompt}
+                    ],
+                    #"max_tokens": 4096,
+                    #"top_p": 1.0,
+                    "temperature": temp,
+                    #"stream": streaming
+                })
+            )
+
+            response_data = response.json()
+            logging.debug("API Response Data: %s", response_data)
+
+            if response.status_code == 200:
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("openrouter: Summarization successful")
+                    print("openrouter: Summarization successful.")
+                    return summary
+                else:
+                    logging.error("openrouter: Expected data not found in API response.")
+                    return "openrouter: Expected data not found in API response."
+            else:
+                logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
+                return f"openrouter: API request failed: {response.text}"
+        except Exception as e:
+            logging.error("openrouter: Error in processing: %s", str(e))
+            return f"openrouter: Error occurred while processing summary with openrouter: {str(e)}"
 
 
-def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None):
+def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None, streaming=False,):
+    # https://huggingface.co/docs/api-inference/tasks/chat-completion
     loaded_config_data = load_and_log_configs()
     logging.debug("HuggingFace: Summarization process starting...")
     try:
@@ -779,34 +988,72 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
             temp = 0.1
         temp = float(temp)
         huggingface_prompt = f"{custom_prompt_arg}\n\n\n{text}"
-        logging.debug("huggingface: Prompt being sent is {huggingface_prompt}")
-        data = {
+        logging.debug(f"HuggingFace: Prompt being sent is {huggingface_prompt}")
+        data_payload = {
             "inputs": huggingface_prompt,
             "max_tokens": 4096,
-            "stream": False,
+            "stream": streaming,
             "temperature": temp
         }
 
-        logging.debug("huggingface: Submitting request...")
-        response = requests.post(API_URL, headers=headers, json=data)
+        logging.debug("HuggingFace: Submitting request...")
+        if streaming:
+            response = requests.post(API_URL, headers=headers, json=data_payload, stream=True)
+            response.raise_for_status()
 
-        if response.status_code == 200:
-            print(response.json())
-            chat_response = response.json()[0]['generated_text'].strip()
-            logging.debug("huggingface: Summarization successful")
-            print("Chat request successful.")
-            return chat_response
+            def stream_generator():
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line.startswith('data:'):
+                            data_str = decoded_line[len('data:'):].strip()
+                            if data_str == '[DONE]':
+                                break
+                            try:
+                                data_json = json.loads(data_str)
+                                if 'token' in data_json:
+                                    token_text = data_json['token'].get('text', '')
+                                    yield token_text
+                                elif 'generated_text' in data_json:
+                                    # Some models may send the full generated text
+                                    generated_text = data_json['generated_text']
+                                    yield generated_text
+                                else:
+                                    logging.debug(f"HuggingFace: Unhandled streaming data: {data_json}")
+                            except json.JSONDecodeError:
+                                logging.error(f"HuggingFace: Error decoding JSON from line: {decoded_line}")
+                                continue
+                # Optionally, yield the final collected text
+                # yield collected_text
+
+            return stream_generator()
         else:
-            logging.error(f"huggingface: Summarization failed with status code {response.status_code}: {response.text}")
-            return f"Failed to process summary, status code {response.status_code}: {response.text}"
+            response = requests.post(API_URL, headers=headers, json=data_payload)
+
+            if response.status_code == 200:
+                response_json = response.json()
+                logging.debug(f"HuggingFace: Response JSON: {response_json}")
+                if isinstance(response_json, dict) and 'generated_text' in response_json:
+                    chat_response = response_json['generated_text'].strip()
+                elif isinstance(response_json, list) and len(response_json) > 0 and 'generated_text' in response_json[0]:
+                    chat_response = response_json[0]['generated_text'].strip()
+                else:
+                    logging.error("HuggingFace: Expected 'generated_text' in response")
+                    return "HuggingFace: Expected 'generated_text' in API response."
+
+                logging.debug("HuggingFace: Summarization successful")
+                return chat_response
+            else:
+                logging.error(f"HuggingFace: Summarization failed with status code {response.status_code}: {response.text}")
+                return f"HuggingFace: Failed to process summary. Status code: {response.status_code}"
 
     except Exception as e:
-        logging.error("huggingface: Error in processing: %s", str(e))
-        print(f"Error occurred while processing summary with huggingface: {str(e)}")
-        return None
+        logging.error("HuggingFace: Error in processing: %s", str(e), exc_info=True)
+        return f"HuggingFace: Error occurred while processing summary with HuggingFace: {str(e)}"
 
 
-def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
+    # https://api-docs.deepseek.com/api/create-chat-completion
     logging.debug("DeepSeek: Summarization process starting...")
     try:
         logging.debug("DeepSeek: Loading and validating configurations")
@@ -830,10 +1077,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
         # Final check to ensure we have a valid API key
         if not deepseek_api_key or not deepseek_api_key.strip():
             logging.error("DeepSeek: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # FIXME
-            # For example: raise ValueError("No valid deepseek API key available")
-
+            return "DeepSeek: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"DeepSeek: Using API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:]}")
 
@@ -847,11 +1091,10 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
             data = input_data
 
         # DEBUG - Debug logging to identify sent data
-        logging.debug(f"DeepSeek: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        logging.debug(f"DeepSeek: Loaded data: {str(data)[:500]}...(snipped to first 500 chars)")
         logging.debug(f"DeepSeek: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
             logging.debug("DeepSeek: Summary already exists in the loaded data")
             return data['summary']
 
@@ -873,13 +1116,13 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
             system_message = "You are a helpful AI assistant who does whatever the user requests."
 
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'Authorization': f'Bearer {deepseek_api_key}',
             'Content-Type': 'application/json'
         }
 
         logging.debug(
-            f"Deepseek API Key: {api_key[:5]}...{api_key[-5:] if api_key else None}")
-        logging.debug("openai: Preparing data + prompt for submittal")
+            f"DeepSeek API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:] if deepseek_api_key else None}")
+        logging.debug("DeepSeek: Preparing data + prompt for submission")
         deepseek_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         data = {
             "model": deepseek_model,
@@ -887,32 +1130,67 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": deepseek_prompt}
             ],
-            "stream": False,
+            "stream": streaming,
             "temperature": temp
         }
 
-        logging.debug("DeepSeek: Posting request")
-        response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=data)
+        if streaming:
+            logging.debug("DeepSeek: Posting streaming request")
+            response = requests.post(
+                'https://api.deepseek.com/chat/completions',
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            response.raise_for_status()
 
-        if response.status_code == 200:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("DeepSeek: Summarization successful")
-                return summary
-            else:
-                logging.warning("DeepSeek: Summary not found in the response data")
-                return "DeepSeek: Summary not available"
+            def stream_generator():
+                collected_text = ""
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line == '':
+                            continue
+                        if decoded_line.startswith('data: '):
+                            data_str = decoded_line[len('data: '):]
+                            if data_str == '[DONE]':
+                                break
+                            try:
+                                data_json = json.loads(data_str)
+                                delta_content = data_json['choices'][0]['delta'].get('content', '')
+                                collected_text += delta_content
+                                yield delta_content
+                            except json.JSONDecodeError:
+                                logging.error(f"DeepSeek: Error decoding JSON from line: {decoded_line}")
+                                continue
+                            except KeyError as e:
+                                logging.error(f"DeepSeek: Key error: {str(e)} in line: {decoded_line}")
+                                continue
+                yield collected_text
+            return stream_generator()
         else:
-            logging.error(f"DeepSeek: Summarization failed with status code {response.status_code}")
-            logging.error(f"DeepSeek: Error response: {response.text}")
-            return f"DeepSeek: Failed to process summary. Status code: {response.status_code}"
+            logging.debug("DeepSeek: Posting request")
+            response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=data)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("DeepSeek: Summarization successful")
+                    return summary
+                else:
+                    logging.warning("DeepSeek: Summary not found in the response data")
+                    return "DeepSeek: Summary not available"
+            else:
+                logging.error(f"DeepSeek: Summarization failed with status code {response.status_code}")
+                logging.error(f"DeepSeek: Error response: {response.text}")
+                return f"DeepSeek: Failed to process summary. Status code: {response.status_code}"
     except Exception as e:
         logging.error(f"DeepSeek: Error in processing: {str(e)}", exc_info=True)
         return f"DeepSeek: Error occurred while processing summary: {str(e)}"
 
 
-def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     logging.debug("Mistral: Summarization process starting...")
     try:
         logging.debug("Mistral: Loading and validating configurations")
@@ -936,10 +1214,7 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
         # Final check to ensure we have a valid API key
         if not mistral_api_key or not mistral_api_key.strip():
             logging.error("Mistral: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # FIXME
-            # For example: raise ValueError("No valid deepseek API key available")
-
+            return "Mistral: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"Mistral: Using API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:]}")
 
@@ -953,11 +1228,10 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
             data = input_data
 
         # DEBUG - Debug logging to identify sent data
-        logging.debug(f"Mistral: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        logging.debug(f"Mistral: Loaded data: {str(data)[:500]}...(snipped to first 500 chars)")
         logging.debug(f"Mistral: Type of data: {type(data)}")
 
         if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
             logging.debug("Mistral: Summary already exists in the loaded data")
             return data['summary']
 
@@ -983,47 +1257,92 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
             'Content-Type': 'application/json'
         }
 
-        logging.debug(
-            f"Deepseek API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
-        logging.debug("Mistral: Preparing data + prompt for submittal")
+        logging.debug(f"Mistral API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
+        logging.debug("Mistral: Preparing data + prompt for submission")
         mistral_prompt = f"{custom_prompt_arg}\n\n\n\n{text} "
         data = {
             "model": mistral_model,
             "messages": [
-                {"role": "system",
-                 "content": system_message},
-                {"role": "user",
-                "content": mistral_prompt}
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": mistral_prompt}
             ],
             "temperature": temp,
             "top_p": 1,
             "max_tokens": 4096,
-            "stream": "false",
-            "safe_prompt": "false"
+            "stream": streaming,
+            "safe_prompt": False
         }
 
-        logging.debug("Mistral: Posting request")
-        response = requests.post('https://api.mistral.ai/v1/chat/completions', headers=headers, json=data)
+        if streaming:
+            logging.debug("Mistral: Posting streaming request")
+            response = requests.post(
+                'https://api.mistral.ai/v1/chat/completions',
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            response.raise_for_status()
 
-        if response.status_code == 200:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Mistral: Summarization successful")
-                return summary
-            else:
-                logging.warning("Mistral: Summary not found in the response data")
-                return "Mistral: Summary not available"
+            def stream_generator():
+                collected_text = ""
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line == '':
+                            continue
+                        try:
+                            # Assuming the response is in SSE format
+                            if decoded_line.startswith('data:'):
+                                data_str = decoded_line[len('data:'):].strip()
+                                if data_str == '[DONE]':
+                                    break
+                                data_json = json.loads(data_str)
+                                if 'choices' in data_json and len(data_json['choices']) > 0:
+                                    delta_content = data_json['choices'][0]['delta'].get('content', '')
+                                    collected_text += delta_content
+                                    yield delta_content
+                                else:
+                                    logging.error(f"Mistral: Unexpected data format: {data_json}")
+                                    continue
+                            else:
+                                # Handle other event types if necessary
+                                continue
+                        except json.JSONDecodeError:
+                            logging.error(f"Mistral: Error decoding JSON from line: {decoded_line}")
+                            continue
+                        except KeyError as e:
+                            logging.error(f"Mistral: Key error: {str(e)} in line: {decoded_line}")
+                            continue
+                # Optionally, you can return the full collected text at the end
+                # yield collected_text
+            return stream_generator()
         else:
-            logging.error(f"Mistral: Summarization failed with status code {response.status_code}")
-            logging.error(f"Mistral: Error response: {response.text}")
-            return f"Mistral: Failed to process summary. Status code: {response.status_code}"
+            logging.debug("Mistral: Posting non-streaming request")
+            response = requests.post(
+                'https://api.mistral.ai/v1/chat/completions',
+                headers=headers,
+                json=data
+            )
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Mistral: Summarization successful")
+                    return summary
+                else:
+                    logging.warning("Mistral: Summary not found in the response data")
+                    return "Mistral: Summary not available"
+            else:
+                logging.error(f"Mistral: Summarization failed with status code {response.status_code}")
+                logging.error(f"Mistral: Error response: {response.text}")
+                return f"Mistral: Failed to process summary. Status code: {response.status_code}"
     except Exception as e:
         logging.error(f"Mistral: Error in processing: {str(e)}", exc_info=True)
         return f"Mistral: Error occurred while processing summary: {str(e)}"
 
 
-def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -1107,27 +1426,60 @@ def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, sys
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": google_prompt}
             ],
+            "stream": streaming,
             #"max_tokens": 4096,
             #"temperature": temp
         }
 
-        logging.debug("Google: Posting request")
-        response = requests.post('https://generativelanguage.googleapis.com/v1beta/', headers=headers, json=data)
+        if streaming:
+            logging.debug("Google: Posting streaming request")
+            response = requests.post(
+                'https://generativelanguage.googleapis.com/v1beta/openai/',
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            response.raise_for_status()
 
-        if response.status_code == 200:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Google: Summarization successful")
-                logging.debug(f"Google: Summary (first 500 chars): {summary[:500]}...")
-                return summary
-            else:
-                logging.warning("Google: Summary not found in the response data")
-                return "Google: Summary not available"
+            def stream_generator():
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line == '':
+                            continue
+                        if decoded_line.startswith('data: '):
+                            data_str = decoded_line[len('data: '):]
+                            if data_str == '[DONE]':
+                                break
+                            try:
+                                data_json = json.loads(data_str)
+                                chunk = data_json["choices"][0]["delta"].get("content", "")
+                                yield chunk
+                            except json.JSONDecodeError:
+                                logging.error(f"Google: Error decoding JSON from line: {decoded_line}")
+                                continue
+                            except KeyError as e:
+                                logging.error(f"Google: Key error: {str(e)} in line: {decoded_line}")
+                                continue
+            return stream_generator()
         else:
-            logging.error(f"Google: Summarization failed with status code {response.status_code}")
-            logging.error(f"Google: Error response: {response.text}")
-            return f"Google: Failed to process summary. Status code: {response.status_code}"
+            logging.debug("Google: Posting request")
+            response = requests.post('https://generativelanguage.googleapis.com/v1beta/openai/', headers=headers, json=data)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Google: Summarization successful")
+                    logging.debug(f"Google: Summary (first 500 chars): {summary[:500]}...")
+                    return summary
+                else:
+                    logging.warning("Google: Summary not found in the response data")
+                    return "Google: Summary not available"
+            else:
+                logging.error(f"Google: Summarization failed with status code {response.status_code}")
+                logging.error(f"Google: Error response: {response.text}")
+                return f"Google: Failed to process summary. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
         logging.error(f"Google: Error decoding JSON: {str(e)}", exc_info=True)
         return f"Google: Error decoding JSON input: {str(e)}"
@@ -1611,7 +1963,8 @@ def process_url(
         diarize=False,
         recursive_summarization=False,
         temp=None,
-        system_message=None):
+        system_message=None,
+        streaming=False,):
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
     set_max_txt_chunk_words = max_words
@@ -1725,36 +2078,39 @@ def process_url(
             for chunk in chunked_transcriptions:
                 summarized_chunks = []
                 if api_name == "anthropic":
-                    summary = summarize_with_anthropic(api_key, chunk, custom_prompt_input)
+                    summary = summarize_with_anthropic(api_key, chunk, custom_prompt_input, streaming=False)
                 elif api_name == "cohere":
-                    summary = summarize_with_cohere(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_cohere(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "openai":
-                    summary = summarize_with_openai(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_openai(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "Groq":
-                    summary = summarize_with_groq(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_groq(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "DeepSeek":
-                    summary = summarize_with_deepseek(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_deepseek(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "OpenRouter":
-                    summary = summarize_with_openrouter(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_openrouter(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "Mistral":
-                    summary = summarize_with_mistral(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_mistral(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 elif api_name == "Google":
-                    summary = summarize_with_google(api_key, chunk, custom_prompt_input, temp, system_message)
+                    summary = summarize_with_google(api_key, chunk, custom_prompt_input, temp, system_message, streaming)
                 # Local LLM APIs
                 elif api_name == "Llama.cpp":
-                    summary = summarize_with_llama(chunk, custom_prompt_input, api_key, temp, system_message)
+                    summary = summarize_with_llama(chunk, custom_prompt_input, api_key, temp, system_message, streaming)
                 elif api_name == "Kobold":
-                    summary = summarize_with_kobold(chunk, None, custom_prompt_input, system_message, temp)
+                    summary = summarize_with_kobold(chunk, None, custom_prompt_input, system_message, temp, streaming)
                 elif api_name == "Ooba":
-                    summary = summarize_with_oobabooga(chunk, None, custom_prompt_input, system_message, temp)
+                    summary = summarize_with_oobabooga(chunk, None, custom_prompt_input, system_message, temp, streaming)
                 elif api_name == "Tabbyapi":
-                    summary = summarize_with_tabbyapi(chunk, custom_prompt_input, system_message, None, temp)
+                    summary = summarize_with_tabbyapi(chunk, custom_prompt_input, system_message, None, temp, streaming)
                 elif api_name == "VLLM":
-                    summary = summarize_with_vllm(chunk, custom_prompt_input, None, None, system_message)
+                    summary = summarize_with_vllm(chunk, custom_prompt_input, None, None, system_message, streaming)
                 elif api_name == "Ollama":
-                    summary = summarize_with_ollama(chunk, custom_prompt_input, api_key, temp, system_message, None)
+                    summary = summarize_with_ollama(chunk, custom_prompt_input, api_key, temp, system_message, None, streaming)
                 elif api_name == "custom_openai_api":
-                    summary = summarize_with_custom_openai(chunk, custom_prompt_input, api_key, temp=None, system_message=None)
+                    summary = summarize_with_custom_openai(chunk, custom_prompt_input, api_key, temp=None, system_message=None, streaming=streaming)
+                #elif api_name == "custom_openai_api_2":
+                    #summary = summarize_with_custom_openai_2(chunk, custom_prompt_input, api_key, temp=None,
+                    #                                       system_message=None, streaming)
 
                 summarized_chunk_transcriptions.append(summary)
 
