@@ -85,10 +85,12 @@ for local development.
 
     Now you can make your changes locally.
 
-1.  (WIP, for now, just use pytest ./Tests/ or Github Actions)When you're done making changes, check that your changes pass flake8
+1.  When you're done making changes, check that your changes pass flake8
     and the tests, including testing other Python versions with tox:
 
-        $ tox
+        $ flake8 App_Function_Libraries/<your_file>.py
+        $ pytest Tests/test_<your_test>.py
+        $ tox (WIP) 
 
 1.  Commit your changes and push your branch to GitHub:
 

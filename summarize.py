@@ -547,7 +547,7 @@ def main(input_path, api_name=None, api_key=None,
                         transcription_text = {'audio_file': audio_file, 'transcription': segments}
 
                     # FIXME rolling summarization
-                    if rolling_summarization == True:
+                    if rolling_summarization:
                         pass
                     #     text = extract_text_from_segments(segments)
                     #     detail = detail_level
@@ -571,7 +571,6 @@ def main(input_path, api_name=None, api_key=None,
                     #                                          max_paragraphs, chunk_text_by_tokens,
                     #                                          max_tokens, summarize_recursively, verbose
                     #                                          )
-
 
                     elif api_name:
                         summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key)
@@ -718,8 +717,8 @@ def main(input_path, api_name=None, api_key=None,
 
                     # FIXME
                     if rolling_summarization:
-                    #     text = extract_text_from_segments(segments)
-                    #     summary = summarize_with_detail_openai(text, detail=detail)
+                        #text = extract_text_from_segments(segments)
+                        #summary = summarize_with_detail_openai(text, detail=detail)
                         pass
                     elif api_name:
                         summary = perform_summarization(api_name, transcription_text, custom_prompt_input, api_key)
@@ -751,12 +750,13 @@ def signal_handler(sig, frame):
     logging.debug(f"Active threads after shutdown: {threading.enumerate()}")
     sys.exit(0)
 
+
 signal.signal(signal.SIGINT, signal_handler)
 
 
-############################## MAIN ##############################
+####################################################################################################################
 #
-#
+# MAIN
 
 if __name__ == "__main__":
     # Register signal handlers
@@ -1014,9 +1014,14 @@ Sample commands:
             logging.error('An error occurred during the transcription process.')
             logging.error(str(e))
             sys.exit(1)
+
     def cleanup():
         logging.info("Cleanup function called. Script is exiting.")
 
     atexit.register(cleanup)
     # Register the cleanup function to run on exit
     atexit.register(cleanup_downloads)
+
+#
+# End of summarize.py
+#######################################################################################################################
