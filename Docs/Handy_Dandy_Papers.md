@@ -15,6 +15,9 @@
 ### Personalization
     https://arxiv.org/abs/2411.16034
 
+### Quantization
+    https://arxiv.org/abs/2411.17691
+
 
 ### RAG
     https://arxiv.org/html/2407.21059v1
