@@ -1,5 +1,5 @@
 
-https://wafris.org/blog/rearchitecting-for-sqlite
+
 
 Multi-modal support
 Collaborative features: Consider adding features that allow multiple users to collaborate on content analysis, annotation, or editing. This could include shared workspaces or real-time collaborative editing.

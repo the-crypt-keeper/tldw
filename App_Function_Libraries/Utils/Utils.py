@@ -231,6 +231,7 @@ def load_and_log_configs():
 
         # Local-Models
         kobold_api_ip = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
+        kobold_openai_api_IP = config.get('Local-API', 'kobold_openai_api_IP', fallback='http://127.0.0.1:5001/v1/chat/completions')
         kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
@@ -335,6 +336,7 @@ def load_and_log_configs():
             },
             'local_api_ip': {
                 'kobold': kobold_api_ip,
+                'kobold_openai': kobold_openai_api_IP,
                 'llama': llama_api_IP,
                 'ooba': ooba_api_IP,
                 'tabby': tabby_api_IP,

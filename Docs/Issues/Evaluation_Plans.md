@@ -15,14 +15,27 @@ https://eugeneyan.com/writing/evals/
 Benchmarking with distilabel
     https://distilabel.argilla.io/latest/sections/pipeline_samples/examples/benchmarking_with_distilabel/
 
+General Research
+    https://arxiv.org/abs/2407.10457
+    https://arxiv.org/abs/2410.01392
+    https://arxiv.org/pdf/2411.09213
+    https://arxiv.org/abs/2411.00640
+    https://ai.gopubby.com/5-ml-techniques-to-boost-your-model-accuracy-without-adding-more-data-94413189aaad?source=collection_home---4------9-----------------------
+    https://arxiv.org/abs/2411.10541
+    https://github.com/DanielWarfield1/MLWritingAndResearch/blob/main/AutoMix.ipynb
 
 Chat arena
     https://github.com/lm-sys/FastChat
 LLM-as-judge
+    https://huggingface.co/spaces/AtlaAI/judge-arena
     https://huggingface.co/learn/cookbook/en/llm_judge
     https://github.com/open-compass/CompassJudger
     https://hamel.dev/blog/posts/llm-judge
-    https://huggingface.co/spaces/AtlaAI/judge-arena
+    https://llm-as-a-judge.github.io/
+    https://github.com/llm-as-a-judge/Awesome-LLM-as-a-judge
+    https://deepmind.google/research/publications/85420/
+    https://arxiv.org/abs/2411.16646
+
 Quant Eval
 https://arxiv.org/abs/2411.02355
 
@@ -33,7 +46,7 @@ Creating Datasets
         https://www.youtube.com/watch?v=ZsCqrAhzkFU
         https://www.youtube.com/watch?v=jWrtgf2w4VU
         https://www.youtube.com/watch?v=ZsCqrAhzkFU
-
+        https://github.com/argilla-io/argilla-cookbook/blob/main/domain-eval/README.md
 
 Finetuning
     https://huggingface.co/learn/cookbook/enterprise_cookbook_argilla
@@ -135,6 +148,8 @@ Finetuning
     - EvalAI
     - FlashRAG
         - https://github.com/RUC-NLPIR/FlashRAG
+    - Olmes
+        - https://github.com/allenai/olmes
 
 - **Citations**
     - L-CiteEval
@@ -173,6 +188,7 @@ Finetuning
     - HelloBench
         - https://github.com/Quehry/HelloBench
         - https://arxiv.org/abs/2409.16191
+    - https://github.com/jonathan-roberts1/needle-threading/
 - **Creative Writing**
     - EQ Bench
         - https://eqbench.com/creative_writing.html
@@ -180,11 +196,14 @@ Finetuning
     - https://arxiv.org/html/2305.14328v2
     - https://arxiv.org/abs/2411.06032
     - https://arxiv.org/abs/2410.02677
+    - https://mbzuai-oryx.github.io/ALM-Bench/
     - User-Centric Evaluation of LLMs
         - https://github.com/Alice1998/URS
     - https://huggingface.co/spaces/HuggingFaceFW/blogpost-fine-tasks
 - **Deceptiveness/Gullibility**
     - https://github.com/lechmazur/deception
+- **Game Playing**
+    - https://github.com/balrog-ai/BALROG
 - **Math Eval**
     - https://arxiv.org/abs/2411.04872
     - GSM8K
@@ -214,6 +233,8 @@ Finetuning
         - DeepEval
             * `assesses whether your LLM chatbot is able to generate relevant responses throughout a conversation. It is calculated by looping through each turn individually and adopts a sliding window approach to take the last min(0, current turn number — window size) turns into account to determine whether it is relevant or not. The final conversation relevancy metric score is simply the number of turn responses that is relevant divided by the total number of turns in a conversational test case.` 
             * https://docs.confident-ai.com/docs/metrics-conversation-relevancy
+    - **Debating**
+        - https://huggingface.co/blog/debate
     - Discussion from different PoV Facilitation
           - https://github.com/Neph0s/awesome-llm-role-playing-with-persona?tab=readme-ov-file
           - https://github.com/lawraa/LLM-Discussion
@@ -227,6 +248,7 @@ Finetuning
         - PingPong Bench
             - https://github.com/IlyaGusev/ping_pong_bench
             - https://ilyagusev.github.io/ping_pong_bench/
+            - https://arxiv.org/pdf/2409.06820
         - DeepEval
             - https://docs.confident-ai.com/docs/metrics-role-adherence
             - https://github.com/confident-ai/deepeval/tree/99aae8ebc09093b8691c7bd6791f6927385cafa8/deepeval/metrics/role_adherence
@@ -316,6 +338,8 @@ Finetuning
     - TruthfulQA
         - https://arxiv.org/abs/2109.07958v2
         - https://github.com/sylinrl/TruthfulQA
+    - Other
+        - https://arxiv.org/abs/2410.01524
 - **Vibes**
     - AidanBench
         - https://github.com/aidanmclaughlin/AidanBench
@@ -355,6 +379,7 @@ https://towardsdatascience.com/how-to-create-a-rag-evaluation-dataset-from-docum
 https://github.com/jonathan-roberts1/needle-threading/
 https://huggingface.co/datasets/jonathan-roberts1/needle-threading
 https://arxiv.org/abs/2411.03538
+https://archive.is/MZsB9
 - **101**
 - **RAG Eval Plan:**
     - The generic idea however: you take a (full, unchunked) document and ask an LLM to generate a question with that document as well as give the factual answer to it. Enforce via prompts to make it use the document only and make it as hard as you want (eg. maybe sometimes you want it to consider 2 documents and make a question that uses bits of both). This gives you a ground truth dataset.
@@ -368,6 +393,10 @@ https://arxiv.org/abs/2411.03538
 - **Metrics**
     - 3 General Categories
         1. Retrieval Metrics
+            - Simple:
+                * How good is the retrieval of the context from the Vector Database?
+                * Is it relevant to the query?
+                * How much noise (irrelevant information) is present?
             - Accuracy
                 * `the proportion of correct predictions (both true positives and true negatives) among the total number of cases examined.`
             - Precision
@@ -396,7 +425,7 @@ https://arxiv.org/abs/2411.03538
                         - rel@k is a binary flag indicating the relevance of the document at rank ‘k’
                     - Mean Average Precision is the mean of the average precision (shown above) over all the ’N’ queries
                     - `MAP = 1/N x [Summation i=1 to N (Average Precision (i)]`
-                - 7. Normalized Discounted Cumulative Gain (nDCG)
+                - Normalized Discounted Cumulative Gain (nDCG)
                     - `nDCG evaluates the ranking quality by considering the position of relevant documents in the result list and assigning higher scores to relevant documents appearing earlier.`
                     - `It is particularly effective for scenarios where documents have varying degrees of relevance.`
                     - `To calculate discounted cumulative gain (DCG), each document in the retrieved list is assigned a relevance score, rel and a discount factor reduces the weight of documents as their rank position increases.`
@@ -409,6 +438,10 @@ https://arxiv.org/abs/2411.03538
                     - `MAP = Σ(Precision_i * Rel_i) / N`
                     - `where Precision_i is the precision at the i-th relevant document, Rel_i is the relevance of the i-th document, and N is the total number of relevant documents.`
         2. Generation-Specific Metric
+            - Simple:
+               * How good is the generated response?
+               * Is the response grounded in the provided context?
+               * Is the response relevant to the query?
         3. RAG-specific Metric
     1. Answer Consistency
        * Whether there is information in the LLM answer that does not come from the context.

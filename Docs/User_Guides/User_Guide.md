@@ -20,6 +20,12 @@
 
 
 
+https://huggingface.co/DavidAU/Maximizing-Model-Performance-All-Quants-Types-And-Full-Precision-by-Samplers_Parameters
+
+Look at:
+    https://upwarddynamism.com/2024/11/24/free-pocket-professor-7-ways-lifelong-learners-crush-it-with-notebooklm/
+
+
 ### <a name="quick-start"></a>Quick Start
 Quick Start: Just click on the appropriate tab for what you're trying to do and fill in the required fields. Click "Process <video/audio/article/etc>" and wait for the results.
 Simple Instructions

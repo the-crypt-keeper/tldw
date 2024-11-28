@@ -14,9 +14,10 @@ from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm, \
     summarize_with_ollama
-from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai, summarize_with_anthropic, \
+from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai, \
+    summarize_with_anthropic, \
     summarize_with_cohere, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
-    summarize_with_huggingface
+    summarize_with_huggingface, summarize_with_mistral, summarize_with_google
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
 
 
@@ -231,11 +232,14 @@ def create_summarize_explain_tab():
 
 
 
-def summarize_explain_text(message, api_endpoint, api_key, summarization, explanation, custom_prompt, custom_system_prompt,):
-    global custom_prompt_output
+def summarize_explain_text(message, api_endpoint, api_key, summarization, explanation, custom_prompt, custom_system_prompt,streaming=False):
+    custom_prompt_output = None
     summarization_response = None
     explanation_response = None
     temp = 0.7
+    response1 = "Summary: No summary requested"
+    response2 = "Explanation: No explanation requested"
+    response3 = "Custom Prompt: No custom prompt requested"
     try:
         logging.info(f"Debug - summarize_explain_text Function - Message: {message}")
         logging.info(f"Debug - summarize_explain_text Function - API Endpoint: {api_endpoint}")
@@ -271,40 +275,44 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
                 logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
                 if api_endpoint.lower() == 'openai':
                     summarization_response = summarize_with_openai(api_key, input_data, user_prompt, temp,
-                                                                   system_prompt)
+                                                                   system_prompt, streaming)
                 elif api_endpoint.lower() == "anthropic":
                     summarization_response = summarize_with_anthropic(api_key, input_data, user_prompt, temp,
-                                                                      system_prompt)
+                                                                      system_prompt, streaming)
                 elif api_endpoint.lower() == "cohere":
                     summarization_response = summarize_with_cohere(api_key, input_data, user_prompt, temp,
-                                                                   system_prompt)
+                                                                   system_prompt, streaming)
                 elif api_endpoint.lower() == "groq":
-                    summarization_response = summarize_with_groq(api_key, input_data, user_prompt, temp, system_prompt)
+                    summarization_response = summarize_with_groq(api_key, input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "openrouter":
                     summarization_response = summarize_with_openrouter(api_key, input_data, user_prompt, temp,
-                                                                       system_prompt)
+                                                                       system_prompt, streaming)
                 elif api_endpoint.lower() == "deepseek":
                     summarization_response = summarize_with_deepseek(api_key, input_data, user_prompt, temp,
-                                                                     system_prompt)
-                elif api_endpoint.lower() == "llama.cpp":
-                    summarization_response = summarize_with_llama(input_data, user_prompt, api_key, temp, system_prompt)
-                elif api_endpoint.lower() == "kobold":
-                    summarization_response = summarize_with_kobold(input_data, api_key, user_prompt, temp,
-                                                                   system_prompt)
-                elif api_endpoint.lower() == "ooba":
-                    summarization_response = summarize_with_oobabooga(input_data, api_key, user_prompt, temp,
-                                                                      system_prompt)
-                elif api_endpoint.lower() == "tabbyapi":
-                    summarization_response = summarize_with_tabbyapi(input_data, user_prompt, temp, system_prompt)
-                elif api_endpoint.lower() == "vllm":
-                    summarization_response = summarize_with_vllm(input_data, user_prompt, system_prompt)
-                elif api_endpoint.lower() == "local-llm":
-                    summarization_response = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt)
+                                                                     system_prompt, streaming)
+                elif api_endpoint.lower() == "mistral":
+                    summarization_response = summarize_with_mistral(api_key, input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "huggingface":
                     summarization_response = summarize_with_huggingface(api_key, input_data, user_prompt,
-                                                                        temp)  # , system_prompt)
+                                                                        temp, streaming)  # , system_prompt)
+                elif api_endpoint.lower() == "google":
+                    summarization_response = summarize_with_google(api_key, input_data, user_prompt, temp, system_prompt, streaming)
+                elif api_endpoint.lower() == "llama.cpp":
+                    summarization_response = summarize_with_llama(input_data, user_prompt, api_key, temp, system_prompt, streaming)
+                elif api_endpoint.lower() == "kobold":
+                    summarization_response = summarize_with_kobold(input_data, api_key, user_prompt, temp,
+                                                                   system_prompt, streaming)
+                elif api_endpoint.lower() == "ooba":
+                    summarization_response = summarize_with_oobabooga(input_data, api_key, user_prompt, temp,
+                                                                      system_prompt, streaming)
+                elif api_endpoint.lower() == "tabbyapi":
+                    summarization_response = summarize_with_tabbyapi(input_data, user_prompt, temp, system_prompt, streaming)
+                elif api_endpoint.lower() == "vllm":
+                    summarization_response = summarize_with_vllm(input_data, user_prompt, system_prompt, streaming)
+                elif api_endpoint.lower() == "local-llm":
+                    summarization_response = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "ollama":
-                    summarization_response = summarize_with_ollama(input_data, user_prompt, None, api_key, temp, system_prompt)
+                    summarization_response = summarize_with_ollama(input_data, user_prompt, None, api_key, temp, system_prompt, streaming)
                 else:
                     raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
         except Exception as e:
@@ -317,38 +325,43 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
                 # Use the existing API request code based on the selected endpoint
                 logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
                 if api_endpoint.lower() == 'openai':
-                    explanation_response = summarize_with_openai(api_key, input_data, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_openai(api_key, input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "anthropic":
                     explanation_response = summarize_with_anthropic(api_key, input_data, user_prompt, temp,
-                                                                    system_prompt)
+                                                                    system_prompt, streaming)
                 elif api_endpoint.lower() == "cohere":
-                    explanation_response = summarize_with_cohere(api_key, input_data, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_cohere(api_key, input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "groq":
-                    explanation_response = summarize_with_groq(api_key, input_data, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_groq(api_key, input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "openrouter":
                     explanation_response = summarize_with_openrouter(api_key, input_data, user_prompt, temp,
-                                                                     system_prompt)
+                                                                     system_prompt, streaming)
                 elif api_endpoint.lower() == "deepseek":
                     explanation_response = summarize_with_deepseek(api_key, input_data, user_prompt, temp,
-                                                                   system_prompt)
+                                                                   system_prompt, streaming)
+                elif api_endpoint.lower() == "mistral":
+                    explanation_response = summarize_with_mistral(api_key, input_data, user_prompt, temp, system_prompt, streaming)
+                elif api_endpoint.lower() == "google":
+                    explanation_response = summarize_with_google(api_key, input_data, user_prompt, temp, system_prompt,
+                                                               streaming)
                 elif api_endpoint.lower() == "llama.cpp":
-                    explanation_response = summarize_with_llama(input_data, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_llama(input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "kobold":
-                    explanation_response = summarize_with_kobold(input_data, api_key, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_kobold(input_data, api_key, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "ooba":
                     explanation_response = summarize_with_oobabooga(input_data, api_key, user_prompt, temp,
-                                                                    system_prompt)
+                                                                    system_prompt, streaming)
                 elif api_endpoint.lower() == "tabbyapi":
-                    explanation_response = summarize_with_tabbyapi(input_data, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_tabbyapi(input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "vllm":
-                    explanation_response = summarize_with_vllm(input_data, user_prompt, system_prompt)
+                    explanation_response = summarize_with_vllm(input_data, user_prompt, system_prompt, streaming)
                 elif api_endpoint.lower() == "local-llm":
-                    explanation_response = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "huggingface":
                     explanation_response = summarize_with_huggingface(api_key, input_data, user_prompt,
-                                                                      temp)  # , system_prompt)
+                                                                      temp, streaming)  # , system_prompt)
                 elif api_endpoint.lower() == "ollama":
-                    explanation_response = summarize_with_ollama(input_data, user_prompt, temp, system_prompt)
+                    explanation_response = summarize_with_ollama(input_data, user_prompt, temp, system_prompt, streaming)
                 else:
                     raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
         except Exception as e:
@@ -359,48 +372,55 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
             if custom_prompt:
                 system_prompt = custom_system_prompt
                 user_prompt = custom_prompt + input_data
+                custom_prompt_output = None
                 # Use the existing API request code based on the selected endpoint
                 logging.info(f"Debug - Chat Function - API Endpoint: {api_endpoint}")
                 if api_endpoint.lower() == 'openai':
-                    custom_prompt_output = summarize_with_openai(api_key, input_data, user_prompt, temp, system_prompt)
+                    custom_prompt_output = summarize_with_openai(api_key, input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "anthropic":
                     custom_prompt_output = summarize_with_anthropic(api_key, input_data, user_prompt, temp,
-                                                                    system_prompt)
+                                                                    system_prompt, streaming)
                 elif api_endpoint.lower() == "cohere":
-                    custom_prompt_output = summarize_with_cohere(api_key, input_data, user_prompt, temp, system_prompt)
+                    custom_prompt_output = summarize_with_cohere(api_key, input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "groq":
-                    custom_prompt_output = summarize_with_groq(api_key, input_data, user_prompt, temp, system_prompt)
+                    custom_prompt_output = summarize_with_groq(api_key, input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "openrouter":
                     custom_prompt_output = summarize_with_openrouter(api_key, input_data, user_prompt, temp,
-                                                                     system_prompt)
+                                                                     system_prompt, streaming)
                 elif api_endpoint.lower() == "deepseek":
                     custom_prompt_output = summarize_with_deepseek(api_key, input_data, user_prompt, temp,
-                                                                   system_prompt)
+                                                                   system_prompt, streaming)
+                elif api_endpoint.lower() == "mistral":
+                    custom_prompt_output = summarize_with_mistral(api_key, input_data, user_prompt, temp, system_prompt, streaming)
+                elif api_endpoint.lower() == "google":
+                    custom_prompt_output = summarize_with_google(api_key, input_data, user_prompt, temp, system_prompt,
+                                                               streaming)
                 elif api_endpoint.lower() == "llama.cpp":
-                    custom_prompt_output = summarize_with_llama(input_data, user_prompt, temp, system_prompt)
+                    custom_prompt_output = summarize_with_llama(input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "kobold":
-                    custom_prompt_output = summarize_with_kobold(input_data, api_key, user_prompt, temp, system_prompt)
+                    custom_prompt_output = summarize_with_kobold(input_data, api_key, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "ooba":
                     custom_prompt_output = summarize_with_oobabooga(input_data, api_key, user_prompt, temp,
-                                                                    system_prompt)
+                                                                    system_prompt, streaming)
                 elif api_endpoint.lower() == "tabbyapi":
-                    custom_prompt_output = summarize_with_tabbyapi(input_data, user_prompt, temp, system_prompt)
+                    custom_prompt_output = summarize_with_tabbyapi(input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "vllm":
-                    custom_prompt_output = summarize_with_vllm(input_data, user_prompt, system_prompt)
+                    custom_prompt_output = summarize_with_vllm(input_data, user_prompt, system_prompt, streaming)
                 elif api_endpoint.lower() == "local-llm":
-                    custom_prompt_output = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt)
+                    custom_prompt_output = summarize_with_local_llm(input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "huggingface":
                     custom_prompt_output = summarize_with_huggingface(api_key, input_data, user_prompt,
-                                                                      temp)  # , system_prompt)
+                                                                      temp, streaming)  # , system_prompt)
                 elif api_endpoint.lower() == "ollama":
-                    custom_prompt_output = summarize_with_ollama(input_data, user_prompt, temp, system_prompt)
+                    custom_prompt_output = summarize_with_ollama(input_data, user_prompt, temp, system_prompt, streaming)
                 else:
                     raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
         except Exception as e:
             logging.error(f"Error in summarization: {str(e)}")
             response2 = f"An error occurred during summarization: {str(e)}"
 
-
+        if not summarization_response and not explanation_response and not custom_prompt_output:
+            return "No summarization, explanation, or custom prompt requested", "No summarization, explanation, or custom prompt returned"
         if summarization_response:
             response1 = f"Summary: {summarization_response}"
         else:
@@ -420,4 +440,4 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
 
     except Exception as e:
         logging.error(f"Error in chat function: {str(e)}")
-        return f"An error occurred: {str(e)}"
+        return f"An error occurred: {str(e)}", "", ""

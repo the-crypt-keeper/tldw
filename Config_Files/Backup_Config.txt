@@ -7,15 +7,15 @@ groq_api_key = <groq_api_key>
 groq_model = llama3-70b-8192
 openai_api_key = <openai_api_key>
 openai_model = gpt-4o
-huggingface_api_key = <huggingface_api_token>
-huggingface_model = CohereForAI/c4ai-command-r-plus
+huggingface_api_key = <huggingface_api_key>
+huggingface_model = meta-llama/Llama-3.1-70B-Instruct
 openrouter_api_key = <openrouter_api_key>
 openrouter_model = mistralai/mistral-7b-instruct:free
-deepseek_api_key = <deepseek-api-key>
+deepseek_api_key = <deepseek_api_key>
 deepseek_model = deepseek-chat
-mistral_model = mistral-large-latest
 mistral_api_key = <mistral_api_key>
-google_api_key =
+mistral_model = mistral-large-latest
+google_api_key = <google_api_key>
 google_model = gemini-1.5-pro
 custom_openai_api_key = <key_here>
 custom_openai_api_ip = <api_ip_here>
@@ -23,6 +23,7 @@ default_api = openai
 
 [Local-API]
 kobold_api_IP = http://127.0.0.1:5001/api/v1/generate
+kobold_openai_api_IP = http://127.0.0.1:5001/v1/chat/completions
 kobold_api_key =
 llama_api_IP = http://127.0.0.1:8080/completion
 llama_api_key =
@@ -37,6 +38,7 @@ ollama_api_key =
 ollama_model = llama3
 aphrodite_api_IP = http://127.0.0.1:8080/completion
 aphrodite_api_key =
+max_tokens = 4096
 
 [Processing]
 processing_choice = cuda
@@ -47,10 +49,18 @@ words_per_second = 3
 save_character_chats = False
 save_rag_chats = False
 local_api_timeout = 90
+local_api_retries = 3
+local_api_retry_delay = 5
+streaming = True
+temperature = 0.7
+top_p = 0.9
+min_p = 0.05
+# https://artefact2.github.io/llm-sampling/
 
 [Auto-Save]
 save_character_chats = False
 save_rag_chats = False
+
 
 [Prompts]
 prompt_sample = "What is the meaning of life?"
@@ -145,5 +155,3 @@ backup_count = 5
 #   gemini-1.5-flash-8b
 #   aqa
 #   text-embedding-004
-
-

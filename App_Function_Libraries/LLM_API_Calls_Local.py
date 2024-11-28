@@ -28,8 +28,7 @@ from App_Function_Libraries.Utils.Utils import *
 # Function Definitions
 #
 
-
-def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None):
+def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None, streaming=False):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Local LLM: Loading json data for summarization")
@@ -76,32 +75,60 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
                     "content": local_llm_prompt
                 }
             ],
-            "max_tokens": 28000,  # Adjust tokens as needed
+            "max_tokens": 8192,
+            "temperature": temp,
+            "stream": streaming
         }
+
         logging.debug("Local LLM: Posting request")
         response = requests.post('http://127.0.0.1:8080/v1/chat/completions', headers=headers, json=data)
 
         if response.status_code == 200:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Local LLM: Summarization successful")
-                print("Local LLM: Summarization successful.")
-                return summary
+            if streaming:
+                logging.debug("Local LLM: Processing streaming response")
+
+                def stream_generator():
+                    for line in response.iter_lines():
+                        if line:
+                            decoded_line = line.decode('utf-8').strip()
+                            if decoded_line.startswith('data:'):
+                                data_str = decoded_line[len('data:'):].strip()
+                                if data_str == '[DONE]':
+                                    break
+                                try:
+                                    data_json = json.loads(data_str)
+                                    if 'choices' in data_json and len(data_json['choices']) > 0:
+                                        delta = data_json['choices'][0].get('delta', {})
+                                        if 'content' in delta:
+                                            content = delta['content']
+                                            yield content
+                                except json.JSONDecodeError:
+                                    logging.error(f"Local LLM: Error decoding JSON from line: {decoded_line}")
+                                    continue
+                return stream_generator()
             else:
-                logging.warning("Local LLM: Chat response not found in the response data")
-                return "Local LLM: Chat response not available"
+                logging.debug("Local LLM: Processing non-streaming response")
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Local LLM: Summarization successful")
+                    logging.info("Local LLM: Summarization successful.")
+                    return summary
+                else:
+                    logging.warning("Local LLM: Summary not found in the response data")
+                    return "Local LLM: Summary not available"
         else:
-            logging.debug("Local LLM: Chat request failed")
+            logging.error(f"Local LLM: Request failed with status code {response.status_code}")
             print("Local LLM: Failed to process Chat response:", response.text)
-            return "Local LLM: Failed to process Chat response"
+            return f"Local LLM: Failed to process Chat response, status code {response.status_code}"
     except Exception as e:
         logging.debug("Local LLM: Error in processing: %s", str(e))
         print("Error occurred while processing Chat request with Local LLM:", str(e))
-        return "Local LLM: Error occurred while processing Chat response"
+        return f"Local LLM: Error occurred while processing Chat response: {str(e)}"
+
 
 # FIXME
-def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8080/completion", api_key=None, system_prompt=None):
+def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8080/completion", api_key=None, system_prompt=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -124,6 +151,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
             logging.info("llama.cpp: API URL not found or is empty")
             return "llama.cpp: API URL not found or is empty"
 
+        # Prepare headers
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
@@ -170,20 +198,45 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
 
         logging.debug("llama: Submitting request to API endpoint")
         print("llama: Submitting request to API endpoint")
-        response = requests.post(api_url, headers=headers, json=data)
-        response_data = response.json()
-        logging.debug("API Response Data: %s", response_data)
+        response = requests.post(api_url, headers=headers, json=data, stream=streaming)
 
         if response.status_code == 200:
-            # if 'X' in response_data:
-            logging.debug(response_data)
-            summary = response_data['content'].strip()
-            logging.debug("llama: Summarization successful")
-            print("Summarization successful.")
-            return summary
-        else:
-            logging.error(f"Llama: API request failed with status code {response.status_code}: {response.text}")
-            return f"Llama: API request failed: {response.text}"
+            if streaming:
+                logging.debug("Llama: Processing streaming response")
+
+                def stream_generator():
+                    for line in response.iter_lines():
+                        if line:
+                            decoded_line = line.decode('utf-8').strip()
+                            if decoded_line.startswith('data:'):
+                                data_str = decoded_line[len('data:'):].strip()
+                                if data_str == '[DONE]':
+                                    break
+                                try:
+                                    data_json = json.loads(data_str)
+                                    if 'choices' in data_json and len(data_json['choices']) > 0:
+                                        delta = data_json['choices'][0].get('delta', {})
+                                        if 'content' in delta:
+                                            content = delta['content']
+                                            yield content
+                                except json.JSONDecodeError:
+                                    logging.error(f"Llama: Error decoding JSON from line: {decoded_line}")
+                                    continue
+                return stream_generator()
+            else:
+                response_data = response.json()
+                logging.debug("API Response Data: %s", response_data)
+
+                if response.status_code == 200:
+                    # if 'X' in response_data:
+                    logging.debug(response_data)
+                    summary = response_data['content'].strip()
+                    logging.debug("Llama: Chat request successful")
+                    print("Llama: Chat request successful.")
+                    return summary
+                else:
+                    logging.error(f"Llama: API Chat request failed with status code {response.status_code}: {response.text}")
+                    return f"Llama: API Chat request failed: {response.text}"
 
     except Exception as e:
         logging.error("Llama: Error in processing: %s", str(e))
@@ -192,7 +245,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
 
 # System prompts not supported through API requests.
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None):
+def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None, streaming=False):
     logging.debug("Kobold: Summarization process starting...")
     try:
         logging.debug("Kobold: Loading and validating configurations")
@@ -245,7 +298,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
             'content-type': 'application/json',
         }
 
-        kobold_prompt = f"{custom_prompt_input}\n\n\n\n{text}"
+        kobold_prompt = f"{custom_prompt_input}\n\n{text}"
         logging.debug("kobold: Prompt being sent is {kobold_prompt}")
 
         # FIXME
@@ -256,43 +309,112 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
             #"top_p": 0.9,
             #"top_k": 100
             #"rep_penalty": 1.0,
+            "stream": streaming
         }
 
         logging.debug("kobold: Submitting request to API endpoint")
         print("kobold: Submitting request to API endpoint")
         kobold_api_ip = loaded_config_data['local_api_ip']['kobold']
-        try:
-            response = requests.post(kobold_api_ip, headers=headers, json=data)
-            logging.debug("kobold: API Response Status Code: %d", response.status_code)
 
-            if response.status_code == 200:
-                try:
-                    response_data = response.json()
-                    logging.debug("kobold: API Response Data: %s", response_data)
+        if streaming:
+            logging.debug("Kobold Summarization: Streaming mode enabled")
+            try:
+                # Send the request with streaming enabled
+                # Get the Streaming API IP from the config
+                kobold_openai_api_IP = loaded_config_data['local_api_ip']['kobold_openai']
+                response = requests.post(
+                    kobold_openai_api_IP, headers=headers, json=data, stream=True
+                )
+                logging.debug(
+                    "Kobold Summarization: API Response Status Code: %d",
+                    response.status_code,
+                )
 
-                    if response_data and 'results' in response_data and len(response_data['results']) > 0:
-                        summary = response_data['results'][0]['text'].strip()
-                        logging.debug("kobold: Chat request successful")
-                        return summary
-                    else:
-                        logging.error("Expected data not found in API response.")
-                        return "Expected data not found in API response."
-                except ValueError as e:
-                    logging.error("kobold: Error parsing JSON response: %s", str(e))
-                    return f"Error parsing JSON response: {str(e)}"
-            else:
-                logging.error(f"kobold: API request failed with status code {response.status_code}: {response.text}")
-                return f"kobold: API request failed: {response.text}"
-        except Exception as e:
-            logging.error("kobold: Error in processing: %s", str(e))
-            return f"kobold: Error occurred while processing summary with kobold: {str(e)}"
+                if response.status_code == 200:
+                    # Process the streamed response
+                    for line in response.iter_lines():
+                        if line:
+                            decoded_line = line.decode('utf-8')
+                            logging.debug(
+                                "Kobold: Received streamed data: %s", decoded_line
+                            )
+                            # OpenAI API streams data prefixed with 'data: '
+                            if decoded_line.startswith('data: '):
+                                content = decoded_line[len('data: '):].strip()
+                                if content == '[DONE]':
+                                    break
+                                try:
+                                    data_chunk = json.loads(content)
+                                    if 'choices' in data_chunk and len(data_chunk['choices']) > 0:
+                                        delta = data_chunk['choices'][0].get('delta', {})
+                                        text = delta.get('content', '')
+                                        if text:
+                                            yield text
+                                    else:
+                                        logging.error(
+                                            "Kobold: Expected data not found in streamed response."
+                                        )
+                                except json.JSONDecodeError as e:
+                                    logging.error(
+                                        "Kobold: Error decoding streamed JSON: %s", str(e)
+                                    )
+                            else:
+                                logging.debug("Kobold: Ignoring line: %s", decoded_line)
+                else:
+                    logging.error(
+                        f"Kobold: API request failed with status code {response.status_code}: {response.text}"
+                    )
+                    yield f"Kobold: API request failed: {response.text}"
+            except Exception as e:
+                logging.error("Kobold: Error in processing: %s", str(e))
+                yield f"Kobold: Error occurred while processing summary with Kobold: {str(e)}"
+        else:
+            try:
+                response = requests.post(
+                    kobold_api_ip, headers=headers, json=data
+                )
+                logging.debug(
+                    "Kobold Summarization: API Response Status Code: %d",
+                    response.status_code,
+                )
+
+                if response.status_code == 200:
+                    try:
+                        response_data = response.json()
+                        logging.debug("Kobold: API Response Data: %s", response_data)
+
+                        if (
+                            response_data
+                            and 'results' in response_data
+                            and len(response_data['results']) > 0
+                        ):
+                            summary = response_data['results'][0]['text'].strip()
+                            logging.debug("Kobold: Chat request successful")
+                            return summary
+                        else:
+                            logging.error("Expected data not found in API response.")
+                            return "Expected data not found in API response."
+                    except ValueError as e:
+                        logging.error(
+                            "Kobold: Error parsing JSON response: %s", str(e)
+                        )
+                        return f"Error parsing JSON response: {str(e)}"
+                else:
+                    logging.error(
+                        f"Kobold: API request failed with status code {response.status_code}: {response.text}"
+                    )
+                    return f"Kobold: API request failed: {response.text}"
+            except Exception as e:
+                logging.error("Kobold: Error in processing: %s", str(e))
+                return f"Kobold: Error occurred while processing summary with Kobold: {str(e)}"
     except Exception as e:
         logging.error("kobold: Error in processing: %s", str(e))
         return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
 
+
 # System prompt doesn't work. FIXME
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions", system_prompt=None):
+def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions", system_prompt=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -321,84 +443,213 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.
         data = {
             "mode": "chat",
             "character": "Example",
-            "messages": [{"role": "user", "content": ooba_prompt}]
+            "messages": [{"role": "user", "content": ooba_prompt}],
+            "stream": streaming
         }
+        if streaming:
+            logging.debug("Ooba Summarization: Streaming mode enabled")
+            try:
+                # Send the request with streaming enabled
+                response = requests.post(
+                    api_url, headers=headers, json=data, stream=True
+                )
+                logging.debug(
+                    "Ooba Summarization: API Response Status Code: %d",
+                    response.status_code,
+                )
 
-        logging.debug("ooba: Submitting request to API endpoint")
-        print("ooba: Submitting request to API endpoint")
-        response = requests.post(api_url, headers=headers, json=data, verify=False)
-        logging.debug("ooba: API Response Data: %s", response)
-
-        if response.status_code == 200:
-            response_data = response.json()
-            summary = response.json()['choices'][0]['message']['content']
-            logging.debug("ooba: Summarization successful")
-            print("Summarization successful.")
-            return summary
+                if response.status_code == 200:
+                    # Process the streamed response
+                    for line in response.iter_lines():
+                        if line:
+                            decoded_line = line.decode('utf-8')
+                            logging.debug(
+                                "Ooba: Received streamed data: %s", decoded_line
+                            )
+                            # OpenAI API streams data prefixed with 'data: '
+                            if decoded_line.startswith('data: '):
+                                content = decoded_line[len('data: '):].strip()
+                                if content == '[DONE]':
+                                    break
+                                try:
+                                    data_chunk = json.loads(content)
+                                    if 'choices' in data_chunk and len(data_chunk['choices']) > 0:
+                                        delta = data_chunk['choices'][0].get('delta', {})
+                                        text = delta.get('content', '')
+                                        if text:
+                                            yield text
+                                    else:
+                                        logging.error(
+                                            "Ooba: Expected data not found in streamed response."
+                                        )
+                                except json.JSONDecodeError as e:
+                                    logging.error(
+                                        "Ooba: Error decoding streamed JSON: %s", str(e)
+                                    )
+                            else:
+                                logging.debug("Ooba: Ignoring line: %s", decoded_line)
+                else:
+                    logging.error(
+                        f"Ooba: API request failed with status code {response.status_code}: {response.text}"
+                    )
+                    yield f"Ooba: API request failed: {response.text}"
+            except Exception as e:
+                logging.error("Ooba: Error in processing: %s", str(e))
+                yield f"Ooba: Error occurred while processing summary with Ooba: {str(e)}"
         else:
-            logging.error(f"oobabooga: API request failed with status code {response.status_code}: {response.text}")
-            return f"ooba: API request failed with status code {response.status_code}: {response.text}"
+            logging.debug("ooba: Submitting request to API endpoint")
+            print("ooba: Submitting request to API endpoint")
+            response = requests.post(api_url, headers=headers, json=data, verify=False)
+            logging.debug("ooba: API Response Data: %s", response)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                summary = response.json()['choices'][0]['message']['content']
+                logging.debug("ooba: Summarization successful")
+                print("Summarization successful.")
+                return summary
+            else:
+                logging.error(f"oobabooga: API request failed with status code {response.status_code}: {response.text}")
+                return f"ooba: API request failed with status code {response.status_code}: {response.text}"
 
     except Exception as e:
         logging.error("ooba: Error in processing: %s", str(e))
         return f"ooba: Error occurred while processing summary with oobabooga: {str(e)}"
 
 
-# FIXME - Install is more trouble than care to deal with right now.
-def chat_with_tabbyapi(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:5000/v1/chat/completions"):
-    loaded_config_data = load_and_log_configs()
-    model = loaded_config_data['models']['tabby']
-    # API key validation
-    if api_key is None:
-        logging.info("tabby: API key not provided as parameter")
-        logging.info("tabby: Attempting to use API key from config file")
-        api_key = loaded_config_data['api_keys']['tabby']
-
-    if api_key is None or api_key.strip() == "":
-        logging.info("tabby: API key not found or is empty")
-
-    if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("tabby: Loading json data for summarization")
-        with open(input_data, 'r') as file:
-            data = json.load(file)
-    else:
-        logging.debug("tabby: Using provided string data for summarization")
-        data = input_data
-
-    logging.debug(f"tabby: Loaded data: {data}")
-    logging.debug(f"tabby: Type of data: {type(data)}")
-
-    if isinstance(data, dict) and 'summary' in data:
-        # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("tabby: Summary already exists in the loaded data")
-        return data['summary']
-
-    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-    if isinstance(data, list):
-        segments = data
-        text = extract_text_from_segments(segments)
-    elif isinstance(data, str):
-        text = data
-    else:
-        raise ValueError("Invalid input data format")
-
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json'
-    }
-    data2 = {
-        'text': text,
-        'model': 'tabby'  # Specify the model if needed
-    }
-    tabby_api_ip = loaded_config_data['local_api']['tabby']['ip']
+def chat_with_tabbyapi(
+    input_data,
+    custom_prompt_input,
+    system_message=None,
+    api_key=None,
+    temp=None,
+    api_IP="http://127.0.0.1:5000/v1/chat/completions",
+    streaming=False
+):
+    logging.debug("TabbyAPI: Chat request process starting...")
     try:
-        response = requests.post(tabby_api_ip, headers=headers, json=data2)
-        response.raise_for_status()
-        summary = response.json().get('summary', '')
-        return summary
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error summarizing with TabbyAPI: {e}")
-        return "Error summarizing with TabbyAPI."
+        logging.debug("TabbyAPI: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
+            tabby_api_key = None
+        else:
+            # Prioritize the API key passed as a parameter
+            if api_key and api_key.strip():
+                tabby_api_key = api_key
+                logging.info("TabbyAPI: Using API key provided as parameter")
+            else:
+                # If no parameter is provided, use the key from the config
+                tabby_api_key = loaded_config_data['api_keys'].get('tabby')
+                if tabby_api_key:
+                    logging.info("TabbyAPI: Using API key from config file")
+                else:
+                    logging.warning("TabbyAPI: No API key found in config file")
+
+        # Set API IP and model from config.txt
+        tabby_api_ip = loaded_config_data['local_api_ip']['tabby']
+        tabby_model = loaded_config_data['models']['tabby']
+        if temp is None:
+            temp = 0.7
+
+        logging.debug(f"TabbyAPI: Using API Key: {tabby_api_key[:5]}...{tabby_api_key[-5:] if tabby_api_key else 'None'}")
+
+        if system_message is None:
+            system_message = "You are a helpful AI assistant."
+
+        if custom_prompt_input is None:
+            custom_prompt_input = f"{input_data}"
+        else:
+            custom_prompt_input = f"{custom_prompt_input}\n\n{input_data}"
+
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        if tabby_api_key:
+            headers['Authorization'] = f'Bearer {tabby_api_key}'
+
+        data2 = {
+            'model': tabby_model,
+            'messages': [
+                {'role': 'system',
+                 'content': system_message
+                 },
+                {'role': 'user',
+                 'content': custom_prompt_input
+                 }
+            ],
+            'temperature': temp,
+            'max_tokens': 4096,
+            "min_tokens": 0,
+            #'top_p': 1.0,
+            #'top_k': 0,
+            #'frequency_penalty': 0,
+            #'presence_penalty': 0.0,
+            #"repetition_penalty": 1.0,
+            "stream": streaming
+        }
+
+        if streaming:
+            logging.debug("TabbyAPI: Streaming mode enabled for chat request")
+            try:
+                response = requests.post(tabby_api_ip, headers=headers, json=data2, stream=True)
+                response.raise_for_status()
+                # Process the streamed response
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line.startswith('data: '):
+                            data_line = decoded_line[len('data: '):]
+                            if data_line == '[DONE]':
+                                break
+                            try:
+                                data_json = json.loads(data_line)
+                                if 'choices' in data_json and len(data_json['choices']) > 0:
+                                    delta = data_json['choices'][0].get('delta', {})
+                                    content = delta.get('content', '')
+                                    if content:
+                                        yield content
+                            except json.JSONDecodeError as e:
+                                logging.error(f"TabbyAPI: Failed to parse JSON streamed data: {str(e)}")
+                        else:
+                            logging.debug(f"TabbyAPI: Received non-data line: {decoded_line}")
+            except requests.exceptions.RequestException as e:
+                logging.error(f"TabbyAPI: Error making chat request with TabbyAPI: {e}")
+                yield f"TabbyAPI: Error making chat request with TabbyAPI: {str(e)}"
+            except Exception as e:
+                logging.error(f"Unexpected error in making chat request with summarize_with_tabbyapi: {e}")
+                yield f"TabbyAPI: Unexpected error in making chat request: {str(e)}"
+        else:
+            try:
+                response = requests.post(tabby_api_ip, headers=headers, json=data2)
+                response.raise_for_status()
+                response_json = response.json()
+
+                # Validate the response structure
+                if all(key in response_json for key in ['id', 'choices', 'created', 'model', 'object', 'usage']):
+                    logging.info("TabbyAPI: Received a valid 200 response")
+                    chat_response = response_json['choices'][0].get('message', {}).get('content', '')
+                    return chat_response
+                else:
+                    logging.error("TabbyAPI: Received a 200 response, but the structure is invalid")
+                    return "Error: Received an invalid response structure from TabbyAPI."
+
+            except requests.exceptions.RequestException as e:
+                logging.error(f"Error making chat request with TabbyAPI: {e}")
+                return f"Error making chat request with TabbyAPI: {str(e)}"
+            except json.JSONDecodeError:
+                logging.error("TabbyAPI: Received an invalid JSON response")
+                return "TabbyAPI: Error: Received an invalid JSON response from TabbyAPI."
+            except Exception as e:
+                logging.error(f"Unexpected error in chat_with_tabbyapi: {e}")
+                return f"TabbyAPI: Unexpected error in chat request process: {str(e)}"
+
+    except Exception as e:
+        logging.error(f"TabbyAPI: Unexpected error in chat_with_tabbyapi: {e}")
+        if streaming:
+            yield f"TabbyAPI: Unexpected error in chat request process: {str(e)}"
+        else:
+            return f"TabbyAPI: Unexpected error in chat request process: {str(e)}"
 
 
 # FIXME aphrodite engine - code was literally tab complete in one go from copilot... :/
@@ -440,7 +691,8 @@ def chat_with_ollama(
     system_message=None,
     model=None,
     max_retries=5,
-    retry_delay=20
+    retry_delay=20,
+    streaming=False
 ):
     try:
         logging.debug("Ollama: Loading and validating configurations")
@@ -526,65 +778,108 @@ def chat_with_ollama(
                     "content": ollama_prompt
                 }
             ],
+            "temperature": temp,
+            "stream": streaming
         }
 
-        for attempt in range(1, max_retries + 1):
-            logging.debug("Ollama: Submitting request to API endpoint")
-            print("Ollama: Submitting request to API endpoint")
-            try:
-                config = load_and_log_configs()
-                local_api_timeout = config['local_api_timeout']
-                response = requests.post(api_url, headers=headers, json=data_payload, timeout=local_api_timeout)
-                response.raise_for_status()  # Raises HTTPError for bad responses
-                response_data = response.json()
-            except requests.exceptions.Timeout:
-                logging.error("Ollama: Request timed out.")
-                return "Ollama: Request timed out."
-            except requests.exceptions.HTTPError as http_err:
-                logging.error(f"Ollama: HTTP error occurred: {http_err}")
-                return f"Ollama: HTTP error occurred: {http_err}"
-            except requests.exceptions.RequestException as req_err:
-                logging.error(f"Ollama: Request exception: {req_err}")
-                return f"Ollama: Request exception: {req_err}"
-            except json.JSONDecodeError:
-                logging.error("Ollama: Failed to decode JSON response")
-                return "Ollama: Failed to decode JSON response."
-            except Exception as e:
-                logging.error(f"Ollama: An unexpected error occurred: {str(e)}")
-                return f"Ollama: An unexpected error occurred: {str(e)}"
+        if streaming:
+            # Add streaming support
+            data_payload['stream'] = True
 
-            logging.debug(f"API Response Data: {response_data}")
+            for attempt in range(1, max_retries + 1):
+                logging.debug("Ollama: Submitting streaming request to API endpoint")
+                print("Ollama: Submitting streaming request to API endpoint")
+                try:
+                    response = requests.post(api_url, headers=headers, json=data_payload, stream=True)
+                    response.raise_for_status()  # Raises HTTPError for bad responses
 
-            if response.status_code == 200:
-                # Inspect available keys
-                available_keys = list(response_data.keys())
-                logging.debug(f"Ollama: Available keys in response: {available_keys}")
+                    # Process the streamed response
+                    for line in response.iter_lines():
+                        if line:
+                            decoded_line = line.decode('utf-8')
+                            logging.debug(f"Ollama: Received line: {decoded_line}")
+                            try:
+                                json_data = json.loads(decoded_line)
+                                if 'response' in json_data:
+                                    text_chunk = json_data['response']
+                                    yield text_chunk
+                                if json_data.get('done', False):
+                                    logging.debug("Ollama: Streaming complete.")
+                                    break
+                            except json.JSONDecodeError:
+                                logging.error("Ollama: Failed to decode JSON from streamed line.")
+                    return  # Exit after streaming is complete
+                except requests.exceptions.Timeout:
+                    logging.error("Ollama: Request timed out.")
+                    yield "Ollama: Request timed out."
+                except requests.exceptions.HTTPError as http_err:
+                    logging.error(f"Ollama: HTTP error occurred: {http_err}")
+                    yield f"Ollama: HTTP error occurred: {http_err}"
+                except requests.exceptions.RequestException as req_err:
+                    logging.error(f"Ollama: Request exception: {req_err}")
+                    yield f"Ollama: Request exception: {req_err}"
+                except Exception as e:
+                    logging.error(f"Ollama: An unexpected error occurred: {str(e)}")
+                    yield f"Ollama: An unexpected error occurred: {str(e)}"
+                break  # Break out of retry loop after successful streaming
+        else:
+            for attempt in range(1, max_retries + 1):
+                logging.debug("Ollama: Submitting request to API endpoint")
+                print("Ollama: Submitting request to API endpoint")
+                try:
+                    config = load_and_log_configs()
+                    local_api_timeout = config['local_api_timeout']
+                    response = requests.post(api_url, headers=headers, json=data_payload, timeout=local_api_timeout)
+                    response.raise_for_status()  # Raises HTTPError for bad responses
+                    response_data = response.json()
+                except requests.exceptions.Timeout:
+                    logging.error("Ollama: Request timed out.")
+                    return "Ollama: Request timed out."
+                except requests.exceptions.HTTPError as http_err:
+                    logging.error(f"Ollama: HTTP error occurred: {http_err}")
+                    return f"Ollama: HTTP error occurred: {http_err}"
+                except requests.exceptions.RequestException as req_err:
+                    logging.error(f"Ollama: Request exception: {req_err}")
+                    return f"Ollama: Request exception: {req_err}"
+                except json.JSONDecodeError:
+                    logging.error("Ollama: Failed to decode JSON response")
+                    return "Ollama: Failed to decode JSON response."
+                except Exception as e:
+                    logging.error(f"Ollama: An unexpected error occurred: {str(e)}")
+                    return f"Ollama: An unexpected error occurred: {str(e)}"
 
-                # Attempt to retrieve 'response'
-                summary = None
-                if 'response' in response_data and response_data['response']:
-                    summary = response_data['response'].strip()
-                elif 'choices' in response_data and len(response_data['choices']) > 0:
-                    choice = response_data['choices'][0]
-                    if 'message' in choice and 'content' in choice['message']:
-                        summary = choice['message']['content'].strip()
+                logging.debug(f"API Response Data: {response_data}")
 
-                if summary:
-                    logging.debug("Ollama: Chat request successful")
-                    print("\n\nChat request successful.")
-                    return summary
-                elif response_data.get('done_reason') == 'load':
-                    logging.warning(f"Ollama: Model is loading. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
+                if response.status_code == 200:
+                    # Inspect available keys
+                    available_keys = list(response_data.keys())
+                    logging.debug(f"Ollama: Available keys in response: {available_keys}")
+
+                    # Attempt to retrieve 'response'
+                    summary = None
+                    if 'response' in response_data and response_data['response']:
+                        summary = response_data['response'].strip()
+                    elif 'choices' in response_data and len(response_data['choices']) > 0:
+                        choice = response_data['choices'][0]
+                        if 'message' in choice and 'content' in choice['message']:
+                            summary = choice['message']['content'].strip()
+
+                    if summary:
+                        logging.debug("Ollama: Chat request successful")
+                        print("\n\nChat request successful.")
+                        return summary
+                    elif response_data.get('done_reason') == 'load':
+                        logging.warning(f"Ollama: Model is loading. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        logging.error("Ollama: API response does not contain 'response' or 'choices'.")
+                        return "Ollama: API response does not contain 'response' or 'choices'."
                 else:
-                    logging.error("Ollama: API response does not contain 'response' or 'choices'.")
-                    return "Ollama: API response does not contain 'response' or 'choices'."
-            else:
-                logging.error(f"Ollama: API request failed with status code {response.status_code}: {response.text}")
-                return f"Ollama: API request failed: {response.text}"
+                    logging.error(f"Ollama: API request failed with status code {response.status_code}: {response.text}")
+                    return f"Ollama: API request failed: {response.text}"
 
-        logging.error("Ollama: Maximum retry attempts reached. Model is still loading.")
-        return "Ollama: Maximum retry attempts reached. Model is still loading."
+            logging.error("Ollama: Maximum retry attempts reached. Model is still loading.")
+            return "Ollama: Maximum retry attempts reached. Model is still loading."
 
     except Exception as e:
         logging.error("\n\nOllama: Error in processing: %s", str(e))
@@ -598,9 +893,10 @@ def chat_with_vllm(
         vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions",
         model: str = None,
         system_prompt: str = None,
-        temp: float = 0.7
+        temp: float = 0.7,
+        streaming=False
 ) -> str:
-    logging.debug("vLLM: Summarization process starting...")
+    logging.debug("vLLM: Chat request being made...")
     try:
         logging.debug("vLLM: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -619,33 +915,14 @@ def chat_with_vllm(
                     logging.info("vLLM: Using API key from config file")
                 else:
                     logging.warning("vLLM: No API key found in config file")
+            if 'vllm' in loaded_config_data['local_api_ip']:
+                vllm_api_url = loaded_config_data['local_api_ip']['vllm']
+                logging.info(f"vLLM: Using API URL from config file: {vllm_api_url}")
+            else:
+                logging.error("vLLM: API URL not found in config file")
 
-        logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:]}")
+        logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:] if vllm_api_key else 'None'}")
         # Process input data
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("vLLM: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
-        else:
-            logging.debug("vLLM: Using provided data for summarization")
-            data = input_data
-
-        logging.debug(f"vLLM: Type of data: {type(data)}")
-
-        # Extract text for summarization
-        if isinstance(data, dict) and 'summary' in data:
-            logging.debug("vLLM: Summary already exists in the loaded data")
-            return data['summary']
-        elif isinstance(data, list):
-            text = extract_text_from_segments(data)
-        elif isinstance(data, str):
-            text = data
-        elif isinstance(data, dict):
-            text = json.dumps(data)
-        else:
-            raise ValueError("Invalid input data format")
-
-        logging.debug(f"vLLM: Extracted text (showing first 500 chars): {text[:500]}...")
 
         if system_prompt is None:
             system_prompt = "You are a helpful AI assistant."
@@ -663,39 +940,74 @@ def chat_with_vllm(
             "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"{custom_prompt_input}\n\n{text}"}
-            ]
+                {"role": "user", "content": f"{custom_prompt_input}\n\n{input_data}"},
+            ],
+            "temperature": temp,
+            "stream": streaming
         }
 
-        # Make the API call
         logging.debug(f"vLLM: Sending request to {vllm_api_url}")
-        response = requests.post(vllm_api_url, headers=headers, json=payload)
 
-        # Check for successful response
-        response.raise_for_status()
-
-        # Extract and return the summary
-        response_data = response.json()
-        if 'choices' in response_data and len(response_data['choices']) > 0:
-            summary = response_data['choices'][0]['message']['content']
-            logging.debug("vLLM: Summarization successful")
-            logging.debug(f"vLLM: Summary (first 500 chars): {summary[:500]}...")
-            return summary
+        if streaming:
+            # Send the request with streaming enabled
+            response = requests.post(vllm_api_url, headers=headers, json=payload, stream=True)
+            response.raise_for_status()
+            # Process the streamed response
+            for line in response.iter_lines():
+                if line:
+                    decoded_line = line.decode('utf-8').strip()
+                    if decoded_line.startswith('data: '):
+                        data_line = decoded_line[len('data: '):]
+                        if data_line == '[DONE]':
+                            break
+                        try:
+                            data_json = json.loads(data_line)
+                            if 'choices' in data_json and len(data_json['choices']) > 0:
+                                delta = data_json['choices'][0].get('delta', {})
+                                content = delta.get('content', '')
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError as e:
+                            logging.error(f"vLLM: Failed to parse JSON streamed data: {str(e)}")
+                    else:
+                        logging.debug(f"vLLM: Received non-data line: {decoded_line}")
         else:
-            raise ValueError("Unexpected response format from vLLM API")
+            # Make the API call
+            logging.debug(f"vLLM: Sending request to {vllm_api_url}")
+            response = requests.post(vllm_api_url, headers=headers, json=payload)
+            # Check for successful response
+            response.raise_for_status()
+            # Extract and return the summary
+            response_data = response.json()
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                summary = response_data['choices'][0]['message']['content']
+                logging.debug("vLLM: Summarization successful")
+                logging.debug(f"vLLM: Summary (first 500 chars): {summary[:500]}...")
+                return summary
+            else:
+                raise ValueError("Unexpected response format from vLLM API")
 
     except requests.RequestException as e:
         logging.error(f"vLLM: API request failed: {str(e)}")
-        return f"Error: vLLM API request failed - {str(e)}"
+        if streaming:
+            yield f"Error: vLLM API request failed - {str(e)}"
+        else:
+            return f"Error: vLLM API request failed - {str(e)}"
     except json.JSONDecodeError as e:
         logging.error(f"vLLM: Failed to parse API response: {str(e)}")
-        return f"Error: Failed to parse vLLM API response - {str(e)}"
+        if streaming:
+            yield f"Error: Failed to parse vLLM API response - {str(e)}"
+        else:
+            return f"Error: Failed to parse vLLM API response - {str(e)}"
     except Exception as e:
         logging.error(f"vLLM: Unexpected error during summarization: {str(e)}")
-        return f"Error: Unexpected error during vLLM summarization - {str(e)}"
+        if streaming:
+            yield f"Error: Unexpected error during vLLM summarization - {str(e)}"
+        else:
+            return f"Error: Unexpected error during vLLM summarization - {str(e)}"
 
 
-def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None):
+def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     custom_openai_api_key = api_key
     try:
@@ -780,29 +1092,62 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
                 {"role": "user", "content": openai_prompt}
             ],
             "max_tokens": 4096,
-            "temperature": temp
+            "temperature": temp,
+            "stream": streaming
         }
 
         custom_openai_url = loaded_config_data['Local_api_ip']['custom_openai_api_ip']
 
-        logging.debug("Custom OpenAI API: Posting request")
-        response = requests.post(custom_openai_url, headers=headers, json=data)
-        logging.debug(f"Custom OpenAI API full API response data: {response}")
-        if response.status_code == 200:
-            response_data = response.json()
-            logging.debug(response_data)
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                chat_response = response_data['choices'][0]['message']['content'].strip()
-                logging.debug("Custom OpenAI API: Chat Sent successfully")
-                logging.debug(f"Custom OpenAI API: Chat response: {chat_response}")
-                return chat_response
-            else:
-                logging.warning("Custom OpenAI API: Chat response not found in the response data")
-                return "Custom OpenAI API: Chat not available"
+        if streaming:
+            response = requests.post(
+                custom_openai_url,
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            response.raise_for_status()
+
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
+
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"OpenAI: Error decoding JSON from line: {line}")
+                            continue
+                yield collected_messages
+            return stream_generator()
         else:
-            logging.error(f"Custom OpenAI API: Chat request failed with status code {response.status_code}")
-            logging.error(f"Custom OpenAI API: Error response: {response.text}")
-            return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
+            logging.debug("Custom OpenAI API: Posting request")
+            response = requests.post(custom_openai_url, headers=headers, json=data)
+            logging.debug(f"Custom OpenAI API full API response data: {response}")
+            if response.status_code == 200:
+                response_data = response.json()
+                logging.debug(response_data)
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    chat_response = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Custom OpenAI API: Chat Sent successfully")
+                    logging.debug(f"Custom OpenAI API: Chat response: {chat_response}")
+                    return chat_response
+                else:
+                    logging.warning("Custom OpenAI API: Chat response not found in the response data")
+                    return "Custom OpenAI API: Chat not available"
+            else:
+                logging.error(f"Custom OpenAI API: Chat request failed with status code {response.status_code}")
+                logging.error(f"Custom OpenAI API: Error response: {response.text}")
+                return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
         logging.error(f"Custom OpenAI API: Error decoding JSON: {str(e)}", exc_info=True)
         return f"Custom OpenAI API: Error decoding JSON input: {str(e)}"
