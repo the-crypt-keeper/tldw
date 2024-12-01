@@ -14,11 +14,14 @@ Unsorted
 	https://aibyhand.substack.com/p/beginners-guide-to-rag-evaluation
 	https://www.louisbouchard.ai/indexing-methods/
 	https://github.com/circlemind-ai/fast-graphrag
-
+	https://github.com/Kain-90/RAG-Play
 
 GraphRAG
 	https://www.microsoft.com/en-us/research/blog/introducing-drift-search-combining-global-and-local-search-methods-to-improve-quality-and-efficiency/	
-
+	https://github.com/esenthil2018/graph_rag/tree/main
+	https://towardsdatascience.com/how-to-implement-graph-rag-using-knowledge-graphs-and-vector-databases-60bb69a22759
+	https://towardsdatascience.com/text-to-knowledge-graph-made-easy-with-graph-maker-f3f890c0dbe8
+	https://towardsdatascience.com/building-a-knowledge-graph-from-scratch-using-llms-f6f677a17f07
 
 
 
