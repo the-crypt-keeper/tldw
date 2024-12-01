@@ -22,7 +22,7 @@ GraphRAG
 	https://towardsdatascience.com/how-to-implement-graph-rag-using-knowledge-graphs-and-vector-databases-60bb69a22759
 	https://towardsdatascience.com/text-to-knowledge-graph-made-easy-with-graph-maker-f3f890c0dbe8
 	https://towardsdatascience.com/building-a-knowledge-graph-from-scratch-using-llms-f6f677a17f07
-
+	https://iopscience.iop.org/article/10.1088/2632-2153/ad7228/pdf
 
 
 ### Links
@@ -33,7 +33,7 @@ GraphRAG
   * https://github.com/jxnl/n-levels-of-rag
   * https://winder.ai/llm-architecture-rag-implementation-design-patterns/ 
   * https://medium.com/@yufan1602/modular-rag-and-rag-flow-part-%E2%85%B0-e69b32dc13a3
-
+	https://news.ycombinator.com/item?id=42174829
 
 - RAG 201
 	* https://medium.com/@cdg2718/why-your-rag-doesnt-work-9755726dd1e9

@@ -101,6 +101,7 @@ Finetuning
 ----------------------------------------------------------------------------------------------------------------
 ### <a name="model-evaluation"></a> Model Evaluation
 - https://github.com/openai/simple-evals/blob/main/simpleqa_eval.py
+- 
 - **101**
     - https://github.com/huggingface/evaluation-guidebook
 - **Metrics**
@@ -288,7 +289,7 @@ Finetuning
     - https://www.confident-ai.com/blog/a-step-by-step-guide-to-evaluating-an-llm-text-summarization-task
     - https://arxiv.org/abs/2009.01325
     - https://www.amazon.science/publications/salient-information-prompting-to-steer-content-in-prompt-based-abstractive-summarization
-    - 
+    - https://towardsdatascience.com/explaining-llms-for-rag-and-summarization-067e486020b4
     - https://arxiv.org/abs/2407.01370v1
     - https://arxiv.org/html/2403.19889v1
     - https://github.com/salesforce/summary-of-a-haystack
