@@ -1,6 +1,11 @@
 # Handy Dandy Papers
 
 
+https://arxiv.org/pdf/2410.13098
+https://arxiv.org/pdf/2404.01413
+https://arxiv.org/abs/2411.11910
+
+
 ### Context
     https://arxiv.org/pdf/2304.12102
     https://arxiv.org/html/2405.20234v2#S3
