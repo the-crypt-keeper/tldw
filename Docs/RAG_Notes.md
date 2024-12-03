@@ -6,6 +6,7 @@ Unsorted
 		https://arxiv.org/abs/2411.02959v1
 	https://github.com/run-llama/llama_parse/blob/main/examples/multimodal/multimodal_report_generation.ipynb
 	https://www.youtube.com/watch?v=aqtX-sGbevw
+	https://arxiv.org/abs/2411.19539
 	https://arxiv.org/abs/2410.21012
 	https://arxiv.org/abs/2410.20088
 	https://arxiv.org/abs/2410.13765
@@ -14,13 +15,17 @@ Unsorted
 	https://aibyhand.substack.com/p/beginners-guide-to-rag-evaluation
 	https://www.louisbouchard.ai/indexing-methods/
 	https://github.com/circlemind-ai/fast-graphrag
-
+	https://github.com/Kain-90/RAG-Play
 
 GraphRAG
 	https://www.microsoft.com/en-us/research/blog/introducing-drift-search-combining-global-and-local-search-methods-to-improve-quality-and-efficiency/	
-
-
-
+	https://github.com/esenthil2018/graph_rag/tree/main
+	https://towardsdatascience.com/how-to-implement-graph-rag-using-knowledge-graphs-and-vector-databases-60bb69a22759
+	https://towardsdatascience.com/how-to-implement-graph-rag-using-knowledge-graphs-and-vector-databases-60bb69a22759
+	https://towardsdatascience.com/text-to-knowledge-graph-made-easy-with-graph-maker-f3f890c0dbe8
+	https://towardsdatascience.com/building-a-knowledge-graph-from-scratch-using-llms-f6f677a17f07
+	https://iopscience.iop.org/article/10.1088/2632-2153/ad7228/pdf
+	https://medium.com/thoughts-on-machine-learning/building-dynamic-knowledge-graphs-using-open-source-llms-06a870e1bc4f
 
 ### Links
 - RAG 101
@@ -30,7 +35,7 @@ GraphRAG
   * https://github.com/jxnl/n-levels-of-rag
   * https://winder.ai/llm-architecture-rag-implementation-design-patterns/ 
   * https://medium.com/@yufan1602/modular-rag-and-rag-flow-part-%E2%85%B0-e69b32dc13a3
-
+	https://news.ycombinator.com/item?id=42174829
 
 - RAG 201
 	* https://medium.com/@cdg2718/why-your-rag-doesnt-work-9755726dd1e9

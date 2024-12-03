@@ -141,54 +141,83 @@ def get_prompt_db_connection():
     return sqlite3.connect(prompt_db_path)
 
 
-def search_prompts(query):
-    logging.debug(f"search_prompts: Searching prompts with query: {query}")
+# def search_prompts(query):
+#     logging.debug(f"search_prompts: Searching prompts with query: {query}")
+#     try:
+#         with get_prompt_db_connection() as conn:
+#             cursor = conn.cursor()
+#             cursor.execute("""
+#                 SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+#                 FROM Prompts p
+#                 LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
+#                 LEFT JOIN Keywords k ON pk.keyword_id = k.id
+#                 WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
+#                 GROUP BY p.id
+#                 ORDER BY p.name
+#             """, (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'))
+#             return cursor.fetchall()
+#     except sqlite3.Error as e:
+#         logging.error(f"Error searching prompts: {e}")
+#         return []
+
+
+def search_prompts(query, search_fields):
+    logging.debug(f"search_prompts: Searching prompts with query: {query}, fields: {search_fields}")
     try:
         with get_prompt_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
+
+            where_clauses = []
+            params = []
+
+            if 'title' in search_fields:
+                where_clauses.append("p.name LIKE ?")
+                params.append(f'%{query}%')
+            if 'content' in search_fields:
+                where_clauses.append("(p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ?)")
+                params.extend([f'%{query}%'] * 3)
+            if 'keywords' in search_fields:
+                where_clauses.append("k.keyword LIKE ?")
+                params.append(f'%{query}%')
+
+            where_clause = " OR ".join(where_clauses)
+
+            cursor.execute(f"""
+                SELECT DISTINCT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
                 FROM Prompts p
                 LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
                 LEFT JOIN Keywords k ON pk.keyword_id = k.id
-                WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
+                WHERE {where_clause}
                 GROUP BY p.id
                 ORDER BY p.name
-            """, (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'))
+            """, params)
             return cursor.fetchall()
     except sqlite3.Error as e:
         logging.error(f"Error searching prompts: {e}")
         return []
 
 
-def search_prompts_by_keyword(keyword, page=1, per_page=10):
-    logging.debug(f"search_prompts_by_keyword: Searching prompts by keyword: {keyword}")
-    normalized_keyword = normalize_keyword(keyword)
-    offset = (page - 1) * per_page
-    with sqlite3.connect(get_database_path('prompts.db')) as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT DISTINCT p.name
-            FROM Prompts p
-            JOIN PromptKeywords pk ON p.id = pk.prompt_id
-            JOIN Keywords k ON pk.keyword_id = k.id
-            WHERE k.keyword LIKE ?
-            LIMIT ? OFFSET ?
-        ''', ('%' + normalized_keyword + '%', per_page, offset))
-        prompts = [row[0] for row in cursor.fetchall()]
-
-        # Get total count of matching prompts
-        cursor.execute('''
-            SELECT COUNT(DISTINCT p.id)
-            FROM Prompts p
-            JOIN PromptKeywords pk ON p.id = pk.prompt_id
-            JOIN Keywords k ON pk.keyword_id = k.id
-            WHERE k.keyword LIKE ?
-        ''', ('%' + normalized_keyword + '%',))
-        total_count = cursor.fetchone()[0]
-
-    total_pages = (total_count + per_page - 1) // per_page
-    return prompts, total_pages, page
+def fetch_item_details_with_keywords(media_id):
+    logging.debug(f"fetch_item_details_with_keywords: Fetching details for media item with ID: {media_id}")
+    try:
+        with sqlite3.connect(get_database_path('prompts.db')) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT m.content, mm.prompt, mm.summary, GROUP_CONCAT(k.keyword, ', ') as keywords
+                FROM Media m
+                LEFT JOIN MediaModifications mm ON m.id = mm.media_id
+                LEFT JOIN MediaKeywords mk ON m.id = mk.media_id
+                LEFT JOIN Keywords k ON mk.keyword_id = k.id
+                WHERE m.id = ?
+                GROUP BY m.id
+            """, (media_id,))
+            result = cursor.fetchone()
+            if result:
+                content, prompt, summary, keywords = result
+                return content, prompt, summary, keywords
+            return None, None, None, None
+    except sqlite3.Error as e:
+        return f"Database error: {e}"
 
 
 def update_prompt_keywords(prompt_name, new_keywords):

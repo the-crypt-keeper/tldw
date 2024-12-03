@@ -4,14 +4,18 @@
 ## Table of Contents
 - [Introduction](#introduction)
 - [Evaluation Plan](#evaluation-plan)
+- [101/General](#general)
 - [Model Evaluation](#model-evaluation)
 - [Search Evaluations](#search-eval)
+- [Abstractive Summarization Evaluations](#abstract_summ_evals)
 - [RAG Evaluation](#rag-eval)
 - [Embeddings Retrieval Evaluation](#embeddings-retrieval-eval)
 - [VLM Evaluations](#vlm-evals)
 ----------------------------------------------------------------------------------------------------------------
 
-https://eugeneyan.com/writing/evals/
+
+https://x.com/bnjmn_marie/status/1846834917608407199
+https://www.juriopitz.com/2024/10/17/evaluation-pitfalls-metric-overview-tips.html
 Benchmarking with distilabel
     https://distilabel.argilla.io/latest/sections/pipeline_samples/examples/benchmarking_with_distilabel/
 
@@ -99,6 +103,7 @@ Finetuning
 ----------------------------------------------------------------------------------------------------------------
 ### <a name="model-evaluation"></a> Model Evaluation
 - https://github.com/openai/simple-evals/blob/main/simpleqa_eval.py
+- 
 - **101**
     - https://github.com/huggingface/evaluation-guidebook
 - **Metrics**
@@ -286,7 +291,7 @@ Finetuning
     - https://www.confident-ai.com/blog/a-step-by-step-guide-to-evaluating-an-llm-text-summarization-task
     - https://arxiv.org/abs/2009.01325
     - https://www.amazon.science/publications/salient-information-prompting-to-steer-content-in-prompt-based-abstractive-summarization
-    - 
+    - https://towardsdatascience.com/explaining-llms-for-rag-and-summarization-067e486020b4
     - https://arxiv.org/abs/2407.01370v1
     - https://arxiv.org/html/2403.19889v1
     - https://github.com/salesforce/summary-of-a-haystack
@@ -348,10 +353,49 @@ Finetuning
 
 
 ----------------------------------------------------------------------------------------------------------------
+ 
 
 
 ----------------------------------------------------------------------------------------------------------------
-### <a name="search-eval"></a> Search Evaluation
+### <a name="general"></a>101/General
+- **Links**
+    - https://eugeneyan.com/writing/evals/
+- **Guidelines for Human Annotators when creating a dataset**
+    - **Areas of Measure**:
+        * **Accuracy:** Is the generated text factually correct and aligned with known information? This is closely tied to factual consistency.
+        * **Relevance:** Is the output appropriate and directly applicable to the task and input?
+        * **Fluency:** Is the text grammatically correct and readable? With modern LLMs, this is less of an issue than it used to be.
+        * **Transparency:** Does the model communicate its thought process and reasoning? Techniques like chain-of-thought help with this.
+        * **Safety:** Are there potential harms or unintended consequences from the generated text? This includes toxicity, bias, and misinformation.
+        * **Human alignment:** To what extent does the model’s output align with human values, preferences, and expectations?
+- **You have a dataset, now what?**
+    * **Increase precision:** Select instances that the model predicts as positive with high probability and annotate them to identify false positives
+    * **Increase recall:** Select instances that the model predicts have low probability and check for false negatives
+    * **Increase confidence:** Select instances where the model is unsure (e.g., probability between 0.4 to 0.6) and collect human labels for finetuning
+
+
+----------------------------------------------------------------------------------------------------------------
+### <a name="abstract-summ-evals"></a> Abstractive Summarization Evaluations
+- **101**
+    - Basic Measures:
+    - `Fluency`: Are sentences in the summary well-formed and easy to read? We want to avoid grammatical errors, random capitalization, etc. 
+    - `Coherence`: Does the summary as a whole make sense? It should be well-structured and logically organized, and not just a jumble of information. 
+    - `Consistency`: Does the summary accurately reflect the content of the source document? We want to ensure there’s no new or contradictory information added. 
+    - `Relevance`: Does the summary focus on the most important aspects of the source document? It should include key points and exclude less relevant details
+- **Benchmarks**
+  - https://github.com/r-three/fib
+  - https://huggingface.co/datasets/r-three/fib
+  - https://github.com/kukrishna/usb
+
+
+
+
+----------------------------------------------------------------------------------------------------------------
+
+
+
+----------------------------------------------------------------------------------------------------------------
+### <a name="search-eval"></a> Search Evaluations
 
 https://arxiv.org/abs/2304.01982
 
@@ -379,6 +423,8 @@ https://towardsdatascience.com/how-to-create-a-rag-evaluation-dataset-from-docum
 https://github.com/jonathan-roberts1/needle-threading/
 https://huggingface.co/datasets/jonathan-roberts1/needle-threading
 https://arxiv.org/abs/2411.03538
+https://arxiv.org/abs/2411.19710
+
 https://archive.is/MZsB9
 - **101**
 - **RAG Eval Plan:**
@@ -713,6 +759,8 @@ https://arxiv.org/abs/2411.02571
 https://github.com/TRI-ML/vlm-evaluation
 https://arxiv.org/abs/2411.13211
 https://videoautoarena.github.io/
+https://arxiv.org/abs/2411.17451
+https://huggingface.co/spaces/MMInstruction/VL-RewardBench
 https://github.com/illuin-tech/vidore-benchmark
 - xkcd bench: https://github.com/arnokha/explain-xkcd-with-llms
 
@@ -720,3 +768,14 @@ https://github.com/illuin-tech/vidore-benchmark
     - https://arxiv.org/html/2411.01106v1
 
 ----------------------------------------------------------------------------------------------------------------
+
+
+
+----------------------------------------------------------------------------------------------------------------
+### <a name="mllm-evals"></a> MLLM Evaluations
+
+https://arxiv.org/abs/2411.15296
+https://arxiv.org/abs/2411.06284
+----------------------------------------------------------------------------------------------------------------
+
+

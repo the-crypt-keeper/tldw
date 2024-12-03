@@ -19,7 +19,7 @@
 - [Contributing](#contributing)
 
 
-
+https://openai.com/chatgpt/use-cases/student-writing-guide/
 https://huggingface.co/DavidAU/Maximizing-Model-Performance-All-Quants-Types-And-Full-Precision-by-Samplers_Parameters
 
 Look at:
