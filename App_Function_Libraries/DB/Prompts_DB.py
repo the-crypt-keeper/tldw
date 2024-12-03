@@ -197,6 +197,29 @@ def search_prompts(query, search_fields):
         return []
 
 
+def fetch_item_details_with_keywords(media_id):
+    logging.debug(f"fetch_item_details_with_keywords: Fetching details for media item with ID: {media_id}")
+    try:
+        with sqlite3.connect(get_database_path('prompts.db')) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT m.content, mm.prompt, mm.summary, GROUP_CONCAT(k.keyword, ', ') as keywords
+                FROM Media m
+                LEFT JOIN MediaModifications mm ON m.id = mm.media_id
+                LEFT JOIN MediaKeywords mk ON m.id = mk.media_id
+                LEFT JOIN Keywords k ON mk.keyword_id = k.id
+                WHERE m.id = ?
+                GROUP BY m.id
+            """, (media_id,))
+            result = cursor.fetchone()
+            if result:
+                content, prompt, summary, keywords = result
+                return content, prompt, summary, keywords
+            return None, None, None, None
+    except sqlite3.Error as e:
+        return f"Database error: {e}"
+
+
 def update_prompt_keywords(prompt_name, new_keywords):
     logging.debug(f"update_prompt_keywords: Updating keywords for prompt: {prompt_name}")
     try:

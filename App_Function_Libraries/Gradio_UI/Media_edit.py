@@ -1,19 +1,23 @@
 # Media_edit.py
 # Functions for Gradio Media_Edit UI
-
+#
 # Imports
 import logging
 import uuid
-
+#
 # External Imports
 import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import add_prompt, update_media_content, db, add_or_update_prompt, \
     fetch_keywords_for_media, update_keywords_for_media, fetch_prompt_details, list_prompts
+from App_Function_Libraries.DB.Prompts_DB import fetch_item_details_with_keywords
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown
 from App_Function_Libraries.DB.SQLite_DB import fetch_item_details
-
+#
+#######################################################################################################################
+#
+# Functions:
 
 def create_media_edit_tab():
     with gr.TabItem("Edit Existing Items in the Media DB", visible=True):
@@ -108,6 +112,7 @@ def create_media_edit_and_clone_tab():
         content_input = gr.Textbox(label="Edit Content", lines=10)
         prompt_input = gr.Textbox(label="Edit Prompt", lines=3)
         summary_input = gr.Textbox(label="Edit Summary", lines=5)
+        keywords_input = gr.Textbox(label="Edit Keywords (comma-separated)", lines=2)
         new_title_input = gr.Textbox(label="New Title (for cloning)", visible=False)
         status_message = gr.Textbox(label="Status", interactive=False)
 
@@ -120,14 +125,14 @@ def create_media_edit_and_clone_tab():
         def load_selected_media_content(selected_item, item_mapping):
             if selected_item and item_mapping and selected_item in item_mapping:
                 media_id = item_mapping[selected_item]
-                content, prompt, summary = fetch_item_details(media_id)
-                return content, prompt, summary, gr.update(visible=True), gr.update(visible=False)
-            return "No item selected or invalid selection", "", "", gr.update(visible=False), gr.update(visible=False)
+                content, prompt, summary, keywords = fetch_item_details_with_keywords(media_id)
+                return content, prompt, summary, keywords, gr.update(visible=True), gr.update(visible=False)
+            return "No item selected or invalid selection", "", "", "", gr.update(visible=False), gr.update(visible=False)
 
         items_output.change(
             fn=load_selected_media_content,
             inputs=[items_output, item_mapping],
-            outputs=[content_input, prompt_input, summary_input, clone_button, save_clone_button]
+            outputs=[content_input, prompt_input, summary_input, keywords_input, clone_button, save_clone_button]
         )
 
         def prepare_for_cloning(selected_item):
@@ -139,7 +144,7 @@ def create_media_edit_and_clone_tab():
             outputs=[new_title_input, save_clone_button]
         )
 
-        def save_cloned_item(selected_item, item_mapping, content, prompt, summary, new_title):
+        def save_cloned_item(selected_item, item_mapping, content, prompt, summary, keywords, new_title):
             if selected_item and item_mapping and selected_item in item_mapping:
                 original_media_id = item_mapping[selected_item]
                 try:
@@ -167,13 +172,16 @@ def create_media_edit_and_clone_tab():
                             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
                         """, (new_media_id, prompt, summary))
 
-                        # Copy keywords from the original item
-                        cursor.execute("""
-                            INSERT INTO MediaKeywords (media_id, keyword_id)
-                            SELECT ?, keyword_id
-                            FROM MediaKeywords
-                            WHERE media_id = ?
-                        """, (new_media_id, original_media_id))
+                        # Handle keywords
+                        keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+                        for keyword in keyword_list:
+                            # Insert keyword if it doesn't exist
+                            cursor.execute("INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)", (keyword,))
+                            cursor.execute("SELECT id FROM Keywords WHERE keyword = ?", (keyword,))
+                            keyword_id = cursor.fetchone()[0]
+
+                            # Associate keyword with the new media item
+                            cursor.execute("INSERT INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)", (new_media_id, keyword_id))
 
                         # Update full-text search index
                         cursor.execute("""
@@ -193,7 +201,7 @@ def create_media_edit_and_clone_tab():
 
         save_clone_button.click(
             fn=save_cloned_item,
-            inputs=[items_output, item_mapping, content_input, prompt_input, summary_input, new_title_input],
+            inputs=[items_output, item_mapping, content_input, prompt_input, summary_input, keywords_input, new_title_input],
             outputs=[status_message, new_title_input, save_clone_button]
         )
 
@@ -376,10 +384,11 @@ def create_prompt_clone_tab():
 
             with gr.Column():
                 title_input = gr.Textbox(label="Title", placeholder="Enter the prompt title")
-                author_input = gr.Textbox(label="Author", placeholder="Enter the prompt's author", lines=3)
+                author_input = gr.Textbox(label="Author", placeholder="Enter the prompt's author", lines=1)
                 description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
                 system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
                 user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
+                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords separated by commas", lines=2)
                 clone_prompt_button = gr.Button("Clone Selected Prompt")
                 save_cloned_prompt_button = gr.Button("Save Cloned Prompt", visible=False)
                 add_prompt_output = gr.HTML()
@@ -460,9 +469,11 @@ def create_prompt_clone_tab():
                         gr.update(value=author or ""),
                         gr.update(value=description or ""),
                         gr.update(value=system_prompt or ""),
-                        gr.update(value=user_prompt or "")
+                        gr.update(value=user_prompt or ""),
+                        gr.update(value=keywords or "")
                     )
             return (
+                gr.update(value=""),
                 gr.update(value=""),
                 gr.update(value=""),
                 gr.update(value=""),
@@ -473,7 +484,7 @@ def create_prompt_clone_tab():
         prompt_dropdown.change(
             fn=load_prompt_details,
             inputs=[prompt_dropdown],
-            outputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input]
+            outputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input, keywords_input]
         )
 
         # Prepare for cloning
@@ -489,9 +500,10 @@ def create_prompt_clone_tab():
         )
 
         # Function to save cloned prompt
-        def save_cloned_prompt(title, author, description, system_prompt, user_prompt, current_page):
+        def save_cloned_prompt(title, author, description, system_prompt, user_prompt, keywords, current_page):
             try:
-                result = add_prompt(title, author, description, system_prompt, user_prompt)
+                keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+                result = add_prompt(title, author, description, system_prompt, user_prompt, keyword_list)
                 if result == "Prompt added successfully.":
                     # After adding, refresh the prompt dropdown
                     prompt_dropdown_update = update_prompt_dropdown(page=current_page)
@@ -506,7 +518,11 @@ def create_prompt_clone_tab():
         save_cloned_prompt_button.click(
             fn=save_cloned_prompt,
             inputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input,
-                    current_page_state],
+                    keywords_input, current_page_state],
             outputs=[add_prompt_output, prompt_dropdown, page_display, prev_page_button, next_page_button,
                      current_page_state, total_pages_state]
         )
+
+#
+# End of Media_edit.py
+#######################################################################################################################
