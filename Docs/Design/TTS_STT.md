@@ -3,6 +3,9 @@
 ## Overview
 
 
+Models
+    https://huggingface.co/NexaAIDev/Qwen2-Audio-7B-GGUF
+
 
 GPT-SoviTTS
 https://levelup.gitconnected.com/great-api-design-comprehensive-guide-from-basics-to-best-practices-9b4e0b613a44?source=home---------56-1--------------------0fc48da7_5ce6_48ca_92d2_260680a20318-------3

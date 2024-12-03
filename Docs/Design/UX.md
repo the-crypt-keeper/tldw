@@ -42,4 +42,10 @@
 
 
 ### Link Dump:
-https://github.com/abi/screenshot-to-code
+https://github.com/abi/screenshot-to-
+https://designdetails.fm/episodes
+https://copycoder.ai/
+https://docs.replit.com/replitai/agent
+https://bolt.new/
+https://github.com/rmusser01/agentic_rag/tree/main
+

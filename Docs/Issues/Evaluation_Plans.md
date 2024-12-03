@@ -14,6 +14,8 @@
 ----------------------------------------------------------------------------------------------------------------
 
 
+https://x.com/bnjmn_marie/status/1846834917608407199
+https://www.juriopitz.com/2024/10/17/evaluation-pitfalls-metric-overview-tips.html
 Benchmarking with distilabel
     https://distilabel.argilla.io/latest/sections/pipeline_samples/examples/benchmarking_with_distilabel/
 
@@ -421,6 +423,8 @@ https://towardsdatascience.com/how-to-create-a-rag-evaluation-dataset-from-docum
 https://github.com/jonathan-roberts1/needle-threading/
 https://huggingface.co/datasets/jonathan-roberts1/needle-threading
 https://arxiv.org/abs/2411.03538
+https://arxiv.org/abs/2411.19710
+
 https://archive.is/MZsB9
 - **101**
 - **RAG Eval Plan:**
