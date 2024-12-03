@@ -10,7 +10,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import add_prompt, update_media_content, db, add_or_update_prompt, \
-    load_prompt_details, fetch_keywords_for_media, update_keywords_for_media, fetch_prompt_details, list_prompts
+    fetch_keywords_for_media, update_keywords_for_media, fetch_prompt_details, list_prompts
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown
 from App_Function_Libraries.DB.SQLite_DB import fetch_item_details
 
@@ -96,7 +96,7 @@ def create_media_edit_and_clone_tab():
             with gr.Column():
                 search_query_input = gr.Textbox(label="Search Query", placeholder="Enter your search query here...")
                 search_type_input = gr.Radio(choices=["Title", "URL", "Keyword", "Content"], value="Title",
-                                         label="Search By")
+                                             label="Search By")
             with gr.Column():
                 search_button = gr.Button("Search")
                 clone_button = gr.Button("Clone Item")
@@ -223,6 +223,7 @@ def create_prompt_edit_tab():
                 description_input = gr.Textbox(label="Description", placeholder="Enter the prompt description", lines=3)
                 system_prompt_input = gr.Textbox(label="System Prompt", placeholder="Enter the system prompt", lines=3)
                 user_prompt_input = gr.Textbox(label="User Prompt", placeholder="Enter the user prompt", lines=3)
+                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords separated by commas", lines=2)
                 add_prompt_button = gr.Button("Add/Update Prompt")
                 add_prompt_output = gr.HTML()
 
@@ -291,10 +292,16 @@ def create_prompt_edit_tab():
             ]
         )
 
+        # Modified function to add or update a prompt with keywords
+        def add_or_update_prompt_with_keywords(title, author, description, system_prompt, user_prompt, keywords):
+            keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+            result = add_or_update_prompt(title, author, description, system_prompt, user_prompt, keyword_list)
+            return gr.HTML(result)
+
         # Event handler for adding or updating a prompt
         add_prompt_button.click(
-            fn=add_or_update_prompt,
-            inputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input],
+            fn=add_or_update_prompt_with_keywords,
+            inputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input, keywords_input],
             outputs=[add_prompt_output]
         ).then(
             fn=update_prompt_dropdown,
@@ -319,10 +326,12 @@ def create_prompt_edit_tab():
                     gr.update(value=author or ""),
                     gr.update(value=description or ""),
                     gr.update(value=system_prompt or ""),
-                    gr.update(value=user_prompt or "")
+                    gr.update(value=user_prompt or ""),
+                    gr.update(value=keywords or "")
                 )
             else:
                 return (
+                    gr.update(value=""),
                     gr.update(value=""),
                     gr.update(value=""),
                     gr.update(value=""),
@@ -339,10 +348,10 @@ def create_prompt_edit_tab():
                 author_input,
                 description_input,
                 system_prompt_input,
-                user_prompt_input
+                user_prompt_input,
+                keywords_input
             ]
         )
-
 
 
 def create_prompt_clone_tab():
@@ -486,14 +495,18 @@ def create_prompt_clone_tab():
                 if result == "Prompt added successfully.":
                     # After adding, refresh the prompt dropdown
                     prompt_dropdown_update = update_prompt_dropdown(page=current_page)
-                    return (result, *prompt_dropdown_update)
+                    return result, *prompt_dropdown_update
                 else:
-                    return (result, gr.update(), gr.update(), gr.update(), gr.update(), current_page, total_pages_state.value)
+                    return result, gr.update(), gr.update(), gr.update(), gr.update(), current_page, \
+                        total_pages_state.value
             except Exception as e:
-                return (f"Error saving cloned prompt: {str(e)}", gr.update(), gr.update(), gr.update(), gr.update(), current_page, total_pages_state.value)
+                return f"Error saving cloned prompt: {str(e)}", gr.update(), gr.update(), gr.update(), gr.update(), \
+                    current_page, total_pages_state.value
 
         save_cloned_prompt_button.click(
             fn=save_cloned_prompt,
-            inputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input, current_page_state],
-            outputs=[add_prompt_output, prompt_dropdown, page_display, prev_page_button, next_page_button, current_page_state, total_pages_state]
+            inputs=[title_input, author_input, description_input, system_prompt_input, user_prompt_input,
+                    current_page_state],
+            outputs=[add_prompt_output, prompt_dropdown, page_display, prev_page_button, next_page_button,
+                     current_page_state, total_pages_state]
         )
