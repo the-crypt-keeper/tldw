@@ -12,7 +12,7 @@
 </div>
 
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)- Demo is now working!
-- (I have no idea when it started working... Checked the other day and it was rendering properly...
+- (I have no idea when it started working... Checked the other day and it was rendering properly... New issue is my HF API keys keep expiring? Not really sure what's going on there.)
 <details> 
 <summary>Public Demo Info</summary>
 
