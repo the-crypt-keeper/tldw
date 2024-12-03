@@ -5,6 +5,18 @@
 #
 ####
 ####################
+# Function Categories
+#
+#     Config loading
+#     Misc-Functions
+#     File-saving Function Definitions
+#     UUID-Functions
+#     Sanitization/Verification Functions
+#     DB Config Loading
+#     File Handling Functions
+#
+#
+####################
 # Function List
 #
 # 1. extract_text_from_segments(segments: List[Dict]) -> str
@@ -415,16 +427,6 @@ print(f"Default API Endpoint: {default_api_endpoint}")
 
 #######################################################################################################################
 #
-# Prompt Handling Functions
-
-
-
-#
-# End of Prompt Handling Functions
-### #############################################################################################################
-
-#######################################################################################################################
-#
 # Misc-Functions
 
 # Log file
@@ -673,15 +675,6 @@ def generate_unique_identifier(file_path):
 
 #
 # End of UUID-Functions
-#######################################################################################################################
-
-
-#######################################################################################################################
-#
-# Backup code
-
-#
-# End of backup code
 #######################################################################################################################
 
 

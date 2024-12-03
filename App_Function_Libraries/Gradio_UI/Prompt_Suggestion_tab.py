@@ -43,7 +43,6 @@ def create_prompt_suggestion_tab():
                                              placeholder="E.g., CUSTOMER_COMPLAINT, COMPANY_NAME")
 
                 # API-related inputs
-                # Refactored API selection dropdown
                 api_name_input = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                     value=default_value,
@@ -89,9 +88,9 @@ def create_prompt_suggestion_tab():
         with gr.Row():
             with gr.Column():
                 prompt_title_input = gr.Textbox(label="Prompt Title", placeholder="Enter a title for this prompt")
-                prompt_author_input = gr.Textbox(label="Author",
-                                                 placeholder="Enter the author's name")  # New author field
+                prompt_author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
                 prompt_description_input = gr.Textbox(label="Prompt Description", placeholder="Enter a description", lines=3)
+                prompt_keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords separated by commas", lines=2)
                 save_prompt_button = gr.Button("Save Prompt to Database")
                 save_prompt_output = gr.Textbox(label="Save Prompt Output", interactive=False)
 
@@ -108,12 +107,15 @@ def create_prompt_suggestion_tab():
             return test_result
 
         # Callback function to save the generated prompt to the database
-        def on_save_prompt(title, author, description, generated_prompt):
+        def on_save_prompt(title, author, description, generated_prompt, keywords):
             if not title or not generated_prompt:
                 return "Error: Title and generated prompt are required."
 
+            # Process keywords
+            keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+
             # Add the generated prompt to the database
-            result = add_or_update_prompt(title, author, description, system_prompt="", user_prompt=generated_prompt, keywords=None)
+            result = add_or_update_prompt(title, author, description, system_prompt="", user_prompt=generated_prompt, keywords=keyword_list)
             return result
 
         # Connect the button to the function that generates the prompt
@@ -133,7 +135,7 @@ def create_prompt_suggestion_tab():
         # Connect the save button to the function that saves the prompt to the database
         save_prompt_button.click(
             fn=on_save_prompt,
-            inputs=[prompt_title_input, prompt_author_input, prompt_description_input, generated_prompt_output],
+            inputs=[prompt_title_input, prompt_author_input, prompt_description_input, generated_prompt_output, prompt_keywords_input],
             outputs=[save_prompt_output]
         )
 
