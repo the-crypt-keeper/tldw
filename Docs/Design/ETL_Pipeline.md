@@ -36,4 +36,11 @@ This page serves as documentation regarding the ETL pipelines within tldw and pr
 
 
 ### Link Dump:
+https://arxiv.org/abs/2410.12189
+https://ucbepic.github.io/docetl/concepts/optimization/
+https://arxiv.org/abs/2410.21169
+https://towardsdatascience.com/etl-pipelines-in-python-best-practices-and-techniques-0c148452cc68
+https://arxiv.org/html/2410.21169v2
+https://github.com/whyhow-ai/knowledge-table
 https://github.com/yobix-ai/extractous
+https://llamahub.ai/l/readers/llama-index-readers-microsoft-sharepoint
