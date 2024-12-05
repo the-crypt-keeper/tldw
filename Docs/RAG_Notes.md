@@ -26,6 +26,18 @@ GraphRAG
 	https://towardsdatascience.com/building-a-knowledge-graph-from-scratch-using-llms-f6f677a17f07
 	https://iopscience.iop.org/article/10.1088/2632-2153/ad7228/pdf
 	https://medium.com/thoughts-on-machine-learning/building-dynamic-knowledge-graphs-using-open-source-llms-06a870e1bc4f
+	https://ai.plainenglish.io/modeling-ai-semantic-memory-with-knowledge-graphs-1ce06f683433
+	https://towardsdatascience.com/how-to-convert-any-text-into-a-graph-of-concepts-110844f22a1a
+
+
+
+
+
+
+
+
+
+
 
 ### Links
 - RAG 101

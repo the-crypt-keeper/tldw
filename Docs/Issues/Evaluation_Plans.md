@@ -31,6 +31,7 @@ General Research
 Chat arena
     https://github.com/lm-sys/FastChat
 LLM-as-judge
+    https://www.atla-ai.com/post/evaluating-the-evaluator
     https://huggingface.co/spaces/AtlaAI/judge-arena
     https://huggingface.co/learn/cookbook/en/llm_judge
     https://github.com/open-compass/CompassJudger
@@ -202,6 +203,7 @@ Finetuning
     - https://arxiv.org/abs/2411.06032
     - https://arxiv.org/abs/2410.02677
     - https://mbzuai-oryx.github.io/ALM-Bench/
+    - https://arxiv.org/abs/2411.19799
     - User-Centric Evaluation of LLMs
         - https://github.com/Alice1998/URS
     - https://huggingface.co/spaces/HuggingFaceFW/blogpost-fine-tasks
@@ -424,8 +426,13 @@ https://github.com/jonathan-roberts1/needle-threading/
 https://huggingface.co/datasets/jonathan-roberts1/needle-threading
 https://arxiv.org/abs/2411.03538
 https://arxiv.org/abs/2411.19710
-
+https://aws.amazon.com/blogs/aws/new-rag-evaluation-and-llm-as-a-judge-capabilities-in-amazon-bedrock/
 https://archive.is/MZsB9
+https://arxiv.org/abs/2411.00136
+https://github.com/opendatalab/OHR-Bench
+https://towardsdatascience.com/from-retrieval-to-intelligence-exploring-rag-agent-rag-and-evaluation-with-trulens-3c518af836ce
+
+
 - **101**
 - **RAG Eval Plan:**
     - The generic idea however: you take a (full, unchunked) document and ask an LLM to generate a question with that document as well as give the factual answer to it. Enforce via prompts to make it use the document only and make it as hard as you want (eg. maybe sometimes you want it to consider 2 documents and make a question that uses bits of both). This gives you a ground truth dataset.
