@@ -3,6 +3,19 @@
 ## Overview
 
 
+https://github.com/jiaaro/pydub
+
+Flow:
+1. Clean/format input text
+2. Split text into segments
+3. Generate audio for each segment using designated provider function
+4. Merge audio segments into single output file
+5. Clean up temporary files
+
+
+
+
+### Link Dump:
 
 https://github.com/cpumaxx/sovits-ff-plugin
 
