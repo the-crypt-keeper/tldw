@@ -13,7 +13,8 @@
 - [VLM Evaluations](#vlm-evals)
 ----------------------------------------------------------------------------------------------------------------
 
-
+https://arxiv.org/abs/2412.03304
+https://arxiv.org/abs/2412.03605
 https://x.com/bnjmn_marie/status/1846834917608407199
 https://www.juriopitz.com/2024/10/17/evaluation-pitfalls-metric-overview-tips.html
 Benchmarking with distilabel
@@ -30,6 +31,7 @@ General Research
 
 Chat arena
     https://github.com/lm-sys/FastChat
+    https://arxiv.org/abs/2412.04363
 LLM-as-judge
     https://www.atla-ai.com/post/evaluating-the-evaluator
     https://huggingface.co/spaces/AtlaAI/judge-arena
@@ -44,9 +46,13 @@ LLM-as-judge
 Quant Eval
 https://arxiv.org/abs/2411.02355
 
+Summarization
+    https://arxiv.org/abs/2412.04254
+
 
 Creating Datasets
     https://github.com/Kiln-AI/Kiln
+    https://arxiv.org/abs/2412.03679
     https://github.com/argilla-io/argilla
         https://www.youtube.com/watch?v=ZsCqrAhzkFU
         https://www.youtube.com/watch?v=jWrtgf2w4VU
@@ -200,6 +206,7 @@ Finetuning
         - https://eqbench.com/creative_writing.html
 - **Culture**
     - https://arxiv.org/html/2305.14328v2
+    - https://huggingface.co/datasets/CohereForAI/Global-MMLU
     - https://arxiv.org/abs/2411.06032
     - https://arxiv.org/abs/2410.02677
     - https://mbzuai-oryx.github.io/ALM-Bench/
