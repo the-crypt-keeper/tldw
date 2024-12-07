@@ -465,9 +465,9 @@ def list_prompts(*args, **kwargs):
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")
 
-def search_prompts(query):
+def search_prompts(*args, **kwargs):
     if db_type == 'sqlite':
-        return sqlite_search_prompts(query)
+        return sqlite_search_prompts(*args, **kwargs)
     elif db_type == 'elasticsearch':
         # Implement Elasticsearch version
         raise NotImplementedError("Elasticsearch version of add_media_with_keywords not yet implemented")

@@ -6,6 +6,15 @@
 - [SQLite DB Design](#sqlite-db-design)
 - [Interesting/Relevant Later](#interesting-relevant-later)
 
+
+Migrating to sqlite-vec
+    https://www.youtube.com/live/xmdiwdom6Vk?t=1740s
+    https://alexgarcia.xyz/blog/2024/sqlite-vec-metadata-release/index.html
+    https://alexgarcia.xyz/sqlite-vec/features/vec0.html
+    https://docs.google.com/document/d/1sJ_S2ggfFmtPJupxIO3C1EZAFuDMUfNYcAytissbFMs/edit?tab=t.0#heading=h.xyau1jyb6vyx
+    https://github.com/Mozilla-Ocho/llamafile/pull/644
+
+https://briandouglas.ie/sqlite-defaults/
 https://kerkour.com/sqlite-for-servers
 https://wafris.org/blog/rearchitecting-for-sqlite
     General DB:
