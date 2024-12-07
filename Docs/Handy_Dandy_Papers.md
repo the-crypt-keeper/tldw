@@ -9,6 +9,12 @@ https://jinyangwu.github.io/hiar-icl/
 https://www.aimodels.fyi/papers/arxiv/beyond-examples-high-level-automated-reasoning-paradigm
 https://arxiv.org/abs/2412.02674
 https://arxiv.org/abs/2411.19865
+https://arxiv.org/abs/2412.04315
+https://arxiv.org/abs/2412.02980
+https://arxiv.org/abs/2412.02906
+https://arxiv.org/pdf/2410.21272
+https://arxiv.org/abs/2412.04318
+https://arxiv.org/abs/2412.02142
 
 ### Context
     https://arxiv.org/pdf/2304.12102
