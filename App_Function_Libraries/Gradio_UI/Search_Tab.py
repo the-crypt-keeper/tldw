@@ -10,11 +10,9 @@ import sqlite3
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import view_database, search_and_display_items, get_all_document_versions, \
-    fetch_item_details_single, fetch_paginated_data, fetch_item_details, get_latest_transcription, search_prompts, \
-    get_document_version
-from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_detailed_view
-from App_Function_Libraries.Utils.Utils import get_database_path, format_text_with_line_breaks
+from App_Function_Libraries.DB.DB_Manager import search_and_display_items, get_all_document_versions, \
+    fetch_item_details, get_latest_transcription, search_prompts, get_document_version
+from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown
 #
 ###################################################################################################
 #
@@ -121,7 +119,7 @@ def display_search_results(query):
     if not query.strip():
         return "Please enter a search query."
 
-    results = search_prompts(query)
+    results = search_prompts(query, ["title", "content", "keywords"])
 
     # Debugging: Print the results to the console to see what is being returned
     print(f"Processed search results for query '{query}': {results}")
@@ -213,6 +211,11 @@ def create_prompt_search_tab():
         with gr.Row():
             with gr.Column():
                 search_query_input = gr.Textbox(label="Search Prompts", placeholder="Enter your search query...")
+                search_fields = gr.CheckboxGroup(
+                    choices=["Title", "Content", "Keywords"],
+                    label="Search Fields",
+                    value=["Title", "Content", "Keywords"]
+                )
                 entries_per_page = gr.Dropdown(choices=[10, 20, 50, 100], label="Entries per Page", value=10)
                 page_number = gr.Number(value=1, label="Page Number", precision=0)
             with gr.Column():
@@ -222,34 +225,14 @@ def create_prompt_search_tab():
                 pagination_info = gr.Textbox(label="Pagination Info", interactive=False)
         search_results_output = gr.HTML()
 
-        # This is dirty and shouldn't be in the UI code, but it's a quick way to get the search working.
-        # FIXME - SQL functions to be moved to DB_Manager
-        def search_and_display_prompts(query, page, entries_per_page):
+        def search_and_display_prompts(query, search_fields, page, entries_per_page):
             offset = (page - 1) * entries_per_page
             try:
-                # FIXME - SQL functions to be moved to DB_Manager
-                with sqlite3.connect(get_database_path('prompts.db')) as conn:
-                    cursor = conn.cursor()
-                    cursor.execute('''
-                        SELECT p.name, p.details, p.system, p.user, GROUP_CONCAT(k.keyword, ', ') as keywords
-                        FROM Prompts p
-                        LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
-                        LEFT JOIN Keywords k ON pk.keyword_id = k.id
-                        WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
-                        GROUP BY p.id
-                        ORDER BY p.name
-                        LIMIT ? OFFSET ?
-                    ''', (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', entries_per_page, offset))
-                    prompts = cursor.fetchall()
+                search_fields_lower = [field.lower() for field in search_fields]
+                prompts = search_prompts(query, search_fields_lower)
 
-                    cursor.execute('''
-                        SELECT COUNT(DISTINCT p.id)
-                        FROM Prompts p
-                        LEFT JOIN PromptKeywords pk ON p.id = pk.prompt_id
-                        LEFT JOIN Keywords k ON pk.keyword_id = k.id
-                        WHERE p.name LIKE ? OR p.details LIKE ? OR p.system LIKE ? OR p.user LIKE ? OR k.keyword LIKE ?
-                    ''', (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'))
-                    total_prompts = cursor.fetchone()[0]
+                total_prompts = len(prompts)
+                prompts = prompts[offset:offset+entries_per_page]
 
                 results = ""
                 for prompt in prompts:
@@ -286,38 +269,38 @@ def create_prompt_search_tab():
             except sqlite3.Error as e:
                 return f"<p>Error searching prompts: {e}</p>", "Error", 0
 
-        def update_search_page(query, page, entries_per_page):
-            results, pagination, total_pages = search_and_display_prompts(query, page, entries_per_page)
+        def update_search_page(query, search_fields, page, entries_per_page):
+            results, pagination, total_pages = search_and_display_prompts(query, search_fields, page, entries_per_page)
             next_disabled = page >= total_pages
             prev_disabled = page <= 1
             return results, pagination, page, gr.update(interactive=not next_disabled), gr.update(interactive=not prev_disabled)
 
-        def go_to_next_search_page(query, current_page, entries_per_page):
+        def go_to_next_search_page(query, search_fields, current_page, entries_per_page):
             next_page = current_page + 1
-            return update_search_page(query, next_page, entries_per_page)
+            return update_search_page(query, search_fields, next_page, entries_per_page)
 
-        def go_to_previous_search_page(query, current_page, entries_per_page):
+        def go_to_previous_search_page(query, search_fields, current_page, entries_per_page):
             previous_page = max(1, current_page - 1)
-            return update_search_page(query, previous_page, entries_per_page)
+            return update_search_page(query, search_fields, previous_page, entries_per_page)
 
         search_button.click(
             fn=update_search_page,
-            inputs=[search_query_input, page_number, entries_per_page],
+            inputs=[search_query_input, search_fields, page_number, entries_per_page],
             outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
         )
 
         next_page_button.click(
             fn=go_to_next_search_page,
-            inputs=[search_query_input, page_number, entries_per_page],
+            inputs=[search_query_input, search_fields, page_number, entries_per_page],
             outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
         )
 
         previous_page_button.click(
             fn=go_to_previous_search_page,
-            inputs=[search_query_input, page_number, entries_per_page],
+            inputs=[search_query_input, search_fields, page_number, entries_per_page],
             outputs=[search_results_output, pagination_info, page_number, next_page_button, previous_page_button]
         )
 
-
-
-
+#
+# End of Search_Tab.py
+#######################################################################################################################

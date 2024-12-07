@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Union, Optional, Tuple
 import asyncio
 from urllib.parse import urljoin, urlparse
 from xml.dom import minidom
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as xET
 #
 # External Libraries
 from bs4 import BeautifulSoup
@@ -36,6 +36,7 @@ import trafilatura
 #
 # Import Local
 from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
+from App_Function_Libraries.Metrics.metrics_logger import log_histogram, log_counter
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
 #######################################################################################################################
 # Function Definitions
@@ -51,9 +52,12 @@ def get_page_title(url: str) -> str:
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         title_tag = soup.find('title')
-        return title_tag.string.strip() if title_tag else "Untitled"
+        title = title_tag.string.strip() if title_tag else "Untitled"
+        log_counter("page_title_extracted", labels={"success": "true"})
+        return title
     except requests.RequestException as e:
         logging.error(f"Error fetching page title: {e}")
+        log_counter("page_title_extracted", labels={"success": "false"})
         return "Untitled"
 
 
@@ -71,6 +75,7 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
             await page.wait_for_load_state("networkidle")
             content = await page.content()
             await browser.close()
+            log_counter("html_fetched", labels={"url": url})
             return content
 
     def extract_article_data(html: str, url: str) -> dict:
@@ -88,6 +93,7 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
         }
 
         if downloaded:
+            log_counter("article_extracted", labels={"success": "true", "url": url})
             # Add metadata to content
             result['content'] = ContentMetadataHandler.format_content_with_metadata(
                 url=url,
@@ -107,6 +113,7 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
                 'date': metadata.date if metadata.date else 'N/A'
             })
         else:
+            log_counter("article_extracted", labels={"success": "false", "url": url})
             logging.warning("Metadata extraction failed.")
 
         if not downloaded:
@@ -126,9 +133,11 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
     article_data = extract_article_data(html, url)
     if article_data['extraction_successful']:
         article_data['content'] = convert_html_to_markdown(article_data['content'])
+        log_histogram("article_content_length", len(article_data['content']), labels={"url": url})
     return article_data
 
 
+# FIXME - Add keyword integration/tagging
 async def scrape_and_summarize_multiple(
     urls: str,
     custom_prompt_arg: Optional[str],
@@ -154,6 +163,7 @@ async def scrape_and_summarize_multiple(
             # Scrape the article
             article = await scrape_article(url, custom_cookies=custom_cookies)
             if article and article['extraction_successful']:
+                log_counter("article_scraped", labels={"success": "true", "url": url})
                 if custom_title:
                     article['title'] = custom_title
 
@@ -162,8 +172,10 @@ async def scrape_and_summarize_multiple(
                     content = article.get('content', '')
                     if content:
                         # Prepare prompts
-                        system_message_final = system_message or "Act as a professional summarizer and summarize this article."
-                        article_custom_prompt = custom_prompt_arg or "Act as a professional summarizer and summarize this article."
+                        system_message_final = system_message or \
+                                               "Act as a professional summarizer and summarize this article."
+                        article_custom_prompt = custom_prompt_arg or \
+                                                "Act as a professional summarizer and summarize this article."
 
                         # Summarize the content using the summarize function
                         summary = summarize(
@@ -175,6 +187,7 @@ async def scrape_and_summarize_multiple(
                             system_message=system_message_final
                         )
                         article['summary'] = summary
+                        log_counter("article_summarized", labels={"success": "true", "url": url})
                         logging.info(f"Summary generated for URL {url}")
                     else:
                         article['summary'] = "No content available to summarize."
@@ -187,7 +200,9 @@ async def scrape_and_summarize_multiple(
                 error_message = f"Extraction unsuccessful for URL {url}"
                 errors.append(error_message)
                 logging.error(error_message)
+                log_counter("article_scraped", labels={"success": "false", "url": url})
         except Exception as e:
+            log_counter("article_processing_error", labels={"url": url})
             error_message = f"Error processing URL {i + 1} ({url}): {str(e)}"
             errors.append(error_message)
             logging.error(error_message, exc_info=True)
@@ -199,6 +214,7 @@ async def scrape_and_summarize_multiple(
         logging.error("No articles were successfully scraped and summarized/analyzed.")
         return []
 
+    log_histogram("articles_processed", len(results))
     return results
 
 
@@ -208,6 +224,7 @@ def scrape_and_no_summarize_then_ingest(url, keywords, custom_article_title):
         article_data = asyncio.run(scrape_article(url))
         print(f"Scraped Article Data: {article_data}")  # Debugging statement
         if not article_data:
+            log_counter("article_scrape_failed", labels={"url": url})
             return "Failed to scrape the article."
 
         # Use the custom title if provided, otherwise use the scraped title
@@ -220,11 +237,13 @@ def scrape_and_no_summarize_then_ingest(url, keywords, custom_article_title):
 
         # Step 2: Ingest the article into the database
         ingestion_result = ingest_article_to_db(url, title, author, content, keywords, ingestion_date, None, None)
+        log_counter("article_ingested", labels={"success": str(ingestion_result).lower(), "url": url})
 
         # When displaying content, we might want to strip metadata
         display_content = ContentMetadataHandler.strip_metadata(content)
         return f"Title: {title}\nAuthor: {author}\nIngestion Result: {ingestion_result}\n\nArticle Contents: {display_content}"
     except Exception as e:
+        log_counter("article_processing_error", labels={"url": url})
         logging.error(f"Error processing URL {url}: {str(e)}")
         return f"Failed to process URL {url}: {str(e)}"
 
@@ -238,7 +257,7 @@ def scrape_from_filtered_sitemap(sitemap_file: str, filter_function) -> list:
     :return: List of scraped articles
     """
     try:
-        tree = ET.parse(sitemap_file)
+        tree = xET.parse(sitemap_file)
         root = tree.getroot()
 
         articles = []
@@ -249,7 +268,7 @@ def scrape_from_filtered_sitemap(sitemap_file: str, filter_function) -> list:
                     articles.append(article_data)
 
         return articles
-    except ET.ParseError as e:
+    except xET.ParseError as e:
         logging.error(f"Error parsing sitemap: {e}")
         return []
 
@@ -262,7 +281,7 @@ def is_content_page(url: str) -> bool:
     :param url: The URL to check
     :return: True if the URL is likely a content page, False otherwise
     """
-    #Add more specific checks here based on the website's structure
+    # Add more specific checks here based on the website's structure
     # Exclude common non-content pages
     exclude_patterns = [
         '/tag/', '/category/', '/author/', '/search/', '/page/',
@@ -311,6 +330,7 @@ async def scrape_entire_site(base_url: str) -> List[Dict]:
     """
     # Step 1: Collect internal links from the site
     links = collect_internal_links(base_url)
+    log_histogram("internal_links_collected", len(links), labels={"base_url": base_url})
     logging.info(f"Collected {len(links)} internal links.")
 
     # Step 2: Generate the temporary sitemap
@@ -336,6 +356,7 @@ async def scrape_entire_site(base_url: str) -> List[Dict]:
         scraped_articles = await asyncio.gather(*[scrape_and_log(link) for link in links])
         # Remove any None values (failed scrapes)
         scraped_articles = [article for article in scraped_articles if article is not None]
+        log_histogram("articles_scraped", len(scraped_articles), labels={"base_url": base_url})
 
     finally:
         # Clean up the temporary sitemap file
@@ -362,7 +383,7 @@ def scrape_from_sitemap(sitemap_url: str) -> list:
     try:
         response = requests.get(sitemap_url)
         response.raise_for_status()
-        root = ET.fromstring(response.content)
+        root = xET.fromstring(response.content)
 
         return [article for url in root.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc')
                 if (article := scrape_article(url.text))]
@@ -415,23 +436,23 @@ def generate_temp_sitemap_from_links(links: set) -> str:
     :return: Path to the temporary sitemap file
     """
     # Create the root element
-    urlset = ET.Element("urlset")
+    urlset = xET.Element("urlset")
     urlset.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
 
     # Add each link to the sitemap
     for link in links:
-        url = ET.SubElement(urlset, "url")
-        loc = ET.SubElement(url, "loc")
+        url = xET.SubElement(urlset, "url")
+        loc = xET.SubElement(url, "loc")
         loc.text = link
-        lastmod = ET.SubElement(url, "lastmod")
+        lastmod = xET.SubElement(url, "lastmod")
         lastmod.text = datetime.now().strftime("%Y-%m-%d")
-        changefreq = ET.SubElement(url, "changefreq")
+        changefreq = xET.SubElement(url, "changefreq")
         changefreq.text = "daily"
-        priority = ET.SubElement(url, "priority")
+        priority = xET.SubElement(url, "priority")
         priority.text = "0.5"
 
     # Create the tree and get it as a string
-    xml_string = ET.tostring(urlset, 'utf-8')
+    xml_string = xET.tostring(urlset, 'utf-8')
 
     # Pretty print the XML
     pretty_xml = minidom.parseString(xml_string).toprettyxml(indent="  ")
@@ -458,7 +479,7 @@ def generate_sitemap_for_url(url: str) -> List[Dict[str, str]]:
     with tempfile.NamedTemporaryFile(mode="w+", suffix=".xml", delete=False) as temp_file:
         create_filtered_sitemap(url, temp_file.name, is_content_page)
         temp_file.seek(0)
-        tree = ET.parse(temp_file.name)
+        tree = xET.parse(temp_file.name)
         root = tree.getroot()
 
         sitemap = []
@@ -479,15 +500,15 @@ def create_filtered_sitemap(base_url: str, output_file: str, filter_function):
     links = collect_internal_links(base_url)
     filtered_links = set(filter(filter_function, links))
 
-    root = ET.Element("urlset")
+    root = xET.Element("urlset")
     root.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
 
     for link in filtered_links:
-        url = ET.SubElement(root, "url")
-        loc = ET.SubElement(url, "loc")
+        url = xET.SubElement(root, "url")
+        loc = xET.SubElement(url, "loc")
         loc.text = link
 
-    tree = ET.ElementTree(root)
+    tree = xET.ElementTree(root)
     tree.write(output_file, encoding='utf-8', xml_declaration=True)
     print(f"Filtered sitemap saved to {output_file}")
 

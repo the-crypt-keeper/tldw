@@ -42,4 +42,18 @@
 
 
 ### Link Dump:
-https://github.com/abi/screenshot-to-code
+https://github.com/abi/screenshot-to-
+https://designdetails.fm/episodes
+https://copycoder.ai/
+https://docs.replit.com/replitai/agent
+https://bolt.new/
+https://github.com/rmusser01/agentic_rag/tree/main
+https://github.com/astramind-ai/Pulsar
+https://github.com/woshixiaobai2019/mirau-chat-ui
+https://github.com/Vali-98/ChatterUI
+https://github.com/Rugz007/liha
+https://astro.new/latest/
+https://github.com/lobehub/lobe-chat
+
+
+
