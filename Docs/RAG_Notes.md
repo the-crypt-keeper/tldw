@@ -21,6 +21,7 @@ Unsorted
 	https://arxiv.org/abs/2412.01572
 	https://pub.towardsai.net/around-the-rag-in-80-questions-part-ii-4df03c6dba86
 	https://www.uber.com/en-IN/blog/introducing-the-prompt-engineering-toolkit/
+	https://arxiv.org/abs/2409.14924
 
 
 GraphRAG

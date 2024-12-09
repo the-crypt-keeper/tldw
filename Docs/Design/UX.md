@@ -54,6 +54,7 @@ https://github.com/Vali-98/ChatterUI
 https://github.com/Rugz007/liha
 https://astro.new/latest/
 https://github.com/lobehub/lobe-chat
+https://www.nngroup.com/videos/the-danger-of-defaults/
 
 
 
