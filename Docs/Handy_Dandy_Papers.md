@@ -20,6 +20,11 @@ https://arxiv.org/abs/2412.02142
     https://arxiv.org/pdf/2304.12102
     https://arxiv.org/html/2405.20234v2#S3
 
+### Dataset Generation
+    https://arxiv.org/abs/2412.04645
+
+
+
 ### Reasoning
 - https://huggingface.co/papers/2411.15862
 
