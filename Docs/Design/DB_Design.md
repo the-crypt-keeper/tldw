@@ -15,6 +15,7 @@ Migrating to sqlite-vec
     https://github.com/Mozilla-Ocho/llamafile/pull/644
 
 https://briandouglas.ie/sqlite-defaults/
+https://phiresky.github.io/blog/2020/sqlite-performance-tuning/
 https://kerkour.com/sqlite-for-servers
 https://wafris.org/blog/rearchitecting-for-sqlite
     General DB:
