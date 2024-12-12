@@ -55,6 +55,9 @@ https://github.com/Rugz007/liha
 https://astro.new/latest/
 https://github.com/lobehub/lobe-chat
 https://www.nngroup.com/videos/the-danger-of-defaults/
+https://writings.stephenwolfram.com/2024/12/useful-to-the-point-of-being-revolutionary-introducing-wolfram-notebook-assistant/
+
+
 
 
 

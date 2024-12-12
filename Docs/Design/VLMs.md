@@ -17,6 +17,9 @@ https://huggingface.co/Qwen/Qwen2-VL-2B
 
 https://www.reddit.com/r/StableDiffusion/comments/1h7hunp/how_to_run_hunyuanvideo_on_a_single_24gb_vram_card/
 https://arxiv.org/abs/2412.05185
+https://huggingface.co/collections/OpenGVLab/internvl-25-673e1019b66e2218f68d7c1c
+
+https://huggingface.co/papers/2412.07626
 
 
 
