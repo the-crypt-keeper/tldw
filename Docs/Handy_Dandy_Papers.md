@@ -15,6 +15,8 @@ https://arxiv.org/abs/2412.02906
 https://arxiv.org/pdf/2410.21272
 https://arxiv.org/abs/2412.04318
 https://arxiv.org/abs/2412.02142
+https://arxiv.org/abs/2412.05265
+
 
 ### Context
     https://arxiv.org/pdf/2304.12102
@@ -27,6 +29,9 @@ https://arxiv.org/abs/2412.02142
 
 ### Reasoning
 - https://huggingface.co/papers/2411.15862
+https://arxiv.org/abs/2411.19865
+https://arxiv.org/abs/2412.06769
+
 
 ### Test-Time Compute
 - https://github.com/GAIR-NLP/O1-Journey
