@@ -102,7 +102,9 @@ def set_api_key(provider: str, api_key: str) -> None:
 tts_config = load_tts_config()
 
 def tts_generate_audio(input_text, provider, voice, model):
-    input_text = "Hello, how are you? I'm doing well, thank you!"
+    # if no input_text is passed, use a default text as a shorthand for validating X service works.
+    if not input_text:
+        input_text = "Hello, how are you? I'm doing well, thank you!"
     if provider not in tts_providers:
         raise ValueError(f"Unsupported provider: {provider}")
     elif provider == "elevenlabs":

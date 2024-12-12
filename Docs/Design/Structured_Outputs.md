@@ -24,4 +24,5 @@ https://docs.pydantic.dev/latest/
 https://github.com/outlines-dev/outlines[
 https://github.com/Dan-wanna-M/formatron/tree/master
 https://blog.dottxt.co/selective-multiplication.html
+https://blog.dottxt.co/say-what-you-mean.html
 

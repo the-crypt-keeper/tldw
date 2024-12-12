@@ -31,6 +31,8 @@ General Research
 Chat arena
     Building one
         https://github.com/lm-sys/FastChat
+        https://github.com/Teachings/llm_tools_benchmark
+        https://github.com/Nutlope/codearena
     Potential issues with creating a chatarena system
         https://arxiv.org/abs/2412.04363
 LLM-as-judge
@@ -213,6 +215,8 @@ Links:
         - https://github.com/Quehry/HelloBench
         - https://arxiv.org/abs/2409.16191
     - https://github.com/jonathan-roberts1/needle-threading/
+    - Michelangelo
+        - https://arxiv.org/abs/2409.12640
 - **Creative Writing**
     - EQ Bench
         - https://eqbench.com/creative_writing.html
