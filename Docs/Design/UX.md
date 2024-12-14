@@ -56,8 +56,17 @@ https://astro.new/latest/
 https://github.com/lobehub/lobe-chat
 https://www.nngroup.com/videos/the-danger-of-defaults/
 https://writings.stephenwolfram.com/2024/12/useful-to-the-point-of-being-revolutionary-introducing-wolfram-notebook-assistant/
+https://en.wikipedia.org/wiki/Template:Google_payment_apps
+https://github.com/stackblitz-labs/bolt.diy
+https://github.com/Haervwe/open-webui-tools
+https://interactjs.io/
+https://markwhen.com/
 
-
-
+Prompt Engineering page:
+- 3 Sections
+  - Prompt
+  - Values
+  - Response
+- Looks like Claude Workshop UI window
 
 

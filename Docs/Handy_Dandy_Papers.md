@@ -31,6 +31,7 @@ https://arxiv.org/abs/2412.05265
 - https://huggingface.co/papers/2411.15862
 https://arxiv.org/abs/2411.19865
 https://arxiv.org/abs/2412.06769
+- https://arxiv.org/abs/2412.01113
 
 
 ### Test-Time Compute
