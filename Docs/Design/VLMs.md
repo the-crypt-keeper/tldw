@@ -20,6 +20,15 @@ https://arxiv.org/abs/2412.05185
 https://huggingface.co/collections/OpenGVLab/internvl-25-673e1019b66e2218f68d7c1c
 
 https://huggingface.co/papers/2412.07626
+https://huggingface.co/AI-Safeguard/Ivy-VL-llava
+https://github.com/matatonic/openedai-vision
+https://github.com/breezedeus/Pix2Text
+https://github.com/Tencent/HunyuanVideo
+https://github.com/huggingface/blog/blob/main/smolvlm.md
+https://huggingface.co/tencent/HunyuanVideo
+https://aivideo.hunyuan.tencent.com/
+https://github.com/deepseek-ai/DeepSeek-VL2
+https://arxiv.org/abs/2409.17146
 
 
 

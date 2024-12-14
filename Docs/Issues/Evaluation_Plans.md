@@ -14,7 +14,7 @@
 ----------------------------------------------------------------------------------------------------------------
 
 
-
+Have LLMs play Social deception games
 Different results depending on batch size during evaluations - https://x.com/bnjmn_marie/status/1846834917608407199
 
 Benchmarking with distilabel

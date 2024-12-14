@@ -7,7 +7,7 @@ import os
 from pydub import AudioSegment
 import re
 import tempfile
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 # External Imports
 #
 # Local Imports
@@ -16,6 +16,72 @@ from typing import List, Tuple
 #
 # Functions:
 
+
+#######################################################
+#
+# TTS Provider Check Functions
+
+tts_providers = ["elevenlabs", "openai", "edge", "google", "sovitts", "qwen"]
+
+def test_all_tts_providers():
+    try:
+        # Load configuration
+        #config = load_config()
+
+        # Override default TTS model to use edge for tests
+        test_config = {"text_to_speech": {"default_tts_model": "edge"}}
+
+        # Read input text from file
+        with open(
+                "tests/data/transcript_336aa9f955cd4019bc1287379a5a2820.txt", "r"
+        ) as file:
+            input_text = file.read()
+
+        # Test ElevenLabs
+        tts_elevenlabs = TextToSpeech(model="elevenlabs")
+        elevenlabs_output_file = "tests/data/response_elevenlabs.mp3"
+        tts_elevenlabs.convert_to_speech(input_text, elevenlabs_output_file)
+        logging.info(
+            f"ElevenLabs TTS completed. Output saved to {elevenlabs_output_file}"
+        )
+
+        # Test OpenAI
+        tts_openai = TextToSpeech(model="openai")
+        openai_output_file = "tests/data/response_openai.mp3"
+        tts_openai.convert_to_speech(input_text, openai_output_file)
+        logging.info(f"OpenAI TTS completed. Output saved to {openai_output_file}")
+
+        # Test Edge
+        tts_edge = TextToSpeech(model="edge")
+        edge_output_file = "tests/data/response_edge.mp3"
+        tts_edge.convert_to_speech(input_text, edge_output_file)
+        logging.info(f"Edge TTS completed. Output saved to {edge_output_file}")
+
+        # Test Google
+        tts_google = TextToSpeech(model="google")
+        google_output_file = "tests/data/response_google.mp3"
+        tts_google.convert_to_speech(input_text, google_output_file)
+        logging.info(f"Google TTS completed. Output saved to {google_output_file}")
+
+        # Test Sovi TTS
+        tts_sovitts = TextToSpeech(model="sovitts")
+        sovitts_output_file = "tests/data/response_sovitts.mp3"
+        tts_sovitts.convert_to_speech(input_text, sovitts_output_file)
+        logging.info(f"Sovi TTS completed. Output saved to {sovitts_output_file}")
+
+        # Test Qwen TTS
+        tts_qwen = TextToSpeech(model="qwen")
+        qwen_output_file = "tests/data/response_qwen.mp3"
+        tts_qwen.convert_to_speech(input_text, qwen_output_file)
+        logging.info(f"Qwen TTS completed. Output saved to {qwen_output_file}")
+
+    except Exception as e:
+        logging.error(f"An error occurred during text-to-speech conversion: {str(e)}")
+        raise
+
+#
+# End of TTS Provider Check Functions
+#######################################################
 
 
 #######################################################
@@ -101,7 +167,7 @@ def set_api_key(provider: str, api_key: str) -> None:
 
 tts_config = load_tts_config()
 
-def tts_generate_audio(input_text, provider, voice, model):
+def tts_generate_audio_single_speaker(input_text, provider, voice, model):
     # if no input_text is passed, use a default text as a shorthand for validating X service works.
     if not input_text:
         input_text = "Hello, how are you? I'm doing well, thank you!"
