@@ -4,6 +4,20 @@
 This page serves as documentation regarding the structured outputs within tldw and provides context/justification for the decisions made within the module.
 
 ## Structured Outputs
+- Structured outputs are useful for generating structured data from unstructured text.
+
+### Use Cases
+1. File Creation
+   - .ical file (calendar file creation)
+   - .json file (structured data)
+   - .csv file (Anki Flash cards + structured data)
+   - .xml file
+   - .yaml file
+   - .toml file
+   - 
+2. Data Extraction
+
+
 
 ### Link Dump:
 https://github.com/yobix-ai/extractous
