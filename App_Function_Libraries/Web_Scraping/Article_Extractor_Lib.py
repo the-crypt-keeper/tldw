@@ -44,6 +44,8 @@ from App_Function_Libraries.Summarization.Summarization_General_Lib import summa
 # Function Definitions
 #
 
+web_scraping_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
 #################################################################
 #
 # Scraping-related functions:
@@ -66,10 +68,10 @@ def get_page_title(url: str) -> str:
 async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     async def fetch_html(url: str) -> str:
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False)
+            browser = await p.chromium.launch(headless=True)
             try:
                 context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                    user_agent=web_scraping_user_agent,
                 #viewport = {"width": 1280, "height": 720},
                 #java_script_enabled = True
                 )
