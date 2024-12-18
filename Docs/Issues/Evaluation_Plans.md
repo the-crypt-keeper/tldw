@@ -14,6 +14,27 @@
 ----------------------------------------------------------------------------------------------------------------
 
 
+
+LightEval + Argilla + distilabel
+- Open source, (will) support litellm and can use distilabel for synth data gen
+
+
+https://huggingface.co/papers/2412.06745
+https://huggingface.co/dranger003/c4ai-command-r-v01-iMat.GGUF
+https://huggingface.co/allenai/Llama-3.1-Tulu-3-8B-DPO
+https://huggingface.co/allenai/Llama-3.1-Tulu-3-8B-SFT-no-safety-data
+https://huggingface.co/mradermacher/Llama-3.1-Tulu-3-8B-SFT-no-safety-data-GGUF
+https://arxiv.org/html/2412.02611v1
+https://huggingface.co/blog/synthetic-data-generator
+https://towardsdatascience.com/stop-guessing-and-measure-your-rag-system-to-drive-real-improvements-bfc03f29ede3
+https://huggingface.co/SultanR/SmolTulu-1.7b-Instruct
+https://huggingface.co/DevQuasar/allenai.Llama-3.1-Tulu-3-8B-SFT-no-safety-data-GGUF
+https://huggingface.co/CohereForAI/c4ai-command-r7b-12-2024
+https://arxiv.org/html/2412.09569v1
+https://huggingface.co/tiiuae
+https://github.com/naver/bergen?tab=readme-ov-file
+
+
 Have LLMs play Social deception games
 Different results depending on batch size during evaluations - https://x.com/bnjmn_marie/status/1846834917608407199
 

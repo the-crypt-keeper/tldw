@@ -26,6 +26,21 @@ Flow:
 
 ### Link Dump:
 https://github.com/albirrkarim/react-speech-highlight-demo
+https://funaudiollm.github.io/cosyvoice2/
+https://funaudiollm.github.io/cosyvoice2/
+https://github.com/InternLM/InternLM-XComposer/tree/main/InternLM-XComposer-2.5-OmniLive
+
+
+
+Gemini
+    https://ai.google.dev/gemini-api/docs#rest
+    https://ai.google.dev/gemini-api/docs/models/gemini-v2
+
+ElevenLabs
+    https://github.com/elevenlabs/elevenlabs-examples/blob/main/examples/text-to-speech/python/text_to_speech_file.py
+    https://elevenlabs.io/docs/api-reference/text-to-speech
+    https://elevenlabs.io/docs/developer-guides/how-to-use-tts-with-streaming
+
 Models
       https://huggingface.co/NexaAIDev/Qwen2-Audio-7B-GGUF
 

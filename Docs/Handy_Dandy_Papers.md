@@ -32,10 +32,11 @@ https://arxiv.org/abs/2412.05265
 https://arxiv.org/abs/2411.19865
 https://arxiv.org/abs/2412.06769
 - https://arxiv.org/abs/2412.01113
-
+https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute
 
 ### Test-Time Compute
 - https://github.com/GAIR-NLP/O1-Journey
+- https://arxiv.org/abs/2408.03314
 
 
 ### Personalization

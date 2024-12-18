@@ -24,6 +24,18 @@ Unsorted
 	https://arxiv.org/abs/2409.14924
 https://arxiv.org/abs/2412.02830
 https://arxiv.org/abs/2407.04125
+https://cobusgreyling.medium.com/four-levels-of-rag-research-from-microsoft-fdc54388f0ff
+https://arxiv.org/html/2412.00239v1
+https://arxiv.org/abs/2412.02830
+https://arxiv.org/html/2412.02035v1
+https://towardsdatascience.com/dragin-dynamic-retrieval-augmented-generation-based-on-the-information-needs-of-large-language-dbdb9aabc1ef
+https://towardsdatascience.com/improve-your-rag-context-recall-by-40-with-an-adapted-embedding-model-5d4a8f583f32
+
+
+
+
+
+
 
 
 GraphRAG
@@ -43,9 +55,9 @@ GraphRAG
 	https://arxiv.org/abs/2412.04119
 	https://aibyhand.substack.com/p/beginners-guide-to-graph-rag
 	https://github.com/gusye1234/nano-graphrag
-
-
-
+	https://arxiv.org/abs/2412.03589
+	https://towardsdatascience.com/graph-rag-a-conceptual-introduction-41cd0d431375
+	https://towardsdatascience.com/towards-named-entity-disambiguation-with-graph-embeddings-ef164aaad37c
 
 
 
