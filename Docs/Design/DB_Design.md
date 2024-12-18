@@ -7,6 +7,11 @@
 - [Interesting/Relevant Later](#interesting-relevant-later)
 
 
+
+SQLite
+    https://highperformancesqlite.com/watch/dot-commands
+    https://www.youtube.com/watch?v=XP-h304N06I
+
 Migrating to sqlite-vec
     https://www.youtube.com/live/xmdiwdom6Vk?t=1740s
     https://alexgarcia.xyz/blog/2024/sqlite-vec-metadata-release/index.html

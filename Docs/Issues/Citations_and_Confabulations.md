@@ -8,6 +8,8 @@
 
 
 https://arxiv.org/abs/2412.04235
+https://arxiv.org/abs/2412.11536
+https://github.com/sunnynexus/RetroLLM
 
 RAG
   https://www.lycee.ai/blog/rag-ragallucinations-and-how-to-fight-them

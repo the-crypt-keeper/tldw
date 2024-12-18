@@ -10,6 +10,65 @@ https://arxiv.org/abs/2411.15114
 https://journaliststudio.google.com/pinpoint/about/
 https://blog.google/products/gemini/google-gemini-deep-research/
 https://github.com/neuml/annotateai
+https://pub.towardsai.net/learn-anything-with-ai-and-the-feynman-technique-00a33f6a02bc
+https://help.openalex.org/hc/en-us/articles/24396686889751-About-us
+https://www.ginkgonotes.com/
+https://www.reddit.com/r/Anki/comments/17u01ge/spaced_repetition_algorithm_a_threeday_journey/
+https://github.com/open-spaced-repetition/fsrs4anki/wiki/Spaced-Repetition-Algorithm:-A-Three%E2%80%90Day-Journey-from-Novice-to-Expert#day-3-the-latest-progress
+
+
+### Ideas
+
+Follow gptresearchers method at first, planner LLM -> query LLM -> analyzer LLM -> summarizer LLM
+
+
+
+Researcher config section
+```
+[researcher]
+# Researcher settings
+default_search_engine = google
+# Options are: google, bing, yandex, baidu, searx, kagi, serper, tavily
+default_search_type = web
+# Options are: web, local, both
+default_search_language = en
+# Options are: FIXME
+default_search_report_language = en
+# Options are: FIXME
+default_search_sort = relevance
+# Options are: relevance, date
+default_search_safe_search = moderate
+# Options are: off, moderate, strict
+default_search_planner = openai-o1-full
+# Options are: FIXME
+default_search_planner_max_tokens = 8192
+default_search_analyzer = openai-o1-full
+# Options are: FIXME
+default_search_analyzer_max_tokens = 8192
+default_search_summarization = openai-o1-full
+# Options are: FIXME
+default_search_summarization_max_tokens = 8192
+search_max_results = 100
+search_report_format = markdown
+# Options are: markdown, html, pdf
+search_max_iterations = 5
+search_max_subtopics = 4
+search_custom_user_agent = "CUSTOM_USER_AGENT_HERE"
+```
+
+
+
+
+
+### Researcher Workflow
+
+
+
+### Researcher Prompts
+
+
+
+
 
 
 

@@ -54,6 +54,11 @@ https://github.com/Vali-98/ChatterUI
 https://github.com/Rugz007/liha
 https://astro.new/latest/
 https://github.com/lobehub/lobe-chat
+https://www.scoutos.com/
+https://github.com/FishiaT/yawullm
+https://ilikeinterfaces.com/2015/03/09/map-ui-ghost-in-the-shell/
+https://jdan.github.io/98.css
+https://github.com/vercel/ai-chatbot
 https://www.nngroup.com/videos/the-danger-of-defaults/
 https://writings.stephenwolfram.com/2024/12/useful-to-the-point-of-being-revolutionary-introducing-wolfram-notebook-assistant/
 https://en.wikipedia.org/wiki/Template:Google_payment_apps
