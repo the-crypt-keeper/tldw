@@ -37,6 +37,8 @@ https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute
 ### Test-Time Compute
 - https://github.com/GAIR-NLP/O1-Journey
 - https://arxiv.org/abs/2408.03314
+- https://github.com/huggingface/search-and-learn
+- https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute
 
 
 ### Personalization

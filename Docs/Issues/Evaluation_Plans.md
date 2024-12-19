@@ -25,6 +25,8 @@ https://huggingface.co/allenai/Llama-3.1-Tulu-3-8B-DPO
 https://huggingface.co/allenai/Llama-3.1-Tulu-3-8B-SFT-no-safety-data
 https://huggingface.co/mradermacher/Llama-3.1-Tulu-3-8B-SFT-no-safety-data-GGUF
 https://arxiv.org/html/2412.02611v1
+https://arxiv.org/abs/2412.05579
+https://huggingface.co/collections/ibm-granite/granite-31-language-models-6751dbbf2f3389bec5c6f02d
 https://huggingface.co/blog/synthetic-data-generator
 https://towardsdatascience.com/stop-guessing-and-measure-your-rag-system-to-drive-real-improvements-bfc03f29ede3
 https://huggingface.co/SultanR/SmolTulu-1.7b-Instruct
@@ -33,6 +35,8 @@ https://huggingface.co/CohereForAI/c4ai-command-r7b-12-2024
 https://arxiv.org/html/2412.09569v1
 https://huggingface.co/tiiuae
 https://github.com/naver/bergen?tab=readme-ov-file
+https://arxiv.org/abs/2412.13147
+https://arxiv.org/abs/2412.13018
 
 
 Have LLMs play Social deception games

@@ -18,7 +18,8 @@ https://github.com/open-spaced-repetition/fsrs4anki/wiki/Spaced-Repetition-Algor
 
 
 ### Ideas
-
+Gated, checkpoints with 'retry, skip, continue' options
+s
 Follow gptresearchers method at first, planner LLM -> query LLM -> analyzer LLM -> summarizer LLM
 
 
@@ -54,8 +55,11 @@ search_report_format = markdown
 search_max_iterations = 5
 search_max_subtopics = 4
 search_custom_user_agent = "CUSTOM_USER_AGENT_HERE"
+search_blacklist_URLs = "URL1,URL2,URL3"
 ```
 
+
+https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama/blob/main/Self_Improving_Search.py
 
 
 
