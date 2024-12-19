@@ -29,6 +29,10 @@ https://github.com/albirrkarim/react-speech-highlight-demo
 https://funaudiollm.github.io/cosyvoice2/
 https://funaudiollm.github.io/cosyvoice2/
 https://github.com/InternLM/InternLM-XComposer/tree/main/InternLM-XComposer-2.5-OmniLive
+https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
+https://huggingface.co/onnx-community/moonshine-base-ONNX
+https://github.com/usefulsensors/moonshine
+
 
 
 
