@@ -65,6 +65,8 @@ https://en.wikipedia.org/wiki/Template:Google_payment_apps
 https://github.com/stackblitz-labs/bolt.diy
 https://github.com/Haervwe/open-webui-tools
 https://interactjs.io/
+https://perchance.org/ai-chat
+https://lovable.dev/
 https://markwhen.com/
 
 Prompt Engineering page:

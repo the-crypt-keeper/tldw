@@ -61,6 +61,7 @@ Chat arena
     Potential issues with creating a chatarena system
         https://arxiv.org/abs/2412.04363
 LLM-as-judge
+        https://arxiv.org/html/2412.14140v1
     Basics
         https://huggingface.co/learn/cookbook/en/llm_judge
     Evaluating LLMs as Judges
@@ -198,7 +199,8 @@ Links:
         - https://github.com/RUC-NLPIR/FlashRAG
     - Olmes
         - https://github.com/allenai/olmes
-
+- **CheeseBench**
+    - https://gist.github.com/av/db14a1f040f46dfb75e48451f4f14847
 - **Citations**
     - L-CiteEval
         - https://huggingface.co/papers/2410.02115
@@ -239,6 +241,7 @@ Links:
     - HelloBench
         - https://github.com/Quehry/HelloBench
         - https://arxiv.org/abs/2409.16191
+    - https://longbench2.github.io/
     - https://github.com/jonathan-roberts1/needle-threading/
     - Michelangelo
         - https://arxiv.org/abs/2409.12640
@@ -376,6 +379,8 @@ Links:
         - https://docs.ragas.io/en/latest/concepts/metrics/available_metrics/summarization_score/
         - https://docs.ragas.io/en/latest/concepts/metrics/available_metrics/noise_sensitivity/
         - https://docs.ragas.io/en/latest/concepts/metrics/available_metrics/agents/#topic_adherence
+- **Temporal Bias**
+    - https://arxiv.org/abs/2412.13377
 - **Text Comprehension**
 - **QA (General)**
     * https://direct.mit.edu/tacl/article/doi/10.1162/tacl_a_00276/43518/Natural-Questions-A-Benchmark-for-Question

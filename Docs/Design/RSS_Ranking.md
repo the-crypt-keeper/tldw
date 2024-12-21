@@ -18,7 +18,7 @@ https://arxiv.org/abs/2411.19352
 
 
 
-
+https://blog.badsectorlabs.com/files/blogs.txt
 
 
 

@@ -16,7 +16,7 @@ https://arxiv.org/pdf/2410.21272
 https://arxiv.org/abs/2412.04318
 https://arxiv.org/abs/2412.02142
 https://arxiv.org/abs/2412.05265
-
+https://arxiv.org/abs/2412.05346
 
 ### Context
     https://arxiv.org/pdf/2304.12102
@@ -26,6 +26,12 @@ https://arxiv.org/abs/2412.05265
     https://arxiv.org/abs/2412.04645
 
 
+### Jailbreaking
+    https://arxiv.org/abs/2411.01084
+    https://arxiv.org/abs/2408.04811
+    https://arxiv.org/html/2412.05346v1
+    https://github.com/centerforaisafety/HarmBench
+    https://github.com/dsbowen/strong_reject
 
 ### Reasoning
 - https://huggingface.co/papers/2411.15862
@@ -61,6 +67,9 @@ https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute
 
 ### Structured Generation
     https://arxiv.org/abs/2411.15100
+
+### Synthetic data creation
+https://arxiv.org/abs/2412.14689
 
 ### Test-Time related
     https://mathcritique.github.io/
