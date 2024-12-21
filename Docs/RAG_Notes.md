@@ -30,6 +30,8 @@ https://arxiv.org/abs/2412.02830
 https://arxiv.org/html/2412.02035v1
 https://towardsdatascience.com/dragin-dynamic-retrieval-augmented-generation-based-on-the-information-needs-of-large-language-dbdb9aabc1ef
 https://towardsdatascience.com/improve-your-rag-context-recall-by-40-with-an-adapted-embedding-model-5d4a8f583f32
+https://arxiv.org/abs/2412.06078
+https://www.zyphra.com/post/the-mixture-of-pageranks-retriever-for-long-context-pre-processing
 
 
 
@@ -58,9 +60,9 @@ GraphRAG
 	https://arxiv.org/abs/2412.03589
 	https://towardsdatascience.com/graph-rag-a-conceptual-introduction-41cd0d431375
 	https://towardsdatascience.com/towards-named-entity-disambiguation-with-graph-embeddings-ef164aaad37c
-
-
-
+	https://generativeai.pub/advanced-rag-retrieval-strategies-using-knowledge-graphs-12c9ce54d2da
+	https://medium.com/@ianormy/microsoft-graphrag-with-an-rdf-knowledge-graph-part-2-d8d291a39ed1
+	https://generativeai.pub/knowledge-graph-extraction-visualization-with-local-llm-from-unstructured-text-a-history-example-94c63b366fed?gi=b98ffc33dcbc
 
 ### Links
 - RAG 101

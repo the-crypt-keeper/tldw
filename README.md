@@ -74,7 +74,7 @@ Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)
 - **Structured Prompt Creation and Management** - Create prompts using a structured approach, and then edit and use them in your chats. Or delete them.
   - Also have the ability to import prompts individually or in bulk. As well as export them as markdown documents.
   - See `./Docs/Prompts/` for examples of prompts. and `./Docs/Propmts/TEMPLATE.md` for the prompt template used in tldw.
-- Features to come: Anki Flashcard Deck Editing (Creation is in), Mindmap creation from content(currently in under `Utilities`, uses PlantUML), better document handling, migration to a FastAPI backend(Gradio is a placeholder UI), and more.
+- Features to come: Migration to a FastAPI backend(Gradio is a placeholder UI). Anki Flashcard Deck Editing (Creation is in), Mindmap creation from content(currently in under `Utilities`, uses PlantUML), better document handling, and more.
 </details>
 
 #### The original scripts by `the-crypt-keeper` for transcribing and summarizing youtube videos are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)

@@ -32,7 +32,9 @@ https://github.com/deepseek-ai/DeepSeek-VL2
 https://arxiv.org/abs/2409.17146
 https://www.reddit.com/r/LocalLLaMA/comments/1hfkytk/answering_my_own_question_i_got_apollo_working/
 https://arxiv.org/abs/2412.09645
-
+https://rentry.org/crhcqq54
+https://arxiv.org/abs/2412.13501
+https://huggingface.co/IamCreateAI/Ruyi-Mini-7B
 https://github.com/tdrussell/diffusion-pipe
 https://proptest.ai/?#/playground
 https://lyra-omni.github.io/

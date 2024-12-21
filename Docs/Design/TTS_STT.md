@@ -20,6 +20,11 @@ Flow:
     - https://cloud.google.com/text-to-speech/docs/ssml
   
   
+### Benchmarks
+https://huggingface.co/blog/big-bench-audio-release
+    https://huggingface.co/datasets/ArtificialAnalysis/big_bench_audio
+https://artificialanalysis.ai/models/speech-to-speech
+
 
 
 
@@ -34,7 +39,14 @@ https://huggingface.co/onnx-community/moonshine-base-ONNX
 https://github.com/usefulsensors/moonshine
 
 
+GLM-4-Voice
+    https://github.com/THUDM/GLM-4-Voice/blob/main/README_en.md
+    https://github.com/THUDM/GLM-4-Voice/tree/main
 
+MoonShine
+    https://huggingface.co/onnx-community/moonshine-base-ONNX
+    https://huggingface.co/spaces/webml-community/moonshine-web
+    https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
 
 Gemini
     https://ai.google.dev/gemini-api/docs#rest

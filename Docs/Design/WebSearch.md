@@ -4,6 +4,53 @@
 This page serves as documentation regarding the web search functionality within tldw and provides context/justification for the decisions made within the module.
 
 
+ask.py https://github.com/pengfeng/ask.py
+    1. User inputs a search query
+    2. Search query is then used to generate several sub-queries
+    3. Each sub-query is then used to perform a search via API call
+    4. Sub-queries are setup using a specific prompt, they do 'at least 3, but no more than 5' - makes me wonder about how many sub-queries should be the default and the range thereof
+    5. Search results returned, passed to groq
+
+inference prompt
+```
+system_prompt = (
+    "You are an expert summarizing the answers based on the provided contents."
+)
+
+user_promt_template = """
+Given the context as a sequence of references with a reference id in the 
+format of a leading [x], please answer the following question using {{ language }}:
+
+{{ query }}
+
+In the answer, use format [1], [2], ..., [n] in line where the reference is used. 
+For example, "According to the research from Google[3], ...".
+
+Please create the answer strictly related to the context. If the context has no
+information about the query, please write "No related information found in the context."
+using {{ language }}.
+
+{{ length_instructions }}
+
+Here is the context:
+{{ context }}
+"""
+```
+extraction prompt
+```
+system_prompt = (
+    "You are an expert of extract structual information from the document."
+)
+user_promt_template = """
+Given the provided content, if it contains information about {{ query }}, please extract the
+list of structured data items as defined in the following Pydantic schema:
+
+{{ extract_schema_str }}
+
+Below is the provided content:
+{{ content }}
+"""
+```
 
 
 OpenPerplex
@@ -14,6 +61,8 @@ OpenPerplex
     5. Concat if exceeds X length, re-rank, then combine into a single document
     6. Present final doc to user
 
+
+
 llm-websearch
     https://github.com/Jay4242/llm-websearch
     1. Performs query -> Fetches results 
@@ -21,6 +70,8 @@ llm-websearch
     3. If so, it fetches the page content and creates a summary of it
     4. Repeat, until all URLs are processed.
     5. Create summary of all summaries/page contents and present final doc to user
+
+
 
 mindsearch
     Uses Knowledge Graph for results
@@ -30,6 +81,8 @@ mindsearch
         temperature=0,
         max_new_tokens=8192,
         repetition_penalty=1.02,
+
+
 
 Perplexity
     1. Search Query
@@ -46,6 +99,8 @@ Perplexity
     - Performs a planning step and then sub-query breakdown searches into 3(?) sub-queries
     - Non-pro simply performs the search, combines the results, and presents them to the user while showing the sources
     - Spaces: Seems to be a way of sharing collections of research document chains, with the ability to add comments, etc.
+
+
 
 ### Search Engines
 - **Google Search**
@@ -75,6 +130,28 @@ Perplexity
     - https://www.ncbi.nlm.nih.gov/home/develop/api/
 
 ### Implementaiton
+- Configuration Options:
+    - Query count
+    - Whether to create Sub-Queries
+    - Sub-Query count
+    - Search Engine Selection
+    - Search Engine API Key
+    - Search Engine Customization Options
+        - Safe Search
+        - Language
+        - Date Range
+    - Search Result Options
+        - Number of Results
+        - Result Sorting - Auto rerank according to ?
+        - Result Filtering - Filter according to a blacklist of URLs? Maybe also content?
+    - Search Result Display Options
+        - Display Format (List, Briefing, Full)
+        - Display Metadata (URL, Date, etc)
+    - Search Result Default Saving Options
+        - Save to DB
+        - Save to File
+        - Save to Clipboard
+        - Save to Notes DB - Create a new note with the search results + metadata & query
 - **Text Search Workflow**
     1. User inputs a search query
     2. User selects a search engine (Option for default search engine in config file)

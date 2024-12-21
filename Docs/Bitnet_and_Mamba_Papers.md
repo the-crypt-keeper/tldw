@@ -1,6 +1,8 @@
 # Bitnet and MAMBA Papers
 
 
+Bamba
+https://huggingface.co/blog/bamba
 
 ### Bitnet
 - Unsorted
