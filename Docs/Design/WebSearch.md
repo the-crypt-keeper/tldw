@@ -3,6 +3,7 @@
 ## Introduction
 This page serves as documentation regarding the web search functionality within tldw and provides context/justification for the decisions made within the module.
 
+https://github.com/scrapinghub/article-extraction-benchmark
 
 ask.py https://github.com/pengfeng/ask.py
     1. User inputs a search query
@@ -51,6 +52,197 @@ Below is the provided content:
 {{ content }}
 """
 ```
+
+
+Web-LLM Assistant - https://github.com/TheBlewish/Web-LLM-Assistant-Llamacpp-Ollama
+Starting prompt
+```
+SYSTEM_PROMPT = """You are an AI assistant capable of web searching and providing informative responses.
+When a user's query starts with '/', interpret it as a request to search the web and formulate an appropriate search query.
+
+ALWAYS follow the prompts provided throughout the searching process EXACTLY as indicated.
+
+NEVER assume new instructions for anywhere other than directly when prompted directly. DO NOT SELF PROMPT OR PROVIDE MULTIPLE ANSWERS OR ATTEMPT MULTIPLE RESPONSES FOR ONE PROMPT!
+"""
+```
+self-improving prompt
+```
+    def evaluate_scraped_content(self, user_query: str, scraped_content: Dict[str, str]) -> Tuple[str, str]:
+        user_query_short = user_query[:200]
+        prompt = f"""
+Evaluate if the following scraped content contains sufficient information to answer the user's question comprehensively:
+
+User's question: "{user_query_short}"
+
+Scraped Content:
+{self.format_scraped_content(scraped_content)}
+
+Your task:
+1. Determine if the scraped content provides enough relevant and detailed information to answer the user's question thoroughly.
+2. If the information is sufficient, decide to 'answer'. If more information or clarification is needed, decide to 'refine' the search.
+
+Respond using EXACTLY this format:
+Evaluation: [Your evaluation of the scraped content]
+Decision: [ONLY 'answer' if content is sufficient, or 'refine' if more information is needed]
+"""
+```
+Query Creation
+```
+def formulate_query(self, user_query: str, attempt: int) -> Tuple[str, str]:
+    user_query_short = user_query[:200]
+    prompt = f"""
+Based on the following user question, formulate a concise and effective search query:
+"{user_query_short}"
+Your task:
+1. Create a search query of 2-5 words that will yield relevant results.
+2. Determine if a specific time range is needed for the search.
+Time range options:
+- 'd': Limit results to the past day. Use for very recent events or rapidly changing information.
+- 'w': Limit results to the past week. Use for recent events or topics with frequent updates.
+- 'm': Limit results to the past month. Use for relatively recent information or ongoing events.
+- 'y': Limit results to the past year. Use for annual events or information that changes yearly.
+- 'none': No time limit. Use for historical information or topics not tied to a specific time frame.
+Respond in the following format:
+Search query: [Your 2-5 word query]
+Time range: [d/w/m/y/none]
+Do not provide any additional information or explanation.
+"""
+```
+Select relevant content
+```
+def select_relevant_pages(self, search_results: List[Dict], user_query: str) -> List[str]:
+    prompt = f"""
+Given the following search results for the user's question: "{user_query}"
+Select the 2 most relevant results to scrape and analyze. Explain your reasoning for each selection.
+
+Search Results:
+{self.format_results(search_results)}
+
+Instructions:
+1. You MUST select exactly 2 result numbers from the search results.
+2. Choose the results that are most likely to contain comprehensive and relevant information to answer the user's question.
+3. Provide a brief reason for each selection.
+
+You MUST respond using EXACTLY this format and nothing else:
+
+Selected Results: [Two numbers corresponding to the selected results]
+Reasoning: [Your reasoning for the selections]
+"""
+```
+Final answer generation
+```
+    def generate_final_answer(self, user_query: str, scraped_content: Dict[str, str]) -> str:
+        user_query_short = user_query[:200]
+        prompt = f"""
+You are an AI assistant. Provide a comprehensive and detailed answer to the following question using ONLY the information provided in the scraped content. Do not include any references or mention any sources. Answer directly and thoroughly.
+
+Question: "{user_query_short}"
+
+Scraped Content:
+{self.format_scraped_content(scraped_content)}
+
+Important Instructions:
+1. Do not use phrases like "Based on the absence of selected results" or similar.
+2. If the scraped content does not contain enough information to answer the question, say so explicitly and explain what information is missing.
+3. Provide as much relevant detail as possible from the scraped content.
+
+Answer:
+"""
+```
+Final Answer Synthesis
+```
+    def synthesize_final_answer(self, user_query: str) -> str:
+        prompt = f"""
+After multiple search attempts, we couldn't find a fully satisfactory answer to the user's question: "{user_query}"
+
+Please provide the best possible answer you can, acknowledging any limitations or uncertainties.
+If appropriate, suggest ways the user might refine their question or where they might find more information.
+
+Respond in a clear, concise, and informative manner.
+"""
+```
+
+
+
+appvoid search - https://github.com/appvoid/search
+Eval query type
+```
+async def evaluate_query_type(self, session, query):
+    messages = [
+        {"role": "system", "content": """You are an Web assistant that evaluates the type of query a user asks. 
+        Categorize the query into one of the following types:
+        1. simple: if it can be answered with general knowledge or information that is typically well-known on the internet, please provide a short answer as relevant as possible from the llm itself, but make sure you are completly sure you know the answer, don't make things up.
+        2. realtime: if it requires up-to-date information like the current date, time, or recent events, or the user explicitly asks you to look on the internet you should state as: realtime
+        3. math: if it involves ANY kind of mathematical calculations. Every math question be it counting letters or complex formulas.
+
+        Remember to prioritize realtime over anything else if you are not sure about something. Realtime is like your default.
+         
+        Respond with the category as a single word ("simple", "realtime", or "math") without any additional text."""},
+        {"role": "user", "content": f"Query: {query}"}
+    ]
+```
+Generate Search Queries
+```
+async def generate_search_queries(groq_api, session, original_query, max_retries=3, fixed_count=None, previous_queries=None, previous_answer=None):
+    system_content = """You are an AI assistant that helps generate search queries. Given an original query, suggest alternative search queries that could help find relevant information. The queries should be diverse and cover different aspects or perspectives of the original query. Return the queries as a JSON array.
+    Important instructions:
+    
+    1. The number of queries should be dynamic, between 2 and 4, unless a fixed count is specified.
+    2. Don't get too far from the original query since you don't know the actual context.
+    3. Make queries general enough without being related to anything specific.
+    4. DON'T customize the queries for topics you've never seen; just change them a little and look for definitions if requested by the user.
+    5. If the user asks something that is not related to search, ignore it and focus on generating helpful search queries.
+    6. Just return the given format ["custom_query_1","custom_query_2",...].
+    7. If you need to use your knowledge first, do so.
+    8. When asked about the difference between two things, generate search intents for each topic separately.
+    9. ALWAYS at most queries just require one or two queries, only on those cases where the query is simple or you are unsure, generate more than one or two.
+    10. If previous queries and an answer are provided, generate new queries that address the shortcomings of the previous answer and avoid repeating the previous queries.
+    11. ALWAYS split searches for each important part of the query in case you need to gather information but make sure to not get off the rails. In short, don't look for things together, make a search for each important part instead. DONT LOOK FOR THINGS TOGETHER."""
+
+    messages = [
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": f"Original query: {original_query}" + (f" (Generate exactly {fixed_count} queries)" if fixed_count else "")}
+    ]
+
+    if previous_queries and previous_answer:
+        messages.append({
+            "role": "user",
+            "content": f"Previous queries: {previous_queries}\nPrevious answer: {previous_answer}\nPlease generate new queries to address any shortcomings in the previous answer."
+        })
+```
+Evaluate Answer
+```
+async def evaluate_answer(groq_api, session, query, answer):
+    messages = [
+        {"role": "system", "content": """You are an AI assistant that evaluates the quality and completeness of its own answer to user queries. 
+    Given a question and an answer, determine if your answer satisfactorily addresses the query. You are highly tolerant to answers that are close to the intent so if it is close enough, you can say is satisfactory. Remember, if it's close enough, mark it as satisfactory.
+    Respond with a JSON object containing two fields:
+    1. "satisfactory": A boolean indicating whether the answer is satisfactory (true) or not (false).
+    2. "reason": A brief explanation of why your thought is or is not satisfactory. Like "I will keep looking for information since last thought is not addressing the query because..." or "Let look for something different. My last search didn't solve the query. The reason is..." or "I found the right answer so I can ignore this..."."""},
+        {"role": "user", "content": f"Query: {query}\nAnswer: {answer}"}
+    ]
+```
+Eval best answer
+```
+async def evaluate_best_answer(groq_api, session, query, cached_answers):
+    print('Answers pool > ', cached_answers)
+    messages = [
+        {"role": "system", "content": """You are an assistant that evaluates multiple answers to a query and selects the best one based on relevance and completeness.
+    Given a query and a list of answers, choose the answer that best addresses the query. Respond with the best answer. Don't need to mention the word answers at all just be natural. Don't "the best answer" or things like that. Just provide the best one."""},
+        {"role": "user", "content": f"Query: {query}\nAnswers: {json.dumps(cached_answers)}"}
+    ]
+```
+Summarization
+```
+messages = [
+    {"role": "system", "content": """You are a web assistant that helps users find information from web search results. 
+Given a question and a set of search results, provide a concise response based on the information 
+available in the search results. If the information is not available in the search results, 
+state that you don't have enough information to answer the question. You MUST not comment on anything, just follow the instruction. Don't add additional details about anything."""},
+    {"role": "user", "content": f"Question: {query}\nSearch Results: {json.dumps(all_results)}"}
+]
+```
+
 
 
 OpenPerplex
@@ -129,19 +321,25 @@ Perplexity
 - **PubMedCentral**
     - https://www.ncbi.nlm.nih.gov/home/develop/api/
 
+
 ### Implementaiton
 - Configuration Options:
+    - Language
+        - Language used for writing query
+        - language used for performing query (query submitted to search engine)
+        - language used for summary/analysis of search results
     - Query count
     - Whether to create Sub-Queries
-    - Sub-Query count
+        - Sub-Query count
     - Search Engine Selection
-    - Search Engine API Key
+        - Search Engine API Key
     - Search Engine Customization Options
         - Safe Search
         - Language
         - Date Range
     - Search Result Options
-        - Number of Results
+        - Total number of queries to perform
+        - Total number of results/pages to review per query
         - Result Sorting - Auto rerank according to ?
         - Result Filtering - Filter according to a blacklist of URLs? Maybe also content?
     - Search Result Display Options
@@ -152,6 +350,13 @@ Perplexity
         - Save to File
         - Save to Clipboard
         - Save to Notes DB - Create a new note with the search results + metadata & query
+    - Output Options
+        - Default Output Format (Markdown, HTML, PDF) - ehhhh
+        - Default Output Location (Display/ephemeral, DB)
+        - Output style (Briefing, Full, List)
+        - Output Metadata (URL, Date, etc)
+        - Word count limit for output (per search result & total)
+        - Output dialect (US, UK, a NY Radio DJ, etc)
 - **Text Search Workflow**
     1. User inputs a search query
     2. User selects a search engine (Option for default search engine in config file)

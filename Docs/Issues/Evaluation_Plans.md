@@ -199,6 +199,8 @@ Links:
         - https://github.com/RUC-NLPIR/FlashRAG
     - Olmes
         - https://github.com/allenai/olmes
+- **Books**
+    - https://novelqa.github.io/
 - **CheeseBench**
     - https://gist.github.com/av/db14a1f040f46dfb75e48451f4f14847
 - **Citations**
@@ -211,6 +213,8 @@ Links:
     - CodeMMLU
         - https://arxiv.org/abs/2410.01999
         - https://github.com/FSoft-AI4Code/CodeMMLU
+    - LiveBench
+        - https://github.com/LiveBench/LiveBench
     - StackUnseen
         - https://prollm.toqan.ai/leaderboard/stack-unseen
     - https://huggingface.co/papers/2412.05210

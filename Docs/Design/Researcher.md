@@ -60,7 +60,8 @@ search_blacklist_URLs = "URL1,URL2,URL3"
 
 
 https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama/blob/main/Self_Improving_Search.py
-
+https://storm.genie.stanford.edu/
+https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama
 
 
 
@@ -73,7 +74,7 @@ https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama/blob/main/Self_
 
 
 
-
+https://github.com/SakanaAI/AI-Scientist
 
 
 one2manny
