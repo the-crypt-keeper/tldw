@@ -4,6 +4,8 @@
 
 
 ### Link Dump:
+https://github.com/jabberjabberjabber/LLMOCR/blob/main/llm-ocr-gui.py#L178
+
 https://arxiv.org/abs/2411.18279
 https://github.com/breezedeus/Pix2Text
 https://huggingface.co/HuggingFaceTB/SmolVLM-Instruct
@@ -26,6 +28,7 @@ https://github.com/matatonic/openedai-vision
 https://github.com/breezedeus/Pix2Text
 https://github.com/Tencent/HunyuanVideo
 https://github.com/huggingface/blog/blob/main/smolvlm.md
+https://colivara.com/
 https://huggingface.co/tencent/HunyuanVideo
 https://aivideo.hunyuan.tencent.com/
 https://github.com/deepseek-ai/DeepSeek-VL2

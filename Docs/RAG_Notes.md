@@ -32,9 +32,9 @@ https://towardsdatascience.com/dragin-dynamic-retrieval-augmented-generation-bas
 https://towardsdatascience.com/improve-your-rag-context-recall-by-40-with-an-adapted-embedding-model-5d4a8f583f32
 https://arxiv.org/abs/2412.06078
 https://www.zyphra.com/post/the-mixture-of-pageranks-retriever-for-long-context-pre-processing
-
-
-
+https://www.timescale.com/blog/finding-the-best-open-source-embedding-model-for-rag
+https://weaviate.io/blog/late-chunking
+https://github.com/superlinear-ai/raglite
 
 
 
@@ -63,6 +63,10 @@ GraphRAG
 	https://generativeai.pub/advanced-rag-retrieval-strategies-using-knowledge-graphs-12c9ce54d2da
 	https://medium.com/@ianormy/microsoft-graphrag-with-an-rdf-knowledge-graph-part-2-d8d291a39ed1
 	https://generativeai.pub/knowledge-graph-extraction-visualization-with-local-llm-from-unstructured-text-a-history-example-94c63b366fed?gi=b98ffc33dcbc
+	https://memgraph.com/webinars/optimizing-insulin-management-the-role-of-graphrag-in-patient-care
+	https://ai.plainenglish.io/metagraphs-and-hypergraphs-for-complex-ai-agent-memory-and-rag-717f6f3589f5
+
+
 
 ### Links
 - RAG 101
