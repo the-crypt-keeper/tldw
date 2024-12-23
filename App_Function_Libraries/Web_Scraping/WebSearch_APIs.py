@@ -45,7 +45,7 @@ def search_bing(search_term, bing_lang="en", bing_country="en", date_range=None,
         # do config check for default search country
         setcountry = bing_country
 
-    headers = {"Ocp-Apim-Subscription-Key": subscription_key}
+    headers = {"Ocp-Apim-Subscription-Key": bing_api_key}
     params = {"q": search_term, "textDecorations": True, "textFormat": "HTML", "count": answer_count,
               "freshness": date_range, "promote": "webpages", "safeSearch": "Moderate"}
     response = requests.get(search_url, headers=headers, params=params)
@@ -118,7 +118,7 @@ def search_duckduckgo():
 def search_google():
     pass
 # Llamaindex
-https://github.com/run-llama/llama_index/blob/main/llama-index-core/llama_index/core/tools/tool_spec/base.py
+#https://github.com/run-llama/llama_index/blob/main/llama-index-core/llama_index/core/tools/tool_spec/base.py
 class GoogleSearchToolSpec(BaseToolSpec):
     """Google Search tool spec."""
 
@@ -154,14 +154,54 @@ class GoogleSearchToolSpec(BaseToolSpec):
         return [Document(text=response.text)]
 
 
-def search_kagi():
+# https://help.kagi.com/kagi/api/search.html
+def search_kagi(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate", date_range=None,
+                 result_filter=None, kagi_api_key=None):
+    search_url = "https://api.search.brave.com/res/v1/web/search"
+
+    if not kagi_api_key:
+        # load key from config file
+        if not kagi_api_key:
+            raise ValueError("Please provide a valid Kagi Search API subscription key")
+    if not country:
+        country = "US"
+    if not search_lang:
+        search_lang = "en"
+    if not ui_lang:
+        ui_lang = "en"
+    if not result_count:
+        result_count = 10
+    # if not date_range:
+    #     date_range = "month"
+    if not result_filter:
+        result_filter = "webpages"
+
+
+    headers = {"Authorization: Bot " + kagi_api_key}
+
+    # https://api.search.brave.com/app/documentation/web-search/query#WebSearchAPIQueryParameters
+    params = {"q": search_term, "textDecorations": True, "textFormat": "HTML", "count": result_count,
+              "freshness": date_range, "promote": "webpages", "safeSearch": "Moderate"}
+
+    response = requests.get(search_url, headers=headers, params=params)
+    response.raise_for_status()
+    # Response: https://api.search.brave.com/app/documentation/web-search/responses#WebSearchApiResponse
+    brave_search_results = response.json()
+    return brave_search_results
+    # curl - v \
+    # - H
+    # "Authorization: Bot $TOKEN" \
+    #         https: // kagi.com / api / v0 / search\?q = steve + jobs
     pass
 
 
 def search_searx():
     pass
 
-
+# https://yandex.cloud/en/docs/search-api/operations/web-search
+# https://yandex.cloud/en/docs/search-api/quickstart/
+# https://yandex.cloud/en/docs/search-api/concepts/response
+# https://github.com/yandex-cloud/cloudapi/blob/master/yandex/cloud/searchapi/v2/search_query.proto
 def search_yandex():
     pass
 
