@@ -37,7 +37,9 @@ https://huggingface.co/tiiuae
 https://github.com/naver/bergen?tab=readme-ov-file
 https://arxiv.org/abs/2412.13147
 https://arxiv.org/abs/2412.13018
-
+https://huggingface.co/blog/big-bench-audio-release
+https://github.com/chigkim/openai-api-gpqa
+https://github.com/chigkim/Ollama-MMLU-Pro
 
 Have LLMs play Social deception games
 Different results depending on batch size during evaluations - https://x.com/bnjmn_marie/status/1846834917608407199

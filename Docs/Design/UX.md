@@ -51,6 +51,8 @@ https://github.com/rmusser01/agentic_rag/tree/main
 https://github.com/astramind-ai/Pulsar
 https://github.com/woshixiaobai2019/mirau-chat-ui
 https://github.com/Vali-98/ChatterUI
+https://www.nngroup.com/videos/efficient-error-messages/
+https://uxdesign.cc/a-good-design-is-a-good-essay-197f4bd31c92
 https://github.com/Rugz007/liha
 https://astro.new/latest/
 https://github.com/lobehub/lobe-chat
@@ -64,8 +66,12 @@ https://writings.stephenwolfram.com/2024/12/useful-to-the-point-of-being-revolut
 https://en.wikipedia.org/wiki/Template:Google_payment_apps
 https://github.com/stackblitz-labs/bolt.diy
 https://github.com/Haervwe/open-webui-tools
+https://uxdesign.cc/the-evolution-of-attention-c6154276f1b4
+https://otranscribe.com/
 https://interactjs.io/
 https://perchance.org/ai-chat
+https://uxdesign.cc/youre-trying-to-turn-an-oil-tanker-288ed30876e4
+https://uxdesign.cc/simple-recall-testing-for-b2b-ux-134e18330da9
 https://lovable.dev/
 https://markwhen.com/
 

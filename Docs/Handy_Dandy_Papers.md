@@ -60,6 +60,11 @@ https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute
 ### RAG
     https://arxiv.org/html/2407.21059v1
 
+
+### RWKV
+    https://arxiv.org/abs/2412.14847
+
+
 ### Sampling
     https://arxiv.org/abs/2411.09661
 

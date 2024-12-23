@@ -37,6 +37,7 @@ https://github.com/InternLM/InternLM-XComposer/tree/main/InternLM-XComposer-2.5-
 https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
 https://huggingface.co/onnx-community/moonshine-base-ONNX
 https://github.com/usefulsensors/moonshine
+https://github.com/Azure-Samples/aisearch-openai-rag-audio
 
 
 GLM-4-Voice
