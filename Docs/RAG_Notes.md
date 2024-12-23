@@ -35,7 +35,8 @@ https://www.zyphra.com/post/the-mixture-of-pageranks-retriever-for-long-context-
 https://www.timescale.com/blog/finding-the-best-open-source-embedding-model-for-rag
 https://weaviate.io/blog/late-chunking
 https://github.com/superlinear-ai/raglite
-
+https://arxiv.org/abs/2412.15101
+https://arxiv.org/abs/2412.14510
 
 
 
@@ -65,7 +66,8 @@ GraphRAG
 	https://generativeai.pub/knowledge-graph-extraction-visualization-with-local-llm-from-unstructured-text-a-history-example-94c63b366fed?gi=b98ffc33dcbc
 	https://memgraph.com/webinars/optimizing-insulin-management-the-role-of-graphrag-in-patient-care
 	https://ai.plainenglish.io/metagraphs-and-hypergraphs-for-complex-ai-agent-memory-and-rag-717f6f3589f5
-
+	https://arxiv.org/html/2411.15671v1
+https://arxiv.org/pdf/2410.04739v1
 
 
 ### Links
