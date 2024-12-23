@@ -166,6 +166,17 @@ def test_generate_audio_openai(api_key, input_text, voice, model, response_forma
 
 #######################################################
 #
+# MS Azure TTS Provider Functions
+#
+#https://github.com/run-llama/llama_index/blob/main/llama-index-integrations/tools/llama-index-tools-azure-speech/README.md
+
+#
+# End of MS Edge TTS Provider Functions
+#######################################################
+
+
+#######################################################
+#
 # MS Edge TTS Provider Functions - NOPE
 #
 # # https://github.com/rany2/edge-tts
@@ -214,6 +225,7 @@ def test_generate_audio_openai(api_key, input_text, voice, model, response_forma
 # ElvenLabs TTS Provider Functions
 # FIXME - all of this
 
+# https://github.com/run-llama/llama_index/blob/main/llama-index-integrations/tools/llama-index-tools-elevenlabs/README.md
 #https://elevenlabs.io/docs/api-reference/text-to-speech
 def generate_audio_elevenlabs(input_text, voice, model=None, api_key=None):
     """Generate audio using ElevenLabs API."""
