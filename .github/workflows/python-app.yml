@@ -59,3 +59,8 @@ jobs:
         pwd
         cd ./Tests/Utils
         pytest test_utils.py
+
+    - name: Test tldw runs
+      run: |
+        pwd
+        python summarize.py -h

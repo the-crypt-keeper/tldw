@@ -16,7 +16,7 @@ https://huggingface.co/HuggingFaceTB/SmolVLM-Instruct
 https://huggingface.co/tencent/HunyuanVideo
 https://huggingface.co/OpenGVLab/InternVL2_5-38B
 https://ivy-lvlm.github.io/Video-MA2MBA/
-
+https://internvl.github.io/blog/2024-12-20-InternVL-2.5-MPO/
 https://huggingface.co/Qwen/Qwen2-VL-72B
 https://huggingface.co/Qwen/Qwen2-VL-7B
 https://huggingface.co/Qwen/Qwen2-VL-2B
