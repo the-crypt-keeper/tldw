@@ -3,6 +3,10 @@
 #
 # Imports
 import requests
+
+from App_Function_Libraries.Utils.Utils import loaded_config_data
+
+
 #
 # 3rd-Party Imports
 #
@@ -11,29 +15,85 @@ import requests
 #######################################################################################################################
 #
 # Functions:
+# 1. perform_websearch
+# 1. search_baidu
+# 2. test_baidu_search
+# 3. search_bing
+# 4. test_search_bing
+# 5. search_brave
+# 6. test_search_brave
+# 7. search_duckduckgo
+# 8. test_duckduckgo_search
+# 9. search_google
+# 10. test_search_google
+# 11. search_kagi
+# 12. test_search_kagi
+# 13. search_searx
+# 14. test_search_searx
+# 15. search_yandex
+# 16. test_search_yandex
+#
+#######################################################################################################################
+#
+
+def perform_websearch(search_engine, search_term, country, search_lang, output_lang, result_count, date_range,
+                      safesearch, site_blacklist, api_key):
+    if search_engine.lower() == "baidu":
+        return search_web_baidu()
+    elif search_engine.lower() == "bing":
+        return search_web_bing(search_term, search_lang, country, date_range, result_count, api_key)
+    elif search_engine.lower() == "brave":
+        return search_web_brave(search_term, country, search_lang, output_lang, result_count, safesearch, api_key,
+                                site_blacklist, date_range)
+    elif search_engine.lower() == "duckduckgo":
+        return search_web_ddg()
+    elif search_engine.lower() == "google":
+        return search_web_google()
+    elif search_engine.lower() == "kagi":
+        return search_web_kagi(search_term, country, search_lang, output_lang, result_count, safesearch, date_range,
+                               site_blacklist, api_key)
+    elif search_engine.lower() == "searx":
+        return search_web_searx()
+    elif search_engine.lower() == "yandex":
+        return search_web_yandex()
+    elif search_engine.lower() == "serper":
+        return search_web_serper()
+    elif search_engine.lower() == "tavily":
+        return search_web_tavily()
+    else:
+        return f"Error: Invalid Search Engine Name {search_engine}"
+
 
 # https://cloud.baidu.com/doc/APIGUIDE/s/Xk1myz05f
-def search_baidu():
+def search_web_baidu():
     pass
+
+
+def test_baidu_search(arg1, arg2, arg3):
+    result = search_web_baidu(arg1, arg2, arg3)
+    return result
+
 
 # https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/quickstarts/rest/python
 # https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/reference/query-parameters
 # Country/Language code: https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/reference/market-codes#country-codes
-def search_bing(search_term, bing_lang="en", bing_country="en", date_range=None, result_count=None, bing_api_key=None):
+def search_web_bing(search_query, bing_lang, bing_country, result_count=None, bing_api_key=None,
+                    date_range=None):
     if not bing_api_key:
         # load key from config file
+        bing_api_key = loaded_config_data['search-engines']['bing_search_api_key']
         if not bing_api_key:
             raise ValueError("Please provide a valid Bing Search API subscription key")
     search_url = "https://api.bing.microsoft.com/v7.0/search"
     if not result_count:
         # Perform check in config file for default search result count
-        answer_count = 10
+        answer_count = loaded_config_data['search-engines']['search_result_max']
     else:
         answer_count = result_count
 
     # date_range = "day", "week", "month", or `YYYY-MM-DD..YYYY-MM-DD`
-    # if not date_range:
-    #     date_range = "month"
+    if not date_range:
+         date_range = None
 
     # Language settings
     if not bing_lang:
@@ -43,48 +103,32 @@ def search_bing(search_term, bing_lang="en", bing_country="en", date_range=None,
     # Country settings
     if not bing_country:
         # do config check for default search country
+        bing_country = loaded_config_data['search-engines']['bing_country_code']
+    else:
         setcountry = bing_country
 
     headers = {"Ocp-Apim-Subscription-Key": bing_api_key}
-    params = {"q": search_term, "textDecorations": True, "textFormat": "HTML", "count": answer_count,
+    params = {"q": search_query, "mkt": bing_country, "textDecorations": True, "textFormat": "HTML", "count": answer_count,
               "freshness": date_range, "promote": "webpages", "safeSearch": "Moderate"}
     response = requests.get(search_url, headers=headers, params=params)
     response.raise_for_status()
     bing_search_results = response.json()
     return bing_search_results
-# Llamaindex https://github.com/run-llama/llama_index/blob/main/llama-index-integrations/tools/llama-index-tools-bing-search/llama_index/tools/bing_search/base.py
-#     def _bing_request(self, endpoint: str, query: str, keys: List[str]):
-#         response = requests.get(
-#             ENDPOINT_BASE_URL + endpoint,
-#             headers={"Ocp-Apim-Subscription-Key": self.api_key},
-#             params={"q": query, "mkt": self.lang, "count": self.results},
-#         )
-#         response_json = response.json()
-#         return [[result[key] for key in keys] for result in response_json["value"]]
-
-
-# Display results bing search
-#     from IPython.display import HTML
-#
-#     rows = "\n".join(["""<tr>
-#                            <td><a href=\"{0}\">{1}</a></td>
-#                            <td>{2}</td>
-#                          </tr>""".format(v["url"], v["name"], v["snippet"])
-#                       for v in search_results["webPages"]["value"]])
-#     HTML("<table>{0}</table>".format(rows))
 
 
 # https://brave.com/search/api/
 # https://github.com/run-llama/llama_index/blob/main/llama-index-integrations/tools/llama-index-tools-brave-search/README.md
-def search_brave(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate", date_range=None,
-                 result_filter=None, brave_api_key=None):
+def search_web_brave(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate",
+                     brave_api_key=None, result_filter=None, date_range=None, ):
     search_url = "https://api.search.brave.com/res/v1/web/search"
-
     if not brave_api_key:
         # load key from config file
+        brave_api_key = loaded_config_data['search-engines']['brave_search_api_key']
         if not brave_api_key:
             raise ValueError("Please provide a valid Brave Search API subscription key")
     if not country:
+        brave_country = loaded_config_data['search-engines']['search_engine_country_code_brave']
+    else:
         country = "US"
     if not search_lang:
         search_lang = "en"
@@ -109,27 +153,122 @@ def search_brave(search_term, country, search_lang, ui_lang, result_count, safes
     brave_search_results = response.json()
     return brave_search_results
 
+
+def test_search_brave(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate", date_range=None,
+                      result_filter=None, brave_api_key=None):
+    result = search_web_brave(search_term, country, search_lang, ui_lang, result_count, safesearch, date_range,
+                          result_filter, brave_api_key)
+    return result
+
+
 # https://github.com/deedy5/duckduckgo_search/blob/main/duckduckgo_search/duckduckgo_search.py
 # https://github.com/deedy5/duckduckgo_search/blob/main/duckduckgo_search/duckduckgo_search.py#L204
-def search_duckduckgo():
+def search_web_ddg():
     pass
 
 
-def search_google():
+def test_duckduckgo_search():
     pass
+
+
+# https://developers.google.com/custom-search/v1/reference/rest/v1/cse/list
+def search_web_google(search_query, google_search_api_key, google_search_engine_id, result_count, c2coff,
+                      results_origin_country, date_range, exactTerms, excludeTerms, filter, geolocation,ui_language,
+                      search_result_language, safesearch, site_blacklist, sort_results_by):
+    search_url = "https://www.googleapis.com/customsearch/v1?"
+
+    if not c2coff:
+        # check config file for default setting
+        enable_traditional_chinese = loaded_config_data['search-engines']['google_simp_trad_chinese']
+    else:
+        enable_traditional_chinese = "0"
+
+    if not results_origin_country:
+        # check config file for default setting
+        limit_country_search = loaded_config_data['search-engines']['limit_google_search_to_country']
+    if limit_country_search:
+        results_origin_country = loaded_config_data['search-engines']['google_search_country']
+
+    if not google_search_engine_id:
+        # load key from config file
+        google_search_engine_id = loaded_config_data['search-engines']['google_search_engine_id']
+        if not google_search_engine_id:
+            raise ValueError("Please set a valid Google Search Engine ID in the config file")
+
+    if not google_search_api_key:
+        # load key from config file
+        google_search_api_key = loaded_config_data['search-engines']['google_search_api_key']
+        if not google_search_api_key:
+            raise ValueError("Please provide a valid Bing Search API subscription key")
+
+    # Logic for handling date range
+    if not date_range:
+        date_range = None
+
+    # Logic for handling exact terms - FIXMe
+    # Identifies a phrase that all documents in the search results must contain.
+    if not exactTerms:
+        exactTerms = None
+
+    # Logic for handling exclude terms - FIXME
+    # Identifies a word or phrase that should not appear in any documents in the search results.
+    if not excludeTerms:
+        excludeTerms = None
+
+    # Logic for handling filter
+    # Controls turning on or off the duplicate content filter.
+    # Default is 1 (On).
+    if not filter:
+        filter = "1"
+
+    # Logic for handling geolocation
+    # Country codes: https://developers.google.com/custom-search/docs/json_api_reference#countryCodes
+    # Country location of user
+    if not geolocation:
+        geolocation = None
+
+    # Logic for handling UI language
+    # https://developers.google.com/custom-search/docs/json_api_reference#wsInterfaceLanguages
+    # https://developers.google.com/custom-search/docs/json_api_reference#interfaceLanguages
+    if not ui_language:
+        ui_language = None
+
+    # Logic for handling search result language
+    if not search_result_language:
+        search_result_language = None
+
+
+    if not result_count:
+        # Perform check in config file for default search result count
+        answer_count = loaded_config_data['search-engines']['search_result_max']
+    else:
+        answer_count = result_count
+    # Language settings
+    if not bing_lang:
+        # do config check for default search language
+        setlang = bing_lang
+
+    # Country settings
+    if not bing_country:
+        # do config check for default search country
+        bing_country = loaded_config_data['search-engines']['bing_country_code']
+    else:
+        setcountry = bing_country
+
+    params = {"c2coff": enable_traditional_chinese, "key": google_search_api_key, "cx": google_search_engine_id, "q": search_query}
+    response = requests.get(search_url, params=params)
+    response.raise_for_status()
+    bing_search_results = response.json()
+    return bing_search_results
+    self.key = key
+    self.engine = engine
+    self.num = num
+
+    pass
+
+
 # Llamaindex
 #https://github.com/run-llama/llama_index/blob/main/llama-index-core/llama_index/core/tools/tool_spec/base.py
-class GoogleSearchToolSpec(BaseToolSpec):
-    """Google Search tool spec."""
-
-    spec_functions = ["google_search"]
-
-    def __init__(self, key: str, engine: str, num: Optional[int] = None) -> None:
-        """Initialize with parameters."""
-        self.key = key
-        self.engine = engine
-        self.num = num
-
     def google_search(self, query: str):
         """
         Make a query to the Google search engine to receive a list of results.
@@ -154,9 +293,13 @@ class GoogleSearchToolSpec(BaseToolSpec):
         return [Document(text=response.text)]
 
 
+def test_search_google():
+    pass
+
+
 # https://help.kagi.com/kagi/api/search.html
-def search_kagi(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate", date_range=None,
-                 result_filter=None, kagi_api_key=None):
+def search_web_kagi(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate", date_range=None,
+                    result_filter=None, kagi_api_key=None):
     search_url = "https://api.search.brave.com/res/v1/web/search"
 
     if not kagi_api_key:
@@ -176,7 +319,6 @@ def search_kagi(search_term, country, search_lang, ui_lang, result_count, safese
     if not result_filter:
         result_filter = "webpages"
 
-
     headers = {"Authorization: Bot " + kagi_api_key}
 
     # https://api.search.brave.com/app/documentation/web-search/query#WebSearchAPIQueryParameters
@@ -195,14 +337,43 @@ def search_kagi(search_term, country, search_lang, ui_lang, result_count, safese
     pass
 
 
-def search_searx():
+def test_search_kagi():
     pass
+
+
+def search_web_searx():
+    pass
+
+
+def test_search_searx():
+    pass
+
+
+def search_web_serper():
+    pass
+
+
+def test_search_serper():
+    pass
+
+
+def search_web_tavily():
+    pass
+
+
+def test_search_tavily():
+    pass
+
 
 # https://yandex.cloud/en/docs/search-api/operations/web-search
 # https://yandex.cloud/en/docs/search-api/quickstart/
 # https://yandex.cloud/en/docs/search-api/concepts/response
 # https://github.com/yandex-cloud/cloudapi/blob/master/yandex/cloud/searchapi/v2/search_query.proto
-def search_yandex():
+def search_web_yandex():
+    pass
+
+
+def test_search_yandex():
     pass
 
 #
