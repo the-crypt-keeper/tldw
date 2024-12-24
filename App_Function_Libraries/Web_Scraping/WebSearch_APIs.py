@@ -495,6 +495,7 @@ def test_search_searx():
     pass
 
 
+# https://github.com/YassKhazzan/openperplex_backend_os/blob/main/sources_searcher.py
 def search_web_serper():
     pass
 
