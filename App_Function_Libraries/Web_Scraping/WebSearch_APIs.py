@@ -2,6 +2,11 @@
 # Description: This file contains the functions that are used for performing queries against various Search Engine APIs
 #
 # Imports
+import json
+from random import choice
+from time import sleep
+from typing import Optional, Dict, List
+
 import requests
 
 from App_Function_Libraries.Utils.Utils import loaded_config_data
@@ -36,30 +41,32 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 #######################################################################################################################
 #
 
-def perform_websearch(search_engine, search_term, country, search_lang, output_lang, result_count, date_range,
+def perform_websearch(search_engine, search_query, country, search_lang, output_lang, result_count, date_range,
                       safesearch, site_blacklist, api_key):
     if search_engine.lower() == "baidu":
         return search_web_baidu()
     elif search_engine.lower() == "bing":
-        return search_web_bing(search_term, search_lang, country, date_range, result_count, api_key)
+        return search_web_bing(search_query, search_lang, country, date_range, result_count, api_key)
     elif search_engine.lower() == "brave":
-        return search_web_brave(search_term, country, search_lang, output_lang, result_count, safesearch, api_key,
+            return search_web_brave(search_query, country, search_lang, output_lang, result_count, safesearch, api_key,
                                 site_blacklist, date_range)
     elif search_engine.lower() == "duckduckgo":
         return search_web_ddg()
     elif search_engine.lower() == "google":
-        return search_web_google()
+        return search_web_google(search_query, api_key, google_search_engine_id, result_count, c2coff,
+                      results_origin_country, date_range, exactTerms, excludeTerms, filter, geolocation, output_lang,
+                      search_result_language, safesearch, site_blacklist, sort_results_by)
     elif search_engine.lower() == "kagi":
-        return search_web_kagi(search_term, country, search_lang, output_lang, result_count, safesearch, date_range,
+        return search_web_kagi(search_query, country, search_lang, output_lang, result_count, safesearch, date_range,
                                site_blacklist, api_key)
-    elif search_engine.lower() == "searx":
-        return search_web_searx()
-    elif search_engine.lower() == "yandex":
-        return search_web_yandex()
     elif search_engine.lower() == "serper":
         return search_web_serper()
     elif search_engine.lower() == "tavily":
         return search_web_tavily()
+    elif search_engine.lower() == "searx":
+        return search_web_searx()
+    elif search_engine.lower() == "yandex":
+        return search_web_yandex()
     else:
         return f"Error: Invalid Search Engine Name {search_engine}"
 
@@ -162,10 +169,139 @@ def test_search_brave(search_term, country, search_lang, ui_lang, result_count, 
 
 
 # https://github.com/deedy5/duckduckgo_search/blob/main/duckduckgo_search/duckduckgo_search.py
-# https://github.com/deedy5/duckduckgo_search/blob/main/duckduckgo_search/duckduckgo_search.py#L204
-def search_web_ddg():
-    pass
+# FIXME - 1shot gen with sonnet 3.5, untested.
+def search_web_ddg(
+        keywords: str,
+        region: str = "wt-wt",
+        safesearch: str = "moderate",
+        max_results: Optional[int] = None
+) -> List[Dict[str, str]]:
+    """
+    Perform a DuckDuckGo search and return results.
 
+    Args:
+        keywords: Search query
+        region: Region code (e.g., "wt-wt", "us-en")
+        safesearch: "on", "moderate", or "off"
+        max_results: Maximum number of results to return
+
+    Returns:
+        List of dictionaries containing search results with 'title', 'href', and 'body' keys
+    """
+
+    # User agent list to randomize requests
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0"
+    ]
+
+    # Helper function to get vqd parameter
+    def get_vqd(keywords: str) -> str:
+        headers = {'User-Agent': choice(user_agents)}
+        resp = requests.get(
+            "https://duckduckgo.com/",
+            params={'q': keywords},
+            headers=headers
+        )
+
+        # Extract vqd from response
+        try:
+            vqd = resp.text.split('vqd="')[1].split('"')[0]
+            return vqd
+        except IndexError:
+            raise Exception("Could not extract vqd parameter")
+
+    results = []
+    vqd = get_vqd(keywords)
+
+    # Search parameters
+    params = {
+        'q': keywords,
+        'kl': region,
+        'l': region,
+        'p': '1' if safesearch == "on" else "",
+        's': '0',
+        'df': '',
+        'vqd': vqd,
+        'ex': '-1' if safesearch == "moderate" else '-2' if safesearch == "off" else ""
+    }
+
+    headers = {
+        'User-Agent': choice(user_agents),
+        'Referer': 'https://duckduckgo.com/'
+    }
+
+    # Keep track of seen URLs to avoid duplicates
+    seen_urls = set()
+
+    try:
+        while True:
+            response = requests.get(
+                'https://links.duckduckgo.com/d.js',
+                params=params,
+                headers=headers
+            )
+
+            if response.status_code != 200:
+                break
+
+            # Parse JSON response
+            try:
+                data = json.loads(response.text.replace('DDG.pageLayout.load(', '').rstrip(');'))
+            except json.JSONDecodeError:
+                break
+
+            # Extract results
+            for result in data['results']:
+                url = result.get('u')
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    results.append({
+                        'title': result.get('t', ''),
+                        'href': url,
+                        'body': result.get('a', '')
+                    })
+
+                    if max_results and len(results) >= max_results:
+                        return results
+
+            # Check for next page
+            if 'next' not in data:
+                break
+
+            params['s'] = data['next']
+            sleep(0.5)  # Be nice to the server
+
+    except Exception as e:
+        print(f"Error during search: {e}")
+
+    return results
+    # def example_usage():
+    #     """Example usage of the DuckDuckGo search function"""
+    #     try:
+    #         # Basic search
+    #         results = search_web_ddg("Python programming")
+    #         print(f"Found {len(results)} results for 'Python programming'")
+    #
+    #         # Print first 3 results
+    #         for i, result in enumerate(results[:3], 1):
+    #             print(f"\nResult {i}:")
+    #             print(f"Title: {result['title']}")
+    #             print(f"URL: {result['href']}")
+    #             print(f"Description: {result['body'][:150]}...")
+    #
+    #         # Search with different parameters
+    #         limited_results = duckduckgo_search(
+    #             keywords="artificial intelligence news",
+    #             region="us-en",
+    #             safesearch="on",
+    #             max_results=5
+    #         )
+    #         print(f"\nFound {len(limited_results)} limited results")
+    #
+    #     except DuckDuckGoSearchException as e:
+    #         print(f"Search failed: {e}")
 
 def test_duckduckgo_search():
     pass
@@ -176,7 +312,7 @@ def search_web_google(search_query, google_search_api_key, google_search_engine_
                       results_origin_country, date_range, exactTerms, excludeTerms, filter, geolocation,ui_language,
                       search_result_language, safesearch, site_blacklist, sort_results_by):
     search_url = "https://www.googleapis.com/customsearch/v1?"
-
+    # FIXME - build the query string dynamically
     if not c2coff:
         # check config file for default setting
         enable_traditional_chinese = loaded_config_data['search-engines']['google_simp_trad_chinese']
@@ -237,60 +373,22 @@ def search_web_google(search_query, google_search_api_key, google_search_engine_
     if not search_result_language:
         search_result_language = None
 
-
-    if not result_count:
-        # Perform check in config file for default search result count
-        answer_count = loaded_config_data['search-engines']['search_result_max']
+    if not safesearch:
+        safe_search = loaded_config_data['search-engines']['google_safe_search']
     else:
-        answer_count = result_count
-    # Language settings
-    if not bing_lang:
-        # do config check for default search language
-        setlang = bing_lang
+        safe_search = safesearch
 
-    # Country settings
-    if not bing_country:
-        # do config check for default search country
-        bing_country = loaded_config_data['search-engines']['bing_country_code']
-    else:
-        setcountry = bing_country
+    if not site_blacklist:
+        site_blacklist = None
+
+    if not sort_results_by:
+        sort_results_by = None
 
     params = {"c2coff": enable_traditional_chinese, "key": google_search_api_key, "cx": google_search_engine_id, "q": search_query}
     response = requests.get(search_url, params=params)
     response.raise_for_status()
-    bing_search_results = response.json()
-    return bing_search_results
-    self.key = key
-    self.engine = engine
-    self.num = num
-
-    pass
-
-
-# Llamaindex
-#https://github.com/run-llama/llama_index/blob/main/llama-index-core/llama_index/core/tools/tool_spec/base.py
-    def google_search(self, query: str):
-        """
-        Make a query to the Google search engine to receive a list of results.
-
-        Args:
-            query (str): The query to be passed to Google search.
-            num (int, optional): The number of search results to return. Defaults to None.
-
-        Raises:
-            ValueError: If the 'num' is not an integer between 1 and 10.
-        """
-        url = QUERY_URL_TMPL.format(
-            key=self.key, engine=self.engine, query=urllib.parse.quote_plus(query)
-        )
-
-        if self.num is not None:
-            if not 1 <= self.num <= 10:
-                raise ValueError("num should be an integer between 1 and 10, inclusive")
-            url += f"&num={self.num}"
-
-        response = requests.get(url)
-        return [Document(text=response.text)]
+    google_search_results = response.json()
+    return google_search_results
 
 
 def test_search_google():
