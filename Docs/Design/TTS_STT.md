@@ -38,6 +38,18 @@ https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
 https://huggingface.co/onnx-community/moonshine-base-ONNX
 https://github.com/usefulsensors/moonshine
 https://github.com/Azure-Samples/aisearch-openai-rag-audio
+https://www.reddit.com/r/LocalLLaMA/comments/1f0awd6/best_local_open_source_texttospeech_and/
+https://github.com/FanaHOVA/smol-podcaster
+https://docs.inferless.com/cookbook/serverless-customer-service-bot
+https://github.com/aedocw/epub2tts
+https://github.com/microsoft/SpeechT5
+
+
+
+
+
+
+
 
 
 GLM-4-Voice

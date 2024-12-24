@@ -339,6 +339,57 @@ def load_and_log_configs():
         default_eleven_tts_output_format = config.get('TTS-Settings', 'default_eleven_tts_output_format',
                                                       fallback='mp3_44100_192')
 
+        # Search Engines
+        search_provider_default = config.get('Search-Engines', 'search_provider_default', fallback='google')
+        search_language_query = config.get('Search-Engines', 'search_language_query', fallback='en')
+        search_language_results = config.get('Search-Engines', 'search_language_results', fallback='en')
+        search_language_analysis = config.get('Search-Engines', 'search_language_analysis', fallback='en')
+        search_default_max_queries = 10
+        search_enable_subquery = config.get('Search-Engines', 'search_enable_subquery', fallback='True')
+        search_enable_subquery_count_max = config.get('Search-Engines', 'search_enable_subquery_count_max', fallback=5)
+        search_result_rerank = config.get('Search-Engines', 'search_result_rerank', fallback='True')
+        search_result_max = config.get('Search-Engines', 'search_result_max', fallback=10)
+        search_result_max_per_query = config.get('Search-Engines', 'search_result_max_per_query', fallback=10)
+        search_result_blacklist = config.get('Search-Engines', 'search_result_blacklist', fallback='')
+        search_result_display_type = config.get('Search-Engines', 'search_result_display_type', fallback='list')
+        search_result_display_metadata = config.get('Search-Engines', 'search_result_display_metadata', fallback='False')
+        search_result_save_to_db = config.get('Search-Engines', 'search_result_save_to_db', fallback='True')
+        search_result_analysis_tone = config.get('Search-Engines', 'search_result_analysis_tone', fallback='')
+        # Search Engine Specifics
+        baidu_search_api_key = config.get('Search-Engines', 'search_engine_api_key_baidu', fallback='')
+        # Bing Search Settings
+        bing_search_api_key = config.get('Search-Engines', 'search_engine_api_key_bing', fallback='')
+        bing_country_code = config.get('Search-Engines', 'search_engine_country_code_bing', fallback='us')
+        # Brave Search Settings
+        brave_search_api_key = config.get('Search-Engines', 'search_engine_api_key_brave', fallback='')
+        brave_country_code = config.get('Search-Engines', 'search_engine_country_code_brave', fallback='us')
+        # DuckDuckGo Search Settings
+        duckduckgo_search_api_key = config.get('Search-Engines', 'search_engine_api_key_duckduckgo', fallback='')
+        # Google Search Settings
+        google_search_api_key = config.get('Search-Engines', 'search_engine_api_key_google', fallback='')
+        google_search_engine_id = config.get('Search-Engines', 'search_engine_id_google', fallback='')
+        google_simp_trad_chinese = config.get('Search-Engines', 'enable_traditional_chinese', fallback='0')
+        limit_google_search_to_country = config.get('Search-Engines', 'limit_google_search_to_country', fallback='0')
+        google_search_country_code = config.get('Search-Engines', 'google_search_country_code', fallback='us')
+        google_filter_setting = config.get('Search-Engines', 'google_filter_setting', fallback='1')
+        google_user_geolocation = config.get('Search-Engines', 'google_user_geolocation', fallback='')
+        google_ui_language = config.get('Search-Engines', 'google_ui_language', fallback='en')
+        google_limit_search_results_to_language = config.get('Search-Engines', 'google_limit_search_results_to_language', fallback='')
+        google_default_search_results = config.get('Search-Engines', 'google_default_search_results', fallback='10')
+        google_safe_search = config.get('Search-Engines', 'google_safe_search', fallback='active')
+        google_enable_site_search = config.get('Search-Engines', 'google_enable_site_search', fallback='0')
+        google_site_search_include = config.get('Search-Engines', 'google_site_search_include', fallback='')
+        google_site_search_exclude = config.get('Search-Engines', 'google_site_search_exclude', fallback='')
+        google_sort_results_by = config.get('Search-Engines', 'google_sort_results_by', fallback='relevance')
+        # Kagi Search Settings
+        kagi_search_api_key = config.get('Search-Engines', 'search_engine_api_key_kagi', fallback='')
+        # Searx Search Settings
+        searx_search_api_key = config.get('Search-Engines', 'search_engine_api_key_searx', fallback='')
+        # Yandex Search Settings
+        yandex_search_api_key = config.get('Search-Engines', 'search_engine_api_key_yandex', fallback='')
+        yandex_search_engine_id = config.get('Search-Engines', 'search_engine_id_yandex', fallback='')
+
+
         return {
             'api_keys': {
                 'anthropic': anthropic_api_key,
@@ -433,6 +484,50 @@ def load_and_log_configs():
                 'default_eleven_tts_voice_use_speaker_boost': default_eleven_tts_voice_use_speaker_boost,
                 'default_eleven_tts_output_format': default_eleven_tts_output_format
                 # GPT Sovi-TTS
+            },
+            'search_settings': {
+            'default_search_provider': search_provider_default,
+            'search_language_query': search_language_query,
+            'search_language_results': search_language_results,
+            'search_language_analysis': search_language_analysis,
+            'search_default_max_queries': search_default_max_queries,
+            'search_enable_subquery': search_enable_subquery,
+            'search_enable_subquery_count_max': search_enable_subquery_count_max,
+            'search_result_rerank': search_result_rerank,
+            'search_result_max': search_result_max,
+            'search_result_max_per_query': search_result_max_per_query,
+            'search_result_blacklist': search_result_blacklist,
+            'search_result_display_type': search_result_display_type,
+            'search_result_display_metadata': search_result_display_metadata,
+            'search_result_save_to_db': search_result_save_to_db,
+            'search_result_analysis_tone': search_result_analysis_tone,
+            },
+            'search_engines': {
+            'baidu_search_api_key': baidu_search_api_key,
+            'bing_search_api_key': bing_search_api_key,
+            'bing_country_code': bing_country_code,
+            'brave_search_api_key': brave_search_api_key,
+            'brave_country_code': brave_country_code,
+            'duckduckgo_search_api_key': duckduckgo_search_api_key,
+            'google_search_api_key': google_search_api_key,
+            'google_search_engine_id': google_search_engine_id,
+            'google_simp_trad_chinese': google_simp_trad_chinese,
+            'limit_google_search_to_country': limit_google_search_to_country,
+            'google_search_country_code': google_search_country_code,
+            'google_search_filter_setting': google_filter_setting,
+            'google_user_geolocation': google_user_geolocation,
+            'google_ui_language': google_ui_language,
+            'google_limit_search_results_to_language': google_limit_search_results_to_language,
+            'google_site_search_include': google_site_search_include,
+            'google_site_search_exclude': google_site_search_exclude,
+            'google_sort_results_by': google_sort_results_by,
+            'google_default_search_results': google_default_search_results,
+            'google_safe_search': google_safe_search,
+            'google_enable_site_search' : google_enable_site_search,
+            'kagi_search_api_key': kagi_search_api_key,
+            'searx_search_api_key': searx_search_api_key,
+            'yandex_search_api_key': yandex_search_api_key,
+            'yandex_search_engine_id': yandex_search_engine_id
             }
         }
 
@@ -441,7 +536,7 @@ def load_and_log_configs():
         return None
 
 
-global_api_endpoints = ["anthropic", "cohere", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "google", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
+global_api_endpoints = ["anthropic", "cohere", "google", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
 
 openai_tts_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
 
@@ -454,12 +549,12 @@ def format_api_name(api):
         "openai": "OpenAI",
         "anthropic": "Anthropic",
         "cohere": "Cohere",
+        "google": "Google",
         "groq": "Groq",
         "huggingface": "HuggingFace",
         "openrouter": "OpenRouter",
         "deepseek": "DeepSeek",
         "mistral": "Mistral",
-        "google": "Google",
         "custom_openai_api": "Custom-OpenAI-API",
         "llama": "Llama.cpp",
         "ooba": "Ooba",

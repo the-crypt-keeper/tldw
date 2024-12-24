@@ -40,6 +40,10 @@ https://arxiv.org/abs/2412.13018
 https://huggingface.co/blog/big-bench-audio-release
 https://github.com/chigkim/openai-api-gpqa
 https://github.com/chigkim/Ollama-MMLU-Pro
+https://huggingface.co/ymcki/Llama-3_1-Nemotron-51B-Instruct-GGUF
+https://pub.towardsai.net/streamline-your-llm-evaluation-a-step-by-step-guide-to-rag-metrics-with-streamlit-38ed9efbdc9a
+
+
 
 Have LLMs play Social deception games
 Different results depending on batch size during evaluations - https://x.com/bnjmn_marie/status/1846834917608407199

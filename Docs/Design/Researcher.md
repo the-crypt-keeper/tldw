@@ -15,6 +15,12 @@ https://help.openalex.org/hc/en-us/articles/24396686889751-About-us
 https://www.ginkgonotes.com/
 https://www.reddit.com/r/Anki/comments/17u01ge/spaced_repetition_algorithm_a_threeday_journey/
 https://github.com/open-spaced-repetition/fsrs4anki/wiki/Spaced-Repetition-Algorithm:-A-Three%E2%80%90Day-Journey-from-Novice-to-Expert#day-3-the-latest-progress
+https://www.scrapingdog.com/blog/scrape-google-news/
+
+
+
+
+
 
 
 ### Ideas
