@@ -384,7 +384,7 @@ def load_and_log_configs():
         # Kagi Search Settings
         kagi_search_api_key = config.get('Search-Engines', 'search_engine_api_key_kagi', fallback='')
         # Searx Search Settings
-        searx_search_api_key = config.get('Search-Engines', 'search_engine_api_key_searx', fallback='')
+        search_engine_searx_api = config.get('Search-Engines', 'search_engine_searx_api', fallback='')
         # Yandex Search Settings
         yandex_search_api_key = config.get('Search-Engines', 'search_engine_api_key_yandex', fallback='')
         yandex_search_engine_id = config.get('Search-Engines', 'search_engine_id_yandex', fallback='')
@@ -525,7 +525,7 @@ def load_and_log_configs():
             'google_safe_search': google_safe_search,
             'google_enable_site_search' : google_enable_site_search,
             'kagi_search_api_key': kagi_search_api_key,
-            'searx_search_api_key': searx_search_api_key,
+            'searx_search_api_url': search_engine_searx_api,
             'yandex_search_api_key': yandex_search_api_key,
             'yandex_search_engine_id': yandex_search_engine_id
             }

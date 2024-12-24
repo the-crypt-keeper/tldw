@@ -3,9 +3,11 @@
 #
 # Imports
 import json
+import os
 from random import choice
 from time import sleep
 from typing import Optional, Dict, List
+from urllib.parse import urlparse, urlencode
 
 import requests
 
@@ -439,11 +441,57 @@ def test_search_kagi():
     pass
 
 
-def search_web_searx():
-    pass
+# https://searx.space
+# https://searx.github.io/searx/dev/search_api.html
+def search_web_searx(search_query):
+    # Check if API URL is configured
+    searx_url = loaded_config_data['search-engines']['searx_search_api_url']
+    if not searx_url:
+        return "Search is disabled and no content was found. This functionality is disabled because the user has not set it up yet."
+
+    # Validate and construct URL
+    try:
+        parsed_url = urlparse(searx_url)
+        params = {
+            'q': search_query,
+            'format': 'json'
+        }
+        search_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}?{urlencode(params)}"
+    except Exception as e:
+        return f"Search is disabled and no content was found. Invalid URL configuration: {str(e)}"
+
+    # Perform the search request
+    try:
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'anything-llm'
+        }
+
+        response = requests.get(search_url, headers=headers)
+        response.raise_for_status()
+        search_data = response.json()
+
+        # Process results
+        data = []
+        for result in search_data.get('results', []):
+            data.append({
+                'title': result.get('title'),
+                'link': result.get('url'),
+                'snippet': result.get('content'),
+                'publishedDate': result.get('publishedDate')
+            })
+
+        if not data:
+            return "No information was found online for the search query."
+
+        return json.dumps(data)
+
+    except requests.exceptions.RequestException as e:
+        return f"There was an error searching for content. {str(e)}"
 
 
 def test_search_searx():
+    search_web_searx("How can I bake a cherry cake?")
     pass
 
 
@@ -455,7 +503,9 @@ def test_search_serper():
     pass
 
 
+# https://docs.tavily.com/docs/rest-api/api-reference
 def search_web_tavily():
+    tavily_url = "https://api.tavily.com/search"
     pass
 
 
