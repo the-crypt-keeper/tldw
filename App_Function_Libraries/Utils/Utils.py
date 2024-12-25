@@ -360,12 +360,14 @@ def load_and_log_configs():
         # Bing Search Settings
         bing_search_api_key = config.get('Search-Engines', 'search_engine_api_key_bing', fallback='')
         bing_country_code = config.get('Search-Engines', 'search_engine_country_code_bing', fallback='us')
+        bing_search_api_url = config.get('Search-Engines', 'search_engine_api_url_bing', fallback='')
         # Brave Search Settings
         brave_search_api_key = config.get('Search-Engines', 'search_engine_api_key_brave', fallback='')
         brave_country_code = config.get('Search-Engines', 'search_engine_country_code_brave', fallback='us')
         # DuckDuckGo Search Settings
         duckduckgo_search_api_key = config.get('Search-Engines', 'search_engine_api_key_duckduckgo', fallback='')
         # Google Search Settings
+        google_search_api_url = config.get('Search-Engines', 'search_engine_api_url_google', fallback='')
         google_search_api_key = config.get('Search-Engines', 'search_engine_api_key_google', fallback='')
         google_search_engine_id = config.get('Search-Engines', 'search_engine_id_google', fallback='')
         google_simp_trad_chinese = config.get('Search-Engines', 'enable_traditional_chinese', fallback='0')
@@ -506,6 +508,7 @@ def load_and_log_configs():
             'baidu_search_api_key': baidu_search_api_key,
             'bing_search_api_key': bing_search_api_key,
             'bing_country_code': bing_country_code,
+            'bing_search_api_url': bing_search_api_url,
             'brave_search_api_key': brave_search_api_key,
             'brave_country_code': brave_country_code,
             'duckduckgo_search_api_key': duckduckgo_search_api_key,

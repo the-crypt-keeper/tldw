@@ -3,6 +3,22 @@
 ## Introduction
 This page serves as documentation regarding the web search functionality within tldw and provides context/justification for the decisions made within the module.
 
+
+
+### Setting the Stage
+The web search functionality is a core component of the tldw system, allowing users to quickly and easily search the web for information on a given topic. This functionality is designed to be simple and intuitive, providing users with the information they need in a clear and concise manner.
+
+#### Bing Search
+- [Bing Search API](https://www.microsoft.com/en-us/bing/apis/bing-web-search-api)
+- Getting Started with Bing Search API
+    - Sign up for a Bing Search API key via Azure (1000 Free Searches a month) - https://www.microsoft.com/en-us/bing/apis/pricing
+    - Use the Bing Search API to perform searches - Add the generated subscription key to your config.txt file.
+          - If for some reason you're doing modifications to the code, be aware: https://github.com/Azure-Samples/cognitive-services-REST-api-samples/issues/139
+    - Perform searches using Bing!
+
+
+
+
 https://github.com/scrapinghub/article-extraction-benchmark
 
 ask.py https://github.com/pengfeng/ask.py

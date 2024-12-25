@@ -50,6 +50,10 @@ https://bolt.new/
 https://github.com/rmusser01/agentic_rag/tree/main
 https://github.com/astramind-ai/Pulsar
 https://github.com/woshixiaobai2019/mirau-chat-ui
+https://uxdesign.cc/the-importance-of-hover-states-c9312d7fd516
+https://trends.uxdesign.cc/
+https://bolters.io/
+
 https://github.com/Vali-98/ChatterUI
 https://www.nngroup.com/videos/efficient-error-messages/
 https://uxdesign.cc/a-good-design-is-a-good-essay-197f4bd31c92
@@ -68,6 +72,7 @@ https://github.com/stackblitz-labs/bolt.diy
 https://github.com/Haervwe/open-webui-tools
 https://uxdesign.cc/the-evolution-of-attention-c6154276f1b4
 https://otranscribe.com/
+https://www.dive.club/ideas/new-types-of-ui-that-generative-ai-has-necessitated
 https://interactjs.io/
 https://perchance.org/ai-chat
 https://uxdesign.cc/youre-trying-to-turn-an-oil-tanker-288ed30876e4

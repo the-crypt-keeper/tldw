@@ -42,7 +42,7 @@ https://github.com/chigkim/openai-api-gpqa
 https://github.com/chigkim/Ollama-MMLU-Pro
 https://huggingface.co/ymcki/Llama-3_1-Nemotron-51B-Instruct-GGUF
 https://pub.towardsai.net/streamline-your-llm-evaluation-a-step-by-step-guide-to-rag-metrics-with-streamlit-38ed9efbdc9a
-
+https://huggingface.co/QuantFactory/granite-3.1-8b-instruct-GGUF
 
 
 Have LLMs play Social deception games

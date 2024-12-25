@@ -37,7 +37,9 @@ https://weaviate.io/blog/late-chunking
 https://github.com/superlinear-ai/raglite
 https://arxiv.org/abs/2412.15101
 https://arxiv.org/abs/2412.14510
-
+https://towardsdatascience.com/advanced-retrieval-techniques-for-better-rags-c53e1b03c183
+https://ai.gopubby.com/agentic-rags-extending-rags-to-sql-databases-1509b25ca3e7
+https://ai.plainenglish.io/a-deep-dive-into-golden-retriever-eea3396af3b4
 
 
 
@@ -67,7 +69,11 @@ GraphRAG
 	https://memgraph.com/webinars/optimizing-insulin-management-the-role-of-graphrag-in-patient-care
 	https://ai.plainenglish.io/metagraphs-and-hypergraphs-for-complex-ai-agent-memory-and-rag-717f6f3589f5
 	https://arxiv.org/html/2411.15671v1
-https://arxiv.org/pdf/2410.04739v1
+	https://arxiv.org/pdf/2410.04739v1
+	https://towardsdatascience.com/how-to-query-a-knowledge-graph-with-llms-using-grag-38bfac47a322
+	https://arxiv.org/abs/2408.04187
+
+
 
 
 ### Links
