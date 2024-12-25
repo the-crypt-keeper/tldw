@@ -16,11 +16,17 @@ https://www.ginkgonotes.com/
 https://www.reddit.com/r/Anki/comments/17u01ge/spaced_repetition_algorithm_a_threeday_journey/
 https://github.com/open-spaced-repetition/fsrs4anki/wiki/Spaced-Repetition-Algorithm:-A-Three%E2%80%90Day-Journey-from-Novice-to-Expert#day-3-the-latest-progress
 https://www.scrapingdog.com/blog/scrape-google-news/
-
-
-
-
-
+https://github.com/mistralai/cookbook/blob/main/third_party/LlamaIndex/llamaindex_arxiv_agentic_rag.ipynb
+https://github.com/ai-christianson/RA.Aid
+https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_research_prompt.md
+https://github.com/0xeb/TheBigPromptLibrary/blob/main/SystemPrompts/Perplexity.ai/20241024-Perplexity-Desktop-App.md
+https://github.com/rashadphz/farfalle
+https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_research_prompt.md
+https://www.emergentmind.com/
+https://github.com/neuml/paperai
+https://github.com/neuml/paperetl
+https://github.com/ai-christianson/RA.Aid
+https://github.com/Future-House/paper-qa
 
 
 ### Ideas
