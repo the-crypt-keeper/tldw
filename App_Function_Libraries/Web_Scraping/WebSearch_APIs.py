@@ -4,12 +4,19 @@
 # Imports
 import json
 import logging
-from typing import Optional, Dict, List, Any
-from urllib.parse import urlparse, urlencode
+import re
+from html import unescape
+from typing import Optional, Dict, Any
+from urllib.parse import urlparse, urlencode, unquote
 #
 # 3rd-Party Imports
 import requests
+from lxml.etree import _Element
+from lxml.html import document_fromstring
 from requests import RequestException
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
+
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import loaded_config_data
@@ -25,30 +32,30 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 
 
 
-def perform_websearch(search_engine, search_query, country, search_lang, output_lang, result_count, date_range,
-                      safesearch, site_blacklist):
+def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None,
+                      safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None):
     if search_engine.lower() == "baidu":
         return search_web_baidu()
     elif search_engine.lower() == "bing":
-        return search_web_bing(search_query, search_lang, country, date_range, result_count)
+        return search_web_bing(search_query, search_lang, content_country, date_range, result_count)
     elif search_engine.lower() == "brave":
-            return search_web_brave(search_query, country, search_lang, output_lang, result_count, safesearch,
+            return search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
                                     site_blacklist, date_range)
     elif search_engine.lower() == "duckduckgo":
-        return search_web_duckduckgo(arg1, arg2)
+        return search_web_duckduckgo(search_query, arg2)
     elif search_engine.lower() == "google":
-        return search_web_google(search_query, result_count, results_origin_country, date_range, exactTerms,
+        return search_web_google(search_query, result_count, content_country, date_range, exactTerms,
                                  excludeTerms, filter, geolocation, output_lang,
                       search_result_language, safesearch, site_blacklist, sort_results_by)
     elif search_engine.lower() == "kagi":
-        return search_web_kagi(search_query, country, search_lang, output_lang, result_count, safesearch, date_range,
+        return search_web_kagi(search_query, content_country, search_lang, output_lang, result_count, safesearch, date_range,
                                site_blacklist)
     elif search_engine.lower() == "serper":
         return search_web_serper()
     elif search_engine.lower() == "tavily":
         return search_web_tavily()
     elif search_engine.lower() == "searx":
-        return search_web_searx()
+        return search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general')
     elif search_engine.lower() == "yandex":
         return search_web_yandex()
     else:
@@ -121,7 +128,7 @@ def search_web_bing(search_query, bing_lang, bing_country, result_count=None, bi
         # do config check for default search language
         setlang = bing_lang
 
-    # Country settings
+    # Returns content for this Country market code
     if not bing_country:
         # do config check for default search country
         bing_country = loaded_config_data['search_engines']['bing_country_code']
@@ -223,9 +230,114 @@ def test_search_brave():
 ######################### DuckDuckGo Search #########################
 #
 # https://github.com/deedy5/duckduckgo_search
-def search_web_duckduckgo(arg1, arg2)
+# Copied request format/structure from https://github.com/deedy5/duckduckgo_search/blob/main/duckduckgo_search/duckduckgo_search.py
+def create_session() -> requests.Session:
+    session = requests.Session()
+    retries = Retry(total=5, backoff_factor=0.1, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+    return session
 
+def search_web_duckduckgo(
+    keywords: str,
+    region: str = "wt-wt",
+    timelimit: str | None = None,
+    max_results: int | None = None,
+) -> list[dict[str, str]]:
+    assert keywords, "keywords is mandatory"
 
+    payload = {
+        "q": keywords,
+        "s": "0",
+        "o": "json",
+        "api": "d.js",
+        "vqd": "",
+        "kl": region,
+        "bing_market": region,
+    }
+
+    def _normalize_url(url: str) -> str:
+        """Unquote URL and replace spaces with '+'."""
+        return unquote(url).replace(" ", "+") if url else ""
+
+    def _normalize(raw_html: str) -> str:
+        """Strip HTML tags from the raw_html string."""
+        REGEX_STRIP_TAGS = re.compile("<.*?>")
+        return unescape(REGEX_STRIP_TAGS.sub("", raw_html)) if raw_html else ""
+
+    if timelimit:
+        payload["df"] = timelimit
+
+    cache = set()
+    results: list[dict[str, str]] = []
+
+    for _ in range(5):
+        response = requests.post("https://html.duckduckgo.com/html", data=payload)
+        resp_content = response.content
+        if b"No  results." in resp_content:
+            return results
+
+        tree = document_fromstring(resp_content)
+        elements = tree.xpath("//div[h2]")
+        if not isinstance(elements, list):
+            return results
+
+        for e in elements:
+            if isinstance(e, _Element):
+                hrefxpath = e.xpath("./a/@href")
+                href = str(hrefxpath[0]) if hrefxpath and isinstance(hrefxpath, list) else None
+                if (
+                    href
+                    and href not in cache
+                    and not href.startswith(
+                        ("http://www.google.com/search?q=", "https://duckduckgo.com/y.js?ad_domain")
+                    )
+                ):
+                    cache.add(href)
+                    titlexpath = e.xpath("./h2/a/text()")
+                    title = str(titlexpath[0]) if titlexpath and isinstance(titlexpath, list) else ""
+                    bodyxpath = e.xpath("./a//text()")
+                    body = "".join(str(x) for x in bodyxpath) if bodyxpath and isinstance(bodyxpath, list) else ""
+                    results.append(
+                        {
+                            "title": _normalize(title),
+                            "href": _normalize_url(href),
+                            "body": _normalize(body),
+                        }
+                    )
+                    if max_results and len(results) >= max_results:
+                        return results
+
+        npx = tree.xpath('.//div[@class="nav-link"]')
+        if not npx or not max_results:
+            return results
+        next_page = npx[-1] if isinstance(npx, list) else None
+        if isinstance(next_page, _Element):
+            names = next_page.xpath('.//input[@type="hidden"]/@name')
+            values = next_page.xpath('.//input[@type="hidden"]/@value')
+            if isinstance(names, list) and isinstance(values, list):
+                payload = {str(n): str(v) for n, v in zip(names, values)}
+
+    return results
+
+def test_search_duckduckgo():
+    try:
+        results = search_web_duckduckgo(
+            keywords="How can I bake a cherry cake?",
+            region="us-en",
+            timelimit="w",
+            max_results=10
+        )
+        print(f"Number of results: {len(results)}")
+        for result in results:
+            print(f"Title: {result['title']}")
+            print(f"URL: {result['href']}")
+            print(f"Snippet: {result['body']}")
+            print("---")
+
+    except ValueError as e:
+        print(f"Invalid input: {str(e)}")
+    except requests.RequestException as e:
+        print(f"Request error: {str(e)}")
 
 
 ######################### Google Search #########################
