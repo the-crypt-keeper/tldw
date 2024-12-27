@@ -53,6 +53,7 @@ https://github.com/woshixiaobai2019/mirau-chat-ui
 https://uxdesign.cc/the-importance-of-hover-states-c9312d7fd516
 https://trends.uxdesign.cc/
 https://bolters.io/
+https://github.com/Cloud-Code-AI/AkiraDocs
 
 https://github.com/Vali-98/ChatterUI
 https://www.nngroup.com/videos/efficient-error-messages/

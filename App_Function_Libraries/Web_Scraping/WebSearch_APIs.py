@@ -30,8 +30,6 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 #######################################################################################################################
 #
 
-
-
 def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None,
                       safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None):
     if search_engine.lower() == "baidu":
