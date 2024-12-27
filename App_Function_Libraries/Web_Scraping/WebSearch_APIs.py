@@ -42,7 +42,7 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
             return search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
                                     site_blacklist, date_range)
     elif search_engine.lower() == "duckduckgo":
-        return search_web_duckduckgo(search_query, arg2)
+        return search_web_duckduckgo(search_query, content_country, date_range, result_count)
     elif search_engine.lower() == "google":
         return search_web_google(search_query, result_count, content_country, date_range, exactTerms,
                                  excludeTerms, filter, geolocation, output_lang,
