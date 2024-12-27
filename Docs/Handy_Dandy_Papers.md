@@ -48,7 +48,8 @@ https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute
 - https://arxiv.org/abs/2408.03314
 - https://github.com/huggingface/search-and-learn
 - https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute
-
+https://arxiv.org/abs/2412.18319
+- https://github.com/hkust-nlp/B-STaR
 
 ### Personalization
     https://arxiv.org/abs/2411.16034

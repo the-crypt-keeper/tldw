@@ -27,6 +27,12 @@ https://github.com/neuml/paperai
 https://github.com/neuml/paperetl
 https://github.com/ai-christianson/RA.Aid
 https://github.com/Future-House/paper-qa
+https://openreview.net/
+https://www.researchrabbit.ai/
+https://github.com/faraz18001/Sales-Llama
+https://github.com/memgraph/memgraph
+
+
 
 
 ### Ideas

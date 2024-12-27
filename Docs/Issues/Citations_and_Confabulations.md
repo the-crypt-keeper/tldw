@@ -14,6 +14,7 @@ https://huggingface.co/PleIAs/Pleias-Nano
 https://deepmind.google/discover/blog/facts-grounding-a-new-benchmark-for-evaluating-the-factuality-of-large-language-models/
 https://arxiv.org/abs/2412.14860
 https://arxiv.org/abs/2412.14686
+https://arxiv.org/abs/2412.18069
 
 
 

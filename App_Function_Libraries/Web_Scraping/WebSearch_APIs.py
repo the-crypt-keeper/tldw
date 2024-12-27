@@ -23,6 +23,8 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 #######################################################################################################################
 #
 
+
+
 def perform_websearch(search_engine, search_query, country, search_lang, output_lang, result_count, date_range,
                       safesearch, site_blacklist):
     if search_engine.lower() == "baidu":
@@ -33,7 +35,7 @@ def perform_websearch(search_engine, search_query, country, search_lang, output_
             return search_web_brave(search_query, country, search_lang, output_lang, result_count, safesearch,
                                     site_blacklist, date_range)
     elif search_engine.lower() == "duckduckgo":
-        return search_web_ddg()
+        return search_web_duckduckgo(arg1, arg2)
     elif search_engine.lower() == "google":
         return search_web_google(search_query, result_count, results_origin_country, date_range, exactTerms,
                                  excludeTerms, filter, geolocation, output_lang,
@@ -51,6 +53,25 @@ def perform_websearch(search_engine, search_query, country, search_lang, output_
         return search_web_yandex()
     else:
         return f"Error: Invalid Search Engine Name {search_engine}"
+
+
+######################### Search Results Parsing #########################
+def parse_html_search_results_generic(soup):
+    results = []
+    for result in soup.find_all('div', class_='result'):
+        title = result.find('h3').text if result.find('h3') else ''
+        url = result.find('a', class_='url')['href'] if result.find('a', class_='url') else ''
+        content = result.find('p', class_='content').text if result.find('p', class_='content') else ''
+        published_date = result.find('span', class_='published_date').text if result.find('span',
+                                                                                          class_='published_date') else ''
+
+        results.append({
+            'title': title,
+            'url': url,
+            'content': content,
+            'publishedDate': published_date
+        })
+    return results
 
 
 ######################### Baidu Search #########################
@@ -145,7 +166,7 @@ def test_search_web_bing():
 # https://brave.com/search/api/
 # https://github.com/run-llama/llama_index/blob/main/llama-index-integrations/tools/llama-index-tools-brave-search/README.md
 def search_web_brave(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate",
-                     brave_api_key=None, result_filter=None, date_range=None, ):
+                     brave_api_key=None, result_filter=None, search_type="ai", date_range=None):
     search_url = "https://api.search.brave.com/res/v1/web/search"
     if not brave_api_key:
         # load key from config file
@@ -166,6 +187,10 @@ def search_web_brave(search_term, country, search_lang, ui_lang, result_count, s
     #     date_range = "month"
     if not result_filter:
         result_filter = "webpages"
+    if search_type == "ai":
+        # FIXME - Option for switching between AI/Regular search
+        pass
+
 
     headers = {"Accept": "application/json", "Accept-Encoding": "gzip", "X-Subscription-Token": brave_api_key}
 
@@ -180,48 +205,27 @@ def search_web_brave(search_term, country, search_lang, ui_lang, result_count, s
     return brave_search_results
 
 
-def test_search_brave(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate", date_range=None,
-                      result_filter=None, brave_api_key=None):
+def test_search_brave():
+    search_term = "How can I bake a cherry cake"
+    country = "US"
+    search_lang = "en"
+    ui_lang = "en"
+    result_count = 10
+    safesearch = "moderate"
+    date_range = None
+    result_filter = None
     result = search_web_brave(search_term, country, search_lang, ui_lang, result_count, safesearch, date_range,
-                          result_filter, brave_api_key)
+                          result_filter)
+    print(result)
     return result
 
 
 ######################### DuckDuckGo Search #########################
 #
-# https://github.com/deedy5/duckduckgo_search/blob/main/duckduckgo_search/duckduckgo_search.py
-# FIXME - 1shot gen with sonnet 3.5, untested.
-def search_web_ddg():
-    # fuck it https://github.com/deedy5/duckduckgo_search/tree/main?tab=readme-ov-file
-    #return results
-    pass
+# https://github.com/deedy5/duckduckgo_search
+def search_web_duckduckgo(arg1, arg2)
 
 
-def test_search_web_ddg():
-    """Example usage of the DuckDuckGo search function"""
-    try:
-        # Basic search
-        results = search_web_ddg("How to bake a cherry cake")
-        print(f"Found {len(results)} results for 'How to bake a cherry cake'")
-
-        # Print first 3 results
-        for i, result in enumerate(results[:3], 1):
-            print(f"\nResult {i}:")
-            print(f"Title: {result['title']}")
-            print(f"URL: {result['href']}")
-            print(f"Description: {result['body'][:150]}...")
-
-        # Search with different parameters
-        limited_results = search_web_ddg(
-            keywords="artificial intelligence news",
-            region="us-en",
-            safesearch="on",
-            max_results=5
-        )
-        print(f"\nFound {len(limited_results)} limited results")
-
-    except Exception as e:
-        print(f"Search failed: {e}")
 
 
 ######################### Google Search #########################
@@ -376,17 +380,6 @@ def test_search_google():
     print(result)
 
 
-######################### Jina.ai Search #########################
-#
-# https://jina.ai/reader/
-def search_web_jina(arg1, arg2, arg3):
-    pass
-
-def test_search_jina(arg1, arg2, arg3):
-    result = search_web_jina(arg1, arg2, arg3)
-    return result
-
-
 ######################### Kagi Search #########################
 #
 # https://help.kagi.com/kagi/api/search.html
@@ -420,13 +413,8 @@ def search_web_kagi(search_term, country, search_lang, ui_lang, result_count, sa
     response = requests.get(search_url, headers=headers, params=params)
     response.raise_for_status()
     # Response: https://api.search.brave.com/app/documentation/web-search/responses#WebSearchApiResponse
-    brave_search_results = response.json()
-    return brave_search_results
-    # curl - v \
-    # - H
-    # "Authorization: Bot $TOKEN" \
-    #         https: // kagi.com / api / v0 / search\?q = steve + jobs
-    pass
+    kagi_search_results = response.json()
+    return kagi_search_results
 
 
 def test_search_kagi():
@@ -437,18 +425,23 @@ def test_search_kagi():
 #
 # https://searx.space
 # https://searx.github.io/searx/dev/search_api.html
-def search_web_searx(search_query):
+def search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general'):
+
     # Check if API URL is configured
     searx_url = loaded_config_data['search_engines']['searx_search_api_url']
     if not searx_url:
-        return "Search is disabled and no content was found. This functionality is disabled because the user has not set it up yet."
+        return "SearX Search is disabled and no content was found. This functionality is disabled because the user has not set it up yet."
 
     # Validate and construct URL
     try:
         parsed_url = urlparse(searx_url)
         params = {
             'q': search_query,
-            'format': 'json'
+            'language': language,
+            'time_range': time_range,
+            'safesearch': safesearch,
+            'pageno': pageno,
+            'categories': categories
         }
         search_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}?{urlencode(params)}"
     except Exception as e:
@@ -457,17 +450,25 @@ def search_web_searx(search_query):
     # Perform the search request
     try:
         headers = {
-            'Content-Type': 'application/json',
             'User-Agent': 'anything-llm'
         }
 
         response = requests.get(search_url, headers=headers)
         response.raise_for_status()
-        search_data = response.json()
+
+        # Check if the response is JSON
+        content_type = response.headers.get('Content-Type', '')
+        if 'application/json' in content_type:
+            search_data = response.json()
+        else:
+            # If not JSON, assume it's HTML and parse it
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(response.text, 'html.parser')
+            search_data = parse_html_search_results_generic(soup)
 
         # Process results
         data = []
-        for result in search_data.get('results', []):
+        for result in search_data:
             data.append({
                 'title': result.get('title'),
                 'link': result.get('url'),
@@ -485,7 +486,8 @@ def search_web_searx(search_query):
 
 
 def test_search_searx():
-    search_web_searx("How can I bake a cherry cake?")
+    result = search_web_searx("How can I bake a cherry cake?")
+    print(result)
     pass
 
 
@@ -502,15 +504,13 @@ def test_search_serper():
 
 ######################### Tavily Search #########################
 #
-# https://docs.tavily.com/docs/rest-api/api-reference
+# https://github.com/YassKhazzan/openperplex_backend_os/blob/main/sources_searcher.py
 def search_web_tavily():
-    tavily_url = "https://api.tavily.com/search"
     pass
 
 
 def test_search_tavily():
     pass
-
 
 ######################### Yandex Search #########################
 #
