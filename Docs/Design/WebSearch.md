@@ -17,6 +17,18 @@ The web search functionality is a core component of the tldw system, allowing us
     - Perform searches using Bing!
 
 
+#### Brave Search
+Two APIs, 1 for 'AI' the other for 'regular' search
+
+
+
+#### DuckDuckGo Search
+using DuckDuckGo website
+
+#### Google Search
+Have to create a custom search engine first, get the ID and then the API key
+
+
 
 
 https://github.com/scrapinghub/article-extraction-benchmark

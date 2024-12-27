@@ -43,7 +43,7 @@ https://github.com/FanaHOVA/smol-podcaster
 https://docs.inferless.com/cookbook/serverless-customer-service-bot
 https://github.com/aedocw/epub2tts
 https://github.com/microsoft/SpeechT5
-
+https://github.com/smellslikeml/dolla_llama
 
 
 
@@ -183,7 +183,7 @@ https://github.com/shagunmistry/NotebookLM_Alternative/tree/main/ai_helper
 https://docs.cartesia.ai/get-started/make-an-api-request
 https://github.com/JarodMica/open-neruosama
 https://github.com/flatmax/speech-to-text
-
+https://arxiv.org/abs/2412.18566
 
 Google
 https://github.com/google-gemini/cookbook/tree/main/gemini-2

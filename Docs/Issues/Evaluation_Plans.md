@@ -43,6 +43,8 @@ https://github.com/chigkim/Ollama-MMLU-Pro
 https://huggingface.co/ymcki/Llama-3_1-Nemotron-51B-Instruct-GGUF
 https://pub.towardsai.net/streamline-your-llm-evaluation-a-step-by-step-guide-to-rag-metrics-with-streamlit-38ed9efbdc9a
 https://huggingface.co/QuantFactory/granite-3.1-8b-instruct-GGUF
+https://huggingface.co/CohereForAI/c4ai-command-r7b-12-2024
+https://arxiv.org/abs/2412.17758
 
 
 Have LLMs play Social deception games
