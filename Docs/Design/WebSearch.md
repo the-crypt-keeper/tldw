@@ -4,9 +4,75 @@
 This page serves as documentation regarding the web search functionality within tldw and provides context/justification for the decisions made within the module.
 
 
-
 ### Setting the Stage
-The web search functionality is a core component of the tldw system, allowing users to quickly and easily search the web for information on a given topic. This functionality is designed to be simple and intuitive, providing users with the information they need in a clear and concise manner.
+- All the web searches are simple HTTP requests to an API or to the direct endpoint and then scraping the results.
+- Parsing results is TODO.
+- The goal is to provide a simple, easy-to-use interface for searching the web and retrieving results.
+- Other modules are responsible for anything else, this module just performs the search, and delivers the results.
+- **Main Function:**
+    - `def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None, safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None)`
+    - `search_engine` - The search engine to use for the search
+    - `search_query` - The query to search for
+    - `content_country` - The country of the content to search for
+    - `search_lang` - The language to use for the search
+    - `output_lang` - The language to use for the output
+    - `result_count` - The number of results to return
+    - `date_range` - The date range to search within
+    - `safesearch` - Whether to enable safe search
+    - `site_blacklist` - A list of sites to exclude from the search results
+    - `exactTerms` - Terms that must be in the search results
+    - `excludeTerms` - Terms that must not be in the search results
+    - `filter` - A filter to apply to the search results
+    - `geolocation` - The geolocation to use for the search
+    - `search_result_language` - The language to use for the search results
+    - `sort_results_by` - How to sort the search results
+    - **Returns:** A list of search results as a dictionary. - FIXME: Define the structure of the dictionary
+      - Each result should contain the title, URL, content, and metadata of the search result.
+
+Search is performed -> Results obtained, each individual item is first analyzed based on snippet, if relevant, entire page is fetched and analyzed, this is then stored in the results dictionary, and the process is repeated until all results are analyzed/limit is hit.
+Once all results are collected, they are then operated on, being used to create whatever final product is desired by the user.
+      - 
+      - 
+Results dictionary:
+```
+{
+    "search_engine": str,
+    "search_query": str,
+    "content_country": str,
+    "search_lang": str,
+    "output_lang": str,
+    "result_count": int,
+    "date_range": Optional[str],
+    "safesearch": Optional[bool],
+    "site_blacklist": Optional[List[str]],
+    "exactTerms": Optional[List[str]],
+    "excludeTerms": Optional[List[str]],
+    "filter": Optional[str],
+    "geolocation": Optional[str],
+    "search_result_language": Optional[str],
+    "sort_results_by": Optional[str],
+    "results": [
+        {
+            "title": str,
+            "url": str,
+            "content": str,
+            "metadata": {
+                "date_published": Optional[str],
+                "author": Optional[str],
+                "source": Optional[str],
+                "language": Optional[str],
+                "relevance_score": Optional[float],
+                "snippet": Optional[str]
+            }
+        },
+        # ... more results ...
+    ],
+    "total_results_found": int,
+    "search_time": float,
+    "error": Optional[str]
+}
+```
+
 
 #### Bing Search
 - [Bing Search API](https://www.microsoft.com/en-us/bing/apis/bing-web-search-api)
@@ -21,15 +87,35 @@ The web search functionality is a core component of the tldw system, allowing us
 Two APIs, 1 for 'AI' the other for 'regular' search
 
 
-
 #### DuckDuckGo Search
-using DuckDuckGo website
+Uses query to direct DDG search, then scrape the results.
+Structure/approach taken from https://github.com/deedy5/duckduckgo_search
+
 
 #### Google Search
 Have to create a custom search engine first, get the ID and then the API key
+- Documentation for making requests: https://developers.google.com/custom-search/v1/reference/rest/v1/cse/list
 
 
+### Kagi Search
+- [Kagi Search API](https://help.kagi.com/kagi/api/search.html)
+- Really straightforward, just a simple search API
 
+
+### SearX Search
+- [Searx Search Documentation](https://searx.github.io/searx/)
+- `SearXNG is a free internet metasearch engine which aggregates results from more than 70 search services. Users are neither tracked nor profiled.`
+- Can host your own instance or use someone else's.
+
+
+### Serper Search
+
+
+### Tavily Search
+
+
+### Yandex Search
+- https://yandex.cloud/en/docs/search-api/quickstart/
 
 https://github.com/scrapinghub/article-extraction-benchmark
 
