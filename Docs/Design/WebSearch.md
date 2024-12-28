@@ -3,10 +3,40 @@
 ## Introduction
 This page serves as documentation regarding the web search functionality within tldw and provides context/justification for the decisions made within the module.
 
+
+Pipeline:
+1. User posts question
+   - Gradio/UI/API
+2. Question is analyzed
+    - Question is analyzed to identify most likely purpose/goal of question, and Sub-questions are generated to support this
+    - User has option of seeing/modifying prompt used for Analysis/sub-question creation
+3. Search(es) is/are performed - User toggled
+    - Search is performed using the user's question and sub-questions
+4. Results are collected, stored, and analyzed
+    - Results are collected, stored in a temp 'search_results' dict, and analyzed for relevance, based on initial snippet(? or full page?)
+    - User has the option of seeing all results, or only relevant results
+    - User has the option to select which results are 'relevant',
+    - User also has the option to select which 'relevant' results are used to answer the question
+5. Relevant results are added to result dictionary
+    - Results determined to be relevant are then stored in a 'relevant_results' dictionary, and the process is repeated until all results are analyzed/limit is hit.
+6. Once all results are collected, they are then used to answer the user's question/sub-questions
+    - The relevant results are then used to answer the user's question/sub-questions
+    - Each result is first abstract summarized, FIXME
+7. The final answer/'briefing' is then presented to the user
+8. User has the option to save the results to the DB 
+9. User has the option to ask follow-up questions / see potential other questions
+
+
+
+
+
 ----------------
 ### Setting the Stage
+- The goal of this module is to provide a simple, easy-to-use interface for searching the web and retrieving results.
 - All the web searches are simple HTTP requests to an API or to the direct endpoint and then scraping the results.
-- Parsing results is TODO.
+- Results are then reviewed for relevancy, if relevant, the full page is fetched and analyzed.
+- The results are then stored in a dictionary, and the process is repeated until all results are analyzed/limit is hit.
+- Once all results are collected, they are then operated on, being used to create whatever final product is desired by the user.
 - The goal is to provide a simple, easy-to-use interface for searching the web and retrieving results.
 - Other modules are responsible for anything else, this module just performs the search, and delivers the results.
 - **Main Function:**

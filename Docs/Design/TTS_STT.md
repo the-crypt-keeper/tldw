@@ -50,8 +50,14 @@ https://github.com/microsoft/SpeechT5
 https://github.com/smellslikeml/dolla_llama
 
 
+Coqui TTS
+    https://github.com/idiap/coqui-ai-TTS
 
+Cartesia
+    https://docs.cartesia.ai/get-started/make-an-api-request
 
+F5 TTS
+    https://github.com/SWivid/F5-TTS
 
 
 Podcastfy
