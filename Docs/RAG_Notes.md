@@ -41,6 +41,7 @@ https://towardsdatascience.com/advanced-retrieval-techniques-for-better-rags-c53
 https://ai.gopubby.com/agentic-rags-extending-rags-to-sql-databases-1509b25ca3e7
 https://ai.plainenglish.io/a-deep-dive-into-golden-retriever-eea3396af3b4
 https://github.com/AhmedAl93/multimodal-agentic-RAG
+https://hub.athina.ai/athina-originals/end-to-end-implementation-of-unstructured-rag/
 
 
 GraphRAG

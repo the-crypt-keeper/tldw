@@ -41,6 +41,10 @@ https://github.com/Azure-Samples/aisearch-openai-rag-audio
 https://www.reddit.com/r/LocalLLaMA/comments/1f0awd6/best_local_open_source_texttospeech_and/
 https://github.com/FanaHOVA/smol-podcaster
 https://docs.inferless.com/cookbook/serverless-customer-service-bot
+https://wave-pulse.io/
+https://huggingface.co/spaces/saq1b/podcastgen/blob/main/app.py
+https://huggingface.co/spaces/mozilla-ai/document-to-podcast/blob/main/app.py
+https://huggingface.co/spaces/Nymbo/Voice-Clone-Multilingual/tree/main
 https://github.com/aedocw/epub2tts
 https://github.com/microsoft/SpeechT5
 https://github.com/smellslikeml/dolla_llama
@@ -50,7 +54,10 @@ https://github.com/smellslikeml/dolla_llama
 
 
 
-
+Podcastfy
+    https://github.com/souzatharsis/podcastfy/blob/main/podcastfy/tts/base.py
+    https://github.com/souzatharsis/podcastfy/blob/main/podcastfy/text_to_speech.py
+    https://github.com/souzatharsis/podcastfy/blob/main/podcastfy/content_generator.py
 
 GLM-4-Voice
     https://github.com/THUDM/GLM-4-Voice/blob/main/README_en.md

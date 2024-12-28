@@ -189,9 +189,10 @@ All features are designed to run **locally** on your device, ensuring privacy an
     - Pytorch + other ML libraries will also cause the size to increase.
     - As such, I would say you want at least 12GB of free space on your system to devote to the app.
     - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
-- **Linux**
+- **Linux (Tested on Debian/Ubuntu/Fedora)**
     1. Download necessary packages (Python3, ffmpeg, portaudio19-dev - `sudo apt install ffmpeg portaudio19-dev gcc build-essential python3-dev` or `dnf install ffmpeg portaudio19-dev gcc build-essential python3-dev`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
        * `portaudio19-dev` for pyaudio, `python3-dev gcc build-essential` for building it.
+       * If you're using another system, you can try `pip install pyaudio` and see if that works. Otherwise, you can run it as a container.
     2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`

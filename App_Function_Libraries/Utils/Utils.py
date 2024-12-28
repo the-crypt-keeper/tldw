@@ -388,6 +388,8 @@ def load_and_log_configs():
         kagi_search_api_key = config.get('Search-Engines', 'search_engine_api_key_kagi', fallback='')
         # Searx Search Settings
         search_engine_searx_api = config.get('Search-Engines', 'search_engine_searx_api', fallback='')
+        # Tavily Search Settings
+        tavily_search_api_key = config.get('Search-Engines', 'search_engine_api_key_tavily', fallback='')
         # Yandex Search Settings
         yandex_search_api_key = config.get('Search-Engines', 'search_engine_api_key_yandex', fallback='')
         yandex_search_engine_id = config.get('Search-Engines', 'search_engine_id_yandex', fallback='')
@@ -532,6 +534,7 @@ def load_and_log_configs():
             'google_enable_site_search' : google_enable_site_search,
             'kagi_search_api_key': kagi_search_api_key,
             'searx_search_api_url': search_engine_searx_api,
+            'tavily_search_api_key': tavily_search_api_key,
             'yandex_search_api_key': yandex_search_api_key,
             'yandex_search_engine_id': yandex_search_engine_id
             }
@@ -543,6 +546,8 @@ def load_and_log_configs():
 
 
 global_api_endpoints = ["anthropic", "cohere", "google", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
+
+global_search_engines = ["baidu", "bing", "brave", "duckduckgo", "google", "kagi", "searx", "tavily", "yandex"]
 
 openai_tts_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
 
