@@ -46,34 +46,157 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None,
                       safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None):
     if search_engine.lower() == "baidu":
-        return search_web_baidu()
+        web_search_results = search_web_baidu(search_query, None, None)
+        process_results = process_web_search_results(web_search_results, "baidu")
+
     elif search_engine.lower() == "bing":
-        return search_web_bing(search_query, search_lang, content_country, date_range, result_count)
+        web_search_results = search_web_bing(search_query, search_lang, content_country, date_range, result_count)
+        process_results = process_web_search_results(web_search_results, "bing")
+
     elif search_engine.lower() == "brave":
-            return search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
+            web_search_results = search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
                                     site_blacklist, date_range)
+            process_results = process_web_search_results(web_search_results, "brave")
+
     elif search_engine.lower() == "duckduckgo":
-        return search_web_duckduckgo(search_query, content_country, date_range, result_count)
+        web_search_results = search_web_duckduckgo(search_query, content_country, date_range, result_count)
+        process_results = process_web_search_results(web_search_results, "ddg")
+
     elif search_engine.lower() == "google":
-        return search_web_google(search_query, result_count, content_country, date_range, exactTerms,
+        web_search_results = search_web_google(search_query, result_count, content_country, date_range, exactTerms,
                                  excludeTerms, filter, geolocation, output_lang,
                       search_result_language, safesearch, site_blacklist, sort_results_by)
+        process_results = process_web_search_results(web_search_results, "google")
+
     elif search_engine.lower() == "kagi":
-        return search_web_kagi(search_query, content_country, search_lang, output_lang, result_count, safesearch, date_range,
+        web_search_results = search_web_kagi(search_query, content_country, search_lang, output_lang, result_count, safesearch, date_range,
                                site_blacklist)
+        process_results = process_web_search_results(web_search_results, "kagi")
+
     elif search_engine.lower() == "serper":
-        return search_web_serper()
+        web_search_results = search_web_serper()
+        process_results = process_web_search_results(web_search_results, "serper")
+
     elif search_engine.lower() == "tavily":
-        return search_web_tavily(search_query, result_count, site_blacklist)
+        web_search_results = search_web_tavily(search_query, result_count, site_blacklist)
+        process_results = process_web_search_results(web_search_results, "tavily")
+
     elif search_engine.lower() == "searx":
-        return search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general')
+        web_search_results = search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general')
+        process_results = process_web_search_results(web_search_results, "bing")
+
     elif search_engine.lower() == "yandex":
-        return search_web_yandex()
+        web_search_results = search_web_yandex()
+        process_results = process_web_search_results(web_search_results, "bing")
+
     else:
         return f"Error: Invalid Search Engine Name {search_engine}"
 
 
-######################### Search Results Parsing #########################
+#
+######################### Search Result Parsing ##################################################################
+#
+
+def process_web_search_results(search_results: Dict, search_engine: str) -> Dict:
+    """
+    Processes search results from a search engine and formats them into a standardized dictionary structure.
+
+    Args:
+        search_results (Dict): The raw search results from the search engine.
+        search_engine (str): The name of the search engine (e.g., "Google", "Bing").
+
+    Returns:
+        Dict: A dictionary containing the processed search results in the specified structure.
+    """
+    # Initialize the output dictionary with default values
+    web_search_results_dict = {
+        "search_engine": search_engine,
+        "search_query": search_results.get("search_query", ""),
+        "content_country": search_results.get("content_country", ""),
+        "search_lang": search_results.get("search_lang", ""),
+        "output_lang": search_results.get("output_lang", ""),
+        "result_count": search_results.get("result_count", 0),
+        "date_range": search_results.get("date_range", None),
+        "safesearch": search_results.get("safesearch", None),
+        "site_blacklist": search_results.get("site_blacklist", None),
+        "exactTerms": search_results.get("exactTerms", None),
+        "excludeTerms": search_results.get("excludeTerms", None),
+        "filter": search_results.get("filter", None),
+        "geolocation": search_results.get("geolocation", None),
+        "search_result_language": search_results.get("search_result_language", None),
+        "sort_results_by": search_results.get("sort_results_by", None),
+        "results": [],
+        "total_results_found": search_results.get("total_results_found", 0),
+        "search_time": search_results.get("search_time", 0.0),
+        "error": search_results.get("error", None),
+        "processing_error": None
+    }
+    try:
+        if search_engine.lower() == "baidu":
+            pass
+        elif search_engine.lower() == "bing":
+            parse_bing_results(search_results, web_search_results_dict)
+            pass
+
+        elif search_engine.lower() == "brave":
+            parse_brave_results(search_results, web_search_results_dict)
+            pass
+
+        elif search_engine.lower() == "duckduckgo":
+            parse_duckduckgo_results(search_results, web_search_results_dict)
+            pass
+
+        elif search_engine.lower() == "google":
+            parse_google_results(search_results, web_search_results_dict)
+            pass
+
+        elif search_engine.lower() == "kagi":
+            parse_kagi_results(search_results, web_search_results_dict)
+            pass
+
+        elif search_engine.lower() == "serper":
+            parse_serper_results(search_results, web_search_results_dict)
+            pass
+
+        elif search_engine.lower() == "tavily":
+            parse_tavily_results(search_results, web_search_results_dict)
+            pass
+
+        elif search_engine.lower() == "searx":
+            parse_searx_results(search_results, web_search_results_dict)
+            pass
+
+        elif search_engine.lower() == "yandex":
+            parse_yandex_results(search_results, web_search_results_dict)
+            pass
+
+        else:
+            web_search_results_dict["processing_error"] = f"Error: Invalid Search Engine Name {search_engine}"
+            raise ValueError(f"Error: Invalid Search Engine Name {search_engine}")
+    except Exception as e:
+        web_search_results_dict["processing_error"] = f"Error processing search results: {str(e)}"
+        raise
+
+    # Process individual search results
+    for result in search_results.get("results", []):
+        processed_result = {
+            "title": result.get("title", ""),
+            "url": result.get("url", ""),
+            "content": result.get("content", ""),
+            "metadata": {
+                "date_published": result.get("metadata", {}).get("date_published", None),
+                "author": result.get("metadata", {}).get("author", None),
+                "source": result.get("metadata", {}).get("source", None),
+                "language": result.get("metadata", {}).get("language", None),
+                "relevance_score": result.get("metadata", {}).get("relevance_score", None),
+                "snippet": result.get("metadata", {}).get("snippet", None)
+            }
+        }
+        web_search_results_dict["results"].append(processed_result)
+
+    return web_search_results_dict
+
+
 def parse_html_search_results_generic(soup):
     results = []
     for result in soup.find_all('div', class_='result'):
@@ -96,13 +219,16 @@ def parse_html_search_results_generic(soup):
 #
 # https://cloud.baidu.com/doc/APIGUIDE/s/Xk1myz05f
 # https://oxylabs.io/blog/how-to-scrape-baidu-search-results
-def search_web_baidu():
+def search_web_baidu(arg1, arg2, arg3):
     pass
 
 
 def test_baidu_search(arg1, arg2, arg3):
     result = search_web_baidu(arg1, arg2, arg3)
     return result
+
+def search_parse_baidu_results():
+    pass
 
 
 ######################### Bing Search #########################
@@ -157,11 +283,11 @@ def search_web_bing(search_query, bing_lang, bing_country, result_count=None, bi
         response = requests.get(search_url, headers=headers, params=params)
         response.raise_for_status()
 
-        print("Headers:  ")
-        print(response.headers)
+        logging.debug("Headers:  ")
+        logging.debug(response.headers)
 
-        print("JSON Response: ")
-        print(response.json())
+        logging.debug("JSON Response: ")
+        logging.debug(response.json())
         bing_search_results = response.json()
         return bing_search_results
     except Exception as ex:
@@ -169,14 +295,83 @@ def search_web_bing(search_query, bing_lang, bing_country, result_count=None, bi
 
 
 def test_search_web_bing():
-    search_query = "How can I bake a cherry cake"
+    search_query = "How can I get started learning machine learning?"
     bing_lang = "en"
     bing_country =  "US"
     result_count = 10
     bing_api_key = None
     date_range = None
     result = search_web_bing(search_query, bing_lang, bing_country, result_count, bing_api_key, date_range)
+    print("Bing Search Results:")
     print(result)
+
+
+# FIXME - untested
+def parse_bing_results(raw_results: Dict, output_dict: Dict) -> None:
+    """
+    Parse Bing search results and update the output dictionary
+
+    Args:
+        raw_results (Dict): Raw Bing API response
+        output_dict (Dict): Dictionary to store processed results
+    """
+    try:
+        # Extract web pages results
+        if "webPages" in raw_results:
+            web_pages = raw_results["webPages"]
+            output_dict["total_results_found"] = web_pages.get("totalEstimatedMatches", 0)
+
+            for result in web_pages.get("value", []):
+                processed_result = {
+                    "title": result.get("name", ""),
+                    "url": result.get("url", ""),
+                    "content": result.get("snippet", ""),
+                    "metadata": {
+                        "date_published": None,  # Bing doesn't typically provide this
+                        "author": None,  # Bing doesn't typically provide this
+                        "source": result.get("displayUrl", None),
+                        "language": None,  # Could be extracted from result.get("language") if available
+                        "relevance_score": None,  # Could be calculated from result.get("rank") if available
+                        "snippet": result.get("snippet", None)
+                    }
+                }
+                output_dict["results"].append(processed_result)
+
+        # Optionally process other result types
+        if "news" in raw_results:
+            for news_item in raw_results["news"].get("value", []):
+                processed_result = {
+                    "title": news_item.get("name", ""),
+                    "url": news_item.get("url", ""),
+                    "content": news_item.get("description", ""),
+                    "metadata": {
+                        "date_published": news_item.get("datePublished", None),
+                        "author": news_item.get("provider", [{}])[0].get("name", None),
+                        "source": news_item.get("provider", [{}])[0].get("name", None),
+                        "language": None,
+                        "relevance_score": None,
+                        "snippet": news_item.get("description", None)
+                    }
+                }
+                output_dict["results"].append(processed_result)
+
+        # Add spell suggestions if available
+        if "spellSuggestion" in raw_results:
+            output_dict["spell_suggestions"] = raw_results["spellSuggestion"]
+
+        # Add related searches if available
+        if "relatedSearches" in raw_results:
+            output_dict["related_searches"] = [
+                item.get("text", "")
+                for item in raw_results["relatedSearches"].get("value", [])
+            ]
+
+    except Exception as e:
+        output_dict["processing_error"] = f"Error processing Bing results: {str(e)}"
+
+
+def test_parse_bing_results():
+    pass
 
 
 ######################### Brave Search #########################
@@ -236,6 +431,65 @@ def test_search_brave():
                           result_filter)
     print(result)
     return result
+
+
+# FIXME - untested
+def parse_brave_results(raw_results: Dict, output_dict: Dict) -> None:
+    """
+    Parse Brave search results and update the output dictionary
+
+    Args:
+        raw_results (Dict): Raw Brave API response
+        output_dict (Dict): Dictionary to store processed results
+    """
+    try:
+        # Extract query information
+        if "query" in raw_results:
+            query_info = raw_results["query"]
+            output_dict.update({
+                "search_query": query_info.get("original", ""),
+                "content_country": query_info.get("country", ""),
+                "city": query_info.get("city", ""),
+                "state": query_info.get("state", ""),
+                "more_results_available": query_info.get("more_results_available", False)
+            })
+
+        # Process web results
+        if "web" in raw_results and "results" in raw_results["web"]:
+            for result in raw_results["web"]["results"]:
+                processed_result = {
+                    "title": result.get("title", ""),
+                    "url": result.get("url", ""),
+                    "content": result.get("description", ""),
+                    "metadata": {
+                        "date_published": result.get("page_age", None),
+                        "author": None,
+                        "source": result.get("profile", {}).get("name", None),
+                        "language": result.get("language", None),
+                        "relevance_score": None,
+                        "snippet": result.get("description", None),
+                        "family_friendly": result.get("family_friendly", None),
+                        "type": result.get("type", None),
+                        "subtype": result.get("subtype", None),
+                        "thumbnail": result.get("thumbnail", {}).get("src", None)
+                    }
+                }
+                output_dict["results"].append(processed_result)
+
+        # Update total results count
+        if "mixed" in raw_results:
+            output_dict["total_results_found"] = len(raw_results["mixed"].get("main", []))
+
+        # Set family friendly status
+        if "mixed" in raw_results:
+            output_dict["family_friendly"] = raw_results.get("family_friendly", True)
+
+    except Exception as e:
+        output_dict["processing_error"] = f"Error processing Brave results: {str(e)}"
+        raise
+
+def test_parse_brave_results():
+    pass
 
 
 ######################### DuckDuckGo Search #########################
@@ -349,6 +603,81 @@ def test_search_duckduckgo():
         print(f"Invalid input: {str(e)}")
     except requests.RequestException as e:
         print(f"Request error: {str(e)}")
+
+
+def parse_duckduckgo_results(raw_results: Dict, output_dict: Dict) -> None:
+    """
+    Parse DuckDuckGo search results and update the output dictionary
+
+    Args:
+        raw_results (Dict): Raw DuckDuckGo response
+        output_dict (Dict): Dictionary to store processed results
+    """
+    try:
+        # DuckDuckGo results appear to be in a simple list format
+        # Each result is separated by "---"
+        results = raw_results.get("results", [])
+
+        for result in results:
+            # Extract information using the consistent format in results
+            title = ""
+            url = ""
+            snippet = ""
+
+            # Parse the result text
+            lines = result.split('\n')
+            for line in lines:
+                if line.startswith("Title: "):
+                    title = line.replace("Title: ", "").strip()
+                elif line.startswith("URL: "):
+                    url = line.replace("URL: ", "").strip()
+                elif line.startswith("Snippet: "):
+                    snippet = line.replace("Snippet: ", "").strip()
+
+            processed_result = {
+                "title": title,
+                "url": url,
+                "content": snippet,
+                "metadata": {
+                    "date_published": None,  # DuckDuckGo doesn't typically provide this
+                    "author": None,  # DuckDuckGo doesn't typically provide this
+                    "source": extract_domain(url) if url else None,
+                    "language": None,  # DuckDuckGo doesn't typically provide this
+                    "relevance_score": None,  # DuckDuckGo doesn't typically provide this
+                    "snippet": snippet
+                }
+            }
+
+            output_dict["results"].append(processed_result)
+
+        # Update total results count
+        output_dict["total_results_found"] = len(output_dict["results"])
+
+    except Exception as e:
+        output_dict["processing_error"] = f"Error processing DuckDuckGo results: {str(e)}"
+
+
+def extract_domain(url: str) -> str:
+    """
+    Extract domain name from URL
+
+    Args:
+        url (str): Full URL
+
+    Returns:
+        str: Domain name
+    """
+    try:
+        from urllib.parse import urlparse
+        parsed_uri = urlparse(url)
+        domain = parsed_uri.netloc
+        return domain.replace('www.', '')
+    except:
+        return url
+
+def test_parse_duckduckgo_results():
+    pass
+
 
 
 ######################### Google Search #########################
@@ -503,45 +832,182 @@ def test_search_google():
     print(result)
 
 
+# FIXME - untested
+def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
+    """
+    Parse Google Custom Search API results and update the output dictionary
+
+    Args:
+        raw_results (Dict): Raw Google API response
+        output_dict (Dict): Dictionary to store processed results
+    """
+    try:
+        # Extract search information
+        if "searchInformation" in raw_results:
+            search_info = raw_results["searchInformation"]
+            output_dict["total_results_found"] = int(search_info.get("totalResults", "0"))
+            output_dict["search_time"] = search_info.get("searchTime", 0.0)
+
+        # Extract spelling suggestions
+        if "spelling" in raw_results:
+            output_dict["spell_suggestions"] = raw_results["spelling"].get("correctedQuery")
+
+        # Extract search parameters from queries
+        if "queries" in raw_results and "request" in raw_results["queries"]:
+            request = raw_results["queries"]["request"][0]
+            output_dict.update({
+                "search_query": request.get("searchTerms", ""),
+                "search_lang": request.get("language", ""),
+                "result_count": request.get("count", 0),
+                "safesearch": request.get("safe", None),
+                "exactTerms": request.get("exactTerms", None),
+                "excludeTerms": request.get("excludeTerms", None),
+                "filter": request.get("filter", None),
+                "geolocation": request.get("gl", None),
+                "search_result_language": request.get("hl", None),
+                "sort_results_by": request.get("sort", None)
+            })
+
+        # Process search results
+        if "items" in raw_results:
+            for item in raw_results["items"]:
+                processed_result = {
+                    "title": item.get("title", ""),
+                    "url": item.get("link", ""),
+                    "content": item.get("snippet", ""),
+                    "metadata": {
+                        "date_published": item.get("pagemap", {}).get("metatags", [{}])[0].get(
+                            "article:published_time"),
+                        "author": item.get("pagemap", {}).get("metatags", [{}])[0].get("article:author"),
+                        "source": item.get("displayLink", None),
+                        "language": item.get("language", None),
+                        "relevance_score": None,  # Google doesn't provide this directly
+                        "snippet": item.get("snippet", None),
+                        "file_format": item.get("fileFormat", None),
+                        "mime_type": item.get("mime", None),
+                        "cache_url": item.get("cacheId", None)
+                    }
+                }
+
+                # Extract additional metadata if available
+                if "pagemap" in item:
+                    pagemap = item["pagemap"]
+                    if "metatags" in pagemap and pagemap["metatags"]:
+                        metatags = pagemap["metatags"][0]
+                        processed_result["metadata"].update({
+                            "description": metatags.get("og:description",
+                                                        metatags.get("description")),
+                            "keywords": metatags.get("keywords"),
+                            "site_name": metatags.get("og:site_name")
+                        })
+
+                output_dict["results"].append(processed_result)
+
+        # Add pagination information
+        output_dict["pagination"] = {
+            "has_next": "nextPage" in raw_results.get("queries", {}),
+            "has_previous": "previousPage" in raw_results.get("queries", {}),
+            "current_page": raw_results.get("queries", {}).get("request", [{}])[0].get("startIndex", 1)
+        }
+
+    except Exception as e:
+        output_dict["processing_error"] = f"Error processing Google results: {str(e)}"
+
+def test_parse_google_results():
+    pass
+
+
+
 ######################### Kagi Search #########################
 #
 # https://help.kagi.com/kagi/api/search.html
-def search_web_kagi(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate", date_range=None,
-                    result_filter=None, kagi_api_key=None):
-    search_url = "https://api.search.brave.com/res/v1/web/search"
+def search_web_kagi(query: str, limit: int = 10) -> Dict:
+    search_url = "https://kagi.com/api/v0/search"
 
+    # load key from config file
+    kagi_api_key = loaded_config_data['search_engines']['kagi_search_api_key']
     if not kagi_api_key:
-        # load key from config file
-        if not kagi_api_key:
-            raise ValueError("Please provide a valid Kagi Search API subscription key")
-    if not country:
-        country = "US"
-    if not search_lang:
-        search_lang = "en"
-    if not ui_lang:
-        ui_lang = "en"
-    if not result_count:
-        result_count = 10
-    # if not date_range:
-    #     date_range = "month"
-    if not result_filter:
-        result_filter = "webpages"
+        raise ValueError("Please provide a valid Kagi Search API subscription key")
 
-    headers = {"Authorization: Bot " + kagi_api_key}
+    """
+    Queries the Kagi Search API with the given query and limit.
+    """
+    if kagi_api_key is None:
+        raise ValueError("API key is required.")
 
-    # https://api.search.brave.com/app/documentation/web-search/query#WebSearchAPIQueryParameters
-    params = {"q": search_term, "textDecorations": True, "textFormat": "HTML", "count": result_count,
-              "freshness": date_range, "promote": "webpages", "safeSearch": "Moderate"}
+    headers = {"Authorization": f"Bot {kagi_api_key}"}
+    endpoint = f"{search_url}/search"
+    params = {"q": query, "limit": limit}
 
-    response = requests.get(search_url, headers=headers, params=params)
+    response = requests.get(endpoint, headers=headers, params=params)
     response.raise_for_status()
-    # Response: https://api.search.brave.com/app/documentation/web-search/responses#WebSearchApiResponse
-    kagi_search_results = response.json()
-    return kagi_search_results
+    print(response.json())
+    return response.json()
 
 
 def test_search_kagi():
+    search_term = "How can I bake a cherry cake"
+    result_count = 10
+    result = search_web_kagi(search_term, result_count)
+    print(result)
+
+
+def parse_kagi_results(raw_results: Dict, output_dict: Dict) -> None:
+    """
+    Parse Kagi search results and update the output dictionary
+
+    Args:
+        raw_results (Dict): Raw Kagi API response
+        output_dict (Dict): Dictionary to store processed results
+    """
+    try:
+        # Extract metadata
+        if "meta" in raw_results:
+            meta = raw_results["meta"]
+            output_dict["search_time"] = meta.get("ms", 0) / 1000.0  # Convert to seconds
+            output_dict["api_balance"] = meta.get("api_balance")
+            output_dict["search_id"] = meta.get("id")
+            output_dict["node"] = meta.get("node")
+
+        # Process search results
+        if "data" in raw_results:
+            for item in raw_results["data"]:
+                # Skip related searches (type 1)
+                if item.get("t") == 1:
+                    output_dict["related_searches"] = item.get("list", [])
+                    continue
+
+                # Process regular search results (type 0)
+                if item.get("t") == 0:
+                    processed_result = {
+                        "title": item.get("title", ""),
+                        "url": item.get("url", ""),
+                        "content": item.get("snippet", ""),
+                        "metadata": {
+                            "date_published": item.get("published"),
+                            "author": None,  # Kagi doesn't typically provide this
+                            "source": None,  # Could be extracted from URL if needed
+                            "language": None,  # Kagi doesn't typically provide this
+                            "relevance_score": None,
+                            "snippet": item.get("snippet"),
+                            "thumbnail": item.get("thumbnail", {}).get("url") if "thumbnail" in item else None
+                        }
+                    }
+                    output_dict["results"].append(processed_result)
+
+            # Update total results count
+            output_dict["total_results_found"] = len([
+                item for item in raw_results["data"]
+                if item.get("t") == 0
+            ])
+
+    except Exception as e:
+        output_dict["processing_error"] = f"Error processing Kagi results: {str(e)}"
+
+
+def test_parse_kagi_results():
     pass
+
 
 
 ######################### SearX Search #########################
@@ -612,6 +1078,14 @@ def test_search_searx():
     print(result)
     pass
 
+def parse_searx_results(searx_search_results, web_search_results_dict):
+    pass
+
+def test_parse_searx_results():
+    pass
+
+
+
 
 ######################### Serper.dev Search #########################
 #
@@ -622,6 +1096,11 @@ def search_web_serper():
 
 def test_search_serper():
     pass
+
+def parse_serper_results(serper_search_results, web_search_results_dict):
+    pass
+
+
 
 
 ######################### Tavily Search #########################
@@ -664,6 +1143,17 @@ def test_search_tavily():
     result = search_web_tavily("How can I bake a cherry cake?")
     print(result)
 
+
+def parse_tavily_results(tavily_search_results, web_search_results_dict):
+    pass
+
+
+def test_parse_tavily_results():
+    pass
+
+
+
+
 ######################### Yandex Search #########################
 #
 # https://yandex.cloud/en/docs/search-api/operations/web-search
@@ -676,6 +1166,10 @@ def search_web_yandex():
 
 def test_search_yandex():
     pass
+
+def parse_yandex_results(yandex_search_results, web_search_results_dict):
+    pass
+
 
 #
 # End of WebSearch_APIs.py
