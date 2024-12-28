@@ -45,6 +45,9 @@ https://pub.towardsai.net/streamline-your-llm-evaluation-a-step-by-step-guide-to
 https://huggingface.co/QuantFactory/granite-3.1-8b-instruct-GGUF
 https://huggingface.co/CohereForAI/c4ai-command-r7b-12-2024
 https://arxiv.org/abs/2412.17758
+https://huggingface.co/spaces/bigcode/bigcodebench-leaderboard
+https://www.atla-ai.com/post/evaluating-the-evaluator
+https://hamel.dev/blog/posts/llm-judge/
 
 
 Have LLMs play Social deception games

@@ -16,7 +16,6 @@ from lxml.html import document_fromstring
 from requests import RequestException
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
-
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import loaded_config_data
@@ -26,9 +25,23 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 # Functions:
 # 1. perform_websearch
 # 2. search_web_baidu
+# 3. search_web_bing
+# 4. search_web_brave
+# 5. search_web_duckduckgo
+# 6. search_web_google
+# 7. search_web_kagi
+# 8. search_web_serper
+# 9. search_web_tavily
+# 10. search_web_searx
+# 11. search_web_yandex
+# 12. parse_html_search_results_generic
 #
 #######################################################################################################################
 #
+# Functions:
+
+# FIXME - parsing for results from each search engine
+# FIXME - Create results dictionary format/specification
 
 def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None,
                       safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None):
@@ -51,7 +64,7 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
     elif search_engine.lower() == "serper":
         return search_web_serper()
     elif search_engine.lower() == "tavily":
-        return search_web_tavily()
+        return search_web_tavily(search_query, result_count, site_blacklist)
     elif search_engine.lower() == "searx":
         return search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general')
     elif search_engine.lower() == "yandex":
@@ -536,7 +549,6 @@ def test_search_kagi():
 # https://searx.space
 # https://searx.github.io/searx/dev/search_api.html
 def search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general'):
-
     # Check if API URL is configured
     searx_url = loaded_config_data['search_engines']['searx_search_api_url']
     if not searx_url:
@@ -560,7 +572,7 @@ def search_web_searx(search_query, language='auto', time_range='', safesearch=0,
     # Perform the search request
     try:
         headers = {
-            'User-Agent': 'anything-llm'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0'
         }
 
         response = requests.get(search_url, headers=headers)
@@ -615,12 +627,42 @@ def test_search_serper():
 ######################### Tavily Search #########################
 #
 # https://github.com/YassKhazzan/openperplex_backend_os/blob/main/sources_searcher.py
-def search_web_tavily():
-    pass
+def search_web_tavily(search_query, result_count=10, site_whitelist=None, site_blacklist=None):
+    # Check if API URL is configured
+    tavily_api_url = "https://api.tavily.com/search"
+
+    tavily_api_key = loaded_config_data['search_engines']['tavily_search_api_key']
+
+    # Prepare the request payload
+    payload = {
+        "api_key": tavily_api_key,
+        "query": search_query,
+        "max_results": result_count
+    }
+
+    # Add optional parameters if provided
+    if site_whitelist:
+        payload["include_domains"] = site_whitelist
+    if site_blacklist:
+        payload["exclude_domains"] = site_blacklist
+
+    # Perform the search request
+    try:
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0'
+        }
+
+        response = requests.post(tavily_api_url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        return f"There was an error searching for content. {str(e)}"
 
 
 def test_search_tavily():
-    pass
+    result = search_web_tavily("How can I bake a cherry cake?")
+    print(result)
 
 ######################### Yandex Search #########################
 #

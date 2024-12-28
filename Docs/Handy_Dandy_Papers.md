@@ -40,7 +40,7 @@ https://arxiv.org/abs/2412.06769
 - https://arxiv.org/abs/2412.01113
 https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute
 - https://machinelearning.apple.com/research/gsm-symbolic
-
+https://arxiv.org/abs/2402.10200
 - 
 
 ### Test-Time Compute

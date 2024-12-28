@@ -76,6 +76,7 @@ https://otranscribe.com/
 https://www.dive.club/ideas/new-types-of-ui-that-generative-ai-has-necessitated
 https://interactjs.io/
 https://perchance.org/ai-chat
+https://uiverse.io/elements
 https://uxdesign.cc/youre-trying-to-turn-an-oil-tanker-288ed30876e4
 https://uxdesign.cc/simple-recall-testing-for-b2b-ux-134e18330da9
 https://lovable.dev/
