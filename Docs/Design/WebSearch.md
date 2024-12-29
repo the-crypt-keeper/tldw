@@ -3,6 +3,8 @@
 ## Introduction
 This page serves as documentation regarding the web search functionality within tldw and provides context/justification for the decisions made within the module.
 
+Search is performed -> Results obtained, each individual item is first analyzed based on snippet, if relevant, entire page is fetched and analyzed, this is then stored in the results dictionary, and the process is repeated until all results are analyzed/limit is hit.
+Once all results are collected, they are then operated on, being used to create whatever final product is desired by the user.
 
 Pipeline:
 1. User posts question
@@ -47,35 +49,41 @@ Pipeline:
 
 ----------------
 ### Setting the Stage
-- The goal of this module is to provide a simple, easy-to-use interface for searching the web and retrieving results.
-- All the web searches are simple HTTP requests to an API or to the direct endpoint and then scraping the results.
-- Results are then reviewed for relevancy, if relevant, the full page is fetched and analyzed.
-- The results are then stored in a dictionary, and the process is repeated until all results are analyzed/limit is hit.
-- Once all results are collected, they are then operated on, being used to create whatever final product is desired by the user.
-- The goal is to provide a simple, easy-to-use interface for searching the web and retrieving results.
-- Other modules are responsible for anything else, this module just performs the search, and delivers the results.
-- **Main Function:**
-    - `def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None, safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None)`
-    - `search_engine` - The search engine to use for the search
-    - `search_query` - The query to search for
-    - `content_country` - The country of the content to search for
-    - `search_lang` - The language to use for the search
-    - `output_lang` - The language to use for the output
-    - `result_count` - The number of results to return
-    - `date_range` - The date range to search within
-    - `safesearch` - Whether to enable safe search
-    - `site_blacklist` - A list of sites to exclude from the search results
-    - `exactTerms` - Terms that must be in the search results
-    - `excludeTerms` - Terms that must not be in the search results
-    - `filter` - A filter to apply to the search results
-    - `geolocation` - The geolocation to use for the search
-    - `search_result_language` - The language to use for the search results
-    - `sort_results_by` - How to sort the search results
-    - **Returns:** A list of search results as a dictionary. - FIXME: Define the structure of the dictionary
-      - Each result should contain the title, URL, content, and metadata of the search result.
+- **Purpose:**
+    - The goal of this module is to provide a simple, easy-to-use interface for searching the web and retrieving results.
+    - All the web searches are simple HTTP requests to an API or to the direct endpoint and then scraping the results.
+    - Results are then reviewed for relevancy, if relevant, the full page is fetched and analyzed.
+    - The results are then stored in a dictionary, and the process is repeated until all results are analyzed/limit is hit.
+    - Once all results are collected, they are then operated on, being used to create whatever final product is desired by the user.
+    - The goal is to provide a simple, easy-to-use interface for searching the web and retrieving results.
+    - Other modules are responsible for anything else, this module just performs the search, and delivers the results.
+- **Main Function:** (Start Here)
+    - `def process_question(question: str, search_params: Dict) -> Dict:`
+        - `question` - The question to search for
+        - `search_params` - A dictionary containing the search parameters
 
-Search is performed -> Results obtained, each individual item is first analyzed based on snippet, if relevant, entire page is fetched and analyzed, this is then stored in the results dictionary, and the process is repeated until all results are analyzed/limit is hit.
-Once all results are collected, they are then operated on, being used to create whatever final product is desired by the user.
+
+- **Function Execution Steps:**
+    - `def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None, safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None)`
+        - `search_engine` - The search engine to use for the search
+        - `search_query` - The query to search for
+        - `content_country` - The country of the content to search for
+        - `search_lang` - The language to use for the search
+        - `output_lang` - The language to use for the output
+        - `result_count` - The number of results to return
+        - `date_range` - The date range to search within
+        - `safesearch` - Whether to enable safe search
+        - `site_blacklist` - A list of sites to exclude from the search results
+        - `exactTerms` - Terms that must be in the search results
+        - `excludeTerms` - Terms that must not be in the search results
+        - `filter` - A filter to apply to the search results
+        - `geolocation` - The geolocation to use for the search
+        - `search_result_language` - The language to use for the search results
+        - `sort_results_by` - How to sort the search results
+    - **Returns:** A list of search results as a dictionary. - FIXME: Define the structure of the dictionary
+              - Each result should contain the title, URL, content, and metadata of the search result.
+
+
 
 https://github.com/scrapinghub/article-extraction-benchmark
 
