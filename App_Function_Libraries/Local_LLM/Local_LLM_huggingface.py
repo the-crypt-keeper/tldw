@@ -12,6 +12,17 @@ import torch
 #
 # Functions:
 
+# FIXME: This function is not complete
+# Setup proper path/configurations for the models
+HF_MODELS_DIR = "models"
+
+# FIXME: This function is not complete
+def get_local_models():
+    if not os.path.exists(HF_MODELS_DIR):
+        os.makedirs(HF_MODELS_DIR)
+    return [d for d in os.listdir(HF_MODELS_DIR) if os.path.isdir(os.path.join(HF_MODELS_DIR, d))]
+
+
 def chat_with_transformers(user_message, system_message, model_name=None, model_path=None, max_new_tokens=100):
     pass
 
