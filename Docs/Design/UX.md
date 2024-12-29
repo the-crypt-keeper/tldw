@@ -81,6 +81,9 @@ https://uxdesign.cc/youre-trying-to-turn-an-oil-tanker-288ed30876e4
 https://uxdesign.cc/simple-recall-testing-for-b2b-ux-134e18330da9
 https://lovable.dev/
 https://markwhen.com/
+https://kando.menu/
+
+
 
 Prompt Engineering page:
 - 3 Sections

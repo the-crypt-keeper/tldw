@@ -18,6 +18,7 @@ https://pythontutor.com/articles/c-cpp-visualizer.html
 https://gitingest.com/
 https://gitdiagram.com/
 https://www.ilograph.com/blog/posts/diagrams-ai-can-and-cannot-generate/#system-diagramming-with-ai
+https://github.com/osanseviero/geminicoder
 
 
 
