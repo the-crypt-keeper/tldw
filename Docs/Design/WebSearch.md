@@ -26,7 +26,23 @@ Pipeline:
 9. User has the option to ask follow-up questions / see potential other questions
 
 
-
+- **Text Search Workflow**
+    1. User inputs a search query
+    2. User selects a search engine (Option for default search engine in config file)
+    3. The user presses 'Search'
+    4. The search query is passed to the selected search engine
+    5. The appropriate search engine is used to perform a search via API call
+    6. The search results are returned from the search engine's API
+    7. Search engine results are then _MODIFIED_ (if necessary/enabled) to fit the user's preferences
+       - This could include re-ranking, summarization/analysis, or other modifications
+    8. The (modified) search results are displayed to the user
+    9. Results are then displayed to the user, 
+       - either as titles of pages with dropdown for all info,
+       - or as a list of links with a briefing/summary of each link
+       - or as a single briefing/summary of all results
+    10. User may then select to save this resulting text to the DB as a plaintext entry, with metadata containing the search query, search engine, and any other relevant information
+    11. Search results are then saved to the DB as a plaintext entry, with metadata containing the search query, search engine, and any other relevant information
+    12. This is then searchable via the Media DB
 
 
 ----------------
@@ -155,23 +171,7 @@ Perplexity
         - Output Metadata (URL, Date, etc)
         - Word count limit for output (per search result & total)
         - Output dialect (US, UK, a NY Radio DJ, etc)
-- **Text Search Workflow**
-    1. User inputs a search query
-    2. User selects a search engine (Option for default search engine in config file)
-    3. The user presses 'Search'
-    4. The search query is passed to the selected search engine
-    5. The appropriate search engine is used to perform a search via API call
-    6. The search results are returned from the search engine's API
-    7. Search engine results are then _MODIFIED_ (if necessary/enabled) to fit the user's preferences
-       - This could include re-ranking, summarization/analysis, or other modifications
-    8. The (modified) search results are displayed to the user
-    9. Results are then displayed to the user, 
-       - either as titles of pages with dropdown for all info,
-       - or as a list of links with a briefing/summary of each link
-       - or as a single briefing/summary of all results
-    10. User may then select to save this resulting text to the DB as a plaintext entry, with metadata containing the search query, search engine, and any other relevant information
-    11. Search results are then saved to the DB as a plaintext entry, with metadata containing the search query, search engine, and any other relevant information
-    12. This is then searchable via the Media DB
+
 
 Results dictionary:
 ```
