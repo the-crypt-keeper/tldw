@@ -41,6 +41,7 @@ Tools
    https://github.com/outlines-dev/outlines
    https://github.com/Dan-wanna-M/formatron/tree/master
    https://github.com/whyhow-ai/knowledge-table
+   https://github.com/guardrails-ai/guardrails
 
 Examples
    https://github.com/dottxt-ai/demos/tree/main/lore-generator

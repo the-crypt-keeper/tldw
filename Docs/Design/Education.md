@@ -9,7 +9,7 @@ https://arxiv.org/abs/2411.07407
 https://arxiv.org/abs/2412.16429
 https://huggingface.co/papers/2412.15443
 https://github.com/thiswillbeyourgithub/AnkiAIUtils
-
+https://news.ycombinator.com/item?id=42534931
 
 
 

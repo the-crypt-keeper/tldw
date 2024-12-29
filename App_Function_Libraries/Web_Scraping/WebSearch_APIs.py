@@ -25,22 +25,170 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 #######################################################################################################################
 #
 # Functions:
-# 1. perform_websearch
-# 2. search_web_baidu
-# 3. search_web_bing
-# 4. search_web_brave
-# 5. search_web_duckduckgo
-# 6. search_web_google
-# 7. search_web_kagi
-# 8. search_web_serper
-# 9. search_web_tavily
-# 10. search_web_searx
-# 11. search_web_yandex
-# 12. parse_html_search_results_generic
+# 1. analyze_question
 #
 #######################################################################################################################
 #
 # Functions:
+
+######################### Main Orchestration Workflow #########################
+#
+def process_question(question: str, search_params: Dict) -> Dict:
+    """
+    Orchestrates the entire pipeline:
+      1. Optionally generate sub-queries (if subquery_generation=True).
+      2. Perform web searches for each query (the original and sub-queries).
+      3. Score results for relevance; filter them.
+      4. Aggregate final answer from relevant results.
+
+    Args:
+        question (str): The user's original question or query.
+        search_params (Dict): A dictionary containing parameters for performing web searches
+                              and specifying LLM endpoints.
+
+    Returns:
+        Dict: A dictionary containing all relevant data, including results from each sub-query.
+
+        A dictionary containing parameters for performing a web search and processing the results.
+
+        Dict Parameters:
+            engine (str): The search engine to use (e.g., "google", "bing", "brave", "duckduckgo", etc.).
+            content_country (str): The country code for content localization (e.g., "US", "UK", "DE").
+            search_lang (str): The language for the search query (e.g., "en" for English).
+            output_lang (str): The desired language for the search results.
+            result_count (int): The number of results to return.
+            date_range (str or None): The time range for the search results (e.g., "y" for the past year).
+            safesearch (str or None): The safe search setting (e.g., "moderate", "strict", "off").
+            site_blacklist (list or None): A list of sites to exclude from the search results.
+            exactTerms (str or None): Terms that must appear in the search results.
+            excludeTerms (str or None): Terms that must not appear in the search results.
+            filter (str or None): Any additional filtering criteria.
+            geolocation (str or None): Geographical location for search results.
+            search_result_language (str or None): The language of the search results.
+            sort_results_by (str or None): Criteria for sorting the results.
+            subquery_generation (bool): Whether to generate sub-queries.
+            subquery_generation_api (str): The API to use for sub-query generation (e.g., "openai", "anthropic", "deepseek").
+            relevance_analysis_llm (str): The LLM model to use for relevance analysis (e.g., "openai", "anthropic", "deepseek").
+            final_answer_llm (str): The LLM model to use for generating the final answer (e.g., "openai", "anthropic", "deepseek").
+
+        Example:
+            search_params = {
+                "engine": "google",
+                "content_country": "US",
+                "search_lang": "en",
+                "output_lang": "en",
+                "result_count": 10,
+                "date_range": "y",
+                "safesearch": "moderate",
+                "site_blacklist": ["example.com", "spam-site.com"],
+                "exactTerms": None,
+                "excludeTerms": None,
+                "filter": None,
+                "geolocation": None,
+                "search_result_language": None,
+                "sort_results_by": None,
+                "subquery_generation": True,
+                "subquery_generation_llm": "openai",
+                "relevance_analysis_llm": "openai",
+                "final_answer_llm": "openai"
+            }
+    """
+    logging.info(f"Starting process_question with query: {question}")
+
+    # 1. Generate sub-queries if requested
+    sub_queries = []
+    sub_query_dict = {
+        "main_goal": question,
+        "sub_questions": [],
+        "search_queries": [],
+        "analysis_prompt": None
+    }
+
+    if search_params.get("subquery_generation", False):
+        api_endpoint = search_params.get("subquery_generation_llm", "openai")
+        sub_query_dict = analyze_question(question, api_endpoint)
+        sub_queries = sub_query_dict.get("sub_questions", [])
+
+    # Merge original question with sub-queries
+    all_queries = [question] + sub_queries
+
+    # 2. Perform searches and accumulate all raw results
+    all_results: List[Dict] = []
+    for q in all_queries:
+        # FIXME - change raw_results to proper dict format
+        raw_results = perform_websearch(
+            search_engine=search_params.get('engine', 'google'),
+            search_query=q,
+            content_country=search_params.get('content_country', 'US'),
+            search_lang=search_params.get('search_lang', 'en'),
+            output_lang=search_params.get('output_lang', 'en'),
+            result_count=search_params.get('result_count', 10),
+            date_range=search_params.get('date_range'),
+            safesearch=search_params.get('safesearch', 'moderate'),
+            site_blacklist=search_params.get('site_blacklist', []),
+            exactTerms=search_params.get('exactTerms'),
+            excludeTerms=search_params.get('excludeTerms'),
+            filter=search_params.get('filter'),
+            geolocation=search_params.get('geolocation'),
+            search_result_language=search_params.get('search_result_language'),
+            sort_results_by=search_params.get('sort_results_by')
+        )
+
+        # Validate raw_results
+        # FIXME - Account for proper structure of returned web_search_results_dict dictionary
+        if not isinstance(raw_results, dict) or "processing_error" in raw_results:
+            logging.warning(f"Error or invalid data returned for query '{q}': {raw_results}")
+            continue
+
+        results_list = raw_results.get("results", [])
+        all_results.extend(results_list)
+
+    # 3. Score/filter (placeholder)
+    relevant_results = {}
+    for r in all_results:
+        # FIXME - Put in proper args / Ensure this works
+        # search_results: List[Dict],
+        # original_question: str,
+        # sub_questions: List[str],
+        # api_endpoint: str
+        list_of_relevant_articles = search_result_relevance(
+            all_results,
+            question,
+            sub_query_dict['sub_questions'],
+            search_params.get('relevance_analysis_llm')
+        )
+        if list_of_relevant_articles:
+            relevant_results[r] = list_of_relevant_articles
+
+
+
+    # 4. Summarize/aggregate final answer
+    final_answer = aggregate_results(
+        #  FIXME - Add proper Args / Ensure this works
+        # relevant_results: Dict[str, Dict],
+        # question: str,
+        # sub_questions: List[str],
+        # api_endpoint: str
+        # FIXME - Proper datatypes/expectations
+        relevant_results,
+        question,
+        sub_query_dict['sub_questions'],
+        api_endpoint=search_params.get('final_answer_llm')
+    )
+
+    # Return the final data
+    # FIXME - Return full query details for debugging and analysis
+    return {
+        "search_engine": search_params.get('engine'),
+        "original_query": question,
+        "sub_questions": sub_query_dict.get('sub_questions', []),
+        "all_queries": all_queries,
+        "results": all_results,
+        "relevant_results": relevant_results,
+        "analysis_prompt": sub_query_dict.get('analysis_prompt'),
+        "final_answer": final_answer
+    }
+
 
 ######################### Question Analysis #########################
 #
@@ -301,163 +449,6 @@ Instructions:
     }
 
 
-######################### Main Orchestration Workflow #########################
-#
-def process_question(question: str, search_params: Dict) -> Dict:
-    """
-    Orchestrates the entire pipeline:
-      1. Optionally generate sub-queries (if subquery_generation=True).
-      2. Perform web searches for each query (the original and sub-queries).
-      3. Score results for relevance; filter them.
-      4. Aggregate final answer from relevant results.
-
-    Args:
-        question (str): The user's original question or query.
-        search_params (Dict): A dictionary containing parameters for performing web searches
-                              and specifying LLM endpoints.
-
-    Returns:
-        Dict: A dictionary containing all relevant data, including results from each sub-query.
-
-        A dictionary containing parameters for performing a web search and processing the results.
-
-        Dict Parameters:
-            engine (str): The search engine to use (e.g., "google", "bing", "brave", "duckduckgo", etc.).
-            content_country (str): The country code for content localization (e.g., "US", "UK", "DE").
-            search_lang (str): The language for the search query (e.g., "en" for English).
-            output_lang (str): The desired language for the search results.
-            result_count (int): The number of results to return.
-            date_range (str or None): The time range for the search results (e.g., "y" for the past year).
-            safesearch (str or None): The safe search setting (e.g., "moderate", "strict", "off").
-            site_blacklist (list or None): A list of sites to exclude from the search results.
-            exactTerms (str or None): Terms that must appear in the search results.
-            excludeTerms (str or None): Terms that must not appear in the search results.
-            filter (str or None): Any additional filtering criteria.
-            geolocation (str or None): Geographical location for search results.
-            search_result_language (str or None): The language of the search results.
-            sort_results_by (str or None): Criteria for sorting the results.
-            subquery_generation (bool): Whether to generate sub-queries.
-            subquery_generation_api (str): The API to use for sub-query generation (e.g., "openai", "anthropic", "deepseek").
-            relevance_analysis_llm (str): The LLM model to use for relevance analysis (e.g., "openai", "anthropic", "deepseek").
-            final_answer_llm (str): The LLM model to use for generating the final answer (e.g., "openai", "anthropic", "deepseek").
-
-        Example:
-            search_params = {
-                "engine": "google",
-                "content_country": "US",
-                "search_lang": "en",
-                "output_lang": "en",
-                "result_count": 10,
-                "date_range": "y",
-                "safesearch": "moderate",
-                "site_blacklist": ["example.com", "spam-site.com"],
-                "exactTerms": None,
-                "excludeTerms": None,
-                "filter": None,
-                "geolocation": None,
-                "search_result_language": None,
-                "sort_results_by": None,
-                "subquery_generation": True,
-                "subquery_generation_llm": "openai",
-                "relevance_analysis_llm": "openai",
-                "final_answer_llm": "openai"
-            }
-    """
-    logging.info(f"Starting process_question with query: {question}")
-
-    # 1. Generate sub-queries if requested
-    sub_queries = []
-    sub_query_dict = {
-        "main_goal": question,
-        "sub_questions": [],
-        "search_queries": [],
-        "analysis_prompt": None
-    }
-
-    if search_params.get("subquery_generation", False):
-        api_endpoint = search_params.get("subquery_generation_llm", "openai")
-        sub_query_dict = analyze_question(question, api_endpoint)
-        sub_queries = sub_query_dict.get("sub_questions", [])
-
-    # Merge original question with sub-queries
-    all_queries = [question] + sub_queries
-
-    # 2. Perform searches and accumulate all raw results
-    all_results: List[Dict] = []
-    for q in all_queries:
-        raw_results = perform_websearch(
-            search_engine=search_params.get('engine', 'google'),
-            search_query=q,
-            content_country=search_params.get('content_country', 'US'),
-            search_lang=search_params.get('search_lang', 'en'),
-            output_lang=search_params.get('output_lang', 'en'),
-            result_count=search_params.get('result_count', 10),
-            date_range=search_params.get('date_range'),
-            safesearch=search_params.get('safesearch', 'moderate'),
-            site_blacklist=search_params.get('site_blacklist', []),
-            exactTerms=search_params.get('exactTerms'),
-            excludeTerms=search_params.get('excludeTerms'),
-            filter=search_params.get('filter'),
-            geolocation=search_params.get('geolocation'),
-            search_result_language=search_params.get('search_result_language'),
-            sort_results_by=search_params.get('sort_results_by')
-        )
-
-        # Validate raw_results
-        if not isinstance(raw_results, dict) or "processing_error" in raw_results:
-            logging.warning(f"Error or invalid data returned for query '{q}': {raw_results}")
-            continue
-
-        results_list = raw_results.get("results", [])
-        all_results.extend(results_list)
-
-    # 3. Score/filter (placeholder)
-    relevant_results = {}
-    for r in all_results:
-        # FIXME - Put in proper args / Ensure this works
-        # search_results: List[Dict],
-        # original_question: str,
-        # sub_questions: List[str],
-        # api_endpoint: str
-        list_of_relevant_articles = search_result_relevance(
-            all_results,
-            question,
-            sub_query_dict['sub_questions'],
-            search_params.get('relevance_analysis_llm')
-        )
-        if list_of_relevant_articles:
-            relevant_results[r] = list_of_relevant_articles
-
-
-
-    # 4. Summarize/aggregate final answer
-    final_answer = aggregate_results(
-        #  FIXME - Add proper Args / Ensure this works
-        # relevant_results: Dict[str, Dict],
-        # question: str,
-        # sub_questions: List[str],
-        # api_endpoint: str
-        # FIXME - Proper datatypes/expectations
-        relevant_results,
-        question,
-        sub_query_dict['sub_questions'],
-        api_endpoint=search_params.get('final_answer_llm')
-    )
-
-    # Return the final data
-    # FIXME - Return full query details for debugging and analysis
-    return {
-        "search_engine": search_params.get('engine'),
-        "original_query": question,
-        "sub_questions": sub_query_dict.get('sub_questions', []),
-        "all_queries": all_queries,
-        "results": all_results,
-        "relevant_results": relevant_results,
-        "analysis_prompt": sub_query_dict.get('analysis_prompt'),
-        "final_answer": final_answer
-    }
-
-
 #
 # End of Orchestration functions
 #######################################################################################################################
@@ -467,6 +458,7 @@ def process_question(question: str, search_params: Dict) -> Dict:
 #
 # Search Engine Functions
 
+# FIXME
 def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None,
                       safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None):
     if search_engine.lower() == "baidu":
