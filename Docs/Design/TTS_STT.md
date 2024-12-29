@@ -52,6 +52,7 @@ https://github.com/smellslikeml/dolla_llama
 
 Coqui TTS
     https://github.com/idiap/coqui-ai-TTS
+    https://huggingface.co/spaces/coqui/xtts/blob/main/app.py
 
 Cartesia
     https://docs.cartesia.ai/get-started/make-an-api-request

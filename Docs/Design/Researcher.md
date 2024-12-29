@@ -135,7 +135,9 @@ https://github.com/memgraph/memgraph
 https://github.com/rashadphz/farfalle/tree/main/src/backend
 https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama/blob/main/Self_Improving_Search.py
 https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama
-
+https://github.com/rashadphz/farfalle/blob/main/src/backend/agent_search.py
+https://github.com/rashadphz/farfalle/blob/main/src/backend/prompts.py
+https://github.com/stanford-oval/storm/blob/main/examples/storm_examples/run_storm_wiki_claude.py
 
 
 

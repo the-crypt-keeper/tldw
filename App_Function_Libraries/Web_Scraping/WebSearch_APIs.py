@@ -6,7 +6,7 @@ import json
 import logging
 import re
 from html import unescape
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from urllib.parse import urlparse, urlencode, unquote
 #
 # 3rd-Party Imports
@@ -16,6 +16,8 @@ from lxml.html import document_fromstring
 from requests import RequestException
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
+
+from App_Function_Libraries.Chat.Chat_Functions import chat_api_call
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import loaded_config_data
@@ -40,54 +42,327 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 #
 # Functions:
 
-# FIXME - parsing for results from each search engine
-# FIXME - Create results dictionary format/specification
+######################### Question Analysis #########################
+#
+#
+def analyze_question(question: str, api_endpoint) -> Dict:
+    logging.debug(f"Analyzing question: {question} with API endpoint: {api_endpoint}")
+    """
+    Analyzes the input question and generates sub-questions
+
+    Returns:
+        Dict containing:
+        - main_goal: str
+        - sub_questions: List[str]
+        - search_queries: List[str]
+        - analysis_prompt: str
+    """
+    original_query = question
+    sub_question_generation_prompt = f"""
+            You are an AI assistant that helps generate search queries. Given an original query, suggest alternative search queries that could help find relevant information. Your goal is to generate queries that are diverse, specific, and highly relevant to the original query, ensuring comprehensive coverage of the topic.
+
+            Important instructions:
+            1. Generate between 2 and 6 queries unless a fixed count is specified. Generate more queries for complex or multifaceted topics and fewer for simple or straightforward ones.
+            2. Ensure the queries are diverse, covering different aspects or perspectives of the original query, while remaining highly relevant to its core intent.
+            3. Prefer specific queries over general ones, as they are more likely to yield targeted and useful results.
+            4. If the query involves comparing two topics, generate separate queries for each topic.
+            5. If previous queries and an answer are provided, generate new queries that address the shortcomings of the previous answer and avoid repeating the previous queries.
+            6. If the original query is broad or ambiguous, generate queries that explore specific subtopics or clarify the intent.
+            7. If the query is too specific or unclear, generate queries that explore related or broader topics to ensure useful results.
+            8. Return the queries as a JSON array in the format ["query_1", "query_2", ...].
+
+            Examples:
+            1. For the query "What are the benefits of exercise?", generate queries like:
+               ["health benefits of physical activity", "mental health benefits of exercise", "long-term effects of regular exercise", "how exercise improves cardiovascular health", "role of exercise in weight management"]
+
+            2. For the query "Compare Python and JavaScript", generate queries like:
+               ["key features of Python programming language", "advantages of JavaScript for web development", "use cases for Python vs JavaScript", "performance comparison of Python and JavaScript", "ease of learning Python vs JavaScript"]
+
+            3. For the query "How does climate change affect biodiversity?", generate queries like:
+               ["impact of climate change on species extinction", "effects of global warming on ecosystems", "role of climate change in habitat loss", "how rising temperatures affect marine biodiversity", "climate change and its impact on migratory patterns"]
+
+            4. For the query "Best practices for remote work", generate queries like:
+               ["tips for staying productive while working from home", "how to maintain work-life balance in remote work", "tools for effective remote team collaboration", "managing communication in remote teams", "ergonomic setup for home offices"]
+
+            5. For the query "What is quantum computing?", generate queries like:
+               ["basic principles of quantum computing", "applications of quantum computing in real-world problems", "difference between classical and quantum computing", "key challenges in developing quantum computers", "future prospects of quantum computing"]
+
+            Original query: {original_query}
+            """
+
+    input_data = "Follow the above instructions."
+
+    sub_questions: List[str] = []
+    try:
+        for attempt in range(3):
+            logging.info(f"Generating sub-questions (attempt {attempt + 1})")
+            response = chat_api_call(api_endpoint, None, input_data, sub_question_generation_prompt, temp=0.7)
+            if response:
+                try:
+                    # Try to parse as JSON first
+                    parsed_response = json.loads(response)
+                    sub_questions = parsed_response.get("sub_questions", [])
+                    if sub_questions:
+                        logging.info("Successfully generated sub-questions from JSON")
+                        break
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, attempt a regex-based fallback
+                    logging.warning("Failed to parse as JSON. Attempting regex extraction.")
+                    matches = re.findall(r'"([^"]*)"', response)
+                    sub_questions = matches if matches else []
+                    if sub_questions:
+                        logging.info("Successfully extracted sub-questions using regex")
+                        break
+
+        # If still no sub-questions, log an error or handle appropriately
+        if not sub_questions:
+            logging.error("Failed to extract sub-questions from API response after all attempts.")
+
+    except Exception as e:
+        logging.error(f"Error generating sub-questions: {str(e)}")
+
+    # Construct and return the result dictionary
+    logging.info("Sub-questions generated successfully")
+    return {
+        "main_goal": original_query,
+        "sub_questions": sub_questions,
+        "search_queries": sub_questions,
+        "analysis_prompt": sub_question_generation_prompt
+    }
+
+
+######################### Relevance Scoring #########################
+#
+def score_result_relevance(
+        result: Dict,
+        original_question: str,
+        sub_questions: List[str]
+) -> float:
+    """
+    Scores how relevant a search result is to the question
+    """
+    # Implement scoring logic
+    pass
+
+
+######################### Result Aggregation & Combination #########################
+#
+def aggregate_results(
+        relevant_results: Dict,
+        question: str,
+        sub_questions: List[str]
+) -> Dict:
+    """
+    Combines and summarizes relevant results
+
+    Returns:
+        Dict containing:
+        - summary: str
+        - evidence: List[Dict]
+        - confidence: float
+    """
+    pass
+
+
+######################### Main Orchestration Workflow #########################
+#
+def process_question(question: str, search_params: Dict) -> Dict:
+    """
+    Orchestrates the entire pipeline:
+      1. Optionally generate sub-queries (if subquery_generation=True).
+      2. Perform web searches for each query (the original and sub-queries).
+      3. (Placeholder) Score results for relevance; filter them.
+      4. (Placeholder) Aggregate final answer from relevant results.
+
+    Args:
+        question (str): The user’s original question or query.
+        search_params (Dict): Dictionary of search parameters (engine, lang, date_range, etc.).
+
+    Returns:
+        Dict: A dictionary containing all relevant data, including results from each sub-query.
+
+        A dictionary containing parameters for performing a web search and processing the results.
+
+        Parameters:
+            engine (str): The search engine to use (e.g., "google", "bing", "brave", "duckduckgo", etc.).
+            content_country (str): The country code for content localization (e.g., "US", "UK", "DE").
+            search_lang (str): The language for the search query (e.g., "en" for English).
+            output_lang (str): The desired language for the search results.
+            result_count (int): The number of results to return.
+            date_range (str or None): The time range for the search results (e.g., "y" for the past year).
+            safesearch (str or None): The safe search setting (e.g., "moderate", "strict", "off").
+            site_blacklist (list or None): A list of sites to exclude from the search results.
+            exactTerms (str or None): Terms that must appear in the search results.
+            excludeTerms (str or None): Terms that must not appear in the search results.
+            filter (str or None): Any additional filtering criteria.
+            geolocation (str or None): Geographical location for search results.
+            search_result_language (str or None): The language of the search results.
+            sort_results_by (str or None): Criteria for sorting the results.
+            subquery_generation (bool): Whether to generate sub-queries.
+            subquery_generation_api (str): The API to use for sub-query generation (e.g., "openai", "anthropic", "deepseek").
+            relevance_analysis_llm (str): The LLM model to use for relevance analysis (e.g., "openai", "anthropic", "deepseek").
+            final_answer_llm (str): The LLM model to use for generating the final answer (e.g., "openai", "anthropic", "deepseek").
+
+        Example:
+            search_params = {
+                "engine": "google",
+                "content_country": "US",
+                "search_lang": "en",
+                "output_lang": "en",
+                "result_count": 10,
+                "date_range": "y",
+                "safesearch": "moderate",
+                "site_blacklist": ["example.com", "spam-site.com"],
+                "exactTerms": None,
+                "excludeTerms": None,
+                "filter": None,
+                "geolocation": None,
+                "search_result_language": None,
+                "sort_results_by": None,
+                "subquery_generation": True,
+                "subquery_generation_llm": "openai",
+                "relevance_analysis_llm": "openai",
+                "final_answer_llm": "openai"
+            }
+    """
+    logging.info(f"Starting process_question with query: {question}")
+
+    # 1. Generate sub-queries if requested
+    if search_params.get("subquery_generation", False):
+        api_endpoint = search_params.get("subquery_generation_llm", "openai")
+        sub_query_dict = analyze_question(question, api_endpoint)
+        sub_queries = sub_query_dict.get("sub_questions", [])
+    else:
+        sub_query_dict = {
+            "main_goal": question,
+            "sub_questions": [],
+            "search_queries": [],
+            "analysis_prompt": None
+        }
+        sub_queries = []
+
+    # Merge original question with sub-queries
+    all_queries = [question] + sub_queries
+
+    # 2. Perform searches and accumulate all raw results
+    all_results: List[Dict] = []
+
+    for q in all_queries:
+        raw_results = perform_websearch(
+            search_engine=search_params.get('engine'),
+            search_query=q,
+            content_country=search_params.get('content_country'),
+            search_lang=search_params.get('search_lang'),
+            output_lang=search_params.get('output_lang'),
+            result_count=search_params.get('result_count', 10),
+            date_range=search_params.get('date_range'),
+            safesearch=search_params.get('safesearch'),
+            site_blacklist=search_params.get('site_blacklist'),
+            exactTerms=search_params.get('exactTerms'),
+            excludeTerms=search_params.get('excludeTerms'),
+            filter=search_params.get('filter'),
+            geolocation=search_params.get('geolocation'),
+            search_result_language=search_params.get('search_result_language'),
+            sort_results_by=search_params.get('sort_results_by')
+        )
+
+        if isinstance(raw_results, dict) and "processing_error" not in raw_results:
+            # 'raw_results' should be a processed dict from process_web_search_results
+            # containing a "results" list inside it.
+            results_list = raw_results.get("results", [])
+            all_results.extend(results_list)
+        else:
+            # If an error string or error dictionary came back, handle it:
+            logging.warning(f"Error or invalid data returned for query '{q}': {raw_results}")
+
+    # 3. Score/filter (placeholder)
+    relevant_results = {}
+    for r in all_results:
+        relevance_score = score_result_relevance(
+            r,
+            question,
+            sub_query_dict['sub_questions']
+        )
+        if relevance_score > RELEVANCE_THRESHOLD:
+            # Use URL or another unique field as the key
+            key = r.get("url") or r.get("title")
+            relevant_results[key] = {
+                "result": r,
+                "relevance_score": relevance_score
+            }
+
+    # 4. Summarize/aggregate final answer
+    final_answer = aggregate_results(
+        relevant_results,
+        question,
+        sub_query_dict['sub_questions']
+    )
+
+    return {
+        "search_engine": search_params.get('engine'),
+        "original_query": question,
+        "sub_questions": sub_query_dict.get('sub_questions', []),
+        "all_queries": all_queries,
+        "results": all_results,
+        "relevant_results": relevant_results,
+        "analysis_prompt": sub_query_dict.get('analysis_prompt'),
+        "final_answer": final_answer
+    }
+
+
+#
+# End of Orchestration functions
+#######################################################################################################################
+
+
+#######################################################################################################################
+#
+# Search Engine Functions
 
 def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None,
                       safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None):
     if search_engine.lower() == "baidu":
         web_search_results = search_web_baidu(search_query, None, None)
-        process_results = process_web_search_results(web_search_results, "baidu")
+        processed_results = process_web_search_results(web_search_results, "baidu")
 
     elif search_engine.lower() == "bing":
         web_search_results = search_web_bing(search_query, search_lang, content_country, date_range, result_count)
-        process_results = process_web_search_results(web_search_results, "bing")
+        processed_results = process_web_search_results(web_search_results, "bing")
 
     elif search_engine.lower() == "brave":
             web_search_results = search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
                                     site_blacklist, date_range)
-            process_results = process_web_search_results(web_search_results, "brave")
+            processed_results = process_web_search_results(web_search_results, "brave")
 
     elif search_engine.lower() == "duckduckgo":
         web_search_results = search_web_duckduckgo(search_query, content_country, date_range, result_count)
-        process_results = process_web_search_results(web_search_results, "ddg")
+        processed_results = process_web_search_results(web_search_results, "ddg")
 
     elif search_engine.lower() == "google":
         web_search_results = search_web_google(search_query, result_count, content_country, date_range, exactTerms,
                                  excludeTerms, filter, geolocation, output_lang,
                       search_result_language, safesearch, site_blacklist, sort_results_by)
-        process_results = process_web_search_results(web_search_results, "google")
+        processed_results = process_web_search_results(web_search_results, "google")
 
     elif search_engine.lower() == "kagi":
-        web_search_results = search_web_kagi(search_query, content_country, search_lang, output_lang, result_count, safesearch, date_range,
-                               site_blacklist)
-        process_results = process_web_search_results(web_search_results, "kagi")
+        web_search_results = search_web_kagi(search_query, content_country)
+        processed_results = process_web_search_results(web_search_results, "kagi")
 
     elif search_engine.lower() == "serper":
         web_search_results = search_web_serper()
-        process_results = process_web_search_results(web_search_results, "serper")
+        processed_results = process_web_search_results(web_search_results, "serper")
 
     elif search_engine.lower() == "tavily":
         web_search_results = search_web_tavily(search_query, result_count, site_blacklist)
-        process_results = process_web_search_results(web_search_results, "tavily")
+        processed_results = process_web_search_results(web_search_results, "tavily")
 
     elif search_engine.lower() == "searx":
         web_search_results = search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general')
-        process_results = process_web_search_results(web_search_results, "bing")
+        processed_results = process_web_search_results(web_search_results, "bing")
 
     elif search_engine.lower() == "yandex":
         web_search_results = search_web_yandex()
-        process_results = process_web_search_results(web_search_results, "bing")
+        processed_results = process_web_search_results(web_search_results, "bing")
 
     else:
         return f"Error: Invalid Search Engine Name {search_engine}"
