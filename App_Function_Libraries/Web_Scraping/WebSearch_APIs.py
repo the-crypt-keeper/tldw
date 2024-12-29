@@ -181,6 +181,7 @@ def search_result_relevance(
             # Perform API call to evaluate relevance
             relevancy_result = chat_api_call(
                 api_endpoint=api_endpoint,
+                api_key=None,
                 input_data=input_data,
                 prompt=eval_prompt,
                 temp=0.7
@@ -431,9 +432,16 @@ def process_question(question: str, search_params: Dict) -> Dict:
 
     # 4. Summarize/aggregate final answer
     final_answer = aggregate_results(
+        #  FIXME - Add proper Args / Ensure this works
+        # relevant_results: Dict[str, Dict],
+        # question: str,
+        # sub_questions: List[str],
+        # api_endpoint: str
+        # FIXME - Proper datatypes/expectations
         relevant_results,
         question,
-        sub_query_dict['sub_questions']
+        sub_query_dict['sub_questions'],
+        api_endpoint=search_params.get('final_answer_llm')
     )
 
     # Return the final data
@@ -464,45 +472,55 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
     if search_engine.lower() == "baidu":
         web_search_results = search_web_baidu(search_query, None, None)
         processed_results = process_web_search_results(web_search_results, "baidu")
+        return processed_results
 
     elif search_engine.lower() == "bing":
         web_search_results = search_web_bing(search_query, search_lang, content_country, date_range, result_count)
         processed_results = process_web_search_results(web_search_results, "bing")
+        return processed_results
 
     elif search_engine.lower() == "brave":
             web_search_results = search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
                                     site_blacklist, date_range)
             processed_results = process_web_search_results(web_search_results, "brave")
+            return processed_results
 
     elif search_engine.lower() == "duckduckgo":
         web_search_results = search_web_duckduckgo(search_query, content_country, date_range, result_count)
         processed_results = process_web_search_results(web_search_results, "ddg")
+        return processed_results
 
     elif search_engine.lower() == "google":
         web_search_results = search_web_google(search_query, result_count, content_country, date_range, exactTerms,
                                  excludeTerms, filter, geolocation, output_lang,
                       search_result_language, safesearch, site_blacklist, sort_results_by)
         processed_results = process_web_search_results(web_search_results, "google")
+        return processed_results
 
     elif search_engine.lower() == "kagi":
         web_search_results = search_web_kagi(search_query, content_country)
         processed_results = process_web_search_results(web_search_results, "kagi")
+        return processed_results
 
     elif search_engine.lower() == "serper":
         web_search_results = search_web_serper()
         processed_results = process_web_search_results(web_search_results, "serper")
+        return processed_results
 
     elif search_engine.lower() == "tavily":
         web_search_results = search_web_tavily(search_query, result_count, site_blacklist)
         processed_results = process_web_search_results(web_search_results, "tavily")
+        return processed_results
 
     elif search_engine.lower() == "searx":
         web_search_results = search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general')
         processed_results = process_web_search_results(web_search_results, "bing")
+        return processed_results
 
     elif search_engine.lower() == "yandex":
         web_search_results = search_web_yandex()
         processed_results = process_web_search_results(web_search_results, "bing")
+        return processed_results
 
     else:
         return f"Error: Invalid Search Engine Name {search_engine}"
