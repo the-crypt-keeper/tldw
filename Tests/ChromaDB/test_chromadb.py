@@ -33,7 +33,11 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs
 ############################################
 
 loaded_config_data = load_and_log_configs()
+if loaded_config_data is None:
+    raise ValueError("Failed to load configuration data")
+
 default_api_endpoint = loaded_config_data['default_api']
+
 
 # Fixture to mock a ChromaDB collection
 @pytest.fixture
