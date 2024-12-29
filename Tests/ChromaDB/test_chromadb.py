@@ -7,6 +7,9 @@ import sys
 from unittest.mock import patch, MagicMock
 # Third-party library imports
 import pytest
+
+from App_Function_Libraries.Utils.Utils import load_and_log_configs
+
 #
 ####################################################################################################
 #
@@ -28,6 +31,9 @@ from App_Function_Libraries.RAG.ChromaDB_Library import (
 ############################################
 # Fixtures for Reusable Mocking and Setup
 ############################################
+
+loaded_config_data = load_and_log_configs()
+default_api_endpoint = loaded_config_data['default_api']
 
 # Fixture to mock a ChromaDB collection
 @pytest.fixture

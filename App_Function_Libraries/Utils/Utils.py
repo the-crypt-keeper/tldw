@@ -553,7 +553,7 @@ openai_tts_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
 
 # Setup Default API Endpoint
 loaded_config_data = load_and_log_configs()
-default_api_endpoint = loaded_config_data.get['default_api', 'openai']
+default_api_endpoint = loaded_config_data['default_api']
 
 def format_api_name(api):
     name_mapping = {
