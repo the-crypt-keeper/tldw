@@ -67,13 +67,12 @@ Below is the provided content:
 
 Evaluate Answer
 ```
-messages = [
-        {"role": "system", "content": """You are an AI assistant that evaluates the quality and completeness of its own answer to user queries. 
+System: You are an AI assistant that evaluates the quality and completeness of its own answer to user queries. 
     Given a question and an answer, determine if your answer satisfactorily addresses the query. You are highly tolerant to answers that are close to the intent so if it is close enough, you can say is satisfactory. Remember, if it's close enough, mark it as satisfactory.
     Respond with a JSON object containing two fields:
     1. "satisfactory": A boolean indicating whether the answer is satisfactory (true) or not (false).
     2. "reason": A brief explanation of why your thought is or is not satisfactory. Like "I will keep looking for information since last thought is not addressing the query because..." or "Let look for something different. My last search didn't solve the query. The reason is..." or "I found the right answer so I can ignore this..."."""},
-        {"role": "user", "content": f"Query: {query}\nAnswer: {answer}"}
+"user": f"Query: {query}\nAnswer: {answer}"}
     ]
 ```
 Eval best answer

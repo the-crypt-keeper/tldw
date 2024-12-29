@@ -131,37 +131,173 @@ def analyze_question(question: str, api_endpoint) -> Dict:
     }
 
 
-######################### Relevance Scoring #########################
+######################### Relevance Analysis #########################
 #
-def score_result_relevance(
-        result: Dict,
-        original_question: str,
-        sub_questions: List[str]
-) -> float:
+def search_result_relevance(
+    search_results: List[Dict],
+    original_question: str,
+    sub_questions: List[str],
+    api_endpoint: str
+) -> Dict[str, Dict]:
     """
-    Scores how relevant a search result is to the question
+    Evaluate whether each search result is relevant to the original question and sub-questions.
+
+    Args:
+        search_results (List[Dict]): List of search results to evaluate.
+        original_question (str): The original question posed by the user.
+        sub_questions (List[str]): List of sub-questions generated from the original question.
+        api_endpoint (str): The LLM or API endpoint to use for relevance analysis.
+
+    Returns:
+        Dict[str, Dict]: A dictionary of relevant results, keyed by a unique ID or index.
     """
-    # Implement scoring logic
-    pass
+    relevant_results = {}
+
+    for idx, result in enumerate(search_results):
+        content = result.get("content", "")
+        if not content:
+            logging.error("No Content found in search results array!")
+
+        eval_prompt = f"""
+                Given the following search results for the user's question: "{original_question}" and the generated sub-questions: {sub_questions}, evaluate the relevance of the search result to the user's question.
+                Explain your reasoning for selection.
+
+                Search Results:
+                {content}
+
+                Instructions:
+                1. You MUST only answer TRUE or False while providing your reasoning for your answer.
+                2. A result is relevant if the result most likely contains comprehensive and relevant information to answer the user's question.
+                3. Provide a brief reason for selection.
+
+                You MUST respond using EXACTLY this format and nothing else:
+
+                Selected Answer: [True or False]
+                Reasoning: [Your reasoning for the selections]
+                """
+        input_data = "Evaluate the relevance of the search result."
+
+        try:
+            # Perform API call to evaluate relevance
+            relevancy_result = chat_api_call(
+                api_endpoint=api_endpoint,
+                input_data=input_data,
+                prompt=eval_prompt,
+                temp=0.7
+            )
+
+            if relevancy_result:
+                # Extract the selected answer and reasoning via regex
+                selected_answer_match = re.search(
+                    r"Selected Answer:\s*(True|False)",
+                    relevancy_result,
+                    re.IGNORECASE
+                )
+                reasoning_match = re.search(
+                    r"Reasoning:\s*(.+)",
+                    relevancy_result,
+                    re.IGNORECASE
+                )
+
+                if selected_answer_match and reasoning_match:
+                    is_relevant = selected_answer_match.group(1).strip().lower() == "true"
+                    reasoning = reasoning_match.group(1).strip()
+
+                    if is_relevant:
+                        # Use the 'id' from the result if available, otherwise use idx
+                        result_id = result.get("id", str(idx))
+                        relevant_results[result_id] = {
+                            "content": content,
+                            "reasoning": reasoning
+                        }
+                        logging.info(f"Relevant result found: ID={result_id} Reasoning={reasoning}")
+                    else:
+                        logging.info(f"Irrelevant result: {reasoning}")
+
+                else:
+                    logging.warning("Failed to parse the API response for relevance analysis.")
+        except Exception as e:
+            logging.error(f"Error during relevance evaluation for result idx={idx}: {e}")
+
+    return relevant_results
 
 
 ######################### Result Aggregation & Combination #########################
 #
 def aggregate_results(
-        relevant_results: Dict,
-        question: str,
-        sub_questions: List[str]
+    relevant_results: Dict[str, Dict],
+    question: str,
+    sub_questions: List[str],
+    api_endpoint: str
 ) -> Dict:
     """
-    Combines and summarizes relevant results
+    Combines and summarizes relevant results into a final answer.
+
+    Args:
+        relevant_results (Dict[str, Dict]): Dictionary of relevant articles/content.
+        question (str): Original question.
+        sub_questions (List[str]): List of sub-questions.
+        api_endpoint (str): LLM or API endpoint for summarization.
 
     Returns:
         Dict containing:
-        - summary: str
-        - evidence: List[Dict]
-        - confidence: float
+        - summary (str): Final summarized answer.
+        - evidence (List[Dict]): List of relevant content items included in the summary.
+        - confidence (float): A rough confidence score (placeholder).
     """
-    pass
+    if not relevant_results:
+        return {
+            "summary": "No relevant results found. Unable to provide an answer.",
+            "evidence": [],
+            "confidence": 0.0
+        }
+
+    # Concatenate relevant contents for summarization
+    concatenated_texts = "\n\n".join(
+        f"ID: {rid}\nContent: {res['content']}\nReasoning: {res['reasoning']}"
+        for rid, res in relevant_results.items()
+    )
+
+    # Example summarization prompt
+    summarize_prompt = f"""
+Please provide a concise summary that answers the question: "{question}"
+
+Relevant sub-questions: {sub_questions}
+
+Here are the relevant excerpts from search results:
+{concatenated_texts}
+
+Instructions:
+1. Provide a concise summary that incorporates the key points.
+2. Avoid quoting large passages verbatim; aim to synthesize the main ideas.
+3. Make sure your answer is coherent, logically consistent, and addresses the question directly.
+"""
+
+    input_data = "Summarize the relevant results."
+
+    try:
+        summary_response = chat_api_call(
+            api_endpoint=api_endpoint,
+            api_key=None,
+            input_data=input_data,
+            prompt=summarize_prompt,
+            temp=0.7
+        )
+        if summary_response:
+            # You could do further parsing or confidence estimation here
+            return {
+                "summary": summary_response,
+                "evidence": list(relevant_results.values()),
+                "confidence": 0.9  # Hardcoded or computed as needed
+            }
+    except Exception as e:
+        logging.error(f"Error aggregating results: {e}")
+
+    return {
+        "summary": "Could not summarize the results due to an error.",
+        "evidence": list(relevant_results.values()),
+        "confidence": 0.0
+    }
 
 
 ######################### Main Orchestration Workflow #########################
@@ -171,19 +307,20 @@ def process_question(question: str, search_params: Dict) -> Dict:
     Orchestrates the entire pipeline:
       1. Optionally generate sub-queries (if subquery_generation=True).
       2. Perform web searches for each query (the original and sub-queries).
-      3. (Placeholder) Score results for relevance; filter them.
-      4. (Placeholder) Aggregate final answer from relevant results.
+      3. Score results for relevance; filter them.
+      4. Aggregate final answer from relevant results.
 
     Args:
-        question (str): The user’s original question or query.
-        search_params (Dict): Dictionary of search parameters (engine, lang, date_range, etc.).
+        question (str): The user's original question or query.
+        search_params (Dict): A dictionary containing parameters for performing web searches
+                              and specifying LLM endpoints.
 
     Returns:
         Dict: A dictionary containing all relevant data, including results from each sub-query.
 
         A dictionary containing parameters for performing a web search and processing the results.
 
-        Parameters:
+        Dict Parameters:
             engine (str): The search engine to use (e.g., "google", "bing", "brave", "duckduckgo", etc.).
             content_country (str): The country code for content localization (e.g., "US", "UK", "DE").
             search_lang (str): The language for the search query (e.g., "en" for English).
@@ -228,36 +365,35 @@ def process_question(question: str, search_params: Dict) -> Dict:
     logging.info(f"Starting process_question with query: {question}")
 
     # 1. Generate sub-queries if requested
+    sub_queries = []
+    sub_query_dict = {
+        "main_goal": question,
+        "sub_questions": [],
+        "search_queries": [],
+        "analysis_prompt": None
+    }
+
     if search_params.get("subquery_generation", False):
         api_endpoint = search_params.get("subquery_generation_llm", "openai")
         sub_query_dict = analyze_question(question, api_endpoint)
         sub_queries = sub_query_dict.get("sub_questions", [])
-    else:
-        sub_query_dict = {
-            "main_goal": question,
-            "sub_questions": [],
-            "search_queries": [],
-            "analysis_prompt": None
-        }
-        sub_queries = []
 
     # Merge original question with sub-queries
     all_queries = [question] + sub_queries
 
     # 2. Perform searches and accumulate all raw results
     all_results: List[Dict] = []
-
     for q in all_queries:
         raw_results = perform_websearch(
-            search_engine=search_params.get('engine'),
+            search_engine=search_params.get('engine', 'google'),
             search_query=q,
-            content_country=search_params.get('content_country'),
-            search_lang=search_params.get('search_lang'),
-            output_lang=search_params.get('output_lang'),
+            content_country=search_params.get('content_country', 'US'),
+            search_lang=search_params.get('search_lang', 'en'),
+            output_lang=search_params.get('output_lang', 'en'),
             result_count=search_params.get('result_count', 10),
             date_range=search_params.get('date_range'),
-            safesearch=search_params.get('safesearch'),
-            site_blacklist=search_params.get('site_blacklist'),
+            safesearch=search_params.get('safesearch', 'moderate'),
+            site_blacklist=search_params.get('site_blacklist', []),
             exactTerms=search_params.get('exactTerms'),
             excludeTerms=search_params.get('excludeTerms'),
             filter=search_params.get('filter'),
@@ -266,30 +402,32 @@ def process_question(question: str, search_params: Dict) -> Dict:
             sort_results_by=search_params.get('sort_results_by')
         )
 
-        if isinstance(raw_results, dict) and "processing_error" not in raw_results:
-            # 'raw_results' should be a processed dict from process_web_search_results
-            # containing a "results" list inside it.
-            results_list = raw_results.get("results", [])
-            all_results.extend(results_list)
-        else:
-            # If an error string or error dictionary came back, handle it:
+        # Validate raw_results
+        if not isinstance(raw_results, dict) or "processing_error" in raw_results:
             logging.warning(f"Error or invalid data returned for query '{q}': {raw_results}")
+            continue
+
+        results_list = raw_results.get("results", [])
+        all_results.extend(results_list)
 
     # 3. Score/filter (placeholder)
     relevant_results = {}
     for r in all_results:
-        relevance_score = score_result_relevance(
-            r,
+        # FIXME - Put in proper args / Ensure this works
+        # search_results: List[Dict],
+        # original_question: str,
+        # sub_questions: List[str],
+        # api_endpoint: str
+        list_of_relevant_articles = search_result_relevance(
+            all_results,
             question,
-            sub_query_dict['sub_questions']
+            sub_query_dict['sub_questions'],
+            search_params.get('relevance_analysis_llm')
         )
-        if relevance_score > RELEVANCE_THRESHOLD:
-            # Use URL or another unique field as the key
-            key = r.get("url") or r.get("title")
-            relevant_results[key] = {
-                "result": r,
-                "relevance_score": relevance_score
-            }
+        if list_of_relevant_articles:
+            relevant_results[r] = list_of_relevant_articles
+
+
 
     # 4. Summarize/aggregate final answer
     final_answer = aggregate_results(
@@ -298,6 +436,8 @@ def process_question(question: str, search_params: Dict) -> Dict:
         sub_query_dict['sub_questions']
     )
 
+    # Return the final data
+    # FIXME - Return full query details for debugging and analysis
     return {
         "search_engine": search_params.get('engine'),
         "original_query": question,
