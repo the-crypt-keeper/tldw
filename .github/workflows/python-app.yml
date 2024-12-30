@@ -33,7 +33,7 @@ jobs:
     - name: Test ChromaDB lib functions with pytest
       run: |
         pwd 
-        pytest ./Tests/ChromaDBtest_chromadb.py
+        pytest ./Tests/ChromaDB/test_chromadb.py
 
     - name: Test RAG lib functions with pytest
       run: |
