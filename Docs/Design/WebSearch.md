@@ -2,65 +2,46 @@
 
 ## Introduction
 This page serves as documentation regarding the web search functionality within tldw and provides context/justification for the decisions made within the module.
-
-Search is performed -> Results obtained, each individual item is first analyzed based on snippet, if relevant, entire page is fetched and analyzed, this is then stored in the results dictionary, and the process is repeated until all results are analyzed/limit is hit.
-Once all results are collected, they are then operated on, being used to create whatever final product is desired by the user.
-
-Pipeline:
-1. User posts question
-   - Gradio/UI/API
-2. Question is analyzed
-    - Question is analyzed to identify most likely purpose/goal of question, and Sub-questions are generated to support this
-    - User has option of seeing/modifying prompt used for Analysis/sub-question creation
-3. Search(es) is/are performed - User gated
-    - Search is performed using the user's question and sub-questions
-4. Results are collected, stored, and analyzed
-    - Results are collected, stored in a 'search_results' dict, and analyzed for relevance, based on initial snippet(? or full page?)
-    - User has the option of seeing all results, removing irrelevant results, and selecting which results are 'relevant'
-    - User also has the option to select which 'relevant' results are used to answer the question
-5. Irrelevant results are removed from the dictionary
-    - Results determined to be relevant are then stored in a 'relevant_results' dictionary, and the process is repeated until all results are analyzed/limit is hit.
-6. Once all results are collected, they are then used to answer the user's question/sub-questions
-    - The remaining relevant results are then used to answer the user's question/sub-questions
-    - Each result is abstractly summarized, and then combined into a single document and supplied to the LLM for final analysis
-7. The final answer/'briefing' is then presented to the user
-8. User has the option to save the results to the DB 
-9. User has the option to ask follow-up questions / see potential other questions
-
-
-- **Text Search Workflow**
-    1. User inputs a search query
-    2. User selects a search engine (Option for default search engine in config file)
-    3. The user presses 'Search'
-    4. The search query is passed to the selected search engine
-    5. The appropriate search engine is used to perform a search via API call
-    6. The search results are returned from the search engine's API
-    7. Search engine results are then _MODIFIED_ (if necessary/enabled) to fit the user's preferences
-       - This could include re-ranking, summarization/analysis, or other modifications
-    8. The (modified) search results are displayed to the user
-    9. Results are then displayed to the user, 
-       - either as titles of pages with dropdown for all info,
-       - or as a list of links with a briefing/summary of each link
-       - or as a single briefing/summary of all results
-    10. User may then select to save this resulting text to the DB as a plaintext entry, with metadata containing the search query, search engine, and any other relevant information
-    11. Search results are then saved to the DB as a plaintext entry, with metadata containing the search query, search engine, and any other relevant information
-    12. This is then searchable via the Media DB
+- **High-Level Workflow**
+    1. User inputs a search query.
+    2. User selects a search engine (Option for default search engine + default query options in config file).
+    3. User may select `Advanced Search` for additional search parameters (Language, Date Range, etc).
+    4. The user presses 'Search'.
+    5. Search is performed -> Results obtained, 
+    6. Each individual item is first analyzed based on snippet, if relevant, entire page is fetched and analyzed, this is then stored in the results dictionary, and the process is repeated until all results are analyzed/limit is hit.
+    7. Once all results are collected, they are then operated on, being used to create whatever final product is desired by the user.
+    8. The final product is then passed back to the UI for display to the user.
 
 
 ----------------
 ### Setting the Stage
-- **Purpose:**
-    - The goal of this module is to provide a simple, easy-to-use interface for searching the web and retrieving results.
-    - All the web searches are simple HTTP requests to an API or to the direct endpoint and then scraping the results.
-    - Results are then reviewed for relevancy, if relevant, the full page is fetched and analyzed.
-    - The results are then stored in a dictionary, and the process is repeated until all results are analyzed/limit is hit.
-    - Once all results are collected, they are then operated on, being used to create whatever final product is desired by the user.
-    - The goal is to provide a simple, easy-to-use interface for searching the web and retrieving results.
-    - Other modules are responsible for anything else, this module just performs the search, and delivers the results.
-- **Main Function:** (Start Here)
-    - `def process_question(question: str, search_params: Dict) -> Dict:`
-        - `question` - The question to search for
-        - `search_params` - A dictionary containing the search parameters
+
+- **Text Search Workflow**
+    1. User inputs a search query.
+    2. User selects a search engine + Query options (Option for default search engine + default query options in config file).
+    3. The user presses 'Search'.
+        - Gradio UI Function makes a call to `process_question` with the search query + search parameters as a dictionary
+    4. `process_question()` checks the search params dict to see if sub-query creation is enabled, if so, it creates a list of sub-queries based on the search query with a call to `analyze_question()`.
+    5. `analyze_question()` takes the search query and generates a list of sub-queries based on the search query, attempts this 3 times, making a call to the LLM API, and then returns the list of sub-queries if successful.
+    6. once back in `process_question()`, all queries are combined into a single query list `#L113`.
+    7. `process_question()` then iterates through the query list, making a call to `perform_websearch()` with each query in the list, and the matching search parameters.
+    8. `perform_websearch()` makes a call to the selected search engine's API with the query and search parameters, and returns the results.
+       - This function is a `sink' for all search engine API calls, and is responsible for handling calling the appropriate search engine API call
+    9. `process_web_search_results()` then takes the results from the search engine, and processes them, converting them into a dictionary of results in the `web_search_results_dict` dictionary.
+       - FIXME - this is where I lose track of what's happening, need to re-read the code
+       - This function returns a filled `web_search_results_dict` dictionary
+    10. `process_question()` then takes the `web_search_results_dict` and processes it, checking to make sure it is valid and contains results.
+        - FIXME - Verify this is correct
+    11. FIXME - Make it optional to display the results to the user, and allow them to select which results are relevant before continuing processing
+    12. `process_question()` then iterates through each search result, checking if it is relevant, and if so, adds it to the `relevant_results_dict`
+          - FIXME - The results should be added back to the `web_search_results_dict` if they are relevant.
+    13. `process_question()` then calls into `aggregate_results()` function with the `web_search_results_dict`
+    14. `aggregate_results()` then takes the `web_search_results_dict` and processes it, combining all the results into a single document
+        - FIXME - This is not implemented yet and also want various options available for this.
+    15. `process_question()` then returns the `web_search_results_dict` to the calling function.
+    15. The calling function then takes the `web_search_results_dict` and processes it, extracting the final results/aggregated report and presenting it to the user
+    16. The user then has the option to save the results to the DB, or ask follow-up questions, etc.
+    17. The user can also select which results are relevant, and which are not, and remove irrelevant results from the `web_search_results_dict`
 
 
 - **Function Execution Steps:**
@@ -85,7 +66,26 @@ Pipeline:
 
 
 
-https://github.com/scrapinghub/article-extraction-benchmark
+----------------
+### Web Search API
+- TBD
+```def perform_websearch(search_engine, 
+                            search_query, 
+                            content_country, 
+                            search_lang, 
+                            output_lang, 
+                            result_count, 
+                            date_range=None,
+                            safesearch=None, 
+                            site_blacklist=None, 
+                            exactTerms=None, 
+                            excludeTerms=None, 
+                            filter=None, 
+                            geolocation=None, 
+                            search_result_language=None, 
+                            sort_results_by=None
+```
+
 
 ask.py https://github.com/pengfeng/ask.py
     1. User inputs a search query
@@ -183,22 +183,22 @@ Perplexity
 
 Results dictionary:
 ```
-{
-    "search_engine": str,
-    "search_query": str,
-    "content_country": str,
-    "search_lang": str,
-    "output_lang": str,
-    "result_count": int,
-    "date_range": Optional[str],
-    "safesearch": Optional[bool],
-    "site_blacklist": Optional[List[str]],
-    "exactTerms": Optional[List[str]],
-    "excludeTerms": Optional[List[str]],
-    "filter": Optional[str],
-    "geolocation": Optional[str],
-    "search_result_language": Optional[str],
-    "sort_results_by": Optional[str],
+web_search_results_dict = {
+    "search_engine": search_engine,
+    "search_query": search_results.get("search_query", ""),
+    "content_country": search_results.get("content_country", ""),
+    "search_lang": search_results.get("search_lang", ""),
+    "output_lang": search_results.get("output_lang", ""),
+    "result_count": search_results.get("result_count", 0),
+    "date_range": search_results.get("date_range", None),
+    "safesearch": search_results.get("safesearch", None),
+    "site_blacklist": search_results.get("site_blacklist", None),
+    "exactTerms": search_results.get("exactTerms", None),
+    "excludeTerms": search_results.get("excludeTerms", None),
+    "filter": search_results.get("filter", None),
+    "geolocation": search_results.get("geolocation", None),
+    "search_result_language": search_results.get("search_result_language", None),
+    "sort_results_by": search_results.get("sort_results_by", None),
     "results": [
         {
             "title": str,
@@ -213,11 +213,11 @@ Results dictionary:
                 "snippet": Optional[str]
             }
         },
-        # ... more results ...
     ],
-    "total_results_found": int,
-    "search_time": float,
-    "error": Optional[str]
+    "total_results_found": search_results.get("total_results_found", 0),
+    "search_time": search_results.get("search_time", 0.0),
+    "error": search_results.get("error", None),
+    "processing_error": None
 }
 ```
 
@@ -226,6 +226,7 @@ Results dictionary:
 
 #### Baidu Search
 - [Baidu Search API](https://www.baidu.com/)
+- Baidu doens't have an official english API, so we'll have to scrape the results or use Serper
 
 
 #### Bing Search
@@ -235,6 +236,7 @@ Results dictionary:
     - Use the Bing Search API to perform searches - Add the generated subscription key to your config.txt file.
           - If for some reason you're doing modifications to the code(Fuck MS), be aware: https://github.com/Azure-Samples/cognitive-services-REST-api-samples/issues/139
     - Perform searches using Bing!
+
 
 #### Brave Search
 Two APIs, 1 for 'AI' the other for 'regular' search
@@ -282,26 +284,3 @@ Structure/approach taken from https://github.com/deedy5/duckduckgo_search
 
 #### PubMedCentral Search
 - https://www.ncbi.nlm.nih.gov/home/develop/api/
-
-
-
-----------------
-### Web Search API
-- TBD
-```def perform_websearch(search_engine, 
-                            search_query, 
-                            content_country, 
-                            search_lang, 
-                            output_lang, 
-                            result_count, 
-                            date_range=None,
-                            safesearch=None, 
-                            site_blacklist=None, 
-                            exactTerms=None, 
-                            excludeTerms=None, 
-                            filter=None, 
-                            geolocation=None, 
-                            search_result_language=None, 
-                            sort_results_by=None
-```
-

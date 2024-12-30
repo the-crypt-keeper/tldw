@@ -160,34 +160,21 @@ def process_question(question: str, search_params: Dict) -> Dict:
         if list_of_relevant_articles:
             relevant_results[r] = list_of_relevant_articles
 
-
-
     # 4. Summarize/aggregate final answer
     final_answer = aggregate_results(
         #  FIXME - Add proper Args / Ensure this works
-        # relevant_results: Dict[str, Dict],
-        # question: str,
-        # sub_questions: List[str],
-        # api_endpoint: str
+        # web_search_results_dict: Dict,
+        # report_language: str,
+        # aggregation_api_endpoint: str
         # FIXME - Proper datatypes/expectations
-        relevant_results,
-        question,
-        sub_query_dict['sub_questions'],
+        web_search_results_dict,
+        report_language=search_params.get('output_lang', 'en'),
         api_endpoint=search_params.get('final_answer_llm')
     )
 
     # Return the final data
     # FIXME - Return full query details for debugging and analysis
-    return {
-        "search_engine": search_params.get('engine'),
-        "original_query": question,
-        "sub_questions": sub_query_dict.get('sub_questions', []),
-        "all_queries": all_queries,
-        "results": all_results,
-        "relevant_results": relevant_results,
-        "analysis_prompt": sub_query_dict.get('analysis_prompt'),
-        "final_answer": final_answer
-    }
+    return web_search_results_dict
 
 
 ######################### Question Analysis #########################
@@ -532,6 +519,42 @@ def process_web_search_results(search_results: Dict, search_engine: str) -> Dict
 
     Returns:
         Dict: A dictionary containing the processed search results in the specified structure.
+
+    web_search_results_dict = {
+        "search_engine": search_engine,
+        "search_query": search_results.get("search_query", ""),
+        "content_country": search_results.get("content_country", ""),
+        "search_lang": search_results.get("search_lang", ""),
+        "output_lang": search_results.get("output_lang", ""),
+        "result_count": search_results.get("result_count", 0),
+        "date_range": search_results.get("date_range", None),
+        "safesearch": search_results.get("safesearch", None),
+        "site_blacklist": search_results.get("site_blacklist", None),
+        "exactTerms": search_results.get("exactTerms", None),
+        "excludeTerms": search_results.get("excludeTerms", None),
+        "filter": search_results.get("filter", None),
+        "geolocation": search_results.get("geolocation", None),
+        "search_result_language": search_results.get("search_result_language", None),
+        "sort_results_by": search_results.get("sort_results_by", None),
+        "results": [
+            {
+                "title": str,
+                "url": str,
+                "content": str,
+                "metadata": {
+                    "date_published": Optional[str],
+                    "author": Optional[str],
+                    "source": Optional[str],
+                    "language": Optional[str],
+                    "relevance_score": Optional[float],
+                    "snippet": Optional[str]
+                }
+            },
+        "total_results_found": search_results.get("total_results_found", 0),
+        "search_time": search_results.get("search_time", 0.0),
+        "error": search_results.get("error", None),
+        "processing_error": None
+    }
     """
     # Initialize the output dictionary with default values
     web_search_results_dict = {
@@ -550,7 +573,21 @@ def process_web_search_results(search_results: Dict, search_engine: str) -> Dict
         "geolocation": search_results.get("geolocation", None),
         "search_result_language": search_results.get("search_result_language", None),
         "sort_results_by": search_results.get("sort_results_by", None),
-        "results": [],
+        "results": [
+            {
+                "title": str,
+                "url": str,
+                "content": str,
+                "metadata": {
+                    "date_published": Optional[str],
+                    "author": Optional[str],
+                    "source": Optional[str],
+                    "language": Optional[str],
+                    "relevance_score": Optional[float],
+                    "snippet": Optional[str]
+                }
+            },
+        ],
         "total_results_found": search_results.get("total_results_found", 0),
         "search_time": search_results.get("search_time", 0.0),
         "error": search_results.get("error", None),
@@ -560,40 +597,32 @@ def process_web_search_results(search_results: Dict, search_engine: str) -> Dict
         if search_engine.lower() == "baidu":
             pass
         elif search_engine.lower() == "bing":
-            parse_bing_results(search_results, web_search_results_dict)
-            pass
+            parsed_results = parse_bing_results(search_results, web_search_results_dict)
 
         elif search_engine.lower() == "brave":
             parse_brave_results(search_results, web_search_results_dict)
             pass
 
         elif search_engine.lower() == "duckduckgo":
-            parse_duckduckgo_results(search_results, web_search_results_dict)
-            pass
+            parsed_results = parse_duckduckgo_results(search_results, web_search_results_dict)
 
         elif search_engine.lower() == "google":
-            parse_google_results(search_results, web_search_results_dict)
-            pass
+            parsed_results = parse_google_results(search_results, web_search_results_dict)
 
         elif search_engine.lower() == "kagi":
-            parse_kagi_results(search_results, web_search_results_dict)
-            pass
+            parsed_results = parse_kagi_results(search_results, web_search_results_dict)
 
         elif search_engine.lower() == "serper":
-            parse_serper_results(search_results, web_search_results_dict)
-            pass
+            parsed_results = parse_serper_results(search_results, web_search_results_dict)
 
         elif search_engine.lower() == "tavily":
-            parse_tavily_results(search_results, web_search_results_dict)
-            pass
+            parsed_results = parse_tavily_results(search_results, web_search_results_dict)
 
         elif search_engine.lower() == "searx":
-            parse_searx_results(search_results, web_search_results_dict)
-            pass
+            parsed_results = parse_searx_results(search_results, web_search_results_dict)
 
         elif search_engine.lower() == "yandex":
-            parse_yandex_results(search_results, web_search_results_dict)
-            pass
+            parsed_results = parse_yandex_results(search_results, web_search_results_dict)
 
         else:
             web_search_results_dict["processing_error"] = f"Error: Invalid Search Engine Name {search_engine}"
