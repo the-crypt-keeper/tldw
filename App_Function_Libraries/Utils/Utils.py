@@ -552,8 +552,13 @@ global_search_engines = ["baidu", "bing", "brave", "duckduckgo", "google", "kagi
 openai_tts_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
 
 # Setup Default API Endpoint
-loaded_config_data = load_and_log_configs()
-default_api_endpoint = loaded_config_data['default_api']
+try:
+    loaded_config_data = load_and_log_configs()
+    default_api_endpoint = loaded_config_data['default_api']
+    print(f"Default API Endpoint: {default_api_endpoint}")
+except Exception as e:
+    logging.error(f"Error loading default API endpoint: {str(e)}")
+    default_api_endpoint = "openai"
 
 def format_api_name(api):
     name_mapping = {
@@ -576,9 +581,6 @@ def format_api_name(api):
         "aphrodite": "Aphrodite"
     }
     return name_mapping.get(api, api.title())
-
-
-print(f"Default API Endpoint: {default_api_endpoint}")
 
 #
 # End of Config loading
