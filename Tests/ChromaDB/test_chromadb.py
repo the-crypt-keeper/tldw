@@ -22,7 +22,7 @@ sys.path.insert(0, project_root)
 print(f"Project root added to sys.path: {project_root}")
 
 # Local Imports
-from App_Function_Libraries.Utils.Utils import load_and_log_configs
+#from App_Function_Libraries.Utils.Utils import load_and_log_configs
 from App_Function_Libraries.RAG.ChromaDB_Library import (
     process_and_store_content, check_embedding_status,
     reset_chroma_collection, vector_search, store_in_chroma, batched, embedding_api_url
@@ -33,11 +33,7 @@ from App_Function_Libraries.RAG.ChromaDB_Library import (
 # Fixtures for Reusable Mocking and Setup
 ############################################
 
-loaded_config_data = load_and_log_configs()
-if loaded_config_data is None:
-    raise ValueError("Failed to load configuration data")
-
-default_api_endpoint = loaded_config_data['default_api']
+default_api_endpoint = "openai"
 
 
 # Fixture to mock a ChromaDB collection
