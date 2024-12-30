@@ -49,6 +49,15 @@ https://github.com/aedocw/epub2tts
 https://github.com/microsoft/SpeechT5
 https://github.com/smellslikeml/dolla_llama
 
+Bark
+https://github.com/suno-ai/bark
+
+
+ChatTTS
+https://huggingface.co/2Noise/ChatTTS
+https://chattts.com/#Demo
+
+
 
 Coqui TTS
     https://github.com/idiap/coqui-ai-TTS
@@ -60,6 +69,9 @@ Cartesia
 F5 TTS
     https://github.com/SWivid/F5-TTS
 
+lina TTS
+https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
+https://github.com/theodorblackbird/lina-speech
 
 Podcastfy
     https://github.com/souzatharsis/podcastfy/blob/main/podcastfy/tts/base.py
@@ -90,11 +102,7 @@ Models
 Merging Audio
     https://github.com/jiaaro/pydub
 
-GPT-SoviTTS
-    https://levelup.gitconnected.com/great-api-design-comprehensive-guide-from-basics-to-best-practices-9b4e0b613a44?source=home---------56-1--------------------0fc48da7_5ce6_48ca_92d2_260680a20318-------3
-    https://rentry.org/GPT-SoVITS-guide
-    https://github.com/RVC-Boss/GPT-SoVITS
-    https://github.com/cpumaxx/sovits-ff-plugin
+
 
 MaskGCT
     https://maskgct.github.io/#emotion-samples
@@ -372,6 +380,15 @@ if __name__ == "__main__":
 ### GPT-SoVITS
 
 - [GPT-SoVITS](f)
+- [GPT-SoVITS-guide rentry.org](https://rentry.org/GPT-SoVITS-guide)
+- Setup Guide: https://ai-hub-docs.vercel.app/tts/gpt-sovits/
+
+
+GPT-SoviTTS
+    https://levelup.gitconnected.com/great-api-design-comprehensive-guide-from-basics-to-best-practices-9b4e0b613a44?source=home---------56-1--------------------0fc48da7_5ce6_48ca_92d2_260680a20318-------3
+    https://rentry.org/GPT-SoVITS-guide
+    https://github.com/RVC-Boss/GPT-SoVITS
+    https://github.com/cpumaxx/sovits-ff-plugin
 
 https://tts.x86.st/
 Finetuning is very quick (about 5 minutes). Captioning of audio was automated with faster-whisper (it is required that the audio is captioned).
