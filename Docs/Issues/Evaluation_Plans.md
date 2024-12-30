@@ -48,6 +48,7 @@ https://arxiv.org/abs/2412.17758
 https://huggingface.co/spaces/bigcode/bigcodebench-leaderboard
 https://www.atla-ai.com/post/evaluating-the-evaluator
 https://hamel.dev/blog/posts/llm-judge/
+https://github.com/scrapinghub/article-extraction-benchmark
 
 
 Have LLMs play Social deception games
