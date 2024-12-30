@@ -31,6 +31,33 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 #
 # Functions:
 
+# FIXME - Add Logging
+
+def test_process_question():
+    results = process_question("What is the capital of France?", {
+        "engine": "google",
+        "content_country": "US",
+        "search_lang": "en",
+        "output_lang": "en",
+        "result_count": 10,
+        "date_range": "y",
+        "safesearch": "moderate",
+        "site_blacklist": ["example.com", "spam-site.com"],
+        "exactTerms": None,
+        "excludeTerms": None,
+        "filter": None,
+        "geolocation": None,
+        "search_result_language": None,
+        "sort_results_by": None,
+        "subquery_generation": True,
+        "subquery_generation_llm": "openai",
+        "relevance_analysis_llm": "openai",
+        "final_answer_llm": "openai"
+    })
+    print(results)
+    pass
+
+
 ######################### Main Orchestration Workflow #########################
 #
 def process_question(question: str, search_params: Dict) -> Dict:
@@ -95,6 +122,12 @@ def process_question(question: str, search_params: Dict) -> Dict:
     """
     logging.info(f"Starting process_question with query: {question}")
 
+    # Validate input parameters
+    if not question or not isinstance(question, str):
+        raise ValueError("Invalid question parameter")
+    if not search_params or not isinstance(search_params, dict):
+        raise ValueError("Invalid search_params parameter")
+
     # 1. Generate sub-queries if requested
     sub_queries = []
     sub_query_dict = {
@@ -112,10 +145,32 @@ def process_question(question: str, search_params: Dict) -> Dict:
     # Merge original question with sub-queries
     all_queries = [question] + sub_queries
 
-    # 2. Perform searches and accumulate all raw results
-    all_results: List[Dict] = []
+    # 2. Initialize a single web_search_results_dict
+    web_search_results_dict = {
+        "search_engine": search_params.get('engine', 'google'),
+        "search_query": question,
+        "content_country": search_params.get('content_country', 'US'),
+        "search_lang": search_params.get('search_lang', 'en'),
+        "output_lang": search_params.get('output_lang', 'en'),
+        "result_count": 0,  # Will be updated as results are added
+        "date_range": search_params.get('date_range'),
+        "safesearch": search_params.get('safesearch', 'moderate'),
+        "site_blacklist": search_params.get('site_blacklist', []),
+        "exactTerms": search_params.get('exactTerms'),
+        "excludeTerms": search_params.get('excludeTerms'),
+        "filter": search_params.get('filter'),
+        "geolocation": search_params.get('geolocation'),
+        "search_result_language": search_params.get('search_result_language'),
+        "sort_results_by": search_params.get('sort_results_by'),
+        "results": [],
+        "total_results_found": 0,
+        "search_time": 0.0,
+        "error": None,
+        "processing_error": None
+    }
+
+    # 3. Perform searches and accumulate all raw results
     for q in all_queries:
-        # FIXME - change raw_results to proper dict format
         raw_results = perform_websearch(
             search_engine=search_params.get('engine', 'google'),
             search_query=q,
@@ -134,47 +189,43 @@ def process_question(question: str, search_params: Dict) -> Dict:
             sort_results_by=search_params.get('sort_results_by')
         )
 
-        # Validate raw_results
-        # FIXME - Account for proper structure of returned web_search_results_dict dictionary
         if not isinstance(raw_results, dict) or "processing_error" in raw_results:
             logging.warning(f"Error or invalid data returned for query '{q}': {raw_results}")
             continue
 
-        results_list = raw_results.get("results", [])
-        all_results.extend(results_list)
+        # Append results to the single web_search_results_dict
+        web_search_results_dict["results"].extend(raw_results.get("results", []))
+        web_search_results_dict["total_results_found"] += raw_results.get("total_results_found", 0)
+        web_search_results_dict["search_time"] += raw_results.get("search_time", 0.0)
 
-    # 3. Score/filter (placeholder)
-    relevant_results = {}
-    for r in all_results:
-        # FIXME - Put in proper args / Ensure this works
-        # search_results: List[Dict],
-        # original_question: str,
-        # sub_questions: List[str],
-        # api_endpoint: str
-        list_of_relevant_articles = search_result_relevance(
-            all_results,
-            question,
-            sub_query_dict['sub_questions'],
-            search_params.get('relevance_analysis_llm')
-        )
-        if list_of_relevant_articles:
-            relevant_results[r] = list_of_relevant_articles
 
-    # 4. Summarize/aggregate final answer
-    final_answer = aggregate_results(
-        #  FIXME - Add proper Args / Ensure this works
-        # web_search_results_dict: Dict,
-        # report_language: str,
-        # aggregation_api_endpoint: str
-        # FIXME - Proper datatypes/expectations
-        web_search_results_dict,
-        report_language=search_params.get('output_lang', 'en'),
-        api_endpoint=search_params.get('final_answer_llm')
+
+    # 4. Score/filter results
+    relevant_results = search_result_relevance(
+        web_search_results_dict["results"],
+        question,
+        sub_query_dict['sub_questions'],
+        search_params.get('relevance_analysis_llm')
     )
 
-    # Return the final data
-    # FIXME - Return full query details for debugging and analysis
-    return web_search_results_dict
+    # 5. Allow user to review and select relevant results
+    if search_params.get("user_review", False):
+        relevant_results = review_and_select_results({"results": list(relevant_results.values())})
+
+    # 6. Summarize/aggregate final answer
+    final_answer = aggregate_results(
+        relevant_results,
+        question,
+        sub_query_dict['sub_questions'],
+        search_params.get('final_answer_llm')
+    )
+
+    # 7. Return the final data, including the single web_search_results_dict
+    return {
+        "final_answer": final_answer,
+        "relevant_results": relevant_results,
+        "web_search_results_dict": web_search_results_dict  # Pass the single dict back
+    }
 
 
 ######################### Question Analysis #########################
@@ -228,8 +279,8 @@ def analyze_question(question: str, api_endpoint) -> Dict:
     input_data = "Follow the above instructions."
 
     sub_questions: List[str] = []
-    try:
-        for attempt in range(3):
+    for attempt in range(3):
+        try:
             logging.info(f"Generating sub-questions (attempt {attempt + 1})")
             response = chat_api_call(api_endpoint, None, input_data, sub_question_generation_prompt, temp=0.7)
             if response:
@@ -249,12 +300,12 @@ def analyze_question(question: str, api_endpoint) -> Dict:
                         logging.info("Successfully extracted sub-questions using regex")
                         break
 
-        # If still no sub-questions, log an error or handle appropriately
-        if not sub_questions:
-            logging.error("Failed to extract sub-questions from API response after all attempts.")
+        except Exception as e:
+            logging.error(f"Error generating sub-questions: {str(e)}")
 
-    except Exception as e:
-        logging.error(f"Error generating sub-questions: {str(e)}")
+    if not sub_questions:
+        logging.error("Failed to extract sub-questions from API response after all attempts.")
+        sub_questions = [original_query]  # Fallback to the original query
 
     # Construct and return the result dictionary
     logging.info("Sub-questions generated successfully")
@@ -268,6 +319,7 @@ def analyze_question(question: str, api_endpoint) -> Dict:
 
 ######################### Relevance Analysis #########################
 #
+# FIXME - Ensure edge cases are handled properly / Structured outputs?
 def search_result_relevance(
     search_results: List[Dict],
     original_question: str,
@@ -292,6 +344,7 @@ def search_result_relevance(
         content = result.get("content", "")
         if not content:
             logging.error("No Content found in search results array!")
+            continue
 
         eval_prompt = f"""
                 Given the following search results for the user's question: "{original_question}" and the generated sub-questions: {sub_questions}, evaluate the relevance of the search result to the user's question.
@@ -383,46 +436,72 @@ def aggregate_results(
     """
     if not relevant_results:
         return {
-            "summary": "No relevant results found. Unable to provide an answer.",
+            "Report": "No relevant results found. Unable to provide an answer.",
             "evidence": [],
             "confidence": 0.0
         }
 
+    # FIXME - Validate and test thoroughly, also structured generation
     # Concatenate relevant contents for summarization
     concatenated_texts = "\n\n".join(
         f"ID: {rid}\nContent: {res['content']}\nReasoning: {res['reasoning']}"
         for rid, res in relevant_results.items()
     )
 
-    # Example summarization prompt
-    summarize_prompt = f"""
-Please provide a concise summary that answers the question: "{question}"
+    # Example analysis prompt
+    # FIXME - Add to config.txt/utils.py
+    analyze_search_results_prompt = f"""
+        Generate a comprehensive, well-structured, and informative answer for a given question, 
+        using ONLY the information found in the provided web Search Results (URL, Page Title, Summary).
+        Use an unbiased, journalistic tone, adapting the level of formality to match the user’s question.
+        
+        • Cite your statements using [number] notation, placing citations at the end of the relevant sentence.
+        • Only cite the most relevant results. If multiple sources support the same point, cite all relevant sources [e.g., 1, 2, 3].
+        • If sources conflict, present both perspectives clearly and cite the respective sources.
+        • If different sources refer to different entities with the same name, provide separate answers.
+        • Do not add any external or fabricated information.
+        • Do not include URLs or a reference section; cite inline with [number] format only.
+        • Do not repeat the question or include unnecessary redundancy.
+        • Use markdown formatting (e.g., **bold**, bullet points, ## headings) to organize the information.
+        • If the provided results are insufficient to answer the question, explicitly state what information is missing or unclear.
+        
+        Structure your answer like this:
+        1. **Short introduction**: Briefly summarize the topic (1–2 sentences).
+        2. **Bulleted points**: Present key details, each with appropriate citations.
+        3. **Conclusion**: Summarize the findings or restate the core answer (with citations if needed).
+        
+        Example:
+        1. **Short introduction**: This topic explores the impact of climate change on agriculture.
+        2. **Bulleted points**:
+           - Rising temperatures have reduced crop yields in some regions [1].
+           - Changes in rainfall patterns are affecting irrigation practices [2, 3].
+        3. **Conclusion**: Climate change poses significant challenges to global agriculture [1, 2, 3].
+        
+        <context>
+        {concatenated_texts}
+        </context>
+        ---------------------
+        
+        Make sure to match the language of the user's question.
+        
+        Question: {question}
+        Answer (in the language of the user's question):
+        """
 
-Relevant sub-questions: {sub_questions}
-
-Here are the relevant excerpts from search results:
-{concatenated_texts}
-
-Instructions:
-1. Provide a concise summary that incorporates the key points.
-2. Avoid quoting large passages verbatim; aim to synthesize the main ideas.
-3. Make sure your answer is coherent, logically consistent, and addresses the question directly.
-"""
-
-    input_data = "Summarize the relevant results."
+    input_data = "Follow the above instructions."
 
     try:
-        summary_response = chat_api_call(
+        returned_response = chat_api_call(
             api_endpoint=api_endpoint,
             api_key=None,
             input_data=input_data,
-            prompt=summarize_prompt,
+            prompt=analyze_search_results_prompt,
             temp=0.7
         )
-        if summary_response:
+        if returned_response:
             # You could do further parsing or confidence estimation here
             return {
-                "summary": summary_response,
+                "Report": returned_response,
                 "evidence": list(relevant_results.values()),
                 "confidence": 0.9  # Hardcoded or computed as needed
             }
@@ -430,11 +509,34 @@ Instructions:
         logging.error(f"Error aggregating results: {e}")
 
     return {
-        "summary": "Could not summarize the results due to an error.",
+        "summary": "Could not create the report due to an error.",
         "evidence": list(relevant_results.values()),
         "confidence": 0.0
     }
 
+
+def review_and_select_results(web_search_results_dict: Dict) -> Dict:
+    """
+    Allows the user to review and select relevant results from the search results.
+
+    Args:
+        web_search_results_dict (Dict): The dictionary containing all search results.
+
+    Returns:
+        Dict: A dictionary containing only the user-selected relevant results.
+    """
+    relevant_results = {}
+    print("Review the search results and select the relevant ones:")
+    for idx, result in enumerate(web_search_results_dict["results"]):
+        print(f"\nResult {idx + 1}:")
+        print(f"Title: {result['title']}")
+        print(f"URL: {result['url']}")
+        print(f"Content: {result['content'][:200]}...")  # Show a preview of the content
+        user_input = input("Is this result relevant? (y/n): ").strip().lower()
+        if user_input == 'y':
+            relevant_results[str(idx)] = result
+
+    return relevant_results
 
 #
 # End of Orchestration functions
@@ -448,62 +550,49 @@ Instructions:
 # FIXME
 def perform_websearch(search_engine, search_query, content_country, search_lang, output_lang, result_count, date_range=None,
                       safesearch=None, site_blacklist=None, exactTerms=None, excludeTerms=None, filter=None, geolocation=None, search_result_language=None, sort_results_by=None):
-    if search_engine.lower() == "baidu":
-        web_search_results = search_web_baidu(search_query, None, None)
-        processed_results = process_web_search_results(web_search_results, "baidu")
-        return processed_results
+    try:
+        if search_engine.lower() == "baidu":
+            web_search_results = search_web_baidu(search_query, None, None)
 
-    elif search_engine.lower() == "bing":
-        web_search_results = search_web_bing(search_query, search_lang, content_country, date_range, result_count)
-        processed_results = process_web_search_results(web_search_results, "bing")
-        return processed_results
+        elif search_engine.lower() == "bing":
+            web_search_results = search_web_bing(search_query, search_lang, content_country, date_range, result_count)
 
-    elif search_engine.lower() == "brave":
-            web_search_results = search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
-                                    site_blacklist, date_range)
-            processed_results = process_web_search_results(web_search_results, "brave")
-            return processed_results
+        elif search_engine.lower() == "brave":
+                web_search_results = search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
+                                        site_blacklist, date_range)
 
-    elif search_engine.lower() == "duckduckgo":
-        web_search_results = search_web_duckduckgo(search_query, content_country, date_range, result_count)
-        processed_results = process_web_search_results(web_search_results, "ddg")
-        return processed_results
+        elif search_engine.lower() == "duckduckgo":
+            web_search_results = search_web_duckduckgo(search_query, content_country, date_range, result_count)
 
-    elif search_engine.lower() == "google":
-        web_search_results = search_web_google(search_query, result_count, content_country, date_range, exactTerms,
-                                 excludeTerms, filter, geolocation, output_lang,
-                      search_result_language, safesearch, site_blacklist, sort_results_by)
-        processed_results = process_web_search_results(web_search_results, "google")
-        return processed_results
+        elif search_engine.lower() == "google":
+            web_search_results = search_web_google(search_query, result_count, content_country, date_range, exactTerms,
+                                     excludeTerms, filter, geolocation, output_lang,
+                          search_result_language, safesearch, site_blacklist, sort_results_by)
 
-    elif search_engine.lower() == "kagi":
-        web_search_results = search_web_kagi(search_query, content_country)
-        processed_results = process_web_search_results(web_search_results, "kagi")
-        return processed_results
+        elif search_engine.lower() == "kagi":
+            web_search_results = search_web_kagi(search_query, content_country)
 
-    elif search_engine.lower() == "serper":
-        web_search_results = search_web_serper()
-        processed_results = process_web_search_results(web_search_results, "serper")
-        return processed_results
+        elif search_engine.lower() == "serper":
+            web_search_results = search_web_serper()
 
-    elif search_engine.lower() == "tavily":
-        web_search_results = search_web_tavily(search_query, result_count, site_blacklist)
-        processed_results = process_web_search_results(web_search_results, "tavily")
-        return processed_results
+        elif search_engine.lower() == "tavily":
+            web_search_results = search_web_tavily(search_query, result_count, site_blacklist)
 
-    elif search_engine.lower() == "searx":
-        web_search_results = search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general')
-        processed_results = process_web_search_results(web_search_results, "bing")
-        return processed_results
+        elif search_engine.lower() == "searx":
+            web_search_results = search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general')
 
-    elif search_engine.lower() == "yandex":
-        web_search_results = search_web_yandex()
-        processed_results = process_web_search_results(web_search_results, "bing")
-        return processed_results
+        elif search_engine.lower() == "yandex":
+            web_search_results = search_web_yandex()
 
-    else:
-        return f"Error: Invalid Search Engine Name {search_engine}"
+        else:
+            return f"Error: Invalid Search Engine Name {search_engine}"
 
+        # Process the raw search results
+        web_search_results_dict = process_web_search_results(web_search_results, search_engine)
+        return web_search_results_dict
+
+    except Exception as e:
+        return {"processing_error": f"Error performing web search: {str(e)}"}
 
 #
 ######################### Search Result Parsing ##################################################################
@@ -556,6 +645,10 @@ def process_web_search_results(search_results: Dict, search_engine: str) -> Dict
         "processing_error": None
     }
     """
+    # Validate input parameters
+    if not isinstance(search_results, dict):
+        raise TypeError("search_results must be a dictionary")
+
     # Initialize the output dictionary with default values
     web_search_results_dict = {
         "search_engine": search_engine,
@@ -594,59 +687,50 @@ def process_web_search_results(search_results: Dict, search_engine: str) -> Dict
         "processing_error": None
     }
     try:
+        # Parse results based on the search engine
         if search_engine.lower() == "baidu":
-            pass
+            pass  # Placeholder for Baidu-specific parsing
         elif search_engine.lower() == "bing":
             parsed_results = parse_bing_results(search_results, web_search_results_dict)
-
         elif search_engine.lower() == "brave":
-            parse_brave_results(search_results, web_search_results_dict)
-            pass
-
+            parsed_results = parse_brave_results(search_results, web_search_results_dict)
         elif search_engine.lower() == "duckduckgo":
             parsed_results = parse_duckduckgo_results(search_results, web_search_results_dict)
-
         elif search_engine.lower() == "google":
             parsed_results = parse_google_results(search_results, web_search_results_dict)
-
         elif search_engine.lower() == "kagi":
             parsed_results = parse_kagi_results(search_results, web_search_results_dict)
-
         elif search_engine.lower() == "serper":
             parsed_results = parse_serper_results(search_results, web_search_results_dict)
-
         elif search_engine.lower() == "tavily":
             parsed_results = parse_tavily_results(search_results, web_search_results_dict)
-
         elif search_engine.lower() == "searx":
             parsed_results = parse_searx_results(search_results, web_search_results_dict)
-
         elif search_engine.lower() == "yandex":
             parsed_results = parse_yandex_results(search_results, web_search_results_dict)
-
         else:
-            web_search_results_dict["processing_error"] = f"Error: Invalid Search Engine Name {search_engine}"
             raise ValueError(f"Error: Invalid Search Engine Name {search_engine}")
+
+        # Process individual search results
+        for result in search_results.get("results", []):
+            processed_result = {
+                "title": result.get("title", ""),
+                "url": result.get("url", ""),
+                "content": result.get("content", ""),
+                "metadata": {
+                    "date_published": result.get("metadata", {}).get("date_published", None),
+                    "author": result.get("metadata", {}).get("author", None),
+                    "source": result.get("metadata", {}).get("source", None),
+                    "language": result.get("metadata", {}).get("language", None),
+                    "relevance_score": result.get("metadata", {}).get("relevance_score", None),
+                    "snippet": result.get("metadata", {}).get("snippet", None)
+                }
+            }
+            web_search_results_dict["results"].append(processed_result)
+
     except Exception as e:
         web_search_results_dict["processing_error"] = f"Error processing search results: {str(e)}"
-        raise
-
-    # Process individual search results
-    for result in search_results.get("results", []):
-        processed_result = {
-            "title": result.get("title", ""),
-            "url": result.get("url", ""),
-            "content": result.get("content", ""),
-            "metadata": {
-                "date_published": result.get("metadata", {}).get("date_published", None),
-                "author": result.get("metadata", {}).get("author", None),
-                "source": result.get("metadata", {}).get("source", None),
-                "language": result.get("metadata", {}).get("language", None),
-                "relevance_score": result.get("metadata", {}).get("relevance_score", None),
-                "snippet": result.get("metadata", {}).get("snippet", None)
-            }
-        }
-        web_search_results_dict["results"].append(processed_result)
+        logging.error(f"Error in process_web_search_results: {str(e)}")
 
     return web_search_results_dict
 
@@ -1284,7 +1368,7 @@ def test_search_google():
                       results_origin_country, date_range, exactTerms, excludeTerms, filter, geolocation,ui_language,
                       search_result_language, safesearch, site_blacklist, sort_results_by)
     print(result)
-
+    return result
 
 # FIXME - untested
 def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
@@ -1368,6 +1452,11 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
         output_dict["processing_error"] = f"Error processing Google results: {str(e)}"
 
 def test_parse_google_results():
+    parsed_results = {}
+    raw_results = {}
+    raw_results = test_search_google()
+    parse_google_results(raw_results, parsed_results)
+    print(parsed_results)
     pass
 
 
