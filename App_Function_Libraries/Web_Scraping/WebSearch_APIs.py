@@ -2,12 +2,14 @@
 # Description: This file contains the functions that are used for performing queries against various Search Engine APIs
 #
 # Imports
+import asyncio
 import json
 import logging
+from html import unescape
+import pytest
 import random
 import re
 import time
-from html import unescape
 from typing import Optional, Dict, Any, List
 from urllib.parse import urlparse, urlencode, unquote
 #
@@ -23,6 +25,9 @@ from App_Function_Libraries.Chat.Chat_Functions import chat_api_call
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import loaded_config_data
+from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
+
+
 #
 #######################################################################################################################
 #
@@ -169,28 +174,13 @@ def generate_and_search(question: str, search_params: Dict) -> Dict:
     }
 
 
-def analyze_and_aggregate(web_search_results_dict: Dict, sub_query_dict: Dict, search_params: Dict) -> Dict:
-    """
-    Analyzes the relevance of search results and aggregates the final answer.
-
-    Args:
-        web_search_results_dict (Dict): A dictionary containing all search results and related metadata.
-        sub_query_dict (Dict): A dictionary containing sub-queries and related metadata.
-        search_params (Dict): A dictionary containing parameters for performing web searches
-                              and specifying LLM endpoints.
-
-    Returns:
-        Dict: A dictionary containing:
-            - final_answer: The aggregated final answer.
-            - relevant_results: The filtered relevant results.
-            - web_search_results_dict: The original search results and metadata.
-    """
+async def analyze_and_aggregate(web_search_results_dict: Dict, sub_query_dict: Dict, search_params: Dict) -> Dict:
     logging.info("Starting analyze_and_aggregate")
 
     # 4. Score/filter results
     logging.info("Scoring and filtering search results")
     sub_questions = sub_query_dict.get("sub_questions", [])
-    relevant_results = search_result_relevance(
+    relevant_results = await search_result_relevance(
         web_search_results_dict["results"],
         sub_query_dict["main_goal"],
         sub_questions,
@@ -223,7 +213,8 @@ def analyze_and_aggregate(web_search_results_dict: Dict, sub_query_dict: Dict, s
     }
 
 
-def test_perplexity_pipeline():
+@pytest.mark.asyncio
+async def test_perplexity_pipeline():
     # Phase 1: Generate sub-queries and perform web searches
     search_params = {
         "engine": "google",
@@ -248,7 +239,7 @@ def test_perplexity_pipeline():
     phase1_results = generate_and_search("What is the capital of France?", search_params)
     # Review the results here if needed
     # Phase 2: Analyze relevance and aggregate final answer
-    phase2_results = analyze_and_aggregate(phase1_results["web_search_results_dict"], phase1_results["sub_query_dict"], search_params)
+    phase2_results = await analyze_and_aggregate(phase1_results["web_search_results_dict"], phase1_results["sub_query_dict"], search_params)
     print(phase2_results["final_answer"])
 
 
@@ -344,7 +335,7 @@ def analyze_question(question: str, api_endpoint) -> Dict:
 ######################### Relevance Analysis #########################
 #
 # FIXME - Ensure edge cases are handled properly / Structured outputs?
-def search_result_relevance(
+async def search_result_relevance(
     search_results: List[Dict],
     original_question: str,
     sub_questions: List[str],
@@ -422,8 +413,10 @@ def search_result_relevance(
                     if is_relevant:
                         # Use the 'id' from the result if available, otherwise use idx
                         result_id = result.get("id", str(idx))
+                        # Scrape the content of the relevant result
+                        scraped_content = await scrape_article(result['url'])
                         relevant_results[result_id] = {
-                            "content": content,
+                            "content": scraped_content['content'],
                             "reasoning": reasoning
                         }
                         logging.info(f"Relevant result found: ID={result_id} Reasoning={reasoning}")
