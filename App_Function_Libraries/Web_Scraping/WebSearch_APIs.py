@@ -33,130 +33,29 @@ from App_Function_Libraries.Utils.Utils import loaded_config_data
 #
 # Functions:
 
-# FIXME - Add Logging
-
-def test_process_question():
-    results = process_question("What is the capital of France?", {
-        "engine": "google",
-        "content_country": "US",
-        "search_lang": "en",
-        "output_lang": "en",
-        "result_count": 10,
-        "date_range": "y",
-        "safesearch": "moderate",
-        "site_blacklist": ["example.com", "spam-site.com"],
-        "exactTerms": None,
-        "excludeTerms": None,
-        "filter": None,
-        "geolocation": None,
-        "search_result_language": None,
-        "sort_results_by": None,
-        "subquery_generation": True,
-        "subquery_generation_llm": "openai",
-        "relevance_analysis_llm": "openai",
-        "final_answer_llm": "openai"
-    })
-    print(results)
-    pass
 
 
 ######################### Main Orchestration Workflow #########################
 #
-def process_question(question: str, search_params: Dict) -> Dict:
+# FIXME - Add Logging
+
+def initialize_web_search_results_dict(search_params: Dict) -> Dict:
     """
-    Orchestrates the entire pipeline:
-      1. Optionally generate sub-queries (if subquery_generation=True).
-      2. Perform web searches for each query (the original and sub-queries).
-      3. Score results for relevance; filter them.
-      4. Aggregate final answer from relevant results.
+    Initializes and returns a dictionary for storing web search results and metadata.
 
     Args:
-        question (str): The user's original question or query.
-        search_params (Dict): A dictionary containing parameters for performing web searches
-                              and specifying LLM endpoints.
+        search_params (Dict): A dictionary containing search parameters.
 
     Returns:
-        Dict: A dictionary containing all relevant data, including results from each sub-query.
-
-        A dictionary containing parameters for performing a web search and processing the results.
-
-        Dict Parameters:
-            engine (str): The search engine to use (e.g., "google", "bing", "brave", "duckduckgo", etc.).
-            content_country (str): The country code for content localization (e.g., "US", "UK", "DE").
-            search_lang (str): The language for the search query (e.g., "en" for English).
-            output_lang (str): The desired language for the search results.
-            result_count (int): The number of results to return.
-            date_range (str or None): The time range for the search results (e.g., "y" for the past year).
-            safesearch (str or None): The safe search setting (e.g., "moderate", "strict", "off").
-            site_blacklist (list or None): A list of sites to exclude from the search results.
-            exactTerms (str or None): Terms that must appear in the search results.
-            excludeTerms (str or None): Terms that must not appear in the search results.
-            filter (str or None): Any additional filtering criteria.
-            geolocation (str or None): Geographical location for search results.
-            search_result_language (str or None): The language of the search results.
-            sort_results_by (str or None): Criteria for sorting the results.
-            subquery_generation (bool): Whether to generate sub-queries.
-            subquery_generation_api (str): The API to use for sub-query generation (e.g., "openai", "anthropic", "deepseek").
-            relevance_analysis_llm (str): The LLM model to use for relevance analysis (e.g., "openai", "anthropic", "deepseek").
-            final_answer_llm (str): The LLM model to use for generating the final answer (e.g., "openai", "anthropic", "deepseek").
-
-        Example:
-            search_params = {
-                "engine": "google",
-                "content_country": "US",
-                "search_lang": "en",
-                "output_lang": "en",
-                "result_count": 10,
-                "date_range": "y",
-                "safesearch": "moderate",
-                "site_blacklist": ["example.com", "spam-site.com"],
-                "exactTerms": None,
-                "excludeTerms": None,
-                "filter": None,
-                "geolocation": None,
-                "search_result_language": None,
-                "sort_results_by": None,
-                "subquery_generation": True,
-                "subquery_generation_llm": "openai",
-                "relevance_analysis_llm": "openai",
-                "final_answer_llm": "openai"
-            }
+        Dict: A dictionary initialized with search metadata.
     """
-    logging.info(f"Starting process_question with query: {question}")
-    # Validate input parameters
-    if not question or not isinstance(question, str):
-        raise ValueError("Invalid question parameter")
-    if not search_params or not isinstance(search_params, dict):
-        raise ValueError("Invalid search_params parameter")
-
-    # 1. Generate sub-queries if requested
-    logging.info(f"Generating sub-queries for the query: {question}")
-    sub_queries = []
-    sub_query_dict = {
-        "main_goal": question,
-        "sub_questions": [],
-        "search_queries": [],
-        "analysis_prompt": None
-    }
-
-    if search_params.get("subquery_generation", False):
-        logging.info("Sub-query generation enabled")
-        api_endpoint = search_params.get("subquery_generation_llm", "openai")
-        sub_query_dict = analyze_question(question, api_endpoint)
-        sub_queries = sub_query_dict.get("sub_questions", [])
-
-    # Merge original question with sub-queries
-    logging.info(f"Sub-queries generated: {sub_queries}")
-    all_queries = [question] + sub_queries
-
-    # 2. Initialize a single web_search_results_dict
-    web_search_results_dict = {
+    return {
         "search_engine": search_params.get('engine', 'google'),
-        "search_query": question,
+        "search_query": "",
         "content_country": search_params.get('content_country', 'US'),
         "search_lang": search_params.get('search_lang', 'en'),
         "output_lang": search_params.get('output_lang', 'en'),
-        "result_count": 0,  # Will be updated as results are added
+        "result_count": 0,
         "date_range": search_params.get('date_range'),
         "safesearch": search_params.get('safesearch', 'moderate'),
         "site_blacklist": search_params.get('site_blacklist', []),
@@ -172,6 +71,59 @@ def process_question(question: str, search_params: Dict) -> Dict:
         "error": None,
         "processing_error": None
     }
+
+def generate_and_search(question: str, search_params: Dict) -> Dict:
+    """
+    Generates sub-queries (if enabled) and performs web searches for each query.
+
+    Args:
+        question (str): The user's original question or query.
+        search_params (Dict): A dictionary containing parameters for performing web searches
+                              and specifying LLM endpoints.
+
+    Returns:
+        Dict: A dictionary containing all search results and related metadata.
+
+    Raises:
+        ValueError: If the input parameters are invalid.
+    """
+    logging.info(f"Starting generate_and_search with query: {question}")
+
+    # Validate input parameters
+    if not question or not isinstance(question, str):
+        raise ValueError("Invalid question parameter")
+    if not search_params or not isinstance(search_params, dict):
+        raise ValueError("Invalid search_params parameter")
+
+    # Check for required keys in search_params
+    required_keys = ["engine", "content_country", "search_lang", "output_lang", "result_count"]
+    for key in required_keys:
+        if key not in search_params:
+            raise ValueError(f"Missing required key in search_params: {key}")
+
+    # 1. Generate sub-queries if requested
+    logging.info(f"Generating sub-queries for the query: {question}")
+    sub_queries = []
+    sub_query_dict = {
+        "main_goal": question,
+        "sub_questions": [],
+        "search_queries": [],
+        "analysis_prompt": None
+    }
+
+    if search_params.get("subquery_generation", False):
+        logging.info("Sub-query generation enabled")
+        api_endpoint = search_params.get("subquery_generation_llm", "openai")
+        sub_query_dict = analyze_question(question, api_endpoint)
+
+    # Merge original question with sub-queries
+    sub_queries = sub_query_dict.get("sub_questions", [])
+    logging.info(f"Sub-queries generated: {sub_queries}")
+    all_queries = [question] + sub_queries
+
+    # 2. Initialize a single web_search_results_dict
+    web_search_results_dict = initialize_web_search_results_dict(search_params)
+    web_search_results_dict["search_query"] = question
 
     # 3. Perform searches and accumulate all raw results
     for q in all_queries:
@@ -195,8 +147,9 @@ def process_question(question: str, search_params: Dict) -> Dict:
         )
 
         if not isinstance(raw_results, dict) or "processing_error" in raw_results:
-            logging.warning(f"Error or invalid data returned for query '{q}': {raw_results}")
+            logging.error(f"Error or invalid data returned for query '{q}': {raw_results}")
             continue
+
         logging.info(f"Search results found for query '{q}': {len(raw_results.get('results', []))}")
 
         # Append results to the single web_search_results_dict
@@ -205,46 +158,93 @@ def process_question(question: str, search_params: Dict) -> Dict:
         web_search_results_dict["search_time"] += raw_results.get("search_time", 0.0)
         logging.info(f"Total results found so far: {len(web_search_results_dict['results'])}")
 
+    return {
+        "web_search_results_dict": web_search_results_dict,
+        "sub_query_dict": sub_query_dict
+    }
+
+
+def analyze_and_aggregate(web_search_results_dict: Dict, sub_query_dict: Dict, search_params: Dict) -> Dict:
+    """
+    Analyzes the relevance of search results and aggregates the final answer.
+
+    Args:
+        web_search_results_dict (Dict): A dictionary containing all search results and related metadata.
+        sub_query_dict (Dict): A dictionary containing sub-queries and related metadata.
+        search_params (Dict): A dictionary containing parameters for performing web searches
+                              and specifying LLM endpoints.
+
+    Returns:
+        Dict: A dictionary containing:
+            - final_answer: The aggregated final answer.
+            - relevant_results: The filtered relevant results.
+            - web_search_results_dict: The original search results and metadata.
+    """
+    logging.info("Starting analyze_and_aggregate")
 
     # 4. Score/filter results
-    # FIXME - allow for user interaction at this point as well
     logging.info("Scoring and filtering search results")
+    sub_questions = sub_query_dict.get("sub_questions", [])
     relevant_results = search_result_relevance(
         web_search_results_dict["results"],
-        question,
-        sub_query_dict['sub_questions'],
+        sub_query_dict["main_goal"],
+        sub_questions,
         search_params.get('relevance_analysis_llm')
     )
+    # FIXME
+    print("Relevant results returned by search_result_relevance:")
+    print(json.dumps(relevant_results, indent=2))
 
-    # 5. Allow user to review and select relevant results (if enabled) or perform further searches/query refinement
+    # 5. Allow user to review and select relevant results (if enabled)
     logging.info("Reviewing and selecting relevant results")
     if search_params.get("user_review", False):
-        logging.info("User review not enabled")
-        relevant_results = review_and_select_results({"results": list(relevant_results.values())})
-    elif search_params.get("user_review", True):
         logging.info("User review enabled")
         relevant_results = review_and_select_results({"results": list(relevant_results.values())})
-        # FIXME - Add return logic here so the function returns and another function picks up
-        # FIXME -   the user can then decide to continue or repeat the process/stop
-        return {
-            "web_search_results_dict": web_search_results_dict  # Pass the single dict back
-        }
 
     # 6. Summarize/aggregate final answer
     final_answer = aggregate_results(
         relevant_results,
-        question,
-        sub_query_dict['sub_questions'],
+        sub_query_dict["main_goal"],
+        sub_questions,
         search_params.get('final_answer_llm')
     )
 
-    # 7. Return the final data, including the single web_search_results_dict
+    # 7. Return the final data
     logging.info("Returning final websearch results")
     return {
         "final_answer": final_answer,
         "relevant_results": relevant_results,
-        "web_search_results_dict": web_search_results_dict  # Pass the single dict back
+        "web_search_results_dict": web_search_results_dict
     }
+
+
+def test_perplexity_pipeline():
+    # Phase 1: Generate sub-queries and perform web searches
+    search_params = {
+        "engine": "google",
+        "content_country": "countryUS",
+        "search_lang": "en",
+        "output_lang": "en",
+        "result_count": 10,
+        "date_range": None,
+        "safesearch": "active",
+        "site_blacklist": ["spam-site.com"],
+        "exactTerms": None,
+        "excludeTerms": None,
+        "filter": None,
+        "geolocation": None,
+        "search_result_language": None,
+        "sort_results_by": None,
+        "subquery_generation": True,
+        "subquery_generation_llm": "openai",
+        "relevance_analysis_llm": "openai",
+        "final_answer_llm": "openai"
+    }
+    phase1_results = generate_and_search("What is the capital of France?", search_params)
+    # Review the results here if needed
+    # Phase 2: Analyze relevance and aggregate final answer
+    phase2_results = analyze_and_aggregate(phase1_results["web_search_results_dict"], phase1_results["sub_query_dict"], search_params)
+    print(phase2_results["final_answer"])
 
 
 ######################### Question Analysis #########################
@@ -358,7 +358,7 @@ def search_result_relevance(
         Dict[str, Dict]: A dictionary of relevant results, keyed by a unique ID or index.
     """
     relevant_results = {}
-
+    print("WHAT THE FUCK")
     for idx, result in enumerate(search_results):
         content = result.get("content", "")
         if not content:
@@ -385,6 +385,7 @@ def search_result_relevance(
         input_data = "Evaluate the relevance of the search result."
 
         try:
+            print("WHAT THE FUCK")
             # Perform API call to evaluate relevance
             relevancy_result = chat_api_call(
                 api_endpoint=api_endpoint,
@@ -394,8 +395,12 @@ def search_result_relevance(
                 temp=0.7
             )
 
+            # FIXME
+            print(f"[DEBUG] Relevancy LLM response for index {idx}:\n{relevancy_result}\n---")
+
             if relevancy_result:
                 # Extract the selected answer and reasoning via regex
+                print(f"LLM Relevancy Response for item {idx}:", relevancy_result)
                 selected_answer_match = re.search(
                     r"Selected Answer:\s*(True|False)",
                     relevancy_result,
@@ -624,6 +629,16 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
                 "safesearch": safesearch or "off",  # Default value,
             }
 
+            # If site_blacklist has multiple domains, do not use siteSearch
+            if site_blacklist and len(site_blacklist) == 1:
+                google_args["siteSearch"] = site_blacklist[0]
+                google_args["siteSearchFilter"] = "e"
+            else:
+                # Do not use siteSearch for multiple domains
+                # Either skip it entirely or see Option 2 below
+                google_args.pop("siteSearch", None)
+                google_args.pop("siteSearchFilter", None)
+
             # Add optional parameters only if they are provided
             if date_range:
                 google_args["date_range"] = date_range
@@ -661,6 +676,9 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
 
         # Process the raw search results
         web_search_results_dict = process_web_search_results(web_search_results, search_engine)
+        # FIXME
+        print("After process_web_search_results:")
+        print(json.dumps(web_search_results_dict, indent=2))
         return web_search_results_dict
 
     except Exception as e:
@@ -673,7 +691,7 @@ def test_perform_websearch_google():
         test_1 = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10)
         print(f"Test 1: {test_1}")
         # FIXME - Fails. Need to fix arg formatting
-        test_2 = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10, date_range="y", safesearch="moderate", site_blacklist=["example.com", "spam-site.com"])
+        test_2 = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10, date_range="y", safesearch="moderate", site_blacklist=["spam-site.com"])
         print(f"Test 2: {test_2}")
         test_3 = results = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10)
         print(f"Test 3: {test_3}")
@@ -1450,7 +1468,7 @@ def search_web_google(
     :param ui_language: Language of the user interface
     :param search_result_language: Language of search results
     :param safesearch: Safe search setting
-    :param site_blacklist: Sites to exclude from search
+    :param site_blacklist: Single Site to exclude from search
     :param sort_results_by: Sorting criteria for results
     :return: JSON response from Google Search API
     """
@@ -1511,9 +1529,6 @@ def search_web_google(
             safesearch = loaded_config_data['search_engines']['google_safe_search']
         if safesearch:
             params["safe"] = safesearch
-        if site_blacklist:
-            params["siteSearch"] = site_blacklist
-            params["siteSearchFilter"] = "e"  # Exclude these sites
         if sort_results_by:
             params["sort"] = sort_results_by
 
@@ -1547,7 +1562,7 @@ def test_search_google():
     google_search_engine_id = loaded_config_data['search_engines']['google_search_engine_id']
     result_count = 10
     c2coff = "1"
-    results_origin_country = "US"
+    results_origin_country = "countryUS"
     date_range = None
     exactTerms = None
     excludeTerms = None
@@ -1588,6 +1603,9 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
         output_dict (Dict): Dictionary to store processed results
     """
     logging.info(f"Raw results received: {json.dumps(raw_results, indent=2)}")
+    # FIXME
+    print("Raw web_search_results from Google:")
+    print(json.dumps(raw_results, indent=2))
     try:
         # Initialize results list if not present
         if "results" not in output_dict:
