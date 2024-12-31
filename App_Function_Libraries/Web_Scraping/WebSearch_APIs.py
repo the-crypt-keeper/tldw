@@ -363,7 +363,6 @@ def search_result_relevance(
         Dict[str, Dict]: A dictionary of relevant results, keyed by a unique ID or index.
     """
     relevant_results = {}
-    print("WHAT THE FUCK #1")
     for idx, result in enumerate(search_results):
         content = result.get("content", "")
         if not content:
@@ -390,7 +389,6 @@ def search_result_relevance(
         input_data = "Evaluate the relevance of the search result."
 
         try:
-            print("WHAT THE FUCK #2")
             # Perform API call to evaluate relevance
             relevancy_result = chat_api_call(
                 api_endpoint=api_endpoint,
@@ -401,11 +399,11 @@ def search_result_relevance(
             )
 
             # FIXME
-            print(f"[DEBUG] Relevancy LLM response for index {idx}:\n{relevancy_result}\n---")
+            logging.debug(f"[DEBUG] Relevancy LLM response for index {idx}:\n{relevancy_result}\n---")
 
             if relevancy_result:
                 # Extract the selected answer and reasoning via regex
-                print(f"LLM Relevancy Response for item {idx}:", relevancy_result)
+                logging.debug(f"LLM Relevancy Response for item {idx}:", relevancy_result)
                 selected_answer_match = re.search(
                     r"Selected Answer:\s*(True|False)",
                     relevancy_result,
@@ -684,8 +682,8 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
         # Process the raw search results
         web_search_results_dict = process_web_search_results(web_search_results, search_engine)
         # FIXME
-        print("After process_web_search_results:")
-        print(json.dumps(web_search_results_dict, indent=2))
+        #logging.debug("After process_web_search_results:")
+        #logging.debug(json.dumps(web_search_results_dict, indent=2))
         return web_search_results_dict
 
     except Exception as e:
@@ -1598,8 +1596,8 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
     """
     logging.info(f"Raw results received: {json.dumps(raw_results, indent=2)}")
     # For debugging only FIXME
-    print("Raw web_search_results from Google:")
-    print(json.dumps(raw_results, indent=2))
+    logging.debug("Raw web_search_results from Google:")
+    logging.debug(json.dumps(raw_results, indent=2))
     try:
         # Initialize results list if not present
         if "results" not in output_dict:
@@ -1717,7 +1715,7 @@ def search_web_kagi(query: str, limit: int = 10) -> Dict:
 
     response = requests.get(endpoint, headers=headers, params=params)
     response.raise_for_status()
-    print(response.json())
+    logging.debug(response.json())
     return response.json()
 
 
