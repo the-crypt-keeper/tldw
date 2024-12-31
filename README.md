@@ -611,6 +611,8 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   * https://www.getcoralai.com/
   * https://getcahier.com/#features
   * https://msty.app/
+  * https://afforai.com
+  * https://penno.io/
 ------------
 
 ### <a name="credits"></a>Credits
