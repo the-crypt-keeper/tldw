@@ -14,12 +14,30 @@ This page serves as documentation regarding the web search functionality within 
 
 
 ### Current Status
-- Bing, Brave, DDG, Google work.
+- Bing, Brave, DDG, Google work for simple searches. Advanced search options are not fully working yet.
+    - Brave: https://api.search.brave.com/app/documentation/web-search/query#WebSearchAPIQueryParameters
+    - Bing: https://docs.microsoft.com/en-us/rest/api/cognitiveservices-bingsearch/bing-web-api-v7-reference
+    - Google: https://developers.google.com/custom-search/v1/reference/rest/v1/cse/list
 - Baidu, SearX, Serper, Tavily, Yandex are not implemented yet.
 - Kagi & SearX are implemented but not working (Kagi because API access and SearX because I'm not sure why)
 - Parsing works for Bing, Brave, DDG, Google.
 - Currently no use of Structured outputs (to-do...)
-- 
+- Full Pipeline works.
+    1. User enters query + Search options
+    2. Query is processed, sub-queries are generated(if specified)
+    3. Each query is sent to the search engine API
+    4. Search results are returned
+    5. Each search result is analyzed, if relevant, the full page is fetched and stored in the results dict
+    6. Results are then aggregated and presented to the user
+- **To Do:**
+    1. Implement rate limiting for search engines/LLM API calls
+    2. Implement the saving options (Web Search DB - allow for saving search results in DB, File, Clipboard, Notes DB - allow for saving search report + citations in a note)
+    2. User can also select which results are relevant, and which are not, and remove irrelevant results from the `web_search_results_dict`
+    3. Implement the remaining search engines (Baidu, SearX, Serper, Tavily, Yandex)
+    4. Implement the advanced search options
+    5. Implement the structured outputs
+    6. Implement the various output options (Style/Format) / Allow the user to customize the aggregation prompt
+    7. Provide the user with follow-up questions + potential other questions, if these are selected, the content is added to the 'ongoing' document
 
 
 ----------------

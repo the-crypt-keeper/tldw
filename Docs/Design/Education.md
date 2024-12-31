@@ -12,6 +12,7 @@ https://github.com/thiswillbeyourgithub/AnkiAIUtils
 https://news.ycombinator.com/item?id=42534931
 https://ankiweb.net/shared/info/1531888719
 https://bbycroft.net/llm
+https://github.com/met4citizen/TalkingHead
 
 
 one2manny
