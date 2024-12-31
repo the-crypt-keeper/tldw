@@ -42,6 +42,10 @@ https://ai.gopubby.com/agentic-rags-extending-rags-to-sql-databases-1509b25ca3e7
 https://ai.plainenglish.io/a-deep-dive-into-golden-retriever-eea3396af3b4
 https://github.com/AhmedAl93/multimodal-agentic-RAG
 https://hub.athina.ai/athina-originals/end-to-end-implementation-of-unstructured-rag/
+https://medium.com/@eliot64/bridging-legal-ai-and-trust-how-we-won-the-llm-x-law-hackathon-45081a8681d9
+https://arxiv.org/abs/2412.15563
+https://arxiv.org/pdf/2410.10293v1
+https://arxiv.org/pdf/2409.02098v1
 
 
 GraphRAG
@@ -76,6 +80,10 @@ GraphRAG
 	https://pub.towardsai.net/building-a-knowledge-graph-from-unstructured-text-data-a-step-by-step-guide-c14c926c2229
 	https://www.youtube.com/watch?v=g6xBklAIrsA
 	https://neuml.hashnode.dev/advanced-rag-with-graph-path-traversal
+https://volodymyrpavlyshyn.medium.com/unified-knowledge-graph-model-rdf-rdf-vs-lpg-the-end-of-war-a7c14d6ac76f
+
+
+
 
 
 ### Links

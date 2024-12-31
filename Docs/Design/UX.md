@@ -82,7 +82,7 @@ https://uxdesign.cc/simple-recall-testing-for-b2b-ux-134e18330da9
 https://lovable.dev/
 https://markwhen.com/
 https://kando.menu/
-
+https://deepseek-artifacts.vercel.app/
 
 
 Prompt Engineering page:

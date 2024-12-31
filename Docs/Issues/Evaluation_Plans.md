@@ -49,7 +49,7 @@ https://huggingface.co/spaces/bigcode/bigcodebench-leaderboard
 https://www.atla-ai.com/post/evaluating-the-evaluator
 https://hamel.dev/blog/posts/llm-judge/
 https://github.com/scrapinghub/article-extraction-benchmark
-
+https://github.com/Zhe-Young/SelfCorrectDecompose
 
 Have LLMs play Social deception games
 Different results depending on batch size during evaluations - https://x.com/bnjmn_marie/status/1846834917608407199
