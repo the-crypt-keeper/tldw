@@ -146,14 +146,19 @@ def generate_and_search(question: str, search_params: Dict) -> Dict:
             sort_results_by=search_params.get('sort_results_by')
         )
 
-        if not isinstance(raw_results, dict) or "processing_error" in raw_results:
+        # Debug: Inspect raw results
+        logging.debug(f"Raw results for query '{q}': {raw_results}")
+
+        # Check for errors or invalid data
+        if not isinstance(raw_results, dict) or raw_results.get("processing_error"):
             logging.error(f"Error or invalid data returned for query '{q}': {raw_results}")
+            print(f"Error or invalid data returned for query '{q}': {raw_results}")
             continue
 
         logging.info(f"Search results found for query '{q}': {len(raw_results.get('results', []))}")
 
         # Append results to the single web_search_results_dict
-        web_search_results_dict["results"].extend(raw_results.get("results", []))
+        web_search_results_dict["results"].extend(raw_results["results"])
         web_search_results_dict["total_results_found"] += raw_results.get("total_results_found", 0)
         web_search_results_dict["search_time"] += raw_results.get("search_time", 0.0)
         logging.info(f"Total results found so far: {len(web_search_results_dict['results'])}")
@@ -358,7 +363,7 @@ def search_result_relevance(
         Dict[str, Dict]: A dictionary of relevant results, keyed by a unique ID or index.
     """
     relevant_results = {}
-    print("WHAT THE FUCK")
+    print("WHAT THE FUCK #1")
     for idx, result in enumerate(search_results):
         content = result.get("content", "")
         if not content:
@@ -385,7 +390,7 @@ def search_result_relevance(
         input_data = "Evaluate the relevance of the search result."
 
         try:
-            print("WHAT THE FUCK")
+            print("WHAT THE FUCK #2")
             # Perform API call to evaluate relevance
             relevancy_result = chat_api_call(
                 api_endpoint=api_endpoint,
@@ -654,7 +659,9 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
                 google_args["sort_results_by"] = sort_results_by
 
             # Call the search_web_google function with the prepared arguments
-            web_search_results = search_web_google(**google_args)
+            web_search_results = search_web_google(**google_args)  # raw JSON
+            web_search_results_dict = process_web_search_results(web_search_results, "google")
+            return web_search_results_dict
 
         elif search_engine.lower() == "kagi":
             web_search_results = search_web_kagi(search_query, content_country)
@@ -851,21 +858,7 @@ def process_web_search_results(search_results: Dict, search_engine: str) -> Dict
         "geolocation": search_results.get("geolocation", None),
         "search_result_language": search_results.get("search_result_language", None),
         "sort_results_by": search_results.get("sort_results_by", None),
-        "results": [
-            {
-                "title": str,
-                "url": str,
-                "content": str,
-                "metadata": {
-                    "date_published": Optional[str],
-                    "author": Optional[str],
-                    "source": Optional[str],
-                    "language": Optional[str],
-                    "relevance_score": Optional[float],
-                    "snippet": Optional[str]
-                }
-            },
-        ],
+        "results": [],
         "total_results_found": search_results.get("total_results_found", 0),
         "search_time": search_results.get("search_time", 0.0),
         "error": search_results.get("error", None),
@@ -897,21 +890,22 @@ def process_web_search_results(search_results: Dict, search_engine: str) -> Dict
             raise ValueError(f"Error: Invalid Search Engine Name {search_engine}")
 
         # Process individual search results
-        for result in search_results.get("results", []):
-            processed_result = {
-                "title": result.get("title", ""),
-                "url": result.get("url", ""),
-                "content": result.get("content", ""),
-                "metadata": {
-                    "date_published": result.get("metadata", {}).get("date_published", None),
-                    "author": result.get("metadata", {}).get("author", None),
-                    "source": result.get("metadata", {}).get("source", None),
-                    "language": result.get("metadata", {}).get("language", None),
-                    "relevance_score": result.get("metadata", {}).get("relevance_score", None),
-                    "snippet": result.get("metadata", {}).get("snippet", None)
-                }
-            }
-            web_search_results_dict["results"].append(processed_result)
+        # DELETEME? This breaks the structure of the results
+        # for result in search_results.get("results", []):
+        #     processed_result = {
+        #         "title": result.get("title", ""),
+        #         "url": result.get("url", ""),
+        #         "content": result.get("content", ""),
+        #         "metadata": {
+        #             "date_published": result.get("metadata", {}).get("date_published", None),
+        #             "author": result.get("metadata", {}).get("author", None),
+        #             "source": result.get("metadata", {}).get("source", None),
+        #             "language": result.get("metadata", {}).get("language", None),
+        #             "relevance_score": result.get("metadata", {}).get("relevance_score", None),
+        #             "snippet": result.get("metadata", {}).get("snippet", None)
+        #         }
+        #     }
+        #     web_search_results_dict["results"].append(processed_result)
 
     except Exception as e:
         web_search_results_dict["processing_error"] = f"Error processing search results: {str(e)}"
@@ -1596,14 +1590,14 @@ def test_search_google():
 
 def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
     """
-    Parse Google Custom Search API results and update the output dictionary
+    Parse Google Custom Search API results and update the output dictionary.
 
     Args:
-        raw_results (Dict): Raw Google API response
-        output_dict (Dict): Dictionary to store processed results
+        raw_results (Dict): Raw Google API response.
+        output_dict (Dict): Dictionary to store processed results.
     """
     logging.info(f"Raw results received: {json.dumps(raw_results, indent=2)}")
-    # FIXME
+    # For debugging only FIXME
     print("Raw web_search_results from Google:")
     print(json.dumps(raw_results, indent=2))
     try:
@@ -1643,10 +1637,15 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
                 processed_result = {
                     "title": item.get("title", ""),
                     "url": item.get("link", ""),
+                    # IMPORTANT: 'snippet' is used as 'content'
                     "content": item.get("snippet", ""),
                     "metadata": {
-                        "date_published": item.get("pagemap", {}).get("metatags", [{}])[0].get("article:published_time"),
-                        "author": item.get("pagemap", {}).get("metatags", [{}])[0].get("article:author"),
+                        "date_published": item.get("pagemap", {})
+                                             .get("metatags", [{}])[0]
+                                             .get("article:published_time"),
+                        "author": item.get("pagemap", {})
+                                      .get("metatags", [{}])[0]
+                                      .get("article:author"),
                         "source": item.get("displayLink", None),
                         "language": item.get("language", None),
                         "relevance_score": None,  # Google doesn't provide this directly
@@ -1663,7 +1662,8 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
                     if "metatags" in pagemap and pagemap["metatags"]:
                         metatags = pagemap["metatags"][0]
                         processed_result["metadata"].update({
-                            "description": metatags.get("og:description", metatags.get("description")),
+                            "description": metatags.get("og:description",
+                                                        metatags.get("description")),
                             "keywords": metatags.get("keywords"),
                             "site_name": metatags.get("og:site_name")
                         })
@@ -1674,19 +1674,22 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
         output_dict["pagination"] = {
             "has_next": "nextPage" in raw_results.get("queries", {}),
             "has_previous": "previousPage" in raw_results.get("queries", {}),
-            "current_page": raw_results.get("queries", {}).get("request", [{}])[0].get("startIndex", 1)
+            "current_page": raw_results.get("queries", {})
+                                   .get("request", [{}])[0]
+                                   .get("startIndex", 1)
         }
 
     except Exception as e:
         logging.error(f"Error processing Google results: {str(e)}")
         output_dict["processing_error"] = f"Error processing Google results: {str(e)}"
 
+
 def test_parse_google_results():
     parsed_results = {}
     raw_results = {}
     raw_results = test_search_google()
     parse_google_results(raw_results, parsed_results)
-    print(parsed_results)
+    print(f"Parsed search results: {parsed_results}")
     pass
 
 
