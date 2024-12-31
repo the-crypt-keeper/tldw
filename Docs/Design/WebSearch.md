@@ -30,7 +30,6 @@ This page serves as documentation regarding the web search functionality within 
     5. Each search result is analyzed, if relevant, the full page is fetched and stored in the results dict
     6. Results are then aggregated and presented to the user
 - **To Do:**
-    1. Implement rate limiting for search engines/LLM API calls
     2. Implement the saving options (Web Search DB - allow for saving search results in DB, File, Clipboard, Notes DB - allow for saving search report + citations in a note)
     2. User can also select which results are relevant, and which are not, and remove irrelevant results from the `web_search_results_dict`
     3. Implement the remaining search engines (Baidu, SearX, Serper, Tavily, Yandex)

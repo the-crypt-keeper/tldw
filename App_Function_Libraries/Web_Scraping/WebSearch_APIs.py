@@ -20,14 +20,11 @@ from lxml.html import document_fromstring
 from requests import RequestException
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
-
-from App_Function_Libraries.Chat.Chat_Functions import chat_api_call
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import loaded_config_data
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
-
-
+from App_Function_Libraries.Chat.Chat_Functions import chat_api_call
 #
 #######################################################################################################################
 #
@@ -37,8 +34,6 @@ from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_art
 #######################################################################################################################
 #
 # Functions:
-
-
 
 ######################### Main Orchestration Workflow #########################
 #
@@ -76,6 +71,7 @@ def initialize_web_search_results_dict(search_params: Dict) -> Dict:
         "error": None,
         "processing_error": None
     }
+
 
 def generate_and_search(question: str, search_params: Dict) -> Dict:
     """
@@ -132,6 +128,7 @@ def generate_and_search(question: str, search_params: Dict) -> Dict:
 
     # 3. Perform searches and accumulate all raw results
     for q in all_queries:
+        sleep_time = random.uniform(1, 1.5)  # Add a random delay to avoid rate limiting
         logging.info(f"Performing web search for query: {q}")
         raw_results = perform_websearch(
             search_engine=search_params.get('engine'),
@@ -187,8 +184,8 @@ async def analyze_and_aggregate(web_search_results_dict: Dict, sub_query_dict: D
         search_params.get('relevance_analysis_llm')
     )
     # FIXME
-    print("Relevant results returned by search_result_relevance:")
-    print(json.dumps(relevant_results, indent=2))
+    logging.debug("Relevant results returned by search_result_relevance:")
+    logging.debug(json.dumps(relevant_results, indent=2))
 
     # 5. Allow user to review and select relevant results (if enabled)
     logging.info("Reviewing and selecting relevant results")
@@ -381,6 +378,7 @@ async def search_result_relevance(
 
         try:
             # Perform API call to evaluate relevance
+            sleep_time = random.uniform(0.2, 0.6)  # Add a random delay to avoid rate limiting
             relevancy_result = chat_api_call(
                 api_endpoint=api_endpoint,
                 api_key=None,
