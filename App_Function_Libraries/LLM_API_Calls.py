@@ -202,7 +202,7 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_m
             ],
             "max_tokens": 4096,
             "temperature": temp,
-            "streaming": streaming
+            "stream": streaming
         }
         if streaming:
             logging.debug("OpenAI: Posting request (streaming")
