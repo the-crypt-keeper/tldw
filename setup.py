@@ -21,3 +21,6 @@ setup(
     ],
     python_requires=">=3.9",
 )
+
+# Dev
+pytest-asyncio
