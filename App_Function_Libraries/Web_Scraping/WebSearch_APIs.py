@@ -573,19 +573,61 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
             web_search_results = search_web_baidu(search_query, None, None)
 
         elif search_engine.lower() == "bing":
-            web_search_results = search_web_bing(search_query, search_lang, content_country, date_range, result_count)
+            # Prepare the arguments for search_web_bing
+            bing_args = {
+                "search_query": search_query,
+                "bing_lang": search_lang,
+                "bing_country": content_country,
+                "result_count": result_count,
+                "bing_api_key": loaded_config_data['search_engines'].get('bing_api_key'),  # Fetch Bing API key from config
+                "date_range": date_range,
+            }
+
+            # Call the search_web_bing function with the prepared arguments
+            web_search_results = search_web_bing(**bing_args)
 
         elif search_engine.lower() == "brave":
-                web_search_results = search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
-                                        site_blacklist, date_range)
+            web_search_results = search_web_brave(search_query, content_country, search_lang, output_lang, result_count, safesearch,
+                                    site_blacklist, date_range)
 
         elif search_engine.lower() == "duckduckgo":
             web_search_results = search_web_duckduckgo(search_query, content_country, date_range, result_count)
 
         elif search_engine.lower() == "google":
-            web_search_results = search_web_google(search_query, result_count, content_country, date_range, exactTerms,
-                                     excludeTerms, filter, geolocation, output_lang,
-                          search_result_language, safesearch, site_blacklist, sort_results_by)
+            # Convert site_blacklist list to a comma-separated string
+            if site_blacklist and isinstance(site_blacklist, list):
+                site_blacklist = ",".join(site_blacklist)
+
+            # Prepare the arguments for search_web_google
+            google_args = {
+                "search_query": search_query,
+                "google_search_api_key": loaded_config_data['search_engines']['google_search_api_key'],
+                "google_search_engine_id": loaded_config_data['search_engines']['google_search_engine_id'],
+                "result_count": result_count,
+                "c2coff": "1",  # Default value
+                "results_origin_country": content_country,
+                "ui_language": output_lang,
+                "search_result_language": search_result_language or "lang_en",  # Default value
+                "geolocation": geolocation or "us",  # Default value
+                "safesearch": safesearch or "off",  # Default value
+            }
+
+            # Add optional parameters only if they are provided
+            if date_range:
+                google_args["date_range"] = date_range
+            if exactTerms:
+                google_args["exactTerms"] = exactTerms
+            if excludeTerms:
+                google_args["excludeTerms"] = excludeTerms
+            if filter:
+                google_args["filter"] = filter
+            if site_blacklist:
+                google_args["site_blacklist"] = site_blacklist
+            if sort_results_by:
+                google_args["sort_results_by"] = sort_results_by
+
+            # Call the search_web_google function with the prepared arguments
+            web_search_results = search_web_google(**google_args)
 
         elif search_engine.lower() == "kagi":
             web_search_results = search_web_kagi(search_query, content_country)
@@ -612,9 +654,97 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
     except Exception as e:
         return {"processing_error": f"Error performing web search: {str(e)}"}
 
-def test_perform_websearch():
-    results = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10, date_range="y", safesearch="moderate", site_blacklist=["example.com", "spam-site.com"])
-    print(results)
+
+def test_perform_websearch_google():
+    # Google Searches
+    try:
+        test_1 = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 1: {test_1}")
+        # FIXME - Fails. Need to fix arg formatting
+        test_2 = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10, date_range="y", safesearch="moderate", site_blacklist=["example.com", "spam-site.com"])
+        print(f"Test 2: {test_2}")
+        test_3 = results = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 3: {test_3}")
+    except Exception as e:
+        print(f"Error performing google searches: {str(e)}")
+    pass
+
+
+def test_perform_websearch_bing():
+    # Bing Searches
+    try:
+        test_4 = perform_websearch("bing", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 4: {test_4}")
+        test_5 = perform_websearch("bing", "What is the capital of France?", "US", "en", "en", 10, date_range="y")
+        print(f"Test 5: {test_5}")
+    except Exception as e:
+        print(f"Error performing bing searches: {str(e)}")
+
+
+def test_perform_websearch_brave():
+    # Brave Searches
+    try:
+        test_7 = perform_websearch("brave", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 7: {test_7}")
+    except Exception as e:
+        print(f"Error performing brave searches: {str(e)}")
+
+
+def test_perform_websearch_ddg():
+    # DuckDuckGo Searches
+    try:
+        test_6 = perform_websearch("duckduckgo", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 6: {test_6}")
+    except Exception as e:
+        print(f"Error performing duckduckgo searches: {str(e)}")
+
+
+# FIXME
+def test_perform_websearch_kagi():
+    # Kagi Searches
+    try:
+        test_8 = perform_websearch("kagi", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 8: {test_8}")
+    except Exception as e:
+        print(f"Error performing kagi searches: {str(e)}")
+
+# FIXME
+def test_perform_websearch_serper():
+    # Serper Searches
+    try:
+        test_9 = perform_websearch("serper", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 9: {test_9}")
+    except Exception as e:
+        print(f"Error performing serper searches: {str(e)}")
+
+# FIXME
+def test_perform_websearch_tavily():
+    # Tavily Searches
+    try:
+        test_10 = perform_websearch("tavily", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 10: {test_10}")
+    except Exception as e:
+        print(f"Error performing tavily searches: {str(e)}")
+
+
+# FIXME
+def test_perform_websearch_searx():
+    # Searx Searches
+    try:
+        test_11 = perform_websearch("searx", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 11: {test_11}")
+    except Exception as e:
+        print(f"Error performing searx searches: {str(e)}")
+
+
+# FIXME
+def test_perform_websearch_yandex():
+    #Yandex Searches
+    try:
+        test_12 = perform_websearch("yandex", "What is the capital of France?", "US", "en", "en", 10)
+        print(f"Test 12: {test_12}")
+    except Exception as e:
+        print(f"Error performing yandex searches: {str(e)}")
     pass
 
 #
