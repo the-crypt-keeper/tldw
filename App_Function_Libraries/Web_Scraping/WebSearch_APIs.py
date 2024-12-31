@@ -403,7 +403,7 @@ def search_result_relevance(
 
             if relevancy_result:
                 # Extract the selected answer and reasoning via regex
-                logging.debug(f"LLM Relevancy Response for item {idx}:", relevancy_result)
+                logging.debug(f"LLM Relevancy Response for item:", relevancy_result)
                 selected_answer_match = re.search(
                     r"Selected Answer:\s*(True|False)",
                     relevancy_result,
@@ -460,6 +460,7 @@ def review_and_select_results(web_search_results_dict: Dict) -> Dict:
             relevant_results[str(idx)] = result
 
     return relevant_results
+
 
 ######################### Result Aggregation & Combination #########################
 #
@@ -886,24 +887,6 @@ def process_web_search_results(search_results: Dict, search_engine: str) -> Dict
             parsed_results = parse_yandex_results(search_results, web_search_results_dict)
         else:
             raise ValueError(f"Error: Invalid Search Engine Name {search_engine}")
-
-        # Process individual search results
-        # DELETEME? This breaks the structure of the results
-        # for result in search_results.get("results", []):
-        #     processed_result = {
-        #         "title": result.get("title", ""),
-        #         "url": result.get("url", ""),
-        #         "content": result.get("content", ""),
-        #         "metadata": {
-        #             "date_published": result.get("metadata", {}).get("date_published", None),
-        #             "author": result.get("metadata", {}).get("author", None),
-        #             "source": result.get("metadata", {}).get("source", None),
-        #             "language": result.get("metadata", {}).get("language", None),
-        #             "relevance_score": result.get("metadata", {}).get("relevance_score", None),
-        #             "snippet": result.get("metadata", {}).get("snippet", None)
-        #         }
-        #     }
-        #     web_search_results_dict["results"].append(processed_result)
 
     except Exception as e:
         web_search_results_dict["processing_error"] = f"Error processing search results: {str(e)}"

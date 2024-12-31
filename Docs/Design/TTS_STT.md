@@ -168,13 +168,15 @@ https://github.com/pipecat-ai/pipecat/tree/a367a038f1a3967292b5de5b43b8600a82a73
 https://github.com/lamm-mit/PDF2Audio
 https://github.com/Purfview/whisper-standalone-win
 https://github.com/ictnlp/LLaMA-Omni
-
+https://levelup.gitconnected.com/build-a-real-time-ai-voice-and-video-chat-app-with-function-calling-by-gemini-2-0-49599a48fbe9?gi=c894f6c092be
+https://github.com/agituts/gemini-2-podcast
 https://github.com/SWivid/F5-TTS
 
 
 https://github.com/matatonic/openedai-speech
 
 https://github.com/RVC-Boss/GPT-SoVITS
+https://www.bilibili.com/video/BV11iiNegEGP/
 https://github.com/RVC-Boss/GPT-SoVITS/wiki/GPT%E2%80%90SoVITS%E2%80%90v2%E2%80%90features-(%E6%96%B0%E7%89%B9%E6%80%A7)
 https://rentry.org/GPT-SoVITS-guide
 https://rentry.org/GPT-SoVITS-guide
