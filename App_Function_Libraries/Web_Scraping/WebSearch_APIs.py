@@ -4,7 +4,9 @@
 # Imports
 import json
 import logging
+import random
 import re
+import time
 from html import unescape
 from typing import Optional, Dict, Any, List
 from urllib.parse import urlparse, urlencode, unquote
@@ -121,7 +123,6 @@ def process_question(question: str, search_params: Dict) -> Dict:
             }
     """
     logging.info(f"Starting process_question with query: {question}")
-
     # Validate input parameters
     if not question or not isinstance(question, str):
         raise ValueError("Invalid question parameter")
@@ -129,6 +130,7 @@ def process_question(question: str, search_params: Dict) -> Dict:
         raise ValueError("Invalid search_params parameter")
 
     # 1. Generate sub-queries if requested
+    logging.info(f"Generating sub-queries for the query: {question}")
     sub_queries = []
     sub_query_dict = {
         "main_goal": question,
@@ -138,11 +140,13 @@ def process_question(question: str, search_params: Dict) -> Dict:
     }
 
     if search_params.get("subquery_generation", False):
+        logging.info("Sub-query generation enabled")
         api_endpoint = search_params.get("subquery_generation_llm", "openai")
         sub_query_dict = analyze_question(question, api_endpoint)
         sub_queries = sub_query_dict.get("sub_questions", [])
 
     # Merge original question with sub-queries
+    logging.info(f"Sub-queries generated: {sub_queries}")
     all_queries = [question] + sub_queries
 
     # 2. Initialize a single web_search_results_dict
@@ -171,8 +175,9 @@ def process_question(question: str, search_params: Dict) -> Dict:
 
     # 3. Perform searches and accumulate all raw results
     for q in all_queries:
+        logging.info(f"Performing web search for query: {q}")
         raw_results = perform_websearch(
-            search_engine=search_params.get('engine', 'google'),
+            search_engine=search_params.get('engine'),
             search_query=q,
             content_country=search_params.get('content_country', 'US'),
             search_lang=search_params.get('search_lang', 'en'),
@@ -192,15 +197,18 @@ def process_question(question: str, search_params: Dict) -> Dict:
         if not isinstance(raw_results, dict) or "processing_error" in raw_results:
             logging.warning(f"Error or invalid data returned for query '{q}': {raw_results}")
             continue
+        logging.info(f"Search results found for query '{q}': {len(raw_results.get('results', []))}")
 
         # Append results to the single web_search_results_dict
         web_search_results_dict["results"].extend(raw_results.get("results", []))
         web_search_results_dict["total_results_found"] += raw_results.get("total_results_found", 0)
         web_search_results_dict["search_time"] += raw_results.get("search_time", 0.0)
-
+        logging.info(f"Total results found so far: {len(web_search_results_dict['results'])}")
 
 
     # 4. Score/filter results
+    # FIXME - allow for user interaction at this point as well
+    logging.info("Scoring and filtering search results")
     relevant_results = search_result_relevance(
         web_search_results_dict["results"],
         question,
@@ -208,9 +216,19 @@ def process_question(question: str, search_params: Dict) -> Dict:
         search_params.get('relevance_analysis_llm')
     )
 
-    # 5. Allow user to review and select relevant results
+    # 5. Allow user to review and select relevant results (if enabled) or perform further searches/query refinement
+    logging.info("Reviewing and selecting relevant results")
     if search_params.get("user_review", False):
+        logging.info("User review not enabled")
         relevant_results = review_and_select_results({"results": list(relevant_results.values())})
+    elif search_params.get("user_review", True):
+        logging.info("User review enabled")
+        relevant_results = review_and_select_results({"results": list(relevant_results.values())})
+        # FIXME - Add return logic here so the function returns and another function picks up
+        # FIXME -   the user can then decide to continue or repeat the process/stop
+        return {
+            "web_search_results_dict": web_search_results_dict  # Pass the single dict back
+        }
 
     # 6. Summarize/aggregate final answer
     final_answer = aggregate_results(
@@ -221,6 +239,7 @@ def process_question(question: str, search_params: Dict) -> Dict:
     )
 
     # 7. Return the final data, including the single web_search_results_dict
+    logging.info("Returning final websearch results")
     return {
         "final_answer": final_answer,
         "relevant_results": relevant_results,
@@ -411,6 +430,29 @@ def search_result_relevance(
     return relevant_results
 
 
+def review_and_select_results(web_search_results_dict: Dict) -> Dict:
+    """
+    Allows the user to review and select relevant results from the search results.
+
+    Args:
+        web_search_results_dict (Dict): The dictionary containing all search results.
+
+    Returns:
+        Dict: A dictionary containing only the user-selected relevant results.
+    """
+    relevant_results = {}
+    print("Review the search results and select the relevant ones:")
+    for idx, result in enumerate(web_search_results_dict["results"]):
+        print(f"\nResult {idx + 1}:")
+        print(f"Title: {result['title']}")
+        print(f"URL: {result['url']}")
+        print(f"Content: {result['content'][:200]}...")  # Show a preview of the content
+        user_input = input("Is this result relevant? (y/n): ").strip().lower()
+        if user_input == 'y':
+            relevant_results[str(idx)] = result
+
+    return relevant_results
+
 ######################### Result Aggregation & Combination #########################
 #
 def aggregate_results(
@@ -514,30 +556,6 @@ def aggregate_results(
         "confidence": 0.0
     }
 
-
-def review_and_select_results(web_search_results_dict: Dict) -> Dict:
-    """
-    Allows the user to review and select relevant results from the search results.
-
-    Args:
-        web_search_results_dict (Dict): The dictionary containing all search results.
-
-    Returns:
-        Dict: A dictionary containing only the user-selected relevant results.
-    """
-    relevant_results = {}
-    print("Review the search results and select the relevant ones:")
-    for idx, result in enumerate(web_search_results_dict["results"]):
-        print(f"\nResult {idx + 1}:")
-        print(f"Title: {result['title']}")
-        print(f"URL: {result['url']}")
-        print(f"Content: {result['content'][:200]}...")  # Show a preview of the content
-        user_input = input("Is this result relevant? (y/n): ").strip().lower()
-        if user_input == 'y':
-            relevant_results[str(idx)] = result
-
-    return relevant_results
-
 #
 # End of Orchestration functions
 #######################################################################################################################
@@ -593,6 +611,11 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
 
     except Exception as e:
         return {"processing_error": f"Error performing web search: {str(e)}"}
+
+def test_perform_websearch():
+    results = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10, date_range="y", safesearch="moderate", site_blacklist=["example.com", "spam-site.com"])
+    print(results)
+    pass
 
 #
 ######################### Search Result Parsing ##################################################################
@@ -835,16 +858,21 @@ def search_web_bing(search_query, bing_lang, bing_country, result_count=None, bi
 def test_search_web_bing():
     search_query = "How can I get started learning machine learning?"
     bing_lang = "en"
-    bing_country =  "US"
+    bing_country = "US"
     result_count = 10
     bing_api_key = None
     date_range = None
     result = search_web_bing(search_query, bing_lang, bing_country, result_count, bing_api_key, date_range)
+    # Unparsed results
     print("Bing Search Results:")
     print(result)
+    # Parsed results
+    output_dict = {"results": []}
+    parse_bing_results(result, output_dict)
+    print("Parsed Bing Results:")
+    print(json.dumps(output_dict, indent=2))
 
 
-# FIXME - untested
 def parse_bing_results(raw_results: Dict, output_dict: Dict) -> None:
     """
     Parse Bing search results and update the output dictionary
@@ -853,7 +881,12 @@ def parse_bing_results(raw_results: Dict, output_dict: Dict) -> None:
         raw_results (Dict): Raw Bing API response
         output_dict (Dict): Dictionary to store processed results
     """
+    logging.info(f"Raw Bing results received: {json.dumps(raw_results, indent=2)}")
     try:
+        # Initialize results list if not present
+        if "results" not in output_dict:
+            output_dict["results"] = []
+
         # Extract web pages results
         if "webPages" in raw_results:
             web_pages = raw_results["webPages"]
@@ -905,11 +938,8 @@ def parse_bing_results(raw_results: Dict, output_dict: Dict) -> None:
             ]
 
     except Exception as e:
+        logging.error(f"Error processing Bing results: {str(e)}")
         output_dict["processing_error"] = f"Error processing Bing results: {str(e)}"
-
-
-def test_parse_bing_results():
-    pass
 
 
 ######################### Brave Search #########################
@@ -919,7 +949,7 @@ def test_parse_bing_results():
 def search_web_brave(search_term, country, search_lang, ui_lang, result_count, safesearch="moderate",
                      brave_api_key=None, result_filter=None, search_type="ai", date_range=None):
     search_url = "https://api.search.brave.com/res/v1/web/search"
-    if not brave_api_key:
+    if not brave_api_key and search_type == "web":
         # load key from config file
         brave_api_key = loaded_config_data['search_engines']['brave_search_api_key']
         if not brave_api_key:
@@ -939,8 +969,9 @@ def search_web_brave(search_term, country, search_lang, ui_lang, result_count, s
     if not result_filter:
         result_filter = "webpages"
     if search_type == "ai":
-        # FIXME - Option for switching between AI/Regular search
-        pass
+        brave_api_key = loaded_config_data['search_engines']['brave_search_ai_api_key']
+    else:
+        raise ValueError("Invalid search type. Please choose 'ai' or 'web'.")
 
 
     headers = {"Accept": "application/json", "Accept-Encoding": "gzip", "X-Subscription-Token": brave_api_key}
@@ -966,12 +997,16 @@ def test_search_brave():
     date_range = None
     result_filter = None
     result = search_web_brave(search_term, country, search_lang, ui_lang, result_count, safesearch, date_range,
-                          result_filter)
+                             result_filter)
+    print("Brave Search Results:")
     print(result)
-    return result
+
+    output_dict = {"results": []}
+    parse_brave_results(result, output_dict)
+    print("Parsed Brave Results:")
+    print(json.dumps(output_dict, indent=2))
 
 
-# FIXME - untested
 def parse_brave_results(raw_results: Dict, output_dict: Dict) -> None:
     """
     Parse Brave search results and update the output dictionary
@@ -981,6 +1016,10 @@ def parse_brave_results(raw_results: Dict, output_dict: Dict) -> None:
         output_dict (Dict): Dictionary to store processed results
     """
     try:
+        # Initialize results list if not present
+        if "results" not in output_dict:
+            output_dict["results"] = []
+
         # Extract query information
         if "query" in raw_results:
             query_info = raw_results["query"]
@@ -1023,8 +1062,8 @@ def parse_brave_results(raw_results: Dict, output_dict: Dict) -> None:
             output_dict["family_friendly"] = raw_results.get("family_friendly", True)
 
     except Exception as e:
+        logging.error(f"Error processing Brave results: {str(e)}")
         output_dict["processing_error"] = f"Error processing Brave results: {str(e)}"
-        raise
 
 def test_parse_brave_results():
     pass
@@ -1122,6 +1161,7 @@ def search_web_duckduckgo(
 
     return results
 
+
 def test_search_duckduckgo():
     try:
         results = search_web_duckduckgo(
@@ -1136,6 +1176,12 @@ def test_search_duckduckgo():
             print(f"URL: {result['href']}")
             print(f"Snippet: {result['body']}")
             print("---")
+
+        # Parse the results
+        output_dict = {"results": []}
+        parse_duckduckgo_results({"results": results}, output_dict)
+        print("Parsed DuckDuckGo Results:")
+        print(json.dumps(output_dict, indent=2))
 
     except ValueError as e:
         print(f"Invalid input: {str(e)}")
@@ -1152,26 +1198,28 @@ def parse_duckduckgo_results(raw_results: Dict, output_dict: Dict) -> None:
         output_dict (Dict): Dictionary to store processed results
     """
     try:
-        # DuckDuckGo results appear to be in a simple list format
-        # Each result is separated by "---"
+        # Initialize results list if not present
+        if "results" not in output_dict:
+            output_dict["results"] = []
+
+        # DuckDuckGo results are in a list of dictionaries
         results = raw_results.get("results", [])
 
         for result in results:
-            # Extract information using the consistent format in results
-            title = ""
-            url = ""
-            snippet = ""
+            # Extract information directly from the dictionary
+            title = result.get("title", "")
+            url = result.get("href", "")
+            snippet = result.get("body", "")
 
-            # Parse the result text
-            lines = result.split('\n')
-            for line in lines:
-                if line.startswith("Title: "):
-                    title = line.replace("Title: ", "").strip()
-                elif line.startswith("URL: "):
-                    url = line.replace("URL: ", "").strip()
-                elif line.startswith("Snippet: "):
-                    snippet = line.replace("Snippet: ", "").strip()
+            # Log warnings for missing data
+            if not title:
+                logging.warning("Missing title in result")
+            if not url:
+                logging.warning("Missing URL in result")
+            if not snippet:
+                logging.warning("Missing snippet in result")
 
+            # Add the processed result to the output dictionary
             processed_result = {
                 "title": title,
                 "url": url,
@@ -1192,6 +1240,7 @@ def parse_duckduckgo_results(raw_results: Dict, output_dict: Dict) -> None:
         output_dict["total_results_found"] = len(output_dict["results"])
 
     except Exception as e:
+        logging.error(f"Error processing DuckDuckGo results: {str(e)}")
         output_dict["processing_error"] = f"Error processing DuckDuckGo results: {str(e)}"
 
 
@@ -1212,6 +1261,7 @@ def extract_domain(url: str) -> str:
         return domain.replace('www.', '')
     except:
         return url
+
 
 def test_parse_duckduckgo_results():
     pass
@@ -1364,13 +1414,27 @@ def test_search_google():
     safesearch = "off"
     site_blacklist = None
     sort_results_by = None
-    result = search_web_google(search_query, google_search_api_key, google_search_engine_id, result_count, c2coff,
-                      results_origin_country, date_range, exactTerms, excludeTerms, filter, geolocation,ui_language,
-                      search_result_language, safesearch, site_blacklist, sort_results_by)
+    result = search_web_google(search_query,
+                               google_search_api_key,
+                               google_search_engine_id,
+                               result_count,
+                               c2coff,
+                               results_origin_country,
+                               date_range,
+                               exactTerms,
+                               excludeTerms,
+                               filter,
+                               geolocation,
+                               ui_language,
+                               search_result_language,
+                               safesearch,
+                               site_blacklist,
+                               sort_results_by
+                               )
     print(result)
     return result
 
-# FIXME - untested
+
 def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
     """
     Parse Google Custom Search API results and update the output dictionary
@@ -1379,12 +1443,17 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
         raw_results (Dict): Raw Google API response
         output_dict (Dict): Dictionary to store processed results
     """
+    logging.info(f"Raw results received: {json.dumps(raw_results, indent=2)}")
     try:
+        # Initialize results list if not present
+        if "results" not in output_dict:
+            output_dict["results"] = []
+
         # Extract search information
         if "searchInformation" in raw_results:
             search_info = raw_results["searchInformation"]
             output_dict["total_results_found"] = int(search_info.get("totalResults", "0"))
-            output_dict["search_time"] = search_info.get("searchTime", 0.0)
+            output_dict["search_time"] = float(search_info.get("searchTime", 0.0))
 
         # Extract spelling suggestions
         if "spelling" in raw_results:
@@ -1414,8 +1483,7 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
                     "url": item.get("link", ""),
                     "content": item.get("snippet", ""),
                     "metadata": {
-                        "date_published": item.get("pagemap", {}).get("metatags", [{}])[0].get(
-                            "article:published_time"),
+                        "date_published": item.get("pagemap", {}).get("metatags", [{}])[0].get("article:published_time"),
                         "author": item.get("pagemap", {}).get("metatags", [{}])[0].get("article:author"),
                         "source": item.get("displayLink", None),
                         "language": item.get("language", None),
@@ -1433,8 +1501,7 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
                     if "metatags" in pagemap and pagemap["metatags"]:
                         metatags = pagemap["metatags"][0]
                         processed_result["metadata"].update({
-                            "description": metatags.get("og:description",
-                                                        metatags.get("description")),
+                            "description": metatags.get("og:description", metatags.get("description")),
                             "keywords": metatags.get("keywords"),
                             "site_name": metatags.get("og:site_name")
                         })
@@ -1449,6 +1516,7 @@ def parse_google_results(raw_results: Dict, output_dict: Dict) -> None:
         }
 
     except Exception as e:
+        logging.error(f"Error processing Google results: {str(e)}")
         output_dict["processing_error"] = f"Error processing Google results: {str(e)}"
 
 def test_parse_google_results():
@@ -1557,11 +1625,43 @@ def test_parse_kagi_results():
 #
 # https://searx.space
 # https://searx.github.io/searx/dev/search_api.html
-def search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general'):
-    # Check if API URL is configured
-    searx_url = loaded_config_data['search_engines']['searx_search_api_url']
+def searx_create_session() -> requests.Session:
+    """
+    Create a requests session with retry logic.
+    """
+    session = requests.Session()
+    retries = Retry(
+        total=3,  # Maximum number of retries
+        backoff_factor=1,  # Exponential backoff factor
+        status_forcelist=[429, 500, 502, 503, 504],  # Retry on these status codes
+        allowed_methods=["GET"]  # Only retry on GET requests
+    )
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+def search_web_searx(search_query, language='auto', time_range='', safesearch=0, pageno=1, categories='general', searx_url=None):
+    """
+    Perform a search using a Searx instance.
+
+    Args:
+        search_query (str): The search query.
+        language (str): Language for the search results.
+        time_range (str): Time range for the search results.
+        safesearch (int): Safe search level (0=off, 1=moderate, 2=strict).
+        pageno (int): Page number of the results.
+        categories (str): Categories to search in (e.g., 'general', 'news').
+        searx_url (str): Custom Searx instance URL (optional).
+
+    Returns:
+        str: JSON string containing the search results or an error message.
+    """
+    # Use the provided Searx URL or fall back to the configured one
     if not searx_url:
-        return "SearX Search is disabled and no content was found. This functionality is disabled because the user has not set it up yet."
+        searx_url = loaded_config_data['search_engines']['searx_search_api_url']
+    if not searx_url:
+        return json.dumps({"error": "SearX Search is disabled and no content was found. This functionality is disabled because the user has not set it up yet."})
 
     # Validate and construct URL
     try:
@@ -1575,16 +1675,28 @@ def search_web_searx(search_query, language='auto', time_range='', safesearch=0,
             'categories': categories
         }
         search_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}?{urlencode(params)}"
+        logging.info(f"Search URL: {search_url}")
     except Exception as e:
-        return f"Search is disabled and no content was found. Invalid URL configuration: {str(e)}"
+        return json.dumps({"error": f"Invalid URL configuration: {str(e)}"})
 
     # Perform the search request
     try:
+        # Mimic browser headers
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': 'https://www.google.com/',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         }
 
-        response = requests.get(search_url, headers=headers)
+        # Add a random delay to mimic human behavior
+        delay = random.uniform(2, 5)  # Random delay between 2 and 5 seconds
+        time.sleep(delay)
+
+        session = searx_create_session()
+        response = session.get(search_url, headers=headers)
         response.raise_for_status()
 
         # Check if the response is JSON
@@ -1608,18 +1720,19 @@ def search_web_searx(search_query, language='auto', time_range='', safesearch=0,
             })
 
         if not data:
-            return "No information was found online for the search query."
+            return json.dumps({"error": "No information was found online for the search query."})
 
         return json.dumps(data)
 
     except requests.exceptions.RequestException as e:
-        return f"There was an error searching for content. {str(e)}"
-
+        logging.error(f"Error searching for content: {str(e)}")
+        return json.dumps({"error": f"There was an error searching for content. {str(e)}"})
 
 def test_search_searx():
-    result = search_web_searx("How can I bake a cherry cake?")
+    # Use a different Searx instance to avoid rate limiting
+    searx_url = "https://searx.be"  # Example of a different Searx instance
+    result = search_web_searx("What goes into making a cherry cake?", searx_url=searx_url)
     print(result)
-    pass
 
 def parse_searx_results(searx_search_results, web_search_results_dict):
     pass
