@@ -74,7 +74,8 @@ GraphRAG
 	https://towardsdatascience.com/how-to-query-a-knowledge-graph-with-llms-using-grag-38bfac47a322
 	https://arxiv.org/abs/2408.04187
 	https://pub.towardsai.net/building-a-knowledge-graph-from-unstructured-text-data-a-step-by-step-guide-c14c926c2229
-
+	https://www.youtube.com/watch?v=g6xBklAIrsA
+	https://neuml.hashnode.dev/advanced-rag-with-graph-path-traversal
 
 
 ### Links

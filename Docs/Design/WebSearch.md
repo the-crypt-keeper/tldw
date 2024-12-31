@@ -13,6 +13,15 @@ This page serves as documentation regarding the web search functionality within 
     8. The final product is then passed back to the UI for display to the user.
 
 
+### Current Status
+- Bing, Brave, DDG, Google work.
+- Baidu, SearX, Serper, Tavily, Yandex are not implemented yet.
+- Kagi & SearX are implemented but not working (Kagi because API access and SearX because I'm not sure why)
+- Parsing works for Bing, Brave, DDG, Google.
+- Currently no use of Structured outputs (to-do...)
+- 
+
+
 ----------------
 ### Setting the Stage
 

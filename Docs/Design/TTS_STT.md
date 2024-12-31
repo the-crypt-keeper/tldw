@@ -49,6 +49,22 @@ https://github.com/aedocw/epub2tts
 https://github.com/microsoft/SpeechT5
 https://github.com/smellslikeml/dolla_llama
 
+
+STT
+    https://github.com/KoljaB/RealtimeSTT
+
+TTS
+    https://github.com/KoljaB/RealtimeTTS
+
+101
+    https://www.inferless.com/learn/comparing-different-text-to-speech---tts--models-for-different-use-cases
+    https://clideo.com/resources/what-is-tts
+    RVC 101
+        https://gudgud96.github.io/2024/09/26/annotated-rvc/
+
+Datasets(?)
+    https://voice-models.com/
+
 Bark
 https://github.com/suno-ai/bark
 
@@ -113,6 +129,10 @@ MaskGCT
 
 Parler
     https://github.com/huggingface/parler-tts
+
+
+YourTTS
+    https://github.com/Edresson/YourTTS
 
 
 TTS Pipeline
@@ -389,10 +409,32 @@ GPT-SoviTTS
     https://rentry.org/GPT-SoVITS-guide
     https://github.com/RVC-Boss/GPT-SoVITS
     https://github.com/cpumaxx/sovits-ff-plugin
+    https://github.com/HanxSmile/Simplify-GPT-SoVITS
+    https://github.com/lrxwisdom001/GPT-SoVITS-Novels/tree/main/voice_synthesis
+    openneurosama - https://github.com/JarodMica/open-neruosama/blob/master/main.py
+
 
 https://tts.x86.st/
 Finetuning is very quick (about 5 minutes). Captioning of audio was automated with faster-whisper (it is required that the audio is captioned).
 With the default batch size of 12, training takes 9.5~ GB.
+
+Inference
+    https://github.com/RVC-Boss/GPT-SoVITS/blob/main/GPT_SoVITS/inference_cli.py
+    No WebUI Inference on Colab: https://colab.research.google.com/drive/1gC1lRxuOh4qW8Yz5TA10BEUPR28nJ3VR
+    Training on Colab: https://colab.research.google.com/drive/1NQGKXYxJcJyTPnHsSyusTdD0l4IdMS37#scrollTo=nhyKqVwcPnvz
+    No WebUI Training on Colab: https://colab.research.google.com/drive/1LmeM8yUyT9MTYF8OXc-NiBonvdh6hII6
+
+Datasets
+    https://ai-hub-docs.vercel.app/rvc/resources/datasets/
+    https://mvsep.com/en
+
+API
+    https://github.com/cpumaxx/sovits-ff-plugin
+
+Comfyui integration
+    https://github.com/heshengtao/comfyui_LLM_party
+
+
 
 - **101**
     - F
@@ -404,5 +446,8 @@ With the default batch size of 12, training takes 9.5~ GB.
     - F
 - **Fine-Tuning**
     - F
+
+### Dataset Creation/Curation
+
 
 

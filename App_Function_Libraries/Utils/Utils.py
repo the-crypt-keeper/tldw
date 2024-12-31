@@ -373,6 +373,7 @@ def load_and_log_configs():
         google_search_engine_id = config.get('Search-Engines', 'search_engine_id_google', fallback='')
         google_simp_trad_chinese = config.get('Search-Engines', 'enable_traditional_chinese', fallback='0')
         limit_google_search_to_country = config.get('Search-Engines', 'limit_google_search_to_country', fallback='0')
+        google_search_country = config.get('Search-Engines', 'google_search_country', fallback='us')
         google_search_country_code = config.get('Search-Engines', 'google_search_country_code', fallback='us')
         google_filter_setting = config.get('Search-Engines', 'google_filter_setting', fallback='1')
         google_user_geolocation = config.get('Search-Engines', 'google_user_geolocation', fallback='')
@@ -521,6 +522,7 @@ def load_and_log_configs():
             'google_search_engine_id': google_search_engine_id,
             'google_simp_trad_chinese': google_simp_trad_chinese,
             'limit_google_search_to_country': limit_google_search_to_country,
+            'google_search_country': google_search_country,
             'google_search_country_code': google_search_country_code,
             'google_search_filter_setting': google_filter_setting,
             'google_user_geolocation': google_user_geolocation,
