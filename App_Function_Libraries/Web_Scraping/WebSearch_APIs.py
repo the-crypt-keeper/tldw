@@ -591,7 +591,19 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
                                     site_blacklist, date_range)
 
         elif search_engine.lower() == "duckduckgo":
-            web_search_results = search_web_duckduckgo(search_query, content_country, date_range, result_count)
+            # Prepare the arguments for search_web_duckduckgo
+            ddg_args = {
+                "keywords": search_query,
+                "region": f"{content_country.lower()}-{search_lang.lower()}",  # Format: "us-en"
+                "timelimit": date_range[0] if date_range else None,  # Use first character of date_range (e.g., "y" -> "y")
+                "max_results": result_count,
+            }
+
+            # Call the search_web_duckduckgo function with the prepared arguments
+            ddg_results = search_web_duckduckgo(**ddg_args)
+
+            # Wrap the results in a dictionary to match the expected format
+            web_search_results = {"results": ddg_results}
 
         elif search_engine.lower() == "google":
             # Convert site_blacklist list to a comma-separated string
@@ -609,7 +621,7 @@ def perform_websearch(search_engine, search_query, content_country, search_lang,
                 "ui_language": output_lang,
                 "search_result_language": search_result_language or "lang_en",  # Default value
                 "geolocation": geolocation or "us",  # Default value
-                "safesearch": safesearch or "off",  # Default value
+                "safesearch": safesearch or "off",  # Default value,
             }
 
             # Add optional parameters only if they are provided
@@ -695,6 +707,8 @@ def test_perform_websearch_ddg():
     try:
         test_6 = perform_websearch("duckduckgo", "What is the capital of France?", "US", "en", "en", 10)
         print(f"Test 6: {test_6}")
+        test_7 = perform_websearch("duckduckgo", "What is the capital of France?", "US", "en", "en", 10, date_range="y")
+        print(f"Test 7: {test_7}")
     except Exception as e:
         print(f"Error performing duckduckgo searches: {str(e)}")
 
