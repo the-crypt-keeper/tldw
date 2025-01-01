@@ -85,7 +85,7 @@ def clear_chat_single():
 
 # FIXME - add additional features....
 def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, conversation_id,
-                 save_conversation, temperature, system_prompt, max_tokens=None, top_p=None, frequency_penalty=None,
+                 save_conversation, temperature, system_prompt, streaming=False, max_tokens=None, top_p=None, frequency_penalty=None,
                  presence_penalty=None, stop_sequence=None):
     try:
         if save_conversation:
@@ -107,22 +107,21 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
             full_message = message
 
         # Generate bot response
-        bot_message = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
-                           temperature, system_prompt)
-
-        logging.debug(f"Bot message being returned: {bot_message}")
+        bot_message = ""
+        for chunk in chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
+                          temperature, system_prompt, streaming):
+            bot_message += chunk  # Accumulate the streamed response
+            logging.debug(f"Bot message being returned: {bot_message}")
+            # Yield the incremental response and updated history
+            yield bot_message, history + [(message, bot_message)], conversation_id
 
         if save_conversation:
             # Add assistant message to the database
             save_message(conversation_id, role="assistant", content=bot_message)
 
-        # Update history
-        new_history = history + [(message, bot_message)]
-
-        return bot_message, new_history, conversation_id
     except Exception as e:
         logging.error(f"Error in chat wrapper: {str(e)}")
-        return "An error occurred.", history, conversation_id
+        yield "An error occurred.", history, conversation_id
 
 
 def search_conversations(query):
@@ -174,7 +173,7 @@ def load_conversation(conversation_id):
 
 
 def regenerate_last_message(history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature,
-                            system_prompt):
+                            system_prompt, streaming=False):
     if not history:
         return history, "No messages to regenerate."
 
@@ -189,20 +188,19 @@ def regenerate_last_message(history, media_content, selected_parts, api_endpoint
     if not last_user_message:
         return new_history, "No user message to regenerate the bot response."
 
-    full_message = last_user_message
+    # Generate the new bot response
+    bot_message = ""
+    if streaming:
+        # For streaming, consume the generator and accumulate the response
+        for chunk in chat(last_user_message, new_history, media_content, selected_parts, api_endpoint, api_key,
+                          custom_prompt, temperature, system_prompt, streaming):
+            bot_message += chunk
+    else:
+        # For non-streaming, get the complete response directly
+        bot_message = next(chat(last_user_message, new_history, media_content, selected_parts, api_endpoint, api_key,
+                                custom_prompt, temperature, system_prompt, streaming))
 
-    bot_message = chat(
-        full_message,
-        new_history,
-        media_content,
-        selected_parts,
-        api_endpoint,
-        api_key,
-        custom_prompt,
-        temperature,
-        system_prompt
-    )
-
+    # Update the history with the regenerated message
     new_history.append((last_user_message, bot_message))
 
     return new_history, "Last message regenerated successfully."
@@ -522,7 +520,7 @@ def create_chat_interface():
         regenerate_button.click(
             regenerate_last_message,
             inputs=[chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, temperature,
-                    system_prompt_input],
+                    system_prompt_input, streaming],
             outputs=[chatbot, save_status]
         ).then(
             lambda history: approximate_token_count(history),

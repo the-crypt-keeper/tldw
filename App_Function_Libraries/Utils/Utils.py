@@ -241,10 +241,10 @@ def load_and_log_configs():
         anthropic_temperature = config.get('API', 'anthropic_temperature', fallback='0.7')
         anthropic_top_p = config.get('API', 'anthropic_top_p', fallback='0.95')
         anthropic_min_p = config.get('API', 'anthropic_min_p', fallback='0.05')
-        cohore_streaming = config.get('API', 'cohere_streaming', fallback='False')
-        cohore_temperature = config.get('API', 'cohere_temperature', fallback='0.7')
-        cohore_top_p = config.get('API', 'cohere_top_p', fallback='0.95')
-        cohore_min_p = config.get('API', 'cohere_min_p', fallback='0.05')
+        cohere_streaming = config.get('API', 'cohere_streaming', fallback='False')
+        cohere_temperature = config.get('API', 'cohere_temperature', fallback='0.7')
+        cohere_top_p = config.get('API', 'cohere_top_p', fallback='0.95')
+        cohere_min_p = config.get('API', 'cohere_min_p', fallback='0.05')
         groq_streaming = config.get('API', 'groq_streaming', fallback='False')
         groq_temperature = config.get('API', 'groq_temperature', fallback='0.7')
         groq_top_p = config.get('API', 'groq_top_p', fallback='0.95')
@@ -465,10 +465,10 @@ def load_and_log_configs():
             'cohere_api': {
                 'api_key': cohere_api_key,
                 'model': cohere_model,
-                'streaming': cohore_streaming,
-                'temperature': cohore_temperature,
-                'top_p': cohore_top_p,
-                'min_p': cohore_min_p
+                'streaming': cohere_streaming,
+                'temperature': cohere_temperature,
+                'top_p': cohere_top_p,
+                'min_p': cohere_min_p
             },
             'groq_api': {
                 'api_key': groq_api_key,
