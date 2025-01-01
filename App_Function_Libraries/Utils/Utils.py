@@ -471,6 +471,22 @@ def load_and_log_configs():
                 'top_p': cohere_top_p,
                 'min_p': cohere_min_p
             },
+            'deepseek_api': {
+                'api_key': deepseek_api_key,
+                'model': deepseek_model,
+                'streaming': deepseek_streaming,
+                'temperature': deepseek_temperature,
+                'top_p': deepseek_top_p,
+                'min_p': deepseek_min_p
+            },
+            'google_api': {
+                'api_key': google_api_key,
+                'model': google_model,
+                'streaming': google_streaming,
+                'temperature': google_temperature,
+                'top_p': google_top_p,
+                'min_p': google_min_p
+            },
             'groq_api': {
                 'api_key': groq_api_key,
                 'model': groq_model,
@@ -479,34 +495,10 @@ def load_and_log_configs():
                 'top_p': groq_top_p,
                 'min_p': groq_min_p
             },
-            'openai_api': {
-                'api_key': openai_api_key,
-                'model': openai_model,
-                'streaming': openai_streaming,
-                'temperature': openai_temperature,
-                'top_p': openai_top_p,
-                'min_p': openai_min_p
-            },
             'huggingface_api': {
                 'api_key': huggingface_api_key,
                 'model': huggingface_model,
                 'streaming': huggingface_streaming,
-            },
-            'openrouter_api': {
-                'api_key': openrouter_api_key,
-                'model': openrouter_model,
-                'streaming': openrouter_streaming,
-                'temperature': openrouter_temperature,
-                'top_p': openrouter_top_p,
-                'min_p': openrouter_min_p
-            },
-            'deepseek_api': {
-                'api_key': deepseek_api_key,
-                'model': deepseek_model,
-                'streaming': deepseek_streaming,
-                'temperature': deepseek_temperature,
-                'top_p': deepseek_top_p,
-                'min_p': deepseek_min_p
             },
             'mistral_api': {
                 'api_key': mistral_api_key,
@@ -516,13 +508,21 @@ def load_and_log_configs():
                 'top_p': mistral_top_p,
                 'min_p': mistral_min_p
             },
-            'google_api': {
-                'api_key': google_api_key,
-                'model': google_model,
-                'streaming': google_streaming,
-                'temperature': google_temperature,
-                'top_p': google_top_p,
-                'min_p': google_min_p
+            'openrouter_api': {
+                'api_key': openrouter_api_key,
+                'model': openrouter_model,
+                'streaming': openrouter_streaming,
+                'temperature': openrouter_temperature,
+                'top_p': openrouter_top_p,
+                'min_p': openrouter_min_p
+            },
+            'openai_api': {
+                'api_key': openai_api_key,
+                'model': openai_model,
+                'streaming': openai_streaming,
+                'temperature': openai_temperature,
+                'top_p': openai_top_p,
+                'min_p': openai_min_p
             },
             'elevenlabs_api': {
                 'api_key': elevenlabs_api_key

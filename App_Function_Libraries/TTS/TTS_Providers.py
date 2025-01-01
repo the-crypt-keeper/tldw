@@ -24,7 +24,7 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_conf
 # OpenAI TTS Provider Functions
 
 # https://github.com/leokwsw/OpenAI-TTS-Gradio/blob/main/app.py
-def generate_audio_openai(api_key, input_text, voice, model, response_format="mp3", output_file="speech.mp3"):
+def generate_audio_openai(api_key, input_text, voice, model, response_format="mp3", output_file="speech.mp3", streaming=False):
     """
     Generate audio using OpenAI's Text-to-Speech API.
 
@@ -44,21 +44,14 @@ def generate_audio_openai(api_key, input_text, voice, model, response_format="mp
         RuntimeError: If the API request fails.
     """
     # Validate inputs
-    loaded_config_data = load_and_log_configs()
-    openai_api_key = api_key
 
     # API key validation
     try:
-        if not openai_api_key:
+        if api_key == None:
             logging.info("OpenAI: API key not provided as parameter")
             logging.info("OpenAI: Attempting to use API key from config file")
-            openai_api_key = loaded_config_data['api_keys']['openai']
-
-        if not openai_api_key:
-            logging.error("OpenAI: API key not found or is empty")
-            return "OpenAI: API Key Not Provided/Found in Config file or is empty"
-
-        logging.debug(f"OpenAI: Using API Key: {openai_api_key[:5]}...{openai_api_key[-5:]}")
+            api_key = loaded_config_data['openai_api']['api_key']
+            logging.debug(f"OpenAI: Using API Key: {api_key[:5]}...{api_key[-5:]}")
     except Exception as e:
         logging.error(f"OpenAI: Error loading API Key: {str(e)}")
         return f"OpenAI: Error loading API Key: {str(e)}"
@@ -115,28 +108,42 @@ def generate_audio_openai(api_key, input_text, voice, model, response_format="mp
         "voice": voice,
     }
 
+    if streaming == True:
+        try:
+            # Make the request to the API
+            response = requests.post(endpoint, headers=headers, json=payload, stream=True)
+            response.raise_for_status()  # Raise an error for HTTP status codes >= 400
+
+            # Save the audio response to a file
+            with open(output_file, "wb") as f:
+                f.write(response.content)
+
+            print(f"Audio successfully generated and saved to {output_file}.")
+            return output_file
+
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Failed to generate audio: {str(e)}") from e
+    else:
+        try:
+            # Make the request to the API
+            response = requests.post(endpoint, headers=headers, json=payload)
+            response.raise_for_status()  # Raise an error for HTTP status codes >= 400
+
+            # Save the audio response to a file
+            with open(output_file, "wb") as f:
+                f.write(response.content)
+
+            print(f"Audio successfully generated and saved to {output_file}.")
+            return output_file
+
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Failed to generate audio: {str(e)}") from e
+
+
+def test_generate_audio_openai():
     try:
-        # Make the request to the API
-        response = requests.post(endpoint, headers=headers, json=payload, stream=True)
-        response.raise_for_status()  # Raise an error for HTTP status codes >= 400
-
-        # Save the audio response to a file
-        with open(output_file, "wb") as f:
-            f.write(response.content)
-
-        print(f"Audio successfully generated and saved to {output_file}.")
-        return output_file
-
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Failed to generate audio: {str(e)}") from e
-
-
-def test_generate_audio_openai(api_key, input_text, voice, model, response_format="mp3", output_file="speech.mp3"):
-    try:
-        if not api_key:
-            logging.info("OpenAI: API key not provided as parameter")
-            logging.info("OpenAI: Attempting to use API key from config file")
-            openai_api_key = loaded_config_data['api_keys']['openai']
+        logging.info("OpenAI: Attempting to use API key from config file")
+        api_key = loaded_config_data['openai_api']['api_key']
 
         if not api_key:
             logging.error("OpenAI: API key not found or is empty")
