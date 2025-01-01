@@ -228,10 +228,18 @@ https://docs.cartesia.ai/get-started/make-an-api-request
 https://github.com/JarodMica/open-neruosama
 https://github.com/flatmax/speech-to-text
 https://arxiv.org/abs/2412.18566
+https://github.com/Rolandjg/skool4free
+
+
+SoundStorm
+    https://deepmind.google/discover/blog/pushing-the-frontiers-of-audio-generation/
+    https://github.com/lucidrains/soundstorm-pytorch
+
 
 Google
 https://github.com/google-gemini/cookbook/tree/main/gemini-2
 https://discuss.ai.google.dev/t/how-does-one-get-access-to-the-api-for-tts-features-of-gemini-2-0/53925/15
+https://illuminate.google.com/home?pli=1
 ```
 import asyncio
 import base64

@@ -103,11 +103,20 @@ Standford STORM
    https://arxiv.org/abs/2402.14207#
    https://storm.genie.stanford.edu/
 
+Google Learn About
+    https://learning.google.com/experiments/learn-about
+
+Google Pinpoint
+    https://journaliststudio.google.com/pinpoint/about/
+
+Gemini Deepresearcher
+    https://blog.google/products/gemini/google-gemini-deep-research/
+
 https://github.com/assafelovic/gpt-researcher
 https://arxiv.org/abs/2411.15114
-https://journaliststudio.google.com/pinpoint/about/
+
 https://github.com/assafelovic/gpt-researcher/tree/master/gpt_researcher
-https://blog.google/products/gemini/google-gemini-deep-research/
+
 https://github.com/neuml/annotateai
 https://docs.gptr.dev/docs/gpt-researcher/multi_agents/langgraph
 https://pub.towardsai.net/learn-anything-with-ai-and-the-feynman-technique-00a33f6a02bc
@@ -133,13 +142,15 @@ https://www.researchrabbit.ai/
 https://github.com/faraz18001/Sales-Llama
 https://github.com/memgraph/memgraph
 https://github.com/rashadphz/farfalle/tree/main/src/backend
-https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama/blob/main/Self_Improving_Search.py
-https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama
+
 https://github.com/rashadphz/farfalle/blob/main/src/backend/agent_search.py
 https://github.com/rashadphz/farfalle/blob/main/src/backend/prompts.py
 https://github.com/stanford-oval/storm/blob/main/examples/storm_examples/run_storm_wiki_claude.py
 https://learning.google.com/experiments/learn-about
 
+AI Web Researcher Ollama
+    https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama/blob/main/Self_Improving_Search.py
+    https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama
 
 
 
