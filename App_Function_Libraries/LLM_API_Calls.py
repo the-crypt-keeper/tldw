@@ -116,7 +116,7 @@ def get_openai_embeddings(input_data: str, model: str) -> List[float]:
         raise ValueError(f"OpenAI: Unexpected error occurred: {str(e)}")
 
 
-def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
+def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=None):
     loaded_config_data = load_and_log_configs()
     openai_api_key = api_key
     try:
