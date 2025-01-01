@@ -381,6 +381,7 @@ def load_and_log_configs():
         default_openai_tts_model = config.get('TTS-Settings', 'default_openai_tts_model', fallback='tts-1-hd')
         default_openai_tts_voice = config.get('TTS-Settings', 'default_openai_tts_voice', fallback='shimmer')
         default_openai_tts_speed = config.get('TTS-Settings', 'default_openai_tts_speed', fallback='1')
+        default_openai_tts_output_format = config.get('TTS-Settings', 'default_openai_tts_output_format', fallback='mp3')
         # Google TTS
         # FIXME - FIX THESE DEFAULTS
         default_google_tts_model = config.get('TTS-Settings', 'default_google_tts_model', fallback='en')
@@ -617,6 +618,7 @@ def load_and_log_configs():
                 'default_openai_tts_voice': default_openai_tts_voice,
                 'default_openai_tts_speed': default_openai_tts_speed,
                 'default_openai_tts_model': default_openai_tts_model,
+                'default_openai_tts_output_format': default_openai_tts_output_format,
                 # Google
                 'default_google_tts_model': default_google_tts_model,
                 'default_google_tts_voice': default_google_tts_voice,
