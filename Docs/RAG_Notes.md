@@ -83,6 +83,7 @@ GraphRAG
 	https://neuml.hashnode.dev/advanced-rag-with-graph-path-traversal
 https://volodymyrpavlyshyn.medium.com/unified-knowledge-graph-model-rdf-rdf-vs-lpg-the-end-of-war-a7c14d6ac76f
 	https://github.com/zjunlp/OneKE
+https://blog.gopenai.com/llm-ontology-prompting-for-knowledge-graph-extraction-efdcdd0db3a1?gi=1d8915f0da5e
 
 
 
