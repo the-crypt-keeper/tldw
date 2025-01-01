@@ -342,6 +342,7 @@ def create_chat_interface():
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
+                streaming = gr.Checkbox(label="Streaming")
                 submit = gr.Button("Submit")
                 regenerate_button = gr.Button("Regenerate Last Message")
                 token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
@@ -456,7 +457,7 @@ def create_chat_interface():
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id,
-                    save_conversation, temperature, system_prompt_input],
+                    save_conversation, temperature, system_prompt_input, streaming],
             outputs=[msg, chatbot, conversation_id]
         ).then(  # Clear the message box after submission
             lambda x: gr.update(value=""),
@@ -577,7 +578,7 @@ def create_chat_interface_stacked():
                     use_summary = gr.Checkbox(label="Use Summary")
                     use_prompt = gr.Checkbox(label="Use Prompt")
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
-                    temp = gr.Slider(label="Temperature", minimum=0.00, maximum=1.0, step=0.05, value=0.7)
+                    temp = gr.Slider(label="Temperature", minimum=0.00, maximum=2.0, step=0.05, value=0.7)
                 with gr.Row():
                     conversation_search = gr.Textbox(label="Search Conversations")
                 with gr.Row():
@@ -607,6 +608,10 @@ def create_chat_interface_stacked():
                     label="Use a pre-set Prompt",
                     value=False,
                     visible=True
+                )
+                streaming = gr.Checkbox(label="Streaming",
+                                        value=False,
+                                        visible=True
                 )
 
                 with gr.Row():
@@ -837,7 +842,7 @@ def create_chat_interface_stacked():
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
-                    conversation_id, save_conversation, temp, system_prompt],
+                    conversation_id, save_conversation, temp, system_prompt, streaming],
             outputs=[msg, chatbot, conversation_id]
         ).then(
             lambda x: gr.update(value=""),
