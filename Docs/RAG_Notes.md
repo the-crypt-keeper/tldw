@@ -46,6 +46,7 @@ https://medium.com/@eliot64/bridging-legal-ai-and-trust-how-we-won-the-llm-x-law
 https://arxiv.org/abs/2412.15563
 https://arxiv.org/pdf/2410.10293v1
 https://arxiv.org/pdf/2409.02098v1
+https://github.com/OpenSPG/KAG
 
 
 GraphRAG
@@ -81,7 +82,7 @@ GraphRAG
 	https://www.youtube.com/watch?v=g6xBklAIrsA
 	https://neuml.hashnode.dev/advanced-rag-with-graph-path-traversal
 https://volodymyrpavlyshyn.medium.com/unified-knowledge-graph-model-rdf-rdf-vs-lpg-the-end-of-war-a7c14d6ac76f
-
+	https://github.com/zjunlp/OneKE
 
 
 
