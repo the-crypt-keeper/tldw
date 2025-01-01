@@ -132,8 +132,9 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_m
 
         logging.debug(f"OpenAI: Using API Key: {openai_api_key[:5]}...{openai_api_key[-5:]}")
 
-        streaming = loaded_config_data['openai_api']['streaming']
-        if streaming == "true" or "True":
+        if not streaming:
+            streaming = loaded_config_data['openai_api']['streaming']
+        if streaming == "true" or True:
             streaming = True
         else:
             streaming = False
