@@ -42,8 +42,8 @@ def show_delete_message(selected):
 
 
 def debug_output(media_content, selected_parts):
-    print(f"Debug - Media Content: {media_content}")
-    print(f"Debug - Selected Parts: {selected_parts}")
+    logging.debug(f"Debug - Media Content: {media_content}")
+    logging.debug(f"Debug - Selected Parts: {selected_parts}")
     return ""
 
 
@@ -55,7 +55,7 @@ def update_selected_parts(use_content, use_summary, use_prompt):
         selected_parts.append("summary")
     if use_prompt:
         selected_parts.append("prompt")
-    print(f"Debug - Update Selected Parts: {selected_parts}")
+    logging.debug(f"Debug - Update Selected Parts: {selected_parts}")
     return selected_parts
 
 
@@ -177,33 +177,42 @@ def regenerate_last_message(history, media_content, selected_parts, api_endpoint
     if not history:
         return history, "No messages to regenerate."
 
-    last_entry = history[-1]
-    last_user_message, last_bot_message = last_entry
+    logging.debug("Starting regenerate_last_message")
 
-    if last_bot_message is None:
-        return history, "The last message is not from the bot."
-
-    new_history = history[:-1]
+    # Find the last user message and its corresponding bot response
+    last_user_message = None
+    last_bot_message = None
+    for i in range(len(history) - 1, -1, -1):
+        if history[i][0]:  # This is a user message
+            last_user_message = history[i][0]
+            if i + 1 < len(history):
+                last_bot_message = history[i + 1][1]
+            break
 
     if not last_user_message:
-        return new_history, "No user message to regenerate the bot response."
+        return history, "No user message found to regenerate the bot response."
+
+    # Remove the last bot message from history
+    new_history = history[:-1] if last_bot_message else history
 
     # Generate the new bot response
     bot_message = ""
-    if streaming:
-        # For streaming, consume the generator and accumulate the response
-        for chunk in chat(last_user_message, new_history, media_content, selected_parts, api_endpoint, api_key,
-                          custom_prompt, temperature, system_prompt, streaming):
+    for chunk in chat(last_user_message, new_history, media_content, selected_parts, api_endpoint, api_key,
+                      custom_prompt, temperature, system_prompt, streaming):
+        if isinstance(chunk, str):
             bot_message += chunk
-    else:
-        # For non-streaming, get the complete response directly
-        bot_message = next(chat(last_user_message, new_history, media_content, selected_parts, api_endpoint, api_key,
-                                custom_prompt, temperature, system_prompt, streaming))
+        elif isinstance(chunk, dict) and "choices" in chunk:
+            content = chunk["choices"][0].get("delta", {}).get("content", "")
+            bot_message += content
 
-    # Update the history with the regenerated message
-    new_history.append((last_user_message, bot_message))
+        # Update the chatbot interface with the partial response
+        new_history_with_regenerated = new_history + [(last_user_message, bot_message)]
+        yield new_history_with_regenerated, "Regenerating..."
 
-    return new_history, "Last message regenerated successfully."
+    # Update the history with the final regenerated message
+    new_history_with_regenerated = new_history + [(last_user_message, bot_message)]
+    logging.debug("Finished regenerating message")
+    yield new_history_with_regenerated, "Last message regenerated successfully."
 
 
 def update_dropdown_multiple(query, search_type, keywords=""):
@@ -340,7 +349,7 @@ def create_chat_interface():
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
-                streaming = gr.Checkbox(label="Streaming")
+                streaming = gr.Checkbox(label="Streaming", value=False, visible=True)
                 submit = gr.Button("Submit")
                 regenerate_button = gr.Button("Regenerate Last Message")
                 token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
@@ -521,7 +530,7 @@ def create_chat_interface():
             regenerate_last_message,
             inputs=[chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, temperature,
                     system_prompt_input, streaming],
-            outputs=[chatbot, save_status]
+            outputs=[chatbot, gr.Textbox(label="Regenerate Status")]
         ).then(
             lambda history: approximate_token_count(history),
             inputs=[chatbot],
