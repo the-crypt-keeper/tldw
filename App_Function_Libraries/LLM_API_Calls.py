@@ -321,7 +321,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
         logging.debug(f"AnthropicAI: Type of data: {type(input_data)}")
 
         # Retrieve the model from config if not provided
-        if not model:
+        if model is None:
             try:
                 anthropic_model = loaded_config_data['anthropic_api']['model']
                 logging.debug(f"Anthropic: Loaded model from config: {anthropic_model}")
@@ -333,9 +333,10 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             logging.debug(f"Anthropic: Using provided model: {anthropic_model}")
 
         if temp is None:
-            temperature = loaded_config_data['anthropic_api']['temperature']
-            temp = 1.0
-
+            temp = loaded_config_data['anthropic_api']['temperature']
+            temp = float(temp)
+        else:
+            temp = 0.7
             logging.debug(f"Anthropic: Using default temperature: {temp}")
 
         headers = {
@@ -467,7 +468,7 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
         else:
             logging.info("Cohere Chat: API key not provided as parameter")
             logging.info("Cohere Chat: Attempting to use API key from config file")
-            logging.debug(f"Cohere Chat: Cohere API Key from config: {loaded_config_data['api_keys']['cohere']}")
+            logging.debug(f"Cohere Chat: Cohere API Key from config: {loaded_config_data['cohere_api']['api_key']}")
             cohere_api_key = loaded_config_data['cohere_api']['api_key']
             if cohere_api_key:
                 logging.debug(f"Cohere Chat: Cohere API Key from config: {cohere_api_key[:3]}...{cohere_api_key[-3:]}")

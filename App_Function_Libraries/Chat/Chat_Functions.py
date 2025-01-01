@@ -55,12 +55,15 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
         elif api_endpoint.lower() == 'anthropic':
             # Retrieve the model from config
             loaded_config_data = load_and_log_configs()
-            model = loaded_config_data['models']['anthropic'] if loaded_config_data else None
+            if not model:
+                model = loaded_config_data['anthropic_api']['model']
             response = chat_with_anthropic(
                 api_key=api_key,
                 input_data=input_data,
                 model=model,
                 custom_prompt_arg=prompt,
+                max_retries=3,
+                retry_delay=5,
                 system_prompt=system_message
             )
 
