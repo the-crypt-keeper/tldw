@@ -295,7 +295,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             logging.info("Anthropic: Attempting to use API key from config file")
             # Ensure 'api_keys' and 'anthropic' keys exist
             try:
-                anthropic_api_key = loaded_config_data['api_keys']['anthropic']
+                anthropic_api_key = loaded_config_data['anthropic_api']['api_key']
                 logging.debug(f"Anthropic: Loaded API Key from config: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
             except (KeyError, TypeError) as e:
                 logging.error(f"Anthropic: Error accessing API key from config: {str(e)}")
@@ -323,7 +323,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
         # Retrieve the model from config if not provided
         if not model:
             try:
-                anthropic_model = loaded_config_data['models']['anthropic']
+                anthropic_model = loaded_config_data['anthropic_api']['model']
                 logging.debug(f"Anthropic: Loaded model from config: {anthropic_model}")
             except (KeyError, TypeError) as e:
                 logging.error(f"Anthropic: Error accessing model from config: {str(e)}")
@@ -333,7 +333,9 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             logging.debug(f"Anthropic: Using provided model: {anthropic_model}")
 
         if temp is None:
+            temperature = loaded_config_data['anthropic_api']['temperature']
             temp = 1.0
+
             logging.debug(f"Anthropic: Using default temperature: {temp}")
 
         headers = {
@@ -466,7 +468,7 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
             logging.info("Cohere Chat: API key not provided as parameter")
             logging.info("Cohere Chat: Attempting to use API key from config file")
             logging.debug(f"Cohere Chat: Cohere API Key from config: {loaded_config_data['api_keys']['cohere']}")
-            cohere_api_key = loaded_config_data['api_keys']['cohere']
+            cohere_api_key = loaded_config_data['cohere_api']['api_key']
             if cohere_api_key:
                 logging.debug(f"Cohere Chat: Cohere API Key from config: {cohere_api_key[:3]}...{cohere_api_key[-3:]}")
             else:
@@ -478,7 +480,7 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
 
         # Ensure model is set
         if not model:
-            model = loaded_config_data['models']['cohere']
+            model = loaded_config_data['cohere_api']['model']
         logging.debug(f"Cohere Chat: Using model: {model}")
 
         if temp is None:
@@ -631,7 +633,7 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
                 logging.info("Groq: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                groq_api_key = loaded_config_data['api_keys'].get('groq')
+                groq_api_key = loaded_config_data['groq_api'].get('api_Key')
                 if groq_api_key:
                     logging.info("Groq: Using API key from config file")
                 else:
@@ -645,6 +647,11 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
 
         logging.debug(f"Groq: Using API Key: {groq_api_key[:5]}...{groq_api_key[-5:]}")
 
+        streaming = loaded_config_data['groq_api']['streaming']
+        if streaming == "true" or "True":
+            streaming = True
+        else:
+            streaming = False
         # Transcript data handling & Validation
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Groq: Loading json data for summarization")
@@ -673,7 +680,7 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
             raise ValueError("Groq: Invalid input data format")
 
         # Set the model to be used
-        groq_model = loaded_config_data['models']['groq']
+        groq_model = loaded_config_data['groq_api']['model']
 
         if temp is None:
             temp = 0.2
@@ -783,7 +790,7 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
                 logging.info("OpenRouter: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                openrouter_api_key = loaded_config_data['api_keys'].get('openrouter')
+                openrouter_api_key = loaded_config_data['openrouter_api'].get('api_key')
                 if openrouter_api_key:
                     logging.info("OpenRouter: Using API key from config file")
                 else:
@@ -792,7 +799,7 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
         # Model Selection validation
         logging.debug("OpenRouter: Validating model selection")
         loaded_config_data = load_and_log_configs()
-        openrouter_model = loaded_config_data['models']['openrouter']
+        openrouter_model = loaded_config_data['openrouter_api']['model']
         logging.debug(f"OpenRouter: Using model from config file: {openrouter_model}")
 
         # Final check to ensure we have a valid API key
@@ -951,7 +958,7 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
             logging.info("HuggingFace Chat: API key not provided as parameter")
             logging.info("HuggingFace Chat: Attempting to use API key from config file")
 
-        huggingface_api_key = loaded_config_data['api_keys'].get('huggingface')
+        huggingface_api_key = loaded_config_data['huggingface_api'].get('api_key')
         logging.debug(f"HuggingFace Chat: API key from config: {huggingface_api_key[:5]}...{huggingface_api_key[-5:]}")
 
         if huggingface_api_key is None or huggingface_api_key.strip() == "":
@@ -964,7 +971,7 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
         }
 
         # Setup model
-        huggingface_model = loaded_config_data['models']['huggingface']
+        huggingface_model = loaded_config_data['huggingface_api']['model']
 
         API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}/v1/chat/completions"
         if temp is None:
@@ -1065,7 +1072,7 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
             logging.info("DeepSeek: Using API key provided as parameter")
         else:
             # If no parameter is provided, use the key from the config
-            deepseek_api_key = loaded_config_data['api_keys'].get('deepseek')
+            deepseek_api_key = loaded_config_data['deepseek_api'].get('api_key')
             if deepseek_api_key and deepseek_api_key.strip():
                 deepseek_api_key = deepseek_api_key.strip()
                 logging.info("DeepSeek: Using API key from config file")
@@ -1121,7 +1128,7 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
             raise ValueError("DeepSeek: Invalid input data format")
 
         # Retrieve the model from config if not provided
-        deepseek_model = loaded_config_data['models'].get('deepseek', "deepseek-chat")
+        deepseek_model = loaded_config_data['deepseek_api'].get('deepseek', "deepseek-chat")
         logging.debug(f"DeepSeek: Using model: {deepseek_model}")
 
         # Ensure temperature is a float within acceptable range
@@ -1252,7 +1259,7 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
                 logging.info("Mistral: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                mistral_api_key = loaded_config_data['api_keys'].get('mistral')
+                mistral_api_key = loaded_config_data['mistral_api'].get('api_key')
                 if mistral_api_key:
                     logging.info("Mistral: Using API key from config file")
                 else:
@@ -1276,7 +1283,7 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
         else:
             raise ValueError("Mistral: Invalid input data format")
 
-        mistral_model = loaded_config_data['models'].get('mistral', "mistral-large-latest")
+        mistral_model = loaded_config_data['mistral_api'].get('model', "mistral-large-latest")
 
         if temp is None:
             temp = 0.2
@@ -1386,7 +1393,7 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
         if not google_api_key:
             logging.info("Google: API key not provided as parameter")
             logging.info("Google: Attempting to use API key from config file")
-            google_api_key = loaded_config_data['api_keys']['google']
+            google_api_key = loaded_config_data['google_api']['api_key']
 
         if not google_api_key:
             logging.error("Google: API key not found or is empty")
@@ -1439,7 +1446,7 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
         logging.debug(f"Google: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"Google: Custom prompt: {custom_prompt_arg}")
 
-        google_model = loaded_config_data['models']['google'] or "gemini-1.5-pro"
+        google_model = loaded_config_data['google_api']['model'] or "gemini-1.5-pro"
         logging.debug(f"Google: Using model: {google_model}")
 
         headers = {
