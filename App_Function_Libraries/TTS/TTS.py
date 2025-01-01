@@ -129,7 +129,7 @@ def merge_audio(audio_segments: List[AudioData]) -> AudioData:
     return b""
 
 
-# Main TTS function
+# Main Podcast generation function
 def generate_tts_podcast(
         text: str,
         provider: str,
