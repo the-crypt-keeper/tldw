@@ -236,6 +236,44 @@ def load_and_log_configs():
         mistral_model = config.get('API', 'mistral_model', fallback='mistral-large-latest')
         google_model = config.get('API', 'google_model', fallback='gemini-1.5-pro')
 
+        # LLM API Settings - streaming / temperature / top_p / min_p
+        anthropic_streaming = config.get('API', 'anthropic_streaming', fallback='False')
+        anthropic_temperature = config.get('API', 'anthropic_temperature', fallback='0.7')
+        anthropic_top_p = config.get('API', 'anthropic_top_p', fallback='0.95')
+        anthropic_min_p = config.get('API', 'anthropic_min_p', fallback='0.05')
+        cohore_streaming = config.get('API', 'cohere_streaming', fallback='False')
+        cohore_temperature = config.get('API', 'cohere_temperature', fallback='0.7')
+        cohore_top_p = config.get('API', 'cohere_top_p', fallback='0.95')
+        cohore_min_p = config.get('API', 'cohere_min_p', fallback='0.05')
+        groq_streaming = config.get('API', 'groq_streaming', fallback='False')
+        groq_temperature = config.get('API', 'groq_temperature', fallback='0.7')
+        groq_top_p = config.get('API', 'groq_top_p', fallback='0.95')
+        groq_min_p = config.get('API', 'groq_min_p', fallback='0.05')
+        openai_streaming = config.get('API', 'openai_streaming', fallback='False')
+        openai_temperature = config.get('API', 'openai_temperature', fallback='0.7')
+        openai_top_p = config.get('API', 'openai_top_p', fallback='0.95')
+        openai_min_p = config.get('API', 'openai_min_p', fallback='0.05')
+        huggingface_streaming = config.get('API', 'huggingface_streaming', fallback='False')
+        huggingface_temperature = config.get('API', 'huggingface_temperature', fallback='0.7')
+        huggingface_top_p = config.get('API', 'huggingface_top_p', fallback='0.95')
+        huggingface_min_p = config.get('API', 'huggingface_min_p', fallback='0.05')
+        openrouter_streaming = config.get('API', 'openrouter_streaming', fallback='False')
+        openrouter_temperature = config.get('API', 'openrouter_temperature', fallback='0.7')
+        openrouter_top_p = config.get('API', 'openrouter_top_p', fallback='0.95')
+        openrouter_min_p = config.get('API', 'openrouter_min_p', fallback='0.05')
+        deepseek_streaming = config.get('API', 'deepseek_streaming', fallback='False')
+        deepseek_temperature = config.get('API', 'deepseek_temperature', fallback='0.7')
+        deepseek_top_p = config.get('API', 'deepseek_top_p', fallback='0.95')
+        deepseek_min_p = config.get('API', 'deepseek_min_p', fallback='0.05')
+        mistral_streaming = config.get('API', 'mistral_streaming', fallback='False')
+        mistral_temperature = config.get('API', 'mistral_temperature', fallback='0.7')
+        mistral_top_p = config.get('API', 'mistral_top_p', fallback='0.95')
+        mistral_min_p = config.get('API', 'mistral_min_p', fallback='0.05')
+        google_streaming = config.get('API', 'google_streaming', fallback='False')
+        google_temperature = config.get('API', 'google_temperature', fallback='0.7')
+        google_top_p = config.get('API', 'google_top_p', fallback='0.95')
+        google_min_p = config.get('API', 'google_min_p', fallback='0.05')
+
         logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
         logging.debug(f"Loaded Cohere Model: {cohere_model}")
         logging.debug(f"Loaded Groq Model: {groq_model}")
@@ -249,12 +287,25 @@ def load_and_log_configs():
         kobold_api_ip = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         kobold_openai_api_IP = config.get('Local-API', 'kobold_openai_api_IP', fallback='http://127.0.0.1:5001/v1/chat/completions')
         kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
+        kobold_streaming = config.get('Local-API', 'kobold_streaming', fallback='False')
+        kobold_temperature = config.get('Local-API', 'kobold_temperature', fallback='0.7')
+        kobold_top_p = config.get('Local-API', 'kobold_top_p', fallback='0.95')
+        kobold_min_p = config.get('Local-API', 'kobold_min_p', fallback='0.05')
+
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
+        llama_streaming = config.get('Local-API', 'llama_streaming', fallback='False')
+        llama_temperature = config.get('Local-API', 'llama_temperature', fallback='0.7')
+        llama_top_p = config.get('Local-API', 'llama_top_p', fallback='0.95')
+        llama_min_p = config.get('Local-API', 'llama_min_p', fallback='0.05')
 
         ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
         ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
+        ooba_streaming = config.get('Local-API', 'ooba_streaming', fallback='False')
+        ooba_temperature = config.get('Local-API', 'ooba_temperature', fallback='0.7')
+        ooba_top_p = config.get('Local-API', 'ooba_top_p', fallback='0.95')
+        ooba_min_p = config.get('Local-API', 'ooba_min_p', fallback='0.05')
 
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
@@ -275,6 +326,8 @@ def load_and_log_configs():
         custom_openai_api_url = config.get('API', 'custom_openai_url', fallback=None)
         logging.debug(
             f"Loaded Custom openai-like endpoint API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
+        custom_openai_api_streaming = config.get('API', 'custom_openai_streaming', fallback='False')
+        custom_openai_api_temperature = config.get('API', 'custom_openai_temperature', fallback='0.7')
 
         logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
         logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
@@ -284,6 +337,10 @@ def load_and_log_configs():
 
         # Retrieve default API choices from the configuration file
         default_api = config.get('API', 'default_api', fallback='openai')
+
+        # Retrieve LLM API settings from the configuration file
+        local_api_retries = config.get('Local-API', 'Settings', fallback='3')
+        local_api_retry_delay = config.get('Local-API', 'local_api_retry_delay', fallback='5')
 
         # Retrieve output paths from the configuration file
         output_path = config.get('Paths', 'output_path', fallback='results')
@@ -397,51 +454,132 @@ def load_and_log_configs():
 
 
         return {
-            'api_keys': {
-                'anthropic': anthropic_api_key,
-                'cohere': cohere_api_key,
-                'groq': groq_api_key,
-                'openai': openai_api_key,
-                'huggingface': huggingface_api_key,
-                'openrouter': openrouter_api_key,
-                'deepseek': deepseek_api_key,
-                'mistral': mistral_api_key,
-                'google': google_api_key,
-                'kobold': kobold_api_key,
-                'llama': llama_api_key,
-                'ooba': ooba_api_key,
-                'tabby': tabby_api_key,
-                'vllm': vllm_api_key,
-                'ollama': ollama_api_key,
-                'aphrodite': aphrodite_api_key,
-                'elevenlabs': elevenlabs_api_key,
-                'custom_openai_api_key': custom_openai_api_key
+            'anthropic_api': {
+                'api_key': anthropic_api_key,
+                'model': anthropic_model,
+                'streaming': anthropic_streaming,
+                'temperature': anthropic_temperature,
+                'top_p': anthropic_top_p,
+                'min_p': anthropic_min_p
             },
-            'models': {
-                'anthropic': anthropic_model,
-                'cohere': cohere_model,
-                'groq': groq_model,
-                'openai': openai_model,
-                'huggingface': huggingface_model,
-                'openrouter': openrouter_model,
-                'deepseek': deepseek_model,
-                'mistral': mistral_model,
-                'google': google_model,
-                'vllm': vllm_model,
-                'tabby': tabby_model,
-                'ollama': ollama_model
-
+            'cohere_api': {
+                'api_key': cohere_api_key,
+                'model': cohere_model,
+                'streaming': cohore_streaming,
+                'temperature': cohore_temperature,
+                'top_p': cohore_top_p,
+                'min_p': cohore_min_p
             },
-            'local_api_ip': {
-                'kobold': kobold_api_ip,
-                'kobold_openai': kobold_openai_api_IP,
-                'llama': llama_api_IP,
-                'ooba': ooba_api_IP,
-                'tabby': tabby_api_IP,
-                'vllm': vllm_api_url,
-                'ollama': ollama_api_url,
-                'aphrodite': aphrodite_api_url,
-                'custom_openai_api_ip': custom_openai_api_url
+            'groq_api': {
+                'api_key': groq_api_key,
+                'model': groq_model,
+                'streaming': groq_streaming,
+                'temperature': groq_temperature,
+                'top_p': groq_top_p,
+                'min_p': groq_min_p
+            },
+            'openai_api': {
+                'api_key': openai_api_key,
+                'model': openai_model,
+                'streaming': openai_streaming,
+                'temperature': openai_temperature,
+                'top_p': openai_top_p,
+                'min_p': openai_min_p
+            },
+            'huggingface_api': {
+                'api_key': huggingface_api_key,
+                'model': huggingface_model,
+                'streaming': huggingface_streaming,
+            },
+            'openrouter_api': {
+                'api_key': openrouter_api_key,
+                'model': openrouter_model,
+                'streaming': openrouter_streaming,
+                'temperature': openrouter_temperature,
+                'top_p': openrouter_top_p,
+                'min_p': openrouter_min_p
+            },
+            'deepseek_api': {
+                'api_key': deepseek_api_key,
+                'model': deepseek_model,
+                'streaming': deepseek_streaming,
+                'temperature': deepseek_temperature,
+                'top_p': deepseek_top_p,
+                'min_p': deepseek_min_p
+            },
+            'mistral_api': {
+                'api_key': mistral_api_key,
+                'model': mistral_model,
+                'streaming': mistral_streaming,
+                'temperature': mistral_temperature,
+                'top_p': mistral_top_p,
+                'min_p': mistral_min_p
+            },
+            'google_api': {
+                'api_key': google_api_key,
+                'model': google_model,
+                'streaming': google_streaming,
+                'temperature': google_temperature,
+                'top_p': google_top_p,
+                'min_p': google_min_p
+            },
+            'elevenlabs_api': {
+                'api_key': elevenlabs_api_key
+            },
+            'custom_openai_api': {
+                'api_key': custom_openai_api_key,
+                'api_url': custom_openai_api_url,
+                'streaming': custom_openai_api_streaming,
+                'temperature': custom_openai_api_temperature,
+            },
+            'llama_api': {
+                'api_ip': llama_api_IP,
+                'api_key': llama_api_key,
+                'streaming': llama_streaming,
+                'temperature': llama_temperature,
+                'top_p': llama_top_p,
+                'min_p': llama_min_p
+            },
+            'ooba_api': {
+                'api_ip': ooba_api_IP,
+                'api_key': ooba_api_key,
+                'streaming': ooba_streaming,
+                'temperature': ooba_temperature,
+                'top_p': ooba_top_p,
+                'min_p': ooba_min_p
+            },
+            'kobold_api': {
+                'api_ip': kobold_api_ip,
+                'api_key': kobold_api_key,
+                'streaming': kobold_streaming,
+                'temperature': kobold_temperature,
+                'top_p': kobold_top_p,
+                'min_p': kobold_min_p
+            },
+            'tabby_api': {
+                'api_ip': tabby_api_IP,
+                'api_key': tabby_api_key,
+                'model': tabby_model
+            },
+            'vllm_api': {
+                'api_url': vllm_api_url,
+                'api_key': vllm_api_key,
+                'model': vllm_model
+            },
+            'ollama_api': {
+                'api_url': ollama_api_url,
+                'api_key': ollama_api_key,
+                'model': ollama_model
+            },
+            'aphrodite_api': {
+                'api_url': aphrodite_api_url,
+                'api_key': aphrodite_api_key
+            },
+            'llm_api_settings': {
+                'default_api': default_api,
+                'local_api_timeout': local_api_timeout,
+                'local_api_retries': local_api_retries,
+                'local_api_retry_delay': local_api_retry_delay,
             },
             'output_path': output_path,
             'processing_choice': processing_choice,
@@ -492,53 +630,53 @@ def load_and_log_configs():
                 # GPT Sovi-TTS
             },
             'search_settings': {
-            'default_search_provider': search_provider_default,
-            'search_language_query': search_language_query,
-            'search_language_results': search_language_results,
-            'search_language_analysis': search_language_analysis,
-            'search_default_max_queries': search_default_max_queries,
-            'search_enable_subquery': search_enable_subquery,
-            'search_enable_subquery_count_max': search_enable_subquery_count_max,
-            'search_result_rerank': search_result_rerank,
-            'search_result_max': search_result_max,
-            'search_result_max_per_query': search_result_max_per_query,
-            'search_result_blacklist': search_result_blacklist,
-            'search_result_display_type': search_result_display_type,
-            'search_result_display_metadata': search_result_display_metadata,
-            'search_result_save_to_db': search_result_save_to_db,
-            'search_result_analysis_tone': search_result_analysis_tone,
+                'default_search_provider': search_provider_default,
+                'search_language_query': search_language_query,
+                'search_language_results': search_language_results,
+                'search_language_analysis': search_language_analysis,
+                'search_default_max_queries': search_default_max_queries,
+                'search_enable_subquery': search_enable_subquery,
+                'search_enable_subquery_count_max': search_enable_subquery_count_max,
+                'search_result_rerank': search_result_rerank,
+                'search_result_max': search_result_max,
+                'search_result_max_per_query': search_result_max_per_query,
+                'search_result_blacklist': search_result_blacklist,
+                'search_result_display_type': search_result_display_type,
+                'search_result_display_metadata': search_result_display_metadata,
+                'search_result_save_to_db': search_result_save_to_db,
+                'search_result_analysis_tone': search_result_analysis_tone,
             },
             'search_engines': {
-            'baidu_search_api_key': baidu_search_api_key,
-            'bing_search_api_key': bing_search_api_key,
-            'bing_country_code': bing_country_code,
-            'bing_search_api_url': bing_search_api_url,
-            'brave_search_api_key': brave_search_api_key,
-            'brave_search_ai_api_key': brave_search_ai_api_key,
-            'brave_country_code': brave_country_code,
-            'duckduckgo_search_api_key': duckduckgo_search_api_key,
-            'google_search_api_url': google_search_api_url,
-            'google_search_api_key': google_search_api_key,
-            'google_search_engine_id': google_search_engine_id,
-            'google_simp_trad_chinese': google_simp_trad_chinese,
-            'limit_google_search_to_country': limit_google_search_to_country,
-            'google_search_country': google_search_country,
-            'google_search_country_code': google_search_country_code,
-            'google_search_filter_setting': google_filter_setting,
-            'google_user_geolocation': google_user_geolocation,
-            'google_ui_language': google_ui_language,
-            'google_limit_search_results_to_language': google_limit_search_results_to_language,
-            'google_site_search_include': google_site_search_include,
-            'google_site_search_exclude': google_site_search_exclude,
-            'google_sort_results_by': google_sort_results_by,
-            'google_default_search_results': google_default_search_results,
-            'google_safe_search': google_safe_search,
-            'google_enable_site_search' : google_enable_site_search,
-            'kagi_search_api_key': kagi_search_api_key,
-            'searx_search_api_url': search_engine_searx_api,
-            'tavily_search_api_key': tavily_search_api_key,
-            'yandex_search_api_key': yandex_search_api_key,
-            'yandex_search_engine_id': yandex_search_engine_id
+                'baidu_search_api_key': baidu_search_api_key,
+                'bing_search_api_key': bing_search_api_key,
+                'bing_country_code': bing_country_code,
+                'bing_search_api_url': bing_search_api_url,
+                'brave_search_api_key': brave_search_api_key,
+                'brave_search_ai_api_key': brave_search_ai_api_key,
+                'brave_country_code': brave_country_code,
+                'duckduckgo_search_api_key': duckduckgo_search_api_key,
+                'google_search_api_url': google_search_api_url,
+                'google_search_api_key': google_search_api_key,
+                'google_search_engine_id': google_search_engine_id,
+                'google_simp_trad_chinese': google_simp_trad_chinese,
+                'limit_google_search_to_country': limit_google_search_to_country,
+                'google_search_country': google_search_country,
+                'google_search_country_code': google_search_country_code,
+                'google_search_filter_setting': google_filter_setting,
+                'google_user_geolocation': google_user_geolocation,
+                'google_ui_language': google_ui_language,
+                'google_limit_search_results_to_language': google_limit_search_results_to_language,
+                'google_site_search_include': google_site_search_include,
+                'google_site_search_exclude': google_site_search_exclude,
+                'google_sort_results_by': google_sort_results_by,
+                'google_default_search_results': google_default_search_results,
+                'google_safe_search': google_safe_search,
+                'google_enable_site_search' : google_enable_site_search,
+                'kagi_search_api_key': kagi_search_api_key,
+                'searx_search_api_url': search_engine_searx_api,
+                'tavily_search_api_key': tavily_search_api_key,
+                'yandex_search_api_key': yandex_search_api_key,
+                'yandex_search_engine_id': yandex_search_engine_id
             }
         }
 
