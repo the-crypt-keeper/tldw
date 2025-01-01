@@ -321,6 +321,7 @@ def load_and_log_configs():
 
         aphrodite_api_url = config.get('Local-API', 'aphrodite_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         aphrodite_api_key = config.get('Local-API', 'aphrodite_api_key', fallback='')
+        aphrodite_model = config.get('Local-API', 'aphrodite_model', fallback='')
 
         custom_openai_api_key = config.get('API', 'custom_openai_api_key', fallback=None)
         custom_openai_api_url = config.get('API', 'custom_openai_url', fallback=None)
@@ -550,6 +551,7 @@ def load_and_log_configs():
             },
             'kobold_api': {
                 'api_ip': kobold_api_ip,
+                'api_streaming_ip': kobold_openai_api_IP,
                 'api_key': kobold_api_key,
                 'streaming': kobold_streaming,
                 'temperature': kobold_temperature,
@@ -573,7 +575,8 @@ def load_and_log_configs():
             },
             'aphrodite_api': {
                 'api_url': aphrodite_api_url,
-                'api_key': aphrodite_api_key
+                'api_key': aphrodite_api_key,
+                'model': aphrodite_model,
             },
             'llm_api_settings': {
                 'default_api': default_api,
