@@ -317,11 +317,13 @@ def create_character_card_interaction_tab():
                 chat_history = gr.Chatbot(label="Conversation", height=800)
                 user_input = gr.Textbox(label="Your message")
                 send_message_button = gr.Button("Send Message")
-                answer_for_me_button = gr.Button("Answer for Me")
-                continue_talking_button = gr.Button("Continue Talking")
+                with gr.Row():
+                    answer_for_me_button = gr.Button("Answer for Me")
+                    continue_talking_button = gr.Button("Continue Talking")
                 regenerate_button = gr.Button("Regenerate Last Message")
-                token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
-                clear_chat_button = gr.Button("Clear Chat")
+                with gr.Row():
+                    token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
+                    clear_chat_button = gr.Button("Clear Chat")
                 save_snapshot_button = gr.Button("Save Chat Snapshot")
                 update_chat_dropdown = gr.Dropdown(label="Select Chat to Update", choices=[], visible=False)
                 load_selected_chat_button = gr.Button("Load Selected Chat", visible=False)
