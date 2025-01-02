@@ -65,6 +65,7 @@ from App_Function_Libraries.Gradio_UI.Utilities import create_utilities_yt_times
     create_utilities_yt_video_tab
 from App_Function_Libraries.Gradio_UI.Video_transcription_tab import create_video_transcription_tab
 from App_Function_Libraries.Gradio_UI.View_tab import create_manage_items_tab
+from App_Function_Libraries.Gradio_UI.WebSearch_tab import create_websearch_tab
 from App_Function_Libraries.Gradio_UI.Website_scraping_tab import create_website_scraping_tab
 from App_Function_Libraries.Gradio_UI.Workflows_tab import chat_workflows_tab
 from App_Function_Libraries.Gradio_UI.View_DB_Items_tab import create_view_all_mediadb_with_versions_tab, \
@@ -468,6 +469,8 @@ def launch_ui(share_public=None, server_mode=False):
                 create_chat_interface_four()
                 chat_workflows_tab()
 
+            with gr.TabItem("Web Search & Review", id="websearch group", visible=True):
+                create_websearch_tab()
             with gr.TabItem("Character Chat", id="character chat group", visible=True):
                 create_character_card_interaction_tab()
                 create_character_chat_mgmt_tab()

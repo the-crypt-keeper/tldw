@@ -104,7 +104,6 @@ def generate_and_search(question: str, search_params: Dict) -> Dict:
 
     # 1. Generate sub-queries if requested
     logging.info(f"Generating sub-queries for the query: {question}")
-    sub_queries = []
     sub_query_dict = {
         "main_goal": question,
         "sub_questions": [],
@@ -294,7 +293,8 @@ def analyze_question(question: str, api_endpoint) -> Dict:
     for attempt in range(3):
         try:
             logging.info(f"Generating sub-questions (attempt {attempt + 1})")
-            response = chat_api_call(api_endpoint, None, input_data, sub_question_generation_prompt, temp=0.7)
+
+            response = chat_api_call(api_endpoint, None, input_data, sub_question_generation_prompt, temp=0.7, system_message=None, streaming=False)
             if response:
                 try:
                     # Try to parse as JSON first
@@ -384,7 +384,9 @@ async def search_result_relevance(
                 api_key=None,
                 input_data=input_data,
                 prompt=eval_prompt,
-                temp=0.7
+                temp=0.7,
+                system_message=None,
+                streaming=False
             )
 
             # FIXME

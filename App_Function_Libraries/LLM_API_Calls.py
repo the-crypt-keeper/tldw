@@ -116,7 +116,7 @@ def get_openai_embeddings(input_data: str, model: str) -> List[float]:
         raise ValueError(f"OpenAI: Unexpected error occurred: {str(e)}")
 
 
-def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=None):
+def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming):
     loaded_config_data = load_and_log_configs()
     openai_api_key = api_key
     try:
@@ -132,12 +132,10 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_m
 
         logging.debug(f"OpenAI: Using API Key: {openai_api_key[:5]}...{openai_api_key[-5:]}")
 
-        if not streaming:
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif streaming is None:
             streaming = loaded_config_data['openai_api']['streaming']
-        if streaming == "true" or True:
-            streaming = True
-        else:
-            streaming = False
         if streaming:
             logging.debug("OpenAI: Streaming mode enabled")
         else:
