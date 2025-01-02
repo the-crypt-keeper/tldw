@@ -2,15 +2,19 @@
 # Description: This file contains the functions to allow for usage of different TTS providers.
 #
 # Imports
+import json
 import logging
 import os
 import tempfile
+import time
 import uuid
-
 #
 # External Imports
 import edge_tts
 import requests
+from openai import api_key
+from pydub import AudioSegment
+from pydub.playback import play
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data
@@ -18,6 +22,69 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_conf
 #######################################################################################################################
 #
 # Functions:
+
+def play_mp3(file_path):
+    """Play an MP3 file using the pydub library."""
+    try:
+        from pydub.utils import which
+        print(f"Debug: ffmpeg path: {which('ffmpeg')}")
+        print(f"Debug: ffplay path: {which('ffplay')}")
+
+        absolute_path = os.path.abspath(file_path)
+        audio = AudioSegment.from_mp3(absolute_path)
+        print("Debug: File loaded successfully")
+        play(audio)
+    except Exception as e:
+        print(f"Debug: Exception type: {type(e)}")
+        print(f"Debug: Exception args: {e.args}")
+        print(f"Error playing the audio file: {e}")
+
+
+def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None, output_file=None, response_format=None, streaming=False):
+    """Generate audio using the specified TTS provider."""
+    if provider == "openai":
+        if api_key == None:
+            api_key = loaded_config_data['openai_api']['api_key']
+        return generate_audio_openai(api_key, text, voice, model, response_format, output_file, streaming)
+    elif provider == "elevenlabs":
+        if api_key == None:
+            api_key = loaded_config_data['elevenlabs_api']['api_key']
+        return generate_audio_elevenlabs(text, voice, model, api_key)
+    # FIXME - add gemini
+    # elif provider == "gemini":
+    #     return generate_audio_gemini(text, voice, model)
+    elif provider == "alltalk":
+        return generate_audio_alltalk(text, voice, model)
+    # FIXME - add gpt-sovit
+    # elif provider == "gpt-sovit":
+    #     return generate_audio_gpt_sovit(text, voice, model)
+    else:
+        raise ValueError(f"Invalid TTS provider: {provider}")
+
+
+def test_generate_audio():
+    """Test the generate_audio function with a real API request."""
+    api_key = None
+    text = "The quick brown fox jumped over the lazy dog."
+    provider = ["openai", "elevenlabs", "alltalk"]
+    voice = "alloy"
+    model = None
+    response_format = "mp3"
+    output_file = "speech.mp3"
+
+    # Call the function
+    for provider in provider:
+        result = generate_audio(api_key, text, provider, voice, model, output_file, response_format)
+
+        # Assertions
+        assert os.path.exists(result), f"The file {result} should exist."
+        assert result.endswith(".mp3"), f"The file {result} should be an MP3 file."
+
+        print(f"Attempting to play file: {result} from provider: {provider}")
+        if os.path.exists(result):
+            play_mp3(result)  # Single play call
+    print("Test successful")
+
 
 #######################################################
 #
@@ -163,6 +230,7 @@ def test_generate_audio_openai():
     try:
         output_file = generate_audio_openai(api_key, input_text, voice, model)
         print(f"Generated audio file: {output_file}")
+        play_mp3(output_file)
     except Exception as e:
         print(f"Error: {e}")
 
@@ -176,51 +244,6 @@ def test_generate_audio_openai():
 # MS Azure TTS Provider Functions
 #
 #https://github.com/run-llama/llama_index/blob/main/llama-index-integrations/tools/llama-index-tools-azure-speech/README.md
-
-#
-# End of MS Edge TTS Provider Functions
-#######################################################
-
-
-#######################################################
-#
-# MS Edge TTS Provider Functions - NOPE
-#
-# # https://github.com/rany2/edge-tts
-#
-# def generate_audio_edge(text, voice, model=None, voice2=None):
-#     # FIXME - SSML tags
-#     common_ssml_tags = ['lang', 'p', 'phoneme', 's', 'sub']
-#     def generate_audio(self, text: str, voice: str, model: str, voice2: str = None) -> bytes:
-#         """Generate audio using Edge TTS."""
-#         import nest_asyncio
-#         import asyncio
-#
-#         # Apply nest_asyncio to allow nested event loops
-#         nest_asyncio.apply()
-#
-#         async def _generate():
-#             communicate = edge_tts.Communicate(text, voice)
-#             # Create a temporary file with proper context management
-#             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp_file:
-#                 temp_path = tmp_file.name
-#
-#             try:
-#                 # Save audio to temporary file
-#                 await communicate.save(temp_path)
-#                 # Read the audio data
-#                 with open(temp_path, 'rb') as f:
-#                     return f.read()
-#             finally:
-#                 # Clean up temporary file
-#                 if os.path.exists(temp_path):
-#                     os.remove(temp_path)
-#
-#         # Use nest_asyncio to handle nested event loops
-#         loop = asyncio.get_event_loop()
-#         return loop.run_until_complete(_generate())
-#     result = generate_audio(text, voice, model, voice2)
-#     return result
 
 #
 # End of MS Edge TTS Provider Functions
@@ -243,7 +266,7 @@ def generate_audio_elevenlabs(input_text, voice, model=None, api_key=None):
         if not elevenlabs_api_key:
             logging.info("ElevenLabs: API key not provided as parameter")
             logging.info("ElevenLabs: Attempting to use API key from config file")
-            elevenlabs_api_key = loaded_config_data['api_keys']['elevenlabs']
+            elevenlabs_api_key = loaded_config_data['elevenlabs_api']['api_key']
 
         if not elevenlabs_api_key:
             logging.error("ElevenLabs: API key not found or is empty")
@@ -278,8 +301,6 @@ def generate_audio_elevenlabs(input_text, voice, model=None, api_key=None):
         return f"ElevenLabs: Error loading Speaker ID(Voice): {str(e)}"
 
     # Handle Model ID/Selection
-    # Set Voice Model
-    model="eleven_turbo_v2_5", # use the turbo model for low latency
     try:
         if not model:
             logging.info("ElevenLabs: Model not provided as parameter")
@@ -293,48 +314,32 @@ def generate_audio_elevenlabs(input_text, voice, model=None, api_key=None):
         return f"ElevenLabs: Error Selecting Model: {str(e)}"
 
     # FIXME - add SSML tags
-
-    # File output (non-streaming)
-    output_format="mp3_22050_32",
-
     # Set the parameters for the TTS conversion
     try:
-        default_eleven_tts_voice_stability = loaded_config_data['tts_settings'].get('default_eleven_tts_voice_stability', 0.0)
-    except Exception as e:
-        logging.error(f"ElevenLabs: Error loading Stability: {str(e)}")
-        return f"ElevenLabs: Error loading Stability: {str(e)}"
+        # Stability
+        stability_str = loaded_config_data['tts_settings'].get('default_eleven_tts_voice_stability', '0.0')
+        default_eleven_tts_voice_stability = float(stability_str) if stability_str else 0.0
 
-    try:
         # Similarity Boost
-        default_eleven_tts_voice_similiarity_boost = loaded_config_data['tts_settings'].get('default_eleven_tts_voice_similiarity_boost', 1.0)
-    except Exception as e:
-        logging.error(f"ElevenLabs: Error loading Similarity Boost: {str(e)}")
-        return f"ElevenLabs: Error loading Similarity Boost: {str(e)}"
+        similarity_boost_str = loaded_config_data['tts_settings'].get('default_eleven_tts_voice_similiarity_boost', '1.0')
+        default_eleven_tts_voice_similiarity_boost = float(similarity_boost_str) if similarity_boost_str else 1.0
 
-    try:
         # Style
-        default_eleven_tts_voice_style = loaded_config_data['tts_settings'].get('default_eleven_tts_voice_style', 0.0)
-    except Exception as e:
-        logging.error(f"ElevenLabs: Error loading Style: {str(e)}")
-        return f"ElevenLabs: Error loading Style: {str(e)}"
+        style_str = loaded_config_data['tts_settings'].get('default_eleven_tts_voice_style', '0.0')
+        default_eleven_tts_voice_style = float(style_str) if style_str else 0.0
 
-    try:
         # Use Speaker Boost
-        default_eleven_tts_voice_use_speaker_boost = loaded_config_data['tts_settings'].get('default_eleven_tts_voice_use_speaker_boost', True)
-    except Exception as e:
-        logging.error(f"ElevenLabs: Error loading Use Speaker Boost: {str(e)}")
-        return f"ElevenLabs: Error loading Use Speaker Boost: {str(e)}"
+        use_speaker_boost_str = loaded_config_data['tts_settings'].get('default_eleven_tts_voice_use_speaker_boost', 'True')
+        default_eleven_tts_voice_use_speaker_boost = use_speaker_boost_str.lower() == 'true' if use_speaker_boost_str else True
 
-    try:
         # Output Format
-        default_eleven_tts_output_format = loaded_config_data['tts_settings'].get('default_eleven_tts_output_format', "mp3_44100_192")
+        default_eleven_tts_output_format = loaded_config_data['tts_settings'].get('default_eleven_tts_output_format', 'mp3_44100_192')
     except Exception as e:
-        logging.error(f"ElevenLabs: Error loading Output Format: {str(e)}")
-        return f"ElevenLabs: Error loading Output Format: {str(e)}"
+        logging.error(f"ElevenLabs: Error loading voice settings: {str(e)}")
+        return f"ElevenLabs: Error loading voice settings: {str(e)}"
 
     # Make the API request
-    # Construct the URL for the Text-to-Speech API request
-    tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice}/stream?output_format=mp3_44100_192"
+    tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice}/stream?output_format={default_eleven_tts_output_format}"
 
     # Set up headers for the API request, including the API key for authentication
     headers = {
@@ -354,37 +359,72 @@ def generate_audio_elevenlabs(input_text, voice, model=None, api_key=None):
             "use_speaker_boost": default_eleven_tts_voice_use_speaker_boost
         }
     }
+
     try:
         # Make the POST request to the TTS API with headers and data, enabling streaming response
         with requests.post(tts_url, headers=headers, json=data, stream=True) as response:
             # Check if the request was successful
             if response.ok:
-                # Create a temporary file - FIXME
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-                    # Read the response in chunks and write to the file
-                    for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
-                        tmp_file.write(chunk)
-                    temp_file_path = tmp_file.name
-                # Inform the user of success
+                # Create temp file but don't use context manager
+                tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+                for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+                    tmp_file.write(chunk)
+                tmp_file.flush()
+                tmp_file.close()  # Explicitly close the file handle
+                temp_file_path = tmp_file.name
                 print(f"Audio stream saved successfully to {temp_file_path}.")
-            if not response.ok:
+                return temp_file_path
+            else:
                 logging.error(f"API request failed: {response.status_code} - {response.text}")
                 return f"API request failed: {response.status_code} - {response.text}"
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"Failed to generate audio: {str(e)}") from e
 
-    save_file_path = f"{uuid.uuid4()}.mp3"
 
-    # Writing the audio to a file
-    with open(save_file_path, "wb") as f:
-        for chunk in response:
-            if chunk:
-                f.write(chunk)
+def test_generate_audio_elevenlabs_real_request():
+    """Test the function with a real API request."""
+    api_key = None
+    input_text = "This is a test text for generating audio."
+    voice = None
+    model = "eleven_turbo_v2"
 
-    print(f"{save_file_path}: A new audio file was saved successfully!")
+    # Call the function
+    result = generate_audio_elevenlabs(input_text=input_text, voice=voice, model=model, api_key=api_key)
 
-    # Return the path of the saved audio file
-    return save_file_path
+    # Assertions
+    assert os.path.exists(result), f"The file {result} should exist."
+    assert result.endswith(".mp3"), f"The file {result} should be an MP3 file."
+
+    print(f"Attempting to play file: {result}")
+    if os.path.exists(result):
+        play_mp3(result)  # Single play call
+
+
+def test_generate_audio_elevenlabs_invalid_api_key():
+    """Test the function with an invalid API key."""
+    # Use an invalid API key
+    api_key = "invalid_api_key"
+    input_text = "This is a test text for generating audio."
+    voice = "your_voice_id"  # Replace with a valid voice ID from ElevenLabs
+
+    # Call the function
+    result = generate_audio_elevenlabs(input_text=input_text, voice=voice, api_key=api_key)
+
+    # Assertions
+    assert "API request failed" in result, "The function should return an error message for an invalid API key."
+
+def test_generate_audio_elevenlabs_missing_input_text():
+    """Test the function with missing input text."""
+    # Use a valid API key but no input text
+    api_key = "your_actual_api_key"
+    input_text = ""
+    voice = "your_voice_id"  # Replace with a valid voice ID from ElevenLabs
+
+    # Call the function
+    result = generate_audio_elevenlabs(input_text=input_text, voice=voice, api_key=api_key)
+
+    # Assertions
+    assert "Error loading input text" in result, "The function should return an error message for missing input text."
 
 # End of ElvenLabs TTS Provider Functions
 #######################################################
@@ -399,6 +439,152 @@ def generate_audio_elevenlabs(input_text, voice, model=None, api_key=None):
 
 #
 # End of Google Gemini TTS Provider Functions
+#######################################################
+
+
+############################################################ LOCAL #####################################################
+
+
+#######################################################
+#
+# AllTalk TTS Provider Functions
+# https://github.com/erew123/alltalk_tts
+# https://github.com/erew123/alltalk_tts/wiki/API-%E2%80%90-OpenAI-V1-Speech-Compatible-Endpoint
+
+def generate_audio_alltalk(input_text, voice=None, model=None, response_format=None, speed=None):
+    """Generate audio using AllTalk API.
+
+    Args:
+        input_text (str): Text to convert to speech (max 4096 chars)
+        voice (str, optional): Voice ID ('alloy', 'echo', 'fable', 'nova', 'onyx', 'shimmer')
+        model (str, optional): Model ID (placeholder)
+        response_format (str, optional): Audio format (defaults to 'wav')
+        speed (float, optional): Speech speed (0.25 to 4.0, defaults to 1.0)
+
+    Returns:
+        str: Path to the generated audio file
+    """
+
+    # Input validation
+    try:
+        if not input_text:
+            raise ValueError("Text input is required.")
+        logging.debug(f"AllTalk: Raw input data type: {type(input_text)}")
+        logging.debug(f"AllTalk: Raw input data (first 500 chars): {str(input_text)[:500]}...")
+    except Exception as e:
+        logging.error(f"AllTalk: Error loading input text: {str(e)}")
+        return f"AllTalk: Error loading input text: {str(e)}"
+    try:
+        if input_text > 4096:
+            raise ValueError("Text input must be less than 4096 characters.")
+    except Exception as e:
+        logging.error(f"AllTalk: Error loading input text(more than 4096 characters): {str(e)}")
+        return f"AllTalk: Error loading input text(more than 4096 characters): {str(e)}"
+
+    # Handle Voice
+    try:
+        if not voice:
+            logging.info("AllTalk: Voice not provided as parameter")
+            logging.info("AllTalk: Attempting to use voice from config file")
+            voice = loaded_config_data['alltalk_api']['voice']
+
+        if not voice:
+            raise ValueError("Voice is required. Default voice not found in config file and no voice selection was passed.")
+    except Exception as e:
+        logging.error(f"AllTalk: Error loading voice: {str(e)}")
+        return f"AllTalk: Error loading voice: {str(e)}"
+
+    # Handle Response Format
+    try:
+        if not response_format:
+            logging.info("AllTalk: Format not provided as parameter")
+            logging.info("AllTalk: Attempting to use format from config file")
+            response_format = loaded_config_data['alltalk_api']['default_alltalk_tts_output_format']
+
+        if not response_format:
+            logging.debug("AllTalk: No response format provided. Defaulting to 'wav'")
+            response_format = "wav"
+    except Exception as e:
+        logging.error(f"AllTalk: Error setting format: {str(e)}")
+        return f"AllTalk: Error setting format: {str(e)}"
+
+    # Handle Speed
+    try:
+        if not speed:
+            logging.info("AllTalk: Speed not provided as parameter")
+            logging.info("AllTalk: Attempting to use speed from config file")
+            speed = loaded_config_data['alltalk_api']['default_alltalk_tts_speed']
+
+        if not speed:
+            logging.debug("AllTalk: No speed provided. Defaulting to '1.0'")
+            speed = 1.0
+
+        speed = float(speed)
+        if not 0.25 <= speed <= 4.0:
+            raise ValueError("Speed must be between 0.25 and 4.0")
+    except Exception as e:
+        logging.error(f"AllTalk: Error setting speed: {str(e)}")
+        return f"AllTalk: Error setting speed: {str(e)}"
+
+    # API URL
+    try:
+        alltalk_api_url = loaded_config_data['alltalk_api']['api_ip']
+        if not alltalk_api_url:
+            raise ValueError("API URL not found in config")
+    except Exception as e:
+        logging.error(f"AllTalk: Error loading API URL: {str(e)}")
+        return f"AllTalk: Error loading API URL: {str(e)}"
+
+    # Prepare request
+    payload = {
+        "model": model,
+        "input": input_text,
+        "voice": voice,
+        "response_format": response_format,
+        "speed": speed
+    }
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    try:
+        # Make the API request without streaming
+        response = requests.post(alltalk_api_url, json=payload, headers=headers)
+
+        if response.ok:
+            # Create a temporary file
+            with tempfile.NamedTemporaryFile(delete=False,
+                                           suffix=f".{response_format}") as tmp_file:
+                # Write the entire response content at once
+                tmp_file.write(response.content)
+                tmp_file.flush()
+                temp_file_path = tmp_file.name
+
+            print(f"Audio stream saved successfully to {temp_file_path}.")
+            return temp_file_path
+        else:
+            error_msg = f"API request failed: {response.status_code} - {response.text}"
+            logging.error(error_msg)
+            return error_msg
+
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Failed to generate audio: {str(e)}"
+        logging.error(error_msg)
+        return error_msg
+
+
+def test_generate_audio_alltalk():
+    model = "placeholder"
+    input_text = "The quick brown fox jumped over the yellow lazy dog."
+    voice = "alloy"
+    response_format = "wav"
+    speed = 1.0
+
+    generate_audio_alltalk(model, input_text, voice, response_format, speed)
+
+#
+# End of AllTalk TTS Provider Functions
 #######################################################
 
 
