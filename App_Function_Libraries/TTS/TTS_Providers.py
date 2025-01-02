@@ -10,7 +10,7 @@ import time
 import uuid
 #
 # External Imports
-import edge_tts
+#import edge_tts
 import requests
 from openai import api_key
 from pydub import AudioSegment
