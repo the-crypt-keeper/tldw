@@ -57,7 +57,7 @@ def initialize_web_search_results_dict(search_params: Dict) -> Dict:
         "output_lang": search_params.get('output_lang', 'en'),
         "result_count": 0,
         "date_range": search_params.get('date_range'),
-        "safesearch": search_params.get('safesearch', 'moderate'),
+        "safesearch": search_params.get('safesearch', 'active'),
         "site_blacklist": search_params.get('site_blacklist', []),
         "exactTerms": search_params.get('exactTerms'),
         "excludeTerms": search_params.get('excludeTerms'),
@@ -137,7 +137,7 @@ def generate_and_search(question: str, search_params: Dict) -> Dict:
             output_lang=search_params.get('output_lang', 'en'),
             result_count=search_params.get('result_count', 10),
             date_range=search_params.get('date_range'),
-            safesearch=search_params.get('safesearch', 'moderate'),
+            safesearch=search_params.get('safesearch', 'active'),
             site_blacklist=search_params.get('site_blacklist', []),
             exactTerms=search_params.get('exactTerms'),
             excludeTerms=search_params.get('excludeTerms'),
@@ -690,7 +690,7 @@ def test_perform_websearch_google():
         test_1 = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10)
         print(f"Test 1: {test_1}")
         # FIXME - Fails. Need to fix arg formatting
-        test_2 = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10, date_range="y", safesearch="moderate", site_blacklist=["spam-site.com"])
+        test_2 = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10, date_range="y", safesearch="active", site_blacklist=["spam-site.com"])
         print(f"Test 2: {test_2}")
         test_3 = results = perform_websearch("google", "What is the capital of France?", "US", "en", "en", 10)
         print(f"Test 3: {test_3}")
