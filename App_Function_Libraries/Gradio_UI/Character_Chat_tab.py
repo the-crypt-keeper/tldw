@@ -34,6 +34,7 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     delete_character_card,
     update_character_card, search_character_chats, save_chat_history_to_character_db,
 )
+from App_Function_Libraries.TTS.TTS_Providers import generate_audio
 from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
     default_api_endpoint, load_comprehensive_config
 
@@ -317,6 +318,9 @@ def create_character_card_interaction_tab():
                 chat_history = gr.Chatbot(label="Conversation", height=800)
                 user_input = gr.Textbox(label="Your message")
                 send_message_button = gr.Button("Send Message")
+                with gr.Row():
+                    speak_button = gr.Button("Speak Response")
+                    tts_status = gr.Textbox(label="TTS Status", interactive=False)
                 with gr.Row():
                     answer_for_me_button = gr.Button("Answer for Me")
                     continue_talking_button = gr.Button("Continue Talking")
@@ -962,7 +966,65 @@ def create_character_card_interaction_tab():
         # Define States for conversation_id and media_content, which are required for saving chat history
         conversation_id = gr.State(str(uuid.uuid4()))
         media_content = gr.State({})
+        # TTS Generation and Playback
+        def speak_last_response(chat_history):
+            """Handle speaking the last chat response."""
+            logging.debug("Starting speak_last_response")
+            try:
+                # If there's no chat history, return
+                if not chat_history or len(chat_history) == 0:
+                    logging.debug("No messages in chat history")
+                    return gr.update(value="No messages to speak", visible=True)
 
+                # Log the chat history content for debugging
+                logging.debug(f"Chat history: {chat_history}")
+
+                # Get the last message from the assistant
+                last_message = chat_history[-1][1]  # Second element of the last tuple
+                logging.debug(f"Last message to speak: {last_message}")
+
+                # Update status to generating
+                yield gr.update(value="Generating audio...", visible=True)
+
+                # Generate audio using your preferred TTS provider
+                try:
+                    audio_file = generate_audio(
+                        text=last_message,
+                        provider="openai",  # or get from config
+                        output_file="last_response.mp3"
+                    )
+                    logging.debug(f"Generated audio file: {audio_file}")
+                except Exception as e:
+                    logging.error(f"Failed to generate audio: {e}")
+                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
+                    return
+
+                # Update status to playing
+                yield gr.update(value="Playing audio...", visible=True)
+
+                # Play the audio
+                if audio_file and os.path.exists(audio_file):
+                    try:
+                        play_mp3(audio_file)
+                        yield gr.update(value="Finished playing audio", visible=True)
+                    except Exception as e:
+                        logging.error(f"Failed to play audio: {e}")
+                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
+                else:
+                    logging.error("Audio file not found")
+                    yield gr.update(value="Failed: Audio file not found", visible=True)
+
+            except Exception as e:
+                logging.error(f"Error in speak_last_response: {str(e)}")
+                yield gr.update(value=f"Error: {str(e)}", visible=True)
+
+            # Update the click handler
+            speak_button.click(
+                fn=speak_last_response,
+                inputs=[chat_history],  # Use chat_history instead of chatbot
+                outputs=[tts_status],
+                api_name="speak_response"
+            )
         # Button Callbacks
 
         # Add the new button callbacks here
