@@ -397,6 +397,12 @@ def load_and_log_configs():
         default_eleven_tts_voice_use_speaker_boost = config.get('TTS-Settings', 'default_eleven_tts_voice_use_speaker_boost', fallback='FIXME')
         default_eleven_tts_output_format = config.get('TTS-Settings', 'default_eleven_tts_output_format',
                                                       fallback='mp3_44100_192')
+        # AllTalk TTS
+        alltalk_api_ip = config.get('TTS-Settings', 'alltalk_api_ip', fallback='http://127.0.0.1:7851/v1/audio/speech')
+        default_alltalk_tts_model = config.get('TTS-Settings', 'default_alltalk_tts_model', fallback='alltalk_model')
+        default_alltalk_tts_voice = config.get('TTS-Settings', 'default_alltalk_tts_voice', fallback='alloy')
+        default_alltalk_tts_speed = config.get('TTS-Settings', 'default_alltalk_tts_speed', fallback=1.0)
+        default_alltalk_tts_output_format = config.get('TTS-Settings', 'default_alltalk_tts_output_format', fallback='mp3')
 
         # Search Engines
         search_provider_default = config.get('Search-Engines', 'search_provider_default', fallback='google')
@@ -527,6 +533,13 @@ def load_and_log_configs():
             },
             'elevenlabs_api': {
                 'api_key': elevenlabs_api_key
+            },
+            'alltalk_api': {
+                'api_ip': alltalk_api_ip,
+                'default_alltalk_tts_model': default_alltalk_tts_model,
+                'default_alltalk_tts_voice': default_alltalk_tts_voice,
+                'default_alltalk_tts_speed': default_alltalk_tts_speed,
+                'default_alltalk_tts_output_format': default_alltalk_tts_output_format,
             },
             'custom_openai_api': {
                 'api_key': custom_openai_api_key,

@@ -350,6 +350,8 @@ def create_chat_interface():
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
                 streaming = gr.Checkbox(label="Streaming", value=False, visible=True)
+                # Fixme - this should trigger teh chatbot to speak the response message when its checked
+                speak_message = gr.Checkbox(label="Speak Message", value=False, visible=True)
                 submit = gr.Button("Submit")
                 regenerate_button = gr.Button("Regenerate Last Message")
                 token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
