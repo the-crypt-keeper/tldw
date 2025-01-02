@@ -42,24 +42,98 @@ def play_mp3(file_path):
 
 def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None, output_file=None, response_format=None, streaming=False):
     """Generate audio using the specified TTS provider."""
+    logging.info(f"Starting generate_audio function")
+
+    # Get default provider if none specified
+    if not provider:
+        provider = loaded_config_data['tts_settings'].get('default_tts_provider', 'openai')
+        logging.info(f"No provider specified, using default: {provider}")
+
+    # Set default output file if none specified
+    if not output_file:
+        # FIXME - use a temp file
+        output_file = "speech.mp3"
+        logging.info(f"No output file specified, using default: {output_file}")
+
+    logging.info(f"Generating audio using {provider} TTS provider")
+
     if provider == "openai":
-        if api_key == None:
+        logging.info("Using OpenAI TTS provider")
+        if api_key is None:
+            logging.info("No API key provided, attempting to use config file")
             api_key = loaded_config_data['openai_api']['api_key']
-        return generate_audio_openai(api_key, text, voice, model, response_format, output_file, streaming)
+        return generate_audio_openai(
+            api_key=api_key,
+            input_text=text,
+            voice=voice,
+            model=model,
+            response_format=response_format,
+            output_file=output_file,
+            streaming=streaming
+        )
+
     elif provider == "elevenlabs":
-        if api_key == None:
+        logging.info("Using ElevenLabs TTS provider")
+        if api_key is None:
+            logging.info("No API key provided, attempting to use config file")
             api_key = loaded_config_data['elevenlabs_api']['api_key']
-        return generate_audio_elevenlabs(text, voice, model, api_key)
-    # FIXME - add gemini
-    # elif provider == "gemini":
-    #     return generate_audio_gemini(text, voice, model)
+        return generate_audio_elevenlabs(
+            input_text=text,
+            voice=voice,
+            model=model,
+            api_key=api_key
+        )
+
     elif provider == "alltalk":
-        return generate_audio_alltalk(text, voice, model)
-    # FIXME - add gpt-sovit
-    # elif provider == "gpt-sovit":
-    #     return generate_audio_gpt_sovit(text, voice, model)
+        logging.info("Using AllTalk TTS provider")
+        return generate_audio_alltalk(
+            input_text=text,
+            voice=voice,
+            model=model
+        )
+
     else:
-        raise ValueError(f"Invalid TTS provider: {provider}")
+        error_msg = f"Invalid TTS provider: {provider}"
+        logging.error(error_msg)
+        raise ValueError(error_msg)
+
+
+def speak_last_response(chatbot):
+    """Handle speaking the last chat response."""
+    logging.debug("Starting speak_last_response")
+    try:
+        # If there's no chat history, return
+        if not chatbot or len(chatbot) == 0:
+            logging.debug("No messages in chatbot history")
+            return "No messages to speak"
+
+        # Log the chatbot content for debugging
+        logging.debug(f"Chatbot history: {chatbot}")
+
+        # Get the last message from the assistant
+        last_message = chatbot[-1][1]
+        logging.debug(f"Last message to speak: {last_message}")
+
+        # Generate audio using your preferred TTS provider
+        audio_file = generate_audio(
+            text=last_message,
+            provider="openai",  # or get from config
+            output_file="last_response.mp3"  # specify output file
+        )
+
+        logging.debug(f"Generated audio file: {audio_file}")
+
+        # Play the audio
+        if audio_file and os.path.exists(audio_file):
+            play_mp3(audio_file)
+            return "Speaking response..."
+        else:
+            logging.error("Failed to generate audio file")
+            return "Failed to generate audio"
+
+    except Exception as e:
+        logging.error(f"Error in speak_last_response: {str(e)}")
+        return f"Error speaking response: {str(e)}"
 
 
 def test_generate_audio():
@@ -110,6 +184,7 @@ def generate_audio_openai(api_key, input_text, voice, model, response_format="mp
         ValueError: If required inputs are missing or invalid.
         RuntimeError: If the API request fails.
     """
+    logging.info("Generating audio using OpenAI API.")
     # Validate inputs
 
     # API key validation
@@ -151,7 +226,7 @@ def generate_audio_openai(api_key, input_text, voice, model, response_format="mp
         if not model:
             logging.info("OpenAI: Model not provided as parameter")
             logging.info("OpenAI: Attempting to use Model from config file")
-            model = loaded_config_data['tts_settings']['default_openai+tts_model']
+            model = loaded_config_data['tts_settings']['default_openai_tts_model']
 
         if not model:
             raise ValueError("Model is required. Default model not found in config and no model selection was passed.")
@@ -259,6 +334,7 @@ def test_generate_audio_openai():
 #https://elevenlabs.io/docs/api-reference/text-to-speech
 def generate_audio_elevenlabs(input_text, voice, model=None, api_key=None):
     """Generate audio using ElevenLabs API."""
+    logging.info("Generating audio using ElevenLabs API.")
     CHUNK_SIZE = 1024
     # API key validation
     elevenlabs_api_key = api_key
