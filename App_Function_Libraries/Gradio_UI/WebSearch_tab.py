@@ -68,6 +68,7 @@ def create_websearch_tab():
 
                 # Status displays
                 with gr.Row():
+                    search_btn = gr.Button("Search", variant="primary")
                     status_display = gr.Markdown(
                         value="Ready",
                         label="Status",
@@ -78,19 +79,21 @@ def create_websearch_tab():
                         visible=True
                     )
 
-                    search_btn = gr.Button("Search", variant="primary")
 
-                # Results review section
-                with gr.Column(visible=False) as review_column:
-                    gr.Markdown("### Review Search Results")
-                    results_review = gr.Dataframe(
-                        headers=["Select", "Title", "URL", "Content Preview"],
-                        datatype=["bool", "str", "str", "str"],
-                        label="Search Results",
-                        interactive=True
-                    )
-                    confirm_selection_btn = gr.Button("Generate Answer from Selected Results")
 
+        with gr.Row():
+            # Results review section
+            with gr.Column(visible=False) as review_column:
+                gr.Markdown("### Review Search Results")
+                results_review = gr.Dataframe(
+                    headers=["Select", "Title", "URL", "Content Preview"],
+                    datatype=["bool", "str", "str", "str"],
+                    label="Search Results",
+                    interactive=True
+                )
+                confirm_selection_btn = gr.Button("Generate Answer from Selected Results")
+
+        with gr.Row():
             # Final output section
             with gr.Column(visible=False) as output_column:
                 answer_output = gr.Markdown(label="Answer")
