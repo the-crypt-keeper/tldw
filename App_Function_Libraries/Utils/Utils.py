@@ -460,6 +460,10 @@ def load_and_log_configs():
         yandex_search_api_key = config.get('Search-Engines', 'search_engine_api_key_yandex', fallback='')
         yandex_search_engine_id = config.get('Search-Engines', 'search_engine_id_yandex', fallback='')
 
+        # Prompts
+        sub_question_generation_prompt = config.get('Prompts', 'sub_question_generation_prompt', fallback='')
+        search_result_relevance_eval_prompt = config.get('Prompts', 'search_result_relevance_eval_prompt', fallback='')
+        analyze_search_results_prompt = config.get('Prompts', 'analyze_search_results_prompt', fallback='')
 
         return {
             'anthropic_api': {
@@ -695,7 +699,12 @@ def load_and_log_configs():
                 'tavily_search_api_key': tavily_search_api_key,
                 'yandex_search_api_key': yandex_search_api_key,
                 'yandex_search_engine_id': yandex_search_engine_id
-            }
+            },
+            'prompts': {
+                'sub_question_generation_prompt': sub_question_generation_prompt,
+                'search_result_relevance_eval_prompt': search_result_relevance_eval_prompt,
+                'analyze_search_results_prompt': analyze_search_results_prompt,
+            },
         }
 
     except Exception as e:

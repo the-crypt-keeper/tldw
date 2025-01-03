@@ -115,6 +115,8 @@ Gemini Deepresearcher
 https://github.com/assafelovic/gpt-researcher
 https://arxiv.org/abs/2411.15114
 
+https://github.com/binary-husky/gpt_academic/blob/master/docs/README.English.md
+https://arxiv.org/abs/2409.13741
 https://github.com/assafelovic/gpt-researcher/tree/master/gpt_researcher
 
 https://github.com/neuml/annotateai

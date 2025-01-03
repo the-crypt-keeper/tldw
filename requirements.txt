@@ -31,6 +31,7 @@ openai
 #outlines
 pandas
 Pillow
+#piper-tts
 playwright
 # I'm not using postgres yet...
 #psycopg2
