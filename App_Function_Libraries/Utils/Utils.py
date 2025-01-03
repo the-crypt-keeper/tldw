@@ -420,6 +420,8 @@ def load_and_log_configs():
         search_result_display_metadata = config.get('Search-Engines', 'search_result_display_metadata', fallback='False')
         search_result_save_to_db = config.get('Search-Engines', 'search_result_save_to_db', fallback='True')
         search_result_analysis_tone = config.get('Search-Engines', 'search_result_analysis_tone', fallback='')
+        relevance_analysis_llm = config.get('Search-Engines', 'relevance_analysis_llm', fallback='False')
+        final_answer_llm = config.get('Search-Engines', 'final_answer_llm', fallback='False')
         # Search Engine Specifics
         baidu_search_api_key = config.get('Search-Engines', 'search_engine_api_key_baidu', fallback='')
         # Bing Search Settings
@@ -667,6 +669,8 @@ def load_and_log_configs():
                 'search_result_display_metadata': search_result_display_metadata,
                 'search_result_save_to_db': search_result_save_to_db,
                 'search_result_analysis_tone': search_result_analysis_tone,
+                'relevance_analysis_llm': relevance_analysis_llm,
+                'final_answer_llm': final_answer_llm,
             },
             'search_engines': {
                 'baidu_search_api_key': baidu_search_api_key,
