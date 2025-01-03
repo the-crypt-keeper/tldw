@@ -3,17 +3,13 @@
 #
 # Imports
 import asyncio
-
+import logging
 #
 # External Imports
 import gradio as gr
-
-from App_Function_Libraries.Web_Scraping.WebSearch_APIs import generate_and_search, analyze_and_aggregate
-
-
 #
 # Local Imports
-
+from App_Function_Libraries.Web_Scraping.WebSearch_APIs import generate_and_search, analyze_and_aggregate
 #
 ########################################################################################################################
 #
@@ -22,6 +18,7 @@ from App_Function_Libraries.Web_Scraping.WebSearch_APIs import generate_and_sear
 def create_websearch_tab():
     with gr.TabItem("Web Search & Review", visible=True):
         with gr.Blocks() as perplexity_interface:
+            # Add CSS
             gr.HTML("""
                 <style>
                     .status-display {
@@ -29,109 +26,45 @@ def create_websearch_tab():
                         border-radius: 5px;
                         margin: 10px 0;
                     }
-                    .status-normal { 
-                        background-color: #f0f0f0; 
-                    }
-                    .status-processing { 
-                        background-color: #fff3cd; 
-                    }
-                    .status-error { 
-                        background-color: #f8d7da; 
-                    }
-                    .status-success { 
-                        background-color: #d4edda; 
-                    }
-
-                    .progress-bar {
-                        width: 100%;
-                        height: 4px;
-                        background: linear-gradient(to right, #4CAF50 0%, #4CAF50 50%, #f0f0f0 50%, #f0f0f0 100%);
-                        background-size: 200% 100%;
-                        animation: progress 1s linear infinite;
-                    }
-
-                    @keyframes progress {
-                        0% { background-position: 100% 0; }
-                        100% { background-position: -100% 0; }
-                    }
-
-                    /* Additional styling for the results table */
-                    .results-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin: 15px 0;
-                    }
-
-                    .results-table th {
-                        background-color: #f5f5f5;
-                        padding: 12px;
-                        text-align: left;
-                        border-bottom: 2px solid #ddd;
-                    }
-
-                    .results-table td {
-                        padding: 10px;
-                        border-bottom: 1px solid #ddd;
-                    }
-
-                    /* Checkbox styling */
-                    .results-table input[type="checkbox"] {
-                        width: 18px;
-                        height: 18px;
-                        cursor: pointer;
-                    }
-
-                    /* Subqueries section styling */
-                    .subqueries-section {
-                        background-color: #f8f9fa;
+                    .status-normal { background-color: #f0f0f0; }
+                    .status-processing { background-color: #fff3cd; }
+                    .status-error { background-color: #f8d7da; }
+                    .status-success { background-color: #d4edda; }
+                    
+                    .result-card {
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
                         padding: 15px;
-                        border-radius: 5px;
-                        margin-bottom: 20px;
+                        margin: 10px 0;
+                        background-color: white;
                     }
-
-                    .subqueries-section h3 {
-                        margin-top: 0;
-                        color: #333;
+                    
+                    .result-title {
+                        font-size: 1.2em;
+                        font-weight: bold;
+                        margin-bottom: 8px;
                     }
-
-                    /* Button styling */
-                    .action-button {
-                        background-color: #007bff;
-                        color: white;
-                        padding: 10px 20px;
-                        border: none;
-                        border-radius: 5px;
-                        cursor: pointer;
-                        transition: background-color 0.3s;
-                    }
-
-                    .action-button:hover {
-                        background-color: #0056b3;
-                    }
-
-                    /* Content preview styling */
-                    .content-preview {
-                        max-height: 100px;
-                        overflow-y: auto;
-                        font-size: 0.9em;
-                        color: #666;
-                    }
-
-                    /* URL styling */
-                    .url-cell {
+                    
+                    .result-url {
                         color: #0066cc;
-                        text-decoration: underline;
+                        margin-bottom: 8px;
                         word-break: break-all;
+                    }
+                    
+                    .result-preview {
+                        color: #666;
+                        margin-top: 8px;
                     }
                 </style>
             """)
-            gr.Markdown("# Perplexity-Style Search Interface")
 
-            # State variables for managing the review process
+            gr.Markdown("# Web Search Interface")
+
+            # State for managing the review process
             state = gr.State({
                 "phase1_results": None,
                 "search_params": None,
-                "selected_results": []
+                "selected_indices": []
             })
 
             with gr.Row():
@@ -169,192 +102,181 @@ def create_websearch_tab():
                             label="Search Language"
                         )
 
-                # Status displays
-                with gr.Row():
-                    search_btn = gr.Button("Search", variant="primary")
-                    status_display = gr.Markdown(
-                        value="Ready",
-                        label="Status",
-                        elem_classes="status-display"
-                    )
-                    progress_display = gr.HTML(
-                        value='<div class="progress-bar" style="display: none;"></div>',
-                        visible=True
-                    )
-
+            # Status and progress displays
             with gr.Row():
-                # Subqueries display section
-                with gr.Column(visible=False) as subqueries_column:
-                    gr.Markdown("### Generated Subqueries")
-                    subqueries_display = gr.JSON(label="Subqueries")
+                search_btn = gr.Button("Search", variant="primary")
+                status_display = gr.Markdown("Ready", elem_classes=["status-display", "status-normal"])
+                progress_display = gr.HTML(visible=False)
 
-            with gr.Row():
-                # Results review section
-                with gr.Column(visible=False) as review_column:
-                    gr.Markdown("### Review Search Results")
-                    results_table = gr.Dataframe(
-                        headers=["Include", "Title", "URL", "Content Preview"],
-                        datatype=["bool", "str", "str", "str"],
-                        label="Search Results",
-                        interactive=True
-                    )
-                    confirm_selection_btn = gr.Button("Generate Answer from Selected Results")
+            # Results review section
+            with gr.Column(visible=False) as review_column:
+                gr.Markdown("### Search Results")
+                results_container = gr.HTML()  # Container for results
+                confirm_selection_btn = gr.Button("Generate Answer from Selected Results")
 
-            with gr.Row():
-                # Final output section
-                with gr.Column(visible=False) as output_column:
-                    answer_output = gr.Markdown(label="Answer")
-                    sources_output = gr.JSON(label="Sources")
+            # Final output section
+            with gr.Column(visible=False) as output_column:
+                answer_output = gr.Markdown(label="Generated Answer")
+                sources_output = gr.JSON(label="Sources")
 
-        # [CSS styles remain the same]
-        def update_status(message, status_type="normal"):
-            status_classes = {
-                "normal": "status-normal",
-                "processing": "status-processing",
-                "error": "status-error",
-                "success": "status-success"
-            }
-            progress_visibility = status_type == "processing"
-            return (
-                gr.Markdown(value=message, elem_classes=status_classes[status_type]),
-                gr.HTML(visible=progress_visibility)
-            )
-        def initial_search(question, engine, count, country, lang, state):
-            try:
-                # Update status to processing
-                status, progress = update_status("Initializing search...", "processing")
-                yield status, progress, state, [], {}, gr.Column(visible=False), gr.Column(visible=False), gr.Column(
-                    visible=False)
-
-                search_params = {
-                    "engine": engine,
-                    "content_country": country,
-                    "search_lang": lang,
-                    "output_lang": lang,
-                    "result_count": count,
-                    "subquery_generation": True,
-                    "subquery_generation_llm": "openai",
-                    "relevance_analysis_llm": "openai",
-                    "final_answer_llm": "openai"
+            def update_status(message, status_type="normal"):
+                """Update the status display with the given message and type."""
+                status_classes = {
+                    "normal": "status-normal",
+                    "processing": "status-processing",
+                    "error": "status-error",
+                    "success": "status-success"
                 }
-
-                status, progress = update_status("Generating sub-queries...", "processing")
-                yield status, progress, state, [], {}, gr.Column(visible=False), gr.Column(visible=False), gr.Column(
-                    visible=False)
-
-                phase1_results = generate_and_search(question, search_params)
-
-                status, progress = update_status("Processing search results...", "processing")
-                yield status, progress, state, [], {}, gr.Column(visible=False), gr.Column(visible=False), gr.Column(
-                    visible=False)
-
-                # Prepare results table data
-                review_data = []
-                for result in phase1_results["web_search_results_dict"]["results"]:
-                    review_data.append([
-                        True,  # Default to included
-                        result.get("title", "No title"),
-                        result.get("url", "No URL"),
-                        result.get("content", "No content")[:200] + "..."
-                    ])
-
-                state = {
-                    "phase1_results": phase1_results,
-                    "search_params": search_params,
-                    "selected_results": []
-                }
-
-                status, progress = update_status("Search completed successfully!", "success")
-                yield (
-                    status,
-                    progress,
-                    state,
-                    review_data,
-                    phase1_results["sub_query_dict"],
-                    gr.Column(visible=True),
-                    gr.Column(visible=True),
-                    gr.Column(visible=False)
+                return (
+                    gr.Markdown(value=message, elem_classes=["status-display", status_classes[status_type]]),
+                    gr.HTML(visible=(status_type == "processing"))
                 )
 
-            except Exception as e:
-                error_message = f"Error during search: {str(e)}"
-                status, progress = update_status(error_message, "error")
-                yield status, progress, state, [], {}, gr.Column(visible=False), gr.Column(visible=False), gr.Column(
-                    visible=False)
+            def format_results_html(results):
+                """Format search results as HTML with checkboxes."""
+                html = ""
+                for idx, result in enumerate(results):
+                    html += f"""
+                    <div class="result-card">
+                        <div class="result-checkbox">
+                            <input type="checkbox" id="result-{idx}" checked>
+                        </div>
+                        <div class="result-title">{result.get('title', 'No title')}</div>
+                        <div class="result-url">{result.get('url', 'No URL')}</div>
+                        <div class="result-preview">{result.get('content', 'No content')[:200]}...</div>
+                    </div>
+                    """
+                return html
 
-        def generate_final_answer(results_data, state):
-            try:
-                status, progress = update_status("Generating final answer...", "processing")
-                yield status, progress, "Processing...", {}, gr.Column(visible=False)
+            def initial_search(question, engine, count, country, lang, state):
+                try:
+                    status, progress = update_status("Initializing search...", "processing")
+                    yield status, progress, state, "", gr.Column(visible=False), gr.Column(visible=False)
 
-                if not state["phase1_results"] or not state["search_params"]:
-                    raise ValueError("No search results available")
+                    search_params = {
+                        "engine": engine,
+                        "content_country": country,
+                        "search_lang": lang,
+                        "output_lang": lang,
+                        "result_count": count
+                    }
 
-                filtered_results = {}
-                all_results = state["phase1_results"]["web_search_results_dict"]["results"]
+                    # Generate and search
+                    phase1_results = generate_and_search(question, search_params)
 
-                for idx, row in enumerate(results_data):
-                    if row[0] and idx < len(all_results):  # If included (checkbox checked)
-                        filtered_results[str(idx)] = all_results[idx]
+                    # Get results list
+                    results_list = phase1_results["web_search_results_dict"]["results"]
 
-                if not filtered_results:
-                    raise ValueError("No results selected")
+                    # Format results as HTML
+                    results_html = format_results_html(results_list)
 
-                status, progress = update_status("Analyzing selected results...", "processing")
-                yield status, progress, "Analyzing...", {}, gr.Column(visible=False)
+                    # Update state with the list indices
+                    state = {
+                        "phase1_results": phase1_results,
+                        "search_params": search_params,
+                        "selected_indices": list(range(len(results_list)))
+                    }
 
-                phase2_results = asyncio.run(analyze_and_aggregate(
-                    {"results": filtered_results},
-                    state["phase1_results"]["sub_query_dict"],
-                    state["search_params"]
-                ))
+                    logging.info(f"Search completed. Results count: {len(results_list)}")
+                    logging.info(f"Selected indices: {state['selected_indices']}")
 
-                status, progress = update_status("Answer generated successfully!", "success")
-                yield status, progress, phase2_results["final_answer"]["Report"], phase2_results["final_answer"][
-                    "evidence"], gr.Column(visible=True)
+                    status, progress = update_status("Search completed successfully!", "success")
+                    yield status, progress, state, results_html, gr.Column(visible=True), gr.Column(visible=False)
 
-            except Exception as e:
-                error_message = f"Error generating answer: {str(e)}"
-                status, progress = update_status(error_message, "error")
-                yield status, progress, "Error occurred while generating answer", {}, gr.Column(visible=False)
+                except Exception as e:
+                    error_message = f"Error during search: {str(e)}"
+                    logging.error(f"Search error: {error_message}")
+                    logging.error("Traceback: ", exc_info=True)
+                    status, progress = update_status(error_message, "error")
+                    yield status, progress, state, "", gr.Column(visible=False), gr.Column(visible=False)
 
-        # Connect event handlers
-        search_btn.click(
-            fn=initial_search,
-            inputs=[
-                question_input,
-                search_engine,
-                result_count,
-                content_country,
-                search_lang,
-                state
-            ],
-            outputs=[
-                status_display,
-                progress_display,
-                state,
-                results_table,
-                subqueries_display,
-                subqueries_column,
-                review_column,
-                output_column
-            ]
-        )
+            def generate_final_answer(state):
+                try:
+                    status, progress = update_status("Generating final answer...", "processing")
+                    yield status, progress, "Processing...", {}, gr.Column(visible=False)
 
-        confirm_selection_btn.click(
-            fn=generate_final_answer,
-            inputs=[
-                results_table,
-                state
-            ],
-            outputs=[
-                status_display,
-                progress_display,
-                answer_output,
-                sources_output,
-                output_column
-            ]
-        )
+                    if not state["phase1_results"] or not state["search_params"]:
+                        raise ValueError("No search results available")
+
+                    # Get selected results
+                    filtered_results = {}
+                    web_search_results = state["phase1_results"]["web_search_results_dict"]["results"]
+
+                    logging.info(f"Processing web search results: {web_search_results}")
+                    logging.info(f"Selected indices: {state['selected_indices']}")
+
+                    # Convert list results to dictionary format expected by analyze_and_aggregate
+                    for idx in state["selected_indices"]:
+                        if idx < len(web_search_results):
+                            result = web_search_results[idx]
+                            filtered_results[str(idx)] = {
+                                'content': result.get('content', ''),
+                                'url': result.get('url', ''),
+                                'title': result.get('title', ''),
+                                'metadata': result.get('metadata', {})
+                            }
+
+                    if not filtered_results:
+                        raise ValueError("No results selected")
+
+                    logging.info(f"Filtered results prepared for analysis: {filtered_results}")
+
+                    # Create the input structure expected by analyze_and_aggregate
+                    input_data = {
+                        "results": filtered_results
+                    }
+
+                    # Generate final answer
+                    phase2_results = asyncio.run(analyze_and_aggregate(
+                        input_data,
+                        state["phase1_results"].get("sub_query_dict", {}),
+                        state["search_params"]
+                    ))
+
+                    status, progress = update_status("Answer generated successfully!", "success")
+                    yield status, progress, phase2_results["final_answer"]["Report"], phase2_results["final_answer"][
+                        "evidence"], gr.Column(visible=True)
+
+                except Exception as e:
+                    error_message = f"Error generating answer: {str(e)}"
+                    logging.error(f"Error in generate_final_answer: {error_message}")
+                    logging.error(f"State: {state}")
+                    logging.error(f"Traceback: ", exc_info=True)  # Add full traceback
+                    status, progress = update_status(error_message, "error")
+                    yield status, progress, "Error occurred while generating answer", {}, gr.Column(visible=False)
+
+            # Connect event handlers
+            search_btn.click(
+                fn=initial_search,
+                inputs=[
+                    question_input,
+                    search_engine,
+                    result_count,
+                    content_country,
+                    search_lang,
+                    state
+                ],
+                outputs=[
+                    status_display,
+                    progress_display,
+                    state,
+                    results_container,
+                    review_column,
+                    output_column
+                ]
+            )
+
+            confirm_selection_btn.click(
+                fn=generate_final_answer,
+                inputs=[state],
+                outputs=[
+                    status_display,
+                    progress_display,
+                    answer_output,
+                    sources_output,
+                    output_column
+                ]
+            )
 
     return perplexity_interface
 

@@ -66,7 +66,9 @@ def get_page_title(url: str) -> str:
 
 
 async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    logging.info(f"Scraping article from URL: {url}")
     async def fetch_html(url: str) -> str:
+        logging.info(f"Fetching HTML from {url}")
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             try:
@@ -79,9 +81,10 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
                     await context.add_cookies(custom_cookies)
                 page = await context.new_page()
                 try:
-                    await page.goto(url, wait_until="domcontentloaded")
-                    await page.wait_for_load_state("networkidle", timeout=30000)
+                    await page.goto(url, wait_until="domcontentloaded", timeout=10000)  # 10-second timeout
+                    await page.wait_for_load_state("networkidle", timeout=10000)  # 10-second timeout
                     content = await page.content()
+                    logging.info(f"HTML fetched successfully from {url}")
                     log_counter("html_fetched", labels={"url": url})
                     return content
                 except Exception as e:
@@ -91,6 +94,7 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
                 await browser.close()
 
     def extract_article_data(html: str, url: str) -> dict:
+        logging.info(f"Extracting article data from HTML for {url}")
         # FIXME - Add option for extracting comments/tables/images
         downloaded = trafilatura.extract(html, include_comments=False, include_tables=False, include_images=False)
         metadata = trafilatura.extract_metadata(html)
@@ -105,6 +109,7 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
         }
 
         if downloaded:
+            logging.info(f"Content extracted successfully from {url}")
             log_counter("article_extracted", labels={"success": "true", "url": url})
             # Add metadata to content
             result['content'] = ContentMetadataHandler.format_content_with_metadata(
@@ -134,6 +139,7 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
         return result
 
     def convert_html_to_markdown(html: str) -> str:
+        logging.info("Converting HTML to Markdown")
         soup = BeautifulSoup(html, 'html.parser')
         for para in soup.find_all('p'):
             # Add a newline at the end of each paragraph for markdown separation
@@ -145,8 +151,10 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
     article_data = extract_article_data(html, url)
     if article_data['extraction_successful']:
         article_data['content'] = convert_html_to_markdown(article_data['content'])
+        logging.info(f"Article content length: {len(article_data['content'])}")
         log_histogram("article_content_length", len(article_data['content']), labels={"url": url})
     return article_data
+
 
 # FIXME - Add keyword integration/tagging
 async def scrape_and_summarize_multiple(
