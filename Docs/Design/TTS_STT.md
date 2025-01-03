@@ -69,15 +69,23 @@ TTS
 Datasets(?)
     https://voice-models.com/
 
+Auralis
+    https://github.com/astramind-ai/Auralis
+    https://www.astramind.ai/post/auralis
+
+Amphion
+    https://github.com/open-mmlab/Amphion
+    https://huggingface.co/amphion/Vevo
+        https://github.com/open-mmlab/Amphion/blob/main/models/vc/vevo/README.md
+        https://openreview.net/pdf?id=anQDiQZhDP
+    https://versavoice.github.io/
+
 Bark
 https://github.com/suno-ai/bark
-
 
 ChatTTS
 https://huggingface.co/2Noise/ChatTTS
 https://chattts.com/#Demo
-
-
 
 Coqui TTS
     https://github.com/idiap/coqui-ai-TTS
@@ -110,6 +118,7 @@ MoonShine
 Gemini
     https://ai.google.dev/gemini-api/docs#rest
     https://ai.google.dev/gemini-api/docs/models/gemini-v2
+    https://github.com/google-gemini/cookbook/blob/main/quickstarts/Audio.ipynb
 
 ElevenLabs
     https://github.com/elevenlabs/elevenlabs-examples/blob/main/examples/text-to-speech/python/text_to_speech_file.py
@@ -131,8 +140,22 @@ MaskGCT
     https://github.com/open-mmlab/Amphion/blob/main/models/tts/maskgct/maskgct_inference.py
     https://huggingface.co/amphion/MaskGCT
 
+Mimic
+    https://github.com/MycroftAI/mimic3
+
+
 Parler
     https://github.com/huggingface/parler-tts
+
+Piper (linux only)
+    https://github.com/rhasspy/piper
+    https://github.com/rhasspy/piper/issues/644
+    https://github.com/rhasspy/piper/discussions/326#discussioncomment-7935208
+    https://noerguerra.com/how-to-read-text-aloud-with-piper-and-python/
+    https://ssamjh.nz/create-custom-piper-tts-voice/
+    https://www.trycatchdebug.net/news/1377664/realtime-tts-with-pipertts-and-openai
+    https://huggingface.co/rhasspy/piper-voices/tree/main
+    https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main
 
 Sherpa ONNX
     https://github.com/k2-fsa/sherpa-onnx
@@ -428,7 +451,7 @@ GPT-SoviTTS
     https://github.com/HanxSmile/Simplify-GPT-SoVITS
     https://github.com/lrxwisdom001/GPT-SoVITS-Novels/tree/main/voice_synthesis
     openneurosama - https://github.com/JarodMica/open-neruosama/blob/master/main.py
-
+    https://huggingface.co/cpumaxx/SoVITS-anime-mini-tts
 
 https://tts.x86.st/
 Finetuning is very quick (about 5 minutes). Captioning of audio was automated with faster-whisper (it is required that the audio is captioned).
@@ -464,6 +487,6 @@ Comfyui integration
     - F
 
 ### Dataset Creation/Curation
-
+https://voiceguide.arimil.com/
 
 

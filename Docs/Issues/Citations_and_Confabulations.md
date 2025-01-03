@@ -37,6 +37,7 @@ Finetuning:
 Abstractive Proposition Segmentation
   https://arxiv.org/abs/2406.19803
   https://huggingface.co/google/gemma-2b-aps-it
+  https://ritvik19.medium.com/papers-explained-244-gemma-aps-8fac1838b9ef
 
 Anthropic:
 ```

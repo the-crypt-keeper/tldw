@@ -708,7 +708,7 @@ def generate_audio_piper(input_text, voice=None, model=None, response_format=Non
 # https://github.com/open-mmlab/Amphion
 # https://huggingface.co/amphion/Vevo
 
-def generate_audio_piper(input_text, voice=None, model=None, response_format=None, speed=None):
+def generate_audio_vevo(input_text, voice=None, model=None, response_format=None, speed=None):
     """Generate audio using Piper TTS.
 
     Args:
@@ -721,7 +721,7 @@ def generate_audio_piper(input_text, voice=None, model=None, response_format=Non
     pass
 
 #
-# End of Piper TTS Provider Functions
+# End of Vevo TTS Provider Functions
 #######################################################
 
 
