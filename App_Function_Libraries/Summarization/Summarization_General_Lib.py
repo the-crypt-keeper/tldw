@@ -126,9 +126,9 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
     try:
         # API key validation
         if not api_key or api_key.strip() == "":
-            logging.info("OpenAI: #1 API key not provided as parameter")
-            logging.info("OpenAI: Attempting to use API key from config file")
-            api_key = loaded_config_data['openai_api']['api_Key']
+            logging.info("OpenAI Summarize: API key not provided as parameter")
+            logging.info("OpenAI Summarize: Attempting to use API key from config file")
+            loaded_config_data.get('openai_api', {}).get('api_key', "")
 
         if not api_key or api_key.strip() == "":
             logging.error("OpenAI: #2 API key not found or is empty")
