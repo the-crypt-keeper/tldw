@@ -40,6 +40,7 @@ def approximate_token_count(history):
     return total_tokens
 
 def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message, streaming):
+    logging.info(f"Debug - Chat API Call - API Endpoint: {api_endpoint}")
     log_counter("chat_api_call_attempt", labels={"api_endpoint": api_endpoint})
     start_time = time.time()
     if not api_key:
