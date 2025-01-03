@@ -24,17 +24,33 @@ def create_websearch_tab():
             search_state = gr.State(value=None)
             # Basic styling
             gr.HTML("""
-                <style>
-                    .result-card {
-                        border: 1px solid #ddd;
-                        border-radius: 8px;
-                        padding: 15px;
-                        margin: 10px 0;
-                        background-color: white;
+                                <style>
+                    .result-card { /* existing styles */ }
+                    
+                    .analyze-button-container {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
                     }
-                    .result-title { font-weight: bold; margin-bottom: 8px; }
-                    .result-url { color: #0066cc; word-break: break-all; }
-                    .result-preview { color: #666; margin-top: 8px; }
+                    
+                    .status-spinner {
+                        display: none;
+                        width: 20px;
+                        height: 20px;
+                        border: 3px solid #f3f3f3;
+                        border-top: 3px solid #3498db;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                    }
+                    
+                    .status-spinner.visible {
+                        display: inline-block;
+                    }
+                    
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
                 </style>
             """)
 
@@ -77,7 +93,18 @@ def create_websearch_tab():
 
             # Results Section
             results_display = gr.HTML(visible=False)
-            analyze_btn = gr.Button("Analyze Selected Results", visible=False)
+            # Analysis button and status container
+            with gr.Row() as analyze_container:
+                analyze_btn = gr.Button("Analyze Selected Results", visible=False)
+                analysis_status = gr.HTML(
+                    """
+                    <div class="analyze-button-container">
+                        <div class="status-spinner"></div>
+                        <span class="status-text"></span>
+                    </div>
+                    """,
+                    visible=False
+                )
 
             # Final Output Section
             with gr.Column(visible=False) as output_section:
@@ -157,6 +184,7 @@ def create_websearch_tab():
                         gr.Markdown("Search completed successfully"),
                         gr.HTML(results_html, visible=True),
                         gr.Button(visible=True),
+                        gr.HTML(visible=True),
                         gr.Column(visible=False),
                         state_to_store
                     )
@@ -166,6 +194,7 @@ def create_websearch_tab():
                         gr.Markdown(f"Error: {str(e)}"),
                         gr.HTML(visible=False),
                         gr.Button(visible=False),
+                        gr.HTML(visible=False),
                         gr.Column(visible=False),
                         None
                     )
@@ -173,6 +202,21 @@ def create_websearch_tab():
             async def analyze_handler(state):
                 logging.debug(f"Received state for analysis: {state}")
                 try:
+                    yield (
+                        gr.HTML(
+                            """
+                            <div class="analyze-button-container">
+                                <div class="status-spinner visible"></div>
+                                <span class="status-text">Processing results...</span>
+                            </div>
+                            """,
+                            visible=True
+                        ),
+                        gr.Markdown("Analysis in progress..."),
+                        gr.JSON(None),
+                        gr.Column(visible=False)
+                    )
+
                     if not state or not isinstance(state, dict):
                         raise ValueError(f"Invalid state received: {state}")
 
@@ -200,7 +244,7 @@ def create_websearch_tab():
                     analysis = await analyze_and_aggregate(
                         state["web_search_results_dict"],
                         state.get("sub_query_dict", {}),
-                        search_params
+                        state.get("search_params", {})
                     )
 
                     logging.debug(f"Analysis results: {analysis}")
@@ -215,32 +259,64 @@ def create_websearch_tab():
                     ### Sources
                     """
 
-                    return (
-                        gr.Markdown("Analysis completed successfully"),
+                    yield (
+                        gr.HTML(
+                            """
+                            <div class="analyze-button-container">
+                                <span class="status-text">✓ Analysis complete</span>
+                            </div>
+                            """,
+                            visible=True
+                        ),
                         gr.Markdown(formatted_answer),
                         analysis["final_answer"]["evidence"],
                         gr.Column(visible=True)
                     )
                 except Exception as e:
                     logging.error(f"Analysis error: {str(e)}", exc_info=True)
-                    return (
-                        gr.Markdown(f"Error during analysis: {str(e)}"),
+                    yield (
+                        gr.HTML(
+                            f"""
+                            <div class="analyze-button-container">
+                                <span class="status-text">❌ Error: {str(e)}</span>
+                            </div>
+                            """,
+                            visible=True
+                        ),
                         gr.Markdown("Analysis failed"),
-                        {},
+                        gr.JSON(None),
                         gr.Column(visible=False)
                     )
 
             # Connect event handlers
             search_btn.click(
                 fn=search_handler,
-                inputs=[query, engine, num_results, country, language],
-                outputs=[status, results_display, analyze_btn, output_section, search_state]  # Use search_state
+                inputs=[
+                    query,
+                    engine,
+                    num_results,
+                    country,
+                    language,
+                ],
+                outputs=[
+                    status,
+                    results_display,
+                    analyze_btn,
+                    analysis_status,
+                    output_section,
+                    search_state  # Update state
+                ]
             )
 
             analyze_btn.click(
                 fn=analyze_handler,
-                inputs=[search_state],  # Use search_state as input
-                outputs=[status, answer, sources, output_section]
+                inputs=[search_state],  # Use the state
+                outputs=[
+                    analysis_status,
+                    answer,
+                    sources,
+                    output_section
+                ]
             )
 
         return interface
