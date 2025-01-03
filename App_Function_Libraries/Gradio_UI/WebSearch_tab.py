@@ -4,9 +4,13 @@
 # Imports
 import asyncio
 import logging
+from typing import Dict
+
 #
 # External Imports
 import gradio as gr
+
+from App_Function_Libraries.Utils.Utils import loaded_config_data
 #
 # Local Imports
 from App_Function_Libraries.Web_Scraping.WebSearch_APIs import generate_and_search, analyze_and_aggregate
@@ -14,23 +18,13 @@ from App_Function_Libraries.Web_Scraping.WebSearch_APIs import generate_and_sear
 ########################################################################################################################
 #
 # Functions:
-
 def create_websearch_tab():
-    with gr.TabItem("Web Search & Review", visible=True):
-        with gr.Blocks() as perplexity_interface:
-            # Add CSS
+    with gr.TabItem("Web Search & Review"):
+        with gr.Blocks() as interface:
+            search_state = gr.State(value=None)
+            # Basic styling
             gr.HTML("""
                 <style>
-                    .status-display {
-                        padding: 10px;
-                        border-radius: 5px;
-                        margin: 10px 0;
-                    }
-                    .status-normal { background-color: #f0f0f0; }
-                    .status-processing { background-color: #fff3cd; }
-                    .status-error { background-color: #f8d7da; }
-                    .status-success { background-color: #d4edda; }
-                    
                     .result-card {
                         border: 1px solid #ddd;
                         border-radius: 8px;
@@ -38,109 +32,65 @@ def create_websearch_tab():
                         margin: 10px 0;
                         background-color: white;
                     }
-                    
-                    .result-title {
-                        font-size: 1.2em;
-                        font-weight: bold;
-                        margin-bottom: 8px;
-                    }
-                    
-                    .result-url {
-                        color: #0066cc;
-                        margin-bottom: 8px;
-                        word-break: break-all;
-                    }
-                    
-                    .result-preview {
-                        color: #666;
-                        margin-top: 8px;
-                    }
+                    .result-title { font-weight: bold; margin-bottom: 8px; }
+                    .result-url { color: #0066cc; word-break: break-all; }
+                    .result-preview { color: #666; margin-top: 8px; }
                 </style>
             """)
 
-            gr.Markdown("# Web Search Interface")
-
-            # State for managing the review process
-            state = gr.State({
-                "phase1_results": None,
-                "search_params": None,
-                "selected_indices": []
-            })
-
+            # Input Section
             with gr.Row():
                 with gr.Column():
-                    # Input components
-                    question_input = gr.Textbox(
-                        label="Enter your question",
-                        placeholder="What would you like to know?",
+                    query = gr.Textbox(
+                        label="Search Query",
+                        placeholder="What would you like to search for?",
                         lines=2
                     )
 
                     with gr.Row():
-                        search_engine = gr.Dropdown(
+                        engine = gr.Dropdown(
                             choices=["google", "bing", "duckduckgo", "brave"],
                             value="google",
                             label="Search Engine"
                         )
-                        result_count = gr.Slider(
-                            minimum=1,
-                            maximum=20,
-                            value=10,
-                            step=1,
+                        num_results = gr.Slider(
+                            minimum=1, maximum=20, value=10, step=1,
                             label="Number of Results"
                         )
 
                     with gr.Row():
-                        content_country = gr.Dropdown(
+                        country = gr.Dropdown(
                             choices=["US", "UK", "CA", "AU"],
                             value="US",
-                            label="Content Country"
+                            label="Content Region"
                         )
-                        search_lang = gr.Dropdown(
+                        language = gr.Dropdown(
                             choices=["en", "es", "fr", "de"],
                             value="en",
-                            label="Search Language"
+                            label="Language"
                         )
 
-            # Status and progress displays
+            # Action Buttons and Status
             with gr.Row():
                 search_btn = gr.Button("Search", variant="primary")
-                status_display = gr.Markdown("Ready", elem_classes=["status-display", "status-normal"])
-                progress_display = gr.HTML(visible=False)
+                status = gr.Markdown("Ready")
 
-            # Results review section
-            with gr.Column(visible=False) as review_column:
-                gr.Markdown("### Search Results")
-                results_container = gr.HTML()  # Container for results
-                confirm_selection_btn = gr.Button("Generate Answer from Selected Results")
+            # Results Section
+            results_display = gr.HTML(visible=False)
+            analyze_btn = gr.Button("Analyze Selected Results", visible=False)
 
-            # Final output section
-            with gr.Column(visible=False) as output_column:
-                answer_output = gr.Markdown(label="Generated Answer")
-                sources_output = gr.JSON(label="Sources")
+            # Final Output Section
+            with gr.Column(visible=False) as output_section:
+                answer = gr.Markdown(label="Analysis")
+                sources = gr.JSON(label="Sources")
 
-            def update_status(message, status_type="normal"):
-                """Update the status display with the given message and type."""
-                status_classes = {
-                    "normal": "status-normal",
-                    "processing": "status-processing",
-                    "error": "status-error",
-                    "success": "status-success"
-                }
-                return (
-                    gr.Markdown(value=message, elem_classes=["status-display", status_classes[status_type]]),
-                    gr.HTML(visible=(status_type == "processing"))
-                )
-
-            def format_results_html(results):
-                """Format search results as HTML with checkboxes."""
+            def format_results(results: list) -> str:
+                """Format search results as HTML."""
                 html = ""
                 for idx, result in enumerate(results):
                     html += f"""
                     <div class="result-card">
-                        <div class="result-checkbox">
-                            <input type="checkbox" id="result-{idx}" checked>
-                        </div>
+                        <input type="checkbox" id="result-{idx}" checked>
                         <div class="result-title">{result.get('title', 'No title')}</div>
                         <div class="result-url">{result.get('url', 'No URL')}</div>
                         <div class="result-preview">{result.get('content', 'No content')[:200]}...</div>
@@ -148,137 +98,152 @@ def create_websearch_tab():
                     """
                 return html
 
-            def initial_search(question, engine, count, country, lang, state):
-                try:
-                    status, progress = update_status("Initializing search...", "processing")
-                    yield status, progress, state, "", gr.Column(visible=False), gr.Column(visible=False)
+            relevance_analysis_llm = loaded_config_data['search_settings']["relevance_analysis_llm"]
+            final_answer_llm = loaded_config_data['search_settings']["final_answer_llm"]
 
+            def perform_search(query: str, engine: str, num_results: int,
+                               country: str, language: str) -> Dict:
+                """Execute the search operation."""
+                search_params = {
+                    "engine": engine,
+                    "content_country": country,
+                    "search_lang": language,
+                    "output_lang": language,
+                    "result_count": num_results,
+                    # Add LLM settings
+                    "relevance_analysis_llm": relevance_analysis_llm,
+                    "final_answer_llm": final_answer_llm
+                }
+
+                return generate_and_search(query, search_params)
+
+            def search_handler(query, engine, num_results, country, language):
+                try:
+                    # Call perform_search with individual arguments
+                    results = perform_search(
+                        query=query,
+                        engine=engine,
+                        num_results=num_results,
+                        country=country,
+                        language=language
+                    )
+
+                    logging.debug(f"Search results: {results}")
+
+                    if not results.get("web_search_results_dict") or not results["web_search_results_dict"].get(
+                            "results"):
+                        raise ValueError("No search results returned")
+
+                    results_html = format_results(results["web_search_results_dict"]["results"])
+
+                    # Store complete results including search params
+                    state_to_store = {
+                        "web_search_results_dict": results["web_search_results_dict"],
+                        "sub_query_dict": results.get("sub_query_dict", {}),
+                        "search_params": {
+                            "engine": engine,
+                            "content_country": country,
+                            "search_lang": language,
+                            "output_lang": language,
+                            "relevance_analysis_llm": relevance_analysis_llm,
+                            "final_answer_llm": final_answer_llm
+                        }
+                    }
+
+                    logging.info(
+                        f"Storing state with {len(state_to_store['web_search_results_dict']['results'])} results")
+
+                    return (
+                        gr.Markdown("Search completed successfully"),
+                        gr.HTML(results_html, visible=True),
+                        gr.Button(visible=True),
+                        gr.Column(visible=False),
+                        state_to_store
+                    )
+                except Exception as e:
+                    logging.error(f"Search error: {str(e)}", exc_info=True)
+                    return (
+                        gr.Markdown(f"Error: {str(e)}"),
+                        gr.HTML(visible=False),
+                        gr.Button(visible=False),
+                        gr.Column(visible=False),
+                        None
+                    )
+
+            async def analyze_handler(state):
+                logging.debug(f"Received state for analysis: {state}")
+                try:
+                    if not state or not isinstance(state, dict):
+                        raise ValueError(f"Invalid state received: {state}")
+
+                    if not state.get("web_search_results_dict"):
+                        raise ValueError("No web search results in state")
+
+                    if not state["web_search_results_dict"].get("results"):
+                        raise ValueError("No results array in web search results")
+
+                    relevance_analysis_llm = loaded_config_data['search_settings']["relevance_analysis_llm"]
+                    final_answer_llm = loaded_config_data['search_settings']["final_answer_llm"]
+
+                    # Create search params with required LLM settings
                     search_params = {
-                        "engine": engine,
-                        "content_country": country,
-                        "search_lang": lang,
-                        "output_lang": lang,
-                        "result_count": count
+                        "engine": state["web_search_results_dict"]["search_engine"],
+                        "content_country": state["web_search_results_dict"]["content_country"],
+                        "search_lang": state["web_search_results_dict"]["search_lang"],
+                        "output_lang": state["web_search_results_dict"]["output_lang"],
+                        # Add LLM settings
+                        "relevance_analysis_llm": relevance_analysis_llm,
+                        "final_answer_llm": final_answer_llm
                     }
 
-                    # Generate and search
-                    phase1_results = generate_and_search(question, search_params)
+                    # Analyze results
+                    analysis = await analyze_and_aggregate(
+                        state["web_search_results_dict"],
+                        state.get("sub_query_dict", {}),
+                        search_params
+                    )
 
-                    # Get results list
-                    results_list = phase1_results["web_search_results_dict"]["results"]
+                    logging.debug(f"Analysis results: {analysis}")
 
-                    # Format results as HTML
-                    results_html = format_results_html(results_list)
+                    if not analysis.get("final_answer"):
+                        raise ValueError("Analysis did not produce a final answer")
 
-                    # Update state with the list indices
-                    state = {
-                        "phase1_results": phase1_results,
-                        "search_params": search_params,
-                        "selected_indices": list(range(len(results_list)))
-                    }
+                    formatted_answer = f"""
+                    ### Analysis Result
+                    {analysis["final_answer"]["Report"]}
 
-                    logging.info(f"Search completed. Results count: {len(results_list)}")
-                    logging.info(f"Selected indices: {state['selected_indices']}")
+                    ### Sources
+                    """
 
-                    status, progress = update_status("Search completed successfully!", "success")
-                    yield status, progress, state, results_html, gr.Column(visible=True), gr.Column(visible=False)
-
+                    return (
+                        gr.Markdown("Analysis completed successfully"),
+                        gr.Markdown(formatted_answer),
+                        analysis["final_answer"]["evidence"],
+                        gr.Column(visible=True)
+                    )
                 except Exception as e:
-                    error_message = f"Error during search: {str(e)}"
-                    logging.error(f"Search error: {error_message}")
-                    logging.error("Traceback: ", exc_info=True)
-                    status, progress = update_status(error_message, "error")
-                    yield status, progress, state, "", gr.Column(visible=False), gr.Column(visible=False)
-
-            def generate_final_answer(state):
-                try:
-                    status, progress = update_status("Generating final answer...", "processing")
-                    yield status, progress, "Processing...", {}, gr.Column(visible=False)
-
-                    if not state["phase1_results"] or not state["search_params"]:
-                        raise ValueError("No search results available")
-
-                    # Get selected results
-                    filtered_results = {}
-                    web_search_results = state["phase1_results"]["web_search_results_dict"]["results"]
-
-                    logging.info(f"Processing web search results: {web_search_results}")
-                    logging.info(f"Selected indices: {state['selected_indices']}")
-
-                    # Convert list results to dictionary format expected by analyze_and_aggregate
-                    for idx in state["selected_indices"]:
-                        if idx < len(web_search_results):
-                            result = web_search_results[idx]
-                            filtered_results[str(idx)] = {
-                                'content': result.get('content', ''),
-                                'url': result.get('url', ''),
-                                'title': result.get('title', ''),
-                                'metadata': result.get('metadata', {})
-                            }
-
-                    if not filtered_results:
-                        raise ValueError("No results selected")
-
-                    logging.info(f"Filtered results prepared for analysis: {filtered_results}")
-
-                    # Create the input structure expected by analyze_and_aggregate
-                    input_data = {
-                        "results": filtered_results
-                    }
-
-                    # Generate final answer
-                    phase2_results = asyncio.run(analyze_and_aggregate(
-                        input_data,
-                        state["phase1_results"].get("sub_query_dict", {}),
-                        state["search_params"]
-                    ))
-
-                    status, progress = update_status("Answer generated successfully!", "success")
-                    yield status, progress, phase2_results["final_answer"]["Report"], phase2_results["final_answer"][
-                        "evidence"], gr.Column(visible=True)
-
-                except Exception as e:
-                    error_message = f"Error generating answer: {str(e)}"
-                    logging.error(f"Error in generate_final_answer: {error_message}")
-                    logging.error(f"State: {state}")
-                    logging.error(f"Traceback: ", exc_info=True)  # Add full traceback
-                    status, progress = update_status(error_message, "error")
-                    yield status, progress, "Error occurred while generating answer", {}, gr.Column(visible=False)
+                    logging.error(f"Analysis error: {str(e)}", exc_info=True)
+                    return (
+                        gr.Markdown(f"Error during analysis: {str(e)}"),
+                        gr.Markdown("Analysis failed"),
+                        {},
+                        gr.Column(visible=False)
+                    )
 
             # Connect event handlers
             search_btn.click(
-                fn=initial_search,
-                inputs=[
-                    question_input,
-                    search_engine,
-                    result_count,
-                    content_country,
-                    search_lang,
-                    state
-                ],
-                outputs=[
-                    status_display,
-                    progress_display,
-                    state,
-                    results_container,
-                    review_column,
-                    output_column
-                ]
+                fn=search_handler,
+                inputs=[query, engine, num_results, country, language],
+                outputs=[status, results_display, analyze_btn, output_section, search_state]  # Use search_state
             )
 
-            confirm_selection_btn.click(
-                fn=generate_final_answer,
-                inputs=[state],
-                outputs=[
-                    status_display,
-                    progress_display,
-                    answer_output,
-                    sources_output,
-                    output_column
-                ]
+            analyze_btn.click(
+                fn=analyze_handler,
+                inputs=[search_state],  # Use search_state as input
+                outputs=[status, answer, sources, output_section]
             )
 
-    return perplexity_interface
+        return interface
 
 #
 # End of File
