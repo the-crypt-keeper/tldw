@@ -92,6 +92,20 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
             model=model
         )
 
+    elif provider == "google":
+        pass
+
+    elif provider == "gpt-soviTTS":
+        pass
+
+    elif provider == "piper":
+        logging.info("Using Piper TTS provider")
+        return generate_audio_piper(
+            input_text=text,
+            model=model,
+            output_file=output_file,
+        )
+
     else:
         error_msg = f"Invalid TTS provider: {provider}"
         logging.error(error_msg)
@@ -661,6 +675,53 @@ def test_generate_audio_alltalk():
 
 #
 # End of AllTalk TTS Provider Functions
+#######################################################
+
+
+#######################################################
+#
+# Piper TTS Provider Functions
+# https://github.com/rhasspy/piper
+# https://github.com/erew123/alltalk_tts/wiki/API-%E2%80%90-OpenAI-V1-Speech-Compatible-Endpoint
+
+def generate_audio_piper(input_text, voice=None, model=None, response_format=None, speed=None):
+    """Generate audio using Piper TTS.
+
+    Args:
+
+    Returns:
+        str: Path to the generated audio file
+    """
+
+    # Input validation
+    pass
+
+#
+# End of Piper TTS Provider Functions
+#######################################################
+
+
+#######################################################
+#
+# Vevo TTS Provider Functions
+#
+# https://github.com/open-mmlab/Amphion
+# https://huggingface.co/amphion/Vevo
+
+def generate_audio_piper(input_text, voice=None, model=None, response_format=None, speed=None):
+    """Generate audio using Piper TTS.
+
+    Args:
+
+    Returns:
+        str: Path to the generated audio file
+    """
+
+    # Input validation
+    pass
+
+#
+# End of Piper TTS Provider Functions
 #######################################################
 
 

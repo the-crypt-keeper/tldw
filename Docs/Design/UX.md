@@ -84,6 +84,9 @@ https://markwhen.com/
 https://kando.menu/
 https://deepseek-artifacts.vercel.app/
 
+Not waifus, but clippy:
+  https://github.com/fghrsh/live2d_demo
+
 
 Prompt Engineering page:
 - 3 Sections

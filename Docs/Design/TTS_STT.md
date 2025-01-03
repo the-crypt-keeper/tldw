@@ -34,9 +34,6 @@ https://github.com/albirrkarim/react-speech-highlight-demo
 https://funaudiollm.github.io/cosyvoice2/
 https://funaudiollm.github.io/cosyvoice2/
 https://github.com/InternLM/InternLM-XComposer/tree/main/InternLM-XComposer-2.5-OmniLive
-https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
-https://huggingface.co/onnx-community/moonshine-base-ONNX
-https://github.com/usefulsensors/moonshine
 https://github.com/Azure-Samples/aisearch-openai-rag-audio
 https://www.reddit.com/r/LocalLLaMA/comments/1f0awd6/best_local_open_source_texttospeech_and/
 https://github.com/FanaHOVA/smol-podcaster
@@ -47,11 +44,17 @@ https://huggingface.co/spaces/mozilla-ai/document-to-podcast/blob/main/app.py
 https://huggingface.co/spaces/Nymbo/Voice-Clone-Multilingual/tree/main
 https://github.com/aedocw/epub2tts
 https://github.com/microsoft/SpeechT5
+https://www.lightnote.co/?utm_source=www.hivefive.community&utm_medium=newsletter&utm_campaign=hive-five-202-a-bias-to-action
 https://github.com/smellslikeml/dolla_llama
-
+https://github.com/dnhkng/GlaDOS
 
 STT
     https://github.com/KoljaB/RealtimeSTT
+    https://github.com/southbridgeai/offmute
+    MoonShine
+        https://github.com/usefulsensors/moonshine
+        https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
+        https://huggingface.co/onnx-community/moonshine-base-ONNX
 
 TTS
     https://github.com/KoljaB/RealtimeTTS
@@ -59,6 +62,7 @@ TTS
 101
     https://www.inferless.com/learn/comparing-different-text-to-speech---tts--models-for-different-use-cases
     https://clideo.com/resources/what-is-tts
+    https://pub.towardsai.net/the-ultimate-guide-to-audio-processing-principles-techniques-and-applications-7724efea00e8
     RVC 101
         https://gudgud96.github.io/2024/09/26/annotated-rvc/
 
@@ -130,6 +134,8 @@ MaskGCT
 Parler
     https://github.com/huggingface/parler-tts
 
+Sherpa ONNX
+    https://github.com/k2-fsa/sherpa-onnx
 
 YourTTS
     https://github.com/Edresson/YourTTS

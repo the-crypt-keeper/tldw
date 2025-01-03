@@ -478,6 +478,7 @@ def aggregate_results(
         - evidence (List[Dict]): List of relevant content items included in the summary.
         - confidence (float): A rough confidence score (placeholder).
     """
+    logging.info("Aggregating and summarizing relevant results")
     if not relevant_results:
         return {
             "Report": "No relevant results found. Unable to provide an answer.",
@@ -493,7 +494,6 @@ def aggregate_results(
     )
 
     # Example analysis prompt
-    # FIXME - Add to config.txt/utils.py
     analyze_search_results_prompt = f"""
         Generate a comprehensive, well-structured, and informative answer for a given question, 
         using ONLY the information found in the provided web Search Results (URL, Page Title, Summary).
@@ -535,13 +535,17 @@ def aggregate_results(
     input_data = "Follow the above instructions."
 
     try:
+        logging.info("Generating the report")
         returned_response = chat_api_call(
             api_endpoint=api_endpoint,
             api_key=None,
             input_data=input_data,
             prompt=analyze_search_results_prompt,
-            temp=0.7
+            temp=0.7,
+            system_message=None,
+            streaming=False
         )
+        logging.debug(f"Returned response from LLM: {returned_response}")
         if returned_response:
             # You could do further parsing or confidence estimation here
             return {
@@ -552,6 +556,7 @@ def aggregate_results(
     except Exception as e:
         logging.error(f"Error aggregating results: {e}")
 
+    logging.error("Could not create the report due to an error.")
     return {
         "summary": "Could not create the report due to an error.",
         "evidence": list(relevant_results.values()),

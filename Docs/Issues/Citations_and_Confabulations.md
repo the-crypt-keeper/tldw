@@ -6,20 +6,21 @@
 3. [References](#references)
 
 
-
-https://arxiv.org/abs/2412.04235
-https://arxiv.org/abs/2412.11536
-https://github.com/sunnynexus/RetroLLM
-https://huggingface.co/PleIAs/Pleias-Nano
-https://deepmind.google/discover/blog/facts-grounding-a-new-benchmark-for-evaluating-the-factuality-of-large-language-models/
-https://arxiv.org/abs/2412.14860
-https://arxiv.org/abs/2412.14686
-https://arxiv.org/abs/2412.18069
-
-
-
 RAG
   https://www.lycee.ai/blog/rag-ragallucinations-and-how-to-fight-them
+  https://huggingface.co/PleIAs/Pleias-Nano
+  https://arxiv.org/abs/2412.11536
+  https://cloud.google.com/generative-ai-app-builder/docs/check-grounding
+  https://cloud.google.com/generative-ai-app-builder/docs/grounded-gen
+  https://arxiv.org/html/2412.15189v1#S6
+  https://aclanthology.org/2024.fever-1.10/
+  https://arxiv.org/pdf/2412.15189
+  https://huggingface.co/papers/2408.12060
+  https://primer.ai/research/rag-v-divide-and-conquer-with-factual-claims/
+  https://arxiv.org/abs/2411.06037
+  https://www.sciencedirect.com/science/article/abs/pii/S0306457320309675
+  https://github.com/Huffon/factsumm
+  https://arxiv.org/abs/2410.07176
 
 Finetuning: 
 - https://eugeneyan.com/writing/finetuning/
@@ -30,8 +31,12 @@ Finetuning:
 - **101**
 - Unsorted
     - https://mattyyeung.github.io/deterministic-quoting#7-conclusion-is-this-really-ready-for-healthcare
+  https://github.com/sunnynexus/RetroLLM
+    - https://github.com/MadryLab/context-cite
 
-
+Abstractive Proposition Segmentation
+  https://arxiv.org/abs/2406.19803
+  https://huggingface.co/google/gemma-2b-aps-it
 
 Anthropic:
 ```
@@ -71,6 +76,12 @@ Benchmarks
   https://huggingface.co/spaces/vectara/Hallucination-evaluation-leaderboard
   https://huggingface.co/spaces/hallucinations-leaderboard/leaderboard
   https://osu-nlp-group.github.io/AttributionBench/
+  Fake News
+    https://arxiv.org/abs/2412.14686
+  FACTS
+    https://www.kaggle.com/facts-leaderboard
+    https://storage.googleapis.com/deepmind-media/FACTS/FACTS_grounding_paper.pdf
+    https://deepmind.google/discover/blog/facts-grounding-a-new-benchmark-for-evaluating-the-factuality-of-large-language-models/
 
 
 Detecting Hallucinations using Semantic Entropy:
@@ -93,38 +104,52 @@ Explainability
 
 Research
   https://github.com/EdinburghNLP/awesome-hallucination-detection
-  https://arxiv.org/abs/2407.13481
-  https://arxiv.org/abs/2408.06195
-  https://arxiv.org/abs/2407.19813
   https://www.lycee.ai/blog/rag-ragallucinations-and-how-to-fight-them
-  https://arxiv.org/abs/2407.16557
-  https://arxiv.org/abs/2407.16604
-  https://arxiv.org/pdf/2309.11495
-  https://deepmind.google/research/publications/85420/
   https://thetechoasis.beehiiv.com/p/eliminating-hallucinations-robots-imitate-us
-  https://arxiv.org/abs/2407.19825
-  https://arxiv.org/abs/2411.14257
-  https://arxiv.org/pdf/2406.02543
-  https://arxiv.org/pdf/2410.19385
-  https://arxiv.org/abs/2406.10279
-  https://arxiv.org/abs/2402.17811
-  https://arxiv.org/pdf/2409.18475
   https://llm-editing.github.io/
-  https://arxiv.org/abs/2411.14257
-  https://arxiv.org/pdf/2407.03651
   https://cleanlab.ai/blog/trustworthy-language-model/
-  https://arxiv.org/abs/2408.07852
+  General
+    https://arxiv.org/pdf/2410.19385
+    https://arxiv.org/pdf/2409.18475
+    https://arxiv.org/pdf/2406.02543
+    https://arxiv.org/abs/2407.19825
+    https://arxiv.org/abs/2407.16604
+    https://arxiv.org/abs/2407.16557
+    https://arxiv.org/abs/2412.04235
+  Attention/Long Context
+    https://arxiv.org/abs/2407.13481
+    https://arxiv.org/pdf/2407.03651
+  CoV
+    https://arxiv.org/pdf/2309.11495
+  KnowledgeGraph
+    https://arxiv.org/abs/2408.07852
+  Mutual Reasoning
+    https://arxiv.org/abs/2408.06195
+  Self-Reasoning
+    https://arxiv.org/abs/2407.19813
+    https://arxiv.org/abs/2412.14860
   Detecting Hallucinations
     https://arxiv.org/abs/2410.22071
     https://arxiv.org/abs/2410.02707
+    https://arxiv.org/abs/2411.14257
   Reflective thinking
     https://arxiv.org/html/2404.09129v1
     https://github.com/yanhong-lbh/LLM-SelfReflection-Eval
   Semantic Entropy
     https://www.nature.com/articles/s41586-024-07421-0
     https://arxiv.org/abs/2406.15927
+  Software Packages
+    https://arxiv.org/abs/2406.10279
+  TruthX
+    https://arxiv.org/abs/2402.17811
+  Working memory
+    https://arxiv.org/abs/2412.18069
   HALVA
     https://research.google/blog/halva-hallucination-attenuated-language-and-vision-assistant/
+Long Form Factuality - Google
+  https://github.com/google-deepmind/long-form-factuality
+  https://deepmind.google/research/publications/85420/
+
 
 
 LLM As Judge:
