@@ -17,6 +17,7 @@ This page serves as documentation regarding the web search functionality within 
 - Bing, Brave, DDG, Google work for simple searches. Advanced search options are not fully working yet.
     - Brave: https://api.search.brave.com/app/documentation/web-search/query#WebSearchAPIQueryParameters
     - Bing: https://docs.microsoft.com/en-us/rest/api/cognitiveservices-bingsearch/bing-web-api-v7-reference
+    - DuckDuckGo: https://duckduckgo.com/
     - Google: https://developers.google.com/custom-search/v1/reference/rest/v1/cse/list
 - Baidu, SearX, Serper, Tavily, Yandex are not implemented yet.
 - Kagi & SearX are implemented but not working (Kagi because API access and SearX because I'm not sure why)
@@ -95,117 +96,71 @@ This page serves as documentation regarding the web search functionality within 
 ----------------
 ### Web Search API
 - TBD
-```def perform_websearch(search_engine, 
-                            search_query, 
-                            content_country, 
-                            search_lang, 
-                            output_lang, 
-                            result_count, 
-                            date_range=None,
-                            safesearch=None, 
-                            site_blacklist=None, 
-                            exactTerms=None, 
-                            excludeTerms=None, 
-                            filter=None, 
-                            geolocation=None, 
-                            search_result_language=None, 
-                            sort_results_by=None
+```
+def perform_websearch(search_engine
+                      search_query,
+                      content_country,
+                      search_lang,
+                      output_lang,
+                      result_count, - Number of results to return(not applicable to all engines, but necessary for consistency)
+                      date_range=None,
+                      safesearch=None,
+                      site_blacklist=None, 
+                      exactTerms=None, 
+                      excludeTerms=None, 
+                      filter=None, 
+                      geolocation=None, 
+                      search_result_language=None
+                      sort_results_by=None):
 ```
 
 
-ask.py https://github.com/pengfeng/ask.py
-    1. User inputs a search query
-    2. Search query is then used to generate several sub-queries
-    3. Each sub-query is then used to perform a search via API call
-    4. Sub-queries are setup using a specific prompt, they do 'at least 3, but no more than 5' - makes me wonder about how many sub-queries should be the default and the range thereof
-    5. Search results returned, passed to groq
 
+### Implementation
 
-OpenPerplex
-    1. Search Query
-    2. Perform search via API
-    3. Collect results, grab story titles + snippets
-    4. Extract content from each URL
-    5. Concat if exceeds X length, re-rank, then combine into a single document
-    6. Present final doc to user
-
-
-
-llm-websearch
-    https://github.com/Jay4242/llm-websearch
-    1. Performs query -> Fetches results 
-    2. Iterates over each page description and decides whether to 'investigate' the page's content
-    3. If so, it fetches the page content and creates a summary of it
-    4. Repeat, until all URLs are processed.
-    5. Create summary of all summaries/page contents and present final doc to user
-
-
-
-mindsearch
-    Uses Knowledge Graph for results
-    Interesting, seems to combat repetition in search results
-        top_p=0.8,
-        top_k=1,
-        temperature=0,
-        max_new_tokens=8192,
-        repetition_penalty=1.02,
-
-
-
-Perplexity
-    1. Search Query
-    2. Perform search via API
-    3. Collect results, grab story titles + snippets
-    4. Extract content from each URL
-    5. Concat if exceeds X length, re-rank, then combine into a single document
-    6. Present final doc to user
-    7. Display top 3 sources at top, with option to show/hide remaining sources - can click on sources to go that URL
-    8. Option for Follow up questions + Potential other questions, if these are selected, the content is added to the 'ongoing' document
-    9. Ongoing document is saved to the DB, and can be accessed later
-    - Option for ranking/share/rewrite/copy to clipboard
-    - Pro allows for seemingly 'planning'/sub-question breakdown of the user's original query, maybe just asking 'what would be questions likely asked?'?
-    - Performs a planning step and then sub-query breakdown searches into 3(?) sub-queries
-    - Non-pro simply performs the search, combines the results, and presents them to the user while showing the sources
-    - Spaces: Seems to be a way of sharing collections of research document chains, with the ability to add comments, etc.
-
-
-
-### Implementaiton
-- Configuration Options:
-    - Language
-        - Language used for writing query
-        - language used for performing query (query submitted to search engine)
-        - language used for summary/analysis of search results
-    - Query count
-    - Whether to create Sub-Queries
-        - Sub-Query count
-    - Search Engine Selection
-        - Search Engine API Key
-    - Search Engine Customization Options
-        - Safe Search
-        - Language
-        - Date Range
-    - Search Result Options
-        - Total number of queries to perform
-        - Total number of results/pages to review per query
-        - Result Sorting - Auto rerank according to ?
-        - Result Filtering - Filter according to a blacklist of URLs? Maybe also content?
-    - Search Result Display Options
-        - Display Format (List, Briefing, Full)
-        - Display Metadata (URL, Date, etc)
-    - Search Result Default Saving Options
-        - Save to DB
-        - Save to File
-        - Save to Clipboard
-        - Save to Notes DB - Create a new note with the search results + metadata & query
-    - Output Options
-        - Default Output Format (Markdown, HTML, PDF) - ehhhh
-        - Default Output Location (Display/ephemeral, DB)
-        - Output style (Briefing, Full, List)
-        - Output Metadata (URL, Date, etc)
-        - Word count limit for output (per search result & total)
-        - Output dialect (US, UK, a NY Radio DJ, etc)
-
+config.txt options explained
+```
+# Search Defaults
+search_provider_default = google
+search_language_query = en - Language Queries will be performed in
+search_language_results = en - Language Results will be returned in
+search_language_analysis = en - Language Analysis will be performed in
+search_default_max_queries = 10 - Maximum number of queries to perform
+search_enable_subquery = True - Enable subqueries
+search_enable_subquery_count_max = 5 - Maximum number of subqueries to generate
+search_result_rerank = True - Enable result reranking
+search_result_max = 15 - Maximum number of results to return
+search_result_max_per_query = 10 - Maximum number of results to return per query
+search_result_blacklist = []
+search_result_display_type = list - Display type for search results, does nothing right now.
+search_result_display_metadata = False - Display metadata for search results, does nothing right now.
+search_result_save_to_db = True - Save search results to the database (not implemented yet)
+# How you want the results to be written, think 'style' or voice 
+search_result_analysis_tone = neutral - Tone of the analysis (not implemented yet)
+relevance_analysis_llm = openai - LLM to use for relevance analysis
+final_answer_llm = openai - LLM to use for final answer generation
+#### Search Engines #####
+# Bing
+search_engine_country_code_bing = en - Country code for Bing, Where Search 'takes place from'
+#
+# Brave
+search_engine_country_code_brave = US - Country code for Brave, Where Search 'takes place from'
+#
+# Google
+# Restricts search results to documents originating in a particular country.
+limit_google_search_to_country = False
+google_search_country_code = US - Country code for Google, Where Search 'takes place from'
+google_filter_setting = 1 - Filter setting for Google, 0 = No filtering, 1 = Moderate filtering, 2 = Strict filtering
+google_user_geolocation = US - Geolocation for user performing the search
+google_limit_search_results_to_language = False - Limit search results to a specific language
+google_default_search_results = 10 - Default number of search results to return
+google_safe_search = "active" - Safe search setting for Google, active, moderate, or off
+google_enable_site_search = False - Enable site search
+google_site_search_include = - Sites to include in the search
+google_site_search_exclude = - Sites to exclude from the search
+# https://developers.google.com/custom-search/docs/structured_search#sort-by-attribute
+google_sort_results_by = - Sort results by attribute (I honestly couldn't find much about this one)
+```
 
 Results dictionary:
 ```
