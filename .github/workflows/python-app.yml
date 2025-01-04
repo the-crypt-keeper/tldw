@@ -33,8 +33,10 @@ jobs:
     - name: Test ChromaDB lib functions with pytest
       run: |
         pwd 
-        cd ./Tests/ChromaDB
-        pytest test_chromadb.py
+        ls
+        ls ./Config_Files
+        cd ./Tests/ChromaDB/
+        pytest ./test_chromadb.py
 
     - name: Test RAG lib functions with pytest
       run: |
@@ -59,3 +61,8 @@ jobs:
         pwd
         cd ./Tests/Utils
         pytest test_utils.py
+
+    - name: Test tldw runs
+      run: |
+        pwd
+        python summarize.py -h

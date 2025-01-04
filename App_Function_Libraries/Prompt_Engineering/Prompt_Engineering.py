@@ -14,6 +14,9 @@ from App_Function_Libraries.Chat.Chat_Functions import chat_api_call
 #
 # Function Definitions
 
+
+################################## Meta Prompt Engineering Functions ##############################################
+
 # Function to generate prompt using metaprompt
 def generate_prompt(api_endpoint, api_key, task, variables_str, temperature):
     # Convert variables into a list from comma-separated input
@@ -492,7 +495,7 @@ def generate_prompt(api_endpoint, api_key, task, variables_str, temperature):
 
     # Call chat API to generate the prompt
     response = chat_api_call(api_endpoint=api_endpoint, api_key=api_key, input_data="", prompt=metaprompt,
-                             temp=temperature)
+                             temp=temperature, streaming=False, minp=None, maxp=None, model=None)
     return response
 
 def extract_between_tags(tag: str, string: str, strip: bool = False) -> list[str]:
@@ -537,7 +540,7 @@ def test_generated_prompt(api_endpoint, api_key, generated_prompt, variable_valu
         prompt_with_values = prompt_with_values.replace(var, value)
 
     # Send the filled-in prompt to the chat API
-    response = chat_api_call(api_endpoint=api_endpoint, api_key=api_key, input_data="", prompt=prompt_with_values, temp=temperature)
+    response = chat_api_call(api_endpoint=api_endpoint, api_key=api_key, input_data="", prompt=prompt_with_values, temp=temperature, system_message=None, streaming=False, minp=None, maxp=None, model=None)
     return response
 
 #

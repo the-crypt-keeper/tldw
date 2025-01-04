@@ -69,12 +69,12 @@ Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)
 - **Backup Management** - A way to back up the DBs, view backups, and restore from a backup. (4 SQLite DBs: Media, Character Chats, RAG Chats, Embeddings)
 - **Trashcan Support** - A way to 'soft' delete content, and restore it if needed. (Helps with accidental deletions) - Trashcan is only for the MediaDB.
 - **Support for 7 Local LLM APIs:** `Llama.cpp`, `Kobold.cpp`, `Oobabooga`, `TabbyAPI`, `vLLM`, `Ollama`, `Aphrodite`, `Custom OpenAI API`.
-- **Support for 8 Commercial APIs:** `Claude Sonnet 3.5`, `Cohere Command R+`, `DeepSeek`, `Groq`, `HuggingFace`, `Mistral`, `OpenAI`, `OpenRouter`.
+- **Support for 9 Commercial APIs:** `Claude Sonnet 3.5`, `Cohere Command R+`, `DeepSeek`, `Google`, `Groq`, `HuggingFace`, `Mistral`, `OpenAI`, `OpenRouter`.
 - **Local Audio Recording with Transcription** - Record audio locally and transcribe it.
 - **Structured Prompt Creation and Management** - Create prompts using a structured approach, and then edit and use them in your chats. Or delete them.
   - Also have the ability to import prompts individually or in bulk. As well as export them as markdown documents.
   - See `./Docs/Prompts/` for examples of prompts. and `./Docs/Propmts/TEMPLATE.md` for the prompt template used in tldw.
-- Features to come: Anki Flashcard Deck Editing (Creation is in), Mindmap creation from content(currently in under `Utilities`, uses PlantUML), better document handling, migration to a FastAPI backend(Gradio is a placeholder UI), and more.
+- Features to come: Migration to a FastAPI backend(Gradio is a placeholder UI). Anki Flashcard Deck Editing (Creation is in), Mindmap creation from content(currently in under `Utilities`, uses PlantUML), better document handling, and more.
 </details>
 
 #### The original scripts by `the-crypt-keeper` for transcribing and summarizing youtube videos are available here: [scripts here](https://github.com/the-crypt-keeper/tldw/tree/main/tldw-original-scripts)
@@ -189,9 +189,10 @@ All features are designed to run **locally** on your device, ensuring privacy an
     - Pytorch + other ML libraries will also cause the size to increase.
     - As such, I would say you want at least 12GB of free space on your system to devote to the app.
     - Text content itself is tiny, but the supporting libraries + ML models can be quite large.
-- **Linux**
+- **Linux (Tested on Debian/Ubuntu/Fedora)**
     1. Download necessary packages (Python3, ffmpeg, portaudio19-dev - `sudo apt install ffmpeg portaudio19-dev gcc build-essential python3-dev` or `dnf install ffmpeg portaudio19-dev gcc build-essential python3-dev`, Update your GPU Drivers/CUDA drivers if you'll be running an LLM locally)
        * `portaudio19-dev` for pyaudio, `python3-dev gcc build-essential` for building it.
+       * If you're using another system, you can try `pip install pyaudio` and see if that works. Otherwise, you can run it as a container.
     2. Open a terminal, navigate to the directory you want to install the script in, and run the following commands:
     3. `git clone https://github.com/rmusser01/tldw`
     4. `cd tldw`
@@ -610,6 +611,8 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   * https://www.getcoralai.com/
   * https://getcahier.com/#features
   * https://msty.app/
+  * https://afforai.com
+  * https://penno.io/
 ------------
 
 ### <a name="credits"></a>Credits

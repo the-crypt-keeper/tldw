@@ -135,7 +135,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
         if api_key is None:
             logging.info("llama.cpp: API key not provided as parameter")
             logging.info("llama.cpp: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['llama']
+            api_key = loaded_config_data['llama_api']['api_key']
 
         if api_key is None or api_key.strip() == "":
             logging.info("llama.cpp: API key not found or is empty")
@@ -145,7 +145,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
         if api_url is None:
             logging.info("llama.cpp: API URL not provided as parameter")
             logging.info("llama.cpp: Attempting to use API URL from config file")
-            api_url = loaded_config_data['local_api_ip']['llama']
+            api_url = loaded_config_data['llama_api']['api_ip']
 
         if api_url is None or api_url.strip() == "":
             logging.info("llama.cpp: API URL not found or is empty")
@@ -260,7 +260,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
                 logging.info("Kobold: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                kobold_api_key = loaded_config_data['api_keys'].get('kobold')
+                kobold_api_key = loaded_config_data['kobold_api'].get('api_key')
                 if kobold_api_key:
                     logging.info("Kobold: Using API key from config file")
                 else:
@@ -314,14 +314,14 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
 
         logging.debug("kobold: Submitting request to API endpoint")
         print("kobold: Submitting request to API endpoint")
-        kobold_api_ip = loaded_config_data['local_api_ip']['kobold']
+        kobold_api_ip = loaded_config_data['kobold_api']['api_ip']
 
         if streaming:
             logging.debug("Kobold Summarization: Streaming mode enabled")
             try:
                 # Send the request with streaming enabled
                 # Get the Streaming API IP from the config
-                kobold_openai_api_IP = loaded_config_data['local_api_ip']['kobold_openai']
+                kobold_openai_api_IP = loaded_config_data['kobold_api']['api_streaming_ip']
                 response = requests.post(
                     kobold_openai_api_IP, headers=headers, json=data, stream=True
                 )
@@ -421,7 +421,7 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.
         if api_key is None:
             logging.info("ooba: API key not provided as parameter")
             logging.info("ooba: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['ooba']
+            api_key = loaded_config_data['ooba_api']['api_key']
 
         if api_key is None or api_key.strip() == "":
             logging.info("ooba: API key not found or is empty")
@@ -540,15 +540,15 @@ def chat_with_tabbyapi(
                 logging.info("TabbyAPI: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                tabby_api_key = loaded_config_data['api_keys'].get('tabby')
+                tabby_api_key = loaded_config_data['tabby_api'].get('api_key')
                 if tabby_api_key:
                     logging.info("TabbyAPI: Using API key from config file")
                 else:
                     logging.warning("TabbyAPI: No API key found in config file")
 
         # Set API IP and model from config.txt
-        tabby_api_ip = loaded_config_data['local_api_ip']['tabby']
-        tabby_model = loaded_config_data['models']['tabby']
+        tabby_api_ip = loaded_config_data['tabby_api']['api_ip']
+        tabby_model = loaded_config_data['tabby_api']['model']
         if temp is None:
             temp = 0.7
 
@@ -655,12 +655,12 @@ def chat_with_tabbyapi(
 # FIXME aphrodite engine - code was literally tab complete in one go from copilot... :/
 def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:8080/completion"):
     loaded_config_data = load_and_log_configs()
-    model = loaded_config_data['models']['aphrodite']
+    model = loaded_config_data['aphrodite_api']['model']
     # API key validation
     if api_key is None:
         logging.info("aphrodite: API key not provided as parameter")
         logging.info("aphrodite: Attempting to use API key from config file")
-        api_key = loaded_config_data['api_keys']['aphrodite']
+        api_key = loaded_config_data['aphrodite_api']['api_key']
 
     if api_key is None or api_key.strip() == "":
         logging.info("aphrodite: API key not found or is empty")
@@ -707,7 +707,7 @@ def chat_with_ollama(
                 logging.info("Ollama: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                ollama_api_key = loaded_config_data['api_keys'].get('ollama')
+                ollama_api_key = loaded_config_data['ollama_api'].get('api_key')
                 if ollama_api_key:
                     logging.info("Ollama: Using API key from config file")
                 else:
@@ -715,14 +715,14 @@ def chat_with_ollama(
 
             # Set model from parameter or config
             if model is None:
-                model = loaded_config_data['models'].get('ollama')
+                model = loaded_config_data['ollama_api'].get('model')
                 if model is None:
                     logging.error("Ollama: Model not found in config file")
                     return "Ollama: Model not found in config file"
 
             # Set api_url from parameter or config
             if api_url is None:
-                api_url = loaded_config_data['local_api_ip'].get('ollama')
+                api_url = loaded_config_data['ollama_api'].get('api_ip')
                 if api_url is None:
                     logging.error("Ollama: API URL not found in config file")
                     return "Ollama: API URL not found in config file"
@@ -910,13 +910,13 @@ def chat_with_vllm(
                 logging.info("vLLM: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                vllm_api_key = loaded_config_data['api_keys'].get('vllm')
+                vllm_api_key = loaded_config_data['vllm_api'].get('api_key')
                 if vllm_api_key:
                     logging.info("vLLM: Using API key from config file")
                 else:
                     logging.warning("vLLM: No API key found in config file")
-            if 'vllm' in loaded_config_data['local_api_ip']:
-                vllm_api_url = loaded_config_data['local_api_ip']['vllm']
+            if 'api_ip' in loaded_config_data['vllm_api']:
+                vllm_api_url = loaded_config_data['vllm_api']['api_ip']
                 logging.info(f"vLLM: Using API URL from config file: {vllm_api_url}")
             else:
                 logging.error("vLLM: API URL not found in config file")
@@ -927,7 +927,7 @@ def chat_with_vllm(
         if system_prompt is None:
             system_prompt = "You are a helpful AI assistant."
 
-        model = model or loaded_config_data['models']['vllm']
+        model = model or loaded_config_data['vllm_api']['model']
         if system_prompt is None:
             system_prompt = "You are a helpful AI assistant."
 
@@ -1015,7 +1015,7 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
         if not custom_openai_api_key:
             logging.info("Custom OpenAI API: API key not provided as parameter")
             logging.info("Custom OpenAI API: Attempting to use API key from config file")
-            custom_openai_api_key = loaded_config_data['api_keys']['custom_openai_api_key']
+            custom_openai_api_key = loaded_config_data['custom_openai_api']['api_key']
 
         if not custom_openai_api_key:
             logging.error("Custom OpenAI API: API key not found or is empty")
@@ -1068,7 +1068,7 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
         logging.debug(f"Custom OpenAI API: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"v: Custom prompt: {custom_prompt_arg}")
 
-        openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
+        openai_model = loaded_config_data['custom_openai_api']['model']
         logging.debug(f"Custom OpenAI API: Using model: {openai_model}")
 
         headers = {
@@ -1096,7 +1096,7 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
             "stream": streaming
         }
 
-        custom_openai_url = loaded_config_data['Local_api_ip']['custom_openai_api_ip']
+        custom_openai_url = loaded_config_data['custom_openai_api']['api_ip']
 
         if streaming:
             response = requests.post(

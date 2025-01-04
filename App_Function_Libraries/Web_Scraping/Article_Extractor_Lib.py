@@ -33,6 +33,8 @@ import pandas as pd
 from playwright.async_api import async_playwright
 import requests
 import trafilatura
+from tqdm import tqdm
+
 #
 # Import Local
 from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
@@ -41,6 +43,8 @@ from App_Function_Libraries.Summarization.Summarization_General_Lib import summa
 #######################################################################################################################
 # Function Definitions
 #
+
+web_scraping_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 #################################################################
 #
@@ -62,23 +66,35 @@ def get_page_title(url: str) -> str:
 
 
 async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    logging.info(f"Scraping article from URL: {url}")
     async def fetch_html(url: str) -> str:
+        logging.info(f"Fetching HTML from {url}")
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
-            )
-            if custom_cookies:
-                await context.add_cookies(custom_cookies)
-            page = await context.new_page()
-            await page.goto(url)
-            await page.wait_for_load_state("networkidle")
-            content = await page.content()
-            await browser.close()
-            log_counter("html_fetched", labels={"url": url})
-            return content
+            try:
+                context = await browser.new_context(
+                    user_agent=web_scraping_user_agent,
+                #viewport = {"width": 1280, "height": 720},
+                #java_script_enabled = True
+                )
+                if custom_cookies:
+                    await context.add_cookies(custom_cookies)
+                page = await context.new_page()
+                try:
+                    await page.goto(url, wait_until="domcontentloaded", timeout=10000)  # 10-second timeout
+                    await page.wait_for_load_state("networkidle", timeout=10000)  # 10-second timeout
+                    content = await page.content()
+                    logging.info(f"HTML fetched successfully from {url}")
+                    log_counter("html_fetched", labels={"url": url})
+                    return content
+                except Exception as e:
+                    logging.error(f"Error fetching HTML for {url}: {e}")
+                    return ""
+            finally:
+                await browser.close()
 
     def extract_article_data(html: str, url: str) -> dict:
+        logging.info(f"Extracting article data from HTML for {url}")
         # FIXME - Add option for extracting comments/tables/images
         downloaded = trafilatura.extract(html, include_comments=False, include_tables=False, include_images=False)
         metadata = trafilatura.extract_metadata(html)
@@ -93,6 +109,7 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
         }
 
         if downloaded:
+            logging.info(f"Content extracted successfully from {url}")
             log_counter("article_extracted", labels={"success": "true", "url": url})
             # Add metadata to content
             result['content'] = ContentMetadataHandler.format_content_with_metadata(
@@ -122,6 +139,7 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
         return result
 
     def convert_html_to_markdown(html: str) -> str:
+        logging.info("Converting HTML to Markdown")
         soup = BeautifulSoup(html, 'html.parser')
         for para in soup.find_all('p'):
             # Add a newline at the end of each paragraph for markdown separation
@@ -133,6 +151,7 @@ async def scrape_article(url: str, custom_cookies: Optional[List[Dict[str, Any]]
     article_data = extract_article_data(html, url)
     if article_data['extraction_successful']:
         article_data['content'] = convert_html_to_markdown(article_data['content'])
+        logging.info(f"Article content length: {len(article_data['content'])}")
         log_histogram("article_content_length", len(article_data['content']), labels={"url": url})
     return article_data
 
@@ -155,6 +174,9 @@ async def scrape_and_summarize_multiple(
 
     results = []
     errors = []
+
+    # Create a tqdm progress bar
+    progress_bar = tqdm(total=len(urls_list), desc="Scraping and Summarizing")
 
     # Loop over each URL to scrape and optionally summarize
     for i, url in enumerate(urls_list):
@@ -206,6 +228,12 @@ async def scrape_and_summarize_multiple(
             error_message = f"Error processing URL {i + 1} ({url}): {str(e)}"
             errors.append(error_message)
             logging.error(error_message, exc_info=True)
+        finally:
+            # Update the progress bar
+            progress_bar.update(1)
+
+    # Close the progress bar
+    progress_bar.close()
 
     if errors:
         logging.error("\n".join(errors))
@@ -804,10 +832,10 @@ class ContentMetadataHandler:
             metadata.update(additional_metadata)
 
         formatted_content = f"""{ContentMetadataHandler.METADATA_START}
-{json.dumps(metadata, indent=2)}
-{ContentMetadataHandler.METADATA_END}
-
-{content}"""
+        {json.dumps(metadata, indent=2)}
+        {ContentMetadataHandler.METADATA_END}
+        
+        {content}"""
 
         return formatted_content
 

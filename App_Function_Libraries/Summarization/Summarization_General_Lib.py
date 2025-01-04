@@ -122,13 +122,15 @@ def extract_text_from_segments(segments):
 
 
 def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
-    loaded_config_data = load_and_log_configs()
+
     try:
         # API key validation
         if not api_key or api_key.strip() == "":
-            logging.info("OpenAI: #1 API key not provided as parameter")
-            logging.info("OpenAI: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['openai']
+            logging.info("OpenAI Summarize: API key not provided as parameter")
+            logging.info("OpenAI Summarize: Attempting to use API key from config file")
+            loaded_config_data = load_and_log_configs()
+            loaded_config_data.get('openai_api', {}).get('api_key', "")
+            logging.debug(f"OpenAI Summarize: Using API key from config file: {api_key[:5]}...{api_key[-5:]}")
 
         if not api_key or api_key.strip() == "":
             logging.error("OpenAI: #2 API key not found or is empty")
@@ -182,7 +184,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
         logging.debug(f"OpenAI: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"OpenAI: Custom prompt: {custom_prompt_arg}")
 
-        openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
+        openai_model = loaded_config_data['openai_api']['model'] or "gpt-4o"
         logging.debug(f"OpenAI: Using model: {openai_model}")
 
         headers = {
@@ -285,7 +287,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
                 logging.info("Anthropic: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                anthropic_api_key = loaded_config_data['api_keys'].get('anthropic')
+                anthropic_api_key = loaded_config_data['anthropic_api'].get('api_key')
                 if anthropic_api_key:
                     logging.info("Anthropic: Using API key from config file")
                 else:
@@ -344,7 +346,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
             "content": f"{text} \n\n\n\n{anthropic_prompt}"
         }
 
-        model = loaded_config_data['models']['anthropic']
+        model = loaded_config_data['anthropic_api']['model']
 
         data = {
             "model": model,
@@ -462,7 +464,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
                 logging.info("Cohere: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                cohere_api_key = loaded_config_data['api_keys'].get('cohere')
+                cohere_api_key = loaded_config_data['cohere_api'].get('api_key')
                 if cohere_api_key:
                     logging.info("Cohere: Using API key from config file")
                 else:
@@ -507,7 +509,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         else:
             raise ValueError("Cohere: Invalid input data format")
 
-        cohere_model = loaded_config_data['models']['cohere']
+        cohere_model = loaded_config_data['cohere']['model']
 
         if temp is None:
             temp = 0.3
@@ -612,7 +614,7 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, syste
                 logging.info("Groq: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                groq_api_key = loaded_config_data['api_keys'].get('groq')
+                groq_api_key = loaded_config_data['groq_api'].get('api_key')
                 if groq_api_key:
                     logging.info("Groq: Using API key from config file")
                 else:
@@ -652,7 +654,7 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, syste
             raise ValueError("Groq: Invalid input data format")
 
         # Set the model to be used
-        groq_model = loaded_config_data['models']['groq']
+        groq_model = loaded_config_data['groq_api']['model']
 
         if temp is None:
             temp = 0.2
@@ -762,7 +764,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None,
                 logging.info("OpenRouter: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                openrouter_api_key = loaded_config_data['api_keys'].get('openrouter')
+                openrouter_api_key = loaded_config_data['openrouter_api'].get('api_key')
                 if openrouter_api_key:
                     logging.info("OpenRouter: Using API key from config file")
                 else:
@@ -771,7 +773,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None,
         # Model Selection validation
         logging.debug("OpenRouter: Validating model selection")
         loaded_config_data = load_and_log_configs()
-        openrouter_model = loaded_config_data['models']['openrouter']
+        openrouter_model = loaded_config_data['openrouter_api']['model']
         logging.debug(f"OpenRouter: Using model from config file: {openrouter_model}")
 
         # Final check to ensure we have a valid API key
@@ -937,7 +939,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
                 logging.info("HuggingFace: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                huggingface_api_key = loaded_config_data['api_keys'].get('huggingface')
+                huggingface_api_key = loaded_config_data['huggingface_api'].get('api_key')
                 logging.debug(f"HuggingFace: API key from config: {huggingface_api_key[:5]}...{huggingface_api_key[-5:]}")
                 if huggingface_api_key:
                     logging.info("HuggingFace: Using API key from config file")
@@ -982,7 +984,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
         headers = {
             "Authorization": f"Bearer {huggingface_api_key}"
         }
-        huggingface_model = loaded_config_data['models']['huggingface']
+        huggingface_model = loaded_config_data['huggingface_api']['model']
         API_URL = f"https://api-inference.huggingface.co/models/{huggingface_model}"
         if temp is None:
             temp = 0.1
@@ -1068,7 +1070,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
                 logging.info("DeepSeek: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                deepseek_api_key = loaded_config_data['api_keys'].get('deepseek')
+                deepseek_api_key = loaded_config_data['deepseek_api'].get('api_key')
                 if deepseek_api_key:
                     logging.info("DeepSeek: Using API key from config file")
                 else:
@@ -1107,7 +1109,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
         else:
             raise ValueError("DeepSeek: Invalid input data format")
 
-        deepseek_model = loaded_config_data['models']['deepseek'] or "deepseek-chat"
+        deepseek_model = loaded_config_data['deepseek']['model'] or "deepseek-chat"
 
         if temp is None:
             temp = 0.1
@@ -1205,7 +1207,7 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
                 logging.info("Mistral: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                mistral_api_key = loaded_config_data['api_keys'].get('mistral')
+                mistral_api_key = loaded_config_data['mistral_api'].get('api_key')
                 if mistral_api_key:
                     logging.info("Mistral: Using API key from config file")
                 else:
@@ -1244,7 +1246,7 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
         else:
             raise ValueError("Mistral: Invalid input data format")
 
-        mistral_model = loaded_config_data['models']['mistral'] or "mistral-large-latest"
+        mistral_model = loaded_config_data['mistral_api']['model'] or "mistral-large-latest"
 
         if temp is None:
             temp = 0.2
@@ -1349,7 +1351,7 @@ def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, sys
         if not api_key or api_key.strip() == "":
             logging.info("Google: #1 API key not provided as parameter")
             logging.info("Google: Attempting to use API key from config file")
-            api_key = loaded_config_data['api_keys']['google']
+            api_key = loaded_config_data['google_api']['api_key']
 
         if not api_key or api_key.strip() == "":
             logging.error("Google: #2 API key not found or is empty")
@@ -1403,7 +1405,7 @@ def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, sys
         logging.debug(f"Google: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"Google: Custom prompt: {custom_prompt_arg}")
 
-        google_model = loaded_config_data['models']['google'] or "gemini-1.5-pro"
+        google_model = loaded_config_data['google_api']['model'] or "gemini-1.5-pro"
         logging.debug(f"Google: Using model: {google_model}")
 
         headers = {

@@ -16,6 +16,38 @@ Unsorted
 	https://www.louisbouchard.ai/indexing-methods/
 	https://github.com/circlemind-ai/fast-graphrag
 	https://github.com/Kain-90/RAG-Play
+	https://arxiv.org/abs/2412.03736
+	https://arxiv.org/abs/2403.10131
+	https://arxiv.org/abs/2412.01572
+	https://pub.towardsai.net/around-the-rag-in-80-questions-part-ii-4df03c6dba86
+	https://www.uber.com/en-IN/blog/introducing-the-prompt-engineering-toolkit/
+	https://arxiv.org/abs/2409.14924
+https://arxiv.org/abs/2412.02830
+https://arxiv.org/abs/2407.04125
+https://cobusgreyling.medium.com/four-levels-of-rag-research-from-microsoft-fdc54388f0ff
+https://arxiv.org/html/2412.00239v1
+https://arxiv.org/abs/2412.02830
+https://arxiv.org/html/2412.02035v1
+https://towardsdatascience.com/dragin-dynamic-retrieval-augmented-generation-based-on-the-information-needs-of-large-language-dbdb9aabc1ef
+https://towardsdatascience.com/improve-your-rag-context-recall-by-40-with-an-adapted-embedding-model-5d4a8f583f32
+https://arxiv.org/abs/2412.06078
+https://www.zyphra.com/post/the-mixture-of-pageranks-retriever-for-long-context-pre-processing
+https://www.timescale.com/blog/finding-the-best-open-source-embedding-model-for-rag
+https://weaviate.io/blog/late-chunking
+https://github.com/superlinear-ai/raglite
+https://arxiv.org/abs/2412.15101
+https://arxiv.org/abs/2412.14510
+https://towardsdatascience.com/advanced-retrieval-techniques-for-better-rags-c53e1b03c183
+https://ai.gopubby.com/agentic-rags-extending-rags-to-sql-databases-1509b25ca3e7
+https://ai.plainenglish.io/a-deep-dive-into-golden-retriever-eea3396af3b4
+https://github.com/AhmedAl93/multimodal-agentic-RAG
+https://hub.athina.ai/athina-originals/end-to-end-implementation-of-unstructured-rag/
+https://medium.com/@eliot64/bridging-legal-ai-and-trust-how-we-won-the-llm-x-law-hackathon-45081a8681d9
+https://arxiv.org/abs/2412.15563
+https://arxiv.org/pdf/2410.10293v1
+https://arxiv.org/pdf/2409.02098v1
+https://github.com/OpenSPG/KAG
+
 
 GraphRAG
 	https://www.microsoft.com/en-us/research/blog/introducing-drift-search-combining-global-and-local-search-methods-to-improve-quality-and-efficiency/	
@@ -26,6 +58,35 @@ GraphRAG
 	https://towardsdatascience.com/building-a-knowledge-graph-from-scratch-using-llms-f6f677a17f07
 	https://iopscience.iop.org/article/10.1088/2632-2153/ad7228/pdf
 	https://medium.com/thoughts-on-machine-learning/building-dynamic-knowledge-graphs-using-open-source-llms-06a870e1bc4f
+	https://ai.plainenglish.io/modeling-ai-semantic-memory-with-knowledge-graphs-1ce06f683433
+	https://towardsdatascience.com/how-to-convert-any-text-into-a-graph-of-concepts-110844f22a1a
+	https://towardsdatascience.com/building-knowledge-graphs-with-llm-graph-transformer-a91045c49b59
+	https://arxiv.org/abs/2412.03589
+	https://arxiv.org/abs/2412.03736
+	https://arxiv.org/abs/2412.04119
+	https://aibyhand.substack.com/p/beginners-guide-to-graph-rag
+	https://github.com/gusye1234/nano-graphrag
+	https://arxiv.org/abs/2412.03589
+	https://towardsdatascience.com/graph-rag-a-conceptual-introduction-41cd0d431375
+	https://towardsdatascience.com/towards-named-entity-disambiguation-with-graph-embeddings-ef164aaad37c
+	https://generativeai.pub/advanced-rag-retrieval-strategies-using-knowledge-graphs-12c9ce54d2da
+	https://medium.com/@ianormy/microsoft-graphrag-with-an-rdf-knowledge-graph-part-2-d8d291a39ed1
+	https://generativeai.pub/knowledge-graph-extraction-visualization-with-local-llm-from-unstructured-text-a-history-example-94c63b366fed?gi=b98ffc33dcbc
+	https://memgraph.com/webinars/optimizing-insulin-management-the-role-of-graphrag-in-patient-care
+	https://ai.plainenglish.io/metagraphs-and-hypergraphs-for-complex-ai-agent-memory-and-rag-717f6f3589f5
+	https://arxiv.org/html/2411.15671v1
+	https://arxiv.org/pdf/2410.04739v1
+	https://towardsdatascience.com/how-to-query-a-knowledge-graph-with-llms-using-grag-38bfac47a322
+	https://arxiv.org/abs/2408.04187
+	https://pub.towardsai.net/building-a-knowledge-graph-from-unstructured-text-data-a-step-by-step-guide-c14c926c2229
+	https://www.youtube.com/watch?v=g6xBklAIrsA
+	https://neuml.hashnode.dev/advanced-rag-with-graph-path-traversal
+https://volodymyrpavlyshyn.medium.com/unified-knowledge-graph-model-rdf-rdf-vs-lpg-the-end-of-war-a7c14d6ac76f
+	https://github.com/zjunlp/OneKE
+https://blog.gopenai.com/llm-ontology-prompting-for-knowledge-graph-extraction-efdcdd0db3a1?gi=1d8915f0da5e
+
+
+
 
 ### Links
 - RAG 101

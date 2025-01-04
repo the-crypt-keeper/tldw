@@ -7,6 +7,9 @@ import sys
 from unittest.mock import patch, MagicMock
 # Third-party library imports
 import pytest
+
+
+
 #
 ####################################################################################################
 #
@@ -19,15 +22,19 @@ sys.path.insert(0, project_root)
 print(f"Project root added to sys.path: {project_root}")
 
 # Local Imports
+#from App_Function_Libraries.Utils.Utils import load_and_log_configs
 from App_Function_Libraries.RAG.ChromaDB_Library import (
     process_and_store_content, check_embedding_status,
-    reset_chroma_collection, vector_search, store_in_chroma, batched, situate_context, schedule_embedding,
-    embedding_api_url
+    reset_chroma_collection, vector_search, store_in_chroma, batched, embedding_api_url
 )
+
 #
 ############################################
 # Fixtures for Reusable Mocking and Setup
 ############################################
+
+default_api_endpoint = "openai"
+
 
 # Fixture to mock a ChromaDB collection
 @pytest.fixture
