@@ -50,6 +50,14 @@ https://github.com/dnhkng/GlaDOS
 https://arxiv.org/abs/2501.01384
 https://sharechatx.github.io/
 https://github.com/vipchengrui/traditional-speech-enhancement
+https://github.com/ictnlp/LLaMA-Omni
+https://github.com/lamm-mit/PDF2Audio
+https://github.com/Purfview/whisper-standalone-win
+https://github.com/livekit/agents
+https://huggingface.co/papers/2410.02678
+https://github.com/Picovoice/speech-to-text-benchmark
+https://huggingface.co/spaces/bencser/episodegen
+
 
 
 STT
@@ -191,9 +199,14 @@ https://docs.inferless.com/cookbook/serverless-customer-service-bot
 https://huggingface.co/spaces/lamm-mit/PDF2Audio
 
 https://huggingface.co/spaces/bencser/episodegen
-
+https://github.com/myshell-ai/MeloTTS
+https://github.com/idiap/coqui-ai-TTS
+https://docs.inferless.com/cookbook/serverless-customer-service-bot
 https://github.com/Picovoice/speech-to-text-benchmark
+Train using: https://github.com/Mangio621/Mangio-RVC-Fork/releases,
+import the .pth into https://huggingface.co/wok000/vcclient000/tree/main to convert your voice in near real time with about a .25s delay
 
+https://www.hackster.io/lhl/voicechat2-local-ai-voice-chat-4c48f2
 https://huggingface.co/papers/2410.02678
 
 https://github.com/livekit/agents

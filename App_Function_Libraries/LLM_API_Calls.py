@@ -145,7 +145,8 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
         if maxp is None:
-            maxp = loaded_config_data['openai_api']['max_p']
+            maxp = loaded_config_data['openai_api']['top_p']
+            maxp = float(maxp)
         if model is None:
             openai_model = loaded_config_data['openai_api']['model'] or "gpt-4o"
             logging.debug(f"OpenAI: Using model: {openai_model}")
