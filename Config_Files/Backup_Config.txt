@@ -3,6 +3,8 @@ anthropic_api_key = <anthropic_api_key>
 anthropic_model = claude-3-5-sonnet-20240620
 anthropic_streaming = True
 anthropic_temperature = 0.7
+anthropic_top_p = 0.95
+anthropic_min_p = 0.05
 #
 cohere_api_key = <cohere_api_key>
 cohere_model = command-r-plus
@@ -18,6 +20,7 @@ openai_api_key = <openai_api_key>
 openai_model = gpt-4o
 openai_streaming = False
 openai_temperature = 0.7
+openai_top_p = 0.95
 #
 huggingface_api_key = <huggingface_api_key>
 huggingface_model = meta-llama/Llama-3.1-70B-Instruct
@@ -142,16 +145,17 @@ default_openai_tts_output_format = mp3
 #
 # ElevenLabs TTS Settings
 default_eleven_tts_voice = pNInz6obpgDQGcFmaJgB
-default_eleven_tts_model = FIXME
-default_eleven_tts_language_code = FIXME
-default_eleven_tts_voice_stability = FIXME
-default_eleven_tts_voice_similiarity_boost = FIXME
-default_eleven_tts_voice_style = FIXME
-default_eleven_tts_voice_use_speaker_boost = FIXME
-default_eleven_tts_voice_pronunciation_dictionary_locators_dict_id = FIXME
-default_eleven_tts_voice_pronunciation_dictionary_locators_version_id = FIXME
+default_eleven_tts_model =
+default_eleven_tts_language_code =
+default_eleven_tts_voice_stability =
+default_eleven_tts_voice_similiarity_boost =
+default_eleven_tts_voice_style =
+default_eleven_tts_voice_use_speaker_boost =
+default_eleven_tts_voice_pronunciation_dictionary_locators_dict_id =
+default_eleven_tts_voice_pronunciation_dictionary_locators_version_id =
 default_eleven_tts_speed = 1
-default_eleven_tts_output_format = FIXME
+# Output options: 'mp3_22050_32', 'mp3_44100_32', 'mp3_44100_64', 'mp3_44100_96', 'mp3_44100_128', 'mp3_44100_192', 'pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100', 'ulaw_8000'
+default_eleven_tts_output_format = mp3_44100_128
 # Google TTS Settings
 default_google_tts_model = FIXME
 default_google_tts_voice = FIXME
@@ -160,6 +164,14 @@ default_google_tts_speed = 1
 # MS Edge TTS Settings
 edge_tts_voice = FIXME
 #
+# GPT-Sovits
+#
+# AllTalk TTS Settings
+default_alltalk_tts_speed = 1.0
+default_alltalk_tts_voice = alloy
+default_alltalk_tts_model = alltalk
+default_alltalk_tts_output_format = mp3
+alltalk_api_ip = http://127.0.0.1:7851/v1/audio/speech
 
 [Search-Engines]
 # Search Defaults
@@ -179,9 +191,11 @@ search_result_display_metadata = False
 search_result_save_to_db = True
 # How you want the results to be written, think 'style' or voice
 search_result_analysis_tone =
+relevance_analysis_llm = openai
+final_answer_llm = openai
 #### Search Engines #####
 # Baidu
-search_engine_api_key_baidu = <baidu_api_key>>
+search_engine_api_key_baidu = 1e1b1b1b1b1b1b1b1
 #
 # Bing
 search_engine_api_url_bing = https://api.bing.microsoft.com/v7.0/search
@@ -224,8 +238,8 @@ search_engine_searx_api = https://search.rhscz.eu/
 # Tavily
 search_engine_api_key_tavily = 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
 # Yandex
-search_engine_api_key_yandex = <yandex_api_key>>
-search_engine_id_yandex = <yandex_search_engine_id>>
+search_engine_api_key_yandex = 1e1b1b1b1b1b1b1b1
+search_engine_id_yandex = 1e1b1b1b1b1b1b1b1
 
 [Prompts]
 prompt_sample = "What is the meaning of life?"

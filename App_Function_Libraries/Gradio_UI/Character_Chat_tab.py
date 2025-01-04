@@ -801,10 +801,6 @@ def create_character_card_interaction_tab():
                     save_status = f"Error regenerating message: {str(e)}"
                     return history, save_status  # Return original history if an error occurs
 
-
-            def toggle_chat_file_upload():
-                return gr.update(visible=True)
-
             def save_untracked_chat_action(history, char_data):
                 if not char_data or not history:
                     return "No chat to save or character not selected."
