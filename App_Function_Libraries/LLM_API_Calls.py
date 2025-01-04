@@ -503,6 +503,18 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
         logging.debug(f"Cohere Chat: Loaded data: {input_data}")
         logging.debug(f"Cohere Chat: Type of data: {type(input_data)}")
 
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('cohere_api', {}).get('streaming', False)
+            logging.debug("Cohere: Streaming mode enabled")
+        else:
+            logging.debug("Cohere: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
         # Ensure model is set
         if not model:
             model = loaded_config_data['cohere_api']['model']
@@ -672,11 +684,18 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
 
         logging.debug(f"Groq: Using API Key: {groq_api_key[:5]}...{groq_api_key[-5:]}")
 
-        streaming = loaded_config_data['groq_api']['streaming']
-        if streaming == "true" or "True":
-            streaming = True
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('groq_api', {}).get('streaming', False)
+            logging.debug("Groq: Streaming mode enabled")
         else:
-            streaming = False
+            logging.debug("Groq: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
         # Transcript data handling & Validation
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Groq: Loading json data for summarization")
@@ -820,6 +839,18 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
                     logging.info("OpenRouter: Using API key from config file")
                 else:
                     logging.warning("OpenRouter: No API key found in config file")
+
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('openrouter_api', {}).get('streaming', False)
+            logging.debug("OpenRouter: Streaming mode enabled")
+        else:
+            logging.debug("OpenRouter: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
         # Model Selection validation
         logging.debug("OpenRouter: Validating model selection")
@@ -995,6 +1026,18 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
             "Authorization": f"Bearer {huggingface_api_key}"
         }
 
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('huggingface_api', {}).get('streaming', False)
+            logging.debug("HuggingFace: Streaming mode enabled")
+        else:
+            logging.debug("HuggingFace: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
         # Setup model
         huggingface_model = loaded_config_data['huggingface_api']['model']
 
@@ -1106,6 +1149,18 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
                 return "DeepSeek: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug("DeepSeek: Using API Key")
+
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('deepseek_api', {}).get('streaming', False)
+            logging.debug("DeepSeek: Streaming mode enabled")
+        else:
+            logging.debug("DeepSeek: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
         # Input data handling
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -1297,6 +1352,18 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
 
         logging.debug(f"Mistral: Using API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:]}")
 
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('mistral_api', {}).get('streaming', False)
+            logging.debug("Mistral: Streaming mode enabled")
+        else:
+            logging.debug("Mistral: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
         logging.debug("Mistral: Using provided string data")
         data = input_data
 
@@ -1425,6 +1492,18 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
             return "Google: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"Google: Using API Key: {google_api_key[:5]}...{google_api_key[-5:]}")
+
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('google_api', {}).get('streaming', False)
+            logging.debug("Google: Streaming mode enabled")
+        else:
+            logging.debug("Google: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
         # Input data handling
         logging.debug(f"Google: Raw input data type: {type(input_data)}")
