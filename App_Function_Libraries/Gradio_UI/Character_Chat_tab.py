@@ -685,8 +685,7 @@ def create_character_card_interaction_tab():
 
             def regenerate_last_message(
                     history, char_data, api_endpoint, api_key,
-                    temperature, user_name_val, auto_save, streaming, minp, maxp
-            ):
+                    temperature, user_name_val, auto_save, streaming_checkbox, minp, maxp):
                 """
                 Regenerates the last bot message by removing it and resending the corresponding user message.
 
@@ -702,109 +701,106 @@ def create_character_card_interaction_tab():
                 Returns:
                     tuple: Updated chat history and a save status message.
                 """
-                if not history:
-                    return history, "No messages to regenerate."
+                try:
+                    streaming = streaming_checkbox.value if hasattr(streaming_checkbox, 'value') else streaming_checkbox
+                    if not history:
+                        return history, "No messages to regenerate."
 
-                last_entry = history[-1]
-                last_user_message, last_bot_message = last_entry
+                    last_entry = history[-1]
+                    last_user_message, last_bot_message = last_entry
 
-                # Check if the last bot message exists
-                if last_bot_message is None:
-                    return history, "The last message is not from the bot."
+                    # Check if the last bot message exists
+                    if last_bot_message is None:
+                        return history, "The last message is not from the bot."
 
-                # Remove the last bot message
-                new_history = history[:-1]
+                    # Remove the last bot message
+                    new_history = history[:-1]
 
-                # Resend the last user message to generate a new bot response
-                if not last_user_message:
-                    return new_history, "No user message to regenerate the bot response."
+                    # Resend the last user message to generate a new bot response
+                    if not last_user_message:
+                        return new_history, "No user message to regenerate the bot response."
 
-                # Prepare the character's background information
-                char_name = char_data.get('name', 'AI Assistant')
-                char_background = f"""
-                Name: {char_name}
-                Description: {char_data.get('description', 'N/A')}
-                Personality: {char_data.get('personality', 'N/A')}
-                Scenario: {char_data.get('scenario', 'N/A')}
-                """
+                    # Prepare the character's background information
+                    char_name = char_data.get('name', 'AI Assistant')
+                    char_background = f"""
+                    Name: {char_name}
+                    Description: {char_data.get('description', 'N/A')}
+                    Personality: {char_data.get('personality', 'N/A')}
+                    Scenario: {char_data.get('scenario', 'N/A')}
+                    """
 
-                # Prepare the system prompt for character impersonation
-                system_message = f"""You are roleplaying as {char_name}, the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI. Always refer to yourself as "{char_name}" and refer to the user as "{user_name_val}".
-    
-                {char_background}
-    
-                Additional instructions: {char_data.get('post_history_instructions', '')}
-                """
+                    # Prepare the system prompt for character impersonation
+                    system_message = f"""You are roleplaying as {char_name}, the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI. Always refer to yourself as "{char_name}" and refer to the user as "{user_name_val}".
+        
+                    {char_background}
+        
+                    Additional instructions: {char_data.get('post_history_instructions', '')}
+                    """
 
-                # Prepare media_content and selected_parts
-                media_content = {
-                    'id': char_name,
-                    'title': char_name,
-                    'content': char_background,
-                    'description': char_data.get('description', ''),
-                    'personality': char_data.get('personality', ''),
-                    'scenario': char_data.get('scenario', '')
-                }
-                selected_parts = ['description', 'personality', 'scenario']
+                    # Prepare media_content and selected_parts
+                    media_content = {
+                        'id': char_name,
+                        'title': char_name,
+                        'content': char_background,
+                        'description': char_data.get('description', ''),
+                        'personality': char_data.get('personality', ''),
+                        'scenario': char_data.get('scenario', '')
+                    }
+                    selected_parts = ['description', 'personality', 'scenario']
 
-                prompt = char_data.get('post_history_instructions', '')
+                    prompt = char_data.get('post_history_instructions', '')
 
-                # Prepare the input for the chat function
-                full_message = f"{user_name_val}: {last_user_message}" if last_user_message else f"{user_name_val}: "
+                    # Prepare the input for the chat function
+                    full_message = f"{user_name_val}: {last_user_message}" if last_user_message else f"{user_name_val}: "
 
-                # Call the chat function to get a new bot message
-                bot_message = chat(
-                    full_message,
-                    new_history,
-                    media_content,
-                    selected_parts,
-                    api_endpoint,
-                    api_key,
-                    prompt,
-                    temperature,
-                    system_message,
-                    streaming,
-                    minp=minp,
-                    maxp=maxp
-                )
+                    # Call the chat function to get a new bot message
+                    bot_message = chat(
+                        full_message,
+                        new_history,
+                        media_content,
+                        selected_parts,
+                        api_endpoint,
+                        api_key,
+                        prompt,
+                        temperature,
+                        system_message,
+                        streaming,
+                        minp=minp,
+                        maxp=maxp
+                    )
 
-                # Handle streaming response
-                if streaming:
-                    new_history.append((last_user_message, ""))  # Append user message with an empty bot response
-                    full_response = ""
-                    for chunk in bot_message:
-                        full_response += chunk
-                        new_history[-1] = (last_user_message, full_response)
-                        yield new_history, ""  # Yield updated history and empty status
+                    # Handle streaming response
+                    if streaming:
+                        full_response = ""
+                        for chunk in bot_message:
+                            full_response += chunk
+                            yield new_history + [(last_user_message, full_response)], ""  # Yield updated history and empty status
 
-                    # After streaming is complete, handle auto-save
-                    save_status = ""
-                    if auto_save:
-                        character_id = char_data.get('id')
-                        if character_id:
-                            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                            add_character_chat(character_id, conversation_name, new_history)
-                            save_status = "Chat auto-saved."
-                        else:
-                            save_status = "Character ID not found; chat not saved."
-                    yield new_history, save_status
-                else:
-                    # For non-streaming, append the full bot response to the history
-                    bot_message = replace_placeholders(bot_message, char_name, user_name_val)
-                    new_history.append((last_user_message, bot_message))
+                        # After streaming is complete, update history and handle auto-save
+                        new_history.append((last_user_message, full_response))
+                    else:
+                        # Replace placeholders in bot message
+                        full_response = replace_placeholders(bot_message, char_name, user_name_val)
+                        # Update history
+                        new_history.append((last_user_message, full_response))
 
-                    # Auto-save if enabled
-                    save_status = ""
-                    if auto_save:
-                        character_id = char_data.get('id')
-                        if character_id:
-                            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                            add_character_chat(character_id, conversation_name, new_history)
-                            save_status = "Chat auto-saved."
-                        else:
-                            save_status = "Character ID not found; chat not saved."
+                        # Auto-save if enabled
+                        save_status = ""
+                        if auto_save:
+                            character_id = char_data.get('id')
+                            if character_id:
+                                conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                                add_character_chat(character_id, conversation_name, new_history)
+                                save_status = "Chat auto-saved."
+                            else:
+                                save_status = "Character ID not found; chat not saved."
 
-                return new_history, save_status
+                        return new_history, save_status
+
+                except Exception as e:
+                    save_status = f"Error regenerating message: {str(e)}"
+                    return history, save_status  # Return original history if an error occurs
+
 
             def toggle_chat_file_upload():
                 return gr.update(visible=True)
@@ -924,26 +920,16 @@ def create_character_card_interaction_tab():
                     full_response = ""
                     for chunk in bot_message:
                         full_response += chunk
-                        history[-1] = (None, full_response)
-                        yield history, ""  # Yield updated history and empty status
+                        yield history + [(None, full_response)], ""  # Yield updated history and empty status
 
-                    # After streaming is complete, handle auto-save
-                    save_status = ""
-                    if auto_save:
-                        character_id = char_data.get('id')
-                        if character_id:
-                            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                            add_character_chat(character_id, conversation_name, history)
-                            save_status = "Chat auto-saved."
-                        else:
-                            save_status = "Character ID not found; chat not saved."
-                    yield history, save_status
+                    # After streaming is complete, update history and handle auto-save
+                    history.append((None, full_response))
                 else:
                     # Replace placeholders in bot message
-                    bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+                    full_response = replace_placeholders(bot_message, char_name, user_name_val)
 
                 # Update history
-                history.append((None, bot_message))
+                history.append((None, full_response))
 
                 # Auto-save if enabled
                 save_status = ""
@@ -1273,7 +1259,7 @@ def create_character_card_interaction_tab():
                 ],
                 outputs=[chat_history, save_status]
             ).then(
-                lambda history: approximate_token_count(history),
+                lambda history: approximate_token_count(history) if history is not None else 0,
                 inputs=[chat_history],
                 outputs=[token_count_display]
             )
