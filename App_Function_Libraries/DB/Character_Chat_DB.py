@@ -355,17 +355,20 @@ def add_character_card(card_data: Dict[str, Any]) -> Optional[int]:
 
 def get_character_cards() -> List[Dict]:
     """Retrieve all character cards from the database."""
-    logging.debug(f"Fetching characters from DB: {chat_DB_PATH}")
-    conn = sqlite3.connect(chat_DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM CharacterCards")
-    rows = cursor.fetchall()
-    columns = [description[0] for description in cursor.description]
-    conn.close()
-    characters = [dict(zip(columns, row)) for row in rows]
-    #logging.debug(f"Characters fetched from DB: {characters}")
-    return characters
-
+    try:
+        logging.debug(f"Fetching characters from DB: {chat_DB_PATH}")
+        conn = sqlite3.connect(chat_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM CharacterCards")
+        rows = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        conn.close()
+        characters = [dict(zip(columns, row)) for row in rows]
+        logging.debug(f"Characters fetched from DB: {characters}")
+        return characters
+    except Exception as e:
+        logging.error(f"Error fetching character cards: {e}")
+        return []
 
 def get_character_card_by_id(character_id: Union[int, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """

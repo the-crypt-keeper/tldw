@@ -1,11 +1,22 @@
+# main.py
+# Description: This file contains the main FastAPI application, which serves as the primary API for the tldw application.
+#
+# Imports
+#
+# 3rd-party Libraries
 from fastapi import FastAPI
-from Server_API.app.api.v1.endpoints import video_processing
-from Server_API.app.core.exceptions import setup_exception_handlers
+#
+# Local Imports
+#
+########################################################################################################################
+#
+# Functions:
 
-app = FastAPI(title="TLDW API", version="1.0.0")
-setup_exception_handlers(app)
-app.include_router(video_processing.router, prefix="/api/v1")
+# Usage: uvicorn main:app --reload
+app = FastAPI(title="tldw API", version="1.0.0")
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the TLDW API"}
+    return {"message": "Welcome to the tldw API"}
+
+

@@ -329,7 +329,7 @@ def geval_summarization(
                 temp = 0.7
                 logging.info(f"Debug - geval_summarization Function - API Endpoint: {api_endpoint}")
                 try:
-                    response = chat_api_call(api_endpoint, api_key, prompt_with_src_and_gen, "", temp, system_message)
+                    response = chat_api_call(api_endpoint, api_key, prompt_with_src_and_gen, "", temp, system_message, streaming=False, minp=None, maxp=None, model=None)
                 except Exception as e:
                     raise ValueError(f"Unsupported API endpoint: {api_endpoint}")
     except RetryError:

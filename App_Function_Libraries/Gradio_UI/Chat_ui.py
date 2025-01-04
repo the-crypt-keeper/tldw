@@ -20,7 +20,11 @@ from App_Function_Libraries.DB.DB_Manager import db, load_chat_history, start_ne
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_db_connection
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, update_user_prompt
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints
+from App_Function_Libraries.TTS.TTS_Providers import generate_audio, play_mp3
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints, \
+    loaded_config_data
+
+
 #
 #
 ########################################################################################################################
@@ -42,8 +46,8 @@ def show_delete_message(selected):
 
 
 def debug_output(media_content, selected_parts):
-    print(f"Debug - Media Content: {media_content}")
-    print(f"Debug - Selected Parts: {selected_parts}")
+    logging.debug(f"Debug - Media Content: {media_content}")
+    logging.debug(f"Debug - Selected Parts: {selected_parts}")
     return ""
 
 
@@ -55,7 +59,7 @@ def update_selected_parts(use_content, use_summary, use_prompt):
         selected_parts.append("summary")
     if use_prompt:
         selected_parts.append("prompt")
-    print(f"Debug - Update Selected Parts: {selected_parts}")
+    logging.debug(f"Debug - Update Selected Parts: {selected_parts}")
     return selected_parts
 
 
@@ -85,7 +89,7 @@ def clear_chat_single():
 
 # FIXME - add additional features....
 def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, conversation_id,
-                 save_conversation, temperature, system_prompt, max_tokens=None, top_p=None, frequency_penalty=None,
+                 save_conversation, temperature, system_prompt, streaming=False, max_tokens=None, top_p=None, frequency_penalty=None,
                  presence_penalty=None, stop_sequence=None):
     try:
         if save_conversation:
@@ -107,22 +111,21 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
             full_message = message
 
         # Generate bot response
-        bot_message = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
-                           temperature, system_prompt)
-
-        logging.debug(f"Bot message being returned: {bot_message}")
+        bot_message = ""
+        for chunk in chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
+                          temperature, system_prompt, streaming):
+            bot_message += chunk  # Accumulate the streamed response
+            logging.debug(f"Bot message being returned: {bot_message}")
+            # Yield the incremental response and updated history
+            yield bot_message, history + [(message, bot_message)], conversation_id
 
         if save_conversation:
             # Add assistant message to the database
             save_message(conversation_id, role="assistant", content=bot_message)
 
-        # Update history
-        new_history = history + [(message, bot_message)]
-
-        return bot_message, new_history, conversation_id
     except Exception as e:
         logging.error(f"Error in chat wrapper: {str(e)}")
-        return "An error occurred.", history, conversation_id
+        yield "An error occurred.", history, conversation_id
 
 
 def search_conversations(query):
@@ -174,38 +177,46 @@ def load_conversation(conversation_id):
 
 
 def regenerate_last_message(history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature,
-                            system_prompt):
+                            system_prompt, streaming=False):
     if not history:
         return history, "No messages to regenerate."
 
-    last_entry = history[-1]
-    last_user_message, last_bot_message = last_entry
+    logging.debug("Starting regenerate_last_message")
 
-    if last_bot_message is None:
-        return history, "The last message is not from the bot."
-
-    new_history = history[:-1]
+    # Find the last user message and its corresponding bot response
+    last_user_message = None
+    last_bot_message = None
+    for i in range(len(history) - 1, -1, -1):
+        if history[i][0]:  # This is a user message
+            last_user_message = history[i][0]
+            if i + 1 < len(history):
+                last_bot_message = history[i + 1][1]
+            break
 
     if not last_user_message:
-        return new_history, "No user message to regenerate the bot response."
+        return history, "No user message found to regenerate the bot response."
 
-    full_message = last_user_message
+    # Remove the last bot message from history
+    new_history = history[:-1] if last_bot_message else history
 
-    bot_message = chat(
-        full_message,
-        new_history,
-        media_content,
-        selected_parts,
-        api_endpoint,
-        api_key,
-        custom_prompt,
-        temperature,
-        system_prompt
-    )
+    # Generate the new bot response
+    bot_message = ""
+    for chunk in chat(last_user_message, new_history, media_content, selected_parts, api_endpoint, api_key,
+                      custom_prompt, temperature, system_prompt, streaming):
+        if isinstance(chunk, str):
+            bot_message += chunk
+        elif isinstance(chunk, dict) and "choices" in chunk:
+            content = chunk["choices"][0].get("delta", {}).get("content", "")
+            bot_message += content
 
-    new_history.append((last_user_message, bot_message))
+        # Update the chatbot interface with the partial response
+        new_history_with_regenerated = new_history + [(last_user_message, bot_message)]
+        yield new_history_with_regenerated, "Regenerating..."
 
-    return new_history, "Last message regenerated successfully."
+    # Update the history with the final regenerated message
+    new_history_with_regenerated = new_history + [(last_user_message, bot_message)]
+    logging.debug("Finished regenerating message")
+    yield new_history_with_regenerated, "Last message regenerated successfully."
 
 
 def update_dropdown_multiple(query, search_type, keywords=""):
@@ -260,6 +271,24 @@ def create_chat_interface():
     custom_css = """
     .chatbot-container .message-wrap .message {
         font-size: 14px !important;
+    }
+    #tts-status {
+        font-weight: bold;
+        padding: 5px;
+        border-radius: 4px;
+        margin-top: 5px;
+    }
+    #tts-status[value*="Error"], #tts-status[value*="Failed"] {
+        color: red;
+        background-color: #ffe6e6;
+    }
+    #tts-status[value*="Generating"], #tts-status[value*="Playing"] {
+        color: #0066cc;
+        background-color: #e6f2ff;
+    }
+    #tts-status[value*="Finished"] {
+        color: green;
+        background-color: #e6ffe6;
     }
     """
     with gr.TabItem("Remote LLM Chat (Horizontal)", visible=True):
@@ -342,16 +371,23 @@ def create_chat_interface():
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
+                streaming = gr.Checkbox(label="Streaming", value=False, visible=True)
                 submit = gr.Button("Submit")
+                with gr.Row():
+                    speak_button = gr.Button("Speak Response")
+                    tts_status = gr.Textbox(label="TTS Status", interactive=False)
                 regenerate_button = gr.Button("Regenerate Last Message")
-                token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
-                clear_chat_button = gr.Button("Clear Chat")
+                with gr.Row():
+                    token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
+                    clear_chat_button = gr.Button("Clear Chat")
 
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
-                save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
-                save_status = gr.Textbox(label="Save Status", interactive=False)
-                save_chat_history_as_file = gr.Button("Save Chat History as File")
-                download_file = gr.File(label="Download Chat History")
+                with gr.Row():
+                    save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
+                    save_status = gr.Textbox(label="Save Status", interactive=False)
+                with gr.Row():
+                    save_chat_history_as_file = gr.Button("Save Chat History as File")
+                    download_file = gr.File(label="Download Chat History")
 
         # Restore original functionality
         search_button.click(
@@ -417,6 +453,64 @@ def create_chat_interface():
             outputs=[preset_prompt, prev_page_button, next_page_button, page_display, current_page_state, total_pages_state]
         )
 
+        # TTS Generation and Playback
+        def speak_last_response(chatbot):
+            """Handle speaking the last chat response."""
+            logging.debug("Starting speak_last_response")
+            try:
+                # If there's no chat history, return
+                if not chatbot or len(chatbot) == 0:
+                    logging.debug("No messages in chatbot history")
+                    return gr.update(value="No messages to speak", visible=True)
+
+                # Log the chatbot content for debugging
+                logging.debug(f"Chatbot history: {chatbot}")
+
+                # Get the last message from the assistant
+                last_message = chatbot[-1][1]
+                logging.debug(f"Last message to speak: {last_message}")
+
+                # Update status to generating
+                yield gr.update(value="Generating audio...", visible=True)
+
+                # Generate audio using your preferred TTS provider
+                try:
+                    audio_file = generate_audio(
+                        api_key=None, # Use default API key
+                        text=last_message,
+                        provider="openai",  # or get from config
+                        output_file="last_response.mp3"
+                    )
+                    logging.debug(f"Generated audio file: {audio_file}")
+                except Exception as e:
+                    logging.error(f"Failed to generate audio: {e}")
+                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
+                    return
+
+                # Update status to playing
+                yield gr.update(value="Playing audio...", visible=True)
+
+                # Play the audio
+                if audio_file and os.path.exists(audio_file):
+                    try:
+                        play_mp3(audio_file)
+                        yield gr.update(value="Finished playing audio", visible=True)
+                    except Exception as e:
+                        logging.error(f"Failed to play audio: {e}")
+                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
+                else:
+                    logging.error("Audio file not found")
+                    yield gr.update(value="Failed: Audio file not found", visible=True)
+
+            except Exception as e:
+                logging.error(f"Error in speak_last_response: {str(e)}")
+                yield gr.update(value=f"Error: {str(e)}", visible=True)
+        speak_button.click(
+            fn=speak_last_response,
+            inputs=[chatbot],
+            outputs=[tts_status],
+            api_name="speak_response"
+        )
         def on_prev_page_click(current_page, total_pages):
             new_page = max(current_page - 1, 1)
             prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
@@ -456,7 +550,7 @@ def create_chat_interface():
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id,
-                    save_conversation, temperature, system_prompt_input],
+                    save_conversation, temperature, system_prompt_input, streaming],
             outputs=[msg, chatbot, conversation_id]
         ).then(  # Clear the message box after submission
             lambda x: gr.update(value=""),
@@ -521,8 +615,8 @@ def create_chat_interface():
         regenerate_button.click(
             regenerate_last_message,
             inputs=[chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, temperature,
-                    system_prompt_input],
-            outputs=[chatbot, save_status]
+                    system_prompt_input, streaming],
+            outputs=[chatbot, gr.Textbox(label="Regenerate Status")]
         ).then(
             lambda history: approximate_token_count(history),
             inputs=[chatbot],
@@ -577,7 +671,7 @@ def create_chat_interface_stacked():
                     use_summary = gr.Checkbox(label="Use Summary")
                     use_prompt = gr.Checkbox(label="Use Prompt")
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
-                    temp = gr.Slider(label="Temperature", minimum=0.00, maximum=1.0, step=0.05, value=0.7)
+                    temp = gr.Slider(label="Temperature", minimum=0.00, maximum=2.0, step=0.05, value=0.7)
                 with gr.Row():
                     conversation_search = gr.Textbox(label="Search Conversations")
                 with gr.Row():
@@ -607,6 +701,10 @@ def create_chat_interface_stacked():
                     label="Use a pre-set Prompt",
                     value=False,
                     visible=True
+                )
+                streaming = gr.Checkbox(label="Streaming",
+                                        value=False,
+                                        visible=True
                 )
 
                 with gr.Row():
@@ -640,15 +738,21 @@ def create_chat_interface_stacked():
         with gr.Row():
             with gr.Column():
                 submit = gr.Button("Submit")
+                with gr.Row():
+                    speak_button = gr.Button("Speak Response")
+                    tts_status = gr.Textbox(label="TTS Status", interactive=False)
                 regenerate_button = gr.Button("Regenerate Last Message")
-                token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
-                clear_chat_button = gr.Button("Clear Chat")
-                chat_media_name = gr.Textbox(label="Custom Chat Name(optional)", visible=True)
-                save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
-                save_status = gr.Textbox(label="Save Status", interactive=False)
-                save_chat_history_as_file = gr.Button("Save Chat History as File")
-            with gr.Column():
-                download_file = gr.File(label="Download Chat History")
+                with gr.Row():
+                    token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
+                    clear_chat_button = gr.Button("Clear Chat")
+
+                chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
+                with gr.Row():
+                    save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
+                    save_status = gr.Textbox(label="Save Status", interactive=False)
+                with gr.Row():
+                    save_chat_history_as_file = gr.Button("Save Chat History as File")
+                    download_file = gr.File(label="Download Chat History")
 
         # Restore original functionality
         search_button.click(
@@ -826,7 +930,64 @@ def create_chat_interface_stacked():
             inputs=[current_page_state, total_pages_state],
             outputs=[preset_prompt, page_display, current_page_state]
         )
+        # TTS Generation and Playback
+        def speak_last_response(chatbot):
+            """Handle speaking the last chat response."""
+            logging.debug("Starting speak_last_response")
+            try:
+                # If there's no chat history, return
+                if not chatbot or len(chatbot) == 0:
+                    logging.debug("No messages in chatbot history")
+                    return gr.update(value="No messages to speak", visible=True)
 
+                # Log the chatbot content for debugging
+                logging.debug(f"Chatbot history: {chatbot}")
+
+                # Get the last message from the assistant
+                last_message = chatbot[-1][1]
+                logging.debug(f"Last message to speak: {last_message}")
+
+                # Update status to generating
+                yield gr.update(value="Generating audio...", visible=True)
+
+                # Generate audio using your preferred TTS provider
+                try:
+                    audio_file = generate_audio(
+                        api_key=None, # Use default API key
+                        text=last_message,
+                        provider="openai",  # or get from config
+                        output_file="last_response.mp3"
+                    )
+                    logging.debug(f"Generated audio file: {audio_file}")
+                except Exception as e:
+                    logging.error(f"Failed to generate audio: {e}")
+                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
+                    return
+
+                # Update status to playing
+                yield gr.update(value="Playing audio...", visible=True)
+
+                # Play the audio
+                if audio_file and os.path.exists(audio_file):
+                    try:
+                        play_mp3(audio_file)
+                        yield gr.update(value="Finished playing audio", visible=True)
+                    except Exception as e:
+                        logging.error(f"Failed to play audio: {e}")
+                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
+                else:
+                    logging.error("Audio file not found")
+                    yield gr.update(value="Failed: Audio file not found", visible=True)
+
+            except Exception as e:
+                logging.error(f"Error in speak_last_response: {str(e)}")
+                yield gr.update(value=f"Error: {str(e)}", visible=True)
+        speak_button.click(
+            fn=speak_last_response,
+            inputs=[chatbot],
+            outputs=[tts_status],
+            api_name="speak_response"
+        )
         # Update prompts when a preset is selected
         preset_prompt.change(
             update_prompts,
@@ -837,7 +998,7 @@ def create_chat_interface_stacked():
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt,
-                    conversation_id, save_conversation, temp, system_prompt],
+                    conversation_id, save_conversation, temp, system_prompt, streaming],
             outputs=[msg, chatbot, conversation_id]
         ).then(
             lambda x: gr.update(value=""),

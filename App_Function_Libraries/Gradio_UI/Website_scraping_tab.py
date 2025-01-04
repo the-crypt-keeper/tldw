@@ -10,14 +10,11 @@ import random
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, List, Dict, Any
 from urllib.parse import urlparse, urljoin
-
 #
 # External Imports
 import gradio as gr
 from playwright.async_api import TimeoutError, async_playwright
 from playwright.sync_api import sync_playwright
-
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
 #
 # Local Imports
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_from_sitemap, scrape_by_url_level, \
@@ -25,8 +22,7 @@ from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_fro
 from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
-
-
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
 #
 ########################################################################################################################
 #
@@ -408,7 +404,12 @@ def create_website_scraping_tab():
 
             with gr.Column():
                 progress_output = gr.Textbox(label="Progress", lines=3)
-                result_output = gr.Textbox(label="Result", lines=20)
+                result_output = gr.Textbox(
+                    label="Web Scraping Results",
+                    lines=20,
+                    elem_classes="scrollable-textbox",
+                    show_copy_button=True
+                )
 
         def update_ui_for_scrape_method(method):
             url_level_update = gr.update(visible=(method == "URL Level"))

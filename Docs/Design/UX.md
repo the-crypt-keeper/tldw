@@ -48,4 +48,53 @@ https://copycoder.ai/
 https://docs.replit.com/replitai/agent
 https://bolt.new/
 https://github.com/rmusser01/agentic_rag/tree/main
+https://github.com/astramind-ai/Pulsar
+https://github.com/woshixiaobai2019/mirau-chat-ui
+https://uxdesign.cc/the-importance-of-hover-states-c9312d7fd516
+https://trends.uxdesign.cc/
+https://bolters.io/
+https://github.com/Cloud-Code-AI/AkiraDocs
+
+https://github.com/Vali-98/ChatterUI
+https://www.nngroup.com/videos/efficient-error-messages/
+https://uxdesign.cc/a-good-design-is-a-good-essay-197f4bd31c92
+https://github.com/Rugz007/liha
+https://astro.new/latest/
+https://github.com/lobehub/lobe-chat
+https://www.scoutos.com/
+https://github.com/FishiaT/yawullm
+https://ilikeinterfaces.com/2015/03/09/map-ui-ghost-in-the-shell/
+https://jdan.github.io/98.css
+https://github.com/vercel/ai-chatbot
+https://www.nngroup.com/videos/the-danger-of-defaults/
+https://writings.stephenwolfram.com/2024/12/useful-to-the-point-of-being-revolutionary-introducing-wolfram-notebook-assistant/
+https://en.wikipedia.org/wiki/Template:Google_payment_apps
+https://github.com/stackblitz-labs/bolt.diy
+https://github.com/Haervwe/open-webui-tools
+https://uxdesign.cc/the-evolution-of-attention-c6154276f1b4
+https://otranscribe.com/
+https://www.dive.club/ideas/new-types-of-ui-that-generative-ai-has-necessitated
+https://interactjs.io/
+https://perchance.org/ai-chat
+https://uiverse.io/elements
+https://uxdesign.cc/youre-trying-to-turn-an-oil-tanker-288ed30876e4
+https://uxdesign.cc/simple-recall-testing-for-b2b-ux-134e18330da9
+https://lovable.dev/
+https://markwhen.com/
+https://kando.menu/
+https://deepseek-artifacts.vercel.app/
+https://darkpatternsgame.productartistry.com/
+
+
+Not waifus, but clippy:
+  https://github.com/fghrsh/live2d_demo
+
+
+Prompt Engineering page:
+- 3 Sections
+  - Prompt
+  - Values
+  - Response
+- Looks like Claude Workshop UI window
+
 

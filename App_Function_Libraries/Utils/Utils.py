@@ -219,7 +219,11 @@ def load_and_log_configs():
 
         google_api_key = config.get('API', 'google_api_key', fallback=None)
         logging.debug(
-            f"Loaded Mistral API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
+            f"Loaded Google API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
+
+        elevenlabs_api_key = config.get('API', 'elevenlabs_api_key', fallback=None)
+        logging.debug(
+            f"Loaded elevenlabs API Key: {elevenlabs_api_key[:5]}...{elevenlabs_api_key[-5:] if elevenlabs_api_key else None}")
 
         # Models
         anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
@@ -231,6 +235,42 @@ def load_and_log_configs():
         deepseek_model = config.get('API', 'deepseek_model', fallback='deepseek-chat')
         mistral_model = config.get('API', 'mistral_model', fallback='mistral-large-latest')
         google_model = config.get('API', 'google_model', fallback='gemini-1.5-pro')
+
+        # LLM API Settings - streaming / temperature / top_p / min_p
+        anthropic_streaming = config.get('API', 'anthropic_streaming', fallback='False')
+        anthropic_temperature = config.get('API', 'anthropic_temperature', fallback='0.7')
+        anthropic_top_p = config.get('API', 'anthropic_top_p', fallback='0.95')
+        anthropic_min_p = config.get('API', 'anthropic_min_p', fallback='0.05')
+        cohere_streaming = config.get('API', 'cohere_streaming', fallback='False')
+        cohere_temperature = config.get('API', 'cohere_temperature', fallback='0.7')
+        cohere_min_p = config.get('API', 'cohere_min_p', fallback='0.05')
+        groq_streaming = config.get('API', 'groq_streaming', fallback='False')
+        groq_temperature = config.get('API', 'groq_temperature', fallback='0.7')
+        groq_top_p = config.get('API', 'groq_top_p', fallback='0.95')
+        groq_min_p = config.get('API', 'groq_min_p', fallback='0.05')
+        openai_streaming = config.get('API', 'openai_streaming', fallback='False')
+        openai_temperature = config.get('API', 'openai_temperature', fallback='0.7')
+        openai_top_p = config.get('API', 'openai_top_p', fallback='0.95')
+        huggingface_streaming = config.get('API', 'huggingface_streaming', fallback='False')
+        huggingface_temperature = config.get('API', 'huggingface_temperature', fallback='0.7')
+        huggingface_top_p = config.get('API', 'huggingface_top_p', fallback='0.95')
+        huggingface_min_p = config.get('API', 'huggingface_min_p', fallback='0.05')
+        openrouter_streaming = config.get('API', 'openrouter_streaming', fallback='False')
+        openrouter_temperature = config.get('API', 'openrouter_temperature', fallback='0.7')
+        openrouter_top_p = config.get('API', 'openrouter_top_p', fallback='0.95')
+        openrouter_min_p = config.get('API', 'openrouter_min_p', fallback='0.05')
+        deepseek_streaming = config.get('API', 'deepseek_streaming', fallback='False')
+        deepseek_temperature = config.get('API', 'deepseek_temperature', fallback='0.7')
+        deepseek_top_p = config.get('API', 'deepseek_top_p', fallback='0.95')
+        deepseek_min_p = config.get('API', 'deepseek_min_p', fallback='0.05')
+        mistral_streaming = config.get('API', 'mistral_streaming', fallback='False')
+        mistral_temperature = config.get('API', 'mistral_temperature', fallback='0.7')
+        mistral_top_p = config.get('API', 'mistral_top_p', fallback='0.95')
+        mistral_min_p = config.get('API', 'mistral_min_p', fallback='0.05')
+        google_streaming = config.get('API', 'google_streaming', fallback='False')
+        google_temperature = config.get('API', 'google_temperature', fallback='0.7')
+        google_top_p = config.get('API', 'google_top_p', fallback='0.95')
+        google_min_p = config.get('API', 'google_min_p', fallback='0.05')
 
         logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
         logging.debug(f"Loaded Cohere Model: {cohere_model}")
@@ -245,12 +285,25 @@ def load_and_log_configs():
         kobold_api_ip = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         kobold_openai_api_IP = config.get('Local-API', 'kobold_openai_api_IP', fallback='http://127.0.0.1:5001/v1/chat/completions')
         kobold_api_key = config.get('Local-API', 'kobold_api_key', fallback='')
+        kobold_streaming = config.get('Local-API', 'kobold_streaming', fallback='False')
+        kobold_temperature = config.get('Local-API', 'kobold_temperature', fallback='0.7')
+        kobold_top_p = config.get('Local-API', 'kobold_top_p', fallback='0.95')
+        kobold_min_p = config.get('Local-API', 'kobold_min_p', fallback='0.05')
+
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
+        llama_streaming = config.get('Local-API', 'llama_streaming', fallback='False')
+        llama_temperature = config.get('Local-API', 'llama_temperature', fallback='0.7')
+        llama_top_p = config.get('Local-API', 'llama_top_p', fallback='0.95')
+        llama_min_p = config.get('Local-API', 'llama_min_p', fallback='0.05')
 
         ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
         ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
+        ooba_streaming = config.get('Local-API', 'ooba_streaming', fallback='False')
+        ooba_temperature = config.get('Local-API', 'ooba_temperature', fallback='0.7')
+        ooba_top_p = config.get('Local-API', 'ooba_top_p', fallback='0.95')
+        ooba_min_p = config.get('Local-API', 'ooba_min_p', fallback='0.05')
 
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
@@ -266,11 +319,14 @@ def load_and_log_configs():
 
         aphrodite_api_url = config.get('Local-API', 'aphrodite_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         aphrodite_api_key = config.get('Local-API', 'aphrodite_api_key', fallback='')
+        aphrodite_model = config.get('Local-API', 'aphrodite_model', fallback='')
 
         custom_openai_api_key = config.get('API', 'custom_openai_api_key', fallback=None)
         custom_openai_api_url = config.get('API', 'custom_openai_url', fallback=None)
         logging.debug(
             f"Loaded Custom openai-like endpoint API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
+        custom_openai_api_streaming = config.get('API', 'custom_openai_streaming', fallback='False')
+        custom_openai_api_temperature = config.get('API', 'custom_openai_temperature', fallback='0.7')
 
         logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
         logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
@@ -280,6 +336,10 @@ def load_and_log_configs():
 
         # Retrieve default API choices from the configuration file
         default_api = config.get('API', 'default_api', fallback='openai')
+
+        # Retrieve LLM API settings from the configuration file
+        local_api_retries = config.get('Local-API', 'Settings', fallback='3')
+        local_api_retry_delay = config.get('Local-API', 'local_api_retry_delay', fallback='5')
 
         # Retrieve output paths from the configuration file
         output_path = config.get('Paths', 'output_path', fallback='results')
@@ -311,51 +371,234 @@ def load_and_log_configs():
         # Local API Timeout
         local_api_timeout = config.get('Local-API', 'local_api_timeout', fallback='90')
 
-        return {
-            'api_keys': {
-                'anthropic': anthropic_api_key,
-                'cohere': cohere_api_key,
-                'groq': groq_api_key,
-                'openai': openai_api_key,
-                'huggingface': huggingface_api_key,
-                'openrouter': openrouter_api_key,
-                'deepseek': deepseek_api_key,
-                'mistral': mistral_api_key,
-                'google': google_api_key,
-                'kobold': kobold_api_key,
-                'llama': llama_api_key,
-                'ooba': ooba_api_key,
-                'tabby': tabby_api_key,
-                'vllm': vllm_api_key,
-                'ollama': ollama_api_key,
-                'aphrodite': aphrodite_api_key,
-                'custom_openai_api_key': custom_openai_api_key
-            },
-            'models': {
-                'anthropic': anthropic_model,
-                'cohere': cohere_model,
-                'groq': groq_model,
-                'openai': openai_model,
-                'huggingface': huggingface_model,
-                'openrouter': openrouter_model,
-                'deepseek': deepseek_model,
-                'mistral': mistral_model,
-                'google': google_model,
-                'vllm': vllm_model,
-                'tabby': tabby_model,
-                'ollama': ollama_model
+        # TTS Settings
+        # FIXME
+        default_tts_provider = config.get('TTS-Settings', 'default_tts_provider', fallback='openai')
+        tts_voice = config.get('TTS-Settings', 'default_tts_voice', fallback='shimmer')
+        # Open AI TTS
+        default_openai_tts_model = config.get('TTS-Settings', 'default_openai_tts_model', fallback='tts-1-hd')
+        default_openai_tts_voice = config.get('TTS-Settings', 'default_openai_tts_voice', fallback='shimmer')
+        default_openai_tts_speed = config.get('TTS-Settings', 'default_openai_tts_speed', fallback='1')
+        default_openai_tts_output_format = config.get('TTS-Settings', 'default_openai_tts_output_format', fallback='mp3')
+        # Google TTS
+        # FIXME - FIX THESE DEFAULTS
+        default_google_tts_model = config.get('TTS-Settings', 'default_google_tts_model', fallback='en')
+        default_google_tts_voice = config.get('TTS-Settings', 'default_google_tts_voice', fallback='en')
+        default_google_tts_speed = config.get('TTS-Settings', 'default_google_tts_speed', fallback='1')
+        # ElevenLabs TTS
+        default_eleven_tts_model = config.get('TTS-Settings', 'default_eleven_tts_model', fallback='FIXME')
+        default_eleven_tts_voice = config.get('TTS-Settings', 'default_eleven_tts_voice', fallback='FIXME')
+        default_eleven_tts_language_code = config.get('TTS-Settings', 'default_eleven_tts_language_code', fallback='FIXME')
+        default_eleven_tts_voice_stability = config.get('TTS-Settings', 'default_eleven_tts_voice_stability', fallback='FIXME')
+        default_eleven_tts_voice_similiarity_boost = config.get('TTS-Settings', 'default_eleven_tts_voice_similiarity_boost', fallback='FIXME')
+        default_eleven_tts_voice_style = config.get('TTS-Settings', 'default_eleven_tts_voice_style', fallback='FIXME')
+        default_eleven_tts_voice_use_speaker_boost = config.get('TTS-Settings', 'default_eleven_tts_voice_use_speaker_boost', fallback='FIXME')
+        default_eleven_tts_output_format = config.get('TTS-Settings', 'default_eleven_tts_output_format',
+                                                      fallback='mp3_44100_192')
+        # AllTalk TTS
+        alltalk_api_ip = config.get('TTS-Settings', 'alltalk_api_ip', fallback='http://127.0.0.1:7851/v1/audio/speech')
+        default_alltalk_tts_model = config.get('TTS-Settings', 'default_alltalk_tts_model', fallback='alltalk_model')
+        default_alltalk_tts_voice = config.get('TTS-Settings', 'default_alltalk_tts_voice', fallback='alloy')
+        default_alltalk_tts_speed = config.get('TTS-Settings', 'default_alltalk_tts_speed', fallback=1.0)
+        default_alltalk_tts_output_format = config.get('TTS-Settings', 'default_alltalk_tts_output_format', fallback='mp3')
 
+        # Search Engines
+        search_provider_default = config.get('Search-Engines', 'search_provider_default', fallback='google')
+        search_language_query = config.get('Search-Engines', 'search_language_query', fallback='en')
+        search_language_results = config.get('Search-Engines', 'search_language_results', fallback='en')
+        search_language_analysis = config.get('Search-Engines', 'search_language_analysis', fallback='en')
+        search_default_max_queries = 10
+        search_enable_subquery = config.get('Search-Engines', 'search_enable_subquery', fallback='True')
+        search_enable_subquery_count_max = config.get('Search-Engines', 'search_enable_subquery_count_max', fallback=5)
+        search_result_rerank = config.get('Search-Engines', 'search_result_rerank', fallback='True')
+        search_result_max = config.get('Search-Engines', 'search_result_max', fallback=10)
+        search_result_max_per_query = config.get('Search-Engines', 'search_result_max_per_query', fallback=10)
+        search_result_blacklist = config.get('Search-Engines', 'search_result_blacklist', fallback='')
+        search_result_display_type = config.get('Search-Engines', 'search_result_display_type', fallback='list')
+        search_result_display_metadata = config.get('Search-Engines', 'search_result_display_metadata', fallback='False')
+        search_result_save_to_db = config.get('Search-Engines', 'search_result_save_to_db', fallback='True')
+        search_result_analysis_tone = config.get('Search-Engines', 'search_result_analysis_tone', fallback='')
+        relevance_analysis_llm = config.get('Search-Engines', 'relevance_analysis_llm', fallback='False')
+        final_answer_llm = config.get('Search-Engines', 'final_answer_llm', fallback='False')
+        # Search Engine Specifics
+        baidu_search_api_key = config.get('Search-Engines', 'search_engine_api_key_baidu', fallback='')
+        # Bing Search Settings
+        bing_search_api_key = config.get('Search-Engines', 'search_engine_api_key_bing', fallback='')
+        bing_country_code = config.get('Search-Engines', 'search_engine_country_code_bing', fallback='us')
+        bing_search_api_url = config.get('Search-Engines', 'search_engine_api_url_bing', fallback='')
+        # Brave Search Settings
+        brave_search_api_key = config.get('Search-Engines', 'search_engine_api_key_brave_regular', fallback='')
+        brave_search_ai_api_key = config.get('Search-Engines', 'search_engine_api_key_brave_ai', fallback='')
+        brave_country_code = config.get('Search-Engines', 'search_engine_country_code_brave', fallback='us')
+        # DuckDuckGo Search Settings
+        duckduckgo_search_api_key = config.get('Search-Engines', 'search_engine_api_key_duckduckgo', fallback='')
+        # Google Search Settings
+        google_search_api_url = config.get('Search-Engines', 'search_engine_api_url_google', fallback='')
+        google_search_api_key = config.get('Search-Engines', 'search_engine_api_key_google', fallback='')
+        google_search_engine_id = config.get('Search-Engines', 'search_engine_id_google', fallback='')
+        google_simp_trad_chinese = config.get('Search-Engines', 'enable_traditional_chinese', fallback='0')
+        limit_google_search_to_country = config.get('Search-Engines', 'limit_google_search_to_country', fallback='0')
+        google_search_country = config.get('Search-Engines', 'google_search_country', fallback='us')
+        google_search_country_code = config.get('Search-Engines', 'google_search_country_code', fallback='us')
+        google_filter_setting = config.get('Search-Engines', 'google_filter_setting', fallback='1')
+        google_user_geolocation = config.get('Search-Engines', 'google_user_geolocation', fallback='')
+        google_ui_language = config.get('Search-Engines', 'google_ui_language', fallback='en')
+        google_limit_search_results_to_language = config.get('Search-Engines', 'google_limit_search_results_to_language', fallback='')
+        google_default_search_results = config.get('Search-Engines', 'google_default_search_results', fallback='10')
+        google_safe_search = config.get('Search-Engines', 'google_safe_search', fallback='active')
+        google_enable_site_search = config.get('Search-Engines', 'google_enable_site_search', fallback='0')
+        google_site_search_include = config.get('Search-Engines', 'google_site_search_include', fallback='')
+        google_site_search_exclude = config.get('Search-Engines', 'google_site_search_exclude', fallback='')
+        google_sort_results_by = config.get('Search-Engines', 'google_sort_results_by', fallback='relevance')
+        # Kagi Search Settings
+        kagi_search_api_key = config.get('Search-Engines', 'search_engine_api_key_kagi', fallback='')
+        # Searx Search Settings
+        search_engine_searx_api = config.get('Search-Engines', 'search_engine_searx_api', fallback='')
+        # Tavily Search Settings
+        tavily_search_api_key = config.get('Search-Engines', 'search_engine_api_key_tavily', fallback='')
+        # Yandex Search Settings
+        yandex_search_api_key = config.get('Search-Engines', 'search_engine_api_key_yandex', fallback='')
+        yandex_search_engine_id = config.get('Search-Engines', 'search_engine_id_yandex', fallback='')
+
+        # Prompts
+        sub_question_generation_prompt = config.get('Prompts', 'sub_question_generation_prompt', fallback='')
+        search_result_relevance_eval_prompt = config.get('Prompts', 'search_result_relevance_eval_prompt', fallback='')
+        analyze_search_results_prompt = config.get('Prompts', 'analyze_search_results_prompt', fallback='')
+
+        return {
+            'anthropic_api': {
+                'api_key': anthropic_api_key,
+                'model': anthropic_model,
+                'streaming': anthropic_streaming,
+                'temperature': anthropic_temperature,
+                'top_p': anthropic_top_p,
+                'min_p': anthropic_min_p
             },
-            'local_api_ip': {
-                'kobold': kobold_api_ip,
-                'kobold_openai': kobold_openai_api_IP,
-                'llama': llama_api_IP,
-                'ooba': ooba_api_IP,
-                'tabby': tabby_api_IP,
-                'vllm': vllm_api_url,
-                'ollama': ollama_api_url,
-                'aphrodite': aphrodite_api_url,
-                'custom_openai_api_ip': custom_openai_api_url
+            'cohere_api': {
+                'api_key': cohere_api_key,
+                'model': cohere_model,
+                'streaming': cohere_streaming,
+                'temperature': cohere_temperature,
+                'min_p': cohere_min_p
+            },
+            'deepseek_api': {
+                'api_key': deepseek_api_key,
+                'model': deepseek_model,
+                'streaming': deepseek_streaming,
+                'temperature': deepseek_temperature,
+                'top_p': deepseek_top_p,
+                'min_p': deepseek_min_p
+            },
+            'google_api': {
+                'api_key': google_api_key,
+                'model': google_model,
+                'streaming': google_streaming,
+                'temperature': google_temperature,
+                'top_p': google_top_p,
+                'min_p': google_min_p
+            },
+            'groq_api': {
+                'api_key': groq_api_key,
+                'model': groq_model,
+                'streaming': groq_streaming,
+                'temperature': groq_temperature,
+                'top_p': groq_top_p,
+                'min_p': groq_min_p
+            },
+            'huggingface_api': {
+                'api_key': huggingface_api_key,
+                'model': huggingface_model,
+                'streaming': huggingface_streaming,
+            },
+            'mistral_api': {
+                'api_key': mistral_api_key,
+                'model': mistral_model,
+                'streaming': mistral_streaming,
+                'temperature': mistral_temperature,
+                'top_p': mistral_top_p,
+                'min_p': mistral_min_p
+            },
+            'openrouter_api': {
+                'api_key': openrouter_api_key,
+                'model': openrouter_model,
+                'streaming': openrouter_streaming,
+                'temperature': openrouter_temperature,
+                'top_p': openrouter_top_p,
+                'min_p': openrouter_min_p
+            },
+            'openai_api': {
+                'api_key': openai_api_key,
+                'model': openai_model,
+                'streaming': openai_streaming,
+                'temperature': openai_temperature,
+                'top_p': openai_top_p,
+            },
+            'elevenlabs_api': {
+                'api_key': elevenlabs_api_key
+            },
+            'alltalk_api': {
+                'api_ip': alltalk_api_ip,
+                'default_alltalk_tts_model': default_alltalk_tts_model,
+                'default_alltalk_tts_voice': default_alltalk_tts_voice,
+                'default_alltalk_tts_speed': default_alltalk_tts_speed,
+                'default_alltalk_tts_output_format': default_alltalk_tts_output_format,
+            },
+            'custom_openai_api': {
+                'api_key': custom_openai_api_key,
+                'api_url': custom_openai_api_url,
+                'streaming': custom_openai_api_streaming,
+                'temperature': custom_openai_api_temperature,
+            },
+            'llama_api': {
+                'api_ip': llama_api_IP,
+                'api_key': llama_api_key,
+                'streaming': llama_streaming,
+                'temperature': llama_temperature,
+                'top_p': llama_top_p,
+                'min_p': llama_min_p
+            },
+            'ooba_api': {
+                'api_ip': ooba_api_IP,
+                'api_key': ooba_api_key,
+                'streaming': ooba_streaming,
+                'temperature': ooba_temperature,
+                'top_p': ooba_top_p,
+                'min_p': ooba_min_p
+            },
+            'kobold_api': {
+                'api_ip': kobold_api_ip,
+                'api_streaming_ip': kobold_openai_api_IP,
+                'api_key': kobold_api_key,
+                'streaming': kobold_streaming,
+                'temperature': kobold_temperature,
+                'top_p': kobold_top_p,
+                'min_p': kobold_min_p
+            },
+            'tabby_api': {
+                'api_ip': tabby_api_IP,
+                'api_key': tabby_api_key,
+                'model': tabby_model
+            },
+            'vllm_api': {
+                'api_url': vllm_api_url,
+                'api_key': vllm_api_key,
+                'model': vllm_model
+            },
+            'ollama_api': {
+                'api_url': ollama_api_url,
+                'api_key': ollama_api_key,
+                'model': ollama_model
+            },
+            'aphrodite_api': {
+                'api_url': aphrodite_api_url,
+                'api_key': aphrodite_api_key,
+                'model': aphrodite_model,
+            },
+            'llm_api_settings': {
+                'default_api': default_api,
+                'local_api_timeout': local_api_timeout,
+                'local_api_retries': local_api_retries,
+                'local_api_retry_delay': local_api_retry_delay,
             },
             'output_path': output_path,
             'processing_choice': processing_choice,
@@ -382,30 +625,121 @@ def load_and_log_configs():
                 'save_rag_chats': save_rag_chats,
             },
             'default_api': default_api,
-            'local_api_timeout': local_api_timeout
+            'local_api_timeout': local_api_timeout,
+            'tts_settings': {
+                'default_tts_provider': default_tts_provider,
+                'tts_voice': tts_voice,
+                # OpenAI
+                'default_openai_tts_voice': default_openai_tts_voice,
+                'default_openai_tts_speed': default_openai_tts_speed,
+                'default_openai_tts_model': default_openai_tts_model,
+                'default_openai_tts_output_format': default_openai_tts_output_format,
+                # Google
+                'default_google_tts_model': default_google_tts_model,
+                'default_google_tts_voice': default_google_tts_voice,
+                'default_google_tts_speed': default_google_tts_speed,
+                # ElevenLabs
+                'default_eleven_tts_model': default_eleven_tts_model,
+                'default_eleven_tts_voice': default_eleven_tts_voice,
+                'default_eleven_tts_language_code': default_eleven_tts_language_code,
+                'default_eleven_tts_voice_stability': default_eleven_tts_voice_stability,
+                'default_eleven_tts_voice_similiarity_boost': default_eleven_tts_voice_similiarity_boost,
+                'default_eleven_tts_voice_style': default_eleven_tts_voice_style,
+                'default_eleven_tts_voice_use_speaker_boost': default_eleven_tts_voice_use_speaker_boost,
+                'default_eleven_tts_output_format': default_eleven_tts_output_format
+                # GPT Sovi-TTS
+            },
+            'search_settings': {
+                'default_search_provider': search_provider_default,
+                'search_language_query': search_language_query,
+                'search_language_results': search_language_results,
+                'search_language_analysis': search_language_analysis,
+                'search_default_max_queries': search_default_max_queries,
+                'search_enable_subquery': search_enable_subquery,
+                'search_enable_subquery_count_max': search_enable_subquery_count_max,
+                'search_result_rerank': search_result_rerank,
+                'search_result_max': search_result_max,
+                'search_result_max_per_query': search_result_max_per_query,
+                'search_result_blacklist': search_result_blacklist,
+                'search_result_display_type': search_result_display_type,
+                'search_result_display_metadata': search_result_display_metadata,
+                'search_result_save_to_db': search_result_save_to_db,
+                'search_result_analysis_tone': search_result_analysis_tone,
+                'relevance_analysis_llm': relevance_analysis_llm,
+                'final_answer_llm': final_answer_llm,
+            },
+            'search_engines': {
+                'baidu_search_api_key': baidu_search_api_key,
+                'bing_search_api_key': bing_search_api_key,
+                'bing_country_code': bing_country_code,
+                'bing_search_api_url': bing_search_api_url,
+                'brave_search_api_key': brave_search_api_key,
+                'brave_search_ai_api_key': brave_search_ai_api_key,
+                'brave_country_code': brave_country_code,
+                'duckduckgo_search_api_key': duckduckgo_search_api_key,
+                'google_search_api_url': google_search_api_url,
+                'google_search_api_key': google_search_api_key,
+                'google_search_engine_id': google_search_engine_id,
+                'google_simp_trad_chinese': google_simp_trad_chinese,
+                'limit_google_search_to_country': limit_google_search_to_country,
+                'google_search_country': google_search_country,
+                'google_search_country_code': google_search_country_code,
+                'google_search_filter_setting': google_filter_setting,
+                'google_user_geolocation': google_user_geolocation,
+                'google_ui_language': google_ui_language,
+                'google_limit_search_results_to_language': google_limit_search_results_to_language,
+                'google_site_search_include': google_site_search_include,
+                'google_site_search_exclude': google_site_search_exclude,
+                'google_sort_results_by': google_sort_results_by,
+                'google_default_search_results': google_default_search_results,
+                'google_safe_search': google_safe_search,
+                'google_enable_site_search' : google_enable_site_search,
+                'kagi_search_api_key': kagi_search_api_key,
+                'searx_search_api_url': search_engine_searx_api,
+                'tavily_search_api_key': tavily_search_api_key,
+                'yandex_search_api_key': yandex_search_api_key,
+                'yandex_search_engine_id': yandex_search_engine_id
+            },
+            'prompts': {
+                'sub_question_generation_prompt': sub_question_generation_prompt,
+                'search_result_relevance_eval_prompt': search_result_relevance_eval_prompt,
+                'analyze_search_results_prompt': analyze_search_results_prompt,
+            },
         }
 
     except Exception as e:
         logging.error(f"Error loading config: {str(e)}")
         return None
 
-global_api_endpoints = ["anthropic", "cohere", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "google", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
+
+global_api_endpoints = ["anthropic", "cohere", "google", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
+
+global_search_engines = ["baidu", "bing", "brave", "duckduckgo", "google", "kagi", "searx", "tavily", "yandex"]
+
+openai_tts_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+
 
 # Setup Default API Endpoint
-loaded_config_data = load_and_log_configs()
-default_api_endpoint = loaded_config_data['default_api']
+try:
+    loaded_config_data = load_and_log_configs()
+    default_api_endpoint = loaded_config_data['default_api']
+    print(f"Default API Endpoint: {default_api_endpoint}")
+except Exception as e:
+    logging.error(f"Error loading default API endpoint: {str(e)}")
+    default_api_endpoint = "openai"
+
 
 def format_api_name(api):
     name_mapping = {
         "openai": "OpenAI",
         "anthropic": "Anthropic",
         "cohere": "Cohere",
+        "google": "Google",
         "groq": "Groq",
         "huggingface": "HuggingFace",
         "openrouter": "OpenRouter",
         "deepseek": "DeepSeek",
         "mistral": "Mistral",
-        "google": "Google",
         "custom_openai_api": "Custom-OpenAI-API",
         "llama": "Llama.cpp",
         "ooba": "Ooba",
@@ -416,9 +750,6 @@ def format_api_name(api):
         "aphrodite": "Aphrodite"
     }
     return name_mapping.get(api, api.title())
-print(f"Default API Endpoint: {default_api_endpoint}")
-
-
 
 #
 # End of Config loading
@@ -596,9 +927,6 @@ def create_download_directory(title):
     return session_path
 
 
-import chardet
-import logging
-
 def safe_read_file(file_path):
     encodings = ['utf-8', 'utf-16', 'ascii', 'latin-1', 'iso-8859-1', 'cp1252', 'utf-8-sig']
 
@@ -725,7 +1053,6 @@ def normalize_title(title, preserve_spaces=False):
     return title.strip('_')
 
 
-
 def clean_youtube_url(url):
     parsed_url = urlparse(url)
     query_params = parse_qs(parsed_url.query)
@@ -820,9 +1147,6 @@ def get_db_config():
         'elasticsearch_port': config.getint('Database', 'elasticsearch_port', fallback=9200)
     }
 
-
-
-
 #
 # End of DB Config Loading
 #######################################################################################################################
@@ -838,6 +1162,7 @@ def format_text_with_line_breaks(text):
 
 # Track temp files for cleanup
 temp_files = []
+
 temp_file_paths = []
 
 def save_temp_file(file):

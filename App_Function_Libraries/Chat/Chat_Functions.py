@@ -30,16 +30,23 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 # Functions:
 
 def approximate_token_count(history):
-    total_text = ''
-    for user_msg, bot_msg in history:
-        if user_msg:
-            total_text += user_msg + ' '
-        if bot_msg:
-            total_text += bot_msg + ' '
-    total_tokens = len(total_text.split())
-    return total_tokens
+    try:
+        total_text = ''
+        for user_msg, bot_msg in history:
+            if user_msg:
+                total_text += user_msg + ' '
+            if bot_msg:
+                total_text += bot_msg + ' '
+        total_tokens = len(total_text.split())
+        return total_tokens
+    except Exception as e:
+        logging.error(f"Error calculating token count: {str(e)}")
+        return 0
 
-def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message=None):
+
+# FIXME - add model parameter
+def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message, streaming, minp=None, maxp=None, model=None):
+    logging.info(f"Debug - Chat API Call - API Endpoint: {api_endpoint}")
     log_counter("chat_api_call_attempt", labels={"api_endpoint": api_endpoint})
     start_time = time.time()
     if not api_key:
@@ -50,18 +57,22 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
         logging.info(f"Debug - Chat API Call - API Key: {api_key}")
         logging.info(f"Debug - Chat chat_api_call - API Endpoint: {api_endpoint}")
         if api_endpoint.lower() == 'openai':
-            response = chat_with_openai(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_openai(api_key, input_data, prompt, temp, system_message, streaming, minp, maxp, model)
 
         elif api_endpoint.lower() == 'anthropic':
             # Retrieve the model from config
             loaded_config_data = load_and_log_configs()
-            model = loaded_config_data['models']['anthropic'] if loaded_config_data else None
+            if not model:
+                model = loaded_config_data['anthropic_api']['model']
             response = chat_with_anthropic(
                 api_key=api_key,
                 input_data=input_data,
                 model=model,
                 custom_prompt_arg=prompt,
-                system_prompt=system_message
+                max_retries=3,
+                retry_delay=5,
+                system_prompt=system_message,
+                streaming=streaming,
             )
 
         elif api_endpoint.lower() == "cohere":
@@ -133,7 +144,7 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
 
 
 def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt, temperature,
-         system_message=None):
+         system_message=None, streaming=False, minp=None, maxp=None, model=None):
     log_counter("chat_attempt", labels={"api_endpoint": api_endpoint})
     start_time = time.time()
     try:
@@ -172,12 +183,15 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         logging.debug(f"Debug - Chat Function - Prompt: {prompt}")
 
         # Use the existing API request code based on the selected endpoint
-        response = chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message)
+        response = chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message, streaming, minp=None, maxp=None, model=None)
 
-        chat_duration = time.time() - start_time
-        log_histogram("chat_duration", chat_duration, labels={"api_endpoint": api_endpoint})
-        log_counter("chat_success", labels={"api_endpoint": api_endpoint})
-        return response
+        if streaming:
+            return response
+        else:
+            chat_duration = time.time() - start_time
+            log_histogram("chat_duration", chat_duration, labels={"api_endpoint": api_endpoint})
+            log_counter("chat_success", labels={"api_endpoint": api_endpoint})
+            return response
     except Exception as e:
         log_counter("chat_error", labels={"api_endpoint": api_endpoint, "error": str(e)})
         logging.error(f"Error in chat function: {str(e)}")
@@ -374,7 +388,6 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
 
 CHARACTERS_FILE = Path('.', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
 
-
 def save_character(character_data):
     log_counter("save_character_attempt")
     start_time = time.time()
@@ -433,7 +446,6 @@ def load_characters():
     except Exception as e:
         log_counter("load_characters_error", labels={"error": str(e)})
         return {}
-
 
 
 def get_character_names():
