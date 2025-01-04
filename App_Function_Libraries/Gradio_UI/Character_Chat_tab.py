@@ -434,34 +434,27 @@ def create_character_card_interaction_tab():
 
                 return loaded_history, char_data, f"Chat history for '{char_name}' imported successfully."
 
-            # def load_character(name):
-            #     characters = get_character_cards()
-            #     character = next((char for char in characters if char['name'] == name), None)
-            #     if character:
-            #         first_message = character.get('first_message', "Hello! I'm ready to chat.")
-            #         return character, [(None, first_message)] if first_message else [], None
-            #     return None, [], None
-            #
-            # def load_character_image(name):
-            #     character = next((char for char in get_character_cards() if char['name'] == name), None)
-            #     if character and 'image' in character and character['image']:
-            #         try:
-            #             # Decode the base64 image
-            #             image_data = base64.b64decode(character['image'])
-            #             # Load as PIL Image
-            #             img = Image.open(io.BytesIO(image_data)).convert("RGBA")
-            #             return img
-            #         except Exception as e:
-            #             logging.error(f"Error loading image for character '{name}': {e}")
-            #             return None
-            #     return None
-
             def character_chat_wrapper(
                     message, history, char_data, api_endpoint, api_key,
                     temperature, user_name_val, auto_save, streaming, minp, maxp
             ):
                 if not char_data:
                     return history, "Please select a character first."
+
+                # Sanitize the initial history to ensure no None values
+                sanitized_history = []
+                for entry in history:
+                    if entry is None:
+                        sanitized_history.append(("", ""))  # Replace None with an empty tuple
+                    elif isinstance(entry, (list, tuple)) and len(entry) == 2:
+                        # Ensure both elements are strings
+                        user_msg = entry[0] if entry[0] is not None else ""
+                        bot_msg = entry[1] if entry[1] is not None else ""
+                        sanitized_history.append((user_msg, bot_msg))
+                    else:
+                        # If the entry is invalid, replace it with an empty tuple
+                        sanitized_history.append(("", ""))
+                history = sanitized_history
 
                 user_name_val = user_name_val or "User"
                 char_name = char_data.get('name', 'AI Assistant')
@@ -512,22 +505,36 @@ def create_character_card_interaction_tab():
                     maxp=maxp
                 )
 
-                # Replace placeholders in bot message
-                bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+                # Handle streaming response
+                if streaming:
+                    # For streaming, append the user message to the history with a placeholder for the bot's response
+                    history.append((user_message, ""))  # Append user message with an empty bot response
+                    logging.debug(f"Updated history (streaming): {history}")
 
-                # Update history
-                history.append((user_message, bot_message))
+                    # Yield the bot's response incrementally
+                    def stream_response():
+                        for chunk in bot_message:
+                            # Update the last entry in the history with the partial response
+                            history[-1] = (user_message, chunk)
+                            yield history, "" # History and empty status message
 
-                # Auto-save if enabled
-                save_status = ""
-                if auto_save:
-                    character_id = char_data.get('id')
-                    if character_id:
-                        conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                        add_character_chat(character_id, conversation_name, history)
-                        save_status = "Chat auto-saved."
-                    else:
-                        save_status = "Character ID not found; chat not saved."
+                    return stream_response()
+                else:
+                    # For non-streaming, append the full bot response to the history
+                    bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+                    history.append((user_message, bot_message))
+                    logging.debug(f"Updated history (non-streaming): {history}")
+
+                    # Auto-save if enabled
+                    save_status = ""
+                    if auto_save:
+                        character_id = char_data.get('id')
+                        if character_id:
+                            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                            add_character_chat(character_id, conversation_name, history)
+                            save_status = "Chat auto-saved."
+                        else:
+                            save_status = "Character ID not found; chat not saved."
 
                 return history, save_status
 
@@ -1141,12 +1148,13 @@ def create_character_card_interaction_tab():
                     temperature_slider,
                     user_name_input,
                     auto_save_checkbox,
+                    streaming,
                     minp_slider,
                     maxp_slider
                 ],
-                outputs=[chat_history, save_status]
+                outputs=[chat_history, save_status]  # Output to both history and chatbot
             ).then(
-                lambda: "", outputs=user_input
+                lambda: "", outputs=user_input  # Clear the input box after sending
             ).then(
                 lambda history: approximate_token_count(history),
                 inputs=[chat_history],
