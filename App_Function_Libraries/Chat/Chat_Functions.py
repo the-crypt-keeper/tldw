@@ -30,14 +30,18 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 # Functions:
 
 def approximate_token_count(history):
-    total_text = ''
-    for user_msg, bot_msg in history:
-        if user_msg:
-            total_text += user_msg + ' '
-        if bot_msg:
-            total_text += bot_msg + ' '
-    total_tokens = len(total_text.split())
-    return total_tokens
+    try:
+        total_text = ''
+        for user_msg, bot_msg in history:
+            if user_msg:
+                total_text += user_msg + ' '
+            if bot_msg:
+                total_text += bot_msg + ' '
+        total_tokens = len(total_text.split())
+        return total_tokens
+    except Exception as e:
+        logging.error(f"Error calculating token count: {str(e)}")
+        return 0
 
 
 # FIXME - add model parameter
@@ -384,7 +388,6 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
 
 CHARACTERS_FILE = Path('.', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
 
-
 def save_character(character_data):
     log_counter("save_character_attempt")
     start_time = time.time()
@@ -443,7 +446,6 @@ def load_characters():
     except Exception as e:
         log_counter("load_characters_error", labels={"error": str(e)})
         return {}
-
 
 
 def get_character_names():

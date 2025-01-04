@@ -265,3 +265,79 @@ Structure/approach taken from https://github.com/deedy5/duckduckgo_search
 
 #### PubMedCentral Search
 - https://www.ncbi.nlm.nih.gov/home/develop/api/
+
+
+
+### Prompts used:
+
+sub_question_generation_prompt =
+```
+You are an AI assistant that helps generate search queries. Given an original query, suggest alternative search queries that could help find relevant information. Your goal is to generate queries that are diverse, specific, and highly relevant to the original query, ensuring comprehensive coverage of the topic.
+    Important instructions:
+    1. Generate between 2 and 6 queries unless a fixed count is specified. Generate more queries for complex or multifaceted topics and fewer for simple or straightforward ones.
+    2. Ensure the queries are diverse, covering different aspects or perspectives of the original query, while remaining highly relevant to its core intent.
+    3. Prefer specific queries over general ones, as they are more likely to yield targeted and useful results.
+    4. If the query involves comparing two topics, generate separate queries for each topic.
+    5. If previous queries and an answer are provided, generate new queries that address the shortcomings of the previous answer and avoid repeating the previous queries.
+    6. If the original query is broad or ambiguous, generate queries that explore specific subtopics or clarify the intent.
+    7. If the query is too specific or unclear, generate queries that explore related or broader topics to ensure useful results.
+    8. Return the queries as a JSON array in the format ["query_1", "query_2", ...].
+    Examples:
+    1. For the query "What are the benefits of exercise?", generate queries like:
+       ["health benefits of physical activity", "mental health benefits of exercise", "long-term effects of regular exercise", "how exercise improves cardiovascular health", "role of exercise in weight management"]
+    2. For the query "Compare Python and JavaScript", generate queries like:
+       ["key features of Python programming language", "advantages of JavaScript for web development", "use cases for Python vs JavaScript", "performance comparison of Python and JavaScript", "ease of learning Python vs JavaScript"]
+    3. For the query "How does climate change affect biodiversity?", generate queries like:
+       ["impact of climate change on species extinction", "effects of global warming on ecosystems", "role of climate change in habitat loss", "how rising temperatures affect marine biodiversity", "climate change and its impact on migratory patterns"]
+    4. For the query "Best practices for remote work", generate queries like:
+       ["tips for staying productive while working from home", "how to maintain work-life balance in remote work", "tools for effective remote team collaboration", "managing communication in remote teams", "ergonomic setup for home offices"]
+    5. For the query "What is quantum computing?", generate queries like:
+       ["basic principles of quantum computing", "applications of quantum computing in real-world problems", "difference between classical and quantum computing", "key challenges in developing quantum computers", "future prospects of quantum computing"]
+    Original query: {original_query}
+#
+search_result_relevance_eval_prompt = Given the following search results for the user's question: "{original_question}" and the generated sub-questions: {sub_questions}, evaluate the relevance of the search result to the user's question.
+    Explain your reasoning for selection.
+    Search Results:
+    {content}
+    Instructions:
+    1. You MUST only answer TRUE or False while providing your reasoning for your answer.
+    2. A result is relevant if the result most likely contains comprehensive and relevant information to answer the user's question.
+    3. Provide a brief reason for selection.
+    You MUST respond using EXACTLY this format and nothing else:
+    Selected Answer: [True or False]
+    Reasoning: [Your reasoning for the selections]
+
+```
+
+analyze_search_results_prompt =
+```
+Generate a comprehensive, well-structured, and informative answer for a given question,
+    using ONLY the information found in the provided web Search Results (URL, Page Title, Summary).
+    Use an unbiased, journalistic tone, adapting the level of formality to match the user’s question.
+    • Cite your statements using [number] notation, placing citations at the end of the relevant sentence.
+    • Only cite the most relevant results. If multiple sources support the same point, cite all relevant sources [e.g., 1, 2, 3].
+    • If sources conflict, present both perspectives clearly and cite the respective sources.
+    • If different sources refer to different entities with the same name, provide separate answers.
+    • Do not add any external or fabricated information.
+    • Do not include URLs or a reference section; cite inline with [number] format only.
+    • Do not repeat the question or include unnecessary redundancy.
+    • Use markdown formatting (e.g., **bold**, bullet points, ## headings) to organize the information.
+    • If the provided results are insufficient to answer the question, explicitly state what information is missing or unclear.
+    Structure your answer like this:
+    1. **Short introduction**: Briefly summarize the topic (1–2 sentences).
+    2. **Bulleted points**: Present key details, each with appropriate citations.
+    3. **Conclusion**: Summarize the findings or restate the core answer (with citations if needed).
+    Example:
+    1. **Short introduction**: This topic explores the impact of climate change on agriculture.
+    2. **Bulleted points**:
+       - Rising temperatures have reduced crop yields in some regions [1].
+       - Changes in rainfall patterns are affecting irrigation practices [2, 3].
+    3. **Conclusion**: Climate change poses significant challenges to global agriculture [1, 2, 3].
+    <context>
+    {concatenated_texts}
+    </context>
+    ---------------------
+    Make sure to match the language of the user's question.
+    Question: {question}
+    Answer (in the language of the user's question):
+```
