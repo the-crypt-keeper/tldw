@@ -768,20 +768,41 @@ def create_character_card_interaction_tab():
                     maxp=maxp
                 )
 
-                # Append the new bot message to the history
-                new_history.append((last_user_message, bot_message))
+                # Handle streaming response
+                if streaming:
+                    new_history.append((last_user_message, ""))  # Append user message with an empty bot response
+                    full_response = ""
+                    for chunk in bot_message:
+                        full_response += chunk
+                        new_history[-1] = (last_user_message, full_response)
+                        yield new_history, ""  # Yield updated history and empty status
 
-                # Auto-save if enabled
-                if auto_save:
-                    character_id = char_data.get('id')
-                    if character_id:
-                        conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                        add_character_chat(character_id, conversation_name, new_history)
-                        save_status = "Chat auto-saved."
-                    else:
-                        save_status = "Character ID not found; chat not saved."
-                else:
+                    # After streaming is complete, handle auto-save
                     save_status = ""
+                    if auto_save:
+                        character_id = char_data.get('id')
+                        if character_id:
+                            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                            add_character_chat(character_id, conversation_name, new_history)
+                            save_status = "Chat auto-saved."
+                        else:
+                            save_status = "Character ID not found; chat not saved."
+                    yield new_history, save_status
+                else:
+                    # For non-streaming, append the full bot response to the history
+                    bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+                    new_history.append((last_user_message, bot_message))
+
+                    # Auto-save if enabled
+                    save_status = ""
+                    if auto_save:
+                        character_id = char_data.get('id')
+                        if character_id:
+                            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                            add_character_chat(character_id, conversation_name, new_history)
+                            save_status = "Chat auto-saved."
+                        else:
+                            save_status = "Character ID not found; chat not saved."
 
                 return new_history, save_status
 
@@ -841,11 +862,12 @@ def create_character_card_interaction_tab():
 
             def continue_talking(
                     history, char_data, api_endpoint, api_key,
-                    temperature, user_name_val, auto_save, minp, maxp
+                    temperature, user_name_val, auto_save, streaming_checkbox, minp, maxp
             ):
                 """
                 Causes the character to continue the conversation or think out loud.
                 """
+                streaming = streaming_checkbox.value if hasattr(streaming_checkbox, 'value') else streaming_checkbox
                 if not char_data:
                     return history, "Please select a character first."
 
@@ -896,8 +918,29 @@ def create_character_card_interaction_tab():
                     maxp=maxp
                 )
 
-                # Replace placeholders in bot message
-                bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+                # Handle streaming response
+                if streaming:
+                    history.append((None, ""))  # Append empty user message with an empty bot response
+                    full_response = ""
+                    for chunk in bot_message:
+                        full_response += chunk
+                        history[-1] = (None, full_response)
+                        yield history, ""  # Yield updated history and empty status
+
+                    # After streaming is complete, handle auto-save
+                    save_status = ""
+                    if auto_save:
+                        character_id = char_data.get('id')
+                        if character_id:
+                            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                            add_character_chat(character_id, conversation_name, history)
+                            save_status = "Chat auto-saved."
+                        else:
+                            save_status = "Character ID not found; chat not saved."
+                    yield history, save_status
+                else:
+                    # Replace placeholders in bot message
+                    bot_message = replace_placeholders(bot_message, char_name, user_name_val)
 
                 # Update history
                 history.append((None, bot_message))
@@ -917,10 +960,11 @@ def create_character_card_interaction_tab():
 
             def answer_for_me(
                     history, char_data, api_endpoint, api_key,
-                    temperature, user_name_val, auto_save, minp, maxp):
+                    temperature, user_name_val, auto_save, streaming_checkbox, minp, maxp):
                 """
                 Generates a likely user response and continues the conversation.
                 """
+                streaming = streaming_checkbox.value if hasattr(streaming_checkbox, 'value') else streaming_checkbox
                 if not char_data:
                     return history, "Please select a character first."
 
@@ -965,8 +1009,52 @@ def create_character_card_interaction_tab():
                     maxp=maxp
                 )
 
-                # Append the generated user response to history
-                history.append((user_response, None))
+                if streaming:
+                    history.append(("", ""))  # Append empty user message
+                    full_user_response = ""
+                    for chunk in user_response:
+                        full_user_response += chunk
+                        history[-1] = (full_user_response, "")
+                        yield history, ""  # Yield updated history and empty status
+
+                    # Now generate the character's response to this user response
+                    system_message_bot = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}"""
+
+                    bot_message = chat(
+                        f"{user_name_val}: {full_user_response}",
+                        history[:-1],
+                        media_content,
+                        selected_parts,
+                        api_endpoint,
+                        api_key,
+                        prompt=char_data.get('post_history_instructions', ''),
+                        temperature=temperature,
+                        system_message=system_message_bot,
+                        streaming=streaming,
+                        minp=minp,
+                        maxp=maxp
+                    )
+
+                    full_bot_response = ""
+                    for chunk in bot_message:
+                        full_bot_response += chunk
+                        history[-1] = (full_user_response, full_bot_response)
+                        yield history, ""  # Yield updated history and empty status
+
+                    # After streaming is complete, handle auto-save
+                    save_status = ""
+                    if auto_save:
+                        character_id = char_data.get('id')
+                        if character_id:
+                            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                            add_character_chat(character_id, conversation_name, history)
+                            save_status = "Chat auto-saved."
+                        else:
+                            save_status = "Character ID not found; chat not saved."
+                    yield history, save_status
+                else:
+                    # Append the generated user response to history
+                    history.append((user_response, None))
 
                 # Now generate the character's response to this user response
                 # Prepare the system message for the character
@@ -1081,6 +1169,7 @@ def create_character_card_interaction_tab():
                     temperature_slider,
                     user_name_input,
                     auto_save_checkbox,
+                    streaming,
                     minp_slider,
                     maxp_slider
                 ],
@@ -1101,6 +1190,7 @@ def create_character_card_interaction_tab():
                     temperature_slider,
                     user_name_input,
                     auto_save_checkbox,
+                    streaming,
                     minp_slider,
                     maxp_slider
                 ],
