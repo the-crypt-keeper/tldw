@@ -151,6 +151,18 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
             logging.info("llama.cpp: API URL not found or is empty")
             return "llama.cpp: API URL not found or is empty"
 
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('llama_api', {}).get('streaming', False)
+            logging.debug("Llama.cpp: Streaming mode enabled")
+        else:
+            logging.debug("Llama.cpp: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
         # Prepare headers
         headers = {
             'accept': 'application/json',
@@ -267,6 +279,18 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
                     logging.warning("Kobold: No API key found in config file")
 
         logging.debug(f"Kobold: Using API Key: {kobold_api_key[:5]}...{kobold_api_key[-5:]}")
+
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('kobold_api', {}).get('streaming', False)
+            logging.debug("Kobold.cpp: Streaming mode enabled")
+        else:
+            logging.debug("Kobold.cpp: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Kobold.cpp: Loading json data for summarization")
@@ -429,6 +453,18 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.
         if system_prompt is None:
             system_prompt = "You are a helpful AI assistant that provides accurate and concise information."
 
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('ooba_api', {}).get('streaming', False)
+            logging.debug("Oobabooga: Streaming mode enabled")
+        else:
+            logging.debug("Oobabooga: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
@@ -546,6 +582,18 @@ def chat_with_tabbyapi(
                 else:
                     logging.warning("TabbyAPI: No API key found in config file")
 
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('tabby_api', {}).get('streaming', False)
+            logging.debug("TabbyAPI: Streaming mode enabled")
+        else:
+            logging.debug("TabbyAPI: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
         # Set API IP and model from config.txt
         tabby_api_ip = loaded_config_data['tabby_api']['api_ip']
         tabby_model = loaded_config_data['tabby_api']['model']
@@ -653,7 +701,7 @@ def chat_with_tabbyapi(
 
 
 # FIXME aphrodite engine - code was literally tab complete in one go from copilot... :/
-def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:8080/completion"):
+def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:8080/completion", streaming=False):
     loaded_config_data = load_and_log_configs()
     model = loaded_config_data['aphrodite_api']['model']
     # API key validation
@@ -664,6 +712,18 @@ def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="h
 
     if api_key is None or api_key.strip() == "":
         logging.info("aphrodite: API key not found or is empty")
+
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('aphrodite_api', {}).get('streaming', False)
+            logging.debug("Aphrodite: Streaming mode enabled")
+        else:
+            logging.debug("Aphrodite: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
     headers = {
         'Authorization': f'Bearer {api_key}',
@@ -713,19 +773,31 @@ def chat_with_ollama(
                 else:
                     logging.warning("Ollama: No API key found in config file")
 
-            # Set model from parameter or config
+        # Set model from parameter or config
+        if model is None:
+            model = loaded_config_data['ollama_api'].get('model')
             if model is None:
-                model = loaded_config_data['ollama_api'].get('model')
-                if model is None:
-                    logging.error("Ollama: Model not found in config file")
-                    return "Ollama: Model not found in config file"
+                logging.error("Ollama: Model not found in config file")
+                return "Ollama: Model not found in config file"
 
-            # Set api_url from parameter or config
+        # Set api_url from parameter or config
+        if api_url is None:
+            api_url = loaded_config_data['ollama_api'].get('api_ip')
             if api_url is None:
-                api_url = loaded_config_data['ollama_api'].get('api_ip')
-                if api_url is None:
-                    logging.error("Ollama: API URL not found in config file")
-                    return "Ollama: API URL not found in config file"
+                logging.error("Ollama: API URL not found in config file")
+                return "Ollama: API URL not found in config file"
+
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('ollama_api', {}).get('streaming', False)
+            logging.debug("Ollama: Streaming mode enabled")
+        else:
+            logging.debug("Ollama: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
         # Load transcript
         logging.debug("Ollama: Loading JSON data")
@@ -921,6 +993,18 @@ def chat_with_vllm(
             else:
                 logging.error("vLLM: API URL not found in config file")
 
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('vllm_api', {}).get('streaming', False)
+            logging.debug("vllm: Streaming mode enabled")
+        else:
+            logging.debug("vllm: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
         logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:] if vllm_api_key else 'None'}")
         # Process input data
 
@@ -1022,6 +1106,18 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
             return "Custom OpenAI API: API Key Not Provided/Found in Config file or is empty"
 
         logging.debug(f"Custom OpenAI API: Using API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:]}")
+
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
+        elif streaming is None:
+            streaming = loaded_config_data.get('custom_openai_api', {}).get('streaming', False)
+            logging.debug("Custom OpenAI API: Streaming mode enabled")
+        else:
+            logging.debug("Custom OpenAI API: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
         # Input data handling
         logging.debug(f"Custom OpenAI API: Raw input data type: {type(input_data)}")
