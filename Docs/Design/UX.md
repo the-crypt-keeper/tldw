@@ -83,6 +83,8 @@ https://lovable.dev/
 https://markwhen.com/
 https://kando.menu/
 https://deepseek-artifacts.vercel.app/
+https://darkpatternsgame.productartistry.com/
+
 
 Not waifus, but clippy:
   https://github.com/fghrsh/live2d_demo

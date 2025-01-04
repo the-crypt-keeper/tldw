@@ -116,7 +116,7 @@ def get_openai_embeddings(input_data: str, model: str) -> List[float]:
         raise ValueError(f"OpenAI: Unexpected error occurred: {str(e)}")
 
 
-def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming):
+def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming, minp, maxp, model):
     loaded_config_data = load_and_log_configs()
     openai_api_key = api_key
     try:
@@ -126,7 +126,7 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
             logging.info("OpenAI: Attempting to use API key from config file")
             openai_api_key = loaded_config_data['openai_api']['api_key']
 
-        if not openai_api_key:
+        if not openai_api_key or openai_api_key == "":
             logging.error("OpenAI: API key not found or is empty")
             return "OpenAI: API Key Not Provided/Found in Config file or is empty"
 
@@ -134,12 +134,21 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
 
         if isinstance(streaming, str):
             streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)  # Convert integers (1/0) to boolean
         elif streaming is None:
-            streaming = loaded_config_data['openai_api']['streaming']
-        if streaming:
+            streaming = loaded_config_data.get('openai_api', {}).get('streaming', False)
             logging.debug("OpenAI: Streaming mode enabled")
         else:
             logging.debug("OpenAI: Streaming mode disabled")
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
+        if maxp is None:
+            maxp = loaded_config_data['openai_api']['max_p']
+        if model is None:
+            openai_model = loaded_config_data['openai_api']['model'] or "gpt-4o"
+            logging.debug(f"OpenAI: Using model: {openai_model}")
 
         # Input data handling
         logging.debug(f"OpenAI: Raw input data type: {type(input_data)}")
@@ -186,9 +195,6 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
         logging.debug(f"OpenAI: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"OpenAI: Custom prompt: {custom_prompt_arg}")
 
-        openai_model = loaded_config_data['openai_api']['model'] or "gpt-4o"
-        logging.debug(f"OpenAI: Using model: {openai_model}")
-
         headers = {
             'Authorization': f'Bearer {openai_api_key}',
             'Content-Type': 'application/json'
@@ -209,9 +215,10 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": openai_prompt}
             ],
-            "max_tokens": 4096,
+            "max_completion_tokens": 4096,
             "temperature": temp,
-            "stream": streaming
+            "stream": streaming,
+            "top_p": maxp
         }
         if streaming:
             logging.debug("OpenAI: Posting request (streaming")
@@ -276,7 +283,7 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None, temp=None, streaming=False):
+def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None, temp=None, streaming=False, minp=None, maxp=None):
     try:
         loaded_config_data = load_and_log_configs()
 
@@ -334,9 +341,26 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
         if temp is None:
             temp = loaded_config_data['anthropic_api']['temperature']
             temp = float(temp)
+            logging.debug(f"Anthropic: Using temperature from config.txt: {temp}")
         else:
             temp = 0.7
             logging.debug(f"Anthropic: Using default temperature: {temp}")
+
+        if minp is None:
+            minp = loaded_config_data['anthropic_api']['min_p']
+            minp = float(minp)
+            logging.debug(f"Anthropic: Using min_p from config.txt: {minp}")
+        else:
+            minp = 0.0
+            logging.debug(f"Anthropic: Using default min_p: {minp}")
+
+        if maxp is None:
+            maxp = loaded_config_data['anthropic_api']['top_p']
+            maxp = float(maxp)
+            logging.debug(f"Anthropic: Using max_p from config.txt: {maxp}")
+        else:
+            maxp = 1.0
+            logging.debug(f"Anthropic: Using default maxp: {maxp}")
 
         headers = {
             'x-api-key': anthropic_api_key,

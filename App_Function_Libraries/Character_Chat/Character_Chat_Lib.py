@@ -87,12 +87,24 @@ def extract_character_id(choice: str) -> int:
     """Extract the character ID from the dropdown selection string."""
     log_counter("extract_character_id_attempt")
     try:
-        character_id = int(choice.split('(ID: ')[1].rstrip(')'))
+        logging.debug(f"Choice received: {choice}")  # Debugging line
+        if not choice:
+            raise ValueError("No choice provided.")
+
+        if '(ID: ' not in choice or ')' not in choice:
+            raise ValueError(f"Invalid choice format: {choice}")
+
+        # Extract the ID part
+        id_part = choice.split('(ID: ')[1]
+        character_id = int(id_part.rstrip(')'))
+
+        logging.debug(f"Extracted character ID: {character_id}")  # Debugging line
         log_counter("extract_character_id_success")
         return character_id
     except Exception as e:
         log_counter("extract_character_id_error", labels={"error": str(e)})
         raise
+
 
 def load_character_wrapper(character_id: int, user_name: str) -> Tuple[Dict[str, Any], List[Tuple[Optional[str], str]], Optional[Image.Image]]:
     """Wrapper function to load character and image using the extracted ID."""

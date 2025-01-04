@@ -47,6 +47,10 @@ https://github.com/microsoft/SpeechT5
 https://www.lightnote.co/?utm_source=www.hivefive.community&utm_medium=newsletter&utm_campaign=hive-five-202-a-bias-to-action
 https://github.com/smellslikeml/dolla_llama
 https://github.com/dnhkng/GlaDOS
+https://arxiv.org/abs/2501.01384
+https://sharechatx.github.io/
+https://github.com/vipchengrui/traditional-speech-enhancement
+
 
 STT
     https://github.com/KoljaB/RealtimeSTT
@@ -58,6 +62,7 @@ STT
 
 TTS
     https://github.com/KoljaB/RealtimeTTS
+    https://si.inc/hertz-dev/
 
 101
     https://www.inferless.com/learn/comparing-different-text-to-speech---tts--models-for-different-use-cases

@@ -59,7 +59,8 @@ Relevance: [score] - [brief explanation]
 
 Overall Assessment: [Your overall assessment of the summary's quality]
 """
-
+    # FIXME - Add g_eval_model to config.txt
+    # g_eval_model = loaded_config[][]
     try:
         result = chat_api_call(
             api_name,
@@ -67,7 +68,11 @@ Overall Assessment: [Your overall assessment of the summary's quality]
             prompt,
             "",
             temp=temp,
-            system_message="You are a helpful AI assistant tasked with evaluating summaries."
+            system_message="You are a helpful AI assistant tasked with evaluating summaries.",
+            streaming=False,
+            minp=None,
+            maxp=None,
+            model=None
         )
     except Exception as e:
         return detailed_api_error(api_name, e)

@@ -23,6 +23,10 @@ https://huggingface.co/Qwen/QVQ-72B-Preview
 https://huggingface.co/Qwen/Qwen2-VL-72B
 https://huggingface.co/Qwen/Qwen2-VL-7B
 https://huggingface.co/Qwen/Qwen2-VL-2B
+https://github.com/Lokesh-Chimakurthi/vision-rag
+https://github.com/tjmlabs/ColiVara
+
+
 
 https://www.reddit.com/r/StableDiffusion/comments/1h7hunp/how_to_run_hunyuanvideo_on_a_single_24gb_vram_card/
 https://arxiv.org/abs/2412.05185

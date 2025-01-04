@@ -243,7 +243,6 @@ def load_and_log_configs():
         anthropic_min_p = config.get('API', 'anthropic_min_p', fallback='0.05')
         cohere_streaming = config.get('API', 'cohere_streaming', fallback='False')
         cohere_temperature = config.get('API', 'cohere_temperature', fallback='0.7')
-        cohere_top_p = config.get('API', 'cohere_top_p', fallback='0.95')
         cohere_min_p = config.get('API', 'cohere_min_p', fallback='0.05')
         groq_streaming = config.get('API', 'groq_streaming', fallback='False')
         groq_temperature = config.get('API', 'groq_temperature', fallback='0.7')
@@ -252,7 +251,6 @@ def load_and_log_configs():
         openai_streaming = config.get('API', 'openai_streaming', fallback='False')
         openai_temperature = config.get('API', 'openai_temperature', fallback='0.7')
         openai_top_p = config.get('API', 'openai_top_p', fallback='0.95')
-        openai_min_p = config.get('API', 'openai_min_p', fallback='0.05')
         huggingface_streaming = config.get('API', 'huggingface_streaming', fallback='False')
         huggingface_temperature = config.get('API', 'huggingface_temperature', fallback='0.7')
         huggingface_top_p = config.get('API', 'huggingface_top_p', fallback='0.95')
@@ -481,7 +479,6 @@ def load_and_log_configs():
                 'model': cohere_model,
                 'streaming': cohere_streaming,
                 'temperature': cohere_temperature,
-                'top_p': cohere_top_p,
                 'min_p': cohere_min_p
             },
             'deepseek_api': {
@@ -535,7 +532,6 @@ def load_and_log_configs():
                 'streaming': openai_streaming,
                 'temperature': openai_temperature,
                 'top_p': openai_top_p,
-                'min_p': openai_min_p
             },
             'elevenlabs_api': {
                 'api_key': elevenlabs_api_key
