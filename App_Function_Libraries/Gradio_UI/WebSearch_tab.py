@@ -24,33 +24,35 @@ def create_websearch_tab():
             search_state = gr.State(value=None)
             # Basic styling
             gr.HTML("""
-                                <style>
+                <style>
+                    .analysis-text {
+                        white-space: pre-wrap !important;
+                        word-wrap: break-word !important;
+                        max-width: 100% !important;
+                        margin: 16px 0 !important;
+                    }
+
+                    /* Make bullet points and lists render properly */
+                    .analysis-text ul {
+                        padding-left: 20px !important;
+                        margin: 10px 0 !important;
+                    }
+
+                    .analysis-text li {
+                        margin: 5px 0 !important;
+                    }
+
+                    /* Ensure headers have proper spacing */
+                    .analysis-text h1, 
+                    .analysis-text h2, 
+                    .analysis-text h3 {
+                        margin-top: 20px !important;
+                        margin-bottom: 10px !important;
+                    }
+
+                    /* Your existing styles... */
                     .result-card { /* existing styles */ }
-                    
-                    .analyze-button-container {
-                        display: flex;
-                        align-items: center;
-                        gap: 10px;
-                    }
-                    
-                    .status-spinner {
-                        display: none;
-                        width: 20px;
-                        height: 20px;
-                        border: 3px solid #f3f3f3;
-                        border-top: 3px solid #3498db;
-                        border-radius: 50%;
-                        animation: spin 1s linear infinite;
-                    }
-                    
-                    .status-spinner.visible {
-                        display: inline-block;
-                    }
-                    
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
+                    /* ... rest of your existing styles ... */
                 </style>
             """)
 
@@ -108,7 +110,12 @@ def create_websearch_tab():
 
             # Final Output Section
             with gr.Column(visible=False) as output_section:
-                answer = gr.Markdown(label="Analysis")
+                # Single markdown box for all analysis text
+                answer = gr.Markdown(
+                    label="Analysis Results",
+                    elem_classes="analysis-text"
+                )
+                # Sources box
                 sources = gr.JSON(label="Sources")
 
             def format_results(results: list) -> str:
@@ -252,12 +259,20 @@ def create_websearch_tab():
                     if not analysis.get("final_answer"):
                         raise ValueError("Analysis did not produce a final answer")
 
-                    formatted_answer = f"""
-                    ### Analysis Result
-                    {analysis["final_answer"]["Report"]}
+                    # Format the raw report with proper markdown
+                    raw_report = analysis["final_answer"]["Report"]
 
-                    ### Sources
-                    """
+                    # Ensure proper markdown formatting
+                    formatted_answer = raw_report.replace('\n', '\n\n')  # Double line breaks
+                    formatted_answer = formatted_answer.replace('•', '\n•')  # Bullet points on new lines
+                    formatted_answer = formatted_answer.replace('- ', '\n- ')  # Dashed lists on new lines
+
+                    # Handle numbered lists (assumes numbers followed by period or parenthesis)
+                    import re
+                    formatted_answer = re.sub(r'(\d+[\)\.]) ', r'\n\1 ', formatted_answer)
+
+                    # Clean up any triple+ line breaks
+                    formatted_answer = re.sub(r'\n{3,}', '\n\n', formatted_answer)
 
                     yield (
                         gr.HTML(

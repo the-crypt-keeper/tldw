@@ -27,17 +27,27 @@ def play_mp3(file_path):
     """Play an MP3 file using the pydub library."""
     try:
         from pydub.utils import which
-        print(f"Debug: ffmpeg path: {which('ffmpeg')}")
-        print(f"Debug: ffplay path: {which('ffplay')}")
+        logging.debug(f"Debug: ffmpeg path: {which('ffmpeg')}")
+        logging.debug(f"Debug: ffplay path: {which('ffplay')}")
 
         absolute_path = os.path.abspath(file_path)
         audio = AudioSegment.from_mp3(absolute_path)
-        print("Debug: File loaded successfully")
+        logging.debug("Debug: File loaded successfully")
         play(audio)
     except Exception as e:
-        print(f"Debug: Exception type: {type(e)}")
-        print(f"Debug: Exception args: {e.args}")
-        print(f"Error playing the audio file: {e}")
+        logging.debug(f"Debug: Exception type: {type(e)}")
+        logging.debug(f"Debug: Exception args: {e.args}")
+        logging.error(f"Error playing the audio file: {e}")
+
+
+def play_audio_file(file_path):
+    """Play an audio file using the pydub library."""
+    try:
+        absolute_path = os.path.abspath(file_path)
+        audio = AudioSegment.from_file(absolute_path)
+        play(audio)
+    except Exception as e:
+        logging.error(f"Error playing the audio file: {e}")
 
 
 def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None, output_file=None, response_format=None, streaming=False):

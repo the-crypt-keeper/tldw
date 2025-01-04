@@ -296,7 +296,7 @@ def analyze_question(question: str, api_endpoint) -> Dict:
         try:
             logging.info(f"Generating sub-questions (attempt {attempt + 1})")
 
-            response = chat_api_call(api_endpoint, None, input_data, sub_question_generation_prompt, temp=0.7, system_message=None, streaming=False)
+            response = chat_api_call(api_endpoint, None, input_data, sub_question_generation_prompt, temp=0.7, system_message=None, streaming=False, minp=None, maxp=None, model=None)
             if response:
                 try:
                     # Try to parse as JSON first

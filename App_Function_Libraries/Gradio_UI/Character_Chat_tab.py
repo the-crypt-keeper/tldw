@@ -2,6 +2,7 @@
 # Description: Library for character card import functions
 #
 # Imports
+import os
 from datetime import datetime
 import re
 import tempfile
@@ -34,7 +35,7 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     delete_character_card,
     update_character_card, search_character_chats, save_chat_history_to_character_db,
 )
-from App_Function_Libraries.TTS.TTS_Providers import generate_audio
+from App_Function_Libraries.TTS.TTS_Providers import generate_audio, play_mp3, play_audio_file
 from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
     default_api_endpoint, load_comprehensive_config
 
@@ -267,958 +268,995 @@ def create_character_card_interaction_tab():
         logging.error(f"Error setting default API endpoint: {str(e)}")
         default_value = None
     with gr.TabItem("Chat with a Character Card", visible=True):
-        gr.Markdown("# Chat with a Character Card")
-        with gr.Row():
-            with gr.Column(scale=1):
-                # Checkbox to Decide Whether to Save Chats by Default
-                config = load_comprehensive_config()
-                auto_save_value = config.get('auto-save', 'save_character_chats', fallback='False')
-                auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=auto_save_value)
-                chat_media_name = gr.Textbox(label="Custom Chat Name (optional)", visible=True)
-                save_chat_history_to_db = gr.Button("Save Chat History to Database")
-                save_status = gr.Textbox(label="Status", interactive=False)
-            with gr.Column(scale=2):
-                gr.Markdown("## Search and Load Existing Chats")
-                chat_search_query = gr.Textbox(
-                    label="Search Chats",
-                    placeholder="Enter chat name or keywords to search"
-                )
-                chat_search_button = gr.Button("Search Chats")
-                chat_search_dropdown = gr.Dropdown(label="Search Results", choices=[], visible=False)
-                load_chat_button = gr.Button("Load Selected Chat", visible=False)
+        with gr.Blocks() as interface:
+            gr.Markdown("# Chat with a Character Card")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    # Checkbox to Decide Whether to Save Chats by Default
+                    config = load_comprehensive_config()
+                    auto_save_value = config.get('auto-save', 'save_character_chats', fallback='False')
+                    auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=auto_save_value)
+                    chat_media_name = gr.Textbox(label="Custom Chat Name (optional)", visible=True)
+                    save_chat_history_to_db = gr.Button("Save Chat History to Database")
+                    save_status = gr.Textbox(label="Status", interactive=False)
+                with gr.Column(scale=2):
+                    gr.Markdown("## Search and Load Existing Chats")
+                    chat_search_query = gr.Textbox(
+                        label="Search Chats",
+                        placeholder="Enter chat name or keywords to search"
+                    )
+                    chat_search_button = gr.Button("Search Chats")
+                    chat_search_dropdown = gr.Dropdown(label="Search Results", choices=[], visible=False)
+                    load_chat_button = gr.Button("Load Selected Chat", visible=False)
 
-        with gr.Row():
-            with gr.Column(scale=1):
-                character_image = gr.Image(label="Character Image", type="pil")
-                character_card_upload = gr.File(
-                    label="Upload Character Card (PNG, WEBP, JSON)",
-                    file_types=[".png", ".webp", ".json"]
-                )
-                import_card_button = gr.Button("Import Character Card")
-                load_characters_button = gr.Button("Load Existing Characters")
-                character_dropdown = gr.Dropdown(label="Select Character", choices=[])
-                user_name_input = gr.Textbox(label="Your Name", placeholder="Enter your name here")
-                # Refactored API selection dropdown
-                api_name_input = gr.Dropdown(
-                    choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
-                    value=default_value,
-                    label="API for Interaction (Mandatory)"
-                )
-                api_key_input = gr.Textbox(
-                    label="API Key (if not set in Config_Files/config.txt)",
-                    placeholder="Enter your API key here", type="password"
-                )
-                temperature_slider = gr.Slider(
-                    minimum=0.0, maximum=2.0, value=0.7, step=0.05, label="Temperature"
-                )
-                chat_file_upload = gr.File(label="Upload Chat History JSON", visible=True)
-                import_chat_button = gr.Button("Import Chat History")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    character_image = gr.Image(label="Character Image", type="pil")
+                    character_card_upload = gr.File(
+                        label="Upload Character Card (PNG, WEBP, JSON)",
+                        file_types=[".png", ".webp", ".json"]
+                    )
+                    import_card_button = gr.Button("Import Character Card")
+                    load_characters_button = gr.Button("Load Existing Characters")
+                    character_dropdown = gr.Dropdown(label="Select Character", choices=[])
+                    user_name_input = gr.Textbox(label="Your Name", placeholder="Enter your name here")
+                    # Refactored API selection dropdown
+                    api_name_input = gr.Dropdown(
+                        choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
+                        value=default_value,
+                        label="API for Interaction (Mandatory)"
+                    )
+                    api_key_input = gr.Textbox(
+                        label="API Key (if not set in Config_Files/config.txt)",
+                        placeholder="Enter your API key here", type="password"
+                    )
+                    temperature_slider = gr.Slider(
+                        minimum=0.0, maximum=2.0, value=0.7, step=0.05, label="Temperature"
+                    )
+                    with gr.Row():
+                        minp_slider = gr.Slider(
+                            minimum=0.0, maximum=1.0, value=0.00, step=0.01, label="Min-P"
+                        )
+                    with gr.Row():
+                        maxp_slider = gr.Slider(
+                            minimum=0.00, maximum=1.0, value=1.00, step=0.01, label="Top-P"
+                        )
+                    chat_file_upload = gr.File(label="Upload Chat History JSON", visible=True)
+                    import_chat_button = gr.Button("Import Chat History")
 
-            with gr.Column(scale=2):
-                chat_history = gr.Chatbot(label="Conversation", height=800)
-                user_input = gr.Textbox(label="Your message")
-                send_message_button = gr.Button("Send Message")
-                with gr.Row():
-                    speak_button = gr.Button("Speak Response")
-                    tts_status = gr.Textbox(label="TTS Status", interactive=False)
-                with gr.Row():
-                    answer_for_me_button = gr.Button("Answer for Me")
-                    continue_talking_button = gr.Button("Continue Talking")
-                regenerate_button = gr.Button("Regenerate Last Message")
-                with gr.Row():
-                    token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
-                    clear_chat_button = gr.Button("Clear Chat")
-                save_snapshot_button = gr.Button("Save Chat Snapshot")
-                update_chat_dropdown = gr.Dropdown(label="Select Chat to Update", choices=[], visible=False)
-                load_selected_chat_button = gr.Button("Load Selected Chat", visible=False)
-                update_chat_button = gr.Button("Update Selected Chat", visible=False)
+                with gr.Column(scale=2):
+                    chat_history = gr.Chatbot(label="Conversation", height=800)
+                    user_input = gr.Textbox(label="Your message")
+                    with gr.Row():
+                        streaming = gr.Checkbox(label="Enable streaming", value=True, interactive=True)
+                        auto_speak_checkbox = gr.Checkbox(label="Auto-speak response", value=False, interactive=True)
+                    send_message_button = gr.Button("Send Message")
+                    with gr.Row():
+                        speak_button = gr.Button("Speak Response")
+                        tts_status = gr.Textbox(label="TTS Status", interactive=False)
+                    with gr.Row():
+                        answer_for_me_button = gr.Button("Answer for Me")
+                        continue_talking_button = gr.Button("Continue Talking")
+                    regenerate_button = gr.Button("Regenerate Last Message")
+                    with gr.Row():
+                        token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
+                        clear_chat_button = gr.Button("Clear Chat")
+                    save_snapshot_button = gr.Button("Save Chat Snapshot")
+                    update_chat_dropdown = gr.Dropdown(label="Select Chat to Update", choices=[], visible=False)
+                    load_selected_chat_button = gr.Button("Load Selected Chat", visible=False)
+                    update_chat_button = gr.Button("Update Selected Chat", visible=False)
 
-        # States
-        character_data = gr.State(None)
-        user_name = gr.State("")
-        selected_chat_id = gr.State(None)  # To track the selected chat for updates
+            # States
+            character_data = gr.State(None)
+            user_name = gr.State("")
+            selected_chat_id = gr.State(None)  # To track the selected chat for updates
 
-        # Callback Functions
+            # Callback Functions
 
-        def search_existing_chats(query):
-            results, message = search_character_chats(query)
-            if results:
-                # Format search results for dropdown
-                formatted_results = [
-                    f"{chat['conversation_name']} (ID: {chat['id']})" for chat in results
-                ]
-            else:
-                formatted_results = []
-            return formatted_results, message
-
-        def load_selected_chat_from_search(selected_chat, user_name):
-            if not selected_chat:
-                return None, [], None, "No chat selected."
-
-            try:
-                chat_id_match = re.search(r'\(ID:\s*(\d+)\)', selected_chat)
-                if not chat_id_match:
-                    return None, [], None, "Invalid chat selection format."
-
-                chat_id = int(chat_id_match.group(1))
-
-                # Use the new function to load chat and character data
-                char_data, chat_history, img = load_chat_and_character(chat_id, user_name)
-
-                if not char_data:
-                    return None, [], None, "Failed to load character data for the selected chat."
-
-                return char_data, chat_history, img, f"Chat '{selected_chat}' loaded successfully."
-            except Exception as e:
-                logging.error(f"Error loading selected chat: {e}")
-                return None, [], None, f"Error loading chat: {e}"
-
-
-        def import_chat_history(file, current_history, char_data, user_name_val):
-            """
-            Imports chat history from a file, replacing '{{user}}' with the actual user name.
-
-            Args:
-                file (file): The uploaded chat history file.
-                current_history (list): The current chat history.
-                char_data (dict): The current character data.
-                user_name_val (str): The user's name.
-
-            Returns:
-                tuple: Updated chat history, updated character data, and a status message.
-            """
-            loaded_history, char_name = load_chat_history(file)
-            if loaded_history is None:
-                return current_history, char_data, "Failed to load chat history."
-
-            # Replace '{{user}}' in the loaded chat history
-            loaded_history = replace_user_placeholder(loaded_history, user_name_val)
-
-            # Check if the loaded chat is for the current character
-            if char_data and char_data.get('name') != char_name:
-                return current_history, char_data, (
-                    f"Warning: Loaded chat is for character '{char_name}', "
-                    f"but current character is '{char_data.get('name')}'. Chat not imported."
-                )
-
-            # If no character is selected, try to load the character from the chat
-            if not char_data:
-                characters = get_character_cards()
-                character = next((char for char in characters if char['name'] == char_name), None)
-                if character:
-                    char_data = character
-                    # Replace '{{user}}' in the first_message if necessary
-                    if character.get('first_message'):
-                        character['first_message'] = character['first_message'].replace("{{user}}",
-                                                                                        user_name_val if user_name_val else "User")
+            def search_existing_chats(query):
+                logging.info(f"Searching for chats with query: {query}")
+                results, message = search_character_chats(query)
+                if results:
+                    # Format search results for dropdown
+                    formatted_results = [
+                        f"{chat['conversation_name']} (ID: {chat['id']})" for chat in results
+                    ]
                 else:
+                    formatted_results = []
+                return formatted_results, message
+
+            def load_selected_chat_from_search(selected_chat, user_name):
+                logging.info(f"Loading selected chat: {selected_chat}")
+                if not selected_chat:
+                    return None, [], None, "No chat selected."
+
+                try:
+                    chat_id_match = re.search(r'\(ID:\s*(\d+)\)', selected_chat)
+                    if not chat_id_match:
+                        return None, [], None, "Invalid chat selection format."
+
+                    chat_id = int(chat_id_match.group(1))
+
+                    # Use the new function to load chat and character data
+                    char_data, chat_history, img = load_chat_and_character(chat_id, user_name)
+
+                    if not char_data:
+                        return None, [], None, "Failed to load character data for the selected chat."
+
+                    return char_data, chat_history, img, f"Chat '{selected_chat}' loaded successfully."
+                except Exception as e:
+                    logging.error(f"Error loading selected chat: {e}")
+                    return None, [], None, f"Error loading chat: {e}"
+
+
+            def import_chat_history(file, current_history, char_data, user_name_val):
+                """
+                Imports chat history from a file, replacing '{{user}}' with the actual user name.
+
+                Args:
+                    file (file): The uploaded chat history file.
+                    current_history (list): The current chat history.
+                    char_data (dict): The current character data.
+                    user_name_val (str): The user's name.
+
+                Returns:
+                    tuple: Updated chat history, updated character data, and a status message.
+                """
+                logging.info(f"Importing chat history from file: {file.name}")
+                loaded_history, char_name = load_chat_history(file)
+                if loaded_history is None:
+                    return current_history, char_data, "Failed to load chat history."
+
+                # Replace '{{user}}' in the loaded chat history
+                loaded_history = replace_user_placeholder(loaded_history, user_name_val)
+
+                # Check if the loaded chat is for the current character
+                if char_data and char_data.get('name') != char_name:
                     return current_history, char_data, (
-                        f"Warning: Character '{char_name}' not found. Please select the character manually."
+                        f"Warning: Loaded chat is for character '{char_name}', "
+                        f"but current character is '{char_data.get('name')}'. Chat not imported."
                     )
 
-            return loaded_history, char_data, f"Chat history for '{char_name}' imported successfully."
-
-        def load_character(name):
-            characters = get_character_cards()
-            character = next((char for char in characters if char['name'] == name), None)
-            if character:
-                first_message = character.get('first_message', "Hello! I'm ready to chat.")
-                return character, [(None, first_message)] if first_message else [], None
-            return None, [], None
-
-        def load_character_image(name):
-            character = next((char for char in get_character_cards() if char['name'] == name), None)
-            if character and 'image' in character and character['image']:
-                try:
-                    # Decode the base64 image
-                    image_data = base64.b64decode(character['image'])
-                    # Load as PIL Image
-                    img = Image.open(io.BytesIO(image_data)).convert("RGBA")
-                    return img
-                except Exception as e:
-                    logging.error(f"Error loading image for character '{name}': {e}")
-                    return None
-            return None
-
-        def character_chat_wrapper(
-                message, history, char_data, api_endpoint, api_key,
-                temperature, user_name_val, auto_save
-        ):
-            if not char_data:
-                return history, "Please select a character first."
-
-            user_name_val = user_name_val or "User"
-            char_name = char_data.get('name', 'AI Assistant')
-
-            # Prepare the character's background information
-            char_background = f"""
-            Name: {char_name}
-            Description: {char_data.get('description', 'N/A')}
-            Personality: {char_data.get('personality', 'N/A')}
-            Scenario: {char_data.get('scenario', 'N/A')}
-            """
-
-            # Prepare the system prompt
-            system_message = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}"""
-
-            # Prepare chat context
-            media_content = {
-                'id': char_name,
-                'title': char_name,
-                'content': char_background,
-                'description': char_data.get('description', ''),
-                'personality': char_data.get('personality', ''),
-                'scenario': char_data.get('scenario', '')
-            }
-            selected_parts = ['description', 'personality', 'scenario']
-
-            prompt = char_data.get('post_history_instructions', '')
-
-            # Sanitize and format user message
-            user_message = sanitize_user_input(message)
-            user_message = replace_placeholders(user_message, char_name, user_name_val)
-            full_message = f"{user_name_val}: {user_message}"
-
-            # Generate bot response
-            bot_message = chat(
-                full_message,
-                history,
-                media_content,
-                selected_parts,
-                api_endpoint,
-                api_key,
-                prompt,
-                temperature,
-                system_message
-            )
-
-            # Replace placeholders in bot message
-            bot_message = replace_placeholders(bot_message, char_name, user_name_val)
-
-            # Update history
-            history.append((user_message, bot_message))
-
-            # Auto-save if enabled
-            save_status = ""
-            if auto_save:
-                character_id = char_data.get('id')
-                if character_id:
-                    conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                    add_character_chat(character_id, conversation_name, history)
-                    save_status = "Chat auto-saved."
-                else:
-                    save_status = "Character ID not found; chat not saved."
-
-            return history, save_status
-
-        def validate_chat_history(chat_history: List[Tuple[Optional[str], str]]) -> bool:
-            """
-            Validate the chat history format and content.
-
-            Args:
-                chat_history: List of message tuples (user_message, bot_message)
-
-            Returns:
-                bool: True if valid, False if invalid
-            """
-            if not isinstance(chat_history, list):
-                return False
-
-            for entry in chat_history:
-                if not isinstance(entry, tuple) or len(entry) != 2:
-                    return False
-                # First element can be None (for system messages) or str
-                if not (entry[0] is None or isinstance(entry[0], str)):
-                    return False
-                # Second element (bot response) must be str and not empty
-                if not isinstance(entry[1], str) or not entry[1].strip():
-                    return False
-
-            return True
-
-        def sanitize_conversation_name(name: str) -> str:
-            """
-            Sanitize the conversation name.
-
-            Args:
-                name: Raw conversation name
-
-            Returns:
-                str: Sanitized conversation name
-            """
-            # Remove any non-alphanumeric characters except spaces and basic punctuation
-            sanitized = re.sub(r'[^a-zA-Z0-9\s\-_.]', '', name)
-            # Limit length
-            sanitized = sanitized[:100]
-            # Ensure it's not empty
-            if not sanitized.strip():
-                sanitized = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            return sanitized
-
-        def save_chat_history_to_db_wrapper(
-                chat_history: List[Tuple[Optional[str], str]],
-                conversation_id: str,
-                media_content: Dict,
-                chat_media_name: str,
-                char_data: Dict,
-                auto_save: bool
-        ) -> Tuple[str, str]:
-            """
-            Save chat history to the database with validation.
-
-            Args:
-                chat_history: List of message tuples
-                conversation_id: Current conversation ID
-                media_content: Media content metadata
-                chat_media_name: Custom name for the chat
-                char_data: Character data dictionary
-                auto_save: Auto-save flag
-
-            Returns:
-                Tuple[str, str]: (status message, detail message)
-            """
-            try:
-                # Basic input validation
-                if not chat_history:
-                    return "No chat history to save.", ""
-
-                if not validate_chat_history(chat_history):
-                    return "Invalid chat history format.", "Please ensure the chat history is valid."
-
+                # If no character is selected, try to load the character from the chat
                 if not char_data:
-                    return "No character selected.", "Please select a character first."
+                    characters = get_character_cards()
+                    character = next((char for char in characters if char['name'] == char_name), None)
+                    if character:
+                        char_data = character
+                        # Replace '{{user}}' in the first_message if necessary
+                        if character.get('first_message'):
+                            character['first_message'] = character['first_message'].replace("{{user}}",
+                                                                                            user_name_val if user_name_val else "User")
+                    else:
+                        return current_history, char_data, (
+                            f"Warning: Character '{char_name}' not found. Please select the character manually."
+                        )
+
+                return loaded_history, char_data, f"Chat history for '{char_name}' imported successfully."
+
+            # def load_character(name):
+            #     characters = get_character_cards()
+            #     character = next((char for char in characters if char['name'] == name), None)
+            #     if character:
+            #         first_message = character.get('first_message', "Hello! I'm ready to chat.")
+            #         return character, [(None, first_message)] if first_message else [], None
+            #     return None, [], None
+            #
+            # def load_character_image(name):
+            #     character = next((char for char in get_character_cards() if char['name'] == name), None)
+            #     if character and 'image' in character and character['image']:
+            #         try:
+            #             # Decode the base64 image
+            #             image_data = base64.b64decode(character['image'])
+            #             # Load as PIL Image
+            #             img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+            #             return img
+            #         except Exception as e:
+            #             logging.error(f"Error loading image for character '{name}': {e}")
+            #             return None
+            #     return None
+
+            def character_chat_wrapper(
+                    message, history, char_data, api_endpoint, api_key,
+                    temperature, user_name_val, auto_save, streaming, minp, maxp
+            ):
+                if not char_data:
+                    return history, "Please select a character first."
+
+                user_name_val = user_name_val or "User"
+                char_name = char_data.get('name', 'AI Assistant')
+
+                # Prepare the character's background information
+                char_background = f"""
+                Name: {char_name}
+                Description: {char_data.get('description', 'N/A')}
+                Personality: {char_data.get('personality', 'N/A')}
+                Scenario: {char_data.get('scenario', 'N/A')}
+                """
+
+                # Prepare the system prompt
+                system_message = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}"""
+
+                # Prepare chat context
+                media_content = {
+                    'id': char_name,
+                    'title': char_name,
+                    'content': char_background,
+                    'description': char_data.get('description', ''),
+                    'personality': char_data.get('personality', ''),
+                    'scenario': char_data.get('scenario', '')
+                }
+                selected_parts = ['description', 'personality', 'scenario']
+
+                prompt = char_data.get('post_history_instructions', '')
+
+                # Sanitize and format user message
+                user_message = sanitize_user_input(message)
+                user_message = replace_placeholders(user_message, char_name, user_name_val)
+                full_message = f"{user_name_val}: {user_message}"
+
+                # Generate bot response
+                logging.debug(f"Generating response; Calling chat function with message: {full_message}")
+                bot_message = chat(
+                    full_message,
+                    history,
+                    media_content,
+                    selected_parts,
+                    api_endpoint,
+                    api_key,
+                    prompt,
+                    temperature,
+                    system_message,
+                    streaming,
+                    minp=minp,
+                    maxp=maxp
+                )
+
+                # Replace placeholders in bot message
+                bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+
+                # Update history
+                history.append((user_message, bot_message))
+
+                # Auto-save if enabled
+                save_status = ""
+                if auto_save:
+                    character_id = char_data.get('id')
+                    if character_id:
+                        conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                        add_character_chat(character_id, conversation_name, history)
+                        save_status = "Chat auto-saved."
+                    else:
+                        save_status = "Character ID not found; chat not saved."
+
+                return history, save_status
+
+            def validate_chat_history(chat_history: List[Tuple[Optional[str], str]]) -> bool:
+                """
+                Validate the chat history format and content.
+
+                Args:
+                    chat_history: List of message tuples (user_message, bot_message)
+
+                Returns:
+                    bool: True if valid, False if invalid
+                """
+                if not isinstance(chat_history, list):
+                    return False
+
+                for entry in chat_history:
+                    if not isinstance(entry, tuple) or len(entry) != 2:
+                        return False
+                    # First element can be None (for system messages) or str
+                    if not (entry[0] is None or isinstance(entry[0], str)):
+                        return False
+                    # Second element (bot response) must be str and not empty
+                    if not isinstance(entry[1], str) or not entry[1].strip():
+                        return False
+
+                return True
+
+            def sanitize_conversation_name(name: str) -> str:
+                """
+                Sanitize the conversation name.
+
+                Args:
+                    name: Raw conversation name
+
+                Returns:
+                    str: Sanitized conversation name
+                """
+                # Remove any non-alphanumeric characters except spaces and basic punctuation
+                sanitized = re.sub(r'[^a-zA-Z0-9\s\-_.]', '', name)
+                # Limit length
+                sanitized = sanitized[:100]
+                # Ensure it's not empty
+                if not sanitized.strip():
+                    sanitized = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                return sanitized
+
+            def save_chat_history_to_db_wrapper(
+                    chat_history: List[Tuple[Optional[str], str]],
+                    conversation_id: str,
+                    media_content: Dict,
+                    chat_media_name: str,
+                    char_data: Dict,
+                    auto_save: bool
+            ) -> Tuple[str, str]:
+                """
+                Save chat history to the database with validation.
+
+                Args:
+                    chat_history: List of message tuples
+                    conversation_id: Current conversation ID
+                    media_content: Media content metadata
+                    chat_media_name: Custom name for the chat
+                    char_data: Character data dictionary
+                    auto_save: Auto-save flag
+
+                Returns:
+                    Tuple[str, str]: (status message, detail message)
+                """
+                try:
+                    # Basic input validation
+                    if not chat_history:
+                        return "No chat history to save.", ""
+
+                    if not validate_chat_history(chat_history):
+                        return "Invalid chat history format.", "Please ensure the chat history is valid."
+
+                    if not char_data:
+                        return "No character selected.", "Please select a character first."
+
+                    character_id = char_data.get('id')
+                    if not character_id:
+                        return "Invalid character data: No character ID found.", ""
+
+                    # Sanitize and prepare conversation name
+                    conversation_name = sanitize_conversation_name(
+                        chat_media_name if chat_media_name.strip()
+                        else f"Chat with {char_data.get('name', 'Unknown')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+
+                    # Save to the database using your existing function
+                    chat_id = save_chat_history_to_character_db(
+                        character_id=character_id,
+                        conversation_name=conversation_name,
+                        chat_history=chat_history
+                    )
+
+                    if chat_id:
+                        success_message = (
+                            f"Chat saved successfully!\n"
+                            f"ID: {chat_id}\n"
+                            f"Name: {conversation_name}\n"
+                            f"Messages: {len(chat_history)}"
+                        )
+                        return success_message, ""
+                    else:
+                        return "Failed to save chat to database.", "Database operation failed."
+
+                except Exception as e:
+                    logging.error(f"Error saving chat history: {str(e)}", exc_info=True)
+                    return f"Error saving chat: {str(e)}", "Please check the logs for more details."
+
+            def update_character_info(name):
+                return load_character_and_image(name, user_name.value)
+
+            def on_character_select(name, user_name_val):
+                logging.debug(f"Character selected: {name}")
+                char_data, chat_history, img = load_character_and_image(name, user_name_val)
+                return char_data, chat_history, img
+
+            def clear_chat_history(char_data, user_name_val):
+                """
+                Clears the chat history and initializes it with the character's first message,
+                replacing the '{{user}}' placeholder with the actual user name.
+
+                Args:
+                    char_data (dict): The current character data.
+                    user_name_val (str): The user's name.
+
+                Returns:
+                    tuple: Updated chat history and the unchanged char_data.
+                """
+                if char_data and 'first_message' in char_data and char_data['first_message']:
+                    # Replace '{{user}}' in the first_message
+                    first_message = char_data['first_message'].replace("{{user}}",
+                                                                       user_name_val if user_name_val else "User")
+                    # Initialize chat history with the updated first_message
+                    return [(None, first_message)], char_data
+                else:
+                    # If no first_message is defined, simply clear the chat
+                    return [], char_data
+
+            def regenerate_last_message(
+                    history, char_data, api_endpoint, api_key,
+                    temperature, user_name_val, auto_save, streaming, minp, maxp
+            ):
+                """
+                Regenerates the last bot message by removing it and resending the corresponding user message.
+
+                Args:
+                    history (list): The current chat history as a list of tuples (user_message, bot_message).
+                    char_data (dict): The current character data.
+                    api_endpoint (str): The API endpoint to use for the LLM.
+                    api_key (str): The API key for authentication.
+                    temperature (float): The temperature setting for the LLM.
+                    user_name_val (str): The user's name.
+                    auto_save (bool): Flag indicating whether to auto-save the chat.
+
+                Returns:
+                    tuple: Updated chat history and a save status message.
+                """
+                if not history:
+                    return history, "No messages to regenerate."
+
+                last_entry = history[-1]
+                last_user_message, last_bot_message = last_entry
+
+                # Check if the last bot message exists
+                if last_bot_message is None:
+                    return history, "The last message is not from the bot."
+
+                # Remove the last bot message
+                new_history = history[:-1]
+
+                # Resend the last user message to generate a new bot response
+                if not last_user_message:
+                    return new_history, "No user message to regenerate the bot response."
+
+                # Prepare the character's background information
+                char_name = char_data.get('name', 'AI Assistant')
+                char_background = f"""
+                Name: {char_name}
+                Description: {char_data.get('description', 'N/A')}
+                Personality: {char_data.get('personality', 'N/A')}
+                Scenario: {char_data.get('scenario', 'N/A')}
+                """
+
+                # Prepare the system prompt for character impersonation
+                system_message = f"""You are roleplaying as {char_name}, the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI. Always refer to yourself as "{char_name}" and refer to the user as "{user_name_val}".
+    
+                {char_background}
+    
+                Additional instructions: {char_data.get('post_history_instructions', '')}
+                """
+
+                # Prepare media_content and selected_parts
+                media_content = {
+                    'id': char_name,
+                    'title': char_name,
+                    'content': char_background,
+                    'description': char_data.get('description', ''),
+                    'personality': char_data.get('personality', ''),
+                    'scenario': char_data.get('scenario', '')
+                }
+                selected_parts = ['description', 'personality', 'scenario']
+
+                prompt = char_data.get('post_history_instructions', '')
+
+                # Prepare the input for the chat function
+                full_message = f"{user_name_val}: {last_user_message}" if last_user_message else f"{user_name_val}: "
+
+                # Call the chat function to get a new bot message
+                bot_message = chat(
+                    full_message,
+                    new_history,
+                    media_content,
+                    selected_parts,
+                    api_endpoint,
+                    api_key,
+                    prompt,
+                    temperature,
+                    system_message,
+                    streaming,
+                    minp=minp,
+                    maxp=maxp
+                )
+
+                # Append the new bot message to the history
+                new_history.append((last_user_message, bot_message))
+
+                # Auto-save if enabled
+                if auto_save:
+                    character_id = char_data.get('id')
+                    if character_id:
+                        conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                        add_character_chat(character_id, conversation_name, new_history)
+                        save_status = "Chat auto-saved."
+                    else:
+                        save_status = "Character ID not found; chat not saved."
+                else:
+                    save_status = ""
+
+                return new_history, save_status
+
+            def toggle_chat_file_upload():
+                return gr.update(visible=True)
+
+            def save_untracked_chat_action(history, char_data):
+                if not char_data or not history:
+                    return "No chat to save or character not selected."
 
                 character_id = char_data.get('id')
                 if not character_id:
-                    return "Invalid character data: No character ID found.", ""
+                    return "Character ID not found."
 
-                # Sanitize and prepare conversation name
-                conversation_name = sanitize_conversation_name(
-                    chat_media_name if chat_media_name.strip()
-                    else f"Chat with {char_data.get('name', 'Unknown')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                )
-
-                # Save to the database using your existing function
-                chat_id = save_chat_history_to_character_db(
-                    character_id=character_id,
-                    conversation_name=conversation_name,
-                    chat_history=chat_history
-                )
-
+                conversation_name = f"Snapshot {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                chat_id = add_character_chat(character_id, conversation_name, history, is_snapshot=True)
                 if chat_id:
-                    success_message = (
-                        f"Chat saved successfully!\n"
-                        f"ID: {chat_id}\n"
-                        f"Name: {conversation_name}\n"
-                        f"Messages: {len(chat_history)}"
-                    )
-                    return success_message, ""
+                    return f"Chat snapshot saved successfully with ID {chat_id}."
                 else:
-                    return "Failed to save chat to database.", "Database operation failed."
+                    return "Failed to save chat snapshot."
 
-            except Exception as e:
-                logging.error(f"Error saving chat history: {str(e)}", exc_info=True)
-                return f"Error saving chat: {str(e)}", "Please check the logs for more details."
+            def select_chat_for_update():
+                # Fetch all chats for the selected character
+                if character_data.value:
+                    character_id = character_data.value.get('id')
+                    if character_id:
+                        chats = get_character_chats(character_id)
+                        chat_choices = [
+                            f"{chat['conversation_name']} (ID: {chat['id']})" for chat in chats
+                        ]
+                        return gr.update(choices=chat_choices), None
+                return gr.update(choices=[]), "No character selected."
 
-        def update_character_info(name):
-            return load_character_and_image(name, user_name.value)
+            def load_selected_chat(chat_selection):
+                if not chat_selection:
+                    return [], "No chat selected."
 
-        def on_character_select(name, user_name_val):
-            logging.debug(f"Character selected: {name}")
-            char_data, chat_history, img = load_character_and_image(name, user_name_val)
-            return char_data, chat_history, img
-
-        def clear_chat_history(char_data, user_name_val):
-            """
-            Clears the chat history and initializes it with the character's first message,
-            replacing the '{{user}}' placeholder with the actual user name.
-
-            Args:
-                char_data (dict): The current character data.
-                user_name_val (str): The user's name.
-
-            Returns:
-                tuple: Updated chat history and the unchanged char_data.
-            """
-            if char_data and 'first_message' in char_data and char_data['first_message']:
-                # Replace '{{user}}' in the first_message
-                first_message = char_data['first_message'].replace("{{user}}",
-                                                                   user_name_val if user_name_val else "User")
-                # Initialize chat history with the updated first_message
-                return [(None, first_message)], char_data
-            else:
-                # If no first_message is defined, simply clear the chat
-                return [], char_data
-
-        def regenerate_last_message(
-                history, char_data, api_endpoint, api_key,
-                temperature, user_name_val, auto_save
-        ):
-            """
-            Regenerates the last bot message by removing it and resending the corresponding user message.
-
-            Args:
-                history (list): The current chat history as a list of tuples (user_message, bot_message).
-                char_data (dict): The current character data.
-                api_endpoint (str): The API endpoint to use for the LLM.
-                api_key (str): The API key for authentication.
-                temperature (float): The temperature setting for the LLM.
-                user_name_val (str): The user's name.
-                auto_save (bool): Flag indicating whether to auto-save the chat.
-
-            Returns:
-                tuple: Updated chat history and a save status message.
-            """
-            if not history:
-                return history, "No messages to regenerate."
-
-            last_entry = history[-1]
-            last_user_message, last_bot_message = last_entry
-
-            # Check if the last bot message exists
-            if last_bot_message is None:
-                return history, "The last message is not from the bot."
-
-            # Remove the last bot message
-            new_history = history[:-1]
-
-            # Resend the last user message to generate a new bot response
-            if not last_user_message:
-                return new_history, "No user message to regenerate the bot response."
-
-            # Prepare the character's background information
-            char_name = char_data.get('name', 'AI Assistant')
-            char_background = f"""
-            Name: {char_name}
-            Description: {char_data.get('description', 'N/A')}
-            Personality: {char_data.get('personality', 'N/A')}
-            Scenario: {char_data.get('scenario', 'N/A')}
-            """
-
-            # Prepare the system prompt for character impersonation
-            system_message = f"""You are roleplaying as {char_name}, the character described below. Respond to the user's messages in character, maintaining the personality and background provided. Do not break character or refer to yourself as an AI. Always refer to yourself as "{char_name}" and refer to the user as "{user_name_val}".
-
-            {char_background}
-
-            Additional instructions: {char_data.get('post_history_instructions', '')}
-            """
-
-            # Prepare media_content and selected_parts
-            media_content = {
-                'id': char_name,
-                'title': char_name,
-                'content': char_background,
-                'description': char_data.get('description', ''),
-                'personality': char_data.get('personality', ''),
-                'scenario': char_data.get('scenario', '')
-            }
-            selected_parts = ['description', 'personality', 'scenario']
-
-            prompt = char_data.get('post_history_instructions', '')
-
-            # Prepare the input for the chat function
-            full_message = f"{user_name_val}: {last_user_message}" if last_user_message else f"{user_name_val}: "
-
-            # Call the chat function to get a new bot message
-            bot_message = chat(
-                full_message,
-                new_history,
-                media_content,
-                selected_parts,
-                api_endpoint,
-                api_key,
-                prompt,
-                temperature,
-                system_message
-            )
-
-            # Append the new bot message to the history
-            new_history.append((last_user_message, bot_message))
-
-            # Auto-save if enabled
-            if auto_save:
-                character_id = char_data.get('id')
-                if character_id:
-                    conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                    add_character_chat(character_id, conversation_name, new_history)
-                    save_status = "Chat auto-saved."
-                else:
-                    save_status = "Character ID not found; chat not saved."
-            else:
-                save_status = ""
-
-            return new_history, save_status
-
-        def toggle_chat_file_upload():
-            return gr.update(visible=True)
-
-        def save_untracked_chat_action(history, char_data):
-            if not char_data or not history:
-                return "No chat to save or character not selected."
-
-            character_id = char_data.get('id')
-            if not character_id:
-                return "Character ID not found."
-
-            conversation_name = f"Snapshot {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            chat_id = add_character_chat(character_id, conversation_name, history, is_snapshot=True)
-            if chat_id:
-                return f"Chat snapshot saved successfully with ID {chat_id}."
-            else:
-                return "Failed to save chat snapshot."
-
-        def select_chat_for_update():
-            # Fetch all chats for the selected character
-            if character_data.value:
-                character_id = character_data.value.get('id')
-                if character_id:
-                    chats = get_character_chats(character_id)
-                    chat_choices = [
-                        f"{chat['conversation_name']} (ID: {chat['id']})" for chat in chats
-                    ]
-                    return gr.update(choices=chat_choices), None
-            return gr.update(choices=[]), "No character selected."
-
-        def load_selected_chat(chat_selection):
-            if not chat_selection:
-                return [], "No chat selected."
-
-            try:
-                chat_id = int(chat_selection.split('(ID: ')[1].rstrip(')'))
-                chat = get_character_chat_by_id(chat_id)
-                if chat:
-                    history = chat['chat_history']
-                    selected_chat_id.value = chat_id  # Update the selected_chat_id state
-                    return history, f"Loaded chat '{chat['conversation_name']}' successfully."
-                else:
-                    return [], "Chat not found."
-            except Exception as e:
-                logging.error(f"Error loading selected chat: {e}")
-                return [], f"Error loading chat: {e}"
-
-        def update_chat(chat_id, updated_history):
-            success = update_character_chat(chat_id, updated_history)
-            if success:
-                return "Chat updated successfully."
-            else:
-                return "Failed to update chat."
-
-        def continue_talking(
-                history, char_data, api_endpoint, api_key,
-                temperature, user_name_val, auto_save
-        ):
-            """
-            Causes the character to continue the conversation or think out loud.
-            """
-            if not char_data:
-                return history, "Please select a character first."
-
-            user_name_val = user_name_val or "User"
-            char_name = char_data.get('name', 'AI Assistant')
-
-            # Prepare the character's background information
-            char_background = f"""
-            Name: {char_name}
-            Description: {char_data.get('description', 'N/A')}
-            Personality: {char_data.get('personality', 'N/A')}
-            Scenario: {char_data.get('scenario', 'N/A')}
-            """
-
-            # Prepare the system prompt
-            system_message = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}
-            If the user does not respond, continue expressing your thoughts or continue the conversation by thinking out loud. If thinking out loud, prefix the message with "Thinking: "."""
-
-            # Prepare chat context
-            media_content = {
-                'id': char_name,
-                'title': char_name,
-                'content': char_background,
-                'description': char_data.get('description', ''),
-                'personality': char_data.get('personality', ''),
-                'scenario': char_data.get('scenario', '')
-            }
-            selected_parts = ['description', 'personality', 'scenario']
-
-            prompt = char_data.get('post_history_instructions', '')
-
-            # Simulate empty user input
-            user_message = ""
-
-            # Generate bot response
-            bot_message = chat(
-                user_message,
-                history,
-                media_content,
-                selected_parts,
-                api_endpoint,
-                api_key,
-                prompt,
-                temperature,
-                system_message
-            )
-
-            # Replace placeholders in bot message
-            bot_message = replace_placeholders(bot_message, char_name, user_name_val)
-
-            # Update history
-            history.append((None, bot_message))
-
-            # Auto-save if enabled
-            save_status = ""
-            if auto_save:
-                character_id = char_data.get('id')
-                if character_id:
-                    conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                    add_character_chat(character_id, conversation_name, history)
-                    save_status = "Chat auto-saved."
-                else:
-                    save_status = "Character ID not found; chat not saved."
-
-            return history, save_status
-
-        def answer_for_me(
-                history, char_data, api_endpoint, api_key,
-                temperature, user_name_val, auto_save
-        ):
-            """
-            Generates a likely user response and continues the conversation.
-            """
-            if not char_data:
-                return history, "Please select a character first."
-
-            user_name_val = user_name_val or "User"
-            char_name = char_data.get('name', 'AI Assistant')
-
-            # Prepare the character's background information
-            char_background = f"""
-            Name: {char_name}
-            Description: {char_data.get('description', 'N/A')}
-            Personality: {char_data.get('personality', 'N/A')}
-            Scenario: {char_data.get('scenario', 'N/A')}
-            """
-
-            # Prepare system message for generating user's response
-            system_message_user = f"""You are simulating the user {user_name_val}. Based on the conversation so far, generate a natural and appropriate response that {user_name_val} might say next. The response should fit the context and flow of the conversation. ONLY SPEAK FOR {user_name_val}."""
-
-            # Prepare chat context
-            media_content = {
-                'id': char_name,
-                'title': char_name,
-                'content': char_background,
-                'description': char_data.get('description', ''),
-                'personality': char_data.get('personality', ''),
-                'scenario': char_data.get('scenario', '')
-            }
-            selected_parts = ['description', 'personality', 'scenario']
-
-            # Generate user response
-            user_response = chat(
-                "",  # No new message
-                history,
-                media_content,
-                selected_parts,
-                api_endpoint,
-                api_key,
-                prompt="",
-                temperature=temperature,
-                system_message=system_message_user
-            )
-
-            # Append the generated user response to history
-            history.append((user_response, None))
-
-            # Now generate the character's response to this user response
-            # Prepare the system message for the character
-            system_message_bot = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}"""
-
-            bot_message = chat(
-                f"{user_name_val}: {user_response}",
-                history[:-1],
-                media_content,
-                selected_parts,
-                api_endpoint,
-                api_key,
-                prompt=char_data.get('post_history_instructions', ''),
-                temperature=temperature,
-                system_message=system_message_bot
-            )
-
-            # Replace placeholders in bot message
-            bot_message = replace_placeholders(bot_message, char_name, user_name_val)
-
-            # Update history with bot's response
-            history[-1] = (user_response, bot_message)
-
-            # Auto-save if enabled
-            save_status = ""
-            if auto_save:
-                character_id = char_data.get('id')
-                if character_id:
-                    conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                    add_character_chat(character_id, conversation_name, history)
-                    save_status = "Chat auto-saved."
-                else:
-                    save_status = "Character ID not found; chat not saved."
-
-            return history, save_status
-
-
-        # Define States for conversation_id and media_content, which are required for saving chat history
-        conversation_id = gr.State(str(uuid.uuid4()))
-        media_content = gr.State({})
-        # TTS Generation and Playback
-        def speak_last_response(chat_history):
-            """Handle speaking the last chat response."""
-            logging.debug("Starting speak_last_response")
-            try:
-                # If there's no chat history, return
-                if not chat_history or len(chat_history) == 0:
-                    logging.debug("No messages in chat history")
-                    return gr.update(value="No messages to speak", visible=True)
-
-                # Log the chat history content for debugging
-                logging.debug(f"Chat history: {chat_history}")
-
-                # Get the last message from the assistant
-                last_message = chat_history[-1][1]  # Second element of the last tuple
-                logging.debug(f"Last message to speak: {last_message}")
-
-                # Update status to generating
-                yield gr.update(value="Generating audio...", visible=True)
-
-                # Generate audio using your preferred TTS provider
                 try:
-                    audio_file = generate_audio(
-                        text=last_message,
-                        provider="openai",  # or get from config
-                        output_file="last_response.mp3"
-                    )
-                    logging.debug(f"Generated audio file: {audio_file}")
+                    chat_id = int(chat_selection.split('(ID: ')[1].rstrip(')'))
+                    chat = get_character_chat_by_id(chat_id)
+                    if chat:
+                        history = chat['chat_history']
+                        selected_chat_id.value = chat_id  # Update the selected_chat_id state
+                        return history, f"Loaded chat '{chat['conversation_name']}' successfully."
+                    else:
+                        return [], "Chat not found."
                 except Exception as e:
-                    logging.error(f"Failed to generate audio: {e}")
-                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
-                    return
+                    logging.error(f"Error loading selected chat: {e}")
+                    return [], f"Error loading chat: {e}"
 
-                # Update status to playing
-                yield gr.update(value="Playing audio...", visible=True)
-
-                # Play the audio
-                if audio_file and os.path.exists(audio_file):
-                    try:
-                        play_mp3(audio_file)
-                        yield gr.update(value="Finished playing audio", visible=True)
-                    except Exception as e:
-                        logging.error(f"Failed to play audio: {e}")
-                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
+            def update_chat(chat_id, updated_history):
+                success = update_character_chat(chat_id, updated_history)
+                if success:
+                    return "Chat updated successfully."
                 else:
-                    logging.error("Audio file not found")
-                    yield gr.update(value="Failed: Audio file not found", visible=True)
+                    return "Failed to update chat."
 
-            except Exception as e:
-                logging.error(f"Error in speak_last_response: {str(e)}")
-                yield gr.update(value=f"Error: {str(e)}", visible=True)
+            def continue_talking(
+                    history, char_data, api_endpoint, api_key,
+                    temperature, user_name_val, auto_save, minp, maxp
+            ):
+                """
+                Causes the character to continue the conversation or think out loud.
+                """
+                if not char_data:
+                    return history, "Please select a character first."
 
-            # Update the click handler
+                user_name_val = user_name_val or "User"
+                char_name = char_data.get('name', 'AI Assistant')
+
+                # Prepare the character's background information
+                char_background = f"""
+                Name: {char_name}
+                Description: {char_data.get('description', 'N/A')}
+                Personality: {char_data.get('personality', 'N/A')}
+                Scenario: {char_data.get('scenario', 'N/A')}
+                """
+
+                # Prepare the system prompt
+                system_message = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}
+                If the user does not respond, continue expressing your thoughts or continue the conversation by thinking out loud. If thinking out loud, prefix the message with "Thinking: "."""
+
+                # Prepare chat context
+                media_content = {
+                    'id': char_name,
+                    'title': char_name,
+                    'content': char_background,
+                    'description': char_data.get('description', ''),
+                    'personality': char_data.get('personality', ''),
+                    'scenario': char_data.get('scenario', '')
+                }
+                selected_parts = ['description', 'personality', 'scenario']
+
+                prompt = char_data.get('post_history_instructions', '')
+
+                # Simulate empty user input
+                user_message = ""
+
+                # Generate bot response
+                bot_message = chat(
+                    user_message,
+                    history,
+                    media_content,
+                    selected_parts,
+                    api_endpoint,
+                    api_key,
+                    prompt,
+                    temperature,
+                    system_message,
+                    streaming,
+                    minp=minp,
+                    maxp=maxp
+                )
+
+                # Replace placeholders in bot message
+                bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+
+                # Update history
+                history.append((None, bot_message))
+
+                # Auto-save if enabled
+                save_status = ""
+                if auto_save:
+                    character_id = char_data.get('id')
+                    if character_id:
+                        conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                        add_character_chat(character_id, conversation_name, history)
+                        save_status = "Chat auto-saved."
+                    else:
+                        save_status = "Character ID not found; chat not saved."
+
+                return history, save_status
+
+            def answer_for_me(
+                    history, char_data, api_endpoint, api_key,
+                    temperature, user_name_val, auto_save, minp, maxp):
+                """
+                Generates a likely user response and continues the conversation.
+                """
+                if not char_data:
+                    return history, "Please select a character first."
+
+                user_name_val = user_name_val or "User"
+                char_name = char_data.get('name', 'AI Assistant')
+
+                # Prepare the character's background information
+                char_background = f"""
+                Name: {char_name}
+                Description: {char_data.get('description', 'N/A')}
+                Personality: {char_data.get('personality', 'N/A')}
+                Scenario: {char_data.get('scenario', 'N/A')}
+                """
+
+                # Prepare system message for generating user's response
+                system_message_user = f"""You are simulating the user {user_name_val}. Based on the conversation so far, generate a natural and appropriate response that {user_name_val} might say next. The response should fit the context and flow of the conversation. ONLY SPEAK FOR {user_name_val}."""
+
+                # Prepare chat context
+                media_content = {
+                    'id': char_name,
+                    'title': char_name,
+                    'content': char_background,
+                    'description': char_data.get('description', ''),
+                    'personality': char_data.get('personality', ''),
+                    'scenario': char_data.get('scenario', '')
+                }
+                selected_parts = ['description', 'personality', 'scenario']
+
+                # Generate user response
+                user_response = chat(
+                    "",  # No new message
+                    history,
+                    media_content,
+                    selected_parts,
+                    api_endpoint,
+                    api_key,
+                    prompt="",
+                    temperature=temperature,
+                    system_message=system_message_user,
+                    streaming=streaming,
+                    minp=minp,
+                    maxp=maxp
+                )
+
+                # Append the generated user response to history
+                history.append((user_response, None))
+
+                # Now generate the character's response to this user response
+                # Prepare the system message for the character
+                system_message_bot = f"""You are roleplaying as {char_name}. {char_data.get('system_prompt', '')}"""
+
+                bot_message = chat(
+                    f"{user_name_val}: {user_response}",
+                    history[:-1],
+                    media_content,
+                    selected_parts,
+                    api_endpoint,
+                    api_key,
+                    prompt=char_data.get('post_history_instructions', ''),
+                    temperature=temperature,
+                    system_message=system_message_bot,
+                    streaming=streaming,
+                    minp=minp,
+                    maxp=maxp
+                )
+
+                # Replace placeholders in bot message
+                bot_message = replace_placeholders(bot_message, char_name, user_name_val)
+
+                # Update history with bot's response
+                history[-1] = (user_response, bot_message)
+
+                # Auto-save if enabled
+                save_status = ""
+                if auto_save:
+                    character_id = char_data.get('id')
+                    if character_id:
+                        conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                        add_character_chat(character_id, conversation_name, history)
+                        save_status = "Chat auto-saved."
+                    else:
+                        save_status = "Character ID not found; chat not saved."
+
+                return history, save_status
+
+
+            # Define States for conversation_id and media_content, which are required for saving chat history
+            conversation_id = gr.State(str(uuid.uuid4()))
+            media_content = gr.State({})
+            # TTS Generation and Playback
+            def speak_last_response(chat_history):
+                """Handle speaking the last chat response."""
+                logging.debug("Starting speak_last_response")
+                try:
+                    # If there's no chat history, return
+                    if not chat_history or len(chat_history) == 0:
+                        logging.debug("No messages in chat history")
+                        return gr.update(value="No messages to speak", visible=True)
+
+                    # Log the chat history content for debugging
+                    logging.debug(f"Chat history: {chat_history}")
+
+                    # Get the last message from the assistant
+                    last_message = chat_history[-1][1]  # Second element of the last tuple
+                    logging.debug(f"Last message to speak: {last_message}")
+
+                    # Update status to generating
+                    yield gr.update(value="Generating audio...", visible=True)
+
+                    # Generate audio using your preferred TTS provider
+                    try:
+                        audio_file = generate_audio(
+                            text=last_message,
+                            provider="openai",  # or get from config
+                            output_file="last_response.mp3",
+                            api_key=None
+                        )
+                        logging.debug(f"Generated audio file: {audio_file}")
+                    except Exception as e:
+                        logging.error(f"Failed to generate audio: {e}")
+                        yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
+                        return
+
+                    # Update status to playing
+                    yield gr.update(value="Playing audio...", visible=True)
+
+                    # Play the audio
+                    if audio_file and os.path.exists(audio_file):
+                        try:
+                            play_audio_file(audio_file)
+                            yield gr.update(value="Finished playing audio", visible=True)
+                        except Exception as e:
+                            logging.error(f"Failed to play audio: {e}")
+                            yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
+                    else:
+                        logging.error("Audio file not found")
+                        yield gr.update(value="Failed: Audio file not found", visible=True)
+
+                except Exception as e:
+                    logging.error(f"Error in speak_last_response: {str(e)}")
+                    yield gr.update(value=f"Error: {str(e)}", visible=True)
+
+            # Button Callbacks
             speak_button.click(
                 fn=speak_last_response,
                 inputs=[chat_history],  # Use chat_history instead of chatbot
                 outputs=[tts_status],
                 api_name="speak_response"
             )
-        # Button Callbacks
+            # Add the new button callbacks here
+            answer_for_me_button.click(
+                fn=answer_for_me,
+                inputs=[
+                    chat_history,
+                    character_data,
+                    api_name_input,
+                    api_key_input,
+                    temperature_slider,
+                    user_name_input,
+                    auto_save_checkbox,
+                    minp_slider,
+                    maxp_slider
+                ],
+                outputs=[chat_history, save_status]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chat_history],
+                outputs=[token_count_display]
+            )
 
-        # Add the new button callbacks here
-        answer_for_me_button.click(
-            fn=answer_for_me,
-            inputs=[
-                chat_history,
-                character_data,
-                api_name_input,
-                api_key_input,
-                temperature_slider,
-                user_name_input,
-                auto_save_checkbox
-            ],
-            outputs=[chat_history, save_status]
-        ).then(
-            lambda history: approximate_token_count(history),
-            inputs=[chat_history],
-            outputs=[token_count_display]
-        )
+            continue_talking_button.click(
+                fn=continue_talking,
+                inputs=[
+                    chat_history,
+                    character_data,
+                    api_name_input,
+                    api_key_input,
+                    temperature_slider,
+                    user_name_input,
+                    auto_save_checkbox,
+                    minp_slider,
+                    maxp_slider
+                ],
+                outputs=[chat_history, save_status]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chat_history],
+                outputs=[token_count_display]
+            )
 
-        continue_talking_button.click(
-            fn=continue_talking,
-            inputs=[
-                chat_history,
-                character_data,
-                api_name_input,
-                api_key_input,
-                temperature_slider,
-                user_name_input,
-                auto_save_checkbox
-            ],
-            outputs=[chat_history, save_status]
-        ).then(
-            lambda history: approximate_token_count(history),
-            inputs=[chat_history],
-            outputs=[token_count_display]
-        )
+            import_card_button.click(
+                fn=import_character_card,
+                inputs=[character_card_upload],
+                outputs=[character_data, character_dropdown, save_status]
+            )
 
-        import_card_button.click(
-            fn=import_character_card,
-            inputs=[character_card_upload],
-            outputs=[character_data, character_dropdown, save_status]
-        )
+            load_characters_button.click(
+                fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
+                outputs=character_dropdown
+            )
 
-        load_characters_button.click(
-            fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
-            outputs=character_dropdown
-        )
+            # FIXME user_name_val = validate_user_name(user_name_val)
+            clear_chat_button.click(
+                fn=clear_chat_history,
+                inputs=[character_data, user_name_input],
+                outputs=[chat_history, character_data]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chat_history],
+                outputs=[token_count_display]
+            )
 
-        # FIXME user_name_val = validate_user_name(user_name_val)
-        clear_chat_button.click(
-            fn=clear_chat_history,
-            inputs=[character_data, user_name_input],
-            outputs=[chat_history, character_data]
-        ).then(
-            lambda history: approximate_token_count(history),
-            inputs=[chat_history],
-            outputs=[token_count_display]
-        )
+            character_dropdown.change(
+                fn=extract_character_id,
+                inputs=[character_dropdown],
+                outputs=character_data
+            ).then(
+                fn=load_character_wrapper,
+                inputs=[character_data, user_name_input],
+                outputs=[character_data, chat_history, character_image]
+            )
 
-        character_dropdown.change(
-            fn=extract_character_id,
-            inputs=[character_dropdown],
-            outputs=character_data
-        ).then(
-            fn=load_character_wrapper,
-            inputs=[character_data, user_name_input],
-            outputs=[character_data, chat_history, character_image]
-        )
+            send_message_button.click(
+                fn=character_chat_wrapper,
+                inputs=[
+                    user_input,
+                    chat_history,
+                    character_data,
+                    api_name_input,
+                    api_key_input,
+                    temperature_slider,
+                    user_name_input,
+                    auto_save_checkbox,
+                    minp_slider,
+                    maxp_slider
+                ],
+                outputs=[chat_history, save_status]
+            ).then(
+                lambda: "", outputs=user_input
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chat_history],
+                outputs=[token_count_display]
+            )
 
-        send_message_button.click(
-            fn=character_chat_wrapper,
-            inputs=[
-                user_input,
-                chat_history,
-                character_data,
-                api_name_input,
-                api_key_input,
-                temperature_slider,
-                user_name_input,
-                auto_save_checkbox
-            ],
-            outputs=[chat_history, save_status]
-        ).then(
-            lambda: "", outputs=user_input
-        ).then(
-            lambda history: approximate_token_count(history),
-            inputs=[chat_history],
-            outputs=[token_count_display]
-        )
+            regenerate_button.click(
+                fn=regenerate_last_message,
+                inputs=[
+                    chat_history,
+                    character_data,
+                    api_name_input,
+                    api_key_input,
+                    temperature_slider,
+                    user_name_input,
+                    auto_save_checkbox,
+                    streaming,
+                    minp_slider,
+                    maxp_slider
+                ],
+                outputs=[chat_history, save_status]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chat_history],
+                outputs=[token_count_display]
+            )
 
-        regenerate_button.click(
-            fn=regenerate_last_message,
-            inputs=[
-                chat_history,
-                character_data,
-                api_name_input,
-                api_key_input,
-                temperature_slider,
-                user_name_input,
-                auto_save_checkbox
-            ],
-            outputs=[chat_history, save_status]
-        ).then(
-            lambda history: approximate_token_count(history),
-            inputs=[chat_history],
-            outputs=[token_count_display]
-        )
+            import_chat_button.click(
+                fn=lambda: gr.update(visible=True),
+                outputs=chat_file_upload
+            )
 
-        import_chat_button.click(
-            fn=lambda: gr.update(visible=True),
-            outputs=chat_file_upload
-        )
+            chat_file_upload.change(
+                fn=import_chat_history,
+                inputs=[chat_file_upload, chat_history, character_data, user_name_input],
+                outputs=[chat_history, character_data, save_status]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chat_history],
+                outputs=[token_count_display]
+            )
 
-        chat_file_upload.change(
-            fn=import_chat_history,
-            inputs=[chat_file_upload, chat_history, character_data, user_name_input],
-            outputs=[chat_history, character_data, save_status]
-        ).then(
-            lambda history: approximate_token_count(history),
-            inputs=[chat_history],
-            outputs=[token_count_display]
-        )
+            save_chat_history_to_db.click(
+                fn=save_chat_history_to_db_wrapper,
+                inputs=[
+                    chat_history,
+                    conversation_id,
+                    media_content,
+                    chat_media_name,
+                    character_data,
+                    auto_save_checkbox  # Pass the auto_save state
+                ],
+                outputs=[conversation_id, save_status]
+            )
 
-        save_chat_history_to_db.click(
-            fn=save_chat_history_to_db_wrapper,
-            inputs=[
-                chat_history,
-                conversation_id,
-                media_content,
-                chat_media_name,
-                character_data,
-                auto_save_checkbox  # Pass the auto_save state
-            ],
-            outputs=[conversation_id, save_status]
-        )
+            # Populate the update_chat_dropdown based on selected character
+            character_dropdown.change(
+                fn=select_chat_for_update,
+                inputs=[],
+                outputs=[update_chat_dropdown, save_status]
+            )
 
-        # Populate the update_chat_dropdown based on selected character
-        character_dropdown.change(
-            fn=select_chat_for_update,
-            inputs=[],
-            outputs=[update_chat_dropdown, save_status]
-        )
+            load_selected_chat_button.click(
+                fn=load_selected_chat,
+                inputs=[update_chat_dropdown],
+                outputs=[chat_history, save_status]
+            )
 
-        load_selected_chat_button.click(
-            fn=load_selected_chat,
-            inputs=[update_chat_dropdown],
-            outputs=[chat_history, save_status]
-        )
+            save_snapshot_button.click(
+                fn=save_untracked_chat_action,
+                inputs=[chat_history, character_data],
+                outputs=save_status
+            )
 
-        save_snapshot_button.click(
-            fn=save_untracked_chat_action,
-            inputs=[chat_history, character_data],
-            outputs=save_status
-        )
+            update_chat_button.click(
+                fn=update_chat,
+                inputs=[selected_chat_id, chat_history],
+                outputs=save_status
+            )
 
-        update_chat_button.click(
-            fn=update_chat,
-            inputs=[selected_chat_id, chat_history],
-            outputs=save_status
-        )
+            # Search Chats
+            chat_search_button.click(
+                fn=search_existing_chats,
+                inputs=[chat_search_query],
+                outputs=[chat_search_dropdown, save_status]
+            ).then(
+                fn=lambda choices, msg: gr.update(choices=choices, visible=True) if choices else gr.update(visible=False),
+                inputs=[chat_search_dropdown, save_status],
+                outputs=[chat_search_dropdown]
+            )
 
-        # Search Chats
-        chat_search_button.click(
-            fn=search_existing_chats,
-            inputs=[chat_search_query],
-            outputs=[chat_search_dropdown, save_status]
-        ).then(
-            fn=lambda choices, msg: gr.update(choices=choices, visible=True) if choices else gr.update(visible=False),
-            inputs=[chat_search_dropdown, save_status],
-            outputs=[chat_search_dropdown]
-        )
+            # Load Selected Chat from Search
+            load_chat_button.click(
+                fn=load_selected_chat_from_search,
+                inputs=[chat_search_dropdown, user_name_input],
+                outputs=[character_data, chat_history, character_image, save_status]
+            ).then(
+                lambda history: approximate_token_count(history),
+                inputs=[chat_history],
+                outputs=[token_count_display]
+            )
 
-        # Load Selected Chat from Search
-        load_chat_button.click(
-            fn=load_selected_chat_from_search,
-            inputs=[chat_search_dropdown, user_name_input],
-            outputs=[character_data, chat_history, character_image, save_status]
-        ).then(
-            lambda history: approximate_token_count(history),
-            inputs=[chat_history],
-            outputs=[token_count_display]
-        )
+            # Show Load Chat Button when a chat is selected
+            chat_search_dropdown.change(
+                fn=lambda selected: gr.update(visible=True) if selected else gr.update(visible=False),
+                inputs=[chat_search_dropdown],
+                outputs=[load_chat_button]
+            )
 
-        # Show Load Chat Button when a chat is selected
-        chat_search_dropdown.change(
-            fn=lambda selected: gr.update(visible=True) if selected else gr.update(visible=False),
-            inputs=[chat_search_dropdown],
-            outputs=[load_chat_button]
-        )
-
-
-        return character_data, chat_history, user_input, user_name, character_image
+            return character_data, chat_history, user_input, user_name, character_image
 
 
 def create_character_chat_mgmt_tab():
@@ -1653,7 +1691,11 @@ def create_character_chat_mgmt_tab():
         load_characters_button.click(
             fn=lambda: gr.update(choices=[f"{char['name']} (ID: {char['id']})" for char in get_character_cards()]),
             outputs=select_character
-        )
+            ).then(
+                lambda choices: print(f"Dropdown choices: {choices}"),  # Debugging line
+                inputs=[select_character],
+                outputs=None
+            )
 
         export_chat_button.click(
             fn=export_current_conversation,
