@@ -507,18 +507,24 @@ def create_character_card_interaction_tab():
 
                 # Handle streaming response
                 if streaming:
-                    # For streaming, append the user message to the history with a placeholder for the bot's response
                     history.append((user_message, ""))  # Append user message with an empty bot response
-                    logging.debug(f"Updated history (streaming): {history}")
+                    full_response = ""
+                    for chunk in bot_message:
+                        full_response += chunk
+                        history[-1] = (user_message, full_response)
+                        yield history, ""  # Yield updated history and empty status
 
-                    # Yield the bot's response incrementally
-                    def stream_response():
-                        for chunk in bot_message:
-                            # Update the last entry in the history with the partial response
-                            history[-1] = (user_message, chunk)
-                            yield history, "" # History and empty status message
-
-                    return stream_response()
+                    # After streaming is complete, handle auto-save
+                    save_status = ""
+                    if auto_save:
+                        character_id = char_data.get('id')
+                        if character_id:
+                            conversation_name = f"Auto-saved chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                            add_character_chat(character_id, conversation_name, history)
+                            save_status = "Chat auto-saved."
+                        else:
+                            save_status = "Character ID not found; chat not saved."
+                    yield history, save_status
                 else:
                     # For non-streaming, append the full bot response to the history
                     bot_message = replace_placeholders(bot_message, char_name, user_name_val)
@@ -536,7 +542,7 @@ def create_character_card_interaction_tab():
                         else:
                             save_status = "Character ID not found; chat not saved."
 
-                return history, save_status
+                    return history, save_status
 
             def validate_chat_history(chat_history: List[Tuple[Optional[str], str]]) -> bool:
                 """
@@ -1152,7 +1158,7 @@ def create_character_card_interaction_tab():
                     minp_slider,
                     maxp_slider
                 ],
-                outputs=[chat_history, save_status]  # Output to both history and chatbot
+                outputs=[chat_history, save_status],
             ).then(
                 lambda: "", outputs=user_input  # Clear the input box after sending
             ).then(
