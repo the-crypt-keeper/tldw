@@ -62,3 +62,5 @@ Apollo
     https://huggingface.co/GoodiesHere/Apollo-LMMs-Apollo-3B-t32
     https://www.reddit.com/r/LocalLLaMA/comments/1hgri8g/has_apollo_disappeared/
 
+InternLM-XComposer
+    https://github.com/InternLM/InternLM-XComposer/tree/main/InternLM-XComposer-2.5-OmniLive

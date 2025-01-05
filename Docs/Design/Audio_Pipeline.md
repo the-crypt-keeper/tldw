@@ -26,6 +26,7 @@ https://pubs.aip.org/asa/jel/article/4/2/025206/3267247/Evaluating-OpenAI-s-Whis
 Transcription:
 https://github.com/AugmendTech/treeseg
 https://www.arxiv.org/abs/2407.12028
+https://github.com/Purfview/whisper-standalone-win
 https://huggingface.co/spaces/aadnk/faster-whisper-webui
 https://huggingface.co/spaces/zhang082799/openai-whisper-large-v3-turbo
 https://petewarden.com/2024/10/21/introducing-moonshine-the-new-state-of-the-art-for-speech-to-text/

@@ -24,45 +24,169 @@ Flow:
 https://huggingface.co/blog/big-bench-audio-release
     https://huggingface.co/datasets/ArtificialAnalysis/big_bench_audio
 https://artificialanalysis.ai/models/speech-to-speech
+https://github.com/Picovoice/speech-to-text-benchmark?tab=readme-ov-file
+https://sakshi113.github.io/mmau_homepage/
 
-
-
+### Other
+https://wave-pulse.io/
 
 
 ### Link Dump:
-https://github.com/albirrkarim/react-speech-highlight-demo
-https://funaudiollm.github.io/cosyvoice2/
-https://funaudiollm.github.io/cosyvoice2/
-https://github.com/InternLM/InternLM-XComposer/tree/main/InternLM-XComposer-2.5-OmniLive
-https://github.com/Azure-Samples/aisearch-openai-rag-audio
-https://www.reddit.com/r/LocalLLaMA/comments/1f0awd6/best_local_open_source_texttospeech_and/
-https://github.com/FanaHOVA/smol-podcaster
-https://docs.inferless.com/cookbook/serverless-customer-service-bot
-https://wave-pulse.io/
-https://huggingface.co/spaces/saq1b/podcastgen/blob/main/app.py
-https://huggingface.co/spaces/mozilla-ai/document-to-podcast/blob/main/app.py
-https://huggingface.co/spaces/Nymbo/Voice-Clone-Multilingual/tree/main
-https://github.com/aedocw/epub2tts
-https://github.com/microsoft/SpeechT5
-https://www.lightnote.co/?utm_source=www.hivefive.community&utm_medium=newsletter&utm_campaign=hive-five-202-a-bias-to-action
-https://github.com/smellslikeml/dolla_llama
-https://github.com/dnhkng/GlaDOS
-https://arxiv.org/abs/2501.01384
-https://sharechatx.github.io/
-https://github.com/vipchengrui/traditional-speech-enhancement
-https://github.com/ictnlp/LLaMA-Omni
-https://github.com/lamm-mit/PDF2Audio
+https://huggingface.co/NexaAIDev/Qwen2-Audio-7B-GGUF
+https://github.com/shagunmistry/NotebookLM_Alternative/tree/main/ai_helper
+https://docs.cartesia.ai/get-started/make-an-api-request
+https://arxiv.org/abs/2412.18566
+https://github.com/pipecat-ai/pipecat/tree/a367a038f1a3967292b5de5b43b8600a82a73fb6?tab=readme-ov-file
 https://github.com/Purfview/whisper-standalone-win
-https://github.com/livekit/agents
-https://huggingface.co/papers/2410.02678
-https://github.com/Picovoice/speech-to-text-benchmark
-https://huggingface.co/spaces/bencser/episodegen
+https://github.com/ictnlp/LLaMA-Omni
+https://levelup.gitconnected.com/build-a-real-time-ai-voice-and-video-chat-app-with-function-calling-by-gemini-2-0-49599a48fbe9?gi=c894f6c092be
 
+
+Blogposts
+    https://blog.duy.dev/build-your-own-voice-assistant-and-run-it-locally/
+    https://www.twilio.com/en-us/blog/twilio-openai-realtime-api-launch-integration
+
+Full Pipelines
+    https://github.com/lhl/voicechat2?tab=readme-ov-file
+    https://github.com/eustlb/speech-to-speech
+    https://github.com/dnhkng/GlaDOS
+    https://github.com/mezbaul-h/june
+    https://github.com/matatonic/openedai-speech
+    https://github.com/pixelpump/Ai-Interview-Assistant-Python
+    https://github.com/huggingface/speech-to-speech
+    https://github.com/harvestingmoon/S2S
+    https://github.com/livekit/agents
+
+
+Voicw2Voicw Models
+    https://github.com/Standard-Intelligence/hertz-dev
+
+
+Editing Suites
+    https://github.com/abus-aikorea/voice-pro
+
+
+
+ElevenLabs
+    https://github.com/elevenlabs/elevenlabs-examples/blob/main/examples/text-to-speech/python/text_to_speech_file.py
+    https://elevenlabs.io/docs/api-reference/text-to-speech
+    https://elevenlabs.io/docs/developer-guides/how-to-use-tts-with-streaming
+Alltalk
+AlwaysReddy - (uses Piper)
+Amphion
+    https://github.com/open-mmlab/Amphion
+    https://huggingface.co/amphion/Vevo
+        https://github.com/open-mmlab/Amphion/blob/main/models/vc/vevo/README.md
+        https://openreview.net/pdf?id=anQDiQZhDP
+    https://versavoice.github.io/
+Auralis
+    https://github.com/astramind-ai/Auralis
+    https://www.astramind.ai/post/auralis
+Bark
+    https://github.com/suno-ai/bark
+Cartesia
+    https://docs.cartesia.ai/get-started/make-an-api-request
+Chat TTS
+    https://huggingface.co/2Noise/ChatTTS
+    https://chattts.com/#Demo
+    https://github.com/2noise/ChatTTS
+Coqui TTS
+    https://github.com/idiap/coqui-ai-TTS
+    https://huggingface.co/spaces/coqui/xtts/blob/main/app.py
+    https://github.com/coqui-ai/TTS
+CosyVoice2
+    https://funaudiollm.github.io/cosyvoice2/
+Daswers XTTS GUI
+F5 TTS
+    https://github.com/SWivid/F5-TTS
+Fish-Speech
+    https://github.com/fishaudio/fish-speech/tree/main
+    https://github.com/fishaudio/fish-speech/blob/main/Start_Agent.md
+    https://huggingface.co/fishaudio/fish-agent-v0.1-3b/tree/main
+Gemini
+    https://ai.google.dev/gemini-api/docs#rest
+    https://ai.google.dev/gemini-api/docs/models/gemini-v2
+    https://github.com/google-gemini/cookbook/blob/main/quickstarts/Audio.ipynb
+Google
+    https://github.com/google-gemini/cookbook/tree/main/gemini-2
+    https://discuss.ai.google.dev/t/how-does-one-get-access-to-the-api-for-tts-features-of-gemini-2-0/53925/15
+    https://illuminate.google.com/home?pli=1
+GLM-4-Voice
+    https://github.com/THUDM/GLM-4-Voice/blob/main/README_en.md
+    https://github.com/THUDM/GLM-4-Voice/tree/main
+    https://huggingface.co/cydxg/glm-4-voice-9b-int4/blob/main/README_en.md
+GPT-SoviTTS
+    https://github.com/cpumaxx/sovits-ff-plugin
+    https://github.com/JarodMica/GPT-SoVITS-Package
+lina TTS
+    https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
+    https://github.com/theodorblackbird/lina-speech
+LMNT
+MaskGCT
+    https://maskgct.github.io/#emotion-samples
+    https://github.com/open-mmlab/Amphion/blob/main/models/tts/maskgct/README.md
+    https://github.com/open-mmlab/Amphion/blob/main/models/tts/maskgct/maskgct_demo.ipynb
+    https://github.com/open-mmlab/Amphion/blob/main/models/tts/maskgct/maskgct_inference.py
+    https://huggingface.co/amphion/MaskGCT
+MeloTTS
+    https://github.com/myshell-ai/MeloTTS
+Mimic
+    https://github.com/MycroftAI/mimic3
+MoonShine
+    https://huggingface.co/onnx-community/moonshine-base-ONNX
+    https://huggingface.co/spaces/webml-community/moonshine-web
+    https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
+Neuro-sama
+    https://github.com/JarodMica/open-neruosama
+Open-LLM-VTuber
+OpenVoice
+    https://github.com/myshell-ai/OpenVoice
+Outte
+    https://github.com/edwko/OuteTTS
+    https://huggingface.co/OuteAI/OuteTTS-0.2-500M-GGUF
+Parler
+    https://github.com/huggingface/parler-tts
+Paroli - Streaming mode implementation of the Piper TTS with RK3588 NPU acceleration support.
+PiperTTS - A fast, local neural text to speech system that is optimized for the Raspberry Pi 4.
+    https://github.com/rhasspy/piper
+    https://github.com/rhasspy/piper/issues/644
+    https://github.com/rhasspy/piper/discussions/326#discussioncomment-7935208
+    https://noerguerra.com/how-to-read-text-aloud-with-piper-and-python/
+    https://ssamjh.nz/create-custom-piper-tts-voice/
+    https://www.trycatchdebug.net/news/1377664/realtime-tts-with-pipertts-and-openai
+    https://huggingface.co/rhasspy/piper-voices/tree/main
+    https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main
+
+PiperUI
+Sherpa ONNX
+    https://github.com/k2-fsa/sherpa-onnx
+Silero
+SpeechT5
+    https://github.com/microsoft/SpeechT5
+SoundStorm
+    https://deepmind.google/discover/blog/pushing-the-frontiers-of-audio-generation/
+    https://github.com/lucidrains/soundstorm-pytorch
+Styletts2
+Tortoise TTS
+VallE-X
+VoiceCraft - 
+xtts
+xtts2
+Yapper
+    https://github.com/n1teshy/yapper-tts
+YourTTS
+    https://github.com/Edresson/YourTTS
+
+
+https://docs.inferless.com/cookbook/serverless-customer-service-bot
+https://github.com/dnhkng/GlaDOS
 
 
 STT
     https://github.com/KoljaB/RealtimeSTT
     https://github.com/southbridgeai/offmute
+    https://github.com/flatmax/speech-to-text
+    https://github.com/collabora/WhisperLive
     MoonShine
         https://github.com/usefulsensors/moonshine
         https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
@@ -82,61 +206,12 @@ TTS
 Datasets(?)
     https://voice-models.com/
 
-Auralis
-    https://github.com/astramind-ai/Auralis
-    https://www.astramind.ai/post/auralis
 
-Amphion
-    https://github.com/open-mmlab/Amphion
-    https://huggingface.co/amphion/Vevo
-        https://github.com/open-mmlab/Amphion/blob/main/models/vc/vevo/README.md
-        https://openreview.net/pdf?id=anQDiQZhDP
-    https://versavoice.github.io/
-
-Bark
-https://github.com/suno-ai/bark
-
-ChatTTS
-https://huggingface.co/2Noise/ChatTTS
-https://chattts.com/#Demo
-
-Coqui TTS
-    https://github.com/idiap/coqui-ai-TTS
-    https://huggingface.co/spaces/coqui/xtts/blob/main/app.py
-
-Cartesia
-    https://docs.cartesia.ai/get-started/make-an-api-request
-
-F5 TTS
-    https://github.com/SWivid/F5-TTS
-
-lina TTS
-https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
-https://github.com/theodorblackbird/lina-speech
 
 Podcastfy
     https://github.com/souzatharsis/podcastfy/blob/main/podcastfy/tts/base.py
     https://github.com/souzatharsis/podcastfy/blob/main/podcastfy/text_to_speech.py
     https://github.com/souzatharsis/podcastfy/blob/main/podcastfy/content_generator.py
-
-GLM-4-Voice
-    https://github.com/THUDM/GLM-4-Voice/blob/main/README_en.md
-    https://github.com/THUDM/GLM-4-Voice/tree/main
-
-MoonShine
-    https://huggingface.co/onnx-community/moonshine-base-ONNX
-    https://huggingface.co/spaces/webml-community/moonshine-web
-    https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
-
-Gemini
-    https://ai.google.dev/gemini-api/docs#rest
-    https://ai.google.dev/gemini-api/docs/models/gemini-v2
-    https://github.com/google-gemini/cookbook/blob/main/quickstarts/Audio.ipynb
-
-ElevenLabs
-    https://github.com/elevenlabs/elevenlabs-examples/blob/main/examples/text-to-speech/python/text_to_speech_file.py
-    https://elevenlabs.io/docs/api-reference/text-to-speech
-    https://elevenlabs.io/docs/developer-guides/how-to-use-tts-with-streaming
 
 Models
       https://huggingface.co/NexaAIDev/Qwen2-Audio-7B-GGUF
@@ -146,39 +221,9 @@ Merging Audio
 
 
 
-MaskGCT
-    https://maskgct.github.io/#emotion-samples
-    https://github.com/open-mmlab/Amphion/blob/main/models/tts/maskgct/README.md
-    https://github.com/open-mmlab/Amphion/blob/main/models/tts/maskgct/maskgct_demo.ipynb
-    https://github.com/open-mmlab/Amphion/blob/main/models/tts/maskgct/maskgct_inference.py
-    https://huggingface.co/amphion/MaskGCT
-
-Mimic
-    https://github.com/MycroftAI/mimic3
-
-
-Parler
-    https://github.com/huggingface/parler-tts
-
-Piper (linux only)
-    https://github.com/rhasspy/piper
-    https://github.com/rhasspy/piper/issues/644
-    https://github.com/rhasspy/piper/discussions/326#discussioncomment-7935208
-    https://noerguerra.com/how-to-read-text-aloud-with-piper-and-python/
-    https://ssamjh.nz/create-custom-piper-tts-voice/
-    https://www.trycatchdebug.net/news/1377664/realtime-tts-with-pipertts-and-openai
-    https://huggingface.co/rhasspy/piper-voices/tree/main
-    https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main
-
-Sherpa ONNX
-    https://github.com/k2-fsa/sherpa-onnx
-
-YourTTS
-    https://github.com/Edresson/YourTTS
-
-
 TTS Pipeline
     https://www.astramind.ai/post/auralis
+
 
 https://github.com/cpumaxx/sovits-ff-plugin
 https://github.com/satvik314/opensource_notebooklm/blob/main/opensource_notebooklm.ipynb
@@ -187,40 +232,15 @@ https://github.com/satvik314/opensource_notebooklm/blob/main/opensource_notebook
 Train using: https://github.com/Mangio621/Mangio-RVC-Fork/releases,
 import the .pth into https://huggingface.co/wok000/vcclient000/tree/main to convert your voice in near real time with about a .25s delay
 
-https://www.hackster.io/lhl/voicechat2-local-ai-voice-chat-4c48f2
-
-https://github.com/abus-aikorea/voice-pro
-
-https://github.com/myshell-ai/MeloTTS
-https://github.com/idiap/coqui-ai-TTS
-https://docs.inferless.com/cookbook/serverless-customer-service-bot
 
 
-https://huggingface.co/spaces/lamm-mit/PDF2Audio
-
-https://huggingface.co/spaces/bencser/episodegen
-https://github.com/myshell-ai/MeloTTS
-https://github.com/idiap/coqui-ai-TTS
-https://docs.inferless.com/cookbook/serverless-customer-service-bot
-https://github.com/Picovoice/speech-to-text-benchmark
 Train using: https://github.com/Mangio621/Mangio-RVC-Fork/releases,
 import the .pth into https://huggingface.co/wok000/vcclient000/tree/main to convert your voice in near real time with about a .25s delay
 
-https://www.hackster.io/lhl/voicechat2-local-ai-voice-chat-4c48f2
-https://huggingface.co/papers/2410.02678
-
-https://github.com/livekit/agents
-https://github.com/pipecat-ai/pipecat/tree/a367a038f1a3967292b5de5b43b8600a82a73fb6?tab=readme-ov-file
-
-https://github.com/lamm-mit/PDF2Audio
-https://github.com/Purfview/whisper-standalone-win
-https://github.com/ictnlp/LLaMA-Omni
-https://levelup.gitconnected.com/build-a-real-time-ai-voice-and-video-chat-app-with-function-calling-by-gemini-2-0-49599a48fbe9?gi=c894f6c092be
-https://github.com/agituts/gemini-2-podcast
-https://github.com/SWivid/F5-TTS
 
 
-https://github.com/matatonic/openedai-speech
+
+
 
 https://github.com/RVC-Boss/GPT-SoVITS
 https://www.bilibili.com/video/BV11iiNegEGP/
@@ -239,54 +259,8 @@ Only thing I changed was remove the space at the beginning of each lines in your
 
 And make sure you get the latest version https://github.com/RVC-Boss/GPT-SoVITS/releases
 
-https://github.com/souzatharsis/podcastfy
-
-https://github.com/THUDM/GLM-4-Voice/tree/main
-
-https://huggingface.co/cydxg/glm-4-voice-9b-int4/blob/main/README_en.md
-
-https://github.com/meta-llama/llama-recipes/tree/main/recipes%2Fquickstart%2FNotebookLlama
 
 
-https://sakshi113.github.io/mmau_homepage/
-
-https://github.com/fishaudio/fish-speech/tree/main
-https://github.com/fishaudio/fish-speech/blob/main/Start_Agent.md
-https://huggingface.co/fishaudio/fish-agent-v0.1-3b/tree/main
-
-https://github.com/pixelpump/Ai-Interview-Assistant-Python
-https://github.com/coqui-ai/TTS
-https://github.com/Standard-Intelligence/hertz-dev
-https://github.com/2noise/ChatTTS
-
-https://github.com/edwko/OuteTTS
-https://huggingface.co/OuteAI/OuteTTS-0.2-500M-GGUF
-https://huggingface.co/NexaAIDev/Qwen2-Audio-7B-GGUF
-
-https://www.twilio.com/en-us/blog/twilio-openai-realtime-api-launch-integration
-https://github.com/huggingface/speech-to-speech
-https://github.com/harvestingmoon/S2S
-https://github.com/collabora/WhisperLive
-https://github.com/JarodMica/audiobook_maker
-https://github.com/myshell-ai/OpenVoice
-https://github.com/JarodMica/GPT-SoVITS-Package
-https://github.com/shagunmistry/NotebookLM_Alternative/tree/main/ai_helper
-https://docs.cartesia.ai/get-started/make-an-api-request
-https://github.com/JarodMica/open-neruosama
-https://github.com/flatmax/speech-to-text
-https://arxiv.org/abs/2412.18566
-https://github.com/Rolandjg/skool4free
-
-
-SoundStorm
-    https://deepmind.google/discover/blog/pushing-the-frontiers-of-audio-generation/
-    https://github.com/lucidrains/soundstorm-pytorch
-
-
-Google
-https://github.com/google-gemini/cookbook/tree/main/gemini-2
-https://discuss.ai.google.dev/t/how-does-one-get-access-to-the-api-for-tts-features-of-gemini-2-0/53925/15
-https://illuminate.google.com/home?pli=1
 ```
 import asyncio
 import base64
