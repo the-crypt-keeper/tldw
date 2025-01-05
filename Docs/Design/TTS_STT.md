@@ -181,7 +181,7 @@ TTS Pipeline
     https://www.astramind.ai/post/auralis
 
 https://github.com/cpumaxx/sovits-ff-plugin
-
+https://github.com/satvik314/opensource_notebooklm/blob/main/opensource_notebooklm.ipynb
 
 
 Train using: https://github.com/Mangio621/Mangio-RVC-Fork/releases,

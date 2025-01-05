@@ -47,7 +47,11 @@ https://arxiv.org/abs/2412.15563
 https://arxiv.org/pdf/2410.10293v1
 https://arxiv.org/pdf/2409.02098v1
 https://github.com/OpenSPG/KAG
+https://generativeai.pub/graph-rag-has-awesome-potential-but-currently-has-serious-flaws-c052a8a3107e
+https://pub.towardsai.net/kag-graph-multimodal-rag-llm-agents-powerful-ai-reasoning-b3da38d31358
 
+https://arxiv.org/abs/2412.19442
+https://arxiv.org/abs/2412.15605
 
 GraphRAG
 	https://www.microsoft.com/en-us/research/blog/introducing-drift-search-combining-global-and-local-search-methods-to-improve-quality-and-efficiency/	
