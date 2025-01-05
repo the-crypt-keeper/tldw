@@ -54,7 +54,6 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
     model = None
     try:
         logging.info(f"Debug - Chat API Call - API Endpoint: {api_endpoint}")
-        logging.info(f"Debug - Chat API Call - API Key: {api_key}")
         logging.info(f"Debug - Chat chat_api_call - API Endpoint: {api_endpoint}")
         if api_endpoint.lower() == 'openai':
             response = chat_with_openai(api_key, input_data, prompt, temp, system_message, streaming, minp, maxp, model)
