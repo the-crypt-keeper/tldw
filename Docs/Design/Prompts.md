@@ -9,7 +9,7 @@ https://github.com/microsoft/PromptWizard
 
 
 https://medium.com/@camauger/crafting-effective-chatgpt-prompts-for-tabletop-roleplaying-games-a-step-by-step-guide-part-1-b81a791d278d
-
+https://towardsdatascience.com/how-i-won-singapores-gpt-4-prompt-engineering-competition-34c195a93d41
 
 
 

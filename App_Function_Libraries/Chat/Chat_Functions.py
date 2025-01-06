@@ -49,12 +49,9 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
     logging.info(f"Debug - Chat API Call - API Endpoint: {api_endpoint}")
     log_counter("chat_api_call_attempt", labels={"api_endpoint": api_endpoint})
     start_time = time.time()
-    if not api_key:
-        api_key = None
-    model = None
     try:
         logging.info(f"Debug - Chat API Call - API Endpoint: {api_endpoint}")
-        logging.info(f"Debug - Chat API Call - API Key: {api_key}")
+        logging.info(f"Debug - Chat API Call - API Key: {api_key[:5]}...{api_key[-5:]}")
         logging.info(f"Debug - Chat chat_api_call - API Endpoint: {api_endpoint}")
         if api_endpoint.lower() == 'openai':
             response = chat_with_openai(api_key, input_data, prompt, temp, system_message, streaming, minp, maxp, model)
@@ -143,7 +140,7 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
         return f"An error occurred: {str(e)}"
 
 
-def chat(message, history, media_content, selected_parts, api_endpoint, api_key, prompt, temperature,
+def chat(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature,
          system_message=None, streaming=False, minp=None, maxp=None, model=None):
     log_counter("chat_attempt", labels={"api_endpoint": api_endpoint})
     start_time = time.time()
@@ -180,10 +177,10 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
 
         logging.debug(f"Debug - Chat Function - Temperature: {temperature}")
         logging.debug(f"Debug - Chat Function - API Key: {api_key[:10]}")
-        logging.debug(f"Debug - Chat Function - Prompt: {prompt}")
+        logging.debug(f"Debug - Chat Function - Prompt: {custom_prompt}")
 
         # Use the existing API request code based on the selected endpoint
-        response = chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message, streaming, minp=None, maxp=None, model=None)
+        response = chat_api_call(api_endpoint, api_key, input_data, custom_prompt, temp, system_message, streaming, minp, maxp, model)
 
         if streaming:
             return response
