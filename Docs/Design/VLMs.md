@@ -9,7 +9,7 @@ https://colab.research.google.com/drive/1wkCIO6q8UDJQbPsu8jI_og1JAUibpp38?usp=sh
 https://colab.research.google.com/drive/1bcSu_mLki11aXpbS6Fwo_WF5idJv8uId?usp=sharing
 https://colab.research.google.com/drive/1E-ySj39oldXcvcsbjDYnvW-USi281Llj?usp=sharing
 
-
+https://github.com/pliang279/awesome-multimodal-ml
 https://arxiv.org/abs/2411.18279
 https://github.com/breezedeus/Pix2Text
 https://huggingface.co/HuggingFaceTB/SmolVLM-Instruct
@@ -62,3 +62,5 @@ Apollo
     https://huggingface.co/GoodiesHere/Apollo-LMMs-Apollo-3B-t32
     https://www.reddit.com/r/LocalLLaMA/comments/1hgri8g/has_apollo_disappeared/
 
+InternLM-XComposer
+    https://github.com/InternLM/InternLM-XComposer/tree/main/InternLM-XComposer-2.5-OmniLive

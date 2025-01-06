@@ -93,7 +93,9 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
                  presence_penalty=None, stop_sequence=None):
     try:
         if save_conversation:
+            logging.info("chat_wrapper(): Saving conversation")
             if conversation_id is None:
+                logging.info("chat_wrapper(): Creating a new conversation")
                 # Create a new conversation
                 media_id = media_content.get('id', None)
                 conversation_name = f"Chat about {media_content.get('title', 'Unknown Media')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -111,11 +113,12 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
             full_message = message
 
         # Generate bot response
+        logging.debug("chat_wrapper(): Generating bot response")
         bot_message = ""
         for chunk in chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
-                          temperature, system_prompt, streaming):
+                          temperature, system_prompt, streaming, minp=None, maxp=None, model=None):
             bot_message += chunk  # Accumulate the streamed response
-            logging.debug(f"Bot message being returned: {bot_message}")
+            logging.debug(f"chat_wrapper(): Bot message being returned: {bot_message}")
             # Yield the incremental response and updated history
             yield bot_message, history + [(message, bot_message)], conversation_id
 
@@ -124,8 +127,8 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
             save_message(conversation_id, role="assistant", content=bot_message)
 
     except Exception as e:
-        logging.error(f"Error in chat wrapper: {str(e)}")
-        yield "An error occurred.", history, conversation_id
+        logging.error(f"chat_wrapper(): Error in chat wrapper: {str(e)}")
+        yield "chat_wrapper(): An error occurred.", history, conversation_id
 
 
 def search_conversations(query):

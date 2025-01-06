@@ -47,6 +47,17 @@ https://arxiv.org/abs/2412.15563
 https://arxiv.org/pdf/2410.10293v1
 https://arxiv.org/pdf/2409.02098v1
 https://github.com/OpenSPG/KAG
+https://generativeai.pub/graph-rag-has-awesome-potential-but-currently-has-serious-flaws-c052a8a3107e
+https://pub.towardsai.net/kag-graph-multimodal-rag-llm-agents-powerful-ai-reasoning-b3da38d31358
+https://medium.com/@florian_algo/ai-innovations-and-insights-14-funnelrag-and-craft-8436f97286bb
+https://arxiv.org/abs/2412.19442
+https://arxiv.org/abs/2412.15605
+https://arxiv.org/html/2412.18069v1
+https://github.com/smallporridge/AssistRAG
+https://medium.com/@samarrana407/why-knowledge-augmented-generation-kag-is-the-best-approach-to-rag-2e7820228087
+
+
+
 
 
 GraphRAG
@@ -84,8 +95,8 @@ GraphRAG
 https://volodymyrpavlyshyn.medium.com/unified-knowledge-graph-model-rdf-rdf-vs-lpg-the-end-of-war-a7c14d6ac76f
 	https://github.com/zjunlp/OneKE
 https://blog.gopenai.com/llm-ontology-prompting-for-knowledge-graph-extraction-efdcdd0db3a1?gi=1d8915f0da5e
-
-
+	https://towardsdatascience.com/how-to-build-a-graph-rag-app-b323fc33ba06
+	https://medium.com/@dickson.lukose/ontology-modelling-and-engineering-4df8b6b9f3a5
 
 
 ### Links

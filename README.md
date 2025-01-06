@@ -37,6 +37,7 @@
 - This project started as a tool by `the-crypt-keeper` to perform summarization of YouTube videos.
 - I forked it, to add a couple features as I wanted to use it to help me consume conference videos at a faster pace. I kept adding/improving things and now it's a fully different tool/focus.
 - You can find the original scripts by `the-crypt-keeper` in the `tldw-original-scripts` directory, a snapshot of the files before I made my changes.
+- The GUI is currently a placeholder. Please excuse its crappiness for now. It will be replaced with a FastAPI backend and a new JS frontend. (Gradio is a placeholder UI)
 </details>
 
 ### Updating from a version installed prior to Nov 1st:

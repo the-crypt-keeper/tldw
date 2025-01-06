@@ -84,6 +84,9 @@ https://markwhen.com/
 https://kando.menu/
 https://deepseek-artifacts.vercel.app/
 https://darkpatternsgame.productartistry.com/
+https://towardsdatascience.com/building-trust-in-llm-answers-highlighting-source-texts-in-pdfs-5d1342ecb811
+https://levelup.gitconnected.com/textual-how-this-python-framework-is-revolutionizing-ui-development-in-2025-7bfb0fd41a59
+https://cin-model-kotaemon.hf.space/app/
 
 
 Not waifus, but clippy:
@@ -98,3 +101,6 @@ Prompt Engineering page:
 - Looks like Claude Workshop UI window
 
 
+
+Website features
+https://github.com/albirrkarim/react-speech-highlight-demo

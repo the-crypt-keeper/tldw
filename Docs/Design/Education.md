@@ -13,7 +13,7 @@ https://news.ycombinator.com/item?id=42534931
 https://ankiweb.net/shared/info/1531888719
 https://bbycroft.net/llm
 https://github.com/met4citizen/TalkingHead
-
+https://github.com/Rolandjg/skool4free
 
 
 one2manny
