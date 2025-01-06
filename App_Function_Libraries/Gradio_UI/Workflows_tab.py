@@ -47,7 +47,6 @@ def chat_workflows_tab():
         with gr.Row():
             with gr.Column():
                 workflow_selector = gr.Dropdown(label="Select Workflow", choices=[wf['name'] for wf in workflows])
-                # Refactored API selection dropdown
                 api_selector = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                     value=default_value,
@@ -91,8 +90,7 @@ def chat_workflows_tab():
                 logging.error(f"Selected workflow not found: {workflow_name}")
                 return {"current_step": 0, "max_steps": 0, "conversation_id": None}, "", []
 
-        def process_workflow_step(message, history, context, workflow_name, api_endpoint, api_key, workflow_state,
-                                  save_conv, temp):
+        def process_workflow_step(message, history, context, workflow_name, api_endpoint, api_key, workflow_state, save_conv, temp):
             logging.info(f"Process workflow step called with message: {message}")
             logging.info(f"Current workflow state: {workflow_state}")
             try:
@@ -114,13 +112,20 @@ def chat_workflows_tab():
                 full_message = f"{context}\n\nStep {current_step + 1}: {prompt}\nUser: {message}"
 
                 logging.info(f"Calling chat_wrapper with full_message: {full_message[:100]}...")
-                bot_message, new_history, new_conversation_id = chat_wrapper(
+
+                # Initialize bot message to accumulate stremed response
+                bot_message = ""
+
+                # call chat _wrapper
+                for chunk, new_history, new_conversation_id in chat_wrapper(
                     full_message, history, media_content.value, selected_parts.value,
                     api_endpoint, api_key, "", workflow_state["conversation_id"],
                     save_conv, temp, "You are a helpful assistant guiding through a workflow."
-                )
+                ):
+                    bot_message = chunk  # Update bot message with the latest chunk
+                    yield new_history, workflow_state, gr.update(interactive=True)
+                    logging.info(f"Received bot_message: {bot_message[:50]}...")
 
-                logging.info(f"Received bot_message: {bot_message[:100]}...")
 
                 next_step = current_step + 1
                 new_workflow_state = {
@@ -131,15 +136,17 @@ def chat_workflows_tab():
 
                 if next_step >= max_steps:
                     logging.info("Workflow completed after this step")
-                    return new_history, new_workflow_state, gr.update(interactive=False)
+                    yield history + [(message, bot_message)], new_workflow_state, gr.update(interactive=False)
                 else:
                     next_prompt = selected_workflow['prompts'][next_step]
+                    new_history = history + [(message, bot_message)]
                     new_history.append((None, f"Step {next_step + 1}: {next_prompt}"))
                     logging.info(f"Moving to next step: {next_step}")
-                    return new_history, new_workflow_state, gr.update(interactive=True)
+                    yield new_history, new_workflow_state, gr.update(interactive=True)
+
             except Exception as e:
                 logging.error(f"Error in process_workflow_step: {str(e)}")
-                return history, workflow_state, gr.update(interactive=True)
+                yield history, workflow_state, gr.update(interactive=True)
 
         workflow_selector.change(
             update_workflow_ui,
@@ -149,8 +156,7 @@ def chat_workflows_tab():
 
         submit_btn.click(
             process_workflow_step,
-            inputs=[msg, chatbot, context_input, workflow_selector, api_selector, api_key_input, workflow_state,
-                    save_conversation, temperature],
+            inputs=[msg, chatbot, context_input, workflow_selector, api_selector, api_key_input, workflow_state, save_conversation, temperature],
             outputs=[chatbot, workflow_state, msg]
         ).then(
             lambda: gr.update(value=""),

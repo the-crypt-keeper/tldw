@@ -118,6 +118,9 @@ GLM-4-Voice
 GPT-SoviTTS
     https://github.com/cpumaxx/sovits-ff-plugin
     https://github.com/JarodMica/GPT-SoVITS-Package
+Kokoro
+    https://github.com/thewh1teagle/kokoro-onnx
+    https://huggingface.co/hexgrad/Kokoro-82M
 lina TTS
     https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
     https://github.com/theodorblackbird/lina-speech
