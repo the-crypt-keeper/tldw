@@ -637,6 +637,11 @@ None of these companies exist to provide AI services in 2024. They’re only doi
 - [Mikupad](https://github.com/lmg-anon/mikupad) - Because I'm not going to write a whole new frontend for non-chat writing.
 - The people who have helped me get to this point, and especially for those not around to see it(DT & CC).
 
+
+### Security Disclosures
+1. Information disclosure via developer print debugging statement in `chat_functions.py` - Thank you to @luca-ing for pointing this out!
+    - Fixed in commit: `8c2484a`
+
 ------------
 
 #### And because Who doesn't love a good quote or two? (Particularly relevant to this material/LLMs)
@@ -644,3 +649,5 @@ None of these companies exist to provide AI services in 2024. They’re only doi
     * Terry Pratchett
 - `The first principle is that you must not fool yourself - and you are the easiest person to fool.`
   *Richard Feynman
+
+
