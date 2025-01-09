@@ -285,85 +285,95 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None, temp=None, streaming=False, topp=None, topk=None):
+def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5,
+                        system_prompt=None, temp=None, streaming=False, topp=None, topk=None):
     try:
         # https://docs.anthropic.com/en/api/messages
         loaded_config_data = load_and_log_configs()
 
         # Check if config was loaded successfully
         if loaded_config_data is None:
-            logging.error("Anthropic: Failed to load configuration data.")
-            return "Anthropic: Failed to load configuration data."
+            logging.error("Anthropic Chat: Failed to load configuration data.")
+            return "Anthropic Chat: Failed to load configuration data."
 
         # Initialize the API key
         anthropic_api_key = api_key
 
         # API key validation
         if not api_key:
-            logging.info("Anthropic: API key not provided as parameter")
-            logging.info("Anthropic: Attempting to use API key from config file")
+            logging.info("Anthropic Chat: API key not provided as parameter")
+            logging.info("Anthropic Chat: Attempting to use API key from config file")
             # Ensure 'api_keys' and 'anthropic' keys exist
             try:
                 anthropic_api_key = loaded_config_data['anthropic_api']['api_key']
                 logging.debug(f"Anthropic: Loaded API Key from config: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
             except (KeyError, TypeError) as e:
-                logging.error(f"Anthropic: Error accessing API key from config: {str(e)}")
-                return "Anthropic: API Key Not Provided/Found in Config file or is empty"
+                logging.error(f"Anthropic Chat: Error accessing API key from config: {str(e)}")
+                return "Anthropic Chat: API Key Not Provided/Found in Config file or is empty"
 
         if not anthropic_api_key or anthropic_api_key == "":
-            logging.error("Anthropic: API key not found or is empty")
-            return "Anthropic: API Key Not Provided/Found in Config file or is empty"
+            logging.error("Anthropic Chat: API key not found or is empty")
+            return "Anthropic Chat: API Key Not Provided/Found in Config file or is empty"
 
         if anthropic_api_key:
-            logging.debug(f"Anthropic: Using API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
+            logging.debug(f"Anthropic Chat: Using API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
         else:
-            logging.debug(f"Anthropic: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+            logging.debug(f"Anthropic Chat: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
         if system_prompt is not None:
-            logging.debug("Anthropic: Using provided system prompt")
+            logging.debug("Anthropic Chat: Using provided system prompt")
             pass
         else:
             system_prompt = "You are a helpful assistant"
-            logging.debug("Anthropic: Using default system prompt")
+            logging.debug("Anthropic Chat: Using default system prompt")
 
-        logging.debug(f"AnthropicAI: Loaded data: {input_data}")
-        logging.debug(f"AnthropicAI: Type of data: {type(input_data)}")
+        logging.debug(f"Anthropic Chat: Loaded data: {input_data}")
+        logging.debug(f"Anthropic Chat: Type of data: {type(input_data)}")
 
         # Retrieve the model from config if not provided
         if model is None:
             try:
                 anthropic_model = loaded_config_data['anthropic_api']['model']
-                logging.debug(f"Anthropic: Loaded model from config: {anthropic_model}")
+                logging.debug(f"Anthropic Chat: Loaded model from config: {anthropic_model}")
             except (KeyError, TypeError) as e:
-                logging.error(f"Anthropic: Error accessing model from config: {str(e)}")
-                return "Anthropic: Model configuration not found."
+                logging.error(f"Anthropic Chat: Error accessing model from config: {str(e)}")
+                return "Anthropic Chat: Model configuration not found."
         else:
             anthropic_model = model
-            logging.debug(f"Anthropic: Using provided model: {anthropic_model}")
+            logging.debug(f"Anthropic Chat: Using provided model: {anthropic_model}")
 
-        if temp is None:
+        # Temperature
+        if not isinstance(temp, float):
             temp = loaded_config_data['anthropic_api']['temperature']
             temp = float(temp)
-            logging.debug(f"Anthropic: Using temperature from config.txt: {temp}")
+            logging.debug(f"Anthropic Chat: Using temperature from config.txt: {temp}")
+        elif isinstance(temp, float):
+            temp = float(temp)
+            logging.debug(f"Anthropic Chat: Using provided temperature: {temp}")
         else:
-            temp = 0.7
-            logging.debug(f"Anthropic: Using default temperature: {temp}")
+            logging.error("Anthropic Chat: Invalid value for temperature")
+            return "Anthropic Chat: Invalid value for temperature"
 
-        if topk is None:
-            topk = loaded_config_data['anthropic_api']['topk']
-            top_k = float(topk)
-            logging.debug(f"Anthropic: Using Top-K from config.txt: {topk}")
-        else:
-            top_k = None
-            logging.debug(f"Anthropic: Using default Top-K: {topk}")
+        # Top-K
+        # if not isinstance(topk, int):
+        #     topk = loaded_config_data['anthropic_api']['top_k']
+        #     top_k = int(topk)
+        #     logging.debug(f"Anthropic Chat: Using Top-K from config.txt: {topk}")
+        # elif isinstance(topk, int):
+        #     top_k = topk
+        #     logging.debug(f"Anthropic Chat: Using provided Top-K: {topk}")
+        # else:
+        #     logging.error("Anthropic Chat: Invalid value for topk")
+        #     return "Anthropic Chat: Invalid value for topk"
 
+        # Top-P
         if topp is None:
             topp = loaded_config_data['anthropic_api']['top_p']
             top_p = float(topp)
-            logging.debug(f"Anthropic: Using max_p from config.txt: {top_p}")
+            logging.debug(f"Anthropic Chat: Using max_p from config.txt: {top_p}")
         else:
             top_p = 1.0
-            logging.debug(f"Anthropic: Using default maxp: {top_p}")
+            logging.debug(f"Anthropic Chat: Using default maxp: {top_p}")
 
         headers = {
             'x-api-key': anthropic_api_key,
@@ -385,7 +395,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
             "temperature": temp,
-            "top_k": top_k,
+            #"top_k": top_k,
             "top_p": top_p,
             "metadata": {
                 "user_id": "example_user_id",
@@ -483,7 +493,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 
 
 # Summarize with Cohere
-def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, system_prompt=None, temp=None, streaming=False, maxp=None, minp=None, topk=None):
+def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, system_prompt=None, temp=None, streaming=False, topp=None, topk=None):
     loaded_config_data = load_and_log_configs()
     cohere_api_key = None
     # https://docs.cohere.com/v2/reference/chat-stream
@@ -506,6 +516,7 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
         logging.debug(f"Cohere Chat: Loaded data: {input_data}")
         logging.debug(f"Cohere Chat: Type of data: {type(input_data)}")
 
+        # Streaming mode
         if isinstance(streaming, str):
             streaming = streaming.lower() == "true"
         elif isinstance(streaming, int):
@@ -518,26 +529,28 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
-        if not topk:
+        # Top-K
+        if not isinstance(topk, int):
             top_k = loaded_config_data['cohere_api']['top_k']
-            top_k = float(top_k)
-        if not maxp:
-            maxp = loaded_config_data['cohere_api']['max_p']
-            maxp = float(maxp)
+            top_k = int(top_k)
+            logging.debug(f"Cohere Chat: Using top_k from config: {top_k}")
 
-        # Ensure model is set
-        if not model:
+        # Max-P
+        if not isinstance(topp, float):
+            topp = loaded_config_data['cohere_api']['max_p']
+            topp = float(topp)
+            logging.debug(f"Cohere Chat: Using max_p from config: {topp}")
+
+        # Temperature
+        if not isinstance(temp, float):
+            temp = loaded_config_data['cohere_api']['temperature']
+            temp = float(temp)
+            logging.debug(f"Cohere Chat: Using temperature from config: {temp}")
+
+        # Model
+        if not isinstance(model, str):
             model = loaded_config_data['cohere_api']['model']
-        logging.debug(f"Cohere Chat: Using model: {model}")
-
-        if temp is None:
-            temp = 0.3
-        else:
-            try:
-                temp = float(temp)
-            except ValueError:
-                logging.warning(f"Cohere Chat: Invalid temperature value '{temp}', defaulting to 0.3")
-                temp = 0.3
+            logging.debug(f"Cohere Chat: Using model from config: {model}")
 
         headers = {
             'accept': 'application/json',
@@ -569,7 +582,7 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
                 }
             ],
             "k": top_k,
-            "p": maxp,
+            "p": topp,
         }
         logging.debug(f"Cohere Chat: Request data: {json.dumps(data, indent=2)}")
 
@@ -683,7 +696,7 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
                 logging.info("Groq: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                groq_api_key = loaded_config_data['groq_api'].get('api_Key')
+                groq_api_key = loaded_config_data['groq_api'].get('api_key')
                 if groq_api_key:
                     logging.info("Groq: Using API key from config file")
                 else:
@@ -692,8 +705,7 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
         # Final check to ensure we have a valid API key
         if not groq_api_key or not groq_api_key.strip():
             logging.error("Anthropic: No valid API key available")
-            # You might want to raise an exception here or handle this case as appropriate for your application
-            # For example: raise ValueError("No valid Anthropic API key available")
+
 
         logging.debug(f"Groq: Using API Key: {groq_api_key[:5]}...{groq_api_key[-5:]}")
 
@@ -832,28 +844,31 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
         return f"Groq: Error occurred while processing summary with Groq: {str(e)}"
 
 
-def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, top_p=None, top_k=None, minp=None):
+def chat_with_openrouter(api_key=None, input_data=None, custom_prompt_arg=None, temp=None, system_message=None, streaming=False, top_p=None, top_k=None, minp=None):
     import requests
     import json
+    openrouter_system_prompt = "You are a helpful AI assistant who does whatever the user requests."
     # https://openrouter.ai/docs/requests
     try:
-        logging.debug("OpenRouter: Loading and validating configurations")
+        logging.info("OpenRouter: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
         if loaded_config_data is None:
             logging.error("Failed to load configuration data")
-            openrouter_api_key = None
+            return "OpenRouter: Failed to load configuration data"
+
+        # Prioritize the API key passed as a parameter
+        if api_key and isinstance(api_key, str) and api_key.strip():
+            logging.debug(f"OpenRouter: Using API key {api_key[:5]}...{api_key[-5:]} provided as parameter")
+            print(f"API Key: {api_key}")
+            print("FUCK THIS2")
         else:
-            # Prioritize the API key passed as a parameter
-            if api_key and api_key.strip():
-                openrouter_api_key = api_key
-                logging.info("OpenRouter: Using API key provided as parameter")
+            # Fall back to the API key from the config file
+            api_key = loaded_config_data['openrouter_api'].get('api_key')
+            if api_key:
+                logging.debug(f"OpenRouter: Loaded API Key from config: {api_key[:5]}...{api_key[-5:]}")
             else:
-                # If no parameter is provided, use the key from the config
-                openrouter_api_key = loaded_config_data['openrouter_api'].get('api_key')
-                if openrouter_api_key:
-                    logging.info("OpenRouter: Using API key from config file")
-                else:
-                    logging.warning("OpenRouter: No API key found in config file")
+                logging.error("OpenRouter: No API key found in config file")
+                return "OpenRouter: No API key found in config file"
 
         if isinstance(streaming, str):
             streaming = streaming.lower() == "true"
@@ -868,28 +883,25 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
         # Model Selection validation
-        logging.debug("OpenRouter: Validating model selection")
-        loaded_config_data = load_and_log_configs()
         openrouter_model = loaded_config_data['openrouter_api']['model']
         logging.debug(f"OpenRouter: Using model from config file: {openrouter_model}")
 
-        # Final check to ensure we have a valid API key
-        if not openrouter_api_key or not openrouter_api_key.strip():
-            logging.error("OpenRouter: No valid API key available")
-            raise ValueError("No valid Anthropic API key available")
+        print(f"API Key: {api_key}")
+        print("FUCK THIS3")
 
-        logging.debug(f"OpenRouter: Using API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:]}")
-
-        logging.debug(f"OpenRouter: Using Model: {openrouter_model}")
-
+        # Top-P
         if not top_p:
             logging.debug(f"OpenRouter: Using top_p {top_p} from config file")
             top_p = loaded_config_data['openrouter_api']['top_p']
             top_p = float(top_p)
+
+        # Top-K
         if not top_k:
             logging.debug(f"OpenRouter: Using top_k {top_k} from config file")
             top_k = loaded_config_data['openrouter_api']['top_k']
             top_k = float(top_k)
+
+        # Min-P
         if not minp:
             logging.debug(f"OpenRouter: Using min_p {minp} from config file")
             minp = loaded_config_data['openrouter_api']['min_p']
@@ -921,14 +933,15 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
         else:
             raise ValueError("OpenRouter: Invalid input data format")
 
+        # System Prompt
+        if not isinstance(system_message, str):
+            logging.debug("OpenRouter: Using default system prompt")
+            system_message = openrouter_system_prompt
+        else:
+            logging.debug("OpenRouter: Using provided system prompt")
+
         openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
         logging.debug(f"openrouter: User Prompt being sent is {openrouter_prompt}")
-
-        if temp is None:
-            temp = 0.1
-        temp = float(temp)
-        if system_message is None:
-            system_message = "You are a helpful AI assistant who does whatever the user requests."
 
     except Exception as e:
         logging.error("OpenRouter: Error in processing: %s", str(e))
@@ -943,7 +956,7 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {openrouter_api_key}",
+                    "Authorization": f"Bearer {api_key}",
                     "Accept": "text/event-stream",  # Important for streaming
                 },
                 data=json.dumps({
@@ -960,7 +973,7 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
                     "stream": True
                 }),
             )
-
+            logging.debug(f"Raw API Response Content: {response.text}")
             if response.status_code == 200:
                 full_response = ""
                 # Process the streaming response
@@ -980,7 +993,8 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
                                         content = delta['content']
                                         print(content, end='', flush=True)  # Print streaming output
                                         full_response += content
-                            except json.JSONDecodeError:
+                            except json.JSONDecodeError as e:
+                                logging.error(f"Error decoding JSON chunk: {e}")
                                 continue
 
                 logging.debug("openrouter: Streaming completed successfully")
@@ -996,12 +1010,11 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
             return error_msg
     else:
         try:
-            logging.debug("OpenRouter: Submitting request to API endpoint")
-            print("OpenRouter: Submitting request to API endpoint")
+            logging.info("OpenRouter: Submitting request to API endpoint")
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {openrouter_api_key}",
+                    "Authorization": f"Bearer {api_key}",
                 },
                 data=json.dumps({
                     "model": openrouter_model,
@@ -1013,9 +1026,11 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
                     "top_k": top_k,
                     "min_p": minp,
                     "temperature": temp,
-                    "stream": True
+                    "stream": False
                 }),
             )
+            # Log response content
+            logging.debug(f"Raw API Response Content: {response.text}")
 
             response_data = response.json()
             logging.debug("Full API Response Data: %s", response_data)
@@ -1024,7 +1039,7 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
                 if 'choices' in response_data and len(response_data['choices']) > 0:
                     summary = response_data['choices'][0]['message']['content'].strip()
                     logging.debug("openrouter: Chat request successful")
-                    print("openrouter: Chat request successful.")
+                    logging.debug("openrouter: Chat request successful.")
                     return summary
                 else:
                     logging.error("openrouter: Expected data not found in API response.")
@@ -1035,7 +1050,6 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
         except Exception as e:
             logging.error("openrouter: Error in processing: %s", str(e))
             return f"openrouter: Error occurred while processing chat request with openrouter: {str(e)}"
-
 
 
 def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None, temp=None, streaming=False):
@@ -1653,8 +1667,8 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
             ],
             "temperature": temp,
             "topP": topp,
-            "topK": topk,
-            "maxOutputTokens": google_max_tokens,
+            #"topK": topk,
+            #"maxOutputTokens": google_max_tokens,
         }
 
         if streaming:

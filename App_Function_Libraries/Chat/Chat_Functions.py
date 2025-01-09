@@ -45,7 +45,7 @@ def approximate_token_count(history):
 
 
 # FIXME - add model parameter
-def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message, streaming, minp=None, maxp=None, model=None, topk=None):
+def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp=None, system_message=None, streaming=None, minp=None, maxp=None, model=None, topk=None, topp=None):
     logging.info(f"Debug - Chat API Call - API Endpoint: {api_endpoint}")
     log_counter("chat_api_call_attempt", labels={"api_endpoint": api_endpoint})
     start_time = time.time()
@@ -79,11 +79,22 @@ def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_messag
                 model=model,
                 custom_prompt_arg=prompt,
                 system_prompt=system_message,
-                temp=temp
+                temp=temp,
+                streaming=streaming,
+                topp=topp,
+                topk=topk
             )
 
         elif api_endpoint.lower() == "groq":
-            response = chat_with_groq(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_groq(
+                api_key=api_key,
+                input_data=input_data,
+                custom_prompt_arg=prompt,
+                temp=temp,
+                system_message=system_message,
+                streaming=streaming,
+                maxp=maxp
+            )
 
         elif api_endpoint.lower() == "openrouter":
             response = chat_with_openrouter(api_key, input_data, prompt, temp, system_message)
