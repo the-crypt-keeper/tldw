@@ -29,7 +29,7 @@ https://sakshi113.github.io/mmau_homepage/
 
 ### Other
 https://wave-pulse.io/
-
+https://arxiv.org/abs/2501.01384
 
 ### Link Dump:
 https://huggingface.co/NexaAIDev/Qwen2-Audio-7B-GGUF
@@ -39,15 +39,16 @@ https://arxiv.org/abs/2412.18566
 https://github.com/pipecat-ai/pipecat/tree/a367a038f1a3967292b5de5b43b8600a82a73fb6?tab=readme-ov-file
 https://github.com/Purfview/whisper-standalone-win
 https://github.com/ictnlp/LLaMA-Omni
+https://github.com/thepersonalaicompany/amurex
 https://levelup.gitconnected.com/build-a-real-time-ai-voice-and-video-chat-app-with-function-calling-by-gemini-2-0-49599a48fbe9?gi=c894f6c092be
-
+https://huggingface.co/papers/2501.02832
 
 Blogposts
     https://blog.duy.dev/build-your-own-voice-assistant-and-run-it-locally/
     https://www.twilio.com/en-us/blog/twilio-openai-realtime-api-launch-integration
 
 Full Pipelines
-    https://github.com/lhl/voicechat2?tab=readme-ov-file
+    https://github.com/lhl/voicechat2
     https://github.com/eustlb/speech-to-speech
     https://github.com/dnhkng/GlaDOS
     https://github.com/mezbaul-h/june
@@ -56,7 +57,8 @@ Full Pipelines
     https://github.com/huggingface/speech-to-speech
     https://github.com/harvestingmoon/S2S
     https://github.com/livekit/agents
-
+    https://github.com/ictnlp/LLaMA-Omni
+    https://github.com/smellslikeml/dolla_llama/blob/main/app/app.py
 
 Voicw2Voicw Models
     https://github.com/Standard-Intelligence/hertz-dev
@@ -97,6 +99,8 @@ Coqui TTS
 CosyVoice2
     https://funaudiollm.github.io/cosyvoice2/
 Daswers XTTS GUI
+Diva
+    https://huggingface.co/spaces/WillHeld/diva-audio
 F5 TTS
     https://github.com/SWivid/F5-TTS
 Fish-Speech
@@ -107,6 +111,7 @@ Gemini
     https://ai.google.dev/gemini-api/docs#rest
     https://ai.google.dev/gemini-api/docs/models/gemini-v2
     https://github.com/google-gemini/cookbook/blob/main/quickstarts/Audio.ipynb
+    https://github.com/livekit/agents/blob/main/examples/voice-pipeline-agent/gemini_voice_agent.py
 Google
     https://github.com/google-gemini/cookbook/tree/main/gemini-2
     https://discuss.ai.google.dev/t/how-does-one-get-access-to-the-api-for-tts-features-of-gemini-2-0/53925/15
@@ -121,6 +126,8 @@ GPT-SoviTTS
 Kokoro
     https://github.com/thewh1teagle/kokoro-onnx
     https://huggingface.co/hexgrad/Kokoro-82M
+    https://github.com/remsky/Kokoro-FastAPI
+    https://huggingface.co/hexgrad/Kokoro-82M/discussions/19
 lina TTS
     https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
     https://github.com/theodorblackbird/lina-speech
@@ -172,6 +179,8 @@ SoundStorm
 Styletts2
 Tortoise TTS
 VallE-X
+VITA
+    https://github.com/VITA-MLLM/VITA
 VoiceCraft - 
 xtts
 xtts2
@@ -190,6 +199,8 @@ STT
     https://github.com/southbridgeai/offmute
     https://github.com/flatmax/speech-to-text
     https://github.com/collabora/WhisperLive
+    https://github.com/fedirz/faster-whisper-server
+    https://github.com/ufal/whisper_streaming
     MoonShine
         https://github.com/usefulsensors/moonshine
         https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web

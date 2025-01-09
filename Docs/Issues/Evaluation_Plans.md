@@ -34,6 +34,8 @@ https://huggingface.co/DevQuasar/allenai.Llama-3.1-Tulu-3-8B-SFT-no-safety-data-
 https://huggingface.co/CohereForAI/c4ai-command-r7b-12-2024
 https://arxiv.org/html/2412.09569v1
 https://huggingface.co/tiiuae
+https://ai.gopubby.com/rag-evaluation-a-visual-approach-c9af26006ef5
+https://huggingface.co/datasets/bytedance-research/ToolHop
 https://github.com/naver/bergen?tab=readme-ov-file
 https://arxiv.org/abs/2412.13147
 https://arxiv.org/abs/2412.13018

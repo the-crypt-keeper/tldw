@@ -23,6 +23,7 @@ Unsorted
 	https://www.uber.com/en-IN/blog/introducing-the-prompt-engineering-toolkit/
 	https://arxiv.org/abs/2409.14924
 https://arxiv.org/abs/2412.02830
+https://arxiv.org/abs/2210.03629
 https://arxiv.org/abs/2407.04125
 https://cobusgreyling.medium.com/four-levels-of-rag-research-from-microsoft-fdc54388f0ff
 https://arxiv.org/html/2412.00239v1
@@ -55,8 +56,8 @@ https://arxiv.org/abs/2412.15605
 https://arxiv.org/html/2412.18069v1
 https://github.com/smallporridge/AssistRAG
 https://medium.com/@samarrana407/why-knowledge-augmented-generation-kag-is-the-best-approach-to-rag-2e7820228087
-
-
+https://pub.towardsai.net/revisiting-chunking-in-the-rag-pipeline-9aab8b1fdbe7
+https://towardsdatascience.com/ai-powered-information-extraction-and-matchmaking-0408c93ec1b9
 
 
 
@@ -97,6 +98,11 @@ https://volodymyrpavlyshyn.medium.com/unified-knowledge-graph-model-rdf-rdf-vs-l
 https://blog.gopenai.com/llm-ontology-prompting-for-knowledge-graph-extraction-efdcdd0db3a1?gi=1d8915f0da5e
 	https://towardsdatascience.com/how-to-build-a-graph-rag-app-b323fc33ba06
 	https://medium.com/@dickson.lukose/ontology-modelling-and-engineering-4df8b6b9f3a5
+	https://github.com/zjukg/KG-LLM-Papers
+https://towardsdatascience.com/how-to-convert-any-text-into-a-graph-of-concepts-110844f22a1a
+https://news.ycombinator.com/item?id=34605772
+https://arxiv.org/abs/2501.02157
+
 
 
 ### Links
