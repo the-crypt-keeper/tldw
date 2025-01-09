@@ -290,7 +290,6 @@ def load_and_log_configs():
         kobold_top_p = config.get('Local-API', 'kobold_top_p', fallback='0.95')
         kobold_top_k = config.get('Local-API', 'kobold_top_k', fallback='100')
 
-
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
         llama_streaming = config.get('Local-API', 'llama_streaming', fallback='False')
@@ -524,7 +523,7 @@ def load_and_log_configs():
                 'temperature': openrouter_temperature,
                 'top_p': openrouter_top_p,
                 'min_p': openrouter_min_p,
-                'openrouter_top_k': openrouter_top_k
+                'top_k': openrouter_top_k
             },
             'openai_api': {
                 'api_key': openai_api_key,
