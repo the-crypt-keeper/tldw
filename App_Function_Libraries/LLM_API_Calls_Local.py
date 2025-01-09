@@ -28,14 +28,14 @@ from App_Function_Libraries.Utils.Utils import *
 # Function Definitions
 #
 
-def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None, streaming=False):
+def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None, streaming=False, top_k=None, top_p=None, min_p=None):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("Local LLM: Loading json data for summarization")
+            logging.debug("Local LLM: Loading json data for Chat request")
             with open(input_data, 'r') as file:
                 data = json.load(file)
         else:
-            logging.debug("openai: Using provided string data for summarization")
+            logging.debug("Local LLM: Using provided string data for Chat request")
             data = input_data
 
         logging.debug(f"Local LLM: Loaded data: {data}")
@@ -55,8 +55,40 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
         else:
             raise ValueError("Invalid input data format")
 
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)
+        elif streaming is None:
+            streaming = False
+
+        if isinstance(top_k, int):
+            top_k = int(top_k)
+            logging.debug(f"Local LLM: Using top_k: {top_k}")
+        elif top_k is None:
+            top_k = load_and_log_configs().get('local_llm', {}).get('top_k', 100)
+            logging.debug(f"Local LLM: Using top_k from config: {top_k}")
+
+        if isinstance(top_p, float):
+            top_p = float(top_p)
+            logging.debug(f"Local LLM: Using top_p: {top_p}")
+        elif top_p is None:
+            top_p = load_and_log_configs().get('local_llm', {}).get('top_p', 0.95)
+            logging.debug(f"Local LLM: Using top_p from config: {top_p}")
+
+        if isinstance(min_p, float):
+            min_p = float(min_p)
+            logging.debug(f"Local LLM: Using min_p: {min_p}")
+        elif min_p is None:
+            min_p = load_and_log_configs().get('local_llm', {}).get('min_p', 0.05)
+            logging.debug(f"Local LLM: Using min_p from config: {min_p}")
+
+        local_llm_system_message = "You are a helpful AI assistant."
+
         if system_message is None:
-            system_message = "You are a helpful AI assistant."
+            system_message = local_llm_system_message
+
+        local_llm_max_tokens = 4096
 
         headers = {
             'Content-Type': 'application/json'
@@ -75,9 +107,12 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
                     "content": local_llm_prompt
                 }
             ],
-            "max_tokens": 8192,
+            "max_tokens": local_llm_max_tokens,
             "temperature": temp,
-            "stream": streaming
+            "stream": streaming,
+            "top_k": top_k,
+            "top_p": top_p,
+            "min_p": min_p
         }
 
         logging.debug("Local LLM: Posting request")
@@ -127,8 +162,7 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
         return f"Local LLM: Error occurred while processing Chat response: {str(e)}"
 
 
-# FIXME
-def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8080/completion", api_key=None, system_prompt=None, streaming=False):
+def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8080/completion", api_key=None, system_prompt=None, streaming=False, top_k=None, top_p=None, min_p=None):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -163,6 +197,40 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
+        if isinstance(top_k, int):
+            top_k = int(top_k)
+            logging.debug(f"Llama.cpp: Using top_k: {top_k}")
+        elif top_k is None:
+            top_k = load_and_log_configs().get('llama_api', {}).get('top_k', 100)
+            logging.debug(f"Llama.cpp: Using top_k from config: {top_k}")
+        if not isinstance(streaming, int):
+            raise ValueError(f"Invalid type for 'top_k': Expected an int, got {type(streaming).__name__}")
+
+        if isinstance(top_p, float):
+            top_p = float(top_p)
+            logging.debug(f"Llama.cpp: Using top_p: {top_p}")
+        elif top_p is None:
+            top_p = load_and_log_configs().get('llama_api', {}).get('top_p', 0.95)
+            logging.debug(f"Llama.cpp: Using top_p from config: {top_p}")
+        if not isinstance(streaming, int):
+            raise ValueError(f"Invalid type for 'top_p': Expected a float, got {type(streaming).__name__}")
+
+        if isinstance(min_p, float):
+            min_p = float(min_p)
+            logging.debug(f"Llama.cpp: Using min_p: {min_p}")
+        elif min_p is None:
+            min_p = load_and_log_configs().get('llama_api', {}).get('min_p', 0.05)
+            logging.debug(f"Llama.cpp: Using min_p from config: {min_p}")
+        if not isinstance(streaming, int):
+            raise ValueError(f"Invalid type for 'min_p': Expected a float, got {type(streaming).__name__}")
+
+        local_llm_system_message = "You are a helpful AI assistant."
+
+        if system_prompt is None:
+            system_prompt = local_llm_system_message
+
+        max_tokens_llama = 4096
+
         # Prepare headers
         headers = {
             'accept': 'application/json',
@@ -171,12 +239,8 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
         if len(api_key) > 5:
             headers['Authorization'] = f'Bearer {api_key}'
 
-        if system_prompt is None:
-            system_prompt = "You are a helpful AI assistant that provides accurate and concise information."
-
         logging.debug("Llama.cpp: System prompt being used is: %s", system_prompt)
         logging.debug("Llama.cpp: User prompt being used is: %s", custom_prompt)
-
 
         llama_prompt = f"{custom_prompt} \n\n\n\n{input_data}"
         logging.debug(f"llama: Prompt being sent is {llama_prompt}")
@@ -185,10 +249,10 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
             "prompt": f"{llama_prompt}",
             "system_prompt": f"{system_prompt}",
             'temperature': temp,
-            #'top_k': '40',
-            #'top_p': '0.95',
-            #'min_p': '0.05',
-            #'n_predict': '-1',
+            'top_k': top_k,
+            'top_p': '0.95',
+            'min_p': '0.05',
+            'n_predict': max_tokens_llama,
             #'n_keep': '0',
             'stream': 'True',
             #'stop': '["\n"]',
@@ -257,7 +321,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
 
 # System prompts not supported through API requests.
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None, streaming=False):
+def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None, streaming=False, top_k=None, top_p=None):
     logging.debug("Kobold: Summarization process starting...")
     try:
         logging.debug("Kobold: Loading and validating configurations")
@@ -291,6 +355,24 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
             logging.debug("Kobold.cpp: Streaming mode disabled")
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
+        if isinstance(top_k, int):
+            top_k = int(top_k)
+            logging.debug(f"Kobold.cpp: Using top_k: {top_k}")
+        elif top_k is None:
+            top_k = load_and_log_configs().get('kobold_api', {}).get('top_k', 100)
+            logging.debug(f"Kobold.cpp: Using top_k from config: {top_k}")
+        if not isinstance(streaming, int):
+            raise ValueError(f"Invalid type for 'top_k': Expected an int, got {type(streaming).__name__}")
+
+        if isinstance(top_p, float):
+            top_p = float(top_p)
+            logging.debug(f"Kobold.cpp: Using top_p: {top_p}")
+        elif top_p is None:
+            top_p = load_and_log_configs().get('kobold_api', {}).get('top_p', 0.95)
+            logging.debug(f"Kobold.cpp: Using top_p from config: {top_p}")
+        if not isinstance(streaming, int):
+            raise ValueError(f"Invalid type for 'top_p': Expected a float, got {type(streaming).__name__}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Kobold.cpp: Loading json data for summarization")
@@ -330,8 +412,8 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
         data = {
             "prompt": kobold_prompt,
             "temperature": 0.7,
-            #"top_p": 0.9,
-            #"top_k": 100
+            "top_p": top_p,
+            "top_k": top_k,
             #"rep_penalty": 1.0,
             "stream": streaming
         }
@@ -436,10 +518,11 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
         return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
 
 
-# System prompt doesn't work. FIXME
+# FIXME - Fix the system prompt
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions", system_prompt=None, streaming=False):
+def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions", system_prompt=None, streaming=False, temp=None, top_p=None):
     loaded_config_data = load_and_log_configs()
+    ooba_system_prompt = "You are a helpful AI assistant that provides accurate and concise information."
     try:
         # API key validation
         if api_key is None:
@@ -451,7 +534,7 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.
             logging.info("ooba: API key not found or is empty")
 
         if system_prompt is None:
-            system_prompt = "You are a helpful AI assistant that provides accurate and concise information."
+            system_prompt = ooba_system_prompt
 
         if isinstance(streaming, str):
             streaming = streaming.lower() == "true"
@@ -465,14 +548,26 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
+        if isinstance(top_p, float):
+            top_p = float(top_p)
+            logging.debug(f"Ooba: Using top_p: {top_p}")
+        elif top_p is None:
+            top_p = load_and_log_configs().get('ooba_api', {}).get('top_p', 0.95)
+            logging.debug(f"Ooba: Using top_p from config: {top_p}")
+        if not isinstance(top_p, float):
+            raise ValueError(f"Invalid type for 'top_p': Expected a float, got {type(streaming).__name__}")
+
+        if temp is None:
+            temp = load_and_log_configs().get('ooba_api', {}).get('temperature', 0.7)
+            logging.debug(f"Ooba: Using temperature from config: {temp}")
+        if not isinstance(temp, float):
+            raise ValueError(f"Invalid type for 'temp': Expected a float, got {type(streaming).__name__}")
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
         }
 
-        # prompt_text = "I like to eat cake and bake cakes. I am a baker. I work in a French bakery baking cakes. It
-        # is a fun job. I have been baking cakes for ten years. I also bake lots of other baked goods, but cakes are
-        # my favorite." prompt_text += f"\n\n{text}"  # Uncomment this line if you want to include the text variable
         ooba_prompt = f"{input_data}" + f"\n\n\n\n{custom_prompt}"
         logging.debug("ooba: Prompt being sent is {ooba_prompt}")
 
@@ -480,7 +575,9 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.
             "mode": "chat",
             "character": "Example",
             "messages": [{"role": "user", "content": ooba_prompt}],
-            "stream": streaming
+            "stream": streaming,
+            "top_p": top_p,
+            "temperature": temp
         }
         if streaming:
             logging.debug("Ooba Summarization: Streaming mode enabled")
@@ -559,8 +656,10 @@ def chat_with_tabbyapi(
     system_message=None,
     api_key=None,
     temp=None,
-    api_IP="http://127.0.0.1:5000/v1/chat/completions",
-    streaming=False
+    streaming=False,
+    top_k=None,
+    top_p=None,
+    min_p=None,
 ):
     logging.debug("TabbyAPI: Chat request process starting...")
     try:
@@ -582,6 +681,7 @@ def chat_with_tabbyapi(
                 else:
                     logging.warning("TabbyAPI: No API key found in config file")
 
+        # Streaming
         if isinstance(streaming, str):
             streaming = streaming.lower() == "true"
         elif isinstance(streaming, int):
@@ -597,18 +697,54 @@ def chat_with_tabbyapi(
         # Set API IP and model from config.txt
         tabby_api_ip = loaded_config_data['tabby_api']['api_ip']
         tabby_model = loaded_config_data['tabby_api']['model']
-        if temp is None:
-            temp = 0.7
+
+        if isinstance(temp, float):
+            temp = float(temp)
+            logging.debug(f"TabbyAPI: Using temperature: {temp}")
+        elif temp is None:
+            temp = loaded_config_data.get('tabby_api', {}).get('temperature', 0.7)
+            logging.debug(f"TabbyAPI: Using temperature from config: {temp}")
+
+        if isinstance(top_k, int):
+            top_k = int(top_k)
+            logging.debug(f"TabbyAPI: Using top_k: {top_k}")
+        elif top_k is None:
+            top_k = loaded_config_data.get('tabby_api', {}).get('top_k', 100)
+            logging.debug(f"TabbyAPI: Using top_k from config: {top_k}")
+        if not isinstance(top_k, int):
+            raise ValueError(f"Invalid type for 'top_k': Expected an int, got {type(top_k).__name__}")
+
+        if isinstance(top_p, float):
+            top_p = float(top_p)
+            logging.debug(f"TabbyAPI: Using top_p: {top_p}")
+        elif top_p is None:
+            top_p = loaded_config_data.get('tabby_api', {}).get('top_p', 0.95)
+            logging.debug(f"TabbyAPI: Using top_p from config: {top_p}")
+        if not isinstance(top_p, float):
+            raise ValueError(f"Invalid type for 'top_p': Expected a float, got {type(top_p).__name__}")
+
+        if isinstance(min_p, float):
+            min_p = float(min_p)
+            logging.debug(f"TabbyAPI: Using min_p: {min_p}")
+        elif min_p is None:
+            min_p = loaded_config_data.get('tabby_api', {}).get('min_p', 0.05)
+            logging.debug(f"TabbyAPI: Using min_p from config: {min_p}")
+        if not isinstance(min_p, float):
+            raise ValueError(f"Invalid type for 'min_p': Expected a float, got {type(min_p).__name__}")
 
         logging.debug(f"TabbyAPI: Using API Key: {tabby_api_key[:5]}...{tabby_api_key[-5:] if tabby_api_key else 'None'}")
 
+        tabby_api_system_message = "You are a helpful AI assistant."
+
         if system_message is None:
-            system_message = "You are a helpful AI assistant."
+            system_message = tabby_api_system_message
 
         if custom_prompt_input is None:
             custom_prompt_input = f"{input_data}"
         else:
             custom_prompt_input = f"{custom_prompt_input}\n\n{input_data}"
+
+        tabby_max_tokens = 4096
 
         headers = {
             'Content-Type': 'application/json'
@@ -627,10 +763,10 @@ def chat_with_tabbyapi(
                  }
             ],
             'temperature': temp,
-            'max_tokens': 4096,
+            'max_tokens': tabby_max_tokens,
             "min_tokens": 0,
-            #'top_p': 1.0,
-            #'top_k': 0,
+            'top_p': top_p,
+            'top_k': top_k,
             #'frequency_penalty': 0,
             #'presence_penalty': 0.0,
             #"repetition_penalty": 1.0,
@@ -701,18 +837,117 @@ def chat_with_tabbyapi(
 
 
 # FIXME aphrodite engine - code was literally tab complete in one go from copilot... :/
-def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:8080/completion", streaming=False):
+# def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:8080/completion", streaming=False, temp=None, system_message=None, top_k=None, top_p=None, min_p=None):
+#     loaded_config_data = load_and_log_configs()
+#     model = loaded_config_data['aphrodite_api']['model']
+#     # API key validation
+#     if api_key is None:
+#         logging.info("aphrodite: API key not provided as parameter")
+#         logging.info("aphrodite: Attempting to use API key from config file")
+#         api_key = loaded_config_data['aphrodite_api']['api_key']
+#
+#     if api_key is None or api_key.strip() == "":
+#         logging.info("aphrodite: API key not found or is empty")
+#
+#         if isinstance(streaming, str):
+#             streaming = streaming.lower() == "true"
+#         elif isinstance(streaming, int):
+#             streaming = bool(streaming)  # Convert integers (1/0) to boolean
+#         elif streaming is None:
+#             streaming = loaded_config_data.get('aphrodite_api', {}).get('streaming', False)
+#             logging.debug("Aphrodite: Streaming mode enabled")
+#         else:
+#             logging.debug("Aphrodite: Streaming mode disabled")
+#         if not isinstance(streaming, bool):
+#             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+#
+#     # Build the request
+#     headers = {
+#         'Authorization': f'Bearer {api_key}',
+#         'Content-Type': 'application/json'
+#     }
+#     body = {
+#         "model": aphrodite_model,
+#         "messages": [
+#             {"role": "system", "content": system_message},
+#             {"role": "user", "content": aphrodite_prompt}
+#         ],
+#         "max_completion_tokens": 4096,
+#         "temperature": temp,
+#         "stream": streaming,
+#         "top_p": top_p,
+#     }
+#
+#     # Send the request
+#     try:
+#         response = requests.post(api_IP, headers=headers, json=body)
+#         response.raise_for_status()
+#         summary = response.json().get('summary', '')
+#         return summary
+#     except requests.exceptions.RequestException as e:
+#         logging.error(f"Error summarizing with Aphrodite: {e}")
+#         return "Error summarizing with Aphrodite."
+def chat_with_aphrodite(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=None,
+                        topp=None, minp=None, topk=None, model=None):
     loaded_config_data = load_and_log_configs()
-    model = loaded_config_data['aphrodite_api']['model']
-    # API key validation
-    if api_key is None:
-        logging.info("aphrodite: API key not provided as parameter")
-        logging.info("aphrodite: Attempting to use API key from config file")
-        api_key = loaded_config_data['aphrodite_api']['api_key']
+    try:
+        # API key validation
+        if not api_key:
+            logging.info("Aphrodite Chat: API key not provided as parameter")
+            logging.info("Aphrodite Chat: Attempting to use API key from config file")
+            aphrodite_api_key = loaded_config_data['aphrodite_api']['api_key']
 
-    if api_key is None or api_key.strip() == "":
-        logging.info("aphrodite: API key not found or is empty")
+        if not api_key or aphrodite_api_key or aphrodite_api_key == "":
+            logging.info("Aphrodite: API key not found or is empty")
 
+        logging.debug(f"Aphrodite: Using API Key: {aphrodite_api_key[:5]}...{aphrodite_api_key[-5:]}")
+
+        if not model:
+            model = loaded_config_data['aphrodite_api']['model']
+        if not isinstance(model, str):
+            raise ValueError(f"Aphrodite Chat: Invalid type for 'model': Expected a string, got {type(model).__name__}")
+
+        # Temperature
+        if isinstance(temp, float):
+            temp = float(temp)
+            logging.debug(f"Aphrodite Chat: Using temperature: {temp}")
+        elif temp is None:
+            temp = loaded_config_data['aphrodite_api']['temperature']
+            logging.debug(f"Aphrodite Chat: Using temperature from config: {temp}")
+        if not isinstance(temp, float):
+            raise ValueError(f"Aphrodite Chat: Invalid type for 'temp': Expected a float, got {type(temp).__name__}")
+
+        # Min-P
+        if isinstance(minp, float):
+            minp = float(minp)
+            logging.debug(f"Aphrodite Chat: Using Min-P: {minp}")
+        elif minp is None:
+            minp = loaded_config_data['aphrodite_api']['min_p']
+            logging.debug(f"Aphrodite Chat: Using Min-P from config: {minp}")
+        if not isinstance(minp, float):
+            raise ValueError(f"Aphrodite Chat: Invalid type for 'min_p': Expected a float, got {type(minp).__name__}")
+
+        # Top-P
+        if isinstance(topp, float):
+            topp = float(topp)
+            logging.debug(f"Aphrodite Chat: Using Top-P: {topp}")
+        elif topp is None:
+            topp = loaded_config_data['aphrodite_api']['top_p']
+            logging.debug(f"Aphrodite Chat: Using Top-P from config: {topp}")
+        if not isinstance(topp, float):
+            raise ValueError(f"Aphrodite Chat: Invalid type for 'top_p': Expected a float, got {type(topp).__name__}")
+
+        # Top-K
+        if isinstance(topk, int):
+            topk = int(topk)
+            logging.debug(f"Aphrodite Chat: Using Top-K: {topk}")
+        elif topk is None:
+            topk = loaded_config_data['aphrodite_api']['top_k']
+            logging.debug(f"Aphrodite Chat: Using Top-K from config: {topk}")
+        if not isinstance(temp, float):
+            raise ValueError(f"Aphrodite Chat: Invalid type for 'top_k': Expected an int, got {type(temp).__name__}")
+
+        # Streaming
         if isinstance(streaming, str):
             streaming = streaming.lower() == "true"
         elif isinstance(streaming, int):
@@ -723,37 +958,152 @@ def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="h
         else:
             logging.debug("Aphrodite: Streaming mode disabled")
         if not isinstance(streaming, bool):
-            raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+            raise ValueError(f"Aphrodite Chat: Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json'
-    }
-    data2 = {
-        'text': input_data,
-    }
-    try:
-        response = requests.post(api_IP, headers=headers, json=data2)
-        response.raise_for_status()
-        summary = response.json().get('summary', '')
-        return summary
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error summarizing with Aphrodite: {e}")
-        return "Error summarizing with Aphrodite."
+        # Model
+        if model is None:
+            aphrodite_model = loaded_config_data['aphrodite_api']['model'] or "gpt-4o"
+            logging.debug(f"Aphrodite Chat: Using model: {aphrodite_model}")
+
+        # Input data handling
+        logging.debug(f"Aphrodite Chat: Raw input data type: {type(input_data)}")
+        logging.debug(f"Aphrodite Chat: Raw input data (first 500 chars): {str(input_data)[:500]}...")
+
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                # It's likely a JSON string
+                logging.debug("Aphrodite Chat: Parsing provided JSON string data for summarization")
+                try:
+                    data = json.loads(input_data)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Aphrodite Chat: Error parsing JSON string: {str(e)}")
+                    return f"Aphrodite Chat: Error parsing JSON input: {str(e)}"
+            elif os.path.isfile(input_data):
+                logging.debug("Aphrodite Chat: Loading JSON data from file for summarization")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                logging.debug("Aphrodite Chat: Using provided string data for summarization")
+                data = input_data
+        else:
+            data = input_data
+
+        logging.debug(f"Aphrodite Chat: Processed data type: {type(data)}")
+        logging.debug(f"Aphrodite Chat: Processed data (first 500 chars): {str(data)[:500]}...")
+
+        # Text extraction
+        if isinstance(data, dict):
+            if 'summary' in data:
+                logging.debug("Aphrodite Chat: Summary already exists in the loaded data")
+                return data['summary']
+            elif 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)  # Convert dict to string if no specific format
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError(f"Aphrodite Chat: Invalid input data format: {type(data)}")
+
+        logging.debug(f"Aphrodite Chat: Extracted text (first 500 chars): {text[:500]}...")
+        logging.debug(f"Aphrodite Chat: Custom prompt: {custom_prompt_arg}")
+
+        headers = {
+            'Authorization': f'Bearer {aphrodite_api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        logging.debug(
+            f"Aphrodite API Key: {aphrodite_api_key[:5]}...{aphrodite_api_key[-5:] if aphrodite_api_key else None}")
+        logging.debug("Aphrodite Chat: Preparing data + prompt for submittal")
+        aphrodite_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        aphrodite_system_message = "You are a helpful AI assistant who does whatever the user requests."
+
+        if system_message is None:
+            system_message = aphrodite_system_message
+
+        data = {
+            "model": aphrodite_model,
+            "messages": [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": aphrodite_prompt}
+            ],
+            "max_completion_tokens": 4096,
+            "temperature": temp,
+            "stream": streaming,
+            "top_p": topp,
+            "top_k": topk,
+            "min_p": minp
+        }
+        if streaming:
+            logging.debug("OpenAI: Posting request (streaming")
+            response = requests.post(
+                'https://api.openai.com/v1/chat/completions',
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            logging.debug(f"OpenAI: Response text: {response.text}")
+            response.raise_for_status()
+
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
+
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"OpenAI: Error decoding JSON from line: {line}")
+                            continue
+
+            return stream_generator()
+        else:
+            logging.debug("OpenAI: Posting request (non-streaming")
+            response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+            logging.debug(f"Full API response data: {response}")
+            if response.status_code == 200:
+                response_data = response.json()
+                logging.debug(response_data)
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    chat_response = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("openai: Chat Sent successfully")
+                    logging.debug(f"openai: Chat response: {chat_response}")
+                    return chat_response
+                else:
+                    logging.warning("openai: Chat response not found in the response data")
+                    return "openai: Chat not available"
+            else:
+                logging.error(f"OpenAI: Chat request failed with status code {response.status_code}")
+                logging.error(f"OpenAI: Error response: {response.text}")
+                return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
+    except json.JSONDecodeError as e:
+        logging.error(f"OpenAI: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"OpenAI: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"OpenAI: Error making API request: {str(e)}", exc_info=True)
+        return f"OpenAI: Error making API request: {str(e)}"
+    except Exception as e:
+        logging.error(f"OpenAI: Unexpected error: {str(e)}", exc_info=True)
+        return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def chat_with_ollama(
-    input_data,
-    custom_prompt,
-    api_url="http://127.0.0.1:11434/v1/chat/completions",
-    api_key=None,
-    temp=None,
-    system_message=None,
-    model=None,
-    max_retries=5,
-    retry_delay=20,
-    streaming=False
-):
+def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/v1/chat/completions", api_key=None,
+                     temp=None, system_message=None, model=None, max_retries=5, retry_delay=20, streaming=False,
+                     top_p=None):
+    # https://github.com/ollama/ollama/blob/main/docs/openai.md
     try:
         logging.debug("Ollama: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -798,6 +1148,15 @@ def chat_with_ollama(
             logging.debug("Ollama: Streaming mode disabled")
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
+        if isinstance(top_p, float):
+            top_p = float(top_p)
+            logging.debug(f"Ollama: Using top_p: {top_p}")
+        elif top_p is None:
+            top_p = load_and_log_configs().get('ollama_api', {}).get('top_p', 0.95)
+            logging.debug(f"Ollama: Using top_p from config: {top_p}")
+        if not isinstance(top_p, float):
+            raise ValueError(f"Invalid type for 'top_p': Expected a float, got {type(streaming).__name__}")
 
         # Load transcript
         logging.debug("Ollama: Loading JSON data")
@@ -851,7 +1210,8 @@ def chat_with_ollama(
                 }
             ],
             "temperature": temp,
-            "stream": streaming
+            "stream": streaming,
+            "top_p": top_p
         }
 
         if streaming:
@@ -959,15 +1319,9 @@ def chat_with_ollama(
 
 
 def chat_with_vllm(
-        input_data: Union[str, dict, list],
-        custom_prompt_input: str,
-        api_key: str = None,
-        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions",
-        model: str = None,
-        system_prompt: str = None,
-        temp: float = 0.7,
-        streaming=False
-) -> str:
+        input_data: Union[str, dict, list], custom_prompt_input: str, api_key: str = None,
+        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions", model: str = None, system_prompt: str = None,
+        temp: float =None, streaming: bool = False, minp: float = None, topp: float = None, topk=None) -> str:
     logging.debug("vLLM: Chat request being made...")
     try:
         logging.debug("vLLM: Loading and validating configurations")
@@ -1005,15 +1359,54 @@ def chat_with_vllm(
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
-        logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:] if vllm_api_key else 'None'}")
-        # Process input data
-
-        if system_prompt is None:
-            system_prompt = "You are a helpful AI assistant."
-
+        # Model
         model = model or loaded_config_data['vllm_api']['model']
+
+        # Top-K
+        if isinstance(topk, int):
+            topk = int(topk)
+            logging.debug(f"vLLM: Using Top-K: {topk}")
+        elif topk is None:
+            topk = loaded_config_data['vllm_api']['top_k']
+            logging.debug(f"vLLM: Using Top-K from config: {topk}")
+        if not isinstance(topk, int):
+            raise ValueError(f"Invalid type for 'top_k': Expected an int, got {type(topk).__name__}")
+
+        # Top-P
+        if isinstance(topp, float):
+            topp = float(topp)
+            logging.debug(f"vLLM: Using Top-P: {topp}")
+        elif topp is None:
+            topp = loaded_config_data['vllm_api']['top_p']
+            logging.debug(f"vLLM: Using Top-P from config: {topp}")
+        if not isinstance(topp, float):
+            raise ValueError(f"Invalid type for 'top_p': Expected a float, got {type(topp).__name__}")
+
+        # Min-P
+        if isinstance(minp, float):
+            minp = float(minp)
+            logging.debug(f"vLLM: Using Min-P: {minp}")
+        elif minp is None:
+            minp = loaded_config_data['vllm_api']['min_p']
+            logging.debug(f"vLLM: Using Min-P from config: {minp}")
+        if not isinstance(minp, float):
+            raise ValueError(f"Invalid type for 'min_p': Expected a float, got {type(minp).__name__}")
+
+        # Temperature
+        if isinstance(temp, float):
+            temp = float(temp)
+            logging.debug(f"vLLM: Using temperature: {temp}")
+        elif temp is None:
+            temp = loaded_config_data['vllm_api']['temperature']
+            logging.debug(f"vLLM: Using temperature from config: {temp}")
+        if not isinstance(temp, float):
+            raise ValueError(f"Invalid type for 'temp': Expected a float, got {type(temp).__name__}")
+
+        logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:] if vllm_api_key else 'None'}")
+
+        vllm_system_prompt = "You are a helpful AI assistant."
         if system_prompt is None:
-            system_prompt = "You are a helpful AI assistant."
+            system_prompt = vllm_system_prompt
 
         # Prepare the API request
         headers = {
@@ -1027,7 +1420,10 @@ def chat_with_vllm(
                 {"role": "user", "content": f"{custom_prompt_input}\n\n{input_data}"},
             ],
             "temperature": temp,
-            "stream": streaming
+            "stream": streaming,
+            "top_p": topp,
+            "top_k": topk,
+            "min_p": minp
         }
 
         logging.debug(f"vLLM: Sending request to {vllm_api_url}")

@@ -16,11 +16,11 @@ https://blog.det.life/from-scrolls-to-similarity-search-building-a-movie-recomme
 https://www.dogesec.com/blog/full_text_rss_atom_blog_feeds/
 https://arxiv.org/abs/2411.19352
 https://arxiv.org/abs/2412.18082
-
+https://blog.badsectorlabs.com/files/blogs.txt
 https://arxiv.org/abs/2412.08604
 https://arxiv.org/abs/2411.18814
 https://blog.badsectorlabs.com/files/blogs.txt
-
+https://github.com/YuanchenBei/Awesome-Cold-Start-Recommendation
 
 
 

@@ -240,14 +240,14 @@ def load_and_log_configs():
         anthropic_streaming = config.get('API', 'anthropic_streaming', fallback='False')
         anthropic_temperature = config.get('API', 'anthropic_temperature', fallback='0.7')
         anthropic_top_p = config.get('API', 'anthropic_top_p', fallback='0.95')
-        anthropic_min_p = config.get('API', 'anthropic_min_p', fallback='0.05')
+        anthropic_top_k = config.get('API', 'anthropic_top_k', fallback='100')
         cohere_streaming = config.get('API', 'cohere_streaming', fallback='False')
         cohere_temperature = config.get('API', 'cohere_temperature', fallback='0.7')
-        cohere_min_p = config.get('API', 'cohere_min_p', fallback='0.05')
+        cohere_max_p = config.get('API', 'cohere_max_p', fallback='0.95')
+        cohere_top_k = config.get('API', 'cohere_top_k', fallback='100')
         groq_streaming = config.get('API', 'groq_streaming', fallback='False')
         groq_temperature = config.get('API', 'groq_temperature', fallback='0.7')
         groq_top_p = config.get('API', 'groq_top_p', fallback='0.95')
-        groq_min_p = config.get('API', 'groq_min_p', fallback='0.05')
         openai_streaming = config.get('API', 'openai_streaming', fallback='False')
         openai_temperature = config.get('API', 'openai_temperature', fallback='0.7')
         openai_top_p = config.get('API', 'openai_top_p', fallback='0.95')
@@ -259,6 +259,7 @@ def load_and_log_configs():
         openrouter_temperature = config.get('API', 'openrouter_temperature', fallback='0.7')
         openrouter_top_p = config.get('API', 'openrouter_top_p', fallback='0.95')
         openrouter_min_p = config.get('API', 'openrouter_min_p', fallback='0.05')
+        openrouter_top_k = config.get('API', 'openrouter_top_k', fallback='100')
         deepseek_streaming = config.get('API', 'deepseek_streaming', fallback='False')
         deepseek_temperature = config.get('API', 'deepseek_temperature', fallback='0.7')
         deepseek_top_p = config.get('API', 'deepseek_top_p', fallback='0.95')
@@ -266,7 +267,6 @@ def load_and_log_configs():
         mistral_streaming = config.get('API', 'mistral_streaming', fallback='False')
         mistral_temperature = config.get('API', 'mistral_temperature', fallback='0.7')
         mistral_top_p = config.get('API', 'mistral_top_p', fallback='0.95')
-        mistral_min_p = config.get('API', 'mistral_min_p', fallback='0.05')
         google_streaming = config.get('API', 'google_streaming', fallback='False')
         google_temperature = config.get('API', 'google_temperature', fallback='0.7')
         google_top_p = config.get('API', 'google_top_p', fallback='0.95')
@@ -288,7 +288,7 @@ def load_and_log_configs():
         kobold_streaming = config.get('Local-API', 'kobold_streaming', fallback='False')
         kobold_temperature = config.get('Local-API', 'kobold_temperature', fallback='0.7')
         kobold_top_p = config.get('Local-API', 'kobold_top_p', fallback='0.95')
-        kobold_min_p = config.get('Local-API', 'kobold_min_p', fallback='0.05')
+        kobold_top_k = config.get('Local-API', 'kobold_top_k', fallback='100')
 
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
@@ -472,14 +472,15 @@ def load_and_log_configs():
                 'streaming': anthropic_streaming,
                 'temperature': anthropic_temperature,
                 'top_p': anthropic_top_p,
-                'min_p': anthropic_min_p
+                'top_k': anthropic_top_k
             },
             'cohere_api': {
                 'api_key': cohere_api_key,
                 'model': cohere_model,
                 'streaming': cohere_streaming,
                 'temperature': cohere_temperature,
-                'min_p': cohere_min_p
+                'max_p': cohere_max_p,
+                'top_k': cohere_top_k
             },
             'deepseek_api': {
                 'api_key': deepseek_api_key,
@@ -502,8 +503,7 @@ def load_and_log_configs():
                 'model': groq_model,
                 'streaming': groq_streaming,
                 'temperature': groq_temperature,
-                'top_p': groq_top_p,
-                'min_p': groq_min_p
+                'top_p': groq_top_p
             },
             'huggingface_api': {
                 'api_key': huggingface_api_key,
@@ -515,8 +515,7 @@ def load_and_log_configs():
                 'model': mistral_model,
                 'streaming': mistral_streaming,
                 'temperature': mistral_temperature,
-                'top_p': mistral_top_p,
-                'min_p': mistral_min_p
+                'top_p': mistral_top_p
             },
             'openrouter_api': {
                 'api_key': openrouter_api_key,
@@ -524,7 +523,8 @@ def load_and_log_configs():
                 'streaming': openrouter_streaming,
                 'temperature': openrouter_temperature,
                 'top_p': openrouter_top_p,
-                'min_p': openrouter_min_p
+                'min_p': openrouter_min_p,
+                'openrouter_top_k': openrouter_top_k
             },
             'openai_api': {
                 'api_key': openai_api_key,
@@ -572,7 +572,7 @@ def load_and_log_configs():
                 'streaming': kobold_streaming,
                 'temperature': kobold_temperature,
                 'top_p': kobold_top_p,
-                'min_p': kobold_min_p
+                'top_k': kobold_top_k
             },
             'tabby_api': {
                 'api_ip': tabby_api_IP,

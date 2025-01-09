@@ -116,9 +116,10 @@ def get_openai_embeddings(input_data: str, model: str) -> List[float]:
         raise ValueError(f"OpenAI: Unexpected error occurred: {str(e)}")
 
 
-def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming, minp, maxp, model):
+def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming, maxp, model):
     loaded_config_data = load_and_log_configs()
     openai_api_key = api_key
+    # https://platform.openai.com/docs/api-reference/invite
     try:
         # API key validation
         if not openai_api_key:
@@ -284,8 +285,9 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
         return f"OpenAI: Unexpected error occurred: {str(e)}"
 
 
-def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None, temp=None, streaming=False, minp=None, maxp=None):
+def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retries=3, retry_delay=5, system_prompt=None, temp=None, streaming=False, topp=None, topk=None):
     try:
+        # https://docs.anthropic.com/en/api/messages
         loaded_config_data = load_and_log_configs()
 
         # Check if config was loaded successfully
@@ -347,21 +349,21 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             temp = 0.7
             logging.debug(f"Anthropic: Using default temperature: {temp}")
 
-        if minp is None:
-            minp = loaded_config_data['anthropic_api']['min_p']
-            minp = float(minp)
-            logging.debug(f"Anthropic: Using min_p from config.txt: {minp}")
+        if topk is None:
+            topk = loaded_config_data['anthropic_api']['topk']
+            top_k = float(topk)
+            logging.debug(f"Anthropic: Using Top-K from config.txt: {topk}")
         else:
-            minp = 0.0
-            logging.debug(f"Anthropic: Using default min_p: {minp}")
+            top_k = None
+            logging.debug(f"Anthropic: Using default Top-K: {topk}")
 
-        if maxp is None:
-            maxp = loaded_config_data['anthropic_api']['top_p']
-            maxp = float(maxp)
-            logging.debug(f"Anthropic: Using max_p from config.txt: {maxp}")
+        if topp is None:
+            topp = loaded_config_data['anthropic_api']['top_p']
+            top_p = float(topp)
+            logging.debug(f"Anthropic: Using max_p from config.txt: {top_p}")
         else:
-            maxp = 1.0
-            logging.debug(f"Anthropic: Using default maxp: {maxp}")
+            top_p = 1.0
+            logging.debug(f"Anthropic: Using default maxp: {top_p}")
 
         headers = {
             'x-api-key': anthropic_api_key,
@@ -376,14 +378,15 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             "content": f"{input_data} \n\n\n\n{anthropic_user_prompt}"
         }
 
+        # FIXME - add topk only if it's not None
         data = {
             "model": anthropic_model,
             "max_tokens": 4096,  # max possible tokens to return
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
             "temperature": temp,
-            "top_k": 0,
-            "top_p": 1.0,
+            "top_k": top_k,
+            "top_p": top_p,
             "metadata": {
                 "user_id": "example_user_id",
             },
@@ -480,10 +483,10 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 
 
 # Summarize with Cohere
-def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, system_prompt=None, temp=None, streaming=False):
+def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, system_prompt=None, temp=None, streaming=False, maxp=None, minp=None, topk=None):
     loaded_config_data = load_and_log_configs()
     cohere_api_key = None
-
+    # https://docs.cohere.com/v2/reference/chat-stream
     try:
         # API key validation
         if api_key:
@@ -514,6 +517,13 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
             logging.debug("Cohere: Streaming mode disabled")
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
+        if not topk:
+            top_k = loaded_config_data['cohere_api']['top_k']
+            top_k = float(top_k)
+        if not maxp:
+            maxp = loaded_config_data['cohere_api']['max_p']
+            maxp = float(maxp)
 
         # Ensure model is set
         if not model:
@@ -558,6 +568,8 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
                     "content": cohere_prompt,
                 }
             ],
+            "k": top_k,
+            "p": maxp,
         }
         logging.debug(f"Cohere Chat: Request data: {json.dumps(data, indent=2)}")
 
@@ -655,8 +667,9 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
 
 
 # https://console.groq.com/docs/quickstart
-def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
+def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, maxp=None):
     logging.debug("Groq: Summarization process starting...")
+    # https://console.groq.com/docs/api-reference#chat-create
     try:
         logging.debug("Groq: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -752,7 +765,9 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
                 }
             ],
             "model": groq_model,
-            "temperature": temp
+            "temperature": temp,
+            "stream": streaming,
+            "top_p": maxp
         }
 
         logging.debug("groq: Submitting request to API endpoint")
@@ -817,10 +832,10 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
         return f"Groq: Error occurred while processing summary with Groq: {str(e)}"
 
 
-def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
+def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, top_p=None, top_k=None, minp=None):
     import requests
     import json
-    global openrouter_model, openrouter_api_key
+    # https://openrouter.ai/docs/requests
     try:
         logging.debug("OpenRouter: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -862,48 +877,62 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
         if not openrouter_api_key or not openrouter_api_key.strip():
             logging.error("OpenRouter: No valid API key available")
             raise ValueError("No valid Anthropic API key available")
+
+        logging.debug(f"OpenRouter: Using API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:]}")
+
+        logging.debug(f"OpenRouter: Using Model: {openrouter_model}")
+
+        if not top_p:
+            logging.debug(f"OpenRouter: Using top_p {top_p} from config file")
+            top_p = loaded_config_data['openrouter_api']['top_p']
+            top_p = float(top_p)
+        if not top_k:
+            logging.debug(f"OpenRouter: Using top_k {top_k} from config file")
+            top_k = loaded_config_data['openrouter_api']['top_k']
+            top_k = float(top_k)
+        if not minp:
+            logging.debug(f"OpenRouter: Using min_p {minp} from config file")
+            minp = loaded_config_data['openrouter_api']['min_p']
+            minp = float(minp)
+
+        if isinstance(input_data, str) and os.path.isfile(input_data):
+            logging.debug("OpenRouter: Loading json data for summarization")
+            with open(input_data, 'r') as file:
+                data = json.load(file)
+        else:
+            logging.debug("OpenRouter: Using provided string data for summarization")
+            data = input_data
+
+        # DEBUG - Debug logging to identify sent data
+        logging.debug(f"OpenRouter: Loaded data: {data[:500]}...(snipped to first 500 chars)")
+        logging.debug(f"OpenRouter: Type of data: {type(data)}")
+
+        if isinstance(data, dict) and 'summary' in data:
+            # If the loaded data is a dictionary and already contains a summary, return it
+            logging.debug("OpenRouter: Summary already exists in the loaded data")
+            return data['summary']
+
+        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
+        if isinstance(data, list):
+            segments = data
+            text = extract_text_from_segments(segments)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("OpenRouter: Invalid input data format")
+
+        openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
+        logging.debug(f"openrouter: User Prompt being sent is {openrouter_prompt}")
+
+        if temp is None:
+            temp = 0.1
+        temp = float(temp)
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+
     except Exception as e:
         logging.error("OpenRouter: Error in processing: %s", str(e))
         return f"OpenRouter: Error occurred while processing config file with OpenRouter: {str(e)}"
-
-    logging.debug(f"OpenRouter: Using API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:]}")
-
-    logging.debug(f"OpenRouter: Using Model: {openrouter_model}")
-
-    if isinstance(input_data, str) and os.path.isfile(input_data):
-        logging.debug("OpenRouter: Loading json data for summarization")
-        with open(input_data, 'r') as file:
-            data = json.load(file)
-    else:
-        logging.debug("OpenRouter: Using provided string data for summarization")
-        data = input_data
-
-    # DEBUG - Debug logging to identify sent data
-    logging.debug(f"OpenRouter: Loaded data: {data[:500]}...(snipped to first 500 chars)")
-    logging.debug(f"OpenRouter: Type of data: {type(data)}")
-
-    if isinstance(data, dict) and 'summary' in data:
-        # If the loaded data is a dictionary and already contains a summary, return it
-        logging.debug("OpenRouter: Summary already exists in the loaded data")
-        return data['summary']
-
-    # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-    if isinstance(data, list):
-        segments = data
-        text = extract_text_from_segments(segments)
-    elif isinstance(data, str):
-        text = data
-    else:
-        raise ValueError("OpenRouter: Invalid input data format")
-
-    openrouter_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
-    logging.debug(f"openrouter: User Prompt being sent is {openrouter_prompt}")
-
-    if temp is None:
-        temp = 0.1
-    temp = float(temp)
-    if system_message is None:
-        system_message = "You are a helpful AI assistant who does whatever the user requests."
 
     if streaming:
         try:
@@ -924,11 +953,12 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
                         {"role": "user", "content": openrouter_prompt}
                     ],
                     #"max_tokens": 4096,
-                    #"top_p": 1.0,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                    "min_p": minp,
                     "temperature": temp,
                     "stream": True
                 }),
-                stream=True  # Enable streaming in requests
             )
 
             if response.status_code == 200:
@@ -979,9 +1009,12 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
                         {"role": "system", "content": system_message},
                         {"role": "user", "content": openrouter_prompt}
                     ],
-                    "temperature": temp
-                },
-                streaming=False)
+                    "top_p": top_p,
+                    "top_k": top_k,
+                    "min_p": minp,
+                    "temperature": temp,
+                    "stream": True
+                }),
             )
 
             response_data = response.json()
@@ -1004,8 +1037,9 @@ def chat_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None, syst
             return f"openrouter: Error occurred while processing chat request with openrouter: {str(e)}"
 
 
-# FIXME: This function is not yet implemented properly
+
 def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=None, temp=None, streaming=False):
+    # https://huggingface.co/docs/api-inference/en/parameters
     loaded_config_data = load_and_log_configs()
     logging.debug(f"huggingface Chat: Chat request process starting...")
     try:
@@ -1110,7 +1144,7 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
         return None
 
 
-def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_message="You are a helpful AI assistant who does whatever the user requests.", max_retries=3, retry_delay=5, streaming=False):
+def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_message=None, max_retries=3, retry_delay=5, streaming=False, topp=None):
     """
     Interacts with the DeepSeek API to generate summaries based on input data.
 
@@ -1126,6 +1160,7 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
     Returns:
         str: The summary generated by DeepSeek or an error message.
     """
+    # https://api-docs.deepseek.com/api/create-chat-completion
     logging.debug("DeepSeek: Summarization process starting...")
     try:
         logging.debug("DeepSeek: Loading and validating configurations")
@@ -1161,6 +1196,14 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
             logging.debug("DeepSeek: Streaming mode disabled")
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
+        # Set default system prompt if not provided
+        if isinstance(system_message, str):
+            logging.debug("DeepSeek: Using provided system prompt")
+            deepseek_system_message = system_message
+        else:
+            deepseek_system_message = "You are a helpful AI assistant who does whatever the user requests."
+            logging.debug("DeepSeek Chat: Using default system prompt")
 
         # Input data handling
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -1221,13 +1264,6 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
             logging.warning("DeepSeek: Invalid temperature value. Setting to default 0.1")
             temp = 0.1
 
-        # Set default system prompt if not provided
-        if system_message is not None:
-            logging.debug("DeepSeek: Using provided system prompt")
-        else:
-            system_message = "You are a helpful AI assistant who does whatever the user requests."
-            logging.debug("DeepSeek: Using default system prompt")
-
         headers = {
             'Authorization': f'Bearer {deepseek_api_key}',
             'Content-Type': 'application/json'
@@ -1238,11 +1274,12 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
         payload = {
             "model": deepseek_model,
             "messages": [
-                {"role": "system", "content": system_message},
+                {"role": "system", "content": deepseek_system_message},
                 {"role": "user", "content": deepseek_prompt}
             ],
-            "stream": False,
-            "temperature": temp
+            "stream": streaming,
+            "temperature": temp,
+            "top_p": topp
         }
 
         logging.debug("DeepSeek: Posting request to API")
@@ -1324,7 +1361,7 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
         return f"DeepSeek: Error occurred while processing chat request: {str(e)}"
 
 
-def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
+def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, topp=None, model=None):
     logging.debug("Mistral: Chat request made")
     try:
         logging.debug("Mistral: Loading and validating configurations")
@@ -1352,6 +1389,7 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
 
         logging.debug(f"Mistral: Using API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:]}")
 
+        # Streaming mode validation
         if isinstance(streaming, str):
             streaming = streaming.lower() == "true"
         elif isinstance(streaming, int):
@@ -1364,6 +1402,26 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
+        # Model Selection validation
+        if isinstance(model, str):
+            mistral_model = model
+        else:
+            mistral_model = loaded_config_data['mistral_api'].get('model', "mistral-large-latest")
+
+        # Temp validation
+        if isinstance(temp, float):
+            temp = float(temp)
+        else:
+            temp = loaded_config_data['mistral_api'].get('temperature', 0.1)
+            temp = float(temp)
+            logging.debug("Mistral: Using temperature from config file")
+
+        # System message validation
+        if system_message is None:
+            mistral_system_message = "You are a helpful AI assistant who does whatever the user requests."
+            system_message = mistral_system_message
+
+        # Input data handling
         logging.debug("Mistral: Using provided string data")
         data = input_data
 
@@ -1374,14 +1432,6 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
             text = input_data
         else:
             raise ValueError("Mistral: Invalid input data format")
-
-        mistral_model = loaded_config_data['mistral_api'].get('model', "mistral-large-latest")
-
-        if temp is None:
-            temp = 0.2
-        temp = float(temp)
-        if system_message is None:
-            system_message = "You are a helpful AI assistant who does whatever the user requests."
 
         headers = {
             'Authorization': f'Bearer {mistral_api_key}',
@@ -1401,7 +1451,8 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
                 "content": mistral_prompt}
             ],
             "temperature": temp,
-            "top_p": 1,
+            "top_p": topp,
+            # FIXME - Add global max tokens variable
             "max_tokens": 4096,
             "stream": streaming,
             "safe_prompt": False
@@ -1476,7 +1527,7 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
         return f"Mistral: Error occurred while processing Chat: {str(e)}"
 
 
-def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
+def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, topp=None, topk=None):
     # https://ai.google.dev/api/generate-content#v1beta.GenerationConfig
     loaded_config_data = load_and_log_configs()
     google_api_key = api_key
@@ -1504,6 +1555,37 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
             logging.debug("Google: Streaming mode disabled")
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
+
+        if isinstance(temp, float):
+            temp = float(temp)
+        else:
+            temp = loaded_config_data['google_api'].get('temperature', 0.1)
+
+        if isinstance(system_message, str):
+            logging.debug("Google: Using provided system message")
+            system_message = system_message
+        else:
+            google_system_message = "You are a helpful AI assistant who does whatever the user requests."
+            logging.debug("Google: Using default system message")
+            system_message = google_system_message
+
+        if isinstance(topp, float):
+            topp = float(topp)
+            logging.debug(f"Google: Using top_p {topp} from parameter")
+        else:
+            topp = loaded_config_data['google_api'].get('top_p', 0.9)
+            logging.debug(f"Google: Using top_p {topp} from config file")
+
+        if isinstance(topk, int):
+            topk = int(topk)
+        else:
+            topk = loaded_config_data['google_api'].get('top_k', 100)
+
+
+
+        # Model selection
+        google_model = loaded_config_data['google_api']['model'] or "gemini-1.5-pro"
+        logging.debug(f"Google: Using model: {google_model}")
 
         # Input data handling
         logging.debug(f"Google: Raw input data type: {type(input_data)}")
@@ -1550,8 +1632,6 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
         logging.debug(f"Google: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"Google: Custom prompt: {custom_prompt_arg}")
 
-        google_model = loaded_config_data['google_api']['model'] or "gemini-1.5-pro"
-        logging.debug(f"Google: Using model: {google_model}")
 
         headers = {
             'Authorization': f'Bearer {google_api_key}',
@@ -1562,19 +1642,19 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
             f"Google API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
         logging.debug("Google: Preparing data + prompt for submittal")
         google_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
-        #if temp is None:
-        #    temp = 0.7
-        if system_message is None:
-            system_message = "You are a helpful AI assistant who does whatever the user requests."
-        #temp = float(temp)
+
+        google_max_tokens = 4096
+
         data = {
             "model": google_model,
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": google_prompt}
             ],
-            #"max_tokens": 4096,
-            #"temperature": temp
+            "temperature": temp,
+            "topP": topp,
+            "topK": topk,
+            "maxOutputTokens": google_max_tokens,
         }
 
         if streaming:

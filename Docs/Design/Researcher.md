@@ -145,6 +145,9 @@ https://github.com/faraz18001/Sales-Llama
 https://github.com/memgraph/memgraph
 https://github.com/rashadphz/farfalle/tree/main/src/backend
 https://github.com/SakanaAI/AI-Scientist
+https://gangiswag.github.io/infogent/
+https://arxiv.org/abs/2501.03916
+https://github.com/dendrite-systems/dendrite-python-sdk
 https://github.com/rashadphz/farfalle/blob/main/src/backend/agent_search.py
 https://github.com/rashadphz/farfalle/blob/main/src/backend/prompts.py
 https://github.com/stanford-oval/storm/

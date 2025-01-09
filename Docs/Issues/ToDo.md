@@ -19,7 +19,11 @@ List of stuff I don't feel like filing an issue for (yet).
       - https://notes.billmill.org/blog/2024/06/Serving_a_billion_web_requests_with_boring_code.html
 - API
       - https://quart.palletsprojects.com/en/latest/tutorials/api_tutorial.html
-
+- Add global max tokens value to config + Per API max tokens value
+- Add global System prompts for Chat API calls
+- Add global System prompts for Summarization API calls
+- 
+- 
 - PDF Parsing
     - marker https://github.com/VikParuchuri/marker
     https://github.com/pdf2htmlEX/pdf2htmlEX
