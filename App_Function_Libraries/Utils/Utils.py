@@ -307,6 +307,11 @@ def load_and_log_configs():
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
         tabby_model = config.get('models', 'tabby_model', fallback=None)
+        tabby_streaming = config.get('Local-API', 'tabby_streaming', fallback='False')
+        tabby_temperature = config.get('Local-API', 'tabby_temperature', fallback='0.7')
+        tabby_top_p = config.get('Local-API', 'tabby_top_p', fallback='0.95')
+        tabby_top_k = config.get('Local-API', 'tabby_top_k', fallback='100')
+        tabby_min_p = config.get('Local-API', 'tabby_min_p', fallback='0.05')
 
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
@@ -576,7 +581,12 @@ def load_and_log_configs():
             'tabby_api': {
                 'api_ip': tabby_api_IP,
                 'api_key': tabby_api_key,
-                'model': tabby_model
+                'model': tabby_model,
+                'streaming': tabby_streaming,
+                'temperature': tabby_temperature,
+                'top_p': tabby_top_p,
+                'top_k': tabby_top_k,
+                'min_p': tabby_min_p
             },
             'vllm_api': {
                 'api_url': vllm_api_url,
