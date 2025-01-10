@@ -558,7 +558,7 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
         }
 
         # Ensure system_prompt is set
-        if not system_prompt:
+        if not isinstance(system_prompt, str):
             system_prompt = "You are a helpful assistant"
         logging.debug(f"Cohere Chat: System Prompt being sent is: '{system_prompt}'")
 
@@ -586,16 +586,17 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
         logging.debug(f"Cohere Chat: Request data: {json.dumps(data, indent=2)}")
 
         logging.debug("cohere chat: Submitting request to API endpoint")
-        print("cohere chat: Submitting request to API endpoint")
+        logging.info("cohere chat: Submitting request to API endpoint")
 
         if streaming:
             logging.debug("Cohere: Submitting streaming request to API endpoint")
             response = requests.post(
-                'https://api.cohere.ai/v1/chat',
+                'https://api.cohere.com/v2/chat',
                 headers=headers,
                 json=data,
                 stream=True  # Enable response streaming
             )
+            logging.debug(f"Cohere Chat: Raw API response: {response.text}")
             response.raise_for_status()
 
             def stream_generator():
@@ -624,7 +625,7 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
             return stream_generator()
         else:
             try:
-                response = requests.post('https://api.cohere.ai/v2/chat', headers=headers, json=data)
+                response = requests.post('https://api.cohere.com/v2/chat', headers=headers, json=data)
                 logging.debug(f"Cohere Chat: Raw API response: {response.text}")
             except requests.RequestException as e:
                 logging.error(f"Cohere Chat: Error making API request: {str(e)}")
