@@ -1313,7 +1313,7 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
                     response = requests.post(
                         'https://api.deepseek.com/chat/completions',
                         headers=headers,
-                        json=data,
+                        json=payload,
                         stream=True
                     )
                     response.raise_for_status()
@@ -1666,7 +1666,9 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
 
         headers = {
             'Authorization': f'Bearer {google_api_key}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            "Accept": "text/event-stream" if streaming else "application/json"
+
         }
 
         logging.debug(
