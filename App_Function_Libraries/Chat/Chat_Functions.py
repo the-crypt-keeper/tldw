@@ -97,21 +97,73 @@ def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp
             )
 
         elif api_endpoint.lower() == "openrouter":
-            response = chat_with_openrouter(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_openrouter(api_key,
+                input_data,
+                prompt,
+                temp,
+                system_message,
+                streaming,
+                topp,
+                topk,
+                minp
+            )
 
         elif api_endpoint.lower() == "deepseek":
-            response = chat_with_deepseek(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_deepseek(api_key, input_data, prompt, temp, system_message, streaming, topp)
 
         elif api_endpoint.lower() == "mistral":
-            response = chat_with_mistral(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_mistral(api_key,
+                 input_data,
+                 prompt,
+                 temp,
+                 system_message,
+                 streaming,
+                 topp,
+                 model
+            )
 
         elif api_endpoint.lower() == "google":
-            response = chat_with_google(api_key, input_data, prompt, temp, system_message)
+            response = chat_with_google(api_key,
+                input_data,
+                prompt,
+                temp,
+                system_message,
+                streaming,
+                topp,
+                topk
+            )
+
+        elif api_endpoint.lower() == "huggingface":
+            response = chat_with_huggingface(api_key,
+                 input_data,
+                 prompt,
+                 system_message,
+                 temp,
+                 streaming
+            )
 
         elif api_endpoint.lower() == "llama.cpp":
-            response = chat_with_llama(input_data, prompt, temp, None, api_key, system_message)
+            response = chat_with_llama(input_data,
+               prompt,
+               temp,
+               None,
+               api_key,
+               system_message,
+               streaming,
+               topk,
+               topp,
+               minp
+            )
         elif api_endpoint.lower() == "kobold":
-            response = chat_with_kobold(input_data, api_key, prompt, temp, system_message)
+            response = chat_with_kobold(input_data,
+                api_key,
+                prompt,
+                temp,
+                system_message,
+                streaming,
+                topk,
+                topp
+            )
 
         elif api_endpoint.lower() == "ooba":
             response = chat_with_oobabooga(input_data, api_key, prompt, temp, system_message)
@@ -124,9 +176,6 @@ def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp
 
         elif api_endpoint.lower() == "local-llm":
             response = chat_with_local_llm(input_data, prompt, temp, system_message)
-
-        elif api_endpoint.lower() == "huggingface":
-            response = chat_with_huggingface(api_key, input_data, prompt, temp)  # , system_message)
 
         elif api_endpoint.lower() == "ollama":
             response = chat_with_ollama(input_data, prompt, None, api_key, temp, system_message)
@@ -143,6 +192,7 @@ def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp
         call_duration = time.time() - start_time
         log_histogram("chat_api_call_duration", call_duration, labels={"api_endpoint": api_endpoint})
         log_counter("chat_api_call_success", labels={"api_endpoint": api_endpoint})
+        logging.debug(f"Debug - Chat API Call - Response: {response}")
         return response
 
     except Exception as e:
@@ -194,11 +244,13 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         response = chat_api_call(api_endpoint, api_key, input_data, custom_prompt, temp, system_message, streaming, minp, maxp, model)
 
         if streaming:
+            logging.debug(f"Debug - Chat Function - Response: {response}")
             return response
         else:
             chat_duration = time.time() - start_time
             log_histogram("chat_duration", chat_duration, labels={"api_endpoint": api_endpoint})
             log_counter("chat_success", labels={"api_endpoint": api_endpoint})
+            logging.debug(f"Debug - Chat Function - Response: {response}")
             return response
     except Exception as e:
         log_counter("chat_error", labels={"api_endpoint": api_endpoint, "error": str(e)})
