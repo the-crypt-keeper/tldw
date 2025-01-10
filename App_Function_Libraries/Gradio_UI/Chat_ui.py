@@ -345,7 +345,7 @@ def create_chat_interface():
                     use_prompt = gr.Checkbox(label="Use Prompt")
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
                 with gr.Row():
-                    temperature = gr.Slider(label="Temperature", minimum=0.00, maximum=1.0, step=0.05, value=0.7)
+                    temperature = gr.Slider(label="Temperature", minimum=0.00, maximum=4.0, step=0.05, value=0.7)
                 with gr.Row():
                     conversation_search = gr.Textbox(label="Search Conversations")
                 with gr.Row():
@@ -694,7 +694,7 @@ def create_chat_interface_stacked():
                     use_summary = gr.Checkbox(label="Use Summary")
                     use_prompt = gr.Checkbox(label="Use Prompt")
                     save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
-                    temp = gr.Slider(label="Temperature", minimum=0.00, maximum=2.0, step=0.05, value=0.7)
+                    temp = gr.Slider(label="Temperature", minimum=0.00, maximum=4.0, step=0.05, value=0.7)
                 with gr.Row():
                     conversation_search = gr.Textbox(label="Search Conversations")
                 with gr.Row():
@@ -1169,7 +1169,7 @@ def create_chat_interface_multi_api():
                         label="API for Chat Interaction (Optional)"
                     )
                     api_key = gr.Textbox(label=f"API Key {i + 1} (if required)", type="password")
-                    temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=1.0, step=0.05,
+                    temperature = gr.Slider(label=f"Temperature {i + 1}", minimum=0.0, maximum=4.0, step=0.05,
                                             value=0.7)
                     chatbot = gr.Chatbot(height=800, elem_classes="chat-window")
                     token_count_display = gr.Number(label=f"Approximate Token Count {i + 1}", value=0,
@@ -1477,7 +1477,7 @@ def create_chat_interface_four():
                 temperature = gr.Slider(
                     label=f"Temperature {index + 1}",
                     minimum=0.0,
-                    maximum=1.0,
+                    maximum=4.0,
                     step=0.05,
                     value=0.7
                 )
