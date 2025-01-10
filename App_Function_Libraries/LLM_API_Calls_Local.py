@@ -415,7 +415,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
         }
 
         kobold_prompt = f"{custom_prompt_input}\n\n{text}"
-        logging.debug("kobold: Prompt being sent is {kobold_prompt}")
+        logging.debug(f"kobold: Prompt being sent is {kobold_prompt}")
 
         data = {
             "prompt": kobold_prompt,
@@ -513,7 +513,8 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                             summary = response_data['results'][0]['text'].strip()
                             logging.debug("Kobold: Chat request successful")
                             logging.debug(f"Kobold: Returning summary: {summary}")
-                            return summary
+                            yield summary
+                            return
                         else:
                             logging.error("Expected data not found in API response.")
                             return "Expected data not found in API response."
@@ -521,15 +522,18 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                         logging.error(
                             "Kobold: Error parsing JSON response: %s", str(e)
                         )
-                        return f"Error parsing JSON response: {str(e)}"
+                        yield f"Error parsing JSON response: {str(e)}"
+                        return
                 else:
                     logging.error(
                         f"Kobold: API request failed with status code {response.status_code}: {response.text}"
                     )
-                    return f"Kobold: API request failed: {response.text}"
+                    yield f"Kobold: API request failed: {response.text}"
+                    return
             except Exception as e:
                 logging.error("kobold: Error in processing: %s", str(e))
-                return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
+                yield f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
+                return
     except Exception as e:
         logging.error("kobold: Error in processing: %s", str(e))
         return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"

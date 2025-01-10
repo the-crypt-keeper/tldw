@@ -115,11 +115,31 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
         # Generate bot response
         logging.debug("chat_wrapper(): Generating bot response")
         bot_message = ""
-        for chunk in chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
-                          temperature, system_prompt, streaming, minp=None, maxp=None, model=None):
-            bot_message += chunk  # Accumulate the streamed response
+        response = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
+                        temperature, system_prompt, streaming, minp=None, maxp=None, model=None)
+
+        # Handle streaming and non-streaming responses
+        if streaming:
+            # For streaming responses, iterate over the generator
+            for chunk in response:
+                bot_message += chunk  # Accumulate the streamed response
+                logging.debug(f"chat_wrapper(): Bot message being returned: {bot_message}")
+                # Yield the incremental response and updated history
+                yield bot_message, history + [(message, bot_message)], conversation_id
+        else:
+            # For non-streaming responses, handle the generator object
+            if hasattr(response, "__iter__") and not isinstance(response, (str, dict)):
+                # Consume the entire generator into a single string
+                chunks = list(response)  # Pull everything from the generator
+                bot_message = "".join(chunks)
+            elif isinstance(response, dict) and "message" in response:
+                bot_message = response["message"]
+            else:
+                # Fallback to a direct string conversion
+                bot_message = str(response)
+
             logging.debug(f"chat_wrapper(): Bot message being returned: {bot_message}")
-            # Yield the incremental response and updated history
+            # Yield the full response and updated history
             yield bot_message, history + [(message, bot_message)], conversation_id
 
         if save_conversation:
