@@ -400,7 +400,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             "metadata": {
                 "user_id": "example_user_id",
             },
-            "stream": False,
+            "stream": streaming,
             "system": system_prompt
         }
 
