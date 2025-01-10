@@ -616,6 +616,13 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
                                 # For text-based streaming
                                 chunk = data_json['text']
                                 yield chunk
+                            elif 'message' in data_json and 'content' in data_json['message']:
+                                # content is usually an array of blocks [{ "type": "text", "text": ... }, ...]
+                                for block in data_json['message']['content']:
+                                    if block.get('type') == 'text':
+                                        chunk = block.get('text', '')
+                                        if chunk:
+                                            yield chunk
                             else:
                                 logging.debug(f"Cohere: Unhandled streaming data: {data_json}")
                         except json.JSONDecodeError:
