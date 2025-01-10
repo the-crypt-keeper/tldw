@@ -410,8 +410,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
                 response = requests.post(
                     'https://api.anthropic.com/v1/messages',
                     headers=headers,
-                    json=data,
-                    stream=streaming
+                    json=data
                 )
 
                 # Check if the status code indicates success
@@ -1432,6 +1431,14 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
             temp = float(temp)
             logging.debug("Mistral: Using temperature from config file")
 
+        # Top-P validation
+        if isinstance(topp, float):
+            topp = float(topp)
+        else:
+            topp = loaded_config_data['mistral_api'].get('top_p', 0.95)
+            topp = float(topp)
+            logging.debug(f"Mistral: Using Top-P: {topp} from config file")
+
         # System message validation
         if system_message is None:
             mistral_system_message = "You are a helpful AI assistant who does whatever the user requests."
@@ -1676,7 +1683,7 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
         if streaming:
             logging.debug("Google: Posting streaming request")
             response = requests.post(
-                'https://generativelanguage.googleapis.com/v1beta/openai/',
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                 headers=headers,
                 json=data,
                 stream=True
@@ -1706,7 +1713,7 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
             return stream_generator()
         else:
             logging.debug("Google: Posting request")
-            response = requests.post('https://generativelanguage.googleapis.com/v1beta/chat/completions', headers=headers, json=data)
+            response = requests.post('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', headers=headers, json=data)
             logging.debug(f"Full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
