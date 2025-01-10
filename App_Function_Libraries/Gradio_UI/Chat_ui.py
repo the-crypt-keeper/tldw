@@ -323,38 +323,6 @@ def create_chat_interface():
 
         with gr.Row():
             with gr.Column(scale=1):
-                search_query_input = gr.Textbox(
-                    label="Search Query",
-                    placeholder="Enter your search query here..."
-                )
-                search_type_input = gr.Radio(
-                    choices=["Title", "Content", "Author", "Keyword"],
-                    value="Keyword",
-                    label="Search By"
-                )
-                keyword_filter_input = gr.Textbox(
-                    label="Filter by Keywords (comma-separated)",
-                    placeholder="ml, ai, python, etc..."
-                )
-                search_button = gr.Button("Search")
-                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
-                item_mapping = gr.State({})
-                with gr.Row():
-                    use_content = gr.Checkbox(label="Use Content")
-                    use_summary = gr.Checkbox(label="Use Summary")
-                    use_prompt = gr.Checkbox(label="Use Prompt")
-                    save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
-                with gr.Row():
-                    temperature = gr.Slider(label="Temperature", minimum=0.00, maximum=4.0, step=0.05, value=0.7)
-                with gr.Row():
-                    conversation_search = gr.Textbox(label="Search Conversations")
-                with gr.Row():
-                    search_conversations_btn = gr.Button("Search Conversations")
-                with gr.Row():
-                    previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
-                with gr.Row():
-                    load_conversations_btn = gr.Button("Load Selected Conversation")
-
                 # Refactored API selection dropdown
                 api_endpoint = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
@@ -391,6 +359,39 @@ def create_chat_interface():
                                              placeholder="Enter custom prompt here",
                                              lines=3,
                                              visible=False)
+                search_query_input = gr.Textbox(
+                    label="Search Query",
+                    placeholder="Enter your search query here..."
+                )
+                search_type_input = gr.Radio(
+                    choices=["Title", "Content", "Author", "Keyword"],
+                    value="Keyword",
+                    label="Search By"
+                )
+                keyword_filter_input = gr.Textbox(
+                    label="Filter by Keywords (comma-separated)",
+                    placeholder="ml, ai, python, etc..."
+                )
+                search_button = gr.Button("Search")
+                items_output = gr.Dropdown(label="Select Item", choices=[], interactive=True)
+                item_mapping = gr.State({})
+                with gr.Row():
+                    use_content = gr.Checkbox(label="Use Content")
+                    use_summary = gr.Checkbox(label="Use Summary")
+                    use_prompt = gr.Checkbox(label="Use Prompt")
+                    save_conversation = gr.Checkbox(label="Save Conversation", value=False, visible=True)
+                with gr.Row():
+                    temperature = gr.Slider(label="Temperature", minimum=0.00, maximum=4.0, step=0.05, value=0.7)
+
+                with gr.Row():
+                    conversation_search = gr.Textbox(label="Search Conversations")
+                with gr.Row():
+                    search_conversations_btn = gr.Button("Search Conversations")
+                with gr.Row():
+                    previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
+                with gr.Row():
+                    load_conversations_btn = gr.Button("Load Selected Conversation")
+
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
                 msg = gr.Textbox(label="Enter your message")
