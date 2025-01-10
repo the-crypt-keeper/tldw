@@ -162,7 +162,7 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
         return f"Local LLM: Error occurred while processing Chat response: {str(e)}"
 
 
-def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8080/completion", api_key=None, system_prompt=None, streaming=False, top_k=None, top_p=None, min_p=None):
+def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None, system_prompt=None, streaming=False, top_k=None, top_p=None, min_p=None):
     loaded_config_data = load_and_log_configs()
     try:
         # API key validation
@@ -202,6 +202,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
             logging.debug(f"Llama.cpp: Using top_k: {top_k}")
         elif top_k is None:
             top_k = load_and_log_configs().get('llama_api', {}).get('top_k', 100)
+            top_k = int(top_k)
             logging.debug(f"Llama.cpp: Using top_k from config: {top_k}")
         if not isinstance(streaming, int):
             raise ValueError(f"Invalid type for 'top_k': Expected an int, got {type(streaming).__name__}")
@@ -211,6 +212,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
             logging.debug(f"Llama.cpp: Using top_p: {top_p}")
         elif top_p is None:
             top_p = load_and_log_configs().get('llama_api', {}).get('top_p', 0.95)
+            top_p = float(top_p)
             logging.debug(f"Llama.cpp: Using top_p from config: {top_p}")
         if not isinstance(streaming, int):
             raise ValueError(f"Invalid type for 'top_p': Expected a float, got {type(streaming).__name__}")
@@ -220,6 +222,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
             logging.debug(f"Llama.cpp: Using min_p: {min_p}")
         elif min_p is None:
             min_p = load_and_log_configs().get('llama_api', {}).get('min_p', 0.05)
+            min_p = float(min_p)
             logging.debug(f"Llama.cpp: Using min_p from config: {min_p}")
         if not isinstance(streaming, int):
             raise ValueError(f"Invalid type for 'min_p': Expected a float, got {type(streaming).__name__}")
@@ -250,11 +253,11 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
             "system_prompt": f"{system_prompt}",
             'temperature': temp,
             'top_k': top_k,
-            'top_p': '0.95',
-            'min_p': '0.05',
+            'top_p': top_p,
+            'min_p': min_p,
             'n_predict': max_tokens_llama,
             #'n_keep': '0',
-            'stream': 'True',
+            'stream': streaming,
             #'stop': '["\n"]',
             #'tfs_z': '1.0',
             #'repeat_penalty': '1.1',
@@ -272,13 +275,12 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
 
         }
 
-        logging.debug("llama: Submitting request to API endpoint")
-        print("llama: Submitting request to API endpoint")
+        logging.debug("llama.cpp: Submitting request to API endpoint")
         response = requests.post(api_url, headers=headers, json=data, stream=streaming)
-
+        logging.debug("Llama.cpp: API Response Data: %s", response)
         if response.status_code == 200:
             if streaming:
-                logging.debug("Llama: Processing streaming response")
+                logging.debug("llama.cpp: Processing streaming response")
 
                 def stream_generator():
                     for line in response.iter_lines():
@@ -321,7 +323,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url="http://127.0.0.1:8
 
 # System prompts not supported through API requests.
 # https://lite.koboldai.net/koboldcpp_api#/api%2Fv1/post_api_v1_generate
-def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="http://127.0.0.1:5001/api/v1/generate", temp=None, system_message=None, streaming=False, top_k=None, top_p=None):
+def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system_message=None, streaming=False, top_k=None, top_p=None):
     logging.debug("Kobold: Summarization process starting...")
     try:
         logging.debug("Kobold: Loading and validating configurations")
@@ -361,6 +363,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
             logging.debug(f"Kobold.cpp: Using top_k: {top_k}")
         elif top_k is None:
             top_k = load_and_log_configs().get('kobold_api', {}).get('top_k', 100)
+            top_k = int(top_k)
             logging.debug(f"Kobold.cpp: Using top_k from config: {top_k}")
         if not isinstance(streaming, int):
             raise ValueError(f"Invalid type for 'top_k': Expected an int, got {type(streaming).__name__}")
@@ -370,9 +373,16 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
             logging.debug(f"Kobold.cpp: Using top_p: {top_p}")
         elif top_p is None:
             top_p = load_and_log_configs().get('kobold_api', {}).get('top_p', 0.95)
+            top_p = float(top_p)
             logging.debug(f"Kobold.cpp: Using top_p from config: {top_p}")
         if not isinstance(streaming, int):
             raise ValueError(f"Invalid type for 'top_p': Expected a float, got {type(streaming).__name__}")
+
+        if not isinstance(temp, float):
+            temp = load_and_log_configs().get('kobold_api', {}).get('temperature', 0.7)
+            logging.debug(f"Kobold.cpp: Using temperature from config: {temp}")
+        if not isinstance(temp, float):
+            raise ValueError(f"Invalid type for 'temp': Expected a float, got {type(streaming).__name__}")
 
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Kobold.cpp: Loading json data for summarization")
@@ -407,11 +417,9 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
         kobold_prompt = f"{custom_prompt_input}\n\n{text}"
         logging.debug("kobold: Prompt being sent is {kobold_prompt}")
 
-        # FIXME
-        # Values literally c/p from the api docs....
         data = {
             "prompt": kobold_prompt,
-            "temperature": 0.7,
+            "temperature": temp,
             "top_p": top_p,
             "top_k": top_k,
             #"rep_penalty": 1.0,
@@ -419,9 +427,11 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
         }
 
         logging.debug("kobold: Submitting request to API endpoint")
-        print("kobold: Submitting request to API endpoint")
+        logging.info("kobold: Submitting request to API endpoint")
         kobold_api_ip = loaded_config_data['kobold_api']['api_ip']
 
+        # FIXME - Kobold uses non-standard streaming bullshit
+        streaming = False
         if streaming:
             logging.debug("Kobold Summarization: Streaming mode enabled")
             try:
@@ -484,18 +494,25 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
                     response.status_code,
                 )
 
+                # Debugging: Print the API response
+                logging.debug(f"API Response: {response.text}")
+
                 if response.status_code == 200:
                     try:
                         response_data = response.json()
                         logging.debug("Kobold: API Response Data: %s", response_data)
 
+                        # Debugging: Print the parsed response data
+                        logging.debug(f"Parsed Response Data: {response_data}")
+
                         if (
-                            response_data
-                            and 'results' in response_data
-                            and len(response_data['results']) > 0
+                                response_data
+                                and 'results' in response_data
+                                and len(response_data['results']) > 0
                         ):
                             summary = response_data['results'][0]['text'].strip()
                             logging.debug("Kobold: Chat request successful")
+                            logging.debug(f"Kobold: Returning summary: {summary}")
                             return summary
                         else:
                             logging.error("Expected data not found in API response.")
@@ -511,8 +528,8 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, kobold_api_ip="ht
                     )
                     return f"Kobold: API request failed: {response.text}"
             except Exception as e:
-                logging.error("Kobold: Error in processing: %s", str(e))
-                return f"Kobold: Error occurred while processing summary with Kobold: {str(e)}"
+                logging.error("kobold: Error in processing: %s", str(e))
+                return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
     except Exception as e:
         logging.error("kobold: Error in processing: %s", str(e))
         return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"

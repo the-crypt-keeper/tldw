@@ -1158,7 +1158,7 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
         return None
 
 
-def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_message=None, max_retries=3, retry_delay=5, streaming=False, topp=None):
+def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_message=None, streaming=False, topp=None):
     """
     Interacts with the DeepSeek API to generate summaries based on input data.
 
@@ -1176,6 +1176,8 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
     """
     # https://api-docs.deepseek.com/api/create-chat-completion
     logging.debug("DeepSeek: Summarization process starting...")
+    max_retries = 3
+    retry_delay = 5
     try:
         logging.debug("DeepSeek: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()

@@ -248,6 +248,7 @@ Structure/approach taken from https://github.com/deedy5/duckduckgo_search
 - [Searx Search Documentation](https://searx.github.io/searx/)
 - `SearXNG is a free internet metasearch engine which aggregates results from more than 70 search services. Users are neither tracked nor profiled.`
 - Can host your own instance or use someone else's.
+https://github.com/searxng/searxng-docker
 
 
 #### Serper Search
