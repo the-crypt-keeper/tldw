@@ -144,6 +144,7 @@ https://www.researchrabbit.ai/
 https://github.com/faraz18001/Sales-Llama
 https://github.com/memgraph/memgraph
 https://github.com/rashadphz/farfalle/tree/main/src/backend
+https://arxiv.org/abs/2501.04306
 https://github.com/SakanaAI/AI-Scientist
 https://gangiswag.github.io/infogent/
 https://arxiv.org/abs/2501.03916

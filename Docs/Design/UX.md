@@ -91,7 +91,7 @@ https://uxdesign.cc/rage-clicks-are-microdoses-of-pure-horror-2afc78696997?gi=09
 https://perchance.org/ai-character-chat
 https://slack.engineering/automated-accessibility-testing-at-slack/
 https://github.com/osbytes/crypt.fyi
-
+https://github.com/satellitecomponent/Neurite
 
 
 
