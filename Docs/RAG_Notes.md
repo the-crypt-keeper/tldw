@@ -58,7 +58,10 @@ https://github.com/smallporridge/AssistRAG
 https://medium.com/@samarrana407/why-knowledge-augmented-generation-kag-is-the-best-approach-to-rag-2e7820228087
 https://pub.towardsai.net/revisiting-chunking-in-the-rag-pipeline-9aab8b1fdbe7
 https://towardsdatascience.com/ai-powered-information-extraction-and-matchmaking-0408c93ec1b9
-
+https://arxiv.org/abs/2501.05366
+https://github.com/sunnynexus/Search-o1
+https://arxiv.org/abs/2501.02772
+https://arxiv.org/abs/2501.00332
 
 
 GraphRAG
