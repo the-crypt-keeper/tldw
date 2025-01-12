@@ -1769,6 +1769,9 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
 
 def summarize_chunk(api_name, text, custom_prompt_input, api_key, temp=None, system_message=None):
     logging.debug("Entered 'summarize_chunk' function")
+    if api_name in (None, "None", "none"):
+        logging.warning("summarize_chunk: API name not provided for summarization")
+        return "No summary available"
     try:
         result = summarize(text, custom_prompt_input, api_name, api_key, temp, system_message)
         if result is None or result.startswith("Error:"):

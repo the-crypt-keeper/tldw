@@ -1,6 +1,8 @@
 # metrics_logger.py
 #
 # Imports
+import functools
+import time
 from datetime import datetime, timezone
 #
 # Third-party Imports
@@ -24,6 +26,7 @@ def log_counter(metric_name, labels=None, value=1):
     }
     logger.info("metric", extra=log_entry)
 
+
 def log_histogram(metric_name, value, labels=None):
     log_entry = {
         "event": metric_name,
@@ -35,6 +38,40 @@ def log_histogram(metric_name, value, labels=None):
         "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
     logger.info("metric", extra=log_entry)
+
+
+def timeit(func):
+    """
+    Decorator that times the execution of the wrapped function
+    and logs the result using log_histogram. Optionally, you could also
+    log a counter each time the function is called.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        elapsed = time.time() - start
+
+        # Print to console (optional)
+        print(f"{func.__name__} executed in {elapsed:.2f} seconds.")
+
+        # Log how long the function took (histogram)
+        log_histogram(
+            metric_name=f"{func.__name__}_duration_seconds",
+            value=elapsed,
+            labels={"function": func.__name__}
+        )
+
+        # (Optional) log how many times the function has been called
+        log_counter(
+            metric_name=f"{func.__name__}_calls",
+            labels={"function": func.__name__}
+        )
+
+        return result
+    return wrapper
+    # Add '@timeit' decorator to functions you want to time
+
 
 #
 # End of Functions

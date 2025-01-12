@@ -124,6 +124,7 @@ def import_epub(file_path,
                                                             )
                     chunk['metadata']['summary'] = summary_text
                     summarized_chunks.append(chunk)
+
             chunks = summarized_chunks
             logging.info("Summarization of chunks completed.")
             log_counter("epub_chunks_summarized", value=len(chunks), labels={"file_path": file_path})

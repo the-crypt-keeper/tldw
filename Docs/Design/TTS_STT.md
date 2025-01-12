@@ -128,6 +128,7 @@ Kokoro
     https://huggingface.co/hexgrad/Kokoro-82M
     https://github.com/remsky/Kokoro-FastAPI
     https://huggingface.co/hexgrad/Kokoro-82M/discussions/19
+    https://www.reddit.com/r/LocalLLaMA/comments/1hyf1pf/comment/m6m86zm/?context=3
 lina TTS
     https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
     https://github.com/theodorblackbird/lina-speech

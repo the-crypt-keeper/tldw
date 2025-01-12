@@ -51,3 +51,16 @@ https://amgadhasan.substack.com/p/sota-asr-tooling-long-form-transcription
 
 
 
+### Benchmarking
+- **Benchmark Goals:**
+    1. `Performance` - Processing time per audio file.
+    2. `Accuracy` - Word Error Rate (WER).
+    3. `Resource Utilization` - CPU, memory, and disk usage.
+    4. `Scalability` - Performance with concurrent tasks or larger datasets.
+- **Benchmark Hooks:**
+    1. Timing - track processing time per function, per audio file. 
+    2. Resource Utilization - track CPU, memory, and disk usage.
+    3. Accuracy - WER Calculation step
+
+
+https://github.com/Roon311/ASR-Evaluation
