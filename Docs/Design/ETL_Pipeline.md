@@ -42,7 +42,15 @@ https://towardsdatascience.com/etl-pipelines-in-python-best-practices-and-techni
 https://github.com/ucbepic/docetl
 https://ucbepic.github.io/docetl/concepts/optimization/
 
+
 ### Links
 https://arxiv.org/html/2410.21169
 
+
+
 ### Link Dump:
+https://github.com/shoryasethia/FinChat
+
+
+
+

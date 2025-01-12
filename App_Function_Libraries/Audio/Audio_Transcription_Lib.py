@@ -32,7 +32,8 @@ from typing import Optional, Union, List, Dict, Any
 #
 # Import Local
 from App_Function_Libraries.Utils.Utils import load_comprehensive_config
-from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram, timeit
+
 #
 #######################################################################################################################
 # Function Definitions
@@ -149,9 +150,11 @@ def get_whisper_model(model_name, device, ):
         whisper_model_instance = WhisperModel(model_name, device=device)
     return whisper_model_instance
 
+
 # os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
 #DEBUG
 #@profile
+@timeit
 def convert_to_wav(video_file_path, offset=0, overwrite=False):
     log_counter("convert_to_wav_attempt", labels={"file_path": video_file_path})
     start_time = time.time()
@@ -222,6 +225,7 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 #DEBUG
 #@profile
 # FIXME - I feel like the `vad_filter` shoudl be enabled by default....
+@timeit
 def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, diarize=False):
     log_counter("speech_to_text_attempt", labels={"file_path": audio_file_path, "model": whisper_model})
     time_start = time.time()
@@ -305,6 +309,7 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         raise RuntimeError("speech-to-text: Error transcribing audio")
 
 
+@timeit
 def record_audio(duration, sample_rate=16000, chunk_size=1024):
     log_counter("record_audio_attempt", labels={"duration": duration})
     p = pyaudio.PyAudio()
@@ -332,6 +337,7 @@ def record_audio(duration, sample_rate=16000, chunk_size=1024):
     return p, stream, audio_queue, stop_recording, audio_thread
 
 
+@timeit
 def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
     log_counter("stop_recording_attempt")
     start_time = time.time()
@@ -353,6 +359,8 @@ def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
     log_counter("stop_recording_success")
     return b''.join(frames)
 
+
+@timeit
 def save_audio_temp(audio_data, sample_rate=16000):
     log_counter("save_audio_temp_attempt")
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:

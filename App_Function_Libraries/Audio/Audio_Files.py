@@ -224,12 +224,14 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
                     transcription = format_transcription_with_timestamps(segments)
                     if not transcription.strip():
                         raise ValueError("Empty transcription generated")
+                    logging.debug(f"Transcription: {transcription}")
 
                     # Initialize summary with default value
                     summary = "No summary available"
 
                     # Attempt summarization if API is provided
-                    if api_name and api_name.lower() != "none":
+                    if api_name not in (None, "None", "none"):
+                        logging.debug(f"Summarizing audio with API: {api_name}")
                         try:
                             chunked_text = improved_chunking_process(transcription, chunk_options)
                             summary_result = perform_summarization(api_name, chunked_text, custom_prompt_input, api_key)

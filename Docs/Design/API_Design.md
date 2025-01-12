@@ -23,3 +23,4 @@ The following endpoints will be available in the API:
 
 ## Links
 https://levelup.gitconnected.com/great-api-design-comprehensive-guide-from-basics-to-best-practices-9b4e0b613a44
+https://github.com/TypeError/secure
