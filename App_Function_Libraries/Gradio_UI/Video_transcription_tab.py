@@ -56,9 +56,11 @@ def create_video_transcription_tab():
                                        placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, other video sites and Youtube playlists.",
                                        lines=5)
                 video_files = gr.File(label="Upload Video File(s) (Optional)", file_types=[".mp4", ".avi", ".mov", ".mkv", ".webm"], file_count="multiple")
-                diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
-                vad_checkbox = gr.Checkbox(label="Enable Voice-Audio-Detection(VAD)", value=True)
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="deepdml/faster-whisper-large-v3-turbo-ct2", label="Whisper Model")
+
+                with gr.Row():
+                    diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
+                    vad_checkbox = gr.Checkbox(label="Enable Voice-Audio-Detection(VAD)", value=True)
 
                 with gr.Row():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
@@ -184,14 +186,15 @@ def create_video_transcription_tab():
                 api_name_input = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                     value=default_value,
-                    label="API for Summarization/Analysis (Optional)"
+                    label="API for Analysis/Summarization (Optional)"
                 )
                 api_key_input = gr.Textbox(label="API Key (Optional - Set in Config.txt)", placeholder="Enter your API key here",
                                            type="password")
                 keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set")
+                # FIXME - Add proper support for this feature
                 batch_size_input = gr.Slider(minimum=1, maximum=10, value=1, step=1,
-                                             label="Batch Size (Number of videos to process simultaneously)")
+                                             label="Batch Size (Number of videos to process simultaneously)", visible=False)
                 timestamp_option = gr.Checkbox(label="Include Timestamps", value=True)
                 keep_original_video = gr.Checkbox(label="Keep Original Video", value=False)
                 # First, create a checkbox to toggle the chunking options

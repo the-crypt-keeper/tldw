@@ -208,7 +208,7 @@ def create_audio_processing_tab():
                 api_name_input = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                     value=default_value,
-                    label="API for Summarization/Analysis (Optional)"
+                    label="API for Analysis/Summarization (Optional)"
                 )
                 api_key_input = gr.Textbox(label="API Key (if required)", placeholder="Enter your API key here", type="password")
                 custom_keywords_input = gr.Textbox(label="Custom Keywords", placeholder="Enter custom keywords, comma-separated")

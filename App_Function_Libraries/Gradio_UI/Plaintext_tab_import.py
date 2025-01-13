@@ -90,7 +90,7 @@ def create_plain_text_import_tab():
                 api_name_input = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                     value=default_value,
-                    label="API for Summarization/Analysis (Optional)"
+                    label="API for Analysis/Summarization (Optional)"
                 )
                 api_key_input = gr.Textbox(label="API Key", type="password")
                 import_button = gr.Button("Import File(s)")
