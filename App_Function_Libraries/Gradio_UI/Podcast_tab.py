@@ -191,7 +191,7 @@ def create_podcast_tab():
                 podcast_api_name_input = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                     value=default_value,
-                    label="API for Summarization/Analysis (Optional)"
+                    label="API for Analysis/Summarization (Optional)"
                 )
                 podcast_api_key_input = gr.Textbox(label="API Key (if required)", type="password")
                 podcast_whisper_model_input = gr.Dropdown(choices=whisper_models, value="distil-large-v3", label="Whisper Model")
