@@ -61,7 +61,7 @@ def create_audio_processing_tab():
                 )
 
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
-                whisper_model_input = gr.Dropdown(choices=whisper_models, value="distil-large-v3", label="Whisper Model")
+                whisper_model_input = gr.Dropdown(choices=whisper_models, value="deepdml/faster-whisper-large-v3-turbo-ct2", label="Whisper Model")
                 keep_timestamps_input = gr.Checkbox(label="Keep Timestamps", value=True)
 
                 with gr.Row():

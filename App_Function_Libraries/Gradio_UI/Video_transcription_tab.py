@@ -58,7 +58,7 @@ def create_video_transcription_tab():
                 video_files = gr.File(label="Upload Video File(s) (Optional)", file_types=[".mp4", ".avi", ".mov", ".mkv", ".webm"], file_count="multiple")
                 diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
                 vad_checkbox = gr.Checkbox(label="Enable Voice-Audio-Detection(VAD)", value=True)
-                whisper_model_input = gr.Dropdown(choices=whisper_models, value="distil-large-v3", label="Whisper Model")
+                whisper_model_input = gr.Dropdown(choices=whisper_models, value="deepdml/faster-whisper-large-v3-turbo-ct2", label="Whisper Model")
 
                 with gr.Row():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
