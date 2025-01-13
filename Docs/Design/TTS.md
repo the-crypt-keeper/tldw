@@ -1,4 +1,4 @@
-# Text-To-Speech / Speech-To-Text Documentation
+# Text-To-Speech
 
 ## Overview
 Use of functions for individual services.
@@ -8,12 +8,10 @@ Use of temporary files for storage.
 Use of pydub for audio manipulation.
 Use of pydub for audio merging.
 
-Flow:
-1. Clean/format input text
-2. Split text into segments
-3. Generate audio for each segment using designated provider function
-4. Merge audio segments into single output file
-5. Clean up temporary files
+
+
+
+
 
 ### Services
 - Google Cloud Text-to-Speech
@@ -195,17 +193,6 @@ https://docs.inferless.com/cookbook/serverless-customer-service-bot
 https://github.com/dnhkng/GlaDOS
 
 
-STT
-    https://github.com/KoljaB/RealtimeSTT
-    https://github.com/southbridgeai/offmute
-    https://github.com/flatmax/speech-to-text
-    https://github.com/collabora/WhisperLive
-    https://github.com/fedirz/faster-whisper-server
-    https://github.com/ufal/whisper_streaming
-    MoonShine
-        https://github.com/usefulsensors/moonshine
-        https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
-        https://huggingface.co/onnx-community/moonshine-base-ONNX
 
 TTS
     https://github.com/KoljaB/RealtimeTTS

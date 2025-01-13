@@ -39,7 +39,7 @@ def create_live_recording_tab():
         with gr.Row():
             with gr.Column():
                 duration = gr.Slider(minimum=1, maximum=8000, value=15, label="Recording Duration (seconds)")
-                whisper_models_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+                whisper_models_input = gr.Dropdown(choices=whisper_models, value="distil-large-v3", label="Whisper Model")
                 vad_filter = gr.Checkbox(label="Use VAD Filter")
                 save_recording = gr.Checkbox(label="Save Recording")
                 save_to_db = gr.Checkbox(label="Save Transcription to Database(Must be checked to save - can be checked afer transcription)", value=False)

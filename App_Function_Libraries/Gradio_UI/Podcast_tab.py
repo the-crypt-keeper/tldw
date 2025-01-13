@@ -194,7 +194,7 @@ def create_podcast_tab():
                     label="API for Summarization/Analysis (Optional)"
                 )
                 podcast_api_key_input = gr.Textbox(label="API Key (if required)", type="password")
-                podcast_whisper_model_input = gr.Dropdown(choices=whisper_models, value="medium", label="Whisper Model")
+                podcast_whisper_model_input = gr.Dropdown(choices=whisper_models, value="distil-large-v3", label="Whisper Model")
 
                 keep_original_input = gr.Checkbox(label="Keep original audio file", value=False)
                 enable_diarization_input = gr.Checkbox(label="Enable speaker diarization", value=False)
