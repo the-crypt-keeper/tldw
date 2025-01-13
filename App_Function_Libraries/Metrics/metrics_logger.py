@@ -4,6 +4,9 @@
 import functools
 import time
 from datetime import datetime, timezone
+
+import psutil
+
 #
 # Third-party Imports
 #
@@ -72,6 +75,12 @@ def timeit(func):
     return wrapper
     # Add '@timeit' decorator to functions you want to time
 
+
+def log_resource_usage():
+    process = psutil.Process()
+    memory = process.memory_info().rss / (1024 ** 2)  # Convert to MB
+    cpu = process.cpu_percent(interval=0.1)
+    print(f"Memory: {memory:.2f} MB, CPU: {cpu:.2f}%")
 
 #
 # End of Functions

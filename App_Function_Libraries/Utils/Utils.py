@@ -180,6 +180,7 @@ def ensure_directory_exists(path):
 
 # FIXME - update to include prompt path in return statement
 def load_and_log_configs():
+    logging.debug("load_and_log_configs(): Loading and logging configurations...")
     try:
         config = load_comprehensive_config()
         if config is None:
@@ -187,43 +188,43 @@ def load_and_log_configs():
             return None
         # API Keys
         anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Anthropic API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:] if anthropic_api_key else None}")
+        # logging.debug(
+        #     f"Loaded Anthropic API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:] if anthropic_api_key else None}")
 
         cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Cohere API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:] if cohere_api_key else None}")
+        # logging.debug(
+        #     f"Loaded Cohere API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:] if cohere_api_key else None}")
 
         groq_api_key = config.get('API', 'groq_api_key', fallback=None)
-        logging.debug(f"Loaded Groq API Key: {groq_api_key[:5]}...{groq_api_key[-5:] if groq_api_key else None}")
+        # logging.debug(f"Loaded Groq API Key: {groq_api_key[:5]}...{groq_api_key[-5:] if groq_api_key else None}")
 
         openai_api_key = config.get('API', 'openai_api_key', fallback=None)
-        logging.debug(
-            f"Loaded OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
+        # logging.debug(
+        #     f"Loaded OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
 
         huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
-        logging.debug(
-            f"Loaded HuggingFace API Key: {huggingface_api_key[:5]}...{huggingface_api_key[-5:] if huggingface_api_key else None}")
+        # logging.debug(
+        #     f"Loaded HuggingFace API Key: {huggingface_api_key[:5]}...{huggingface_api_key[-5:] if huggingface_api_key else None}")
 
         openrouter_api_key = config.get('API', 'openrouter_api_key', fallback=None)
-        logging.debug(
-            f"Loaded OpenRouter API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:] if openrouter_api_key else None}")
+        # logging.debug(
+        #     f"Loaded OpenRouter API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:] if openrouter_api_key else None}")
 
         deepseek_api_key = config.get('API', 'deepseek_api_key', fallback=None)
-        logging.debug(
-            f"Loaded DeepSeek API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:] if deepseek_api_key else None}")
+        # logging.debug(
+        #     f"Loaded DeepSeek API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:] if deepseek_api_key else None}")
 
         mistral_api_key = config.get('API', 'mistral_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Mistral API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
+        # logging.debug(
+        #     f"Loaded Mistral API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
 
         google_api_key = config.get('API', 'google_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Google API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
+        # logging.debug(
+        #     f"Loaded Google API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
 
         elevenlabs_api_key = config.get('API', 'elevenlabs_api_key', fallback=None)
-        logging.debug(
-            f"Loaded elevenlabs API Key: {elevenlabs_api_key[:5]}...{elevenlabs_api_key[-5:] if elevenlabs_api_key else None}")
+        # logging.debug(
+        #     f"Loaded elevenlabs API Key: {elevenlabs_api_key[:5]}...{elevenlabs_api_key[-5:] if elevenlabs_api_key else None}")
 
         # Models
         anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
@@ -1075,7 +1076,7 @@ def sanitize_filename(filename):
     # Replace forbidden characters with a dash
     sanitized = re.sub(r'[<>:"/\\|?*]', '-', filename)
     # Replace runs of whitespace with a single underscore (optional)
-    sanitized = re.sub(r'\s+', '_', sanitized).strip()
+    sanitized = re.sub(r'[\s.]+', '_', sanitized).strip()
     return sanitized
 
 
