@@ -129,7 +129,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
             logging.info("OpenAI Summarize: API key not provided as parameter")
             logging.info("OpenAI Summarize: Attempting to use API key from config file")
             loaded_config_data = load_and_log_configs()
-            loaded_config_data.get('openai_api', {}).get('api_key', "")
+            api_key = loaded_config_data.get('openai_api', {}).get('api_key', "")
             logging.debug(f"OpenAI Summarize: Using API key from config file: {api_key[:5]}...{api_key[-5:]}")
 
         if not api_key or api_key.strip() == "":

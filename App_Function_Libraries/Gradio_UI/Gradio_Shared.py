@@ -20,8 +20,9 @@ from App_Function_Libraries.Utils.Utils import format_transcription
 #
 # Functions:
 
-whisper_models = ["small", "medium", "small.en", "medium.en", "medium", "large", "large-v1", "large-v2", "large-v3",
-                  "distil-large-v2", "distil-medium.en", "distil-small.en"]
+whisper_models = ["tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium",
+        "large-v1", "large-v2", "large-v3", "large", "distil-large-v2", "distil-medium.en", "distil-small.en",
+        "distil-large-v3", "deepdml/faster-whisper-large-v3-turbo-ct2"]
 
 # Sample data
 prompts_category_1 = [

@@ -1072,9 +1072,10 @@ def clean_youtube_url(url):
     return cleaned_url
 
 def sanitize_filename(filename):
-    # Remove invalid characters and replace spaces with underscores
-    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
-    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    # Replace forbidden characters with a dash
+    sanitized = re.sub(r'[<>:"/\\|?*]', '-', filename)
+    # Replace runs of whitespace with a single underscore (optional)
+    sanitized = re.sub(r'\s+', '_', sanitized).strip()
     return sanitized
 
 
