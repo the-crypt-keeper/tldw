@@ -26,6 +26,8 @@
 - https://github.com/Picovoice/speech-to-text-benchmark
 
 
+
+
 ### Link Dump:
 STT
     https://github.com/KoljaB/RealtimeSTT
