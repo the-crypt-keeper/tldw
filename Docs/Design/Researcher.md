@@ -128,6 +128,8 @@ https://github.com/assafelovic/gpt-researcher/tree/master/multi_agents
 https://www.reddit.com/r/Anki/comments/17u01ge/spaced_repetition_algorithm_a_threeday_journey/
 https://github.com/open-spaced-repetition/fsrs4anki/wiki/Spaced-Repetition-Algorithm:-A-Three%E2%80%90Day-Journey-from-Novice-to-Expert#day-3-the-latest-progress
 https://www.scrapingdog.com/blog/scrape-google-news/
+https://arxiv.org/html/2501.03916
+    https://unimodal4reasoning.github.io/Dolphin-project-page/
 https://github.com/mistralai/cookbook/blob/main/third_party/LlamaIndex/llamaindex_arxiv_agentic_rag.ipynb
 https://github.com/ai-christianson/RA.Aid
 https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_research_prompt.md
@@ -144,7 +146,12 @@ https://www.researchrabbit.ai/
 https://github.com/faraz18001/Sales-Llama
 https://github.com/memgraph/memgraph
 https://github.com/rashadphz/farfalle/tree/main/src/backend
+https://arxiv.org/abs/2501.04306
 https://github.com/SakanaAI/AI-Scientist
+https://agentlaboratory.github.io/
+https://gangiswag.github.io/infogent/
+https://arxiv.org/abs/2501.03916
+https://github.com/dendrite-systems/dendrite-python-sdk
 https://github.com/rashadphz/farfalle/blob/main/src/backend/agent_search.py
 https://github.com/rashadphz/farfalle/blob/main/src/backend/prompts.py
 https://github.com/stanford-oval/storm/

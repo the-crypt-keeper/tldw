@@ -36,7 +36,10 @@ async def process_video_task(url, whisper_model, custom_prompt, api_name, api_ke
 
         # Perform summarization
         full_text_with_metadata = f"{video_metadata}\n\n{transcription_text}"
-        summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key)
+        if api_name in (None, "None", "none"):
+            summary_text = "No summary available"
+        else:
+            summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key)
 
         # Save transcription and summary
         json_file_path, summary_file_path = save_transcription_and_summary(full_text_with_metadata, summary_text, download_path, video_metadata)

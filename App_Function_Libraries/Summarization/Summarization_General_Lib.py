@@ -129,7 +129,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
             logging.info("OpenAI Summarize: API key not provided as parameter")
             logging.info("OpenAI Summarize: Attempting to use API key from config file")
             loaded_config_data = load_and_log_configs()
-            loaded_config_data.get('openai_api', {}).get('api_key', "")
+            api_key = loaded_config_data.get('openai_api', {}).get('api_key', "")
             logging.debug(f"OpenAI Summarize: Using API key from config file: {api_key[:5]}...{api_key[-5:]}")
 
         if not api_key or api_key.strip() == "":
@@ -1592,7 +1592,9 @@ def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize
 
     # Update path to include whisper model in filename
     base_path = audio_file_path.replace('.wav', '')
-    segments_json_path = f"{base_path}-whisper_model-{whisper_model}.segments.json"
+
+    whisper_model_sanitized = whisper_model.replace("/", "_").replace("\\", "_")
+    segments_json_path = f"{base_path}-whisper_model-{whisper_model_sanitized}.segments.json"
     temp_files.append(segments_json_path)
 
     if diarize:
@@ -1651,7 +1653,18 @@ def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize
             logging.info(f"Segments file already exists: {segments_json_path}")
             try:
                 with open(segments_json_path, 'r', encoding='utf-8') as file:
-                    segments = json.load(file)
+                    loaded_data = json.load(file)
+
+                # If it’s a dictionary with a 'segments' key, extract that list
+                if isinstance(loaded_data, dict) and "segments" in loaded_data:
+                    segments = loaded_data["segments"]
+                else:
+                    # If for some reason it's already a list, or invalid,
+                    # handle that here — e.g.:
+                    segments = loaded_data
+
+                logging.debug(f"First few segments from speech_to_text: {segments[:2]}")
+
                 # Check if segments are empty or invalid
                 if not segments or not isinstance(segments, list):
                     if not overwrite:
@@ -1675,21 +1688,24 @@ def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize
                 logging.error(f"Failed to read or parse the segments JSON file: {str(e)}")
                 if os.path.exists(segments_json_path):
                     os.remove(segments_json_path)
+        else:
+            # Generate new transcription if file doesn't exist
 
-        # Generate new transcription if file doesn't exist
-        audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
-        if segments is None:
-            logging.error("Failed to generate new transcription")
-            return None, None
+            audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
+            if segments is None:
+                logging.error("Failed to generate new transcription")
+                return None, None
 
-        return audio_file_path, segments
-
+            return audio_file_path, segments
     except Exception as e:
         logging.error(f"Error in perform_transcription: {str(e)}")
         return None, None
 
 
 def re_generate_transcription(audio_file_path, whisper_model, vad_filter):
+    """
+    Re-generate the transcription by calling speech_to_text.
+    """
     global segments_json_path
     try:
         logging.info(f"Generating new transcription for {audio_file_path}")
@@ -1703,9 +1719,11 @@ def re_generate_transcription(audio_file_path, whisper_model, vad_filter):
             logging.error("Generated segments are empty or invalid")
             return None, None
 
-        # More detailed validation
-        if not all(isinstance(segment, dict) and all(key in segment for key in ['Text', 'Time_Start', 'Time_End']) for
-                   segment in segments):
+        if not all(
+                isinstance(segment, dict)
+                and all(key in segment for key in ['Text', 'Time_Start', 'Time_End'])
+                for segment in segments
+        ):
             logging.error("Generated segments are missing required fields or have invalid format")
             logging.debug(f"Segments structure: {segments[:2]}")  # Log first two segments for debugging
             return None, None
@@ -1769,6 +1787,9 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
 
 def summarize_chunk(api_name, text, custom_prompt_input, api_key, temp=None, system_message=None):
     logging.debug("Entered 'summarize_chunk' function")
+    if api_name in (None, "None", "none"):
+        logging.warning("summarize_chunk: API name not provided for summarization")
+        return "No summary available"
     try:
         result = summarize(text, custom_prompt_input, api_name, api_key, temp, system_message)
         if result is None or result.startswith("Error:"):

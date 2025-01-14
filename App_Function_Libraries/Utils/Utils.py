@@ -180,6 +180,7 @@ def ensure_directory_exists(path):
 
 # FIXME - update to include prompt path in return statement
 def load_and_log_configs():
+    logging.debug("load_and_log_configs(): Loading and logging configurations...")
     try:
         config = load_comprehensive_config()
         if config is None:
@@ -187,43 +188,43 @@ def load_and_log_configs():
             return None
         # API Keys
         anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Anthropic API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:] if anthropic_api_key else None}")
+        # logging.debug(
+        #     f"Loaded Anthropic API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:] if anthropic_api_key else None}")
 
         cohere_api_key = config.get('API', 'cohere_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Cohere API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:] if cohere_api_key else None}")
+        # logging.debug(
+        #     f"Loaded Cohere API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:] if cohere_api_key else None}")
 
         groq_api_key = config.get('API', 'groq_api_key', fallback=None)
-        logging.debug(f"Loaded Groq API Key: {groq_api_key[:5]}...{groq_api_key[-5:] if groq_api_key else None}")
+        # logging.debug(f"Loaded Groq API Key: {groq_api_key[:5]}...{groq_api_key[-5:] if groq_api_key else None}")
 
         openai_api_key = config.get('API', 'openai_api_key', fallback=None)
-        logging.debug(
-            f"Loaded OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
+        # logging.debug(
+        #     f"Loaded OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
 
         huggingface_api_key = config.get('API', 'huggingface_api_key', fallback=None)
-        logging.debug(
-            f"Loaded HuggingFace API Key: {huggingface_api_key[:5]}...{huggingface_api_key[-5:] if huggingface_api_key else None}")
+        # logging.debug(
+        #     f"Loaded HuggingFace API Key: {huggingface_api_key[:5]}...{huggingface_api_key[-5:] if huggingface_api_key else None}")
 
         openrouter_api_key = config.get('API', 'openrouter_api_key', fallback=None)
-        logging.debug(
-            f"Loaded OpenRouter API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:] if openrouter_api_key else None}")
+        # logging.debug(
+        #     f"Loaded OpenRouter API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:] if openrouter_api_key else None}")
 
         deepseek_api_key = config.get('API', 'deepseek_api_key', fallback=None)
-        logging.debug(
-            f"Loaded DeepSeek API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:] if deepseek_api_key else None}")
+        # logging.debug(
+        #     f"Loaded DeepSeek API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:] if deepseek_api_key else None}")
 
         mistral_api_key = config.get('API', 'mistral_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Mistral API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
+        # logging.debug(
+        #     f"Loaded Mistral API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
 
         google_api_key = config.get('API', 'google_api_key', fallback=None)
-        logging.debug(
-            f"Loaded Google API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
+        # logging.debug(
+        #     f"Loaded Google API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
 
         elevenlabs_api_key = config.get('API', 'elevenlabs_api_key', fallback=None)
-        logging.debug(
-            f"Loaded elevenlabs API Key: {elevenlabs_api_key[:5]}...{elevenlabs_api_key[-5:] if elevenlabs_api_key else None}")
+        # logging.debug(
+        #     f"Loaded elevenlabs API Key: {elevenlabs_api_key[:5]}...{elevenlabs_api_key[-5:] if elevenlabs_api_key else None}")
 
         # Models
         anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
@@ -240,14 +241,14 @@ def load_and_log_configs():
         anthropic_streaming = config.get('API', 'anthropic_streaming', fallback='False')
         anthropic_temperature = config.get('API', 'anthropic_temperature', fallback='0.7')
         anthropic_top_p = config.get('API', 'anthropic_top_p', fallback='0.95')
-        anthropic_min_p = config.get('API', 'anthropic_min_p', fallback='0.05')
+        anthropic_top_k = config.get('API', 'anthropic_top_k', fallback='100')
         cohere_streaming = config.get('API', 'cohere_streaming', fallback='False')
         cohere_temperature = config.get('API', 'cohere_temperature', fallback='0.7')
-        cohere_min_p = config.get('API', 'cohere_min_p', fallback='0.05')
+        cohere_max_p = config.get('API', 'cohere_max_p', fallback='0.95')
+        cohere_top_k = config.get('API', 'cohere_top_k', fallback='100')
         groq_streaming = config.get('API', 'groq_streaming', fallback='False')
         groq_temperature = config.get('API', 'groq_temperature', fallback='0.7')
         groq_top_p = config.get('API', 'groq_top_p', fallback='0.95')
-        groq_min_p = config.get('API', 'groq_min_p', fallback='0.05')
         openai_streaming = config.get('API', 'openai_streaming', fallback='False')
         openai_temperature = config.get('API', 'openai_temperature', fallback='0.7')
         openai_top_p = config.get('API', 'openai_top_p', fallback='0.95')
@@ -259,6 +260,7 @@ def load_and_log_configs():
         openrouter_temperature = config.get('API', 'openrouter_temperature', fallback='0.7')
         openrouter_top_p = config.get('API', 'openrouter_top_p', fallback='0.95')
         openrouter_min_p = config.get('API', 'openrouter_min_p', fallback='0.05')
+        openrouter_top_k = config.get('API', 'openrouter_top_k', fallback='100')
         deepseek_streaming = config.get('API', 'deepseek_streaming', fallback='False')
         deepseek_temperature = config.get('API', 'deepseek_temperature', fallback='0.7')
         deepseek_top_p = config.get('API', 'deepseek_top_p', fallback='0.95')
@@ -266,7 +268,6 @@ def load_and_log_configs():
         mistral_streaming = config.get('API', 'mistral_streaming', fallback='False')
         mistral_temperature = config.get('API', 'mistral_temperature', fallback='0.7')
         mistral_top_p = config.get('API', 'mistral_top_p', fallback='0.95')
-        mistral_min_p = config.get('API', 'mistral_min_p', fallback='0.05')
         google_streaming = config.get('API', 'google_streaming', fallback='False')
         google_temperature = config.get('API', 'google_temperature', fallback='0.7')
         google_top_p = config.get('API', 'google_top_p', fallback='0.95')
@@ -288,8 +289,7 @@ def load_and_log_configs():
         kobold_streaming = config.get('Local-API', 'kobold_streaming', fallback='False')
         kobold_temperature = config.get('Local-API', 'kobold_temperature', fallback='0.7')
         kobold_top_p = config.get('Local-API', 'kobold_top_p', fallback='0.95')
-        kobold_min_p = config.get('Local-API', 'kobold_min_p', fallback='0.05')
-
+        kobold_top_k = config.get('Local-API', 'kobold_top_k', fallback='100')
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
@@ -308,6 +308,11 @@ def load_and_log_configs():
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
         tabby_model = config.get('models', 'tabby_model', fallback=None)
+        tabby_streaming = config.get('Local-API', 'tabby_streaming', fallback='False')
+        tabby_temperature = config.get('Local-API', 'tabby_temperature', fallback='0.7')
+        tabby_top_p = config.get('Local-API', 'tabby_top_p', fallback='0.95')
+        tabby_top_k = config.get('Local-API', 'tabby_top_k', fallback='100')
+        tabby_min_p = config.get('Local-API', 'tabby_min_p', fallback='0.05')
 
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
@@ -472,14 +477,15 @@ def load_and_log_configs():
                 'streaming': anthropic_streaming,
                 'temperature': anthropic_temperature,
                 'top_p': anthropic_top_p,
-                'min_p': anthropic_min_p
+                'top_k': anthropic_top_k
             },
             'cohere_api': {
                 'api_key': cohere_api_key,
                 'model': cohere_model,
                 'streaming': cohere_streaming,
                 'temperature': cohere_temperature,
-                'min_p': cohere_min_p
+                'max_p': cohere_max_p,
+                'top_k': cohere_top_k
             },
             'deepseek_api': {
                 'api_key': deepseek_api_key,
@@ -502,8 +508,7 @@ def load_and_log_configs():
                 'model': groq_model,
                 'streaming': groq_streaming,
                 'temperature': groq_temperature,
-                'top_p': groq_top_p,
-                'min_p': groq_min_p
+                'top_p': groq_top_p
             },
             'huggingface_api': {
                 'api_key': huggingface_api_key,
@@ -515,8 +520,7 @@ def load_and_log_configs():
                 'model': mistral_model,
                 'streaming': mistral_streaming,
                 'temperature': mistral_temperature,
-                'top_p': mistral_top_p,
-                'min_p': mistral_min_p
+                'top_p': mistral_top_p
             },
             'openrouter_api': {
                 'api_key': openrouter_api_key,
@@ -524,7 +528,8 @@ def load_and_log_configs():
                 'streaming': openrouter_streaming,
                 'temperature': openrouter_temperature,
                 'top_p': openrouter_top_p,
-                'min_p': openrouter_min_p
+                'min_p': openrouter_min_p,
+                'top_k': openrouter_top_k
             },
             'openai_api': {
                 'api_key': openai_api_key,
@@ -572,12 +577,17 @@ def load_and_log_configs():
                 'streaming': kobold_streaming,
                 'temperature': kobold_temperature,
                 'top_p': kobold_top_p,
-                'min_p': kobold_min_p
+                'top_k': kobold_top_k
             },
             'tabby_api': {
                 'api_ip': tabby_api_IP,
                 'api_key': tabby_api_key,
-                'model': tabby_model
+                'model': tabby_model,
+                'streaming': tabby_streaming,
+                'temperature': tabby_temperature,
+                'top_p': tabby_top_p,
+                'top_k': tabby_top_k,
+                'min_p': tabby_min_p
             },
             'vllm_api': {
                 'api_url': vllm_api_url,
@@ -1063,9 +1073,18 @@ def clean_youtube_url(url):
     return cleaned_url
 
 def sanitize_filename(filename):
-    # Remove invalid characters and replace spaces with underscores
+    """
+    Sanitizes the filename by:
+      1) Removing forbidden characters entirely (rather than replacing them with '-')
+      2) Collapsing consecutive whitespace into a single space
+      3) Collapsing consecutive dashes into a single dash
+    """
+    # 1) Remove forbidden characters
     sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
+    # 2) Replace runs of whitespace with a single space
     sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    # 3) Replace consecutive dashes with a single dash
+    sanitized = re.sub(r'-{2,}', '-', sanitized)
     return sanitized
 
 

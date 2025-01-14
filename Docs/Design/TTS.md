@@ -1,4 +1,4 @@
-# Text-To-Speech / Speech-To-Text Documentation
+# Text-To-Speech
 
 ## Overview
 Use of functions for individual services.
@@ -8,12 +8,10 @@ Use of temporary files for storage.
 Use of pydub for audio manipulation.
 Use of pydub for audio merging.
 
-Flow:
-1. Clean/format input text
-2. Split text into segments
-3. Generate audio for each segment using designated provider function
-4. Merge audio segments into single output file
-5. Clean up temporary files
+
+
+
+
 
 ### Services
 - Google Cloud Text-to-Speech
@@ -29,7 +27,7 @@ https://sakshi113.github.io/mmau_homepage/
 
 ### Other
 https://wave-pulse.io/
-
+https://arxiv.org/abs/2501.01384
 
 ### Link Dump:
 https://huggingface.co/NexaAIDev/Qwen2-Audio-7B-GGUF
@@ -39,15 +37,16 @@ https://arxiv.org/abs/2412.18566
 https://github.com/pipecat-ai/pipecat/tree/a367a038f1a3967292b5de5b43b8600a82a73fb6?tab=readme-ov-file
 https://github.com/Purfview/whisper-standalone-win
 https://github.com/ictnlp/LLaMA-Omni
+https://github.com/thepersonalaicompany/amurex
 https://levelup.gitconnected.com/build-a-real-time-ai-voice-and-video-chat-app-with-function-calling-by-gemini-2-0-49599a48fbe9?gi=c894f6c092be
-
+https://huggingface.co/papers/2501.02832
 
 Blogposts
     https://blog.duy.dev/build-your-own-voice-assistant-and-run-it-locally/
     https://www.twilio.com/en-us/blog/twilio-openai-realtime-api-launch-integration
 
 Full Pipelines
-    https://github.com/lhl/voicechat2?tab=readme-ov-file
+    https://github.com/lhl/voicechat2
     https://github.com/eustlb/speech-to-speech
     https://github.com/dnhkng/GlaDOS
     https://github.com/mezbaul-h/june
@@ -56,7 +55,8 @@ Full Pipelines
     https://github.com/huggingface/speech-to-speech
     https://github.com/harvestingmoon/S2S
     https://github.com/livekit/agents
-
+    https://github.com/ictnlp/LLaMA-Omni
+    https://github.com/smellslikeml/dolla_llama/blob/main/app/app.py
 
 Voicw2Voicw Models
     https://github.com/Standard-Intelligence/hertz-dev
@@ -97,6 +97,8 @@ Coqui TTS
 CosyVoice2
     https://funaudiollm.github.io/cosyvoice2/
 Daswers XTTS GUI
+Diva
+    https://huggingface.co/spaces/WillHeld/diva-audio
 F5 TTS
     https://github.com/SWivid/F5-TTS
 Fish-Speech
@@ -107,6 +109,7 @@ Gemini
     https://ai.google.dev/gemini-api/docs#rest
     https://ai.google.dev/gemini-api/docs/models/gemini-v2
     https://github.com/google-gemini/cookbook/blob/main/quickstarts/Audio.ipynb
+    https://github.com/livekit/agents/blob/main/examples/voice-pipeline-agent/gemini_voice_agent.py
 Google
     https://github.com/google-gemini/cookbook/tree/main/gemini-2
     https://discuss.ai.google.dev/t/how-does-one-get-access-to-the-api-for-tts-features-of-gemini-2-0/53925/15
@@ -121,6 +124,9 @@ GPT-SoviTTS
 Kokoro
     https://github.com/thewh1teagle/kokoro-onnx
     https://huggingface.co/hexgrad/Kokoro-82M
+    https://github.com/remsky/Kokoro-FastAPI
+    https://huggingface.co/hexgrad/Kokoro-82M/discussions/19
+    https://www.reddit.com/r/LocalLLaMA/comments/1hyf1pf/comment/m6m86zm/?context=3
 lina TTS
     https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
     https://github.com/theodorblackbird/lina-speech
@@ -172,6 +178,8 @@ SoundStorm
 Styletts2
 Tortoise TTS
 VallE-X
+VITA
+    https://github.com/VITA-MLLM/VITA
 VoiceCraft - 
 xtts
 xtts2
@@ -185,15 +193,6 @@ https://docs.inferless.com/cookbook/serverless-customer-service-bot
 https://github.com/dnhkng/GlaDOS
 
 
-STT
-    https://github.com/KoljaB/RealtimeSTT
-    https://github.com/southbridgeai/offmute
-    https://github.com/flatmax/speech-to-text
-    https://github.com/collabora/WhisperLive
-    MoonShine
-        https://github.com/usefulsensors/moonshine
-        https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
-        https://huggingface.co/onnx-community/moonshine-base-ONNX
 
 TTS
     https://github.com/KoljaB/RealtimeTTS
@@ -451,6 +450,7 @@ GPT-SoviTTS
 https://tts.x86.st/
 Finetuning is very quick (about 5 minutes). Captioning of audio was automated with faster-whisper (it is required that the audio is captioned).
 With the default batch size of 12, training takes 9.5~ GB.
+Batch Size Scales linearly with VRAM. 1 batch size = 4 GB of VRAM.
 
 Inference
     https://github.com/RVC-Boss/GPT-SoVITS/blob/main/GPT_SoVITS/inference_cli.py

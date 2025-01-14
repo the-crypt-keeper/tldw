@@ -87,6 +87,14 @@ https://darkpatternsgame.productartistry.com/
 https://towardsdatascience.com/building-trust-in-llm-answers-highlighting-source-texts-in-pdfs-5d1342ecb811
 https://levelup.gitconnected.com/textual-how-this-python-framework-is-revolutionizing-ui-development-in-2025-7bfb0fd41a59
 https://cin-model-kotaemon.hf.space/app/
+https://uxdesign.cc/rage-clicks-are-microdoses-of-pure-horror-2afc78696997?gi=091f565dd941
+https://perchance.org/ai-character-chat
+https://slack.engineering/automated-accessibility-testing-at-slack/
+https://github.com/osbytes/crypt.fyi
+https://github.com/satellitecomponent/Neurite
+https://uxdesign.cc/ai-and-cognitive-offloading-sharing-the-thinking-process-with-machines-2d27e66e0f31
+https://www.typingmind.com
+
 
 
 Not waifus, but clippy:

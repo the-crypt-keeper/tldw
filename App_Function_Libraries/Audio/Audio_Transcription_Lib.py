@@ -24,6 +24,8 @@ import subprocess
 import tempfile
 import threading
 import time
+from pathlib import Path
+
 # DEBUG Imports
 #from memory_profiler import profile
 import pyaudio
@@ -31,8 +33,9 @@ from faster_whisper import WhisperModel as OriginalWhisperModel
 from typing import Optional, Union, List, Dict, Any
 #
 # Import Local
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config
-from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config, sanitize_filename
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram, timeit
+
 #
 #######################################################################################################################
 # Function Definitions
@@ -81,7 +84,7 @@ class WhisperModel(OriginalWhisperModel):
     valid_model_sizes = [
         "tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium",
         "large-v1", "large-v2", "large-v3", "large", "distil-large-v2", "distil-medium.en",
-        "distil-small.en", "distil-large-v3",
+        "distil-small.en", "distil-large-v3", "deepdml/faster-whisper-large-v3-turbo-ct2"
     ]
 
     def __init__(
@@ -146,12 +149,14 @@ def get_whisper_model(model_name, device, ):
     if whisper_model_instance is None:
         logging.info(f"Initializing new WhisperModel with size {model_name} on device {device}")
         # FIXME - add compute_type="int8"
-        whisper_model_instance = WhisperModel(model_name, device=device)
+        whisper_model_instance = WhisperModel(model_name, device=device, compute_type="default")
     return whisper_model_instance
+
 
 # os.system(r'.\Bin\ffmpeg.exe -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
 #DEBUG
 #@profile
+@timeit
 def convert_to_wav(video_file_path, offset=0, overwrite=False):
     log_counter("convert_to_wav_attempt", labels={"file_path": video_file_path})
     start_time = time.time()
@@ -221,23 +226,43 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 # Transcribe .wav into .segments.json
 #DEBUG
 #@profile
-# FIXME - I feel like the `vad_filter` shoudl be enabled by default....
-def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='medium.en', vad_filter=False, diarize=False):
+# FIXME - I feel like the `vad_filter` should be enabled by default....
+@timeit
+def speech_to_text(
+    audio_file_path: str,
+    selected_source_lang: str = 'en',
+    whisper_model: str = 'distil-large-v3',
+    vad_filter: bool = False,
+    diarize: bool = False
+):
+    """
+    Transcribe audio to text using a Whisper model and optionally handle diarization.
+    Saves JSON output to {filename}-whisper_model-{model}.segments.json in the same directory.
+    """
+
     log_counter("speech_to_text_attempt", labels={"file_path": audio_file_path, "model": whisper_model})
     time_start = time.time()
 
-    if audio_file_path is None:
+    if not audio_file_path:
         log_counter("speech_to_text_error", labels={"error": "No audio file provided"})
         raise ValueError("speech-to-text: No audio file provided")
-    logging.info("speech-to-text: Audio file path: %s", audio_file_path)
+
+    # Convert the string to a Path object and ensure it's resolved (absolute path)
+    file_path = Path(audio_file_path).resolve()
+    logging.info("speech-to-text: Audio file path: %s", file_path)
 
     try:
-        _, file_ending = os.path.splitext(audio_file_path)
-        out_file = audio_file_path.replace(file_ending, "-whisper_model-"+whisper_model+".segments.json")
-        prettified_out_file = audio_file_path.replace(file_ending, "-whisper_model-"+whisper_model+".segments_pretty.json")
-        if os.path.exists(out_file):
+        # Get file extension and base name
+        file_ending = file_path.suffix
+
+        # Construct output filenames in the same directory as the input file
+        santitized_whisper_model_name = sanitize_filename(whisper_model)
+        out_file = file_path.with_name(f"{file_path.stem}-whisper_model-{santitized_whisper_model_name}.segments.json")
+        prettified_out_file = file_path.with_name(f"{file_path.stem}-whisper_model-{santitized_whisper_model_name}.segments_pretty.json")
+
+        if out_file.exists():
             logging.info("speech-to-text: Segments file already exists: %s", out_file)
-            with open(out_file) as f:
+            with out_file.open() as f:
                 segments = json.load(f)
             return segments
 
@@ -247,9 +272,9 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
         transcribe_options = dict(task="transcribe", **options)
         # use function and config at top of file
         logging.debug("speech-to-text: Using whisper model: %s", whisper_model)
+
         whisper_model_instance = get_whisper_model(whisper_model, processing_choice)
-        # faster_whisper transcription right here - FIXME -test batching - ha
-        segments_raw, info = whisper_model_instance.transcribe(audio_file_path, **transcribe_options)
+        segments_raw, info = whisper_model_instance.transcribe(str(file_path), **transcribe_options)
 
         segments = []
         for segment_chunk in segments_raw:
@@ -260,7 +285,7 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
             }
             logging.debug("Segment: %s", chunk)
             segments.append(chunk)
-            # Print to verify its working
+            # Print to verify it's working
             logging.info(f"{segment_chunk.start:.2f}s - {segment_chunk.end:.2f}s | {segment_chunk.text}")
 
             # Log it as well.
@@ -268,7 +293,11 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
                 f"Transcribed Segment: {segment_chunk.start:.2f}s - {segment_chunk.end:.2f}s | {segment_chunk.text}")
 
         if segments:
-            segments[0]["Text"] = f"This text was transcribed using whisper model: {whisper_model}\n\n" + segments[0]["Text"]
+            # Insert metadata at the start of the first segment if desired
+            segments[0]["Text"] = (
+                f"This text was transcribed using whisper model: {whisper_model}\n\n"
+                + segments[0]["Text"]
+            )
 
         if not segments:
             log_counter("speech_to_text_error", labels={"error": "No transcription produced"})
@@ -276,35 +305,46 @@ def speech_to_text(audio_file_path, selected_source_lang='en', whisper_model='me
 
         transcription_time = time.time() - time_start
         logging.info("speech-to-text: Transcription completed in %.2f seconds", transcription_time)
-        log_histogram("speech_to_text_duration", transcription_time, labels={"file_path": audio_file_path, "model": whisper_model})
-        log_counter("speech_to_text_success", labels={"file_path": audio_file_path, "model": whisper_model})
+        log_histogram(
+            "speech_to_text_duration",
+            transcription_time,
+            labels={"file_path": str(file_path), "model": whisper_model}
+        )
+        log_counter("speech_to_text_success", labels={"file_path": str(file_path), "model": whisper_model})
+
         # Save the segments to a JSON file - prettified and non-prettified
         # FIXME refactor so this is an optional flag to save either the prettified json file or the normal one
         save_json = True
         if save_json:
             logging.info("speech-to-text: Saving segments to JSON file")
             output_data = {'segments': segments}
+
             logging.info("speech-to-text: Saving JSON to %s", out_file)
-            with open(out_file, 'w') as f:
+            with out_file.open('w', encoding='utf-8') as f:
                 json.dump(output_data, f)
+
+            # free up memory
             del output_data
             gc.collect()
-            with open(prettified_out_file, 'w') as f:
-                logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
+
+            logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
+            with prettified_out_file.open('w', encoding='utf-8') as f:
                 json.dump({'segments': segments}, f, indent=2)
-
-
 
         logging.debug(f"speech-to-text: returning {segments[:500]}")
         gc.collect()
         return segments
 
     except Exception as e:
-        logging.error("speech-to-text: Error transcribing audio: %s", str(e))
-        log_counter("speech_to_text_error", labels={"file_path": audio_file_path, "model": whisper_model, "error": str(e)})
-        raise RuntimeError("speech-to-text: Error transcribing audio")
+        logging.error("speech-to-text: Error transcribing audio: %s", str(e), exc_info=True)
+        log_counter(
+            "speech_to_text_error",
+            labels={"file_path": str(file_path), "model": whisper_model, "error": str(e)}
+        )
+        raise RuntimeError("speech-to-text: Error transcribing audio") from e
 
 
+@timeit
 def record_audio(duration, sample_rate=16000, chunk_size=1024):
     log_counter("record_audio_attempt", labels={"duration": duration})
     p = pyaudio.PyAudio()
@@ -332,6 +372,7 @@ def record_audio(duration, sample_rate=16000, chunk_size=1024):
     return p, stream, audio_queue, stop_recording, audio_thread
 
 
+@timeit
 def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
     log_counter("stop_recording_attempt")
     start_time = time.time()
@@ -353,6 +394,8 @@ def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
     log_counter("stop_recording_success")
     return b''.join(frames)
 
+
+@timeit
 def save_audio_temp(audio_data, sample_rate=16000):
     log_counter("save_audio_temp_attempt")
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:

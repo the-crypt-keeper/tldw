@@ -9,6 +9,10 @@ https://jianzongwu.github.io/projects/diffsensei/
 https://github.com/jianzongwu/DiffSensei
 https://github.com/joonspk-research/generative_agents
 
+https://github.com/icip-cas/PPTAgent
+    https://huggingface.co/datasets/Forceless/Zenodo10K
+
+
 
 ### Storytelling
 

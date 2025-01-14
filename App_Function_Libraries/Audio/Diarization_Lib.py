@@ -23,11 +23,16 @@ from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
 # Import 3rd Party Libraries
 from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
 import yaml
+
+from App_Function_Libraries.Metrics.metrics_logger import timeit
+
+
 #
 #######################################################################################################################
 # Function Definitions
 #
 
+@timeit
 def load_pipeline_from_pretrained(path_to_config: str | Path) -> SpeakerDiarization:
     path_to_config = Path(path_to_config).resolve()
     logging.debug(f"Loading pyannote pipeline from {path_to_config}...")
@@ -92,6 +97,7 @@ def load_pipeline_from_pretrained(path_to_config: str | Path) -> SpeakerDiarizat
     return pipeline
 
 
+@timeit
 def audio_diarization(audio_file_path: str) -> list:
     logging.info('audio-diarization: Loading pyannote pipeline')
 
@@ -191,6 +197,7 @@ def audio_diarization(audio_file_path: str) -> list:
 #         raise RuntimeError("audio-diarization: Error performing diarization")
 #     return segments
 
+@timeit
 def combine_transcription_and_diarization(audio_file_path: str) -> List[Dict[str, Any]]:
     logging.info('combine-transcription-and-diarization: Starting transcription and diarization...')
 

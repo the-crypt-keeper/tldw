@@ -110,7 +110,7 @@ def create_summarize_explain_tab():
                     api_endpoint = gr.Dropdown(
                         choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                         value=default_value,
-                        label="API for Summarization/Analysis (Optional)"
+                        label="API for Analysis/Summarization (Optional)"
                     )
                 with gr.Row():
                     api_key_input = gr.Textbox(
