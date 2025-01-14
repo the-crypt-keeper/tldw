@@ -25,3 +25,7 @@ https://southbridge-research.notion.site/Entropixplained-11e5fec70db18022b083d7d
 https://magazine.sebastianraschka.com/p/practical-tips-for-finetuning-llms?utm_medium=email
 https://magazine.sebastianraschka.com/p/lora-and-dora-from-scratch?utm_medium=email
 https://arxiv.org/abs/2405.09673
+https://github.com/GoogleCloudPlatform/generative-ai/blob/main/open-models/serving/vertex_ai_tgi_gemma_multi_lora_adapters_deployment.ipynb
+
+
+
