@@ -56,7 +56,7 @@ def create_video_transcription_tab():
                                        placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, other video sites and Youtube playlists.",
                                        lines=5)
                 video_files = gr.File(label="Upload Video File(s) (Optional)", file_types=[".mp4", ".avi", ".mov", ".mkv", ".webm"], file_count="multiple")
-                whisper_model_input = gr.Dropdown(choices=whisper_models, value="deepdml/faster-whisper-large-v3-turbo-ct2", label="Whisper Model")
+                whisper_model_input = gr.Dropdown(choices=whisper_models, value="distil-large-v3", label="Whisper Model")
 
                 with gr.Row():
                     diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
