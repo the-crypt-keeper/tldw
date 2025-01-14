@@ -450,6 +450,7 @@ GPT-SoviTTS
 https://tts.x86.st/
 Finetuning is very quick (about 5 minutes). Captioning of audio was automated with faster-whisper (it is required that the audio is captioned).
 With the default batch size of 12, training takes 9.5~ GB.
+Batch Size Scales linearly with VRAM. 1 batch size = 4 GB of VRAM.
 
 Inference
     https://github.com/RVC-Boss/GPT-SoVITS/blob/main/GPT_SoVITS/inference_cli.py

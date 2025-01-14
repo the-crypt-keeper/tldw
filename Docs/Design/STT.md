@@ -1,7 +1,29 @@
 # Speech-To-Text Documentation
 
 
+## To Do
+Switch to mobiusLabs model: https://github.com/SYSTRAN/faster-whisper/issues/1030
+https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo
+
+
 ## Overview
+- **Usage**
+    1. If transcribing english audio, use [Whisper-Turbo v3](https://huggingface.co/openai/whisper-large-v3-turbo)
+       * Model used in this project: [Deepdml/faster-whisper-large-v3-turbo-ct2](https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2)
+    2. If transcribing non-english audio, use [Whisper-Large distil v3](https://huggingface.co/distil-whisper/distil-large-v3)
+    3. If that fails, then use [Whisper-Large v3](https://huggingface.co/openai/whisper-large-v3) -> Whisper-Large v2
+- **Voice-Audio-Detection(VAD)**
+    - Use VAD to detect voice activity in audio files.
+    - This feature is currently not properly understood, so :shrug:
+- **Speaker-Diarization**
+    - Use Pyannote to determine speaker boundaries in audio files.
+    - This feature is currently either implemented poorly or it's not that great at diarization.
+- **Transcription**
+    - Use Faster Whisper to transcribe audio files. Uses Whisper models currently
+    - Faster_whisper is a re-implementation of whisper using via CTranslate2(an inference engine for Transformers models)
+          - Supports both CPU and GPU + Quantization
+          - https://opennmt.net/CTranslate2/quantization.html
+
 - **Backend**
   - faster_whisper
   - Model: `WhisperModel` (User-selectable)
@@ -24,7 +46,7 @@
 
 ### Benchmarks
 - https://github.com/Picovoice/speech-to-text-benchmark
-
+https://huggingface.co/spaces/hf-audio/open_asr_leaderboard
 
 
 
