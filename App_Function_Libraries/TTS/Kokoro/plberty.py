@@ -1,3 +1,4 @@
+# https://huggingface.co/hexgrad/Kokoro-82M/blob/main/plbert.py
 # https://github.com/yl4579/StyleTTS2/blob/main/Utils/PLBERT/util.py
 from transformers import AlbertConfig, AlbertModel
 

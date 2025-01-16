@@ -1,3 +1,4 @@
+# https://huggingface.co/hexgrad/Kokoro-82M/blob/main/models.py
 # https://github.com/yl4579/StyleTTS2/blob/main/models.py
 from App_Function_Libraries.TTS.Kokoro.kokoro import generate_full
 from App_Function_Libraries.TTS.Kokoro.istftnet import AdaIN1d, Decoder

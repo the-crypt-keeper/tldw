@@ -1,3 +1,4 @@
+# https://huggingface.co/hexgrad/Kokoro-82M/blob/main/istftnet.py
 # https://github.com/yl4579/StyleTTS2/blob/main/Modules/istftnet.py
 from scipy.signal import get_window
 from torch.nn import Conv1d, ConvTranspose1d
