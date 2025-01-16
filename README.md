@@ -349,19 +349,26 @@ All features are designed to run **locally** on your device, ensuring privacy an
 
 
 ### Planned Features
-You can view the full roadmap on the [GitHub Issues page](https://github.com/rmusser01/tldw/issues).
+You can view the current "Focused tasks" list at [Milestone: Beta v10](https://github.com/rmusser01/tldw/milestone/22).
 <details>
 <summary>**Planned Features(Extended) - Click-Here**</summary>
 
 ### Some planned features include:
 - **Improved RAG Pipeline** (Retrieval-Augmented Generation) support with enhanced testing.
+    - The current RAG pipeline is decent but could be a lot better/further-tuned.
+    - See https://github.com/rmusser01/tldw/milestone/14 for more information/progress. (This is low-priority currently)
 - **New, more intuitive UI**, migrating to FastAPI with custom front-ends.
+    - Gradio is a placeholder UI, and I'd like to move to a more intuitive, user-friendly UI. This will be built slowly, and is the next 'main' focus.
 - **Streaming responses** for real-time answers.
+    - This is currently in, but not all APIs support it. I'd like to get it working for all APIs.
 - **Whisper model transcription accuracy testing**
     - Identify accuracy of used models.
     - Set it up so users can test against their own datasets
+    - faster_whisper has benchmarking tools do exactly this, but again, low priority currently.
 - **TTS/STT support** for the UI so you can ask questions directly to the model or have it speak out the results to you.
-  - Having something like this would be pretty fucking cool I think: https://github.com/smellslikeml/dolla_llama/tree/main (Need to look more into nemesis by specterops)
+  - Speech-to-Text support for the UI so you can ask questions directly to the model. (Status: In as standalone feature but not added to chats as an input yet)
+  - Text-to-Speech support for the UI so you can have the model speak out the results to you. (Status: Can generate chat responses, but nothing else currently))
+  - Speech-to-Speech support for the UI so you can have a voice conversation with the model. (Status: Not started)
 - Add **some neat writing tools**, since why not have some fun?
   - https://github.com/the-crypt-keeper/the-muse 
   - https://github.com/the-crypt-keeper/LLooM 
@@ -623,6 +630,7 @@ None of these companies exist to provide AI services in 2024. They’re only doi
   * https://msty.app/
   * https://afforai.com
   * https://penno.io/
+  * https://thedrive.ai/
 ------------
 
 ### <a name="credits"></a>Credits

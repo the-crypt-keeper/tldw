@@ -157,6 +157,8 @@ https://github.com/rashadphz/farfalle/blob/main/src/backend/prompts.py
 https://github.com/stanford-oval/storm/
 https://github.com/stanford-oval/storm/blob/main/examples/storm_examples/run_storm_wiki_claude.py
 https://learning.google.com/experiments/learn-about
+https://github.com/SamuelSchmidgall/AgentLaboratory
+https://github.com/exa-labs/company-researcher
 
 AI Web Researcher Ollama
     https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama/blob/main/Self_Improving_Search.py

@@ -127,6 +127,7 @@ Kokoro
     https://github.com/remsky/Kokoro-FastAPI
     https://huggingface.co/hexgrad/Kokoro-82M/discussions/19
     https://www.reddit.com/r/LocalLLaMA/comments/1hyf1pf/comment/m6m86zm/?context=3
+    https://kokorotts.org/
 lina TTS
     https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
     https://github.com/theodorblackbird/lina-speech
@@ -152,7 +153,7 @@ OpenVoice
     https://github.com/myshell-ai/OpenVoice
 Outte
     https://github.com/edwko/OuteTTS
-    https://huggingface.co/OuteAI/OuteTTS-0.2-500M-GGUF
+    https://huggingface.co/collections/OuteAI/outetts-03-6786b1ebc7aeb757bc17a2fa
 Parler
     https://github.com/huggingface/parler-tts
 Paroli - Streaming mode implementation of the Piper TTS with RK3588 NPU acceleration support.
@@ -164,6 +165,8 @@ PiperTTS - A fast, local neural text to speech system that is optimized for the 
     https://ssamjh.nz/create-custom-piper-tts-voice/
     https://www.trycatchdebug.net/news/1377664/realtime-tts-with-pipertts-and-openai
     https://huggingface.co/rhasspy/piper-voices/tree/main
+    https://k2-fsa.github.io/sherpa/onnx/tts/piper.html
+    https://github.com/rhasspy/piper/blob/master/TRAINING.md
     https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main
 
 PiperUI
