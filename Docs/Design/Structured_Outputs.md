@@ -46,6 +46,7 @@ Tools
    https://github.com/Dan-wanna-M/formatron/tree/master
    https://github.com/whyhow-ai/knowledge-table
    https://github.com/guardrails-ai/guardrails
+   https://arena-ai.github.io/structured-logprobs/
 
 Examples
    https://github.com/dottxt-ai/demos/tree/main/lore-generator

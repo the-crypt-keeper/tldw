@@ -94,6 +94,7 @@ https://github.com/osbytes/crypt.fyi
 https://github.com/satellitecomponent/Neurite
 https://uxdesign.cc/ai-and-cognitive-offloading-sharing-the-thinking-process-with-machines-2d27e66e0f31
 https://www.typingmind.com
+https://github.com/felladrin/MiniSearch
 
 
 

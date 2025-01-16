@@ -12,7 +12,8 @@ https://medium.com/@camauger/crafting-effective-chatgpt-prompts-for-tabletop-rol
 https://towardsdatascience.com/how-i-won-singapores-gpt-4-prompt-engineering-competition-34c195a93d41
 https://arxiv.org/abs/2411.01992
 https://github.com/lks-ai/prowl
-
+https://github.com/MIATECHPARTNERS/PromptChains
+https://github.com/mazen160/llmquery/
 
 
 

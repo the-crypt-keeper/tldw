@@ -22,7 +22,7 @@ https://gitdiagram.com/
 https://www.ilograph.com/blog/posts/diagrams-ai-can-and-cannot-generate/#system-diagramming-with-ai
 https://github.com/osanseviero/geminicoder
 https://blog.val.town/blog/fast-follow/
-
+https://glean.software/
 
 
 

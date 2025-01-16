@@ -5,6 +5,7 @@
 import json
 import logging
 import os
+import re
 import tempfile
 import time
 import uuid
@@ -15,6 +16,12 @@ import requests
 from openai import api_key
 from pydub import AudioSegment
 from pydub.playback import play
+import numpy as np
+import torch
+from phonemizer import phonemize
+import soundfile as sf
+
+from App_Function_Libraries.TTS.TTS_Providers_Local import play_mp3, generate_audio_kokoro
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data
@@ -23,32 +30,9 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_conf
 #
 # Functions:
 
-def play_mp3(file_path):
-    """Play an MP3 file using the pydub library."""
-    try:
-        from pydub.utils import which
-        logging.debug(f"Debug: ffmpeg path: {which('ffmpeg')}")
-        logging.debug(f"Debug: ffplay path: {which('ffplay')}")
-
-        absolute_path = os.path.abspath(file_path)
-        audio = AudioSegment.from_mp3(absolute_path)
-        logging.debug("Debug: File loaded successfully")
-        play(audio)
-    except Exception as e:
-        logging.debug(f"Debug: Exception type: {type(e)}")
-        logging.debug(f"Debug: Exception args: {e.args}")
-        logging.error(f"Error playing the audio file: {e}")
-
-
-def play_audio_file(file_path):
-    """Play an audio file using the pydub library."""
-    try:
-        absolute_path = os.path.abspath(file_path)
-        audio = AudioSegment.from_file(absolute_path)
-        play(audio)
-    except Exception as e:
-        logging.error(f"Error playing the audio file: {e}")
-
+########################################################
+#
+# Audio Generation Functions
 
 def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None, output_file=None, response_format=None, streaming=False):
     """Generate audio using the specified TTS provider."""
@@ -114,6 +98,18 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
             input_text=text,
             model=model,
             output_file=output_file,
+        )
+
+    elif provider == "kokoro":
+        logging.info("Using Kokoro TTS provider")
+        return generate_audio_kokoro(
+            input_text=text,
+            voice=voice,
+            model_path=loaded_config_data['tts_settings'].get('local_tts_model_path', 'kokoro_model.pth'),
+            device=loaded_config_data['tts_settings'].get('local_tts_device', 'cpu'),
+            output_format=response_format or 'wav',
+            output_file=output_file or 'speech.wav',
+            speed=1.0
         )
 
     else:
@@ -182,6 +178,10 @@ def test_generate_audio():
         if os.path.exists(result):
             play_mp3(result)  # Single play call
     print("Test successful")
+
+#
+# End of Audio Generation Functions
+########################################################
 
 
 #######################################################

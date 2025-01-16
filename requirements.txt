@@ -30,6 +30,7 @@ openai
 # Requires rust compiler...
 #outlines
 pandas
+phonemizer
 Pillow
 #piper-tts
 playwright
