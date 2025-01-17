@@ -23,6 +23,9 @@ https://www.ilograph.com/blog/posts/diagrams-ai-can-and-cannot-generate/#system-
 https://github.com/osanseviero/geminicoder
 https://blog.val.town/blog/fast-follow/
 https://glean.software/
+https://github.com/AtakanTekparmak/exec-python/tree/main
+https://huggingface.co/blog/andthattoo/dpab-a
+https://github.com/firstbatchxyz/function-calling-eval
 
 
 

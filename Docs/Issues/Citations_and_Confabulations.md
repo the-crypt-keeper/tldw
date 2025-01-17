@@ -6,6 +6,9 @@
 3. [References](#references)
 
 
+
+https://arxiv.org/abs/2412.07965
+
 RAG
   https://www.lycee.ai/blog/rag-ragallucinations-and-how-to-fight-them
   https://huggingface.co/PleIAs/Pleias-Nano
