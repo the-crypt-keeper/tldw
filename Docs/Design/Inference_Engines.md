@@ -26,6 +26,6 @@ https://magazine.sebastianraschka.com/p/practical-tips-for-finetuning-llms?utm_m
 https://magazine.sebastianraschka.com/p/lora-and-dora-from-scratch?utm_medium=email
 https://arxiv.org/abs/2405.09673
 https://github.com/GoogleCloudPlatform/generative-ai/blob/main/open-models/serving/vertex_ai_tgi_gemma_multi_lora_adapters_deployment.ipynb
-
-
+https://github.com/Infini-AI-Lab/UMbreLLa
+https://huggingface.co/blog/andthattoo/dpab-a
 

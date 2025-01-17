@@ -152,7 +152,8 @@ Open-LLM-VTuber
 OpenVoice
     https://github.com/myshell-ai/OpenVoice
 Outte
-    https://github.com/edwko/OuteTTS
+    https://github.com/edwko/outetts
+    https://github.com/edwko/OuteTTS/pull/46#issuecomment-2527817670
     https://huggingface.co/collections/OuteAI/outetts-03-6786b1ebc7aeb757bc17a2fa
 Parler
     https://github.com/huggingface/parler-tts
@@ -488,6 +489,7 @@ Comfyui integration
 ------------------------------------------------------------------------------------------------
 #### Kokoro
 https://huggingface.co/hexgrad/Kokoro-82M
+Eventually migrate to using: https://github.com/thewh1teagle/kokoro-onnx
 - **101**
     - F
 - **Setup**

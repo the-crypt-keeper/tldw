@@ -22,7 +22,7 @@ from App_Function_Libraries.Utils.Utils import format_transcription
 
 whisper_models = ["tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium",
         "large-v1", "large-v2", "large-v3", "large", "distil-large-v2", "distil-medium.en", "distil-small.en",
-        "distil-large-v3", "deepdml/faster-whisper-large-v3-turbo-ct2"]
+        "distil-large-v3", "deepdml/faster-whisper-large-v3-turbo-ct2", "nyrahealth/faster_CrisperWhisper"]
 
 # Sample data
 prompts_category_1 = [

@@ -15,6 +15,10 @@
 
 ### 5. Implementation
 
+
+
+
+
 ## Design Principles
 
 ### 1. Consistency
@@ -26,6 +30,9 @@
 ### 4. Familiarity
 
 ### 5. Responsiveness
+
+
+
 
 ## Design Elements
 
@@ -42,6 +49,11 @@
 
 
 ### Link Dump:
+
+Website:
+  https://github.com/AnswerDotAI/fasthtml-example/tree/main/02_chatbot
+
+
 https://github.com/abi/screenshot-to-
 https://designdetails.fm/episodes
 https://copycoder.ai/
