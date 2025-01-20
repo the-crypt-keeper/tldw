@@ -197,9 +197,6 @@ def toggle_recording(
                 )
                 partial_thread.start()
 
-            # Clear both text boxes when starting new recording
-            partial_text_state["text"] = ""
-
             # recording_state: store everything we might need
             new_state = {
                 "p": p,
@@ -231,6 +228,7 @@ def toggle_recording(
         stop_event = recording_state["stop_event"]
         audio_thread = recording_state["audio_thread"]
         partial_thread = recording_state["partial_thread"]
+        whisper_model = recording_state.get("whisper_model", "distil-large-v3")
         lock = recording_state["lock"]
 
         # 1) Stop the partial transcription thread if it exists
@@ -250,10 +248,7 @@ def toggle_recording(
 
         # Check for valid audio
         if not raw_audio:
-            error_message = "No audio recorded"
-            with lock:
-                partial_text_state["text"] = error_message
-            return None, False, "Start Recording", error_message, None
+            return None, False, "Start Recording", "No audio recorded", None
 
         # 3) Final transcription of entire audio
         temp_file = save_audio_temp(raw_audio)
@@ -471,39 +466,21 @@ def create_live_recording_tab():
         # Define your polling function
         def poll_partial_text(live, partial_text_state):
             """Return partial text only if user set live_update = True."""
-            if not live:
+            if live:
+                # Access the text safely through the state object
+                return partial_text_state["text"] if partial_text_state else "(No transcription yet)"
+            else:
                 return "(Live update disabled)"
-            return partial_text_state["text"] if partial_text_state else "(No transcription yet)"
 
-    # Create a state for the timer
-    timer_state = gr.State(None)
+        # Create the Timer with a 2-second interval
+        my_timer = gr.Timer(value=2.0)
 
-    # Function to start/stop timer based on checkbox
-    def handle_live_update_change(live_update_enabled, timer_state):
-        if live_update_enabled:
-            # Create and start new timer
-            new_timer = gr.Timer(value=2.0)
-            new_timer.tick(
-                fn=poll_partial_text,
-                inputs=[live_update, partial_text_state],
-                outputs=partial_txt,
-            )
-            return new_timer
-        else:
-            # Stop and clear timer
-            if timer_state is not None:
-                timer_state.stop()
-            return None
-
-    # Connect the live_update checkbox to timer management
-    live_update.change(
-        fn=handle_live_update_change,
-        inputs=[live_update, timer_state],
-        outputs=[timer_state],
-    )
-
-    # Remove the original timer setup
-    # (delete the my_timer = gr.Timer(value=2.0) and its .tick() call)
+        # Attach the event listener with .tick()
+        my_timer.tick(
+            fn=poll_partial_text,
+            inputs=[live_update, partial_text_state],
+            outputs=partial_txt,
+        )
 #
 # End of Functions
 ########################################################################################################################
