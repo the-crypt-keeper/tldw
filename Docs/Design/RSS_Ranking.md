@@ -8,7 +8,7 @@ RSS
     https://feedparser.readthedocs.io/en/latest/
     https://github.com/kurtmckee/feedparser
 
-
+https://news.ycombinator.com/item?id=42761219
 https://towardsdatascience.com/a-mixed-methods-approach-to-offline-evaluation-of-news-recommender-systems-7dc7e9f0b501
 https://towardsdatascience.com/making-news-recommendations-explainable-with-large-language-models-74f119c7e036
 https://blog.det.life/from-scrolls-to-similarity-search-building-a-movie-recommender-with-duckdb-vss-8122e4d2e486?gi=c094d02d0993

@@ -54,6 +54,7 @@ Website:
   https://github.com/AnswerDotAI/fasthtml-example/tree/main/02_chatbot
 
 
+https://github.com/sshh12/spark-stack
 https://github.com/abi/screenshot-to-
 https://designdetails.fm/episodes
 https://copycoder.ai/

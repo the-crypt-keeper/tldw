@@ -322,6 +322,10 @@ def create_character_card_interaction_tab():
                         maxp_slider = gr.Slider(
                             minimum=0.00, maximum=1.0, value=1.00, step=0.01, label="Top-P"
                         )
+                    with gr.Row():
+                        topk_slider = gr.Slider(
+                            minimum=0, maximum=200, value=0, step=1, label="Top-K"
+                        )
                     chat_file_upload = gr.File(label="Upload Chat History JSON", visible=True)
                     import_chat_button = gr.Button("Import Chat History")
 
@@ -984,7 +988,7 @@ def create_character_card_interaction_tab():
                     selected_parts,
                     api_endpoint,
                     api_key,
-                    prompt="",
+                    custom_prompt="",
                     temperature=temperature,
                     system_message=system_message_user,
                     streaming=streaming,
@@ -1010,7 +1014,7 @@ def create_character_card_interaction_tab():
                         selected_parts,
                         api_endpoint,
                         api_key,
-                        prompt=char_data.get('post_history_instructions', ''),
+                        custom_prompt=char_data.get('post_history_instructions', ''),
                         temperature=temperature,
                         system_message=system_message_bot,
                         streaming=streaming,
@@ -1050,7 +1054,7 @@ def create_character_card_interaction_tab():
                     selected_parts,
                     api_endpoint,
                     api_key,
-                    prompt=char_data.get('post_history_instructions', ''),
+                    custom_prompt=char_data.get('post_history_instructions', ''),
                     temperature=temperature,
                     system_message=system_message_bot,
                     streaming=streaming,
