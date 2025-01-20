@@ -35,7 +35,8 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     delete_character_card,
     update_character_card, search_character_chats, save_chat_history_to_character_db,
 )
-from App_Function_Libraries.TTS.TTS_Providers import generate_audio, play_mp3, play_audio_file
+from App_Function_Libraries.TTS.TTS_Providers import generate_audio
+from App_Function_Libraries.TTS.TTS_Providers_Local import play_audio_file
 from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
     default_api_endpoint, load_comprehensive_config
 

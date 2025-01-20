@@ -20,8 +20,10 @@ import multiprocessing
 import os
 from pathlib import Path
 import queue
-import sys
+# FIXME - don't need sounddevice + pyaudio, just one-> Pyaudio
+import sounddevice as sd
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -76,7 +78,7 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 
 ##########################################################
 # Transcription Sink Function
-def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate: int = 16000) -> str:
+def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate: int = 16000, speaker_lang=None, whisper_model="distil-large-v3") -> str:
     """
     Unified transcribe entry point.
     Chooses faster-whisper or Qwen2Audio based on config.
@@ -90,13 +92,9 @@ def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate
         logging.info("Transcribing using Qwen2Audio")
         return transcribe_with_qwen2audio(audio_data, sample_rate)
     else:
-        logging.info("Transcribing using faster-whisper")
-        # The function from your Audio_Transcription_Lib:
-        # speech_to_text() expects a file path, so we either:
-        #   1) Save the audio_data to a temporary WAV
-        #   2) or adjust speech_to_text to accept raw NumPy arrays.
-        #
-        # For simplicity, let's do the temporary-file approach:
+        logging.info(f"Transcribing using faster-whisper with model: {whisper_model}")
+        # The function from your Audio_Transcription_Lib speech_to_text() expects a file path,
+        #   so we save the audio_data to a temporary WAV
         import tempfile
         import soundfile as sf
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
@@ -104,14 +102,25 @@ def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate
             tmp_wav_path = tmp_file.name
 
         # Now pass to faster-whisper
-        segments = speech_to_text(tmp_wav_path, whisper_model='small.en')  # or user-chosen
-        if isinstance(segments, dict) and 'error' in segments:
-            # handle error
-            return ""
-        # Merge all segment texts
-        final_text = " ".join(seg["Text"] for seg in segments['segments']) if isinstance(segments, dict) else " ".join(
-            seg["Text"] for seg in segments)
-        return final_text
+        try:
+            segments = speech_to_text(
+                tmp_wav_path,
+                whisper_model=whisper_model,
+                selected_source_lang=speaker_lang
+            )
+            if isinstance(segments, dict) and 'error' in segments:
+                # handle error
+                return f"Error in transcription: {segments['error']}"
+            # Merge all segment texts
+            final_text = " ".join(seg["Text"] for seg in segments['segments']) if isinstance(segments, dict) else " ".join(
+                seg["Text"] for seg in segments)
+            return final_text
+        finally:
+            # Clean up temporary file
+            try:
+                os.remove(tmp_wav_path)
+            except:
+                pass
 
 #
 # End of Sink Function
@@ -124,7 +133,7 @@ def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate
 
 # FIXME - Sample code for live audio transcription
 class LiveAudioStreamer:
-    def __init__(self, sample_rate=16000, chunk_size=1024, silence_threshold=0.01, silence_duration=1.0):
+    def __init__(self, sample_rate=16000, chunk_size=1024, silence_threshold=0.01, silence_duration=1.6):
         """
         :param silence_threshold: amplitude threshold below which we consider "silence"
         :param silence_duration: how many seconds of silence needed to finalize
@@ -197,8 +206,7 @@ class LiveAudioStreamer:
                         print("Silence detected. Finalizing the chunk.")
                         final_audio = np.concatenate(audio_buffer, axis=0).flatten()
                         audio_buffer.clear()
-                        # Transcribe
-                        from Transcription_Providers import transcribe_audio
+                        # Transcribe the finalized audio
                         user_text = transcribe_audio(final_audio, sample_rate=self.sample_rate)
 
                         # Then do something with user_text (e.g. add to chatbot)
@@ -212,14 +220,14 @@ class LiveAudioStreamer:
         """Hook/callback: override or connect a signal to do something with the transcribed text."""
         print(f"USER SAID: {text}")
 
-# Usage example
-if __name__ == "__main__":
-    streamer = LiveAudioStreamer(silence_threshold=0.01, silence_duration=1.5)
-    streamer.start()
-    print("Recording... talk, then remain silent for 1.5s to finalize.")
-    time.sleep(15)  # Let it run for 15 seconds
-    streamer.stop()
-    print("Stopped.")
+# # Usage example
+# if __name__ == "__main__":
+#     streamer = LiveAudioStreamer(silence_threshold=0.01, silence_duration=1.5)
+#     streamer.start()
+#     print("Recording... talk, then remain silent for 1.5s to finalize.")
+#     time.sleep(15)  # Let it run for 15 seconds
+#     streamer.stop()
+#     print("Stopped.")
 
 #
 # End of Live Audio Transcription Functions
@@ -381,8 +389,8 @@ def get_whisper_model(model_name, device, ):
 @timeit
 def speech_to_text(
     audio_file_path: str,
-    selected_source_lang: str = 'en',
     whisper_model: str = 'distil-large-v3',
+    selected_source_lang: str = 'en',  # Changed order of parameters
     vad_filter: bool = False,
     diarize: bool = False
 ):
