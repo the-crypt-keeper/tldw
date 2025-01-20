@@ -26,6 +26,11 @@ https://glean.software/
 https://github.com/AtakanTekparmak/exec-python/tree/main
 https://huggingface.co/blog/andthattoo/dpab-a
 https://github.com/firstbatchxyz/function-calling-eval
+https://codemirror.net/
+https://github.com/codemirror/dev
+https://github.com/google/diff-match-patch
+https://highlightjs.org/
+
 
 
 

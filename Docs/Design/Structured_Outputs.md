@@ -3,6 +3,10 @@
 
 https://towardsdatascience.com/diving-deeper-with-structured-outputs-b4a5d280c208
 https://generativeai.pub/building-multi-agent-llm-systems-with-pydanticai-framework-a-step-by-step-guide-to-create-ai-5e41fbba2608
+https://github.com/openai/openai-structured-outputs-samples
+
+
+
 
 ## Introduction
 This page serves as documentation regarding the structured outputs within tldw and provides context/justification for the decisions made within the module.

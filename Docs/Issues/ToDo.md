@@ -4,7 +4,9 @@ List of stuff I don't feel like filing an issue for (yet).
 
 
 ## To Do
+- searx https://github.com/Jay4242/llm-websearch/blob/main/llm-websearch.bash
 - Blogpost
+- https://adamj.eu/tech/2024/12/30/python-temporary-files-directories-unittest/
 - Documentation
 - Update README
 - Update CONTRIBUTING

@@ -63,6 +63,8 @@ https://arxiv.org/abs/2501.05366
 https://github.com/sunnynexus/Search-o1
 https://arxiv.org/abs/2501.02772
 https://arxiv.org/abs/2501.00332
+https://huggingface.co/MMDocIR
+https://github.com/opendatalab/OmniDocBench
 
 
 GraphRAG
@@ -106,7 +108,13 @@ https://blog.gopenai.com/llm-ontology-prompting-for-knowledge-graph-extraction-e
 https://towardsdatascience.com/how-to-convert-any-text-into-a-graph-of-concepts-110844f22a1a
 https://news.ycombinator.com/item?id=34605772
 https://arxiv.org/abs/2501.02157
+https://www.linkedin.com/pulse/taxonomy-ontology-knowledge-graph-rajib-deb-oedkc/
 
+
+
+Context Relevancy
+	https://arxiv.org/abs/2404.10198
+	https://github.com/kevinwu23/StanfordClashEval
 
 
 ### Links

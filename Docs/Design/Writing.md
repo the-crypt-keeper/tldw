@@ -16,5 +16,11 @@ https://github.com/Cloud-Code-AI/AkiraDocs
 https://www.greghilston.com/post/canpunk-new-genre-with-llms/
 https://github.com/desik1998/PersonalizingStoriesUsingAI/blob/main/OtherApproachesCode/Personalized_Novel_Generation_POC_draft.ipynb
 https://github.com/foldl/WritingTools
-
+https://huggingface.co/LatitudeGames/Wayfarer-12B-GGUF
 https://huggingface.co/Writer/Palmyra-Creative
+https://silverbullet.md/
+https://github.com/silverbulletmd/silverbullet
+
+
+
+
