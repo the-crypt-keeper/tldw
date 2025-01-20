@@ -931,6 +931,21 @@ def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5
                 print("Max retries reached. Download failed.")
                 raise
 
+def download_file_if_missing(url: str, local_path: str) -> None:
+    """
+    Download a file from a URL if it does not exist locally.
+    """
+    if os.path.exists(local_path):
+        logging.debug(f"File already exists locally: {local_path}")
+        return
+    logging.info(f"Downloading from {url} to {local_path}")
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    r = requests.get(url, stream=True)
+    r.raise_for_status()
+    with open(local_path, "wb") as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+
 def create_download_directory(title):
     base_dir = "Results"
     # Remove characters that are illegal in Windows filenames and normalize
