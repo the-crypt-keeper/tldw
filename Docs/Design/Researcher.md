@@ -142,6 +142,9 @@ https://github.com/neuml/paperetl
 https://github.com/ai-christianson/RA.Aid
 https://github.com/Future-House/paper-qa
 https://openreview.net/
+https://learning.google.com/experiments/learn-about/signup
+https://departmentofproduct.substack.com/p/how-to-use-perplexity-to-automate
+https://departmentofproduct.substack.com/p/deep-the-ux-of-search
 https://www.researchrabbit.ai/
 https://github.com/faraz18001/Sales-Llama
 https://github.com/memgraph/memgraph
@@ -159,6 +162,9 @@ https://github.com/stanford-oval/storm/blob/main/examples/storm_examples/run_sto
 https://learning.google.com/experiments/learn-about
 https://github.com/SamuelSchmidgall/AgentLaboratory
 https://github.com/exa-labs/company-researcher
+https://zjunlp.github.io/project/OmniThink/
+
+
 
 AI Web Researcher Ollama
     https://github.com/TheBlewish/Automated-AI-Web-Researcher-Ollama/blob/main/Self_Improving_Search.py

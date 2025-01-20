@@ -4,7 +4,12 @@
 ## To Do
 Switch to mobiusLabs model: https://github.com/SYSTRAN/faster-whisper/issues/1030
 https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo
+https://huggingface.co/spaces/hf-audio/open_asr_leaderboard
 
+
+
+Review potential use of quantized STT Models:
+    * https://opennmt.net/CTranslate2/quantization.html
 
 ## Overview
 - **Usage**

@@ -20,4 +20,4 @@ https://arxiv.org/pdf/2407.14482
 https://spider2-sql.github.io/
 https://departmentofproduct.substack.com/p/how-to-write-sql-queries-using-ai?utm_medium=email&triedRedirect=true
 https://generativeai.pub/ai-innovations-and-insights-15-text2sql-and-extractous-2643981b197f
-
+https://medium.com/wrenai/how-uber-is-saving-140-000-hours-each-month-using-text-to-sql-and-how-you-can-harness-the-same-fb4818ae4ea3

@@ -376,6 +376,9 @@ def load_and_log_configs():
         # Local API Timeout
         local_api_timeout = config.get('Local-API', 'local_api_timeout', fallback='90')
 
+        # STT Settings
+        default_stt_provider = config.get('STT-Settings', 'default_stt_provider', fallback='faster_whisper')
+
         # TTS Settings
         # FIXME
         default_tts_provider = config.get('TTS-Settings', 'default_tts_provider', fallback='openai')
@@ -636,6 +639,9 @@ def load_and_log_configs():
             },
             'default_api': default_api,
             'local_api_timeout': local_api_timeout,
+            'STT_Settings': {
+                'default_stt_provider': default_stt_provider,
+            },
             'tts_settings': {
                 'default_tts_provider': default_tts_provider,
                 'tts_voice': tts_voice,

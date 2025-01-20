@@ -10,7 +10,7 @@ Use of pydub for audio merging.
 
 
 
-
+https://generativeai.pub/glm-4-voice-9b-real-time-multilingual-voice-conversation-ai-install-locally-in-minutes-ce2fcd6c8fd8
 
 
 ### Services
@@ -122,12 +122,7 @@ GPT-SoviTTS
     https://github.com/cpumaxx/sovits-ff-plugin
     https://github.com/JarodMica/GPT-SoVITS-Package
 Kokoro
-    https://github.com/thewh1teagle/kokoro-onnx
-    https://huggingface.co/hexgrad/Kokoro-82M
-    https://github.com/remsky/Kokoro-FastAPI
-    https://huggingface.co/hexgrad/Kokoro-82M/discussions/19
-    https://www.reddit.com/r/LocalLLaMA/comments/1hyf1pf/comment/m6m86zm/?context=3
-    https://kokorotts.org/
+
 lina TTS
     https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
     https://github.com/theodorblackbird/lina-speech
@@ -155,6 +150,7 @@ Outte
     https://github.com/edwko/outetts
     https://github.com/edwko/OuteTTS/pull/46#issuecomment-2527817670
     https://huggingface.co/collections/OuteAI/outetts-03-6786b1ebc7aeb757bc17a2fa
+    https://github.com/edwko/OuteTTS/blob/main/docs/interface_v2_usage.md
 Parler
     https://github.com/huggingface/parler-tts
 Paroli - Streaming mode implementation of the Piper TTS with RK3588 NPU acceleration support.
@@ -171,6 +167,8 @@ PiperTTS - A fast, local neural text to speech system that is optimized for the 
     https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main
 
 PiperUI
+RVC
+    https://www.youtube.com/watch?v=Q8du7n0vgfU
 Sherpa ONNX
     https://github.com/k2-fsa/sherpa-onnx
 Silero
@@ -180,6 +178,7 @@ SoundStorm
     https://deepmind.google/discover/blog/pushing-the-frontiers-of-audio-generation/
     https://github.com/lucidrains/soundstorm-pytorch
 Styletts2
+    https://www.youtube.com/watch?v=dCmAbcJ5v5k
 Tortoise TTS
 VallE-X
 VITA
@@ -489,9 +488,16 @@ Comfyui integration
 ------------------------------------------------------------------------------------------------
 #### Kokoro
 https://huggingface.co/hexgrad/Kokoro-82M
+
+    https://www.reddit.com/r/LocalLLaMA/comments/1hyf1pf/comment/m6m86zm/?context=3
+
+    
 Eventually migrate to using: https://github.com/thewh1teagle/kokoro-onnx
 - **101**
+    - https://kokorotts.org/
+    - https://huggingface.co/hexgrad/Kokoro-82M
     - F
+    - Onnx Model: https://github.com/thewh1teagle/kokoro-onnx
 - **Setup**
     1. f
     2. f
@@ -500,7 +506,13 @@ Eventually migrate to using: https://github.com/thewh1teagle/kokoro-onnx
     5. f
 - **Inference**
 - **API**
-- 
+- Finetuning
+  - https://huggingface.co/hexgrad/Kokoro-82M/discussions/19
+- **Examples**
+    - https://github.com/thewh1teagle/kokoro-onnx/tree/main/examples
+    - https://github.com/ugotworms/professor-kokoro-radio
+    - https://github.com/remsky/Kokoro-FastAPI
+    - https://github.com/kaminoer/KokoDOS/tree/main/glados
 
 ------------------------------------------------------------------------------------------------
 
