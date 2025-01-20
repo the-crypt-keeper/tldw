@@ -273,14 +273,15 @@ def load_and_log_configs():
         google_top_p = config.get('API', 'google_top_p', fallback='0.95')
         google_min_p = config.get('API', 'google_min_p', fallback='0.05')
 
-        logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
-        logging.debug(f"Loaded Cohere Model: {cohere_model}")
-        logging.debug(f"Loaded Groq Model: {groq_model}")
-        logging.debug(f"Loaded OpenAI Model: {openai_model}")
-        logging.debug(f"Loaded HuggingFace Model: {huggingface_model}")
-        logging.debug(f"Loaded OpenRouter Model: {openrouter_model}")
-        logging.debug(f"Loaded Deepseek Model: {deepseek_model}")
-        logging.debug(f"Loaded Mistral Model: {mistral_model}")
+        # Logging Checks for model loads
+        # logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
+        # logging.debug(f"Loaded Cohere Model: {cohere_model}")
+        # logging.debug(f"Loaded Groq Model: {groq_model}")
+        # logging.debug(f"Loaded OpenAI Model: {openai_model}")
+        # logging.debug(f"Loaded HuggingFace Model: {huggingface_model}")
+        # logging.debug(f"Loaded OpenRouter Model: {openrouter_model}")
+        # logging.debug(f"Loaded Deepseek Model: {deepseek_model}")
+        # logging.debug(f"Loaded Mistral Model: {mistral_model}")
 
         # Local-Models
         kobold_api_ip = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
@@ -333,11 +334,12 @@ def load_and_log_configs():
         custom_openai_api_streaming = config.get('API', 'custom_openai_streaming', fallback='False')
         custom_openai_api_temperature = config.get('API', 'custom_openai_temperature', fallback='0.7')
 
-        logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
-        logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
-        logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
-        logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
-        logging.debug(f"Loaded VLLM API URL: {vllm_api_url}")
+        # Logging Checks for Local API IP loads
+        # logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
+        # logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
+        # logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
+        # logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
+        # logging.debug(f"Loaded VLLM API URL: {vllm_api_url}")
 
         # Retrieve default API choices from the configuration file
         default_api = config.get('API', 'default_api', fallback='openai')
