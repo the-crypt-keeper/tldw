@@ -203,7 +203,7 @@ def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp
 
 
 def chat(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature,
-         system_message=None, streaming=False, minp=None, maxp=None, model=None):
+         system_message=None, streaming=False, minp=None, maxp=None, model=None, topp=None, topk=None):
     log_counter("chat_attempt", labels={"api_endpoint": api_endpoint})
     start_time = time.time()
     try:
@@ -242,7 +242,7 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         logging.debug(f"Debug - Chat Function - Prompt: {custom_prompt}")
 
         # Use the existing API request code based on the selected endpoint
-        response = chat_api_call(api_endpoint, api_key, input_data, custom_prompt, temp, system_message, streaming, minp, maxp, model)
+        response = chat_api_call(api_endpoint, api_key, input_data, custom_prompt, temp, system_message, streaming, minp, maxp, model, topp, topk)
 
         if streaming:
             logging.debug(f"Debug - Chat Function - Response: {response}")
