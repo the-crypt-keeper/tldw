@@ -158,7 +158,8 @@ def toggle_recording(
         live_update,
         save_recording,
         partial_text_state,
-        whisper_model
+        whisper_model,
+        speaker_lang="en"
 ):
     """
     Single function to handle both 'start' and 'stop' logic.
@@ -176,8 +177,8 @@ def toggle_recording(
             p, stream, audio_queue, stop_event, audio_thread = record_audio_indef()
             log_counter("live_recording_start_success")
 
-            # Add a small delay after starting recording
-            time.sleep(0.5)  # 500ms delay to avoid cutting off the start
+            # Add a small delay after starting recording to avoid cutting off the start
+            time.sleep(0.5)
 
             # If user wants real-time partial updates, start the partial thread
             partial_thread = None
@@ -191,9 +192,13 @@ def toggle_recording(
                     lock=lock,
                     sample_rate=16000,
                     update_interval=2.0,
-                    whisper_model=whisper_model
+                    whisper_model=whisper_model,
+                    speaker_lang=speaker_lang
                 )
                 partial_thread.start()
+
+            # Clear both text boxes when starting new recording
+            partial_text_state["text"] = ""
 
             # recording_state: store everything we might need
             new_state = {
@@ -214,7 +219,6 @@ def toggle_recording(
             logging.error(f"Error starting recording: {str(e)}")
             return None, False, "Start Recording", f"Error starting recording: {str(e)}", None
 
-
     # ================== STOP RECORDING ======================
     if not recording_state:
         # No active recording to stop
@@ -227,7 +231,7 @@ def toggle_recording(
         stop_event = recording_state["stop_event"]
         audio_thread = recording_state["audio_thread"]
         partial_thread = recording_state["partial_thread"]
-        whisper_model = recording_state.get("whisper_model", "distil-large-v3")
+        lock = recording_state["lock"]
 
         # 1) Stop the partial transcription thread if it exists
         if partial_thread is not None:
@@ -246,7 +250,10 @@ def toggle_recording(
 
         # Check for valid audio
         if not raw_audio:
-            return None, False, "Start Recording", "No audio recorded", None
+            error_message = "No audio recorded"
+            with lock:
+                partial_text_state["text"] = error_message
+            return None, False, "Start Recording", error_message, None
 
         # 3) Final transcription of entire audio
         temp_file = save_audio_temp(raw_audio)
@@ -257,10 +264,19 @@ def toggle_recording(
                 final_audio_np,
                 transcription_method,
                 sample_rate=16000,
-                whisper_model=whisper_model
+                whisper_model=whisper_model,
+                speaker_lang=speaker_lang
             )
+
+            # Update both partial and final text
+            with lock:
+                partial_text_state["text"] = final_result
+
         except Exception as e:
-            final_result = f"[Error in final transcription: {str(e)}]"
+            error_message = f"[Error in final transcription: {str(e)}]"
+            with lock:
+                partial_text_state["text"] = error_message
+            final_result = error_message
 
         # 4) Optionally save the WAV
         if not save_recording and os.path.exists(temp_file):
@@ -273,7 +289,10 @@ def toggle_recording(
 
     except Exception as e:
         logging.error(f"Error stopping recording: {str(e)}")
-        return None, False, "Start Recording", f"Error stopping recording: {str(e)}", None
+        error_message = f"Error stopping recording: {str(e)}"
+        with recording_state["lock"]:
+            partial_text_state["text"] = error_message
+        return None, False, "Start Recording", error_message, None
 
 
 ########################################################################
@@ -382,9 +401,16 @@ def create_live_recording_tab():
                 # Show partial transcription if "live_update" is on
                 partial_txt = gr.Textbox(
                     label="Partial Transcription (refreshes every 2s if live_update enabled)",
-                    lines=5
+                    lines=5,
+                    interactive=False,
+                    show_copy_button=True
                 )
-                final_txt = gr.Textbox(label="Final Transcription (once stopped)", lines=5)
+                final_txt = gr.Textbox(
+                    label="Final Transcription (once stopped)",
+                    lines=5,
+                    interactive = False,
+                    show_copy_button = True
+                )
                 audio_output = gr.Audio(label="Recorded Audio", visible=False)
                 db_save_status = gr.Textbox(label="Database Save Status", lines=2)
 
@@ -445,21 +471,39 @@ def create_live_recording_tab():
         # Define your polling function
         def poll_partial_text(live, partial_text_state):
             """Return partial text only if user set live_update = True."""
-            if live:
-                # Access the text safely through the state object
-                return partial_text_state["text"] if partial_text_state else "(No transcription yet)"
-            else:
+            if not live:
                 return "(Live update disabled)"
+            return partial_text_state["text"] if partial_text_state else "(No transcription yet)"
 
-        # Create the Timer with a 2-second interval
-        my_timer = gr.Timer(value=2.0)
+    # Create a state for the timer
+    timer_state = gr.State(None)
 
-        # Attach the event listener with .tick()
-        my_timer.tick(
-            fn=poll_partial_text,
-            inputs=[live_update, partial_text_state],
-            outputs=partial_txt,
-        )
+    # Function to start/stop timer based on checkbox
+    def handle_live_update_change(live_update_enabled, timer_state):
+        if live_update_enabled:
+            # Create and start new timer
+            new_timer = gr.Timer(value=2.0)
+            new_timer.tick(
+                fn=poll_partial_text,
+                inputs=[live_update, partial_text_state],
+                outputs=partial_txt,
+            )
+            return new_timer
+        else:
+            # Stop and clear timer
+            if timer_state is not None:
+                timer_state.stop()
+            return None
+
+    # Connect the live_update checkbox to timer management
+    live_update.change(
+        fn=handle_live_update_change,
+        inputs=[live_update, timer_state],
+        outputs=[timer_state],
+    )
+
+    # Remove the original timer setup
+    # (delete the my_timer = gr.Timer(value=2.0) and its .tick() call)
 #
 # End of Functions
 ########################################################################################################################
