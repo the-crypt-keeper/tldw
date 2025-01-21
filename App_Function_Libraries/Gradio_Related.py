@@ -59,6 +59,7 @@ from App_Function_Libraries.Gradio_UI.RAG_Chat_tab import create_rag_tab
 from App_Function_Libraries.Gradio_UI.Embeddings_tab import create_embeddings_tab, create_view_embeddings_tab, \
     create_purge_embeddings_tab
 from App_Function_Libraries.Gradio_UI.Semantic_Scholar_tab import create_semantic_scholar_tab
+from App_Function_Libraries.Gradio_UI.TTS_Playground import create_audio_generation_tab
 from App_Function_Libraries.Gradio_UI.Trash import create_view_trash_tab, create_empty_trash_tab, \
     create_delete_trash_tab, create_search_and_mark_trash_tab
 from App_Function_Libraries.Gradio_UI.Utilities import create_utilities_yt_timestamp_tab, create_utilities_yt_audio_tab, \
@@ -453,6 +454,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_resummary_tab()
                     create_summarize_explain_tab()
                     create_live_recording_tab()
+                    create_audio_generation_tab()
                     create_arxiv_tab()
                     create_semantic_scholar_tab()
 
