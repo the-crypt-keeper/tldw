@@ -7,9 +7,6 @@
 #
 # Import necessary libraries
 import logging
-import os
-import tempfile
-import zipfile
 #
 # Import Non-Local
 import gradio as gr
@@ -25,6 +22,8 @@ from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_
 # Functions:
 
 def create_plain_text_import_tab():
+    """Create the Gradio UI tab for importing .md/.txt/.rtf/.docx and .zip files."""
+
     try:
         default_value = None
         if default_api_endpoint:
@@ -46,7 +45,7 @@ def create_plain_text_import_tab():
                 import_files = gr.File(
                     label="Upload files for import",
                     file_count="multiple",
-                    file_types=[".md", ".txt", ".rtf", ".docx", ".zip"]
+                    file_types=['text', ".md", ".txt", ".rtf", ".docx", ".zip", "zip"]
                 )
 
                 # Optional metadata override fields
@@ -96,7 +95,11 @@ def create_plain_text_import_tab():
                 import_button = gr.Button("Import File(s)")
 
             with gr.Column():
-                import_output = gr.Textbox(label="Import Status", lines=10)
+                import_output = gr.Textbox(
+                    label="Import Status",
+                    lines=10,
+                    interactive=False
+                )
 
         import_button.click(
             fn=import_file_handler,
@@ -113,7 +116,18 @@ def create_plain_text_import_tab():
             outputs=import_output
         )
 
-    return import_files, author_input, keywords_input, system_prompt_input, custom_prompt_input, auto_summarize_checkbox, api_name_input, api_key_input, import_button, import_output
+    return (
+        import_files,
+        author_input,
+        keywords_input,
+        system_prompt_input,
+        custom_prompt_input,
+        auto_summarize_checkbox,
+        api_name_input,
+        api_key_input,
+        import_button,
+        import_output
+)
 
 #
 # End of Plain_text_import.py
