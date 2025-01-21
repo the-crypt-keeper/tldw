@@ -34,7 +34,8 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_conf
 #
 # Audio Generation Functions
 
-def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None, output_file=None, response_format=None, streaming=False):
+# FIXME - add speed to all providers
+def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None, output_file=None, response_format=None, streaming=False, speed=None):
     """Generate audio using the specified TTS provider."""
     logging.info(f"Starting generate_audio function")
 
@@ -60,6 +61,7 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
             input_text=text,
             voice=voice,
             model=model,
+            speed=speed,
             response_format=response_format,
             output_file=output_file,
             streaming=streaming
@@ -189,7 +191,7 @@ def test_generate_audio():
 # OpenAI TTS Provider Functions
 
 # https://github.com/leokwsw/OpenAI-TTS-Gradio/blob/main/app.py
-def generate_audio_openai(api_key, input_text, voice, model, response_format="mp3", output_file="speech.mp3", streaming=False):
+def generate_audio_openai(api_key, input_text, voice, model, speed, response_format="mp3", output_file="speech.mp3", streaming=False):
     """
     Generate audio using OpenAI's Text-to-Speech API.
 
@@ -198,6 +200,7 @@ def generate_audio_openai(api_key, input_text, voice, model, response_format="mp
         input_text (str): Text input for speech synthesis.
         voice (str): Voice to use for the synthesis.
         model (str): Model to use for the synthesis (e.g., "tts-1").
+        speed (float): Speed of the speech synthesis (default is 1.0).
         response_format (str): Format of the response audio file (default is "mp3").
         output_file (str): Name of the output file to save the audio.
 
@@ -272,6 +275,8 @@ def generate_audio_openai(api_key, input_text, voice, model, response_format="mp
         "model": model,
         "input": input_text,
         "voice": voice,
+        "response_format": response_format,
+        "speed": speed
     }
 
     if streaming == True:
