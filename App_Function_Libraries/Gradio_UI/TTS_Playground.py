@@ -33,8 +33,6 @@ def generate_tts_audio(
         model,
         speed,
         output_format,
-        save_to_db,
-        custom_title
 ):
     """Wrapper function for TTS generation with logging and error handling"""
     log_counter("tts_generation_attempt", labels={"provider": provider})
@@ -48,53 +46,25 @@ def generate_tts_audio(
             provider=provider,
             voice=voice,
             model=model,
+            voice2=None,
+            output_file=None,
             response_format=output_format,
-            streaming=False
+            streaming=False,
+            speed=speed
         )
 
         # Validate output
         if not os.path.exists(audio_file):
             raise ValueError(f"Generated file not found at {audio_file}")
 
-        # Save to database if requested
-        db_result = ""
-        if save_to_db:
-            db_result = save_audio_to_db(audio_file, custom_title, provider)
-
         log_counter("tts_generation_success", labels={"provider": provider})
         log_histogram("tts_generation_duration", time.time() - start_time)
 
-        return audio_file, db_result
+        return audio_file, audio_file, "Audio generated successfully!"
 
     except Exception as e:
         log_counter("tts_generation_error", labels={"provider": provider, "error": str(e)})
-        return None, f"Error generating audio: {str(e)}"
-
-
-def save_audio_to_db(audio_path, title, provider):
-    """Save generated audio to media database"""
-    try:
-        if not title.strip():
-            title = f"{provider} TTS Generation - {time.strftime('%Y-%m-%d %H:%M:%S')}"
-
-        info_dict = {
-            "title": title,
-            "uploader": provider,
-            "webpage_url": "generated"
-        }
-
-        return add_media_to_database(
-            url=audio_path,
-            info_dict=info_dict,
-            segments=[],
-            summary="TTS Generated Audio",
-            keywords=["tts", provider],
-            media_type="audio"
-        )
-
-    except Exception as e:
-        return f"Error saving to database: {str(e)}"
-
+        return None, None, f"Error generating audio: {str(e)}"
 
 ########################################################################
 # UI Components
@@ -146,40 +116,22 @@ def create_audio_generation_tab():
                         value="mp3"
                     )
 
-                with gr.Accordion("Database Options", open=False):
-                    save_checkbox = gr.Checkbox(
-                        label="Save to Database",
-                        value=False
-                    )
-
-                    title_input = gr.Textbox(
-                        label="Custom Title",
-                        visible=False,
-                        placeholder="Enter custom title for database entry"
-                    )
-
                 generate_btn = gr.Button("Generate Audio", variant="primary")
 
             with gr.Column(scale=1):
                 # Output Components
                 audio_output = gr.Audio(label="Generated Audio")
                 download_button = gr.File(label="Download File")
-                db_status = gr.Textbox(label="Database Status", interactive=False)
+                status_box = gr.Textbox(label="Status", interactive=False)
 
-        # Dynamic UI Updates
+        # Update voice dropdown based on provider
         provider_dropdown.change(
             fn=lambda p: gr.Dropdown(choices=DEFAULT_VOICES.get(p, [])),
             inputs=[provider_dropdown],
             outputs=[voice_dropdown]
         )
 
-        save_checkbox.change(
-            fn=lambda x: gr.update(visible=x),
-            inputs=[save_checkbox],
-            outputs=[title_input]
-        )
-
-        # Generation Handler
+        # Generate button: return a single file path for audio_output
         generate_btn.click(
             fn=generate_tts_audio,
             inputs=[
@@ -188,20 +140,12 @@ def create_audio_generation_tab():
                 voice_dropdown,
                 model_dropdown,
                 speed_slider,
-                format_dropdown,
-                save_checkbox,
-                title_input
+                format_dropdown
             ],
-            outputs=[audio_output, db_status]
+            outputs=[audio_output, download_button, status_box]
         )
 
-        # Auto-populate download button
-        audio_output.change(
-            fn=lambda x: x,
-            inputs=[audio_output],
-            outputs=[download_button]
-        )
-
+    # Return an empty update or omit
     return gr.update()
 
 #
