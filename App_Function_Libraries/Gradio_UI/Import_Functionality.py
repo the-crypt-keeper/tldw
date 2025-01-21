@@ -2,6 +2,7 @@
 # Functionality to import content into the DB
 #
 # Imports
+import json
 from datetime import datetime
 from time import sleep
 import logging
@@ -19,20 +20,22 @@ import zipfile
 # External Imports
 import gradio as gr
 from chardet import detect
-
+from docx2txt import docx2txt
+from pypandoc import convert_file
 #
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import insert_prompt_to_db, import_obsidian_note_to_db, \
     add_media_to_database, list_prompts
+from App_Function_Libraries.Metrics.metrics_logger import log_counter
 from App_Function_Libraries.Prompt_Handling import import_prompt_from_file, import_prompts_from_zip#
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
+from App_Function_Libraries.Utils.Utils import FileProcessor, ZipValidator
 #
 ###################################################################################################################
 #
 # Functions:
 
 logger = logging.getLogger()
-
 
 def import_data(file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
     logging.debug(f"Starting import_data with file: {file} / Title: {title} / Author: {author} / Keywords: {keywords}")
@@ -125,60 +128,310 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
             os.unlink(temp_file_path)
 
 
-def process_obsidian_zip(zip_file):
+###############################################################
+#
+# Plaintext/Markdown/RTF/Docx Import Functionality
+
+def preview_import_handler(
+        files,
+        author,
+        keywords,
+        system_prompt,
+        user_prompt,
+        auto_summarize,
+        api_name,
+        api_key
+):
+    """
+    Step 1: Read/convert files (or ZIP of multiple text files) + optionally auto-summarize,
+    but DO NOT store in the DB.
+
+    Returns:
+      - A user-facing status string
+      - A JSON string (preview_data_json) containing a list of file results:
+          [
+            {
+               "filename": "...",
+               "title": "...",
+               "content": "...",
+               "summary": "...",
+               "author": "...",
+               "keywords": [...],
+               "system_prompt": "...",
+               "user_prompt": "...",
+               ...
+            },
+            ...
+          ]
+    """
+    if not files:
+        return "No files uploaded.", None
+
+    results_for_ui = []
+    preview_list = []
+
     with tempfile.TemporaryDirectory() as temp_dir:
-        try:
-            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
-                zip_ref.extractall(temp_dir)
+        for file_obj in files:
+            filename = os.path.basename(file_obj.name)
+            try:
+                # Make a temp copy
+                temp_path = os.path.join(temp_dir, filename)
+                with open(temp_path, 'wb') as f:
+                    f.write(open(file_obj.name, 'rb').read())
 
-            imported_files, total_files, errors = import_obsidian_vault(temp_dir)
+                # If the file is a ZIP, extract and preview each valid item
+                if temp_path.lower().endswith('.zip'):
+                    with tempfile.TemporaryDirectory() as zip_temp_dir:
+                        with zipfile.ZipFile(temp_path, 'r') as zip_ref:
+                            zip_ref.extractall(zip_temp_dir)
 
-            return imported_files, total_files, errors
-        except zipfile.BadZipFile:
-            error_msg = "The uploaded file is not a valid zip file."
-            logger.error(error_msg)
-            return 0, 0, [error_msg]
-        except Exception as e:
-            error_msg = f"Error processing zip file: {str(e)}\n{traceback.format_exc()}"
-            logger.error(error_msg)
-            return 0, 0, [error_msg]
-        finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+                        for root, _, extracted_files in os.walk(zip_temp_dir):
+                            for extracted_filename in extracted_files:
+                                if extracted_filename.lower().endswith(('.md', '.txt', '.rtf', '.docx')):
+                                    extracted_path = os.path.join(root, extracted_filename)
+                                    file_info = _preview_single_file(
+                                        extracted_path,
+                                        author,
+                                        keywords,
+                                        system_prompt,
+                                        user_prompt,
+                                        auto_summarize,
+                                        api_name,
+                                        api_key
+                                    )
+                                    preview_list.append(file_info)
+                                    results_for_ui.append(f"📄 [ZIP] {extracted_filename} => Success")
+
+                    results_for_ui.append(f"📦 {filename} => Extracted successfully.")
+
+                else:
+                    # Single file scenario
+                    file_info = _preview_single_file(
+                        temp_path,
+                        author,
+                        keywords,
+                        system_prompt,
+                        user_prompt,
+                        auto_summarize,
+                        api_name,
+                        api_key
+                    )
+                    preview_list.append(file_info)
+                    results_for_ui.append(f"📄 {filename} => Success")
+
+            except Exception as e:
+                logging.exception(f"❌ Error with file: {filename}")
+                results_for_ui.append(f"❌ {filename} => {str(e)}")
+
+    # Convert list of file info dicts to JSON so we can store in gr.State or similar
+    preview_data_json = json.dumps(preview_list, ensure_ascii=False)
+    status_message = "\n".join(results_for_ui)
+
+    return status_message, preview_data_json
 
 
+def _preview_single_file(
+        file_path,
+        author,
+        keywords,
+        system_prompt,
+        user_prompt,
+        auto_summarize,
+        api_name,
+        api_key
+):
+    """
+    Internal helper to read/convert a single file into plain text,
+    optionally auto-summarize, and return a dictionary describing the
+    would-be DB record (but does not ingest).
+    """
+    log_counter("file_preview_attempt", labels={"file_path": file_path})
 
-def scan_obsidian_vault(vault_path):
-    markdown_files = []
-    for root, dirs, files in os.walk(vault_path):
-        for file in files:
-            if file.endswith('.md'):
-                markdown_files.append(os.path.join(root, file))
-    return markdown_files
+    # Derive a filename-based title
+    filename = os.path.basename(file_path)
+    title = os.path.splitext(filename)[0]
+    extension = os.path.splitext(filename)[1].lower()
 
+    # 1) Read/convert content
+    try:
+        if extension == '.rtf':
+            with tempfile.NamedTemporaryFile(suffix='.md', delete=False) as temp_md:
+                convert_file(file_path, 'md', outputfile=temp_md.name)
+                file_path_md = temp_md.name
+            with open(file_path_md, 'r', encoding='utf-8') as f:
+                content = f.read()
+        elif extension == '.docx':
+            content = docx2txt.process(file_path)
+        else:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+    except Exception as e:
+        logging.error(f"Error reading file content: {str(e)}")
+        return {
+            "filename": filename,
+            "title": title,
+            "content": f"Error reading file: {e}",
+            "summary": None,
+            "author": author,
+            "keywords": keywords.split(",") if keywords else [],
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "auto_summarize": auto_summarize,
+            "api_name": api_name,
+            "api_key": api_key,
+        }
 
-def parse_obsidian_note(file_path):
-    with open(file_path, 'r', encoding='utf-8') as file:
-        content = file.read()
+    # 2) Optionally auto-summarize
+    summary = None
+    if auto_summarize and api_name and api_key:
+        combined_prompt = (system_prompt or "") + "\n\n" + (user_prompt or "")
+        summary = perform_summarization(
+            api_name=api_name,
+            text=content,
+            prompt=combined_prompt,
+            api_key=api_key
+        )
 
-    frontmatter = {}
-    frontmatter_match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
-    if frontmatter_match:
-        frontmatter_text = frontmatter_match.group(1)
-        import yaml
-        frontmatter = yaml.safe_load(frontmatter_text)
-        content = content[frontmatter_match.end():]
+    if not summary:
+        summary = "No summary provided"
 
-    tags = re.findall(r'#(\w+)', content)
-    links = re.findall(r'\[\[(.*?)\]\]', content)
-
+    # 3) Return the file info dict (not ingested yet)
     return {
-        'title': os.path.basename(file_path).replace('.md', ''),
-        'content': content,
-        'frontmatter': frontmatter,
-        'tags': tags,
-        'links': links,
-        'file_path': file_path  # Add this line
+        "filename": filename,
+        "title": title,
+        "content": content,
+        "summary": summary,
+        "author": author,
+        "keywords": keywords.split(",") if keywords else [],
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "auto_summarize": auto_summarize,
+        "api_name": api_name,
+        "api_key": api_key
     }
+
+
+def final_ingest_handler(preview_data_json, updated_metadata_json):
+    """
+    Step 2: Actually ingest data into the database using add_media_to_database.
+
+    - preview_data_json: The JSON output from preview_import_handler()
+    - updated_metadata_json: (Optional) JSON from the user specifying
+        overrides for each file.
+
+    Returns a status string (success/fail for each file).
+    """
+    if not preview_data_json:
+        return "No preview data found. Please run the preview step first."
+
+    try:
+        preview_list = json.loads(preview_data_json)
+    except Exception as e:
+        logging.exception("Error loading preview data.")
+        return f"Error parsing preview data: {e}"
+
+    # Parse user-supplied overrides (if any)
+    if updated_metadata_json:
+        try:
+            overrides_dict = json.loads(updated_metadata_json)
+        except Exception as e:
+            logging.exception("Error loading user metadata overrides.")
+            overrides_dict = {}
+    else:
+        overrides_dict = {}
+
+    results = []
+    for file_info in preview_list:
+        fname = file_info["filename"]
+        # Attempt to match user overrides by filename (the base name without extension, or the full fname).
+        # Typically the user might key by "Doc1" vs "Doc1.txt". Decide how you want to match.
+        # Here we assume the user’s JSON keys match exactly the 'filename' in file_info.
+        this_file_overrides = overrides_dict.get(fname, {})
+
+        # Combine final metadata
+        final_author = this_file_overrides.get("author", file_info["author"])
+        final_keywords = this_file_overrides.get("keywords", file_info["keywords"])
+        final_title = this_file_overrides.get("title", file_info["title"])
+        final_summary = this_file_overrides.get("summary", file_info["summary"])
+
+        text_content = file_info["content"]  # The converted text
+
+        # Construct combined prompts if needed or just store them
+        combined_prompt = (file_info["system_prompt"] or "") + "\n\n" + (file_info["user_prompt"] or "")
+
+        # Now do the actual DB ingestion
+        try:
+            db_result = add_media_to_database(
+                url=fname,  # or some unique identifier
+                info_dict={
+                    "title": final_title,
+                    "uploader": final_author,
+                },
+                segments=[{"Text": text_content}],
+                summary=final_summary,
+                keywords=final_keywords,
+                custom_prompt_input=combined_prompt,
+                whisper_model="Imported",
+                media_type="document",
+                overwrite=False
+            )
+            results.append(f"✅ {fname} => {db_result}")
+        except Exception as e:
+            logging.exception(f"Error ingesting file {fname}")
+            results.append(f"❌ {fname} => {str(e)}")
+
+    # Return an overall string
+    return "\n".join(results)
+
+#
+# End of Plaintext/Markdown/RTF/Docx Import Functionality
+###############################################################
+
+
+###############################################################
+#
+# Plaintext/Markdown Import Functionality
+
+def create_import_item_tab():
+    with gr.TabItem("Import Markdown/Text Files", visible=True):
+        gr.Markdown("# Import a markdown file or text file into the database")
+        gr.Markdown("...and have it tagged + summarized")
+        with gr.Row():
+            with gr.Column():
+                import_file = gr.File(label="Upload file for import", file_types=["txt", "md"])
+                title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
+                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
+                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords, comma-separated")
+                custom_prompt_input = gr.Textbox(label="Custom Prompt",
+                                             placeholder="Enter a custom prompt for summarization (optional)")
+                summary_input = gr.Textbox(label="Summary",
+                                       placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
+                auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
+                api_name_input = gr.Dropdown(
+                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
+                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],
+                label="API for Auto-summarization"
+                )
+                api_key_input = gr.Textbox(label="API Key", type="password")
+            with gr.Column():
+                import_button = gr.Button("Import Data")
+                import_output = gr.Textbox(label="Import Status")
+
+        import_button.click(
+            fn=import_data,
+            inputs=[import_file, title_input, author_input, keywords_input, custom_prompt_input,
+                    summary_input, auto_summarize_checkbox, api_name_input, api_key_input],
+            outputs=import_output
+        )
+
+#
+# Import Plaintext/Markdown Tab
+###############################################################
+
+
+###############################################################
+#
+# Prompt Import Functionality
 
 def create_import_single_prompt_tab():
     with gr.TabItem("Import a Prompt", visible=True):
@@ -223,38 +476,6 @@ def create_import_single_prompt_tab():
             fn=save_prompt_to_db,
             inputs=[title_input, author_input, system_input, user_input, keywords_input],
             outputs=save_output
-        )
-
-def create_import_item_tab():
-    with gr.TabItem("Import Markdown/Text Files", visible=True):
-        gr.Markdown("# Import a markdown file or text file into the database")
-        gr.Markdown("...and have it tagged + summarized")
-        with gr.Row():
-            with gr.Column():
-                import_file = gr.File(label="Upload file for import", file_types=["txt", "md"])
-                title_input = gr.Textbox(label="Title", placeholder="Enter the title of the content")
-                author_input = gr.Textbox(label="Author", placeholder="Enter the author's name")
-                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords, comma-separated")
-                custom_prompt_input = gr.Textbox(label="Custom Prompt",
-                                             placeholder="Enter a custom prompt for summarization (optional)")
-                summary_input = gr.Textbox(label="Summary",
-                                       placeholder="Enter a summary or leave blank for auto-summarization", lines=3)
-                auto_summarize_checkbox = gr.Checkbox(label="Auto-summarize", value=False)
-                api_name_input = gr.Dropdown(
-                choices=[None, "Local-LLM", "OpenAI", "Anthropic", "Cohere", "Groq", "DeepSeek", "Mistral", "OpenRouter",
-                         "Llama.cpp", "Kobold", "Ooba", "Tabbyapi", "VLLM","ollama", "HuggingFace", "Custom-OpenAI-API"],
-                label="API for Auto-summarization"
-                )
-                api_key_input = gr.Textbox(label="API Key", type="password")
-            with gr.Column():
-                import_button = gr.Button("Import Data")
-                import_output = gr.Textbox(label="Import Status")
-
-        import_button.click(
-            fn=import_data,
-            inputs=[import_file, title_input, author_input, keywords_input, custom_prompt_input,
-                    summary_input, auto_summarize_checkbox, api_name_input, api_key_input],
-            outputs=import_output
         )
 
 
@@ -400,6 +621,69 @@ def create_import_multiple_prompts_tab():
             outputs=[prompts_dropdown, prev_page_button, page_display, current_page_state, total_pages_state]
         )
 
+#
+# End of Prompt Import Functionality
+###############################################################
+
+
+###############################################################
+#
+# Obsidian Vault Import Functionality
+
+def process_obsidian_zip(zip_file):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+
+            imported_files, total_files, errors = import_obsidian_vault(temp_dir)
+
+            return imported_files, total_files, errors
+        except zipfile.BadZipFile:
+            error_msg = "The uploaded file is not a valid zip file."
+            logger.error(error_msg)
+            return 0, 0, [error_msg]
+        except Exception as e:
+            error_msg = f"Error processing zip file: {str(e)}\n{traceback.format_exc()}"
+            logger.error(error_msg)
+            return 0, 0, [error_msg]
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+
+def scan_obsidian_vault(vault_path):
+    markdown_files = []
+    for root, dirs, files in os.walk(vault_path):
+        for file in files:
+            if file.endswith('.md'):
+                markdown_files.append(os.path.join(root, file))
+    return markdown_files
+
+
+def parse_obsidian_note(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        content = file.read()
+
+    frontmatter = {}
+    frontmatter_match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
+    if frontmatter_match:
+        frontmatter_text = frontmatter_match.group(1)
+        import yaml
+        frontmatter = yaml.safe_load(frontmatter_text)
+        content = content[frontmatter_match.end():]
+
+    tags = re.findall(r'#(\w+)', content)
+    links = re.findall(r'\[\[(.*?)\]\]', content)
+
+    return {
+        'title': os.path.basename(file_path).replace('.md', ''),
+        'content': content,
+        'frontmatter': frontmatter,
+        'tags': tags,
+        'links': links,
+        'file_path': file_path  # Add this line
+    }
 
 def create_import_obsidian_vault_tab():
     with gr.TabItem("Import Obsidian Vault", visible=True):
@@ -463,6 +747,14 @@ def import_obsidian_vault(vault_path, progress=gr.Progress()):
         logger.error(error_msg)
         return 0, 0, [error_msg]
 
+#
+# End of Obsidian Vault Import Functionality
+###############################################################
+
+
+###############################################################
+#
+# RAG Chat Conversation Import Functionality
 
 class RAGQABatchImporter:
     def __init__(self, db_path: str):
@@ -636,150 +928,6 @@ class RAGQABatchImporter:
             return False, f"Import failed: {str(e)}"
 
 
-class FileProcessor:
-    """Handles file reading and name processing"""
-
-    VALID_EXTENSIONS = {'.md', '.txt', '.zip'}
-    ENCODINGS_TO_TRY = [
-        'utf-8',
-        'utf-16',
-        'windows-1252',
-        'iso-8859-1',
-        'ascii'
-    ]
-
-    @staticmethod
-    def detect_encoding(file_path: str) -> str:
-        """Detect the file encoding using chardet"""
-        with open(file_path, 'rb') as file:
-            raw_data = file.read()
-            result = detect(raw_data)
-            return result['encoding'] or 'utf-8'
-
-    @staticmethod
-    def read_file_content(file_path: str) -> str:
-        """Read file content with automatic encoding detection"""
-        detected_encoding = FileProcessor.detect_encoding(file_path)
-
-        # Try detected encoding first
-        try:
-            with open(file_path, 'r', encoding=detected_encoding) as f:
-                return f.read()
-        except UnicodeDecodeError:
-            # If detected encoding fails, try others
-            for encoding in FileProcessor.ENCODINGS_TO_TRY:
-                try:
-                    with open(file_path, 'r', encoding=encoding) as f:
-                        return f.read()
-                except UnicodeDecodeError:
-                    continue
-
-            # If all encodings fail, use utf-8 with error handling
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-                return f.read()
-
-    @staticmethod
-    def process_filename_to_title(filename: str) -> str:
-        """Convert filename to a readable title"""
-        # Remove extension
-        name = os.path.splitext(filename)[0]
-
-        # Look for date patterns
-        date_pattern = r'(\d{4}[-_]?\d{2}[-_]?\d{2})'
-        date_match = re.search(date_pattern, name)
-        date_str = ""
-        if date_match:
-            try:
-                date = datetime.strptime(date_match.group(1).replace('_', '-'), '%Y-%m-%d')
-                date_str = date.strftime("%b %d, %Y")
-                name = name.replace(date_match.group(1), '').strip('-_')
-            except ValueError:
-                pass
-
-        # Replace separators with spaces
-        name = re.sub(r'[-_]+', ' ', name)
-
-        # Remove redundant spaces
-        name = re.sub(r'\s+', ' ', name).strip()
-
-        # Capitalize words, excluding certain words
-        exclude_words = {'a', 'an', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'with'}
-        words = name.split()
-        capitalized = []
-        for i, word in enumerate(words):
-            if i == 0 or word not in exclude_words:
-                capitalized.append(word.capitalize())
-            else:
-                capitalized.append(word.lower())
-        name = ' '.join(capitalized)
-
-        # Add date if found
-        if date_str:
-            name = f"{name} - {date_str}"
-
-        return name
-
-
-class ZipValidator:
-    """Validates zip file contents and structure"""
-
-    MAX_ZIP_SIZE = 100 * 1024 * 1024  # 100MB
-    MAX_FILES = 100
-    VALID_EXTENSIONS = {'.md', '.txt'}
-
-    @staticmethod
-    def validate_zip_file(zip_path: str) -> Tuple[bool, str, List[str]]:
-        """
-        Validate zip file and its contents
-        Returns: (is_valid, error_message, valid_files)
-        """
-        try:
-            # Check zip file size
-            if os.path.getsize(zip_path) > ZipValidator.MAX_ZIP_SIZE:
-                return False, "Zip file too large (max 100MB)", []
-
-            valid_files = []
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                # Check number of files
-                if len(zip_ref.filelist) > ZipValidator.MAX_FILES:
-                    return False, f"Too many files in zip (max {ZipValidator.MAX_FILES})", []
-
-                # Check for directory traversal attempts
-                for file_info in zip_ref.filelist:
-                    if '..' in file_info.filename or file_info.filename.startswith('/'):
-                        return False, "Invalid file paths detected", []
-
-                # Validate each file
-                total_size = 0
-                for file_info in zip_ref.filelist:
-                    # Skip directories
-                    if file_info.filename.endswith('/'):
-                        continue
-
-                    # Check file size
-                    if file_info.file_size > ZipValidator.MAX_ZIP_SIZE:
-                        return False, f"File {file_info.filename} too large", []
-
-                    total_size += file_info.file_size
-                    if total_size > ZipValidator.MAX_ZIP_SIZE:
-                        return False, "Total uncompressed size too large", []
-
-                    # Check file extension
-                    ext = os.path.splitext(file_info.filename)[1].lower()
-                    if ext in ZipValidator.VALID_EXTENSIONS:
-                        valid_files.append(file_info.filename)
-
-            if not valid_files:
-                return False, "No valid markdown or text files found in zip", []
-
-            return True, "", valid_files
-
-        except zipfile.BadZipFile:
-            return False, "Invalid or corrupted zip file", []
-        except Exception as e:
-            return False, f"Error processing zip file: {str(e)}", []
-
-
 def create_conversation_import_tab() -> gr.Tab:
     """Create the import tab for the Gradio interface"""
     with gr.Tab("Import RAG Chats") as tab:
@@ -850,3 +998,12 @@ def create_conversation_import_tab() -> gr.Tab:
         )
 
     return tab
+
+#
+# End of Conversation Import Functionality
+###############################################################
+
+
+#
+# End of Import_Functionality.py
+########################################################################################################################

@@ -30,6 +30,8 @@
 ####################
 #
 # Import necessary libraries
+import zipfile
+
 import chardet
 import configparser
 import hashlib
@@ -40,8 +42,8 @@ import re
 import tempfile
 import time
 import uuid
-from datetime import timedelta
-from typing import Union, AnyStr
+from datetime import timedelta, datetime
+from typing import Union, AnyStr, Tuple, List
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 #
 # Non-Local Imports
@@ -1252,10 +1254,6 @@ def get_db_config():
 # End of DB Config Loading
 #######################################################################################################################
 
-def format_text_with_line_breaks(text):
-    # Split the text into sentences and add line breaks
-    sentences = text.replace('. ', '.<br>').replace('? ', '?<br>').replace('! ', '!<br>')
-    return sentences
 
 #######################################################################################################################
 #
@@ -1288,6 +1286,154 @@ def cleanup_temp_files():
 
 def generate_unique_id():
     return f"uploaded_file_{uuid.uuid4()}"
+
+class FileProcessor:
+    """Handles file reading and name processing"""
+
+    VALID_EXTENSIONS = {'.md', '.txt', '.zip'}
+    ENCODINGS_TO_TRY = [
+        'utf-8',
+        'utf-16',
+        'windows-1252',
+        'iso-8859-1',
+        'ascii'
+    ]
+
+    @staticmethod
+    def detect_encoding(file_path: str) -> str:
+        """Detect the file encoding using chardet"""
+        with open(file_path, 'rb') as file:
+            raw_data = file.read()
+            result = chardet.detect(raw_data)
+            return result['encoding'] or 'utf-8'
+
+    @staticmethod
+    def read_file_content(file_path: str) -> str:
+        """Read file content with automatic encoding detection"""
+        detected_encoding = FileProcessor.detect_encoding(file_path)
+
+        # Try detected encoding first
+        try:
+            with open(file_path, 'r', encoding=detected_encoding) as f:
+                return f.read()
+        except UnicodeDecodeError:
+            # If detected encoding fails, try others
+            for encoding in FileProcessor.ENCODINGS_TO_TRY:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        return f.read()
+                except UnicodeDecodeError:
+                    continue
+
+            # If all encodings fail, use utf-8 with error handling
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                return f.read()
+
+    @staticmethod
+    def process_filename_to_title(filename: str) -> str:
+        """Convert filename to a readable title"""
+        # Remove extension
+        name = os.path.splitext(filename)[0]
+
+        # Look for date patterns
+        date_pattern = r'(\d{4}[-_]?\d{2}[-_]?\d{2})'
+        date_match = re.search(date_pattern, name)
+        date_str = ""
+        if date_match:
+            try:
+                date = datetime.strptime(date_match.group(1).replace('_', '-'), '%Y-%m-%d')
+                date_str = date.strftime("%b %d, %Y")
+                name = name.replace(date_match.group(1), '').strip('-_')
+            except ValueError:
+                pass
+
+        # Replace separators with spaces
+        name = re.sub(r'[-_]+', ' ', name)
+
+        # Remove redundant spaces
+        name = re.sub(r'\s+', ' ', name).strip()
+
+        # Capitalize words, excluding certain words
+        exclude_words = {'a', 'an', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'with'}
+        words = name.split()
+        capitalized = []
+        for i, word in enumerate(words):
+            if i == 0 or word not in exclude_words:
+                capitalized.append(word.capitalize())
+            else:
+                capitalized.append(word.lower())
+        name = ' '.join(capitalized)
+
+        # Add date if found
+        if date_str:
+            name = f"{name} - {date_str}"
+
+        return name
+
+
+class ZipValidator:
+    """Validates zip file contents and structure"""
+
+    MAX_ZIP_SIZE = 100 * 1024 * 1024  # 100MB
+    MAX_FILES = 100
+    VALID_EXTENSIONS = {'.md', '.txt'}
+
+    @staticmethod
+    def validate_zip_file(zip_path: str) -> Tuple[bool, str, List[str]]:
+        """
+        Validate zip file and its contents
+        Returns: (is_valid, error_message, valid_files)
+        """
+        try:
+            # Check zip file size
+            if os.path.getsize(zip_path) > ZipValidator.MAX_ZIP_SIZE:
+                return False, "Zip file too large (max 100MB)", []
+
+            valid_files = []
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                # Check number of files
+                if len(zip_ref.filelist) > ZipValidator.MAX_FILES:
+                    return False, f"Too many files in zip (max {ZipValidator.MAX_FILES})", []
+
+                # Check for directory traversal attempts
+                for file_info in zip_ref.filelist:
+                    if '..' in file_info.filename or file_info.filename.startswith('/'):
+                        return False, "Invalid file paths detected", []
+
+                # Validate each file
+                total_size = 0
+                for file_info in zip_ref.filelist:
+                    # Skip directories
+                    if file_info.filename.endswith('/'):
+                        continue
+
+                    # Check file size
+                    if file_info.file_size > ZipValidator.MAX_ZIP_SIZE:
+                        return False, f"File {file_info.filename} too large", []
+
+                    total_size += file_info.file_size
+                    if total_size > ZipValidator.MAX_ZIP_SIZE:
+                        return False, "Total uncompressed size too large", []
+
+                    # Check file extension
+                    ext = os.path.splitext(file_info.filename)[1].lower()
+                    if ext in ZipValidator.VALID_EXTENSIONS:
+                        valid_files.append(file_info.filename)
+
+            if not valid_files:
+                return False, "No valid markdown or text files found in zip", []
+
+            return True, "", valid_files
+
+        except zipfile.BadZipFile:
+            return False, "Invalid or corrupted zip file", []
+        except Exception as e:
+            return False, f"Error processing zip file: {str(e)}", []
+
+def format_text_with_line_breaks(text):
+    # Split the text into sentences and add line breaks
+    sentences = text.replace('. ', '.<br>').replace('? ', '?<br>').replace('! ', '!<br>')
+    return sentences
 
 #
 # End of File Handling Functions
