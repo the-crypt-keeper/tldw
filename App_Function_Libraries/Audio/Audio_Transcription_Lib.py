@@ -640,18 +640,36 @@ def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
 
 
 @timeit
-def save_audio_temp(audio_data, sample_rate=16000):
+def save_audio_temp(audio_data, sample_rate=24000):
+    """Save audio data to temporary WAV file with proper format handling."""
     log_counter("save_audio_temp_attempt")
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-        import wave
-        wf = wave.open(temp_file.name, 'wb')
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(sample_rate)
-        wf.writeframes(audio_data)
-        wf.close()
-        log_counter("save_audio_temp_success")
-        return temp_file.name
+
+    try:
+        # Convert tensor to numpy array if needed
+        if isinstance(audio_data, torch.Tensor):
+            audio_data = audio_data.cpu().numpy()
+
+        # Ensure float32 format and make writable
+        audio_data = np.asarray(audio_data, dtype=np.float32).copy()
+
+        # Normalize audio
+        max_amp = np.max(np.abs(audio_data))
+        if max_amp > 1.0:
+            audio_data /= max_amp
+
+        # Convert to int16
+        audio_data_int16 = np.int16(audio_data * 32767)
+
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+            wavfile.write(temp_file.name, sample_rate, audio_data_int16)
+            log_counter("save_audio_temp_success")
+            return temp_file.name
+
+    except Exception as e:
+        logging.error(f"Error saving temp audio: {str(e)}")
+        log_counter("save_audio_temp_error")
+        return None
 
 #
 # End of Audio Recording Functions
