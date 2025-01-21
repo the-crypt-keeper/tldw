@@ -41,7 +41,7 @@ def process_obsidian_zip(zip_file):
             shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-
+# FIXME - File path issue
 def scan_obsidian_vault(vault_path):
     markdown_files = []
     for root, dirs, files in os.walk(vault_path):
@@ -75,6 +75,21 @@ def parse_obsidian_note(file_path):
         'file_path': file_path  # Add this line
     }
 
+
+def import_vault(vault_path, vault_zip):
+    if vault_zip:
+        imported, total, errors = process_obsidian_zip(vault_zip.name)
+    elif vault_path:
+        imported, total, errors = import_obsidian_vault(vault_path)
+    else:
+        return "Please provide either a local vault path or upload a zip file."
+
+    status = f"Imported {imported} out of {total} files.\n"
+    if errors:
+        status += f"Encountered {len(errors)} errors:\n" + "\n".join(errors)
+    return status
+
+
 def create_import_obsidian_vault_tab():
     with gr.TabItem("Import Obsidian Vault", visible=True):
         gr.Markdown("## Import Obsidian Vault")
@@ -85,21 +100,6 @@ def create_import_obsidian_vault_tab():
             with gr.Column():
                 import_vault_button = gr.Button("Import Obsidian Vault")
                 import_status = gr.Textbox(label="Import Status", interactive=False)
-
-
-    def import_vault(vault_path, vault_zip):
-        if vault_zip:
-            imported, total, errors = process_obsidian_zip(vault_zip.name)
-        elif vault_path:
-            imported, total, errors = import_obsidian_vault(vault_path)
-        else:
-            return "Please provide either a local vault path or upload a zip file."
-
-        status = f"Imported {imported} out of {total} files.\n"
-        if errors:
-            status += f"Encountered {len(errors)} errors:\n" + "\n".join(errors)
-        return status
-
 
     import_vault_button.click(
         fn=import_vault,

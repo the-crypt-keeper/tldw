@@ -25,7 +25,7 @@ from App_Function_Libraries.Summarization.Summarization_General_Lib import perfo
 
 logger = logging.getLogger()
 
-def import_data(file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key):
+def import_data(file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key, system_prompt):
     logging.debug(f"Starting import_data with file: {file} / Title: {title} / Author: {author} / Keywords: {keywords}")
     if file is None:
         return "No file uploaded. Please upload a file."
@@ -86,10 +86,10 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
         # If auto-summarize is enabled and we have an API, do summarization
         if auto_summarize and api_name and api_key:
             # FIXME - Make sure custom_prompt is system prompt
-            summary = perform_summarization(api_name, file_content, custom_prompt, api_key)
+            summary = perform_summarization(api_name, file_content, custom_prompt, api_key, False, None, system_prompt)
         # If there's no user-provided summary, and we haven't auto-summarized:
         elif not summary:
-            summary = "No summary provided"
+            summary = "No analysis provided"
 
         # --- ALWAYS add to database after we've finalized `summary` ---
         result = add_media_to_database(
@@ -98,7 +98,7 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
             segments=segments,
             summary=summary,
             keywords=keyword_list,
-            custom_prompt_input=custom_prompt,
+            custom_prompt_input=system_prompt + "\n\nCustom Prompt:\n\n" + custom_prompt,
             whisper_model="Imported",  # indicates it was an imported file
             media_type="document",
             overwrite=False
@@ -421,7 +421,8 @@ def import_plain_text_file(file_path, author, keywords, system_prompt, user_prom
             None,        # No summary - let auto_summarize handle it
             auto_summarize,
             api_name,
-            api_key
+            api_key,
+            system_prompt
         )
 
         log_counter("file_processing_success", labels={"file_path": file_path})
