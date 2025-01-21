@@ -10,8 +10,6 @@ import logging
 #
 # Import Non-Local
 import gradio as gr
-from docx2txt import docx2txt
-from pypandoc import convert_file
 #
 # Import Local libraries
 from App_Function_Libraries.Plaintext.Plaintext_Files import import_file_handler
