@@ -39,6 +39,9 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
     if file is None:
         return "No file uploaded. Please upload a file."
 
+    # We'll define this here so we can clean it up at the very end
+    temp_file_path = None
+
     try:
         logging.debug(f"File object type: {type(file)}")
         logging.debug(f"File object attributes: {dir(file)}")
@@ -48,66 +51,78 @@ def import_data(file, title, author, keywords, custom_prompt, summary, auto_summ
         else:
             file_name = 'unknown_file'
 
-        # Create a temporary file
+        # Create a temporary file for reading the content
         with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt', encoding='utf-8') as temp_file:
+            # Keep track of the full path so we can remove it later
+            temp_file_path = temp_file.name
+
             if isinstance(file, str):
-                # If file is a string, it's likely file content
+                # 'file' is actually a string of content
                 temp_file.write(file)
             elif hasattr(file, 'read'):
-                # If file has a 'read' method, it's likely a file-like object
+                # 'file' is a file-like object
                 content = file.read()
                 if isinstance(content, bytes):
                     content = content.decode('utf-8')
                 temp_file.write(content)
             else:
-                # If it's neither a string nor a file-like object, try converting it to a string
+                # If neither a string nor file-like, force string conversion
                 temp_file.write(str(file))
 
+            temp_file.flush()  # Make sure data is written
             temp_file.seek(0)
             file_content = temp_file.read()
 
         logging.debug(f"File name: {file_name}")
         logging.debug(f"File content (first 100 chars): {file_content[:100]}")
 
-        # Create info_dict
+        # Build info_dict for DB storage
         info_dict = {
             'title': title or 'Untitled',
             'uploader': author or 'Unknown',
         }
 
-        # FIXME - Add chunking support... I added chapter chunking specifically for this...
-        # Create segments (assuming one segment for the entire content)
+        # Prepare segments (right now just one segment for everything)
+        # If you intend to chunk, you can do that here:
         segments = [{'Text': file_content}]
 
-        # Process keywords
-        keyword_list = [kw.strip() for kw in keywords.split(',') if kw.strip()] if keywords else []
+        # Process keywords into a list
+        if keywords:
+            keyword_list = [kw.strip() for kw in keywords.split(',') if kw.strip()]
+        else:
+            keyword_list = []
 
-        # Handle summarization
+        # If auto-summarize is enabled and we have an API, do summarization
         if auto_summarize and api_name and api_key:
+            # FIXME - Make sure custom_prompt is system prompt
             summary = perform_summarization(api_name, file_content, custom_prompt, api_key)
+        # If there's no user-provided summary, and we haven't auto-summarized:
         elif not summary:
             summary = "No summary provided"
 
-            # Add to database
-            result = add_media_to_database(
-                url=file_name,  # Using filename as URL
-                info_dict=info_dict,
-                segments=segments,
-                summary=summary,
-                keywords=keyword_list,
-                custom_prompt_input=custom_prompt,
-                whisper_model="Imported",  # Indicating this was an imported file
-                media_type="document",
-                overwrite=False  # Set this to True if you want to overwrite existing entries
-            )
+        # --- ALWAYS add to database after we've finalized `summary` ---
+        result = add_media_to_database(
+            url=file_name,             # or any unique identifier
+            info_dict=info_dict,
+            segments=segments,
+            summary=summary,
+            keywords=keyword_list,
+            custom_prompt_input=custom_prompt,
+            whisper_model="Imported",  # indicates it was an imported file
+            media_type="document",
+            overwrite=False
+        )
 
-            # Clean up the temporary file
-            os.unlink(temp_file.name)
+        return f"File '{file_name}' import attempt complete. Database result: {result}"
 
-            return f"File '{file_name}' import attempt complete. Database result: {result}"
     except Exception as e:
         logging.exception(f"Error importing file: {str(e)}")
         return f"Error importing file: {str(e)}"
+
+    finally:
+        # Clean up the temporary file if it was created
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
 
 
 def process_obsidian_zip(zip_file):
