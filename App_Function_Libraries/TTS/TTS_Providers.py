@@ -54,8 +54,7 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
     if provider == "openai":
         logging.info("Using OpenAI TTS provider")
         if api_key is None:
-            logging.info("No API key provided, attempting to use config file")
-            api_key = loaded_config_data['openai_api']['api_key']
+            logging.info("No API key provided, will attempt to use config file")
         return generate_audio_openai(
             api_key=api_key,
             input_text=text,
@@ -276,34 +275,41 @@ def generate_audio_openai(api_key, input_text, voice, model, response_format="mp
     }
 
     if streaming == True:
+        logging.info("OpenAI: Using streaming response")
         try:
             # Make the request to the API
             response = requests.post(endpoint, headers=headers, json=payload, stream=True)
+            logging.debug(f"OpenAI: API Response: {response}")
             response.raise_for_status()  # Raise an error for HTTP status codes >= 400
 
             # Save the audio response to a file
             with open(output_file, "wb") as f:
+                logging.debug(f"OpenAI: Saving audio to file: {output_file}")
                 f.write(response.content)
 
-            print(f"Audio successfully generated and saved to {output_file}.")
+            logging.info(f"Audio successfully generated and saved to {output_file}.")
             return output_file
 
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"Failed to generate audio: {str(e)}") from e
     else:
         try:
+            logging.info("OpenAI: Not using streaming response")
             # Make the request to the API
             response = requests.post(endpoint, headers=headers, json=payload)
+            logging.debug(f"OpenAI: API Response: {response}")
             response.raise_for_status()  # Raise an error for HTTP status codes >= 400
 
             # Save the audio response to a file
             with open(output_file, "wb") as f:
+                logging.debug(f"OpenAI: Saving audio to file: {output_file}")
                 f.write(response.content)
 
-            print(f"Audio successfully generated and saved to {output_file}.")
+            logging.info(f"Audio successfully generated and saved to {output_file}.")
             return output_file
 
         except requests.exceptions.RequestException as e:
+            logging.error(f"OpenAI: Failed to generate audio: {str(e)}")
             raise RuntimeError(f"Failed to generate audio: {str(e)}") from e
 
 

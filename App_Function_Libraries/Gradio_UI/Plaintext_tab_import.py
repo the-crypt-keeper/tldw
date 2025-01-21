@@ -30,6 +30,8 @@ def create_plain_text_import_tab():
         default_value = None
 
     with gr.TabItem("Import Plain Text & .docx Files", visible=True):
+        gr.Markdown("# Import Plaintext files")
+        gr.Markdown("Upload txt/docx/md/rtf/zip collections of them for import")
         with gr.Row():
             with gr.Column():
                 gr.Markdown("### Step 1: Upload / Preview")

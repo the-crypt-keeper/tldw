@@ -11,10 +11,32 @@ cohere_model = command-r-plus
 cohere_streaming = True
 cohere_temperature = 0.7
 #
+deepseek_api_key = <deepseek_api_key>
+# Options: 'deepseek-chat' or 'deepseek-reasoner'
+deepseek_model = deepseek-chat
+deepseek_streaming = True
+deepseek_temperature = 0.7
+#
+google_api_key = <google_api_key>
+# Available Model Options:
+google_model = gemini-1.5-pro
+google_streaming = True
+google_temperature = 0.7
+#
 groq_api_key = <groq_api_key>
 groq_model = llama3-70b-8192
 groq_streaming = True
 groq_temperature = 0.7
+#
+huggingface_api_key = <huggingface_api_key>
+huggingface_model = meta-llama/Llama-3.1-70B-Instruct
+huggingface_streaming = True
+huggingface_temperature = 0.7
+#
+mistral_api_key = <mistral_api_key>
+mistral_model = mistral-large-latest
+mistral_streaming = True
+mistral_temperature = 0.7
 #
 openai_api_key = <openai_api_key>
 openai_model = gpt-4o
@@ -22,29 +44,8 @@ openai_streaming = False
 openai_temperature = 0.7
 openai_top_p = 0.95
 #
-huggingface_api_key = <huggingface_api_key>
-huggingface_model = meta-llama/Llama-3.1-70B-Instruct
-huggingface_streaming = True
-huggingface_temperature = 0.7
-#
 openrouter_api_key = <openrouter_api_key>
 openrouter_model = mistralai/mistral-7b-instruct:free
-#
-deepseek_api_key = <deepseek_api_key>
-deepseek_model = deepseek-chat
-deepseek_streaming = True
-deepseek_temperature = 0.7
-#
-mistral_api_key = <mistral_api_key>
-mistral_model = mistral-large-latest
-mistral_streaming = True
-mistral_temperature = 0.7
-#
-google_api_key = <google_api_key>
-# Available Model Options:
-google_model = gemini-1.5-pro
-google_streaming = True
-google_temperature = 0.7
 #
 elevenlabs_api_key = <eleven_labs_api_key>
 #
@@ -66,6 +67,7 @@ kobold_streaming = True
 kobold_temperature = 0.7
 kobold_top_p = 0.9
 kobold_min_p = 0.05
+kobold_top_k = 100
 #
 llama_api_IP = http://127.0.0.1:8080/completion
 llama_api_key =
@@ -73,6 +75,7 @@ llama_streaming = True
 llama_temperature = 0.7
 llama_top_p = 0.9
 llama_min_p = 0.05
+llama_top_k = 100
 #
 ooba_api_key =
 ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
@@ -80,22 +83,29 @@ ooba_streaming = True
 ooba_temperature = 0.7
 ooba_top_p = 0.9
 ooba_min_p = 0.05
+ooba_top_k = 100
 #
 tabby_api_IP = http://127.0.0.1:5000/v1/chat/completions
 tabby_api_key =
 tabby_streaming = True
 tabby_temperature = 0.7
+tabby_top_k = 100
 #
 vllm_api_IP = http://127.0.0.1:8000/v1/chat/completions
 vllm_model =
 vllm_api_key =
 vllm_streaming = True
 vllm_temperature = 0.7
+vllm_top_p = 0.9
+vllm_min_p = 0.05
+vllm_top_k = 100
 #
 ollama_api_IP = http://127.0.0.1:11434/v1/chat/completions
 ollama_api_key =
 ollama_model = llama3
 ollama_streaming = True
+ollama_temperature = 0.7
+ollama_top_p = 0.9
 #
 aphrodite_api_IP = http://127.0.0.1:8080/completion
 aphrodite_api_key =
@@ -142,6 +152,7 @@ default_openai_tts_speed = 1
 # available models are 'tts-1' or 'tts-1-hd'
 default_openai_tts_model = tts-1-hd
 default_openai_tts_output_format = mp3
+default_openai_tts_streaming = False
 #
 # ElevenLabs TTS Settings
 default_eleven_tts_voice = pNInz6obpgDQGcFmaJgB
@@ -172,6 +183,25 @@ default_alltalk_tts_voice = alloy
 default_alltalk_tts_model = alltalk
 default_alltalk_tts_output_format = mp3
 alltalk_api_ip = http://127.0.0.1:7851/v1/audio/speech
+#
+# Kokoro TTS Settings
+kokoro_model_path = ./App_Function_Libraries/models/kokoro_models/
+default_kokoro_tts_speed = 1.0
+# Options: bella, nicole, sarah, sky, adam, michael, emma, isabella, george, lewis
+default_kokoro_tts_voice = sky
+# Options: onnx, pht
+default_kokoro_tts_model = pht
+# Options: wav, mp3
+default_kokoro_tts_output_format = wav
+#
+# Self-Hosted OpenAI API Settings
+default_custom_openai_tts_voice = shimmer
+default_custom_openai_tts_speed = 1
+default_custom_openai_tts_model = tts-1-hd
+default_custom_openai_tts_output_format = mp3
+default_custom_openai_api_ip = http://
+default_custom_openai_api_streaming = True
+
 
 [Search-Engines]
 # Search Defaults
