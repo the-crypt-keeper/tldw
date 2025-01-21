@@ -424,6 +424,7 @@ def load_and_log_configs():
         default_alltalk_tts_output_format = config.get('TTS-Settings', 'default_alltalk_tts_output_format', fallback='mp3')
 
         # Kokoro TTS
+        kokoro_model_path = config.get('TTS-Settings', 'kokoro_model_path', fallback='Databases/kokoro_models')
         default_kokoro_tts_model = config.get('TTS-Settings', 'default_kokoro_tts_model', fallback='pht')
         default_kokoro_tts_voice = config.get('TTS-Settings', 'default_kokoro_tts_voice', fallback='sky')
         default_kokoro_tts_speed = config.get('TTS-Settings', 'default_kokoro_tts_speed', fallback=1.0)
