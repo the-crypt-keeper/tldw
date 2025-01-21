@@ -298,6 +298,7 @@ def load_and_log_configs():
         llama_temperature = config.get('Local-API', 'llama_temperature', fallback='0.7')
         llama_top_p = config.get('Local-API', 'llama_top_p', fallback='0.95')
         llama_min_p = config.get('Local-API', 'llama_min_p', fallback='0.05')
+        llama_top_k = config.get('Local-API', 'llama_top_k', fallback='100')
 
         ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
         ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
@@ -305,6 +306,7 @@ def load_and_log_configs():
         ooba_temperature = config.get('Local-API', 'ooba_temperature', fallback='0.7')
         ooba_top_p = config.get('Local-API', 'ooba_top_p', fallback='0.95')
         ooba_min_p = config.get('Local-API', 'ooba_min_p', fallback='0.05')
+        ooba_top_k = config.get('Local-API', 'ooba_top_k', fallback='100')
 
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
@@ -318,10 +320,18 @@ def load_and_log_configs():
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
         vllm_model = config.get('Local-API', 'vllm_model', fallback=None)
+        vllm_streaming = config.get('Local-API', 'vllm_streaming', fallback='False')
+        vllm_temperature = config.get('Local-API', 'vllm_temperature', fallback='0.7')
+        vllm_top_p = config.get('Local-API', 'vllm_top_p', fallback='0.95')
+        vllm_top_k = config.get('Local-API', 'vllm_top_k', fallback='100')
+        vllm_min_p = config.get('Local-API', 'vllm_min_p', fallback='0.05')
 
         ollama_api_url = config.get('Local-API', 'ollama_api_IP', fallback='http://127.0.0.1:11434/api/generate')
         ollama_api_key = config.get('Local-API', 'ollama_api_key', fallback=None)
         ollama_model = config.get('Local-API', 'ollama_model', fallback=None)
+        ollama_streaming = config.get('Local-API', 'ollama_streaming', fallback='False')
+        ollama_temperature = config.get('Local-API', 'ollama_temperature', fallback='0.7')
+        ollama_top_p = config.get('Local-API', 'ollama_top_p', fallback='0.95')
 
         aphrodite_api_url = config.get('Local-API', 'aphrodite_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         aphrodite_api_key = config.get('Local-API', 'aphrodite_api_key', fallback='')
@@ -390,6 +400,7 @@ def load_and_log_configs():
         default_openai_tts_voice = config.get('TTS-Settings', 'default_openai_tts_voice', fallback='shimmer')
         default_openai_tts_speed = config.get('TTS-Settings', 'default_openai_tts_speed', fallback='1')
         default_openai_tts_output_format = config.get('TTS-Settings', 'default_openai_tts_output_format', fallback='mp3')
+        default_openai_tts_streaming = config.get('TTS-Settings', 'default_openai_tts_streaming', fallback='False')
         # Google TTS
         # FIXME - FIX THESE DEFAULTS
         default_google_tts_model = config.get('TTS-Settings', 'default_google_tts_model', fallback='en')
@@ -411,6 +422,21 @@ def load_and_log_configs():
         default_alltalk_tts_voice = config.get('TTS-Settings', 'default_alltalk_tts_voice', fallback='alloy')
         default_alltalk_tts_speed = config.get('TTS-Settings', 'default_alltalk_tts_speed', fallback=1.0)
         default_alltalk_tts_output_format = config.get('TTS-Settings', 'default_alltalk_tts_output_format', fallback='mp3')
+
+        # Kokoro TTS
+        default_kokoro_tts_model = config.get('TTS-Settings', 'default_kokoro_tts_model', fallback='pht')
+        default_kokoro_tts_voice = config.get('TTS-Settings', 'default_kokoro_tts_voice', fallback='sky')
+        default_kokoro_tts_speed = config.get('TTS-Settings', 'default_kokoro_tts_speed', fallback=1.0)
+        default_kokoro_tts_output_format = config.get('TTS-Settings', 'default_kokoro_tts_output_format', fallback='wav')
+
+
+        # Self-hosted OpenAI API TTS
+        default_openai_api_tts_model = config.get('TTS-Settings', 'default_openai_api_tts_model', fallback='tts-1-hd')
+        default_openai_api_tts_voice = config.get('TTS-Settings', 'default_openai_api_tts_voice', fallback='shimmer')
+        default_openai_api_tts_speed = config.get('TTS-Settings', 'default_openai_api_tts_speed', fallback='1')
+        default_openai_api_tts_output_format = config.get('TTS-Settings', 'default_openai_tts_api_output_format', fallback='mp3')
+        default_openai_api_tts_streaming = config.get('TTS-Settings', 'default_openai_tts_streaming', fallback='False')
+
 
         # Search Engines
         search_provider_default = config.get('Search-Engines', 'search_provider_default', fallback='google')
@@ -565,7 +591,8 @@ def load_and_log_configs():
                 'streaming': llama_streaming,
                 'temperature': llama_temperature,
                 'top_p': llama_top_p,
-                'min_p': llama_min_p
+                'min_p': llama_min_p,
+                'top_k': llama_top_k
             },
             'ooba_api': {
                 'api_ip': ooba_api_IP,
@@ -573,7 +600,8 @@ def load_and_log_configs():
                 'streaming': ooba_streaming,
                 'temperature': ooba_temperature,
                 'top_p': ooba_top_p,
-                'min_p': ooba_min_p
+                'min_p': ooba_min_p,
+                'top_k': ooba_top_k
             },
             'kobold_api': {
                 'api_ip': kobold_api_ip,
@@ -597,12 +625,20 @@ def load_and_log_configs():
             'vllm_api': {
                 'api_url': vllm_api_url,
                 'api_key': vllm_api_key,
-                'model': vllm_model
+                'model': vllm_model,
+                'streaming': vllm_streaming,
+                'temperature': vllm_temperature,
+                'top_p': vllm_top_p,
+                'top_k': vllm_top_k,
+                'min_p': vllm_min_p
             },
             'ollama_api': {
                 'api_url': ollama_api_url,
                 'api_key': ollama_api_key,
-                'model': ollama_model
+                'model': ollama_model,
+                'streaming': ollama_streaming,
+                'temperature': ollama_temperature,
+                'top_p': ollama_top_p,
             },
             'aphrodite_api': {
                 'api_url': aphrodite_api_url,
@@ -664,8 +700,30 @@ def load_and_log_configs():
                 'default_eleven_tts_voice_similiarity_boost': default_eleven_tts_voice_similiarity_boost,
                 'default_eleven_tts_voice_style': default_eleven_tts_voice_style,
                 'default_eleven_tts_voice_use_speaker_boost': default_eleven_tts_voice_use_speaker_boost,
-                'default_eleven_tts_output_format': default_eleven_tts_output_format
-                # GPT Sovi-TTS
+                'default_eleven_tts_output_format': default_eleven_tts_output_format,
+                # Open Source / Self-Hosted TTS
+                # GPT SoVITS
+                # 'default_gpt_tts_model': default_gpt_tts_model,
+                # 'default_gpt_tts_voice': default_gpt_tts_voice,
+                # 'default_gpt_tts_speed': default_gpt_tts_speed,
+                # 'default_gpt_tts_output_format': default_gpt_tts_output_format
+                # AllTalk
+                'alltalk_api_ip': alltalk_api_ip,
+                'default_alltalk_tts_model': default_alltalk_tts_model,
+                'default_alltalk_tts_voice': default_alltalk_tts_voice,
+                'default_alltalk_tts_speed': default_alltalk_tts_speed,
+                'default_alltalk_tts_output_format': default_alltalk_tts_output_format,
+                # Kokoro
+                'default_kokoro_tts_model': default_kokoro_tts_model,
+                'default_kokoro_tts_voice': default_kokoro_tts_voice,
+                'default_kokoro_tts_speed': default_kokoro_tts_speed,
+                'default_kokoro_tts_output_format': default_kokoro_tts_output_format,
+                # Self-hosted OpenAI API
+                'default_openai_api_tts_model': default_openai_api_tts_model,
+                'default_openai_api_tts_voice': default_openai_api_tts_voice,
+                'default_openai_api_tts_speed': default_openai_api_tts_speed,
+                'default_openai_api_tts_output_format': default_openai_api_tts_output_format,
+                'default_openai_api_tts_streaming': default_openai_api_tts_streaming,
             },
             'search_settings': {
                 'default_search_provider': search_provider_default,

@@ -36,6 +36,7 @@ import pyaudio
 from faster_whisper import WhisperModel as OriginalWhisperModel
 import numpy as np
 import torch
+from scipy.io import wavfile
 from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
 #
 # Import Local
