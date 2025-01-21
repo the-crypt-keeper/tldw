@@ -249,6 +249,7 @@ async def _handle_onnx_streaming(
         output_format: str,
 ) -> str:
     """Handle async streaming for ONNX."""
+    # FIXME - Replace with PyAudio
     import sounddevice as sd
     stream = kokoro.create_stream(text, voice=voice, speed=speed, lang=lang)
     full_audio = []
