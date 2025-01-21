@@ -1,0 +1,71 @@
+# Placeholder for now
+[project]
+name = "tldw"
+version = "0.0.11"
+description = "It does the stuff."
+authors = ["Robert Musser contact@tldwproject.com"]
+license = "Apache2.0"
+readme = "README.md"
+requires-python = ">=3.9"
+
+# Base dependencies
+dependencies = [
+    "requests>=2.25.0",
+    "click>=8.0.0",
+]
+
+[project.optional-dependencies]
+web_research = [
+    "placeholder",
+    "Placeholder"
+]
+
+TTS_All = [
+    "numpy>=1.20.0",
+    "pandas>=1.2.0",
+]
+
+TTS_kokoro = [
+    "matplotlib>=3.4.0",
+    "seaborn>=0.11.0",
+]
+
+TTS_Sovits = [
+    "scikit-learn>=0.24.0",
+    "scipy>=1.6.0",
+]
+
+backend_llama = [
+    "scikit-learn>=0.24.0",
+    "scipy>=1.6.0",
+]
+
+backend_vllm = [
+    "scikit-learn>=0.24.0",
+    "scipy>=1.6.0",
+]
+
+db_postgres = [
+    "psycopg2-binary",
+    "psycopg2",
+]
+
+db_opensearch = [
+    "opensearch",
+    "placeholder",
+]
+# You can also create a group that includes multiple packages
+all = [
+    "numpy>=1.20.0",
+    "pandas>=1.2.0",
+    "matplotlib>=3.4.0",
+    "seaborn>=0.11.0",
+    "scikit-learn>=0.24.0",
+    "scipy>=1.6.0",
+]
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# ... other configurations ...

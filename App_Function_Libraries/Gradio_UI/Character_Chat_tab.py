@@ -507,7 +507,8 @@ def create_character_card_interaction_tab():
                     system_message,
                     streaming,
                     minp=minp,
-                    maxp=maxp
+                    maxp=maxp,
+                    topk=topk_slider.value
                 )
 
                 # Handle streaming response
@@ -771,7 +772,8 @@ def create_character_card_interaction_tab():
                         system_message,
                         streaming,
                         minp=minp,
-                        maxp=maxp
+                        maxp=maxp,
+                        topk=topk_slider.value
                     )
 
                     # Handle streaming response
@@ -912,7 +914,8 @@ def create_character_card_interaction_tab():
                     system_message,
                     streaming,
                     minp=minp,
-                    maxp=maxp
+                    maxp=maxp,
+                    topk=topk_slider.value
                 )
 
                 # Handle streaming response
@@ -993,7 +996,8 @@ def create_character_card_interaction_tab():
                     system_message=system_message_user,
                     streaming=streaming,
                     minp=minp,
-                    maxp=maxp
+                    maxp=maxp,
+                    topk=topk_slider.value
                 )
 
                 if streaming:
@@ -1019,7 +1023,8 @@ def create_character_card_interaction_tab():
                         system_message=system_message_bot,
                         streaming=streaming,
                         minp=minp,
-                        maxp=maxp
+                        maxp=maxp,
+                        topk=topk_slider.value
                     )
 
                     full_bot_response = ""
@@ -1059,7 +1064,8 @@ def create_character_card_interaction_tab():
                     system_message=system_message_bot,
                     streaming=streaming,
                     minp=minp,
-                    maxp=maxp
+                    maxp=maxp,
+                    topk=topk_slider.value
                 )
 
                 # Replace placeholders in bot message
@@ -1158,7 +1164,8 @@ def create_character_card_interaction_tab():
                     auto_save_checkbox,
                     streaming,
                     minp_slider,
-                    maxp_slider
+                    maxp_slider,
+                    topk_slider
                 ],
                 outputs=[chat_history, save_status]
             ).then(
@@ -1179,7 +1186,8 @@ def create_character_card_interaction_tab():
                     auto_save_checkbox,
                     streaming,
                     minp_slider,
-                    maxp_slider
+                    maxp_slider,
+                    topk_slider
                 ],
                 outputs=[chat_history, save_status]
             ).then(
@@ -1233,7 +1241,8 @@ def create_character_card_interaction_tab():
                     auto_save_checkbox,
                     streaming,
                     minp_slider,
-                    maxp_slider
+                    maxp_slider,
+                    topk_slider
                 ],
                 outputs=[chat_history, save_status],
             ).then(
@@ -1256,7 +1265,8 @@ def create_character_card_interaction_tab():
                     auto_save_checkbox,
                     streaming,
                     minp_slider,
-                    maxp_slider
+                    maxp_slider,
+                    topk_slider
                 ],
                 outputs=[chat_history, save_status]
             ).then(

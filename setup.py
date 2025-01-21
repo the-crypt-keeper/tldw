@@ -1,3 +1,4 @@
+# Replace with new generation/filling from pyproject.toml once that's done
 from setuptools import setup, find_packages
 
 setup(
