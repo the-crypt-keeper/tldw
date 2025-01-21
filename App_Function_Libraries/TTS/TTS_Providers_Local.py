@@ -92,6 +92,11 @@ def normalize_text(text):
 ########################################################
 #
 # Kokoro TTS Provider Functions
+# Thank you to:
+# https://github.com/thewh1teagle/kokoro-onnx
+# https://huggingface.co/hexgrad/Kokoro-82M
+# https://github.com/PierrunoYT/Kokoro-TTS-Local
+# https://huggingface.co/hexgrad/Kokoro-82M/discussions/64
 
 # Global caches for the model and voicepacks
 _kokoro_model_cache = {}
