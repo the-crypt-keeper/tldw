@@ -279,3 +279,24 @@ def create_chunking_inputs():
     gr_semantic_chunk_long_file_overlap = gr.Number(label="Max Chunk Overlap Size", value=100, visible=True)
     return [chunk_text_by_words_checkbox, max_words_input, chunk_text_by_sentences_checkbox, max_sentences_input,
             chunk_text_by_paragraphs_checkbox, max_paragraphs_input, chunk_text_by_tokens_checkbox, max_tokens_input]
+
+
+def ask_clear_chat():
+    """First step: show confirmation UI (Markdown + 2 new buttons)."""
+    return (
+        gr.update(visible=True),  # Show the confirmation row
+        "Are you sure you want to clear the chat?"
+    )
+
+def confirm_clear_chat(confirm):
+    """Second step: either clear the chat or do nothing."""
+    if confirm == "yes":
+        # Actual clear-chat logic
+        return [], None, gr.update(visible=False), ""
+    else:
+        # Cancel, just hide the confirmation row
+        return None, None, gr.update(visible=False), ""
+
+#
+# End of Gradio_Shared.py
+#######################################################################################################################
