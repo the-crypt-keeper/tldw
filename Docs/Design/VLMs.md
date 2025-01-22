@@ -30,6 +30,7 @@ https://arxiv.org/abs/2412.07112
 https://arxiv.org/abs/2501.07542
 https://www.reddit.com/r/StableDiffusion/comments/1h7hunp/how_to_run_hunyuanvideo_on_a_single_24gb_vram_card/
 https://arxiv.org/abs/2412.05185
+https://huggingface.co/vidore/colqwen2-v0.1
 https://huggingface.co/collections/OpenGVLab/internvl-25-673e1019b66e2218f68d7c1c
 https://huggingface.co/Infinigence/Megrez-3B-Omni
 https://arxiv.org/abs/2501.07888

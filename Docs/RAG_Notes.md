@@ -7,6 +7,9 @@ Unsorted
 	https://github.com/run-llama/llama_parse/blob/main/examples/multimodal/multimodal_report_generation.ipynb
 	https://www.youtube.com/watch?v=aqtX-sGbevw
 	https://arxiv.org/abs/2411.19539
+https://arxiv.org/pdf/2501.09136v1
+https://arxiv.org/pdf/2501.07572v2
+https://arxiv.org/pdf/2412.17149
 	https://arxiv.org/abs/2410.21012
 	https://arxiv.org/abs/2410.20088
 	https://arxiv.org/abs/2410.13765

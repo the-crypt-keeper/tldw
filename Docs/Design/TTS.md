@@ -126,6 +126,11 @@ Kokoro
 lina TTS
     https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
     https://github.com/theodorblackbird/lina-speech
+LLaSA
+    https://huggingface.co/blog/srinivasbilla/llasa-tts
+    https://github.com/zhenye234/LLaSA_training
+    https://huggingface.co/spaces/srinivasbilla/llasa-3b-tts
+    https://github.com/nivibilla/local-llasa-tts
 LMNT
 MaskGCT
     https://maskgct.github.io/#emotion-samples
