@@ -87,7 +87,8 @@ Benchmarks
     https://www.kaggle.com/facts-leaderboard
     https://storage.googleapis.com/deepmind-media/FACTS/FACTS_grounding_paper.pdf
     https://deepmind.google/discover/blog/facts-grounding-a-new-benchmark-for-evaluating-the-factuality-of-large-language-models/
-
+Halogen
+  https://arxiv.org/pdf/2501.08292
 
 Detecting Hallucinations using Semantic Entropy:
     https://www.nature.com/articles/s41586-024-07421-0

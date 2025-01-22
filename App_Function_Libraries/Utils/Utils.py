@@ -395,6 +395,7 @@ def load_and_log_configs():
 
         # TTS Settings
         # FIXME
+        local_tts_device = config.get('TTS-Settings', 'local_tts_device', fallback='cpu')
         default_tts_provider = config.get('TTS-Settings', 'default_tts_provider', fallback='openai')
         tts_voice = config.get('TTS-Settings', 'default_tts_voice', fallback='shimmer')
         # Open AI TTS
@@ -686,6 +687,7 @@ def load_and_log_configs():
             'tts_settings': {
                 'default_tts_provider': default_tts_provider,
                 'tts_voice': tts_voice,
+                'local_tts_device': local_tts_device,
                 # OpenAI
                 'default_openai_tts_voice': default_openai_tts_voice,
                 'default_openai_tts_speed': default_openai_tts_speed,

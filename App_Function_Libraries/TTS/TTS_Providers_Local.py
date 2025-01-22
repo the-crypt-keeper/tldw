@@ -12,6 +12,7 @@ import uuid
 from typing import Optional, Generator
 
 import nltk
+from kokoro_onnx import Kokoro, EspeakConfig
 #
 # External Imports
 from pydub.playback import play
@@ -142,7 +143,7 @@ def get_kokoro_model(model_path: str, device: str) -> torch.nn.Module:
     global _kokoro_model_cache
     if (model_path, device) not in _kokoro_model_cache:
         if not os.path.exists(model_path):
-            url = f"https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/{os.path.basename(model_path)}"
+            url = "https://huggingface.co/hexgrad/Kokoro-82M/blob/main/kokoro-v0_19.pth"
             logging.info(f"Downloading model from {url}")
             download_file(url, model_path)
         MODEL = build_model(model_path, device=device)
@@ -160,7 +161,7 @@ def get_kokoro_voicepack(voice: str, device: str) -> torch.Tensor:
 
     if (voice_path, device) not in _kokoro_voicepack_cache:
         if not os.path.exists(voice_path):
-            url = f"https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/{voice}.pt"
+            url = f"https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/{voice}.pt?download=true"
             logging.info(f"Downloading voicepack from {url}")
             download_file(url, voice_path)
         VOICEPACK = torch.load(voice_path, weights_only=True).to(device)
@@ -183,17 +184,22 @@ def generate_audio_kokoro(
         stream: bool = False,
 ) -> str:
     """Generate audio with chunking, dynamic downloads, ONNX support, and streaming."""
+    logging.info("Kokoro TTS: Generating audio...")
+
+    logging.debug("Checking eSpeak NG installation...")
     if not check_espeak_installed():
         logging.error("eSpeak NG not found. Install and set environment variables.")
         return "Error: eSpeak NG required"
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    logging.info(f"Using device: {device}")
+    logging.info(f"Using device type (CPU or CUDA): {device}")
 
     if use_onnx:
+        logging.debug("Using ONNX model for Kokoro TTS...")
         return _handle_onnx_generation(input_text, voice, onnx_model_path, onnx_voices_json,
                                        output_format, output_file, speed, post_process, stream)
     else:
+        logging.debug("Using PyTorch model for Kokoro TTS...")
         return _handle_pytorch_generation(input_text, voice, model_path, device,
                                           output_format, output_file, speed, post_process)
 
@@ -211,18 +217,22 @@ def _handle_onnx_generation(
 ) -> str:
     """Handle ONNX model audio generation."""
     from kokoro_onnx import Kokoro, EspeakConfig
+    logging.debug("Using ONNX model for Kokoro TTS...")
 
     if not os.path.exists(model_path):
+        logging.debug("Downloading Kokoro ONNX model...")
         download_file(
             "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx",
             model_path
         )
     if not os.path.exists(voices_json):
+        logging.debug("Downloading Kokoro ONNX voices JSON...")
         download_file(
             "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json",
             voices_json
         )
 
+    logging.debug("Initializing Kokoro TTS...")
     espeak_lib = os.getenv("PHONEMIZER_ESPEAK_LIBRARY")
     kokoro = Kokoro(
         model_path,
@@ -233,8 +243,10 @@ def _handle_onnx_generation(
     lang = 'en-us' if voice.startswith('a') else 'en-gb'
 
     if stream:
+        logging.debug("Kokoro ONNX: Streaming audio generation...")
         return _handle_onnx_streaming(kokoro, text, voice, speed, lang, output_file, output_format)
     else:
+        logging.debug("Kokoro ONNX: Single audio generation...")
         samples, sr = kokoro.create(text, voice=voice, speed=speed, lang=lang)
         return _save_audio(samples, sr, output_file, output_format, post_process)
 
@@ -249,6 +261,7 @@ async def _handle_onnx_streaming(
         output_format: str,
 ) -> str:
     """Handle async streaming for ONNX."""
+    logging.debug("Kokoro ONNX: Streaming audio generation...")
     # FIXME - Replace with PyAudio
     import sounddevice as sd
     stream = kokoro.create_stream(text, voice=voice, speed=speed, lang=lang)
@@ -274,27 +287,37 @@ def _handle_pytorch_generation(
         post_process: bool,
 ) -> str:
     """Handle PyTorch model audio generation with chunking."""
+    logging.debug("Using PyTorch model for Kokoro TTS...")
+
+    logging.debug("Checking for nltk install...")
     try:
         nltk.data.find('tokenizers/punkt')
     except LookupError:
         nltk.download('punkt', quiet=True)
 
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+    logging.debug("Splitting text into chunks...")
     text_chunks = split_text_into_sentence_chunks(text, 50, tokenizer)
 
+    logging.debug("Getting Kokoro model and voicepack...")
     MODEL = get_kokoro_model(model_path, device)
     VOICEPACK = get_kokoro_voicepack(voice, device)
     lang = 'a' if voice.startswith('a') else 'b'
 
     audio_segments = []
+    logging.debug("Generating audio for text chunks...")
     for chunk in text_chunks:
+        logging.debug(f"Generating audio for chunk: {chunk}")
         audio, _ = generate(MODEL, chunk, VOICEPACK, lang=lang, speed=speed)
 
         # Convert tensor to numpy array if needed
         if isinstance(audio, torch.Tensor):
+            logging.debug("Converting audio tensor to numpy array...")
             audio = audio.cpu().numpy()
         audio_segments.append(audio)
+        logging.debug(f"Generated audio for chunk: {chunk}")
 
+    logging.debug("Combining audio segments...")
     audio_data = np.concatenate(audio_segments)
     return _save_audio(audio_data, 24000, output_file, output_format, post_process)
 
@@ -307,6 +330,7 @@ def _save_audio(
         post_process: bool,
 ) -> str:
     """Save audio data to file with optional post-processing."""
+    logging.debug("Saving audio data to file...")
     max_amp = np.max(np.abs(audio_data))
     if max_amp > 1.0:
         audio_data /= max_amp
@@ -340,22 +364,27 @@ async def generate_audio_stream_kokoro(
         onnx_voices_json: str = "voices.json",
 ) -> Generator[np.ndarray, None, None]:
     """Async generator for streaming audio chunks (ONNX only)."""
-    from kokoro_onnx import Kokoro, EspeakConfig
+    logging.info("Kokoro Streaming: Generating audio stream...")
+
+    logging.debug("Kokoro Streaming: Checking eSpeak NG installation...")
     if not check_espeak_installed():
         raise RuntimeError("eSpeak NG not installed")
 
     if not os.path.exists(onnx_model_path):
+        logging.debug("Kokoro Streaming: Downloading Kokoro ONNX model...")
         download_file(
             "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx",
             onnx_model_path
         )
     if not os.path.exists(onnx_voices_json):
+        logging.debug("Downloading Kokoro ONNX voices JSON...")
         download_file(
             "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json",
             onnx_voices_json
         )
 
     espeak_lib = os.getenv("PHONEMIZER_ESPEAK_LIBRARY")
+    logging.debug("Kokoro Streaming: Initializing Kokoro TTS...")
     kokoro = Kokoro(
         onnx_model_path,
         onnx_voices_json,
@@ -363,9 +392,12 @@ async def generate_audio_stream_kokoro(
     )
 
     lang = 'en-us' if voice.startswith('a') else 'en-gb'
+    logging.debug("Kokoro Streaming: Starting audio stream...")
     stream = kokoro.create_stream(input_text, voice=voice, speed=1.0, lang=lang)
 
+    logging.debug("Kokoro Streaming: Yielding audio chunks...")
     async for samples, sr in stream:
+        logging.debug(f"Yielding audio chunk for stream...")
         yield samples, sr
 
 
@@ -544,12 +576,6 @@ def test_invalid_voicepack():
         voice="nonexistent_voice",
         output_file="test_invalid_voice.wav"
     )
-
-#
-# End of Local TTS Provider Functions
-#######################################################
-
-
 
 #
 # End of Local TTS Provider Functions

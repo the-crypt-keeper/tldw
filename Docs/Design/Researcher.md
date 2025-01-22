@@ -141,6 +141,7 @@ https://github.com/neuml/paperai
 https://github.com/neuml/paperetl
 https://github.com/ai-christianson/RA.Aid
 https://github.com/Future-House/paper-qa
+https://github.com/bytedance/pasa
 https://openreview.net/
 https://learning.google.com/experiments/learn-about/signup
 https://departmentofproduct.substack.com/p/how-to-use-perplexity-to-automate
