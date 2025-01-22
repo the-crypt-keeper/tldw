@@ -331,10 +331,11 @@ def create_character_card_interaction_tab():
 
                 with gr.Column(scale=2):
                     chat_history = gr.Chatbot(label="Conversation", height=800)
-                    user_input = gr.Textbox(label="Your message")
                     with gr.Row():
                         streaming = gr.Checkbox(label="Enable streaming", value=True, interactive=True)
+                        # FIXME - Add support for auto-speak response
                         auto_speak_checkbox = gr.Checkbox(label="Auto-speak response", value=False, interactive=True)
+                    user_input = gr.Textbox(label="Your message")
                     send_message_button = gr.Button("Send Message")
                     with gr.Row():
                         speak_button = gr.Button("Speak Response")
