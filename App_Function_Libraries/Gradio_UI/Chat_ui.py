@@ -502,8 +502,13 @@ def create_chat_interface():
                     audio_file = generate_audio(
                         api_key=None, # Use default API key
                         text=last_message,
-                        provider="openai",  # or get from config
-                        output_file="last_response.mp3"
+                        provider=None,  # get from config
+                        voice=None,  # get from config
+                        model=None,  # get from config
+                        voice2=None,  # Don't use a second voice for single chat response
+                        output_file="last_response.mp3",
+                        response_format="mp3",
+                        speed=None,  # get from config
                     )
                     logging.debug(f"Generated audio file: {audio_file}")
                 except Exception as e:
@@ -977,10 +982,15 @@ def create_chat_interface_stacked():
                 # Generate audio using your preferred TTS provider
                 try:
                     audio_file = generate_audio(
-                        api_key=None, # Use default API key
+                        api_key=None,  # Use default API key
                         text=last_message,
-                        provider="openai",  # or get from config
-                        output_file="last_response.mp3"
+                        provider=None,  # get from config
+                        voice=None,  # get from config
+                        model=None,  # get from config
+                        voice2=None,  # Don't use a second voice for single chat response
+                        output_file="last_response.mp3",
+                        response_format="mp3",
+                        speed=None,  # get from config
                     )
                     logging.debug(f"Generated audio file: {audio_file}")
                 except Exception as e:

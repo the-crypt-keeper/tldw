@@ -2,26 +2,19 @@
 # Description: This file contains the functions to allow for usage of offline/local TTS providers.
 #
 # Imports
-import json
 import logging
 import os
 import re
-import tempfile
-import time
-import uuid
 from typing import Optional, Generator
-
-import nltk
-from kokoro_onnx import Kokoro, EspeakConfig
 #
 # External Imports
-from pydub.playback import play
+from kokoro_onnx import Kokoro, EspeakConfig
+import nltk
 import numpy as np
+from pydub.playback import play
 import torch
 from phonemizer import phonemize
-import soundfile as sf
 from transformers import AutoTokenizer
-
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data, download_file
@@ -311,6 +304,9 @@ def _handle_pytorch_generation(
     text_chunks = split_text_into_sentence_chunks(text, 50, tokenizer)
 
     logging.debug("Getting Kokoro model and voicepack...")
+    # Get default voicepack if not found
+    if voice not in _kokoro_voicepack_cache and not isinstance(voice, str):
+        voice = "af_bella"
     MODEL = get_kokoro_model(device)
     VOICEPACK = get_kokoro_voicepack(voice, device)
     lang = 'a' if voice.startswith('a') else 'b'
