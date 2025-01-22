@@ -417,12 +417,10 @@ def test_generate_audio_kokoro():
     os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
     os.environ["PHONEMIZER_ESPEAK_PATH"] = r"C:\Program Files\eSpeak NG\espeak-ng.exe"
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
     try:
         result = generate_audio_kokoro(
             input_text="Hello, this is a test of the Kokoro TTS system.",
             voice="af_sarah",
-            model_path=os.path.join(base_dir, "kokoro", "kokoro-v0_19.pth"),
             use_onnx=False
         )
         if "Error" in result:
