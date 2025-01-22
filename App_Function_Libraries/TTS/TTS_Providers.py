@@ -120,25 +120,39 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
 
 def speak_last_response(chatbot):
     """Handle speaking the last chat response."""
-    logging.debug("Starting speak_last_response")
+    logging.debug("speak_last_response(): Starting speak_last_response")
     try:
+        logging.debug(f"speak_last_response(): Chatbot history: {chatbot}")
         # If there's no chat history, return
         if not chatbot or len(chatbot) == 0:
-            logging.debug("No messages in chatbot history")
+            logging.debug("speak_last_response(): No messages in chatbot history")
             return "No messages to speak"
-
-        # Log the chatbot content for debugging
-        logging.debug(f"Chatbot history: {chatbot}")
 
         # Get the last message from the assistant
         last_message = chatbot[-1][1]
-        logging.debug(f"Last message to speak: {last_message}")
+        logging.debug(f"speak_last_response(): Last message to speak: {last_message}")
+
+        # Get the TTS provider from the config
+        tts_provider = loaded_config_data['tts_settings'].get('default_tts_provider', 'openai')
+        logging.debug(f"speak_last_response(): Using TTS provider: {tts_provider}")
+
+        # Get the default voice for the TTS provider
+        default_tts_voice = loaded_config_data['tts_settings'].get('default_tts_voice', None)
+        logging.debug(f"speak_last_response(): Using default voice: {default_tts_voice}")
 
         # Generate audio using your preferred TTS provider
+        logging.debug("speak_last_response(): Generating audio file")
         audio_file = generate_audio(
+            api_key=None,  # Will use config credentials
             text=last_message,
-            provider="openai",  # or get from config
-            output_file="last_response.mp3"  # specify output file
+            provider=tts_provider,
+            voice=default_tts_voice,
+            model=None, # Let the provider choose the model
+            voice2=None, # We won't use a second voice for single chat messages
+            output_file="last_response.mp3",  # specify output file
+            response_format="mp3",  # specify response format
+            streaming=False,  # specify streaming
+            speed=1.0  # specify speed
         )
 
         logging.debug(f"Generated audio file: {audio_file}")
