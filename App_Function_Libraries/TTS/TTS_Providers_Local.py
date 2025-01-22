@@ -138,12 +138,20 @@ def split_text_into_sentence_chunks(text: str, max_tokens: int, tokenizer) -> li
     return chunks
 
 
-def get_kokoro_model(model_path: str, device: str) -> torch.nn.Module:
-    """Retrieve the Kokoro model, cached if already loaded with dynamic downloading."""
+def get_kokoro_model(device: str) -> torch.nn.Module:
+    """Retrieve the Kokoro model from the proper directory, cached if already loaded with dynamic downloading."""
     global _kokoro_model_cache
+
+    # FIXME - Add check/loading of model from kokoro_model_path in config.txt
+    # Construct the correct model path
+    base_dir = os.getcwd()  # Parent script runs from tldw/
+    model_dir = os.path.join(base_dir, "App_Function_Libraries", "models", "kokoro_models")
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = os.path.join(model_dir, "kokoro-v0_19.pth")
+
     if (model_path, device) not in _kokoro_model_cache:
         if not os.path.exists(model_path):
-            url = "https://huggingface.co/hexgrad/Kokoro-82M/blob/main/kokoro-v0_19.pth"
+            url = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v0_19.pth?download=true"
             logging.info(f"Downloading model from {url}")
             download_file(url, model_path)
         MODEL = build_model(model_path, device=device)
@@ -155,14 +163,17 @@ def get_kokoro_model(model_path: str, device: str) -> torch.nn.Module:
 def get_kokoro_voicepack(voice: str, device: str) -> torch.Tensor:
     """Retrieve the Kokoro voicepack with dynamic downloading."""
     global _kokoro_voicepack_cache
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    voice_dir = os.path.join(base_dir, "kokoro", "voices")
+
+    # Always store voices in tldw\App_Function_Libraries\TTS\Kokoro\voices
+    voice_dir = os.path.join("App_Function_Libraries", "TTS", "Kokoro", "voices")
+    os.makedirs(voice_dir, exist_ok=True)
+
     voice_path = os.path.join(voice_dir, f"{voice}.pt")
 
     if (voice_path, device) not in _kokoro_voicepack_cache:
         if not os.path.exists(voice_path):
             url = f"https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices/{voice}.pt?download=true"
-            logging.info(f"Downloading voicepack from {url}")
+            logging.info(f"Downloading voicepack from {url} to {voice_path}")
             download_file(url, voice_path)
         VOICEPACK = torch.load(voice_path, weights_only=True).to(device)
         _kokoro_voicepack_cache[(voice_path, device)] = VOICEPACK
@@ -172,13 +183,14 @@ def get_kokoro_voicepack(voice: str, device: str) -> torch.Tensor:
 def generate_audio_kokoro(
         input_text: str,
         voice: str = "af",
-        model_path: str = "kokoro-v0_19.pth",
         device: Optional[str] = None,
         output_format: str = "wav",
         output_file: str = "speech.wav",
         speed: float = 1.0,
         post_process: bool = True,
         use_onnx: bool = False,
+        # FIXME - Remove the file path declaration here and stuff it into the function
+        # FIXME - Also make sure it checks against config.txt for the model path
         onnx_model_path: str = "kokoro-v0_19.onnx",
         onnx_voices_json: str = "voices.json",
         stream: bool = False,
@@ -200,7 +212,7 @@ def generate_audio_kokoro(
                                        output_format, output_file, speed, post_process, stream)
     else:
         logging.debug("Using PyTorch model for Kokoro TTS...")
-        return _handle_pytorch_generation(input_text, voice, model_path, device,
+        return _handle_pytorch_generation(input_text, voice, device,
                                           output_format, output_file, speed, post_process)
 
 
@@ -279,7 +291,6 @@ async def _handle_onnx_streaming(
 def _handle_pytorch_generation(
         text: str,
         voice: str,
-        model_path: str,
         device: str,
         output_format: str,
         output_file: str,
@@ -300,7 +311,7 @@ def _handle_pytorch_generation(
     text_chunks = split_text_into_sentence_chunks(text, 50, tokenizer)
 
     logging.debug("Getting Kokoro model and voicepack...")
-    MODEL = get_kokoro_model(model_path, device)
+    MODEL = get_kokoro_model(device)
     VOICEPACK = get_kokoro_voicepack(voice, device)
     lang = 'a' if voice.startswith('a') else 'b'
 

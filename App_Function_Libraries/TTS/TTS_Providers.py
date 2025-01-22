@@ -106,8 +106,6 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
         return generate_audio_kokoro(
             input_text=text,
             voice=voice,
-            # FIXME - Proper checks for files
-            model_path=loaded_config_data['tts_settings'].get('local_tts_model_path', 'kokoro_model.pth'),
             device=loaded_config_data['tts_settings'].get('local_tts_device', 'cpu'),
             output_format=response_format or 'wav',
             output_file=output_file or 'speech.wav',
