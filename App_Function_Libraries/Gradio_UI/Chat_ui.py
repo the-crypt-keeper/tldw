@@ -394,8 +394,8 @@ def create_chat_interface():
 
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
-                msg = gr.Textbox(label="Enter your message")
                 streaming = gr.Checkbox(label="Streaming", value=False, visible=True)
+                msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
                 with gr.Row():
                     speak_button = gr.Button("Speak Response")
