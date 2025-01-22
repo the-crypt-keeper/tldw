@@ -314,6 +314,24 @@ def create_chat_interface():
         background-color: #e6ffe6;
     }
     """
+    confirm_clear_chat_js = """
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Grab the clear chat button by its elem_id
+      const btn = document.querySelector("#clear_chat_btn");
+      if(btn) {
+        btn.addEventListener("click", function(e) {
+          // Show a confirmation dialog
+          if(!confirm("Are you sure you want to clear the chat?")) {
+            // If user cancels, stop the click from reaching the server
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        });
+      }
+    });
+    </script>
+    """
     with gr.TabItem("Remote LLM Chat (Horizontal)", visible=True):
         gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
         chat_history = gr.State([])
@@ -403,8 +421,8 @@ def create_chat_interface():
                 regenerate_button = gr.Button("Regenerate Last Message")
                 with gr.Row():
                     token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
-                    clear_chat_button = gr.Button("Clear Chat")
-
+                    download_tts = gr.File(label="Download TTS Audio", interactive=False)
+                    clear_chat_button = gr.Button("Clear Chat", elem_id="clear_chat_btn")
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
                 with gr.Row():
                     save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
@@ -413,6 +431,7 @@ def create_chat_interface():
                     save_chat_history_as_file = gr.Button("Save Chat History as File")
                     download_file = gr.File(label="Download Chat History")
 
+        gr.HTML(confirm_clear_chat_js)
         # Restore original functionality
         search_button.click(
             fn=update_dropdown_multiple,
@@ -441,11 +460,11 @@ def create_chat_interface():
             )
 
         def clear_chat():
-            return [], None  # Return empty list for chatbot and None for conversation_id
+            return [], None, 0  # Return empty list for chatbot and None for conversation_id and token count
 
         clear_chat_button.click(
             clear_chat,
-            outputs=[chatbot, conversation_id]
+            outputs=[chatbot, conversation_id, token_count_display]
         )
 
         # Function to handle preset prompt checkbox change
@@ -485,7 +504,8 @@ def create_chat_interface():
                 # If there's no chat history, return
                 if not chatbot or len(chatbot) == 0:
                     logging.debug("No messages in chatbot history")
-                    return gr.update(value="No messages to speak", visible=True)
+                    yield gr.update(value="No messages to speak", visible=True), None
+                    return
 
                 # Log the chatbot content for debugging
                 logging.debug(f"Chatbot history: {chatbot}")
@@ -495,12 +515,12 @@ def create_chat_interface():
                 logging.debug(f"Last message to speak: {last_message}")
 
                 # Update status to generating
-                yield gr.update(value="Generating audio...", visible=True)
+                yield gr.update(value="Generating audio...", visible=True), None
 
                 # Generate audio using your preferred TTS provider
                 try:
                     audio_file = generate_audio(
-                        api_key=None, # Use default API key
+                        api_key=None,  # Use default API key
                         text=last_message,
                         provider=None,  # get from config
                         voice=None,  # get from config
@@ -513,33 +533,36 @@ def create_chat_interface():
                     logging.debug(f"Generated audio file: {audio_file}")
                 except Exception as e:
                     logging.error(f"Failed to generate audio: {e}")
-                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
+                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True), None
                     return
 
                 # Update status to playing
-                yield gr.update(value="Playing audio...", visible=True)
+                yield gr.update(value="Playing audio...", visible=True), None
 
                 # Play the audio
                 if audio_file and os.path.exists(audio_file):
                     try:
                         play_mp3(audio_file)
-                        yield gr.update(value="Finished playing audio", visible=True)
+                        # After finishing playback, provide the file for download
+                        yield gr.update(value="Finished playing audio", visible=True), audio_file
                     except Exception as e:
                         logging.error(f"Failed to play audio: {e}")
-                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
+                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True), audio_file
                 else:
                     logging.error("Audio file not found")
-                    yield gr.update(value="Failed: Audio file not found", visible=True)
+                    yield gr.update(value="Failed: Audio file not found", visible=True), None
 
             except Exception as e:
                 logging.error(f"Error in speak_last_response: {str(e)}")
-                yield gr.update(value=f"Error: {str(e)}", visible=True)
+                yield gr.update(value=f"Error: {str(e)}", visible=True), None
+
         speak_button.click(
             fn=speak_last_response,
             inputs=[chatbot],
-            outputs=[tts_status],
+            outputs=[tts_status, download_tts],
             api_name="speak_response"
         )
+
         def on_prev_page_click(current_page, total_pages):
             new_page = max(current_page - 1, 1)
             prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
