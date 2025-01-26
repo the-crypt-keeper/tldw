@@ -21,9 +21,6 @@ from transformers import AutoTokenizer
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data, download_file
 # Kokoro-Specific Imports
 from scipy.io import wavfile
-from App_Function_Libraries.TTS.Kokoro.kokoro import generate
-from App_Function_Libraries.TTS.Kokoro.models import build_model
-from App_Function_Libraries.TTS.Kokoro import istftnet
 from pydub import AudioSegment, effects  # For optional post-processing
 #
 #######################################################################################################################
@@ -135,6 +132,13 @@ def split_text_into_sentence_chunks(text: str, max_tokens: int, tokenizer) -> li
 def get_kokoro_model(device: str) -> torch.nn.Module:
     """Retrieve the Kokoro model from the proper directory, cached if already loaded with dynamic downloading."""
     global _kokoro_model_cache
+    try:
+        from App_Function_Libraries.TTS.Kokoro.kokoro import generate
+        from App_Function_Libraries.TTS.Kokoro.models import build_model
+        from App_Function_Libraries.TTS.Kokoro import istftnet
+    except ImportError:
+        raise ImportError(
+            "The required packages needed for Kokoro are not currently installed. Please follow the instructions in the README to install them.")
 
     # FIXME - Add check/loading of model from kokoro_model_path in config.txt
     # Construct the correct model path
@@ -314,6 +318,13 @@ def _handle_pytorch_generation(
 ) -> str:
     """Handle PyTorch model audio generation with chunking."""
     logging.debug("Using PyTorch model for Kokoro TTS...")
+    try:
+        from App_Function_Libraries.TTS.Kokoro.kokoro import generate
+        from App_Function_Libraries.TTS.Kokoro.models import build_model
+        from App_Function_Libraries.TTS.Kokoro import istftnet
+    except ImportError:
+        raise ImportError(
+            "The required packages needed for Kokoro are not currently installed. Please follow the instructions in the README to install them.")
 
     logging.debug("Checking for nltk install...")
     try:
