@@ -20,8 +20,6 @@ import multiprocessing
 import os
 from pathlib import Path
 import queue
-# FIXME - don't need sounddevice + pyaudio, just one-> Pyaudio
-import sounddevice as sd
 import subprocess
 import sys
 import tempfile
@@ -151,25 +149,32 @@ class LiveAudioStreamer:
         self.last_audio_chunk_time = time.time()
         self.silence_start_time = None
 
-    def audio_callback(self, indata, frames, time_info, status):
-        """sounddevice InputStream callback"""
+        self.pa = pyaudio.PyAudio()
+
+    def audio_callback(self, in_data, frame_count, time_info, status):
+        """PyAudio stream callback"""
         if status:
             print(f"Stream status: {status}")
         if not self.is_recording:
-            return
-        self.audio_queue.put(indata.copy())
+            return (in_data, pyaudio.paContinue)
+
+        # Convert the raw audio data to a numpy array
+        audio_data = np.frombuffer(in_data, dtype=np.float32)
+        self.audio_queue.put(audio_data.copy())
+        return (in_data, pyaudio.paContinue)
 
     def start(self):
         """Open the audio stream and start recording in a separate thread."""
         self.is_recording = True
-        self.stream = sd.InputStream(
-            samplerate=self.sample_rate,
+        self.stream = self.pa.open(
+            format=pyaudio.paFloat32,
             channels=1,
-            callback=self.audio_callback,
-            blocksize=self.chunk_size,
-            dtype='float32'
+            rate=self.sample_rate,
+            input=True,
+            frames_per_buffer=self.chunk_size,
+            stream_callback=self.audio_callback
         )
-        self.stream.start()
+        self.stream.start_stream()
         self.listener_thread = threading.Thread(target=self.listen_loop)
         self.listener_thread.start()
 
@@ -178,9 +183,10 @@ class LiveAudioStreamer:
         self.is_recording = False
         self.stop_event.set()
         if self.stream:
-            self.stream.stop()
+            self.stream.stop_stream()
             self.stream.close()
         self.listener_thread.join()
+        self.pa.terminate()
 
     def listen_loop(self):
         """Continuously pull chunks from the queue and detect silence."""
