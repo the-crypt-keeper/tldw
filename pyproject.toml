@@ -1,8 +1,8 @@
 # Placeholder for now
 [project]
 name = "tldw"
-version = "0.0.11"
-description = "It does the stuff."
+version = "0.0.11.1"
+description = "A naive attempt at 'A Young Lady's Illustrated Primer'."
 authors = ["Robert Musser contact@tldwproject.com"]
 license = "Apache2.0"
 readme = "README.md"
@@ -10,29 +10,102 @@ requires-python = ">=3.9"
 
 # Base dependencies
 dependencies = [
-    "requests>=2.25.0",
-    "click>=8.0.0",
+    "beautifulsoup4",
+    "bert_score",
+    "chardet",
+    "chromadb",
+    "docx2txt",
+    "EbookLib",
+    "faster_whisper",
+    "fire",
+    "FlashRank",
+    "fugashi",
+    "html2text",
+    "jieba",
+    "Jinja2",
+    "joblib",
+    "langdetect",
+    "lxml_html_clean",
+    "mwparserfromhell",
+    "mwxml",
+    "nltk",
+    "numpy",
+    "openai",
+    "pandas",
+    "Pillow",
+    "psutil",
+    "pyannote.audio",
+    "PyAudio",
+    "pymupdf",
+    "pymupdf4llm",
+    "docling",
+    "pypandoc",
+    "pypandoc_binary",
+    "pytest",
+    "python-json-logger",
+    "Requests",
+    "rouge_score",
+    "scikit_learn",
+    "sentence_transformers",
+    "textstat",
+    "tiktoken",
+    "toml",
+    "tqdm",
+    "transformers",
+    "urllib3",
+    "yt_dlp",
+    "datasets",
+    "tqdm",
+
 ]
 
 [project.optional-dependencies]
+gradio = [
+    "fastapi",
+    "gradio",
+]
+
+media_wiki = [
+    "mwparserfromhell",
+    "mwxml",
+]
+
 web_research = [
     "placeholder",
-    "Placeholder"
+    "Placeholder",
+    "arxiv",
+    "genanki",
+    "playwright",
+    "trafilatura",
 ]
 
 TTS_All = [
-    "numpy>=1.20.0",
-    "pandas>=1.2.0",
+    "pydub",
+
 ]
 
 TTS_kokoro = [
-    "matplotlib>=3.4.0",
-    "seaborn>=0.11.0",
+    "pydub",
+    "phonemizer",
+    "scipy",
+    "munch",
+    "pydub",
 ]
 
-TTS_Sovits = [
-    "scikit-learn>=0.24.0",
-    "scipy>=1.6.0",
+TTS_kokoro_onnx = [
+    "pydub",
+    "onnxruntime",
+    "kokoro-onnx",
+
+]
+
+TTS_sovits = [
+    "pydub",
+]
+
+backend_onnx = [
+    "onnxruntime",
+    "",
 ]
 
 backend_llama = [
@@ -52,7 +125,7 @@ db_postgres = [
 
 db_opensearch = [
     "opensearch",
-    "placeholder",
+    "elasticsearch",
 ]
 # You can also create a group that includes multiple packages
 all = [
@@ -67,5 +140,3 @@ all = [
 [build-system]
 requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
-
-# ... other configurations ...

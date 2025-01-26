@@ -18,7 +18,7 @@ https://arxiv.org/abs/2412.02142
 https://arxiv.org/abs/2412.05265
 https://arxiv.org/abs/2412.05346
 https://arxiv.org/abs/2501.00070
-
+https://github.com/KindXiaoming/physics_of_skill_learning
 ### Context
     https://arxiv.org/pdf/2304.12102
     https://arxiv.org/html/2405.20234v2#S3

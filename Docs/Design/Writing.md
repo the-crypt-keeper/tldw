@@ -20,7 +20,7 @@ https://huggingface.co/LatitudeGames/Wayfarer-12B-GGUF
 https://huggingface.co/Writer/Palmyra-Creative
 https://silverbullet.md/
 https://github.com/silverbulletmd/silverbullet
-
+https://github.com/glowingjade/obsidian-smart-composer
 
 
 

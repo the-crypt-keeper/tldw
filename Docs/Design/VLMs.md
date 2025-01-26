@@ -31,6 +31,10 @@ https://arxiv.org/abs/2501.07542
 https://www.reddit.com/r/StableDiffusion/comments/1h7hunp/how_to_run_hunyuanvideo_on_a_single_24gb_vram_card/
 https://arxiv.org/abs/2412.05185
 https://huggingface.co/vidore/colqwen2-v0.1
+https://github.com/bytedance/UI-TARS
+https://github.com/ggerganov/llama.cpp/pull/11289
+https://mmvu-benchmark.github.io/
+https://github.com/DAMO-NLP-SG/VideoLLaMA3
 https://huggingface.co/collections/OpenGVLab/internvl-25-673e1019b66e2218f68d7c1c
 https://huggingface.co/Infinigence/Megrez-3B-Omni
 https://arxiv.org/abs/2501.07888
@@ -66,3 +70,13 @@ Apollo
 
 InternLM-XComposer
     https://github.com/InternLM/InternLM-XComposer/tree/main/InternLM-XComposer-2.5-OmniLive
+
+SmolVLM
+    https://huggingface.co/blog/smolervlm
+    https://huggingface.co/collections/HuggingFaceTB/smolvlm-256m-and-500m-6791fafc5bb0ab8acc960fb0
+    https://huggingface.co/blog/smolvlm
+    https://huggingface.co/learn/cookbook/fine_tuning_vlm_dpo_smolvlm_instruct
+
+
+
+
