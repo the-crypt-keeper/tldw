@@ -263,6 +263,17 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
             log_histogram("chat_duration", chat_duration, labels={"api_endpoint": api_endpoint})
             log_counter("chat_success", labels={"api_endpoint": api_endpoint})
             logging.debug(f"Debug - Chat Function - Response: {response}")
+            loaded_config_data = load_and_log_configs()
+            post_gen_replacement = loaded_config_data['chat_dictionaries']['post_gen_replacement']
+            if post_gen_replacement:
+                post_gen_replacement_dict = loaded_config_data['chat_dictionaries']['post_gen_replacement_dict']
+                chatdict_entries = parse_user_dict_markdown_file(post_gen_replacement_dict)
+                response = process_user_input(
+                    response,
+                    chatdict_entries,
+                    # max_tokens=max_tokens(5000 default),
+                    # strategy="sorted_evenly" (default)
+                )
             return response
     except Exception as e:
         log_counter("chat_error", labels={"api_endpoint": api_endpoint, "error": str(e)})
@@ -619,7 +630,7 @@ def apply_replacement_once(text, entry):
     return replaced_text, replaced_count
 
 # Chat Dictionary Pipeline
-def process_user_input(user_input, entries, max_tokens, strategy="sorted_evenly"):
+def process_user_input(user_input, entries, max_tokens=5000, strategy="sorted_evenly"):
     current_time = datetime.now()
 
     try:

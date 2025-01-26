@@ -112,7 +112,9 @@ https://towardsdatascience.com/how-to-convert-any-text-into-a-graph-of-concepts-
 https://news.ycombinator.com/item?id=34605772
 https://arxiv.org/abs/2501.02157
 https://www.linkedin.com/pulse/taxonomy-ontology-knowledge-graph-rajib-deb-oedkc/
-
+	https://medium.com/@researchgraph/dynamic-knowledge-graphs-a-next-step-for-data-representation-c35a205a520a
+	https://pub.towardsai.net/exploring-and-comparing-graph-based-rag-approaches-microsoft-graphrag-vs-neo4j-langchain-3837cd3dddef?gi=35f7e36d3e71
+	https://medium.com/@infiniflowai/how-our-graphrag-reveals-the-hidden-relationships-of-jon-snow-and-the-mother-of-dragons-bd89084f64ec
 
 
 Context Relevancy
