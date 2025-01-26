@@ -8,6 +8,16 @@
 - [Chat Dictionaries](#chat-dictionaries)
 
 
+
+# Link Dump:
+https://github.com/caspianmoon/memoripy
+https://arxiv.org/abs/2407.03974
+https://arxiv.org/abs/2408.13718
+https://artefact2.github.io/llm-sampling/
+https://github.com/t41372/Open-LLM-VTuber
+
+
+
 ### Introduction
 
 
@@ -155,16 +165,6 @@ backstory: |
 # Timed Effect
 warning: System critical! | timed_effects={"cooldown":120}
 ```
-
-
-
-# Link Dump:
-https://github.com/caspianmoon/memoripy
-https://arxiv.org/abs/2407.03974
-https://arxiv.org/abs/2408.13718
-https://artefact2.github.io/llm-sampling/
-https://github.com/t41372/Open-LLM-VTuber
-
 
 
 

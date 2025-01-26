@@ -383,6 +383,13 @@ def load_and_log_configs():
         # Prompts - FIXME
         prompt_path = config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')
 
+        # Chat Dictionaries
+        enable_chat_dictionaries = config.get('Chat-Dictionaries', 'enable_chat_dictionaries', fallback='False')
+        chat_dict_chat_prompts = config.get('Chat-Dictionaries', 'chat_dictionary_chat_prompts', fallback='')
+        chat_dict_RAG_prompts = config.get('Chat-Dictionaries', 'chat_dictionary_RAG_prompts', fallback='')
+        chat_dict_replacement_strategy = config.get('Chat-Dictionaries', 'chat_dictionary_replacement_strategy', fallback='character_lore_first')
+        chat_dict_max_tokens = config.get('Chat-Dictionaries', 'chat_dictionary_max_tokens', fallback='1000')
+
         # Auto-Save Values
         save_character_chats = config.get('Auto-Save', 'save_character_chats', fallback='False')
         save_rag_chats = config.get('Auto-Save', 'save_rag_chats', fallback='False')
@@ -657,6 +664,13 @@ def load_and_log_configs():
             },
             'output_path': output_path,
             'processing_choice': processing_choice,
+            'chat_dictionaries': {
+                'enable_chat_dictionaries': enable_chat_dictionaries,
+                'chat_dict_chat_prompts': chat_dict_chat_prompts,
+                'chat_dict_RAG_prompts': chat_dict_RAG_prompts,
+                'chat_dict_replacement_strategy': chat_dict_replacement_strategy,
+                'chat_dict_max_tokens': chat_dict_max_tokens
+            },
             'db_config': {
                 'prompt_path': get_project_relative_path(config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')),
                 'db_type': config.get('Database', 'type', fallback='sqlite'),
