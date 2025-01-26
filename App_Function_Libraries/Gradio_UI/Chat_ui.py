@@ -13,7 +13,8 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, chat, save_chat_history, \
-    update_chat_content, save_chat_history_to_db_wrapper
+    update_chat_content, save_chat_history_to_db_wrapper, parse_user_dict_markdown_file, ChatDictionary, \
+    process_user_input
 from App_Function_Libraries.DB.DB_Manager import db, load_chat_history, start_new_conversation, \
     save_message, search_conversations_by_keywords, \
     get_all_conversations, delete_messages_in_conversation, search_media_db, list_prompts
@@ -89,9 +90,12 @@ def clear_chat_single():
 
 # FIXME - add additional features....
 def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, conversation_id,
-                 save_conversation, temperature, system_prompt, streaming=False, max_tokens=None, top_p=None, frequency_penalty=None,
-                 presence_penalty=None, stop_sequence=None):
+                 save_conversation, temperature, system_prompt, streaming=False, chatdict_entries=None, max_tokens=500,
+                 strategy="sorted_evenly"):
     try:
+        logging.debug("chat_wrapper(): Starting chat wrapper")
+
+        # Check if the conversation should be saved
         if save_conversation:
             logging.info("chat_wrapper(): Saving conversation")
             if conversation_id is None:
@@ -106,11 +110,22 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
         # Include the selected parts and custom_prompt only for the first message
         if not history and selected_parts:
             message_body = "\n".join(selected_parts)
-            full_message = f"{custom_prompt}\n\n{message}\n\n{message_body}"
+            base_message = f"{custom_prompt}\n\n{message}\n\n{message_body}" if custom_prompt else message
         elif custom_prompt:
-            full_message = f"{custom_prompt}\n\n{message}"
+            base_message = f"{custom_prompt}\n\n{message}"
         else:
-            full_message = message
+            base_message = message
+
+        # Apply chat dictionary processing
+        if chatdict_entries:
+            full_message = process_user_input(
+                base_message,
+                chatdict_entries,
+                max_tokens=max_tokens,
+                strategy=strategy
+            )
+        else:
+            full_message = base_message
 
         # Generate bot response
         logging.debug("chat_wrapper(): Generating bot response")
@@ -409,6 +424,21 @@ def create_chat_interface():
                     previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
                 with gr.Row():
                     load_conversations_btn = gr.Button("Load Selected Conversation")
+                with gr.Row():
+                    chatdict_files = gr.Files(label="Upload Chat Dictionary Markdown Files")
+                    chatdict_entries = gr.State([])
+                    max_tokens = gr.Slider(
+                        label="Max Replacement Tokens",
+                        minimum=100,
+                        maximum=2000,
+                        value=500,
+                        step=50
+                    )
+                    strategy = gr.Dropdown(
+                        label="Replacement Strategy",
+                        choices=["sorted_evenly", "character_lore_first", "global_lore_first"],
+                        value="sorted_evenly"
+                    )
 
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
@@ -494,6 +524,23 @@ def create_chat_interface():
             fn=on_preset_prompt_checkbox_change,
             inputs=[preset_prompt_checkbox],
             outputs=[preset_prompt, prev_page_button, next_page_button, page_display, current_page_state, total_pages_state]
+        )
+
+        # Chat Dictionary stuff
+        def load_chatdict_files(files):
+            entries = []
+            for file in files:
+                entries_dict = parse_user_dict_markdown_file(file.name)
+                logging.debug(f"Loaded entries from {file.name}: {entries_dict.keys()}")
+                for key, content in entries_dict.items():
+                    entries.append(ChatDictionary(key=key, content=content))
+            logging.debug(f"Total entries loaded: {len(entries)}")
+            return entries
+
+        chatdict_files.upload(
+            fn=load_chatdict_files,
+            inputs=[chatdict_files],
+            outputs=[chatdict_entries]
         )
 
         # TTS Generation and Playback
@@ -602,7 +649,7 @@ def create_chat_interface():
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id,
-                    save_conversation, temperature, system_prompt_input, streaming],
+                    save_conversation, temperature, system_prompt_input, streaming, chatdict_entries, max_tokens, strategy],
             outputs=[msg, chatbot, conversation_id]
         ).then(  # Clear the message box after submission
             lambda x: gr.update(value=""),
