@@ -6,6 +6,8 @@ import logging
 import os
 import re
 from typing import Optional, Generator
+
+import pyaudio
 #
 # External Imports
 from kokoro_onnx import Kokoro, EspeakConfig
@@ -267,15 +269,31 @@ async def _handle_onnx_streaming(
 ) -> str:
     """Handle async streaming for ONNX."""
     logging.debug("Kokoro ONNX: Streaming audio generation...")
-    # FIXME - Replace with PyAudio
-    import sounddevice as sd
+
+    # Initialize PyAudio
+    p = pyaudio.PyAudio()
+
     stream = kokoro.create_stream(text, voice=voice, speed=speed, lang=lang)
     full_audio = []
 
     async for samples, sr in stream:
-        sd.play(samples, sr)
-        sd.wait()
+        # Open a PyAudio stream
+        audio_stream = p.open(format=pyaudio.paFloat32,
+                              channels=1,
+                              rate=sr,
+                              output=True)
+
+        # Play the audio samples
+        audio_stream.write(samples.tobytes())
+
+        # Close the stream
+        audio_stream.stop_stream()
+        audio_stream.close()
+
         full_audio.append(samples)
+
+    # Terminate PyAudio
+    p.terminate()
 
     combined = np.concatenate(full_audio)
     return _save_audio(combined, sr, output_file, output_format, post_process=True)

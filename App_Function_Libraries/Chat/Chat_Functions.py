@@ -601,13 +601,13 @@ def apply_replacement_once(text, entry):
 def process_user_input(user_input, entries, max_tokens, strategy="sorted_evenly"):
     current_time = datetime.now()
 
-    # Match entries using regex or plain text
+    # 1. Match entries using regex or plain text
     matched_entries = [entry for entry in entries if entry.matches(user_input)]
 
-    # Apply group scoring
+    # 2. Apply group scoring
     matched_entries = group_scoring(matched_entries)
 
-    # Apply probability filter
+    # 3. Apply probability filter
     matched_entries = filter_by_probability(matched_entries)
 
     # Apply timed effects
