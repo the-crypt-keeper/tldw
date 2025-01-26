@@ -10,7 +10,6 @@ from typing import Optional, Generator
 import pyaudio
 #
 # External Imports
-from kokoro_onnx import Kokoro, EspeakConfig
 import nltk
 import numpy as np
 from pydub.playback import play
@@ -223,6 +222,11 @@ def _handle_onnx_generation(
         stream: bool,
 ) -> str:
     """Handle ONNX model audio generation."""
+    try:
+        import onnxruntime, kokoro_onnx
+    except ImportError:
+        raise ImportError(
+            "The 'onnxruntime' and `kokoro_onnx` packages are required for this function. Please install it using 'pip install onnxruntime kokoro_onnx'.")
     from kokoro_onnx import Kokoro, EspeakConfig
     logging.debug("Using ONNX model for Kokoro TTS...")
 
@@ -389,6 +393,11 @@ async def generate_audio_stream_kokoro(
         onnx_voices_json: str = "voices.json",
 ) -> Generator[np.ndarray, None, None]:
     """Async generator for streaming audio chunks (ONNX only)."""
+    try:
+        import onnxruntime, kokoro_onnx
+    except ImportError:
+        raise ImportError(
+            "The 'onnxruntime' and `kokoro_onnx` packages are required for this function. Please install it using 'pip install onnxruntime kokoro_onnx'.")
     logging.info("Kokoro Streaming: Generating audio stream...")
 
     logging.debug("Kokoro Streaming: Checking eSpeak NG installation...")
@@ -410,6 +419,8 @@ async def generate_audio_stream_kokoro(
 
     espeak_lib = os.getenv("PHONEMIZER_ESPEAK_LIBRARY")
     logging.debug("Kokoro Streaming: Initializing Kokoro TTS...")
+    from kokoro_onnx import Kokoro
+    from kokoro_onnx import EspeakConfig
     kokoro = Kokoro(
         onnx_model_path,
         onnx_voices_json,
