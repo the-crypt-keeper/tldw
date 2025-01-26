@@ -128,6 +128,13 @@ min_p = 0.05
 [Processing]
 processing_choice = cuda
 
+[Chat-Dictionaries]
+enable_chat_dictionaries = True
+chat_dictionary_chat_prompts = ./Helper_Scripts/Chat_Dictionaries/Chat_Prompts.md
+chat_dictionary_RAG_prompts = ./Helper_Scripts/Chat_Dictionaries/RAG_Prompts.md
+strategy = character_lore_first
+max_tokens = 1000
+
 [Settings]
 # Rename to LLM_API_Settings
 chunk_duration = 30
