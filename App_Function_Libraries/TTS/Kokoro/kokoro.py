@@ -88,14 +88,23 @@ VOCAB = get_vocab()
 def tokenize(ps):
     return [i for i in map(VOCAB.get, ps) if i is not None]
 
-from phonemizer.backend.espeak.wrapper import EspeakWrapper
-_ESPEAK_LIBRARY = 'C:\Program Files\eSpeak NG\libespeak-ng.dll'
-EspeakWrapper.set_library(_ESPEAK_LIBRARY)
 
-phonemizers = dict(
-    a=phonemizer.backend.EspeakBackend(language='en-us', preserve_punctuation=True, with_stress=True),
-    b=phonemizer.backend.EspeakBackend(language='en-gb', preserve_punctuation=True, with_stress=True),
-)
+try:
+    from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+    _ESPEAK_LIBRARY = 'C:\Program Files\eSpeak NG\libespeak-ng.dll'
+    EspeakWrapper.set_library(_ESPEAK_LIBRARY)
+
+    phonemizers = dict(
+        a=phonemizer.backend.EspeakBackend(language='en-us', preserve_punctuation=True, with_stress=True),
+        b=phonemizer.backend.EspeakBackend(language='en-gb', preserve_punctuation=True, with_stress=True),
+    )
+except ImportError:
+    raise ImportError(
+        "The 'espeak` package is required for this function. Please install it using your platforms appropriate method.")
+
+
+
 def phonemize(text, lang, norm=True):
     if norm:
         text = normalize_text(text)

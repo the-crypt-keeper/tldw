@@ -40,6 +40,124 @@
 - **Examples**
  
 
+# Chat Dictionary User Manual Specification
+
+## 1. Introduction
+The **Chat Dictionary** dynamically modifies chat messages before sending them to an LLM. Use it for:
+- Dynamic responses based on keywords/patterns
+- Managing lore/world-building in role-playing
+- Enforcing consistent terminology
+- Adding context-aware behavior
+
+---
+
+## 2. Key Features
+1. Text Replacement
+2. Regex Support
+3. Probability-Based Triggers (0-100%)
+4. Group Conflict Resolution
+5. Token Budget Management
+6. Timed Effects (cooldowns/delays)
+7. Replacement Limits
+
+---
+
+## 3. File Format
+Save entries in `.md` files with this structure:
+
+### 3.1 Basic Syntax
+```
+Single-line:
+    key: value
+```
+
+```
+Multi-line:
+    key: |
+      line1
+      line2
+```
+
+### 3.2 Advanced Syntax
+Regex pattern:
+    /pattern/: replacement
+
+Add properties:
+    key: value | probability=50 group=global
+
+---
+
+## 4. Entry Properties
+| Property         | Description                          | Default |
+|------------------|--------------------------------------|---------|
+| key              | Word/phrase/regex to match           | Required|
+| content          | Replacement text                     | Required|
+| probability      | Trigger chance (0-100)               | 100     |
+| group            | Category for conflict resolution     | None    |
+| timed_effects    | cooldown/delay/sticky (seconds)      | None    |
+| max_replacements | Maximum uses                         | 1       |
+
+---
+
+## 5. Usage Examples
+
+### Simple Replacement
+    greeting: Hello!
+
+### Regex Replacement
+    /\b\d{3}-\d{4}\b/: REDACTED-PHONE
+
+### Multi-Line Entry
+    weather: |
+      Current: Sunny
+      Temp: 75°F
+
+### Timed Entry
+    alert: System overload! | timed_effects={"cooldown":60}
+
+---
+
+## 6. Integration Steps
+1. Upload `.md` files via UI
+2. Configure settings:
+   - Max Tokens (500-2000)
+   - Strategy (sorted_evenly/character_first/global_first)
+3. Replacements auto-apply to user input
+
+---
+
+## 7. Troubleshooting
+
+**Problem**            | **Solution**
+-----------------------|-----------------------------
+No replacement         | Check key spelling/regex
+Token limit exceeded   | Reduce content length
+Unexpected behavior    | Check group conflicts
+File not loading       | Validate markdown syntax
+
+---
+
+## 8. Full Example File
+
+`Chat_Dictionary.md`
+```
+# Character Info
+hero: John | group=character probability=90
+
+# Global Rules
+/\[redacted\]/: [CLASSIFIED] | group=global
+
+# Multi-line
+backstory: |
+  John grew up in a small village.
+  He became a hero after defeating the dragon.
+
+# Timed Effect
+warning: System critical! | timed_effects={"cooldown":120}
+```
+
+
+
 # Link Dump:
 https://github.com/caspianmoon/memoripy
 https://arxiv.org/abs/2407.03974

@@ -21,7 +21,7 @@ from transformers import AutoTokenizer
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data, download_file
 # Kokoro-Specific Imports
 from scipy.io import wavfile
-from App_Function_Libraries.TTS.Kokoro.kokoro import generate_full, generate
+from App_Function_Libraries.TTS.Kokoro.kokoro import generate
 from App_Function_Libraries.TTS.Kokoro.models import build_model
 from App_Function_Libraries.TTS.Kokoro import istftnet
 from pydub import AudioSegment, effects  # For optional post-processing
