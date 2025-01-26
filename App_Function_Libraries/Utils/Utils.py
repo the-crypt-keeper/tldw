@@ -385,6 +385,8 @@ def load_and_log_configs():
 
         # Chat Dictionaries
         enable_chat_dictionaries = config.get('Chat-Dictionaries', 'enable_chat_dictionaries', fallback='False')
+        post_gen_replacement = config.get('Chat-Dictionaries', 'post_gen_replacement', fallback='False')
+        post_gen_replacement_dict = config.get('Chat-Dictionaries', 'post_gen_replacement_dict', fallback='')
         chat_dict_chat_prompts = config.get('Chat-Dictionaries', 'chat_dictionary_chat_prompts', fallback='')
         chat_dict_RAG_prompts = config.get('Chat-Dictionaries', 'chat_dictionary_RAG_prompts', fallback='')
         chat_dict_replacement_strategy = config.get('Chat-Dictionaries', 'chat_dictionary_replacement_strategy', fallback='character_lore_first')
@@ -666,6 +668,8 @@ def load_and_log_configs():
             'processing_choice': processing_choice,
             'chat_dictionaries': {
                 'enable_chat_dictionaries': enable_chat_dictionaries,
+                'post_gen_replacement': post_gen_replacement,
+                'post_gen_replacement_dict': post_gen_replacement_dict,
                 'chat_dict_chat_prompts': chat_dict_chat_prompts,
                 'chat_dict_RAG_prompts': chat_dict_RAG_prompts,
                 'chat_dict_replacement_strategy': chat_dict_replacement_strategy,

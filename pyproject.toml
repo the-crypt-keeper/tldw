@@ -79,6 +79,15 @@ web_research = [
     "trafilatura",
 ]
 
+STT_All = [
+    "placeholder",
+    "blah"
+]
+
+STT_parakeet = [
+    "nemo_toolkit['asr']"
+]
+
 TTS_All = [
     "pydub",
 
