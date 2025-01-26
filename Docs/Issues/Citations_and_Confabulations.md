@@ -9,6 +9,11 @@
 
 https://arxiv.org/abs/2412.07965
 https://arxiv.org/abs/2501.08292
+https://huggingface.co/QuantFactory/gemma-7b-aps-it-GGUF
+https://huggingface.co/google/gemma-7b-aps-it
+https://docs.anthropic.com/en/docs/build-with-claude/citations
+https://mattyyeung.github.io/deterministic-quoting
+
 
 RAG
   https://www.lycee.ai/blog/rag-ragallucinations-and-how-to-fight-them

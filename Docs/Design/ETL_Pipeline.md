@@ -20,6 +20,7 @@ https://towardsdatascience.com/etl-pipelines-in-python-best-practices-and-techni
     - stdlib
 - **PowerPoint Presentations** - need to add
     - docling
+    - https://github.com/ssine/pptx2md
 - **Rich Text(`.rtf`, `.docx`)**
     - doc2txt
     - pypandoc

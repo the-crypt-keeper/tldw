@@ -19,6 +19,8 @@ https://pythontutor.com/c.html#mode=edit
 https://pythontutor.com/articles/c-cpp-visualizer.html
 https://gitingest.com/
 https://www.qodo.ai/blog/rag-for-large-scale-code-repos/
+
+https://github.com/sammcj/ingest
 https://gitdiagram.com/
 https://www.ilograph.com/blog/posts/diagrams-ai-can-and-cannot-generate/#system-diagramming-with-ai
 https://github.com/osanseviero/geminicoder

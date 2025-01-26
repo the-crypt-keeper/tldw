@@ -143,8 +143,8 @@ save_rag_chats = False
 # General TTS Settings
 # Options: 'cpu', 'cuda'
 local_tts_device = cpu
-default_tts_provider = kokoro
-default_tts_voice = af_bella
+default_tts_provider = openai
+default_tts_voice = shimmer
 default_tts_speed = 1
 #
 # OpenAI TTS Settings

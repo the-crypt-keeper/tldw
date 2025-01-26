@@ -41,7 +41,6 @@ psutil
 #psycopg2-binary
 pyannote.audio
 PyAudio
-pycookiecheat
 pydub
 pymupdf
 pymupdf4llm

@@ -35,6 +35,7 @@ https://github.com/cpldcpu/MisguidedAttention
 https://github.com/lechmazur/generalization
 https://docs.ragas.io/en/stable/getstarted/rag_eval/
 https://github.com/plurch/ir_evaluation
+https://github.com/OpenBMB/UltraEval-Audio
 https://alibaba-nlp.github.io/WebWalker/
 https://arxiv.org/abs/2501.03491
 https://machinelearningmastery.com/rag-hallucination-detection-techniques/

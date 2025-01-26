@@ -25,6 +25,12 @@ https://artificialanalysis.ai/models/speech-to-speech
 https://github.com/Picovoice/speech-to-text-benchmark?tab=readme-ov-file
 https://sakshi113.github.io/mmau_homepage/
 
+
+### Streaming
+https://github.com/KoljaB/RealtimeSTT/tree/master
+https://github.com/amanvirparhar/weebo/tree/main
+
+
 ### Other
 https://wave-pulse.io/
 https://arxiv.org/abs/2501.01384
@@ -38,6 +44,7 @@ https://github.com/pipecat-ai/pipecat/tree/a367a038f1a3967292b5de5b43b8600a82a73
 https://github.com/Purfview/whisper-standalone-win
 https://github.com/ictnlp/LLaMA-Omni
 https://github.com/thepersonalaicompany/amurex
+https://huggingface.co/Vikhrmodels/salt-asr_wav-uni_1_tts_wav-uni_1-12k
 https://levelup.gitconnected.com/build-a-real-time-ai-voice-and-video-chat-app-with-function-calling-by-gemini-2-0-49599a48fbe9?gi=c894f6c092be
 https://huggingface.co/papers/2501.02832
 
