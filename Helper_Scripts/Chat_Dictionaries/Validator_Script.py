@@ -16,43 +16,45 @@ from typing import Dict, Set
 #from App_Function_Libraries.Chat.Chat_Functions import parse_user_dict_markdown_file
 def parse_user_dict_markdown_file(file_path):
     """
-    Parse a Markdown file to extract key-value pairs, including multi-line values.
+    Parse a Markdown file with custom termination symbol for multi-line values.
     """
     logging.debug(f"Parsing user dictionary file: {file_path}")
     replacement_dict = {}
     current_key = None
     current_value = []
+    termination_pattern = re.compile(r'^\s*---@@@---\s*$')
 
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8') as file:
         for line in file:
-            # Match lines with "key: value" or "key: |" format
-            key_value_match = re.match(r'^\s*([^:]+?)\s*:\s*(.*)$', line)
-            if key_value_match:
-                key, value = key_value_match.groups()
-
-                # If the value is "|", prepare for multi-line
-                if value.strip() == '|':
-                    current_key = key
-                    current_value = []
-                else:
-                    # Single-line key-value pair
-                    replacement_dict[key] = value.strip()
-            elif current_key:
-                # Append multi-line values
-                stripped_line = line.strip()
-                if stripped_line:  # Skip empty lines
-                    current_value.append(stripped_line)
-            else:
+            # Check for termination pattern first
+            if termination_pattern.match(line):
+                if current_key:
+                    replacement_dict[current_key] = '\n'.join(current_value).strip()
+                    current_key, current_value = None, []
                 continue
 
-            # If we encounter an empty line or EOF, store the multi-line value
-            if current_key and (line.strip() == '' or line == ''):
-                replacement_dict[current_key] = '\n'.join(current_value)
-                current_key, current_value = None, []
+            # Match key lines only when not in multi-line mode
+            if not current_key:
+                key_value_match = re.match(r'^\s*([^:\n]+?)\s*:\s*(.*?)\s*$', line)
+                if key_value_match:
+                    key, value = key_value_match.groups()
+                    if value.strip() == '|':
+                        current_key = key.strip()
+                        current_value = []
+                    else:
+                        replacement_dict[key.strip()] = value.strip()
+                continue
 
-    # Handle any remaining multi-line value at EOF
-    if current_key:
-        replacement_dict[current_key] = '\n'.join(current_value)
+            # Processing multi-line content
+            if current_key:
+                # Strip trailing whitespace but preserve leading spaces
+                cleaned_line = line.rstrip('\n\r')
+                current_value.append(cleaned_line)
+
+        # Handle any remaining multi-line value at EOF
+        if current_key:
+            replacement_dict[current_key] = '\n'.join(current_value).strip()
+
     logging.debug(f"Parsed entries: {replacement_dict}")
     return replacement_dict
 
@@ -107,6 +109,10 @@ class ChatDictValidator:
                 # Check if bold formatting is correctly used
                 if value.count("**") % 2 != 0:
                     self.warnings.append(f"Unbalanced bold formatting in key '{key}' in {source}")
+
+            # Check for unterminated multi-line blocks
+            if value.startswith('|'):
+                self.warnings.append(f"Potential unterminated multi-line block for key '{key}' in {source}")
 
     def report(self) -> None:
         """Print validation results"""
