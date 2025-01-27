@@ -8,6 +8,11 @@ license = "Apache2.0"
 readme = "README.md"
 requires-python = ">=3.9"
 
+[project.urls]
+Homepage = "https://tldwproject.com"
+Documenttion = "https://docs.tldwproject.com"
+Repository = "https://github.com/rmusser01/tldw"
+
 # Base dependencies
 dependencies = [
     "beautifulsoup4",
@@ -85,7 +90,8 @@ STT_All = [
 ]
 
 STT_parakeet = [
-    "nemo_toolkit['asr']"
+    "nemo_toolkit['asr']",
+    "cython",
 ]
 
 TTS_All = [

@@ -84,12 +84,34 @@ def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate
     """
     loaded_config_data = load_and_log_configs()
     if not transcription_provider:
-        # qwen2audio / faster_whisper
+        # Load default transcription provider via config file
         transcription_provider = loaded_config_data['STT-Settings']['default_transcriber']
 
     if transcription_provider.lower() == 'qwen2audio':
         logging.info("Transcribing using Qwen2Audio")
         return transcribe_with_qwen2audio(audio_data, sample_rate)
+
+    elif transcription_provider.lower() == "parakeet":
+        logging.info("Transcribing using Parakeet")
+        # FIXME - implement Parakeet
+        try:
+            import nemo.collections.asr as nemo_asr
+        except ImportError:
+            return "Nemo package not found. Please install 'nemo_toolkit[asr]' to use Parakeet."
+
+        asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name="nvidia/parakeet-rnnt-1.1b")
+
+        # Enable local attention
+        asr_model.change_attention_model("rel_pos_local_attn", [128, 128])  # local attn
+
+        # Enable chunking for subsampling module
+        asr_model.change_subsampling_conv_chunking_factor(1)  # 1 = auto select
+
+        # Transcribe a huge audio file
+        transcript = asr_model.transcribe(["<path to a huge audio file>.wav"])
+
+        return transcript
+
     else:
         logging.info(f"Transcribing using faster-whisper with model: {whisper_model}")
         # The function from your Audio_Transcription_Lib speech_to_text() expects a file path,
@@ -110,10 +132,12 @@ def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate
             if isinstance(segments, dict) and 'error' in segments:
                 # handle error
                 return f"Error in transcription: {segments['error']}"
+
             # Merge all segment texts
             final_text = " ".join(seg["Text"] for seg in segments['segments']) if isinstance(segments, dict) else " ".join(
                 seg["Text"] for seg in segments)
             return final_text
+
         finally:
             # Clean up temporary file
             try:

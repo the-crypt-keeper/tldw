@@ -250,8 +250,15 @@ def toggle_recording(
         if not raw_audio:
             return None, False, "Start Recording", "No audio recorded", None
 
+        # FIXME - Make sure this works....
+        # Convert raw_audio to a NumPy array if it's in byte format
+        if isinstance(raw_audio, bytes):
+            raw_audio_np = np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32) / 32768.0
+        else:
+            raw_audio_np = raw_audio
+
         # 3) Final transcription of entire audio
-        temp_file = save_audio_temp(raw_audio)
+        temp_file = save_audio_temp(raw_audio_np)
         final_audio_np = np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32) / 32768.0
 
         try:
@@ -354,7 +361,7 @@ def get_partial_transcript(partial_text_state):
 ########################################################################
 # 5. The main Gradio tab
 # Provide a couple transcription methods
-TRANSCRIPTION_METHODS = ["faster-whisper", "qwen2audio"]
+TRANSCRIPTION_METHODS = ["faster-whisper", "qwen2audio", "parakeet"]
 
 def create_live_recording_tab():
     try:

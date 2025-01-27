@@ -164,7 +164,8 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
                     data = json.loads(input_data)
                 except json.JSONDecodeError as e:
                     logging.error(f"OpenAI: Error parsing JSON string: {str(e)}")
-                    return f"OpenAI: Error parsing JSON input: {str(e)}"
+                    data = input_data
+                    pass
             elif os.path.isfile(input_data):
                 logging.debug("OpenAI: Loading JSON data from file for summarization")
                 with open(input_data, 'r') as file:
@@ -1236,7 +1237,8 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
                     data = json.load(file)
                 except json.JSONDecodeError as e:
                     logging.error(f"DeepSeek: JSON decoding failed: {str(e)}")
-                    return f"DeepSeek: Invalid JSON file. Error: {str(e)}"
+                    data = input_data
+                    pass
         else:
             logging.debug("DeepSeek: Using provided string data for summarization")
             data = input_data
@@ -1630,7 +1632,8 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
                     data = json.loads(input_data)
                 except json.JSONDecodeError as e:
                     logging.error(f"Google: Error parsing JSON string: {str(e)}")
-                    return f"Google: Error parsing JSON input: {str(e)}"
+                    data = input_data
+                    pass
             elif os.path.isfile(input_data):
                 logging.debug("Google: Loading JSON data from file for chat message")
                 with open(input_data, 'r') as file:

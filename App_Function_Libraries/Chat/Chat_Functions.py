@@ -471,12 +471,13 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
 
 def parse_user_dict_markdown_file(file_path):
     """
-    Parse a Markdown file to extract key-value pairs, including multi-line values.
+    Parse a Markdown file to extract key-value pairs, including multi-line values and nested structures.
     """
     logging.debug(f"Parsing user dictionary file: {file_path}")
     replacement_dict = {}
     current_key = None
     current_value = []
+    in_multiline = False
 
     with open(file_path, 'r') as file:
         for line in file:
@@ -489,14 +490,15 @@ def parse_user_dict_markdown_file(file_path):
                 if value.strip() == '|':
                     current_key = key
                     current_value = []
+                    in_multiline = True
                 else:
                     # Single-line key-value pair
                     replacement_dict[key] = value.strip()
-            elif current_key:
+                    in_multiline = False
+            elif in_multiline:
                 # Append multi-line values
-                stripped_line = line.strip()
-                if stripped_line:  # Skip empty lines
-                    current_value.append(stripped_line)
+                stripped_line = line.rstrip()  # Preserve leading spaces
+                current_value.append(stripped_line)
             else:
                 continue
 
@@ -504,6 +506,7 @@ def parse_user_dict_markdown_file(file_path):
             if current_key and (line.strip() == '' or line == ''):
                 replacement_dict[current_key] = '\n'.join(current_value)
                 current_key, current_value = None, []
+                in_multiline = False
 
     # Handle any remaining multi-line value at EOF
     if current_key:

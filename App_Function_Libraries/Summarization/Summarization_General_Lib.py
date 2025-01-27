@@ -1109,7 +1109,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
         else:
             raise ValueError("DeepSeek: Invalid input data format")
 
-        deepseek_model = loaded_config_data['deepseek']['model'] or "deepseek-chat"
+        deepseek_model = loaded_config_data['deepseek_api']['model'] or "deepseek-chat"
 
         if temp is None:
             temp = 0.1
