@@ -1146,7 +1146,8 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
                     data = json.loads(input_data)
                 except json.JSONDecodeError as e:
                     logging.error(f"Custom OpenAI API: Error parsing JSON string: {str(e)}")
-                    return f"Custom OpenAI API: Error parsing JSON input: {str(e)}"
+                    data = input_data
+                    pass
             elif os.path.isfile(input_data):
                 logging.debug("Custom OpenAI API: Loading JSON data from file for summarization")
                 with open(input_data, 'r') as file:

@@ -917,11 +917,14 @@ Sample commands:
 #   Launch the UI
     # Launch the GUI
     if args.user_interface:
-        launch_ui(share_public=False)
-    elif share_public is not None:
-        if local_llm:
-            time.sleep(2)
-            launch_ui(share_public=True)
+        if args.share_public:
+            if args.local_llm:
+                time.sleep(2)
+                launch_ui(share_public=True)
+            else:
+                launch_ui(share_public=True)
+        else:
+            launch_ui(share_public=False)
     elif not args.input_path:
         parser.print_help()
         sys.exit(1)

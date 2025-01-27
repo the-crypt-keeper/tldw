@@ -102,6 +102,11 @@ class ChatDictValidator:
                     re.compile(key[1:-1])
                 except re.error as e:
                     self.errors.append(f"Invalid regex '{key}' in {source}: {str(e)}")
+                            # Markdown formatting validation (example: check for bold formatting)
+            if "**" in value:
+                # Check if bold formatting is correctly used
+                if value.count("**") % 2 != 0:
+                    self.warnings.append(f"Unbalanced bold formatting in key '{key}' in {source}")
 
     def report(self) -> None:
         """Print validation results"""
