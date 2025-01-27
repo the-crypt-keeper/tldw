@@ -86,6 +86,7 @@ Multi-line:
     key: |
       line1
       line2
+---@@@---
 ```
 
 ### 3.2 Advanced Syntax
@@ -118,10 +119,12 @@ Add properties:
     /\b\d{3}-\d{4}\b/: REDACTED-PHONE
 
 ### Multi-Line Entry
+```
     weather: |
       Current: Sunny
       Temp: 75°F
-
+---@@@---
+```
 ### Timed Entry
     alert: System overload! | timed_effects={"cooldown":60}
 
@@ -161,6 +164,7 @@ hero: John | group=character probability=90
 backstory: |
   John grew up in a small village.
   He became a hero after defeating the dragon.
+---@@@---
 
 # Timed Effect
 warning: System critical! | timed_effects={"cooldown":120}
