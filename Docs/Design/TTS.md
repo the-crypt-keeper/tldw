@@ -11,7 +11,7 @@ Use of pydub for audio merging.
 
 
 https://generativeai.pub/glm-4-voice-9b-real-time-multilingual-voice-conversation-ai-install-locally-in-minutes-ce2fcd6c8fd8
-
+https://github.com/KartDriver/mira_converse?tab=readme-ov-file
 
 ### Services
 - Google Cloud Text-to-Speech
