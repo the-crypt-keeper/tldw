@@ -15,8 +15,10 @@ https://arxiv.org/abs/2407.03974
 https://arxiv.org/abs/2408.13718
 https://artefact2.github.io/llm-sampling/
 https://github.com/t41372/Open-LLM-VTuber
-https://prompt.16x.engineer/
-
+- Other Chat Front-ends:
+    https://prompt.16x.engineer/
+	https://www.librechat.ai/docs/features/fork
+	https://github.com/danny-avila/LibreChat
 
 ### Introduction
 

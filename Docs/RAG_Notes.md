@@ -11,7 +11,10 @@ https://arxiv.org/pdf/2501.09136v1
 https://arxiv.org/pdf/2501.07572v2
 https://arxiv.org/pdf/2412.17149
 	https://arxiv.org/abs/2410.21012
+https://arxiv.org/abs/2501.15228
 	https://arxiv.org/abs/2410.20088
+https://research.google/blog/speculative-rag-enhancing-retrieval-augmented-generation-through-drafting/
+https://arxiv.org/abs/2501.14342
 	https://arxiv.org/abs/2410.13765
 	https://arxiv.org/pdf/2409.15699v1
 	https://aibyhand.substack.com/p/beginners-guide-to-graph-rag

@@ -21,6 +21,7 @@ https://arxiv.org/abs/2412.08604
 https://arxiv.org/abs/2411.18814
 https://blog.badsectorlabs.com/files/blogs.txt
 https://github.com/YuanchenBei/Awesome-Cold-Start-Recommendation
+https://arxiv.org/abs/2501.16302
 https://paperswithcode.com/paper/monolith-real-time-recommendation-system-with
 https://snap-research.github.io/open-set-video-personalization/
 https://github.com/leafac/kill-the-newsletter

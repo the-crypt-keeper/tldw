@@ -31,6 +31,8 @@ https://arxiv.org/abs/2501.07542
 https://www.reddit.com/r/StableDiffusion/comments/1h7hunp/how_to_run_hunyuanvideo_on_a_single_24gb_vram_card/
 https://arxiv.org/abs/2412.05185
 https://huggingface.co/vidore/colqwen2-v0.1
+https://huggingface.co/collections/nvidia/eagle-2-6764ba887fa1ef387f7df067
+https://github.com/baichuan-inc/Baichuan-Omni-1.5
 https://github.com/bytedance/UI-TARS
 https://github.com/ggerganov/llama.cpp/pull/11289
 https://mmvu-benchmark.github.io/
@@ -78,5 +80,8 @@ SmolVLM
     https://huggingface.co/learn/cookbook/fine_tuning_vlm_dpo_smolvlm_instruct
 
 
-
+Qwen 2.5VL
+    https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct
+    https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct
+    https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct
 
