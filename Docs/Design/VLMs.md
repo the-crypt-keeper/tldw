@@ -60,6 +60,12 @@ https://huggingface.co/IamCreateAI/Ruyi-Mini-7B
 https://github.com/tdrussell/diffusion-pipe
 https://proptest.ai/?#/playground
 https://lyra-omni.github.io/
+
+
+Integration
+    https://github.com/matatonic/openedai-vision
+    https://github.com/phildougherty/qwen2.5-VL-inference-openai
+
 Apollo
     https://arxiv.org/abs/2412.10360
     https://apollo-lmms.github.io/
@@ -84,4 +90,3 @@ Qwen 2.5VL
     https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct
     https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct
     https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct
-
