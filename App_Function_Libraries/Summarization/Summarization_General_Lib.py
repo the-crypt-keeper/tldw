@@ -21,10 +21,10 @@ import logging
 import os
 import time
 from typing import Optional
-
+#
 import requests
-from requests import RequestException
-
+#
+# Import Local
 from App_Function_Libraries.Audio.Audio_Transcription_Lib import convert_to_wav, speech_to_text
 from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summarize, recursive_summarize_chunks, \
     improved_chunking_process
@@ -33,18 +33,16 @@ from App_Function_Libraries.Summarization.Local_Summarization_Lib import summari
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm, \
     summarize_with_ollama, summarize_with_custom_openai
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
-# Import Local
-from App_Function_Libraries.Utils.Utils import load_and_log_configs, load_comprehensive_config, sanitize_filename, \
-    clean_youtube_url, create_download_directory, is_valid_url
+from App_Function_Libraries.Utils.Utils import (load_and_log_configs, sanitize_filename, clean_youtube_url,
+                                                create_download_directory, is_valid_url)
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
-
 #
 #######################################################################################################################
 # Function Definitions
 #
-config = load_comprehensive_config()
-openai_api_key = config.get('API', 'openai_api_key', fallback=None)
 
+loaded_config_data = load_and_log_configs()
+openai_api_key = loaded_config_data.get('openai_api', {}).get('api_key', None)
 
 def summarize(
     input_data: str,
@@ -63,6 +61,8 @@ def summarize(
             return summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "cohere":
             return summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
+        elif api_name.lower() == "google":
+            return summarize_with_google(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "groq":
             return summarize_with_groq(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "huggingface":
@@ -184,7 +184,8 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
         logging.debug(f"OpenAI: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"OpenAI: Custom prompt: {custom_prompt_arg}")
 
-        openai_model = loaded_config_data['openai_api']['model'] or "gpt-4o"
+        config_settings = load_and_log_configs()
+        openai_model = config_settings['openai_api']['model'] or "gpt-4o"
         logging.debug(f"OpenAI: Using model: {openai_model}")
 
         headers = {

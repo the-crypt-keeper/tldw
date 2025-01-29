@@ -8,18 +8,21 @@ import os
 import time
 from typing import Dict, Any, List, Optional
 
+from App_Function_Libraries.Chat.Chat_Functions import process_user_input, ChatDictionary, parse_user_dict_markdown_file
 from App_Function_Libraries.DB.Character_Chat_DB import get_character_chats, perform_full_text_search_chat, \
     fetch_keywords_for_chats, search_character_chat, search_character_cards, fetch_character_ids_by_keywords
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import search_rag_chat, search_rag_notes
 #
 # Local Imports
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
+from App_Function_Libraries.RAG.Embeddings_Create import loaded_config
 from App_Function_Libraries.RAG.RAG_Persona_Chat import perform_vector_search_chat
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_custom_openai
+from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.DB.DB_Manager import fetch_keywords_for_media, search_media_db, get_notes_by_keywords, \
     search_conversations_by_keywords
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config, load_and_log_configs
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 # 3rd-Party Imports
@@ -292,134 +295,46 @@ def enhanced_rag_pipeline(
         }
 
 
-
 # Need to write a test for this function FIXME
 def generate_answer(api_choice: str, context: str, query: str) -> str:
     # Metrics
     log_counter("generate_answer_attempt", labels={"api_choice": api_choice})
     start_time = time.time()
     logging.debug("Entering generate_answer function")
-    config = load_comprehensive_config()
-    logging.debug(f"Config sections: {config.sections()}")
-    prompt = f"Context: {context}\n\nQuestion: {query}"
-    try:
-        if api_choice == "OpenAI":
-            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openai
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_openai(config['API']['openai_api_key'], prompt, "")
+    loaded_config_data = load_and_log_configs()
 
-        elif api_choice == "Anthropic":
-            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_anthropic
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_anthropic(config['API']['anthropic_api_key'], prompt, "")
+    # Prep the RAG Prompt Dictionary
+    file_path = loaded_config_data['chat_dictionaries']['chat_dict_RAG_prompts']
+    rag_prompt_placeholder = loaded_config_data['chat_dictionaries']['default_rag_prompt']
+    query = rag_prompt_placeholder + query
+    rag_prompt_entries = []
+    rag_prompt_dict_data = parse_user_dict_markdown_file(file_path)
+    print("DEBUG: rag_prompt_dict_data =", rag_prompt_dict_data)
+    for k, v in rag_prompt_dict_data.items():
+        # k is your "key", v is your "content"
+        rag_prompt_entries.append(ChatDictionary(key=k, content=v))
 
-        elif api_choice == "Cohere":
-            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_cohere
+    rag_prompt = process_user_input(query, rag_prompt_entries)
+    rag_prompt = f"RAG Prompt: {rag_prompt}\n\n{context}\n\nQuestion: {query}"
+    # Non-Prompt Dictionary Version
+    #prompt = f"Context: {context}\n\nQuestion: {query}"
+    if api_choice:
+        try:
             answer_generation_duration = time.time() - start_time
             log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
+            api_choice = api_choice.casefold()
+            result = summarize(rag_prompt, "", api_choice, loaded_config_data[f'{api_choice}_api']['api_key'], None,
+                               None, None)
             log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_cohere(config['API']['cohere_api_key'], prompt, "")
+            return result
 
-        elif api_choice == "Groq":
-            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_groq
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_groq(config['API']['groq_api_key'], prompt, "")
-
-        elif api_choice == "OpenRouter":
-            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_openrouter
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_openrouter(config['API']['openrouter_api_key'], prompt, "")
-
-        elif api_choice == "HuggingFace":
-            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_huggingface
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_huggingface(config['API']['huggingface_api_key'], prompt, "")
-
-        elif api_choice == "DeepSeek":
-            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_deepseek
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_deepseek(config['API']['deepseek_api_key'], prompt, "")
-
-        elif api_choice == "Mistral":
-            from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_with_mistral
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_mistral(config['API']['mistral_api_key'], prompt, "")
-
-        # Local LLM APIs
-        elif api_choice == "Local-LLM":
-            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_local_llm
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            # FIXME
-            return summarize_with_local_llm(config['Local-API']['local_llm_path'], prompt, "")
-
-        elif api_choice == "Llama.cpp":
-            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_llama(prompt, "", config['Local-API']['llama_api_key'], None, None)
-        elif api_choice == "Kobold":
-            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_kobold
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_kobold(prompt, config['Local-API']['kobold_api_key'], "", system_message=None, temp=None)
-
-        elif api_choice == "Ooba":
-            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_oobabooga
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_oobabooga(prompt, config['Local-API']['ooba_api_key'], custom_prompt="", system_message=None, temp=None)
-
-        elif api_choice == "TabbyAPI":
-            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_tabbyapi
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_tabbyapi(prompt, None, None, None, None, )
-
-        elif api_choice == "vLLM":
-            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_vllm
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_vllm(prompt, "", config['Local-API']['vllm_api_key'], None, None)
-
-        elif api_choice.lower() == "ollama":
-            from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_ollama
-            answer_generation_duration = time.time() - start_time
-            log_histogram("generate_answer_duration", answer_generation_duration, labels={"api_choice": api_choice})
-            log_counter("generate_answer_success", labels={"api_choice": api_choice})
-            return summarize_with_ollama(prompt, "", config['Local-API']['ollama_api_IP'], config['Local-API']['ollama_api_key'], None, None, None)
-
-        elif api_choice.lower() == "custom_openai_api":
-            logging.debug(f"RAG Answer Gen: Trying with Custom_OpenAI API")
-            summary = summarize_with_custom_openai(prompt, "", config['API']['custom_openai_api_key'], None,
-                                                   None)
-        else:
-            log_counter("generate_answer_error", labels={"api_choice": api_choice, "error": str()})
-            raise ValueError(f"Unsupported API choice: {api_choice}")
-    except Exception as e:
-        log_counter("generate_answer_error", labels={"api_choice": api_choice, "error": str(e)})
-        logging.error(f"Error in generate_answer: {str(e)}")
-        return "An error occurred while generating the answer."
+        except Exception as e:
+            log_counter("generate_answer_error", labels={"api_choice": api_choice, "error": str(e)})
+            logging.error(f"Error in generate_answer: {str(e)}")
+            return "An error occurred while generating the answer."
+    else:
+        log_counter("generate_answer_error", labels={"api_choice": api_choice, "error": str()})
+        raise ValueError(f"Unsupported API choice: {api_choice}")
 
 
 def perform_vector_search(query: str, relevant_media_ids: List[str] = None, top_k=10) -> List[Dict[str, Any]]:

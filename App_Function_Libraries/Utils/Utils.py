@@ -388,9 +388,10 @@ def load_and_log_configs():
         post_gen_replacement = config.get('Chat-Dictionaries', 'post_gen_replacement', fallback='False')
         post_gen_replacement_dict = config.get('Chat-Dictionaries', 'post_gen_replacement_dict', fallback='')
         chat_dict_chat_prompts = config.get('Chat-Dictionaries', 'chat_dictionary_chat_prompts', fallback='')
-        chat_dict_RAG_prompts = config.get('Chat-Dictionaries', 'chat_dictionary_RAG_prompts', fallback='')
+        chat_dict_rag_prompts = config.get('Chat-Dictionaries', 'chat_dictionary_RAG_prompts', fallback='')
         chat_dict_replacement_strategy = config.get('Chat-Dictionaries', 'chat_dictionary_replacement_strategy', fallback='character_lore_first')
         chat_dict_max_tokens = config.get('Chat-Dictionaries', 'chat_dictionary_max_tokens', fallback='1000')
+        default_rag_prompt = config.get('Chat-Dictionaries', 'default_rag_prompt', fallback='')
 
         # Auto-Save Values
         save_character_chats = config.get('Auto-Save', 'save_character_chats', fallback='False')
@@ -671,9 +672,10 @@ def load_and_log_configs():
                 'post_gen_replacement': post_gen_replacement,
                 'post_gen_replacement_dict': post_gen_replacement_dict,
                 'chat_dict_chat_prompts': chat_dict_chat_prompts,
-                'chat_dict_RAG_prompts': chat_dict_RAG_prompts,
+                'chat_dict_RAG_prompts': chat_dict_rag_prompts,
                 'chat_dict_replacement_strategy': chat_dict_replacement_strategy,
-                'chat_dict_max_tokens': chat_dict_max_tokens
+                'chat_dict_max_tokens': chat_dict_max_tokens,
+                'default_rag_prompt': default_rag_prompt
             },
             'db_config': {
                 'prompt_path': get_project_relative_path(config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')),
