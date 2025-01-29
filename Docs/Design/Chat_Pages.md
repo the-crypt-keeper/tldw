@@ -47,12 +47,32 @@ https://github.com/t41372/Open-LLM-VTuber
   - This is a very basic example, but the idea is to allow the LLM to understand and respond to a wider range of topics and questions.
 - **Usage**
   - Chat dictionaries may be used from the config file or from the chat page itself.
+  - They can be used to replace words or phrases with other words or phrases.
+    * This can be used to help add context or replace acronyms with their full meaning.
+  - Simply create a markdown file with the words/phrases you want to replace and what you want to replace them with.
+  - Then either:
+    - A: Move the file to the chat dictionary folder and modify the config file for the specific chat dictionary you want to replace
+    - B: Upload the chat dictionary file from the chat page itself for use in that chat.
 - **Implementation**
-  - f
-- **Examples**
- 
+  - Chat dictionary files are markdown files with a specific structure.
+  - The structure is extremely simple and easy to understand.
+    - It is a key-value pair where the key is the word or phrase you want to replace and the value is what you want to replace it with
+      - For single-line entries: separated by a colon `:`
+      - For multi-line entries: separated by a colon `:` and then a pipe `|`
+      - Each entry is separated by `---@@@---`
+      - Example of a single line `greeting` entry which matches on `greeting` and replaces it with `Hello!`, while `weather` is replaced with a multi-line entry:
+        ```
+        greeting: Hello!
+        weather: |
+          Current: Sunny
+          Temp: 75°F
+        ---@@@---
+        ```
 
-# Chat Dictionary User Manual Specification
+- **Examples**
+    - For examples, see the [Chat Dictionary User Manual Specification](#chat-dictionary-user-manual-specification) below.
+
+# <a name="chat-dictionary-user-manual-specification"></a> Chat Dictionary User Manual Specification
 
 ## 1. Introduction
 The **Chat Dictionary** dynamically modifies chat messages before sending them to an LLM. Use it for:
