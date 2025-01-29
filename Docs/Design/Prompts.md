@@ -12,76 +12,30 @@ https://medium.com/@camauger/crafting-effective-chatgpt-prompts-for-tabletop-rol
 https://towardsdatascience.com/how-i-won-singapores-gpt-4-prompt-engineering-competition-34c195a93d41
 https://arxiv.org/abs/2411.01992
 https://github.com/lks-ai/prowl
+https://github.com/MIATECHPARTNERS/PromptChains
+https://github.com/mazen160/llmquery/
 
 
 
 
-
-
-
-
-
-
-
-
-```https://gist.githubusercontent.com/dsartori/35de7f2ed879d5a5e50f6362dea2281b/raw/fb45b3ebbed46ebd99cd4a8d7083112ada596090/rag_prompt.txt
-You are an expert assistant trained to retrieve and generate detailed information **only** from a curated dataset. Your primary goal is to answer natural-language queries accurately and concisely by extracting and synthesizing information explicitly available in the dataset. You are prohibited from making assumptions, inferences, or providing information that cannot be directly traced back to the dataset. The topics you specialize in are:
-
-
-- policies and priorities
-- organizational structure
-- programs and operations
-- key partnerships
-- challenges 
-- history and legislation
-
-
-### Guidelines for Responses:
-1. **Source-Dependence**:
-   - Only provide answers based on explicit information in the dataset. 
-   - Avoid making assumptions, synthesizing unrelated data, or inferring conclusions not directly supported by the dataset.
-   - If the requested information is not found, respond transparently with: *"This information is not available in the dataset."*
-
-
-2. **Explicit Citations**:
-   - For every response, reference the specific chunk(s) or metadata field(s) that support your answer (e.g., "According to chunk 1-4, ...").
-   - If multiple chunks are used, list all relevant sources to improve transparency.
-
-
-3. **Clarification**:
-   - If a query is ambiguous or lacks sufficient context, ask clarifying questions before proceeding.
-
-
-4. **Language Consistency**:
-   - Respond exclusively in the user’s language. Do not switch languages or interpret unless explicitly requested.
-
-
-5. **Accuracy First**:
-   - Prioritize accuracy by strictly adhering to the dataset. Avoid providing speculative or generalized answers.
-
-
-6. **General Before Specific**:
-   - Begin with a concise general overview of the relevant topic, based entirely on the dataset.
-   - Provide detailed insights, examples, or elaborations only upon follow-up or explicit request.
-
-
-7. **Iterative Engagement**:
-   - Encourage the user to refine or expand their queries to enable more precise responses.
-
-
-### Response Structure:
-1. **General Overview**: Provide a high-level summary of the relevant information available in the dataset.
-2. **Detailed Insights (If Requested)**: Offer specific details or examples directly sourced from the dataset, explicitly citing the source.
-3. **Unavailable Information**: If the dataset lacks information for a query, respond with: *"This information is not available in the dataset."*
-4. **Next Steps**: Suggest follow-up queries or related topics the user might explore.
-
-
-### Key Instructions:
-- **Do Not Hallucinate**: Never provide information that is not explicitly present in the dataset. If uncertain, state clearly that the information is unavailable.
-- **Transparency**: Reference specific chunks, sections, or metadata fields for every detail provided.
-- **Avoid Inference**: Refrain from combining or interpreting unrelated information unless explicitly connected within the dataset.
-- **Focus on Relevance**: Ensure answers are concise, precise, and directly address the user’s query.
-
-
-Adapt to the user's needs by maintaining strict adherence to the dataset while offering actionable and transparent insights.
+COSTAR
+Context, Objective, Style, Tone, Audience, Response
+https://towardsdatascience.com/how-i-won-singapores-gpt-4-prompt-engineering-competition-34c195a93d41
 ```
+Context: This is about setting the stage. You tell the AI the backstory of what you’re asking. Imagine saying, “We’re planning a birthday party,” instead of just blurting out, “How do I bake a cake?” This way, the AI gets the full picture and can give you a better answer.
+
+Objective: Here, you’re super clear about what you want the AI to do. It’s like saying, “Please list the best birthday cakes for kids.” This makes sure the AI sticks to the point and gives you exactly what you’re looking for.
+
+Style: Style is all about how you want the AI to ‘talk’. Maybe you want it to sound like a famous writer, a business guru, or just a friendly person next door. It’s like picking the perfect outfit for an occasion — you’re choosing how the AI should sound to fit what you need.
+
+Tone: Tone is the vibe of the AI’s reply. Do you want it to be all serious and formal? Or maybe fun and lighthearted? Think of it like picking music for your party — it sets the mood for your chat with the AI.
+
+Audience: This is about who’s going to read or hear what the AI says. Is it for kids, pros, or someone just starting to learn about a topic? By knowing your audience, the AI can make sure it talks in a way that’s easy for them to understand, just like how you’d talk differently to a kid than to your boss.
+
+Response: Finally, this is about how you want the AI’s answer to look. Do you want a simple list, a full paragraph, or something techy like a JSON format? It’s like deciding whether you want your info in a text, an email, or a fancy report.
+```
+
+
+
+
+

@@ -30,6 +30,7 @@ openai
 # Requires rust compiler...
 #outlines
 pandas
+phonemizer
 Pillow
 #piper-tts
 playwright
@@ -40,7 +41,6 @@ psutil
 #psycopg2-binary
 pyannote.audio
 PyAudio
-pycookiecheat
 pydub
 pymupdf
 pymupdf4llm

@@ -15,10 +15,30 @@
 
 
 
+
+    Answer Correctness: Checks the accuracy of the generated llm response compared to the ground truth.
+
+    Context Sufficiency: Checks if the context contains enough information to answer the user's query
+
+    Context Precision: Evaluates whether all relevant items present in the contexts are ranked higher or not.
+
+    Context Recall: Measures the extent to which the retrieved context aligns with the expected response.
+
+    Answer/Response Relevancy: Measures how pertinent the generated response is to the given prompt.
+
 LightEval + Argilla + distilabel
 - Open source, (will) support litellm and can use distilabel for synth data gen
 
 
+https://nicholas.carlini.com/writing/2024/my-benchmark-for-large-language-models.html
+https://github.com/cpldcpu/MisguidedAttention
+https://github.com/lechmazur/generalization
+https://docs.ragas.io/en/stable/getstarted/rag_eval/
+https://github.com/plurch/ir_evaluation
+https://github.com/OpenBMB/UltraEval-Audio
+https://alibaba-nlp.github.io/WebWalker/
+https://arxiv.org/abs/2501.03491
+https://machinelearningmastery.com/rag-hallucination-detection-techniques/
 https://huggingface.co/papers/2412.06745
 https://huggingface.co/dranger003/c4ai-command-r-v01-iMat.GGUF
 https://huggingface.co/allenai/Llama-3.1-Tulu-3-8B-DPO

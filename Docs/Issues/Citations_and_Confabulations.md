@@ -6,6 +6,17 @@
 3. [References](#references)
 
 
+
+https://arxiv.org/abs/2412.07965
+https://arxiv.org/abs/2501.08292
+https://huggingface.co/QuantFactory/gemma-7b-aps-it-GGUF
+https://huggingface.co/google/gemma-7b-aps-it
+https://docs.anthropic.com/en/docs/build-with-claude/citations
+https://mattyyeung.github.io/deterministic-quoting
+https://github.com/tangzhy/RealCritic
+
+https://liveideabench.com/
+
 RAG
   https://www.lycee.ai/blog/rag-ragallucinations-and-how-to-fight-them
   https://huggingface.co/PleIAs/Pleias-Nano
@@ -83,7 +94,8 @@ Benchmarks
     https://www.kaggle.com/facts-leaderboard
     https://storage.googleapis.com/deepmind-media/FACTS/FACTS_grounding_paper.pdf
     https://deepmind.google/discover/blog/facts-grounding-a-new-benchmark-for-evaluating-the-factuality-of-large-language-models/
-
+Halogen
+  https://arxiv.org/pdf/2501.08292
 
 Detecting Hallucinations using Semantic Entropy:
     https://www.nature.com/articles/s41586-024-07421-0

@@ -8,7 +8,7 @@ https://github.com/jabberjabberjabber/LLMOCR/blob/main/llm-ocr-gui.py#L178
 https://colab.research.google.com/drive/1wkCIO6q8UDJQbPsu8jI_og1JAUibpp38?usp=sharing#scrollTo=5LH3vJS6SkHF
 https://colab.research.google.com/drive/1bcSu_mLki11aXpbS6Fwo_WF5idJv8uId?usp=sharing
 https://colab.research.google.com/drive/1E-ySj39oldXcvcsbjDYnvW-USi281Llj?usp=sharing
-
+https://mbzuai-oryx.github.io/LlamaV-o1/
 https://github.com/pliang279/awesome-multimodal-ml
 https://arxiv.org/abs/2411.18279
 https://github.com/breezedeus/Pix2Text
@@ -25,13 +25,21 @@ https://huggingface.co/Qwen/Qwen2-VL-7B
 https://huggingface.co/Qwen/Qwen2-VL-2B
 https://github.com/Lokesh-Chimakurthi/vision-rag
 https://github.com/tjmlabs/ColiVara
-
-
-
+https://arxiv.org/abs/2501.07888
+https://arxiv.org/abs/2412.07112
+https://arxiv.org/abs/2501.07542
 https://www.reddit.com/r/StableDiffusion/comments/1h7hunp/how_to_run_hunyuanvideo_on_a_single_24gb_vram_card/
 https://arxiv.org/abs/2412.05185
+https://huggingface.co/vidore/colqwen2-v0.1
+https://huggingface.co/collections/nvidia/eagle-2-6764ba887fa1ef387f7df067
+https://github.com/baichuan-inc/Baichuan-Omni-1.5
+https://github.com/bytedance/UI-TARS
+https://github.com/ggerganov/llama.cpp/pull/11289
+https://mmvu-benchmark.github.io/
+https://github.com/DAMO-NLP-SG/VideoLLaMA3
 https://huggingface.co/collections/OpenGVLab/internvl-25-673e1019b66e2218f68d7c1c
 https://huggingface.co/Infinigence/Megrez-3B-Omni
+https://arxiv.org/abs/2501.07888
 https://huggingface.co/FastVideo/FastHunyuan
 https://huggingface.co/papers/2412.07626
 https://huggingface.co/AI-Safeguard/Ivy-VL-llava
@@ -64,3 +72,16 @@ Apollo
 
 InternLM-XComposer
     https://github.com/InternLM/InternLM-XComposer/tree/main/InternLM-XComposer-2.5-OmniLive
+
+SmolVLM
+    https://huggingface.co/blog/smolervlm
+    https://huggingface.co/collections/HuggingFaceTB/smolvlm-256m-and-500m-6791fafc5bb0ab8acc960fb0
+    https://huggingface.co/blog/smolvlm
+    https://huggingface.co/learn/cookbook/fine_tuning_vlm_dpo_smolvlm_instruct
+
+
+Qwen 2.5VL
+    https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct
+    https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct
+    https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct
+

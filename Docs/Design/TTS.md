@@ -10,7 +10,7 @@ Use of pydub for audio merging.
 
 
 
-
+https://generativeai.pub/glm-4-voice-9b-real-time-multilingual-voice-conversation-ai-install-locally-in-minutes-ce2fcd6c8fd8
 
 
 ### Services
@@ -25,6 +25,12 @@ https://artificialanalysis.ai/models/speech-to-speech
 https://github.com/Picovoice/speech-to-text-benchmark?tab=readme-ov-file
 https://sakshi113.github.io/mmau_homepage/
 
+
+### Streaming
+https://github.com/KoljaB/RealtimeSTT/tree/master
+https://github.com/amanvirparhar/weebo/tree/main
+
+
 ### Other
 https://wave-pulse.io/
 https://arxiv.org/abs/2501.01384
@@ -38,6 +44,7 @@ https://github.com/pipecat-ai/pipecat/tree/a367a038f1a3967292b5de5b43b8600a82a73
 https://github.com/Purfview/whisper-standalone-win
 https://github.com/ictnlp/LLaMA-Omni
 https://github.com/thepersonalaicompany/amurex
+https://huggingface.co/Vikhrmodels/salt-asr_wav-uni_1_tts_wav-uni_1-12k
 https://levelup.gitconnected.com/build-a-real-time-ai-voice-and-video-chat-app-with-function-calling-by-gemini-2-0-49599a48fbe9?gi=c894f6c092be
 https://huggingface.co/papers/2501.02832
 
@@ -122,14 +129,15 @@ GPT-SoviTTS
     https://github.com/cpumaxx/sovits-ff-plugin
     https://github.com/JarodMica/GPT-SoVITS-Package
 Kokoro
-    https://github.com/thewh1teagle/kokoro-onnx
-    https://huggingface.co/hexgrad/Kokoro-82M
-    https://github.com/remsky/Kokoro-FastAPI
-    https://huggingface.co/hexgrad/Kokoro-82M/discussions/19
-    https://www.reddit.com/r/LocalLLaMA/comments/1hyf1pf/comment/m6m86zm/?context=3
+
 lina TTS
     https://github.com/theodorblackbird/lina-speech/blob/main/InferenceLina.ipynb
     https://github.com/theodorblackbird/lina-speech
+LLaSA
+    https://huggingface.co/blog/srinivasbilla/llasa-tts
+    https://github.com/zhenye234/LLaSA_training
+    https://huggingface.co/spaces/srinivasbilla/llasa-3b-tts
+    https://github.com/nivibilla/local-llasa-tts
 LMNT
 MaskGCT
     https://maskgct.github.io/#emotion-samples
@@ -151,8 +159,10 @@ Open-LLM-VTuber
 OpenVoice
     https://github.com/myshell-ai/OpenVoice
 Outte
-    https://github.com/edwko/OuteTTS
-    https://huggingface.co/OuteAI/OuteTTS-0.2-500M-GGUF
+    https://github.com/edwko/outetts
+    https://github.com/edwko/OuteTTS/pull/46#issuecomment-2527817670
+    https://huggingface.co/collections/OuteAI/outetts-03-6786b1ebc7aeb757bc17a2fa
+    https://github.com/edwko/OuteTTS/blob/main/docs/interface_v2_usage.md
 Parler
     https://github.com/huggingface/parler-tts
 Paroli - Streaming mode implementation of the Piper TTS with RK3588 NPU acceleration support.
@@ -164,9 +174,13 @@ PiperTTS - A fast, local neural text to speech system that is optimized for the 
     https://ssamjh.nz/create-custom-piper-tts-voice/
     https://www.trycatchdebug.net/news/1377664/realtime-tts-with-pipertts-and-openai
     https://huggingface.co/rhasspy/piper-voices/tree/main
+    https://k2-fsa.github.io/sherpa/onnx/tts/piper.html
+    https://github.com/rhasspy/piper/blob/master/TRAINING.md
     https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main
 
 PiperUI
+RVC
+    https://www.youtube.com/watch?v=Q8du7n0vgfU
 Sherpa ONNX
     https://github.com/k2-fsa/sherpa-onnx
 Silero
@@ -176,6 +190,7 @@ SoundStorm
     https://deepmind.google/discover/blog/pushing-the-frontiers-of-audio-generation/
     https://github.com/lucidrains/soundstorm-pytorch
 Styletts2
+    https://www.youtube.com/watch?v=dCmAbcJ5v5k
 Tortoise TTS
 VallE-X
 VITA
@@ -429,8 +444,8 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-
-### GPT-SoVITS
+------------------------------------------------------------------------------------------------
+#### GPT-SoVITS
 
 - [GPT-SoVITS](f)
 - [GPT-SoVITS-guide rentry.org](https://rentry.org/GPT-SoVITS-guide)
@@ -468,8 +483,6 @@ API
 Comfyui integration
     https://github.com/heshengtao/comfyui_LLM_party
 
-
-
 - **101**
     - F
 - **Setup**
@@ -480,8 +493,47 @@ Comfyui integration
     - F
 - **Fine-Tuning**
     - F
+------------------------------------------------------------------------------------------------
 
+
+
+------------------------------------------------------------------------------------------------
+#### Kokoro
+https://huggingface.co/hexgrad/Kokoro-82M
+
+    https://www.reddit.com/r/LocalLLaMA/comments/1hyf1pf/comment/m6m86zm/?context=3
+
+    
+Eventually migrate to using: https://github.com/thewh1teagle/kokoro-onnx
+- **101**
+    - https://kokorotts.org/
+    - https://huggingface.co/hexgrad/Kokoro-82M
+    - F
+    - Onnx Model: https://github.com/thewh1teagle/kokoro-onnx
+- **Setup**
+    1. f
+    2. f
+    3. f
+    4. f
+    5. f
+- **Inference**
+- **API**
+- Finetuning
+  - https://huggingface.co/hexgrad/Kokoro-82M/discussions/19
+- **Examples**
+    - https://github.com/thewh1teagle/kokoro-onnx/tree/main/examples
+    - https://github.com/ugotworms/professor-kokoro-radio
+    - https://github.com/remsky/Kokoro-FastAPI
+    - https://github.com/kaminoer/KokoDOS/tree/main/glados
+
+------------------------------------------------------------------------------------------------
+
+
+
+
+------------------------------------------------------------------------------------------------
 ### Dataset Creation/Curation
 https://voiceguide.arimil.com/
 
 
+------------------------------------------------------------------------------------------------

@@ -15,6 +15,10 @@
 
 ### 5. Implementation
 
+
+
+
+
 ## Design Principles
 
 ### 1. Consistency
@@ -26,6 +30,9 @@
 ### 4. Familiarity
 
 ### 5. Responsiveness
+
+
+
 
 ## Design Elements
 
@@ -42,6 +49,12 @@
 
 
 ### Link Dump:
+
+Website:
+  https://github.com/AnswerDotAI/fasthtml-example/tree/main/02_chatbot
+
+
+https://github.com/sshh12/spark-stack
 https://github.com/abi/screenshot-to-
 https://designdetails.fm/episodes
 https://copycoder.ai/
@@ -54,7 +67,8 @@ https://uxdesign.cc/the-importance-of-hover-states-c9312d7fd516
 https://trends.uxdesign.cc/
 https://bolters.io/
 https://github.com/Cloud-Code-AI/AkiraDocs
-
+https://ui.shadcn.com/docs
+https://www.typingmind.com/
 https://github.com/Vali-98/ChatterUI
 https://www.nngroup.com/videos/efficient-error-messages/
 https://uxdesign.cc/a-good-design-is-a-good-essay-197f4bd31c92
@@ -94,6 +108,7 @@ https://github.com/osbytes/crypt.fyi
 https://github.com/satellitecomponent/Neurite
 https://uxdesign.cc/ai-and-cognitive-offloading-sharing-the-thinking-process-with-machines-2d27e66e0f31
 https://www.typingmind.com
+https://github.com/felladrin/MiniSearch
 
 
 

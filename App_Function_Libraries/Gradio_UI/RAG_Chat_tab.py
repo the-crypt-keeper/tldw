@@ -36,20 +36,6 @@ def create_rag_tab():
         with gr.Row():
             with gr.Column():
                 search_query = gr.Textbox(label="Enter your question", placeholder="What would you like to know?")
-
-                keyword_filtering_checkbox = gr.Checkbox(label="Enable Keyword Filtering", value=False)
-
-                keywords_input = gr.Textbox(
-                    label="Enter keywords (comma-separated)",
-                    value="keyword1, keyword2, ...",
-                    visible=False
-                )
-
-                keyword_instructions = gr.Markdown(
-                    "Enter comma-separated keywords to filter your search results.",
-                    visible=False
-                )
-
                 # Refactored API selection dropdown
                 api_choice = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
@@ -57,6 +43,16 @@ def create_rag_tab():
                     label="API for Chat Response (Optional)"
                 )
                 search_button = gr.Button("Search")
+                keyword_filtering_checkbox = gr.Checkbox(label="Enable Keyword Filtering", value=False)
+                keywords_input = gr.Textbox(
+                    label="Enter keywords (comma-separated)",
+                    value="keyword1, keyword2, ...",
+                    visible=False
+                )
+                keyword_instructions = gr.Markdown(
+                    "Enter comma-separated keywords to filter your search results.",
+                    visible=False
+                )
 
             with gr.Column():
                 result_output = gr.Textbox(label="Answer", lines=10)

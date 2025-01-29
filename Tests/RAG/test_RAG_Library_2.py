@@ -312,8 +312,18 @@ def test_generate_answer_success(mocker):
         return_value='API response'
     )
 
+    # IMPORTANT: Patch the function where it is *used*, i.e. in RAG_Library_2
+    mock_parse = mocker.patch(
+        'App_Function_Libraries.RAG.RAG_Library_2.parse_user_dict_markdown_file',
+        return_value={'some_key': 'some_value'}
+    )
+
+    # Now call generate_answer
     result = generate_answer('OpenAI', 'Test context', 'Test query')
     assert result == 'API response'
+
+    # Optionally, assert that parse was called
+    mock_parse.assert_called_once()
 
 
 def test_enhanced_rag_pipeline_no_results(mocker):

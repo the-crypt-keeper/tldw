@@ -29,12 +29,14 @@ from App_Function_Libraries.Gradio_UI.Chat_ui import create_chat_interface_four,
     create_chat_interface_stacked, create_chat_interface
 from App_Function_Libraries.Gradio_UI.Config_tab import create_config_editor_tab
 from App_Function_Libraries.Gradio_UI.Explain_summarize_tab import create_summarize_explain_tab
-from App_Function_Libraries.Gradio_UI.Export_Functionality import create_rag_export_tab, create_export_tabs
+from App_Function_Libraries.Gradio_UI.Export_Functionality import create_export_tabs
+from App_Function_Libraries.Gradio_UI.Import_Obsidian import create_import_obsidian_vault_tab
+from App_Function_Libraries.Gradio_UI.Import_Prompts_tab import create_import_single_prompt_tab, \
+    create_import_multiple_prompts_tab
+from App_Function_Libraries.Gradio_UI.Import_RAG_Chat import create_conversation_import_tab
+from App_Function_Libraries.Gradio_UI.Import_Text_MD import create_import_item_tab
 #from App_Function_Libraries.Gradio_UI.Backup_Functionality import create_backup_tab, create_view_backups_tab, \
 #    create_restore_backup_tab
-from App_Function_Libraries.Gradio_UI.Import_Functionality import create_import_single_prompt_tab, \
-    create_import_obsidian_vault_tab, create_import_item_tab, create_import_multiple_prompts_tab, \
-    create_conversation_import_tab
 from App_Function_Libraries.Gradio_UI.Introduction_tab import create_introduction_tab
 from App_Function_Libraries.Gradio_UI.Keywords import create_view_keywords_tab, create_add_keyword_tab, \
     create_delete_keyword_tab, create_export_keywords_tab, create_rag_qa_keywords_tab, create_character_keywords_tab, \
@@ -59,6 +61,7 @@ from App_Function_Libraries.Gradio_UI.RAG_Chat_tab import create_rag_tab
 from App_Function_Libraries.Gradio_UI.Embeddings_tab import create_embeddings_tab, create_view_embeddings_tab, \
     create_purge_embeddings_tab
 from App_Function_Libraries.Gradio_UI.Semantic_Scholar_tab import create_semantic_scholar_tab
+from App_Function_Libraries.Gradio_UI.TTS_Playground import create_audio_generation_tab
 from App_Function_Libraries.Gradio_UI.Trash import create_view_trash_tab, create_empty_trash_tab, \
     create_delete_trash_tab, create_search_and_mark_trash_tab
 from App_Function_Libraries.Gradio_UI.Utilities import create_utilities_yt_timestamp_tab, create_utilities_yt_audio_tab, \
@@ -85,32 +88,12 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs
 # Function Definitions
 #
 
-
 # Disable Gradio Analytics
 os.environ['GRADIO_ANALYTICS_ENABLED'] = 'False'
-
-
 custom_prompt_input = None
 server_mode = False
 share_public = False
-custom_prompt_summarize_bulleted_notes = ("""
-                    <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
-                        **Bulleted Note Creation Guidelines**
 
-                        **Headings**:
-                        - Based on referenced topics, not categories like quotes or terms
-                        - Surrounded by **bold** formatting 
-                        - Not listed as bullet points
-                        - No space between headings and list items underneath
-
-                        **Emphasis**:
-                        - **Important terms** set in bold font
-                        - **Text ending in a colon**: also bolded
-
-                        **Review**:
-                        - Ensure adherence to specified format
-                        - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
-                    """)
 #
 # End of globals
 #######################################################################################################################
@@ -247,8 +230,6 @@ custom_prompt_summarize_bulleted_notes = ("""
 #######################################################################################################################
 #
 # Migration Script
-import sqlite3
-import uuid
 import logging
 import os
 from datetime import datetime
@@ -453,6 +434,7 @@ def launch_ui(share_public=None, server_mode=False):
                     create_resummary_tab()
                     create_summarize_explain_tab()
                     create_live_recording_tab()
+                    create_audio_generation_tab()
                     create_arxiv_tab()
                     create_semantic_scholar_tab()
 

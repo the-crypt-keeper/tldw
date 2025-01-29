@@ -30,6 +30,8 @@
 ####################
 #
 # Import necessary libraries
+import zipfile
+
 import chardet
 import configparser
 import hashlib
@@ -40,8 +42,8 @@ import re
 import tempfile
 import time
 import uuid
-from datetime import timedelta
-from typing import Union, AnyStr
+from datetime import timedelta, datetime
+from typing import Union, AnyStr, Tuple, List
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 #
 # Non-Local Imports
@@ -273,14 +275,15 @@ def load_and_log_configs():
         google_top_p = config.get('API', 'google_top_p', fallback='0.95')
         google_min_p = config.get('API', 'google_min_p', fallback='0.05')
 
-        logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
-        logging.debug(f"Loaded Cohere Model: {cohere_model}")
-        logging.debug(f"Loaded Groq Model: {groq_model}")
-        logging.debug(f"Loaded OpenAI Model: {openai_model}")
-        logging.debug(f"Loaded HuggingFace Model: {huggingface_model}")
-        logging.debug(f"Loaded OpenRouter Model: {openrouter_model}")
-        logging.debug(f"Loaded Deepseek Model: {deepseek_model}")
-        logging.debug(f"Loaded Mistral Model: {mistral_model}")
+        # Logging Checks for model loads
+        # logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
+        # logging.debug(f"Loaded Cohere Model: {cohere_model}")
+        # logging.debug(f"Loaded Groq Model: {groq_model}")
+        # logging.debug(f"Loaded OpenAI Model: {openai_model}")
+        # logging.debug(f"Loaded HuggingFace Model: {huggingface_model}")
+        # logging.debug(f"Loaded OpenRouter Model: {openrouter_model}")
+        # logging.debug(f"Loaded Deepseek Model: {deepseek_model}")
+        # logging.debug(f"Loaded Mistral Model: {mistral_model}")
 
         # Local-Models
         kobold_api_ip = config.get('Local-API', 'kobold_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
@@ -297,6 +300,7 @@ def load_and_log_configs():
         llama_temperature = config.get('Local-API', 'llama_temperature', fallback='0.7')
         llama_top_p = config.get('Local-API', 'llama_top_p', fallback='0.95')
         llama_min_p = config.get('Local-API', 'llama_min_p', fallback='0.05')
+        llama_top_k = config.get('Local-API', 'llama_top_k', fallback='100')
 
         ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
         ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
@@ -304,6 +308,7 @@ def load_and_log_configs():
         ooba_temperature = config.get('Local-API', 'ooba_temperature', fallback='0.7')
         ooba_top_p = config.get('Local-API', 'ooba_top_p', fallback='0.95')
         ooba_min_p = config.get('Local-API', 'ooba_min_p', fallback='0.05')
+        ooba_top_k = config.get('Local-API', 'ooba_top_k', fallback='100')
 
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
@@ -317,10 +322,18 @@ def load_and_log_configs():
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
         vllm_model = config.get('Local-API', 'vllm_model', fallback=None)
+        vllm_streaming = config.get('Local-API', 'vllm_streaming', fallback='False')
+        vllm_temperature = config.get('Local-API', 'vllm_temperature', fallback='0.7')
+        vllm_top_p = config.get('Local-API', 'vllm_top_p', fallback='0.95')
+        vllm_top_k = config.get('Local-API', 'vllm_top_k', fallback='100')
+        vllm_min_p = config.get('Local-API', 'vllm_min_p', fallback='0.05')
 
         ollama_api_url = config.get('Local-API', 'ollama_api_IP', fallback='http://127.0.0.1:11434/api/generate')
         ollama_api_key = config.get('Local-API', 'ollama_api_key', fallback=None)
         ollama_model = config.get('Local-API', 'ollama_model', fallback=None)
+        ollama_streaming = config.get('Local-API', 'ollama_streaming', fallback='False')
+        ollama_temperature = config.get('Local-API', 'ollama_temperature', fallback='0.7')
+        ollama_top_p = config.get('Local-API', 'ollama_top_p', fallback='0.95')
 
         aphrodite_api_url = config.get('Local-API', 'aphrodite_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         aphrodite_api_key = config.get('Local-API', 'aphrodite_api_key', fallback='')
@@ -333,11 +346,12 @@ def load_and_log_configs():
         custom_openai_api_streaming = config.get('API', 'custom_openai_streaming', fallback='False')
         custom_openai_api_temperature = config.get('API', 'custom_openai_temperature', fallback='0.7')
 
-        logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
-        logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
-        logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
-        logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
-        logging.debug(f"Loaded VLLM API URL: {vllm_api_url}")
+        # Logging Checks for Local API IP loads
+        # logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
+        # logging.debug(f"Loaded Llama API IP: {llama_api_IP}")
+        # logging.debug(f"Loaded Ooba API IP: {ooba_api_IP}")
+        # logging.debug(f"Loaded Tabby API IP: {tabby_api_IP}")
+        # logging.debug(f"Loaded VLLM API URL: {vllm_api_url}")
 
         # Retrieve default API choices from the configuration file
         default_api = config.get('API', 'default_api', fallback='openai')
@@ -369,6 +383,16 @@ def load_and_log_configs():
         # Prompts - FIXME
         prompt_path = config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')
 
+        # Chat Dictionaries
+        enable_chat_dictionaries = config.get('Chat-Dictionaries', 'enable_chat_dictionaries', fallback='False')
+        post_gen_replacement = config.get('Chat-Dictionaries', 'post_gen_replacement', fallback='False')
+        post_gen_replacement_dict = config.get('Chat-Dictionaries', 'post_gen_replacement_dict', fallback='')
+        chat_dict_chat_prompts = config.get('Chat-Dictionaries', 'chat_dictionary_chat_prompts', fallback='')
+        chat_dict_rag_prompts = config.get('Chat-Dictionaries', 'chat_dictionary_RAG_prompts', fallback='')
+        chat_dict_replacement_strategy = config.get('Chat-Dictionaries', 'chat_dictionary_replacement_strategy', fallback='character_lore_first')
+        chat_dict_max_tokens = config.get('Chat-Dictionaries', 'chat_dictionary_max_tokens', fallback='1000')
+        default_rag_prompt = config.get('Chat-Dictionaries', 'default_rag_prompt', fallback='')
+
         # Auto-Save Values
         save_character_chats = config.get('Auto-Save', 'save_character_chats', fallback='False')
         save_rag_chats = config.get('Auto-Save', 'save_rag_chats', fallback='False')
@@ -376,8 +400,12 @@ def load_and_log_configs():
         # Local API Timeout
         local_api_timeout = config.get('Local-API', 'local_api_timeout', fallback='90')
 
+        # STT Settings
+        default_stt_provider = config.get('STT-Settings', 'default_stt_provider', fallback='faster_whisper')
+
         # TTS Settings
         # FIXME
+        local_tts_device = config.get('TTS-Settings', 'local_tts_device', fallback='cpu')
         default_tts_provider = config.get('TTS-Settings', 'default_tts_provider', fallback='openai')
         tts_voice = config.get('TTS-Settings', 'default_tts_voice', fallback='shimmer')
         # Open AI TTS
@@ -385,6 +413,7 @@ def load_and_log_configs():
         default_openai_tts_voice = config.get('TTS-Settings', 'default_openai_tts_voice', fallback='shimmer')
         default_openai_tts_speed = config.get('TTS-Settings', 'default_openai_tts_speed', fallback='1')
         default_openai_tts_output_format = config.get('TTS-Settings', 'default_openai_tts_output_format', fallback='mp3')
+        default_openai_tts_streaming = config.get('TTS-Settings', 'default_openai_tts_streaming', fallback='False')
         # Google TTS
         # FIXME - FIX THESE DEFAULTS
         default_google_tts_model = config.get('TTS-Settings', 'default_google_tts_model', fallback='en')
@@ -406,6 +435,22 @@ def load_and_log_configs():
         default_alltalk_tts_voice = config.get('TTS-Settings', 'default_alltalk_tts_voice', fallback='alloy')
         default_alltalk_tts_speed = config.get('TTS-Settings', 'default_alltalk_tts_speed', fallback=1.0)
         default_alltalk_tts_output_format = config.get('TTS-Settings', 'default_alltalk_tts_output_format', fallback='mp3')
+
+        # Kokoro TTS
+        kokoro_model_path = config.get('TTS-Settings', 'kokoro_model_path', fallback='Databases/kokoro_models')
+        default_kokoro_tts_model = config.get('TTS-Settings', 'default_kokoro_tts_model', fallback='pht')
+        default_kokoro_tts_voice = config.get('TTS-Settings', 'default_kokoro_tts_voice', fallback='sky')
+        default_kokoro_tts_speed = config.get('TTS-Settings', 'default_kokoro_tts_speed', fallback=1.0)
+        default_kokoro_tts_output_format = config.get('TTS-Settings', 'default_kokoro_tts_output_format', fallback='wav')
+
+
+        # Self-hosted OpenAI API TTS
+        default_openai_api_tts_model = config.get('TTS-Settings', 'default_openai_api_tts_model', fallback='tts-1-hd')
+        default_openai_api_tts_voice = config.get('TTS-Settings', 'default_openai_api_tts_voice', fallback='shimmer')
+        default_openai_api_tts_speed = config.get('TTS-Settings', 'default_openai_api_tts_speed', fallback='1')
+        default_openai_api_tts_output_format = config.get('TTS-Settings', 'default_openai_tts_api_output_format', fallback='mp3')
+        default_openai_api_tts_streaming = config.get('TTS-Settings', 'default_openai_tts_streaming', fallback='False')
+
 
         # Search Engines
         search_provider_default = config.get('Search-Engines', 'search_provider_default', fallback='google')
@@ -560,7 +605,8 @@ def load_and_log_configs():
                 'streaming': llama_streaming,
                 'temperature': llama_temperature,
                 'top_p': llama_top_p,
-                'min_p': llama_min_p
+                'min_p': llama_min_p,
+                'top_k': llama_top_k
             },
             'ooba_api': {
                 'api_ip': ooba_api_IP,
@@ -568,7 +614,8 @@ def load_and_log_configs():
                 'streaming': ooba_streaming,
                 'temperature': ooba_temperature,
                 'top_p': ooba_top_p,
-                'min_p': ooba_min_p
+                'min_p': ooba_min_p,
+                'top_k': ooba_top_k
             },
             'kobold_api': {
                 'api_ip': kobold_api_ip,
@@ -592,12 +639,20 @@ def load_and_log_configs():
             'vllm_api': {
                 'api_url': vllm_api_url,
                 'api_key': vllm_api_key,
-                'model': vllm_model
+                'model': vllm_model,
+                'streaming': vllm_streaming,
+                'temperature': vllm_temperature,
+                'top_p': vllm_top_p,
+                'top_k': vllm_top_k,
+                'min_p': vllm_min_p
             },
             'ollama_api': {
                 'api_url': ollama_api_url,
                 'api_key': ollama_api_key,
-                'model': ollama_model
+                'model': ollama_model,
+                'streaming': ollama_streaming,
+                'temperature': ollama_temperature,
+                'top_p': ollama_top_p,
             },
             'aphrodite_api': {
                 'api_url': aphrodite_api_url,
@@ -612,6 +667,16 @@ def load_and_log_configs():
             },
             'output_path': output_path,
             'processing_choice': processing_choice,
+            'chat_dictionaries': {
+                'enable_chat_dictionaries': enable_chat_dictionaries,
+                'post_gen_replacement': post_gen_replacement,
+                'post_gen_replacement_dict': post_gen_replacement_dict,
+                'chat_dict_chat_prompts': chat_dict_chat_prompts,
+                'chat_dict_RAG_prompts': chat_dict_rag_prompts,
+                'chat_dict_replacement_strategy': chat_dict_replacement_strategy,
+                'chat_dict_max_tokens': chat_dict_max_tokens,
+                'default_rag_prompt': default_rag_prompt
+            },
             'db_config': {
                 'prompt_path': get_project_relative_path(config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')),
                 'db_type': config.get('Database', 'type', fallback='sqlite'),
@@ -636,9 +701,13 @@ def load_and_log_configs():
             },
             'default_api': default_api,
             'local_api_timeout': local_api_timeout,
+            'STT_Settings': {
+                'default_stt_provider': default_stt_provider,
+            },
             'tts_settings': {
                 'default_tts_provider': default_tts_provider,
                 'tts_voice': tts_voice,
+                'local_tts_device': local_tts_device,
                 # OpenAI
                 'default_openai_tts_voice': default_openai_tts_voice,
                 'default_openai_tts_speed': default_openai_tts_speed,
@@ -656,8 +725,30 @@ def load_and_log_configs():
                 'default_eleven_tts_voice_similiarity_boost': default_eleven_tts_voice_similiarity_boost,
                 'default_eleven_tts_voice_style': default_eleven_tts_voice_style,
                 'default_eleven_tts_voice_use_speaker_boost': default_eleven_tts_voice_use_speaker_boost,
-                'default_eleven_tts_output_format': default_eleven_tts_output_format
-                # GPT Sovi-TTS
+                'default_eleven_tts_output_format': default_eleven_tts_output_format,
+                # Open Source / Self-Hosted TTS
+                # GPT SoVITS
+                # 'default_gpt_tts_model': default_gpt_tts_model,
+                # 'default_gpt_tts_voice': default_gpt_tts_voice,
+                # 'default_gpt_tts_speed': default_gpt_tts_speed,
+                # 'default_gpt_tts_output_format': default_gpt_tts_output_format
+                # AllTalk
+                'alltalk_api_ip': alltalk_api_ip,
+                'default_alltalk_tts_model': default_alltalk_tts_model,
+                'default_alltalk_tts_voice': default_alltalk_tts_voice,
+                'default_alltalk_tts_speed': default_alltalk_tts_speed,
+                'default_alltalk_tts_output_format': default_alltalk_tts_output_format,
+                # Kokoro
+                'default_kokoro_tts_model': default_kokoro_tts_model,
+                'default_kokoro_tts_voice': default_kokoro_tts_voice,
+                'default_kokoro_tts_speed': default_kokoro_tts_speed,
+                'default_kokoro_tts_output_format': default_kokoro_tts_output_format,
+                # Self-hosted OpenAI API
+                'default_openai_api_tts_model': default_openai_api_tts_model,
+                'default_openai_api_tts_voice': default_openai_api_tts_voice,
+                'default_openai_api_tts_speed': default_openai_api_tts_speed,
+                'default_openai_api_tts_output_format': default_openai_api_tts_output_format,
+                'default_openai_api_tts_streaming': default_openai_api_tts_streaming,
             },
             'search_settings': {
                 'default_search_provider': search_provider_default,
@@ -923,6 +1014,21 @@ def download_file(url, dest_path, expected_checksum=None, max_retries=3, delay=5
                 print("Max retries reached. Download failed.")
                 raise
 
+def download_file_if_missing(url: str, local_path: str) -> None:
+    """
+    Download a file from a URL if it does not exist locally.
+    """
+    if os.path.exists(local_path):
+        logging.debug(f"File already exists locally: {local_path}")
+        return
+    logging.info(f"Downloading from {url} to {local_path}")
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    r = requests.get(url, stream=True)
+    r.raise_for_status()
+    with open(local_path, "wb") as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+
 def create_download_directory(title):
     base_dir = "Results"
     # Remove characters that are illegal in Windows filenames and normalize
@@ -1170,10 +1276,6 @@ def get_db_config():
 # End of DB Config Loading
 #######################################################################################################################
 
-def format_text_with_line_breaks(text):
-    # Split the text into sentences and add line breaks
-    sentences = text.replace('. ', '.<br>').replace('? ', '?<br>').replace('! ', '!<br>')
-    return sentences
 
 #######################################################################################################################
 #
@@ -1206,6 +1308,154 @@ def cleanup_temp_files():
 
 def generate_unique_id():
     return f"uploaded_file_{uuid.uuid4()}"
+
+class FileProcessor:
+    """Handles file reading and name processing"""
+
+    VALID_EXTENSIONS = {'.md', '.txt', '.zip'}
+    ENCODINGS_TO_TRY = [
+        'utf-8',
+        'utf-16',
+        'windows-1252',
+        'iso-8859-1',
+        'ascii'
+    ]
+
+    @staticmethod
+    def detect_encoding(file_path: str) -> str:
+        """Detect the file encoding using chardet"""
+        with open(file_path, 'rb') as file:
+            raw_data = file.read()
+            result = chardet.detect(raw_data)
+            return result['encoding'] or 'utf-8'
+
+    @staticmethod
+    def read_file_content(file_path: str) -> str:
+        """Read file content with automatic encoding detection"""
+        detected_encoding = FileProcessor.detect_encoding(file_path)
+
+        # Try detected encoding first
+        try:
+            with open(file_path, 'r', encoding=detected_encoding) as f:
+                return f.read()
+        except UnicodeDecodeError:
+            # If detected encoding fails, try others
+            for encoding in FileProcessor.ENCODINGS_TO_TRY:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        return f.read()
+                except UnicodeDecodeError:
+                    continue
+
+            # If all encodings fail, use utf-8 with error handling
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                return f.read()
+
+    @staticmethod
+    def process_filename_to_title(filename: str) -> str:
+        """Convert filename to a readable title"""
+        # Remove extension
+        name = os.path.splitext(filename)[0]
+
+        # Look for date patterns
+        date_pattern = r'(\d{4}[-_]?\d{2}[-_]?\d{2})'
+        date_match = re.search(date_pattern, name)
+        date_str = ""
+        if date_match:
+            try:
+                date = datetime.strptime(date_match.group(1).replace('_', '-'), '%Y-%m-%d')
+                date_str = date.strftime("%b %d, %Y")
+                name = name.replace(date_match.group(1), '').strip('-_')
+            except ValueError:
+                pass
+
+        # Replace separators with spaces
+        name = re.sub(r'[-_]+', ' ', name)
+
+        # Remove redundant spaces
+        name = re.sub(r'\s+', ' ', name).strip()
+
+        # Capitalize words, excluding certain words
+        exclude_words = {'a', 'an', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'with'}
+        words = name.split()
+        capitalized = []
+        for i, word in enumerate(words):
+            if i == 0 or word not in exclude_words:
+                capitalized.append(word.capitalize())
+            else:
+                capitalized.append(word.lower())
+        name = ' '.join(capitalized)
+
+        # Add date if found
+        if date_str:
+            name = f"{name} - {date_str}"
+
+        return name
+
+
+class ZipValidator:
+    """Validates zip file contents and structure"""
+
+    MAX_ZIP_SIZE = 100 * 1024 * 1024  # 100MB
+    MAX_FILES = 100
+    VALID_EXTENSIONS = {'.md', '.txt'}
+
+    @staticmethod
+    def validate_zip_file(zip_path: str) -> Tuple[bool, str, List[str]]:
+        """
+        Validate zip file and its contents
+        Returns: (is_valid, error_message, valid_files)
+        """
+        try:
+            # Check zip file size
+            if os.path.getsize(zip_path) > ZipValidator.MAX_ZIP_SIZE:
+                return False, "Zip file too large (max 100MB)", []
+
+            valid_files = []
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                # Check number of files
+                if len(zip_ref.filelist) > ZipValidator.MAX_FILES:
+                    return False, f"Too many files in zip (max {ZipValidator.MAX_FILES})", []
+
+                # Check for directory traversal attempts
+                for file_info in zip_ref.filelist:
+                    if '..' in file_info.filename or file_info.filename.startswith('/'):
+                        return False, "Invalid file paths detected", []
+
+                # Validate each file
+                total_size = 0
+                for file_info in zip_ref.filelist:
+                    # Skip directories
+                    if file_info.filename.endswith('/'):
+                        continue
+
+                    # Check file size
+                    if file_info.file_size > ZipValidator.MAX_ZIP_SIZE:
+                        return False, f"File {file_info.filename} too large", []
+
+                    total_size += file_info.file_size
+                    if total_size > ZipValidator.MAX_ZIP_SIZE:
+                        return False, "Total uncompressed size too large", []
+
+                    # Check file extension
+                    ext = os.path.splitext(file_info.filename)[1].lower()
+                    if ext in ZipValidator.VALID_EXTENSIONS:
+                        valid_files.append(file_info.filename)
+
+            if not valid_files:
+                return False, "No valid markdown or text files found in zip", []
+
+            return True, "", valid_files
+
+        except zipfile.BadZipFile:
+            return False, "Invalid or corrupted zip file", []
+        except Exception as e:
+            return False, f"Error processing zip file: {str(e)}", []
+
+def format_text_with_line_breaks(text):
+    # Split the text into sentences and add line breaks
+    sentences = text.replace('. ', '.<br>').replace('? ', '?<br>').replace('! ', '!<br>')
+    return sentences
 
 #
 # End of File Handling Functions

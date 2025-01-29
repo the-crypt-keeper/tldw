@@ -4,7 +4,9 @@ List of stuff I don't feel like filing an issue for (yet).
 
 
 ## To Do
+- searx https://github.com/Jay4242/llm-websearch/blob/main/llm-websearch.bash
 - Blogpost
+- https://adamj.eu/tech/2024/12/30/python-temporary-files-directories-unittest/
 - Documentation
 - Update README
 - Update CONTRIBUTING
@@ -22,7 +24,8 @@ List of stuff I don't feel like filing an issue for (yet).
 - Add global max tokens value to config + Per API max tokens value
 - Add global System prompts for Chat API calls
 - Add global System prompts for Summarization API calls
-- 
+- ERROR:root:Error in perform_full_text_search (Media DB): 'NoneType' object has no attribute 'split'
+
 - 
 - PDF Parsing
     - marker https://github.com/VikParuchuri/marker
@@ -70,12 +73,9 @@ https://github.com/dongguanting/DPA-RAG
 https://arxiv.org/html/2411.02959v1
 https://arxiv.org/pdf/2409.05591
 
-UI
-https://ui.shadcn.com/docs
-https://www.typingmind.com/
 
 ASR
-https://github.com/revdotcom/reverb
+
 
 Hallucinations
 https://arxiv.org/abs/2410.22071

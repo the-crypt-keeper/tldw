@@ -10,6 +10,7 @@ import re
 import sqlite3
 import tempfile
 import time
+import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
 #
@@ -203,7 +204,7 @@ def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp
 
 
 def chat(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, temperature,
-         system_message=None, streaming=False, minp=None, maxp=None, model=None):
+         system_message=None, streaming=False, minp=None, maxp=None, model=None, topp=None, topk=None, chatdict_entries=None, max_tokens=500, strategy="sorted_evenly"):
     log_counter("chat_attempt", labels={"api_endpoint": api_endpoint})
     start_time = time.time()
     try:
@@ -218,6 +219,16 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
             selected_parts = [selected_parts] if selected_parts else []
 
         # logging.debug(f"Debug - Chat Function - Selected Parts (after check): {selected_parts}")
+
+        # Handle Chat Dictionary processing
+        if chatdict_entries:
+            processed_input = process_user_input(
+                message,
+                chatdict_entries,
+                max_tokens=max_tokens,
+                strategy=strategy
+            )
+            message = processed_input
 
         # Combine the selected parts of the media content
         combined_content = "\n\n".join(
@@ -242,7 +253,7 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
         logging.debug(f"Debug - Chat Function - Prompt: {custom_prompt}")
 
         # Use the existing API request code based on the selected endpoint
-        response = chat_api_call(api_endpoint, api_key, input_data, custom_prompt, temp, system_message, streaming, minp, maxp, model)
+        response = chat_api_call(api_endpoint, api_key, input_data, custom_prompt, temp, system_message, streaming, minp, maxp, model, topp, topk)
 
         if streaming:
             logging.debug(f"Debug - Chat Function - Response: {response}")
@@ -252,6 +263,17 @@ def chat(message, history, media_content, selected_parts, api_endpoint, api_key,
             log_histogram("chat_duration", chat_duration, labels={"api_endpoint": api_endpoint})
             log_counter("chat_success", labels={"api_endpoint": api_endpoint})
             logging.debug(f"Debug - Chat Function - Response: {response}")
+            loaded_config_data = load_and_log_configs()
+            post_gen_replacement = loaded_config_data['chat_dictionaries']['post_gen_replacement']
+            if post_gen_replacement:
+                post_gen_replacement_dict = loaded_config_data['chat_dictionaries']['post_gen_replacement_dict']
+                chatdict_entries = parse_user_dict_markdown_file(post_gen_replacement_dict)
+                response = process_user_input(
+                    response,
+                    chatdict_entries,
+                    # max_tokens=max_tokens(5000 default),
+                    # strategy="sorted_evenly" (default)
+                )
             return response
     except Exception as e:
         log_counter("chat_error", labels={"api_endpoint": api_endpoint, "error": str(e)})
@@ -449,48 +471,50 @@ def update_chat_content(selected_item, use_content, use_summary, use_prompt, ite
 
 def parse_user_dict_markdown_file(file_path):
     """
-    Parse a Markdown file to extract key-value pairs, including multi-line values.
+    Parse a Markdown file with custom termination symbol for multi-line values.
     """
+    logging.debug(f"Parsing user dictionary file: {file_path}")
     replacement_dict = {}
     current_key = None
     current_value = []
+    termination_pattern = re.compile(r'^\s*---@@@---\s*$')
 
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8') as file:
         for line in file:
-            # Match lines with "key: value" or "key: |" format
-            key_value_match = re.match(r'^\s*(\w+)\s*:\s*(.*)$', line)
-            if key_value_match:
-                key, value = key_value_match.groups()
-
-                # If the value is "|", prepare for multi-line
-                if value.strip() == '|':
-                    current_key = key
-                    current_value = []
-                else:
-                    # Single-line key-value pair
-                    replacement_dict[key] = value.strip()
-            elif current_key:
-                # Append multi-line values
-                stripped_line = line.strip()
-                if stripped_line:  # Skip empty lines
-                    current_value.append(stripped_line)
-            else:
+            # Check for termination pattern first
+            if termination_pattern.match(line):
+                if current_key:
+                    replacement_dict[current_key] = '\n'.join(current_value).strip()
+                    current_key, current_value = None, []
                 continue
 
-            # If we encounter an empty line or EOF, store the multi-line value
-            if current_key and (line.strip() == '' or line == ''):
-                replacement_dict[current_key] = '\n'.join(current_value)
-                current_key, current_value = None, []
+            # Match key lines only when not in multi-line mode
+            if not current_key:
+                key_value_match = re.match(r'^\s*([^:\n]+?)\s*:\s*(.*?)\s*$', line)
+                if key_value_match:
+                    key, value = key_value_match.groups()
+                    if value.strip() == '|':
+                        current_key = key.strip()
+                        current_value = []
+                    else:
+                        replacement_dict[key.strip()] = value.strip()
+                continue
 
-    # Handle any remaining multi-line value at EOF
-    if current_key:
-        replacement_dict[current_key] = '\n'.join(current_value)
+            # Processing multi-line content
+            if current_key:
+                # Strip trailing whitespace but preserve leading spaces
+                cleaned_line = line.rstrip('\n\r')
+                current_value.append(cleaned_line)
 
+        # Handle any remaining multi-line value at EOF
+        if current_key:
+            replacement_dict[current_key] = '\n'.join(current_value).strip()
+
+    logging.debug(f"Parsed entries: {replacement_dict}")
     return replacement_dict
 
 
-# World Info Entry Class with Enhanced Capabilities
-class WorldInfoEntry:
+class ChatDictionary:
     def __init__(self, key, content, probability=100, group=None, timed_effects=None, max_replacements=1):
         self.key = self.compile_key(key)
         self.content = content
@@ -516,6 +540,7 @@ class WorldInfoEntry:
 
 # Strategy for inclusion
 def apply_strategy(entries, strategy="sorted_evenly"):
+    logging.debug(f"Applying strategy: {strategy}")
     if strategy == "sorted_evenly":
         return sorted(entries, key=lambda e: e.key)
     elif strategy == "character_lore_first":
@@ -531,10 +556,10 @@ def filter_by_probability(entries):
 
 # Group Scoring - Situation where multiple entries are triggered in different groups in a single message
 def group_scoring(entries):
+    logging.debug(f"Group scoring for {len(entries)} entries")
     grouped_entries = {}
     for entry in entries:
-        if entry.group:
-            grouped_entries.setdefault(entry.group, []).append(entry)
+        grouped_entries.setdefault(entry.group, []).append(entry)
 
     selected_entries = []
     for group, group_entries in grouped_entries.items():
@@ -544,6 +569,7 @@ def group_scoring(entries):
 
 # Timed Effects
 def apply_timed_effects(entry, current_time):
+    logging.debug(f"Applying timed effects for entry: {entry.key}")
     if entry.timed_effects["delay"] > 0:
         if entry.last_triggered is None or current_time - entry.last_triggered < timedelta(seconds=entry.timed_effects["delay"]):
             return False
@@ -555,6 +581,7 @@ def apply_timed_effects(entry, current_time):
 
 # Context/Token Budget Mgmt
 def calculate_token_usage(entries):
+    logging.debug(f"Calculating token usage for {len(entries)} entries")
     return sum(len(entry.content.split()) for entry in entries)
 
 def enforce_token_budget(entries, max_tokens):
@@ -573,13 +600,21 @@ def match_whole_words(entries, text):
     for entry in entries:
         if re.search(rf'\b{entry.key}\b', text):
             matched_entries.append(entry)
+            logging.debug(f"Chat Dictionary: Matched entry: {entry.key}")
     return matched_entries
+
+class TokenBudgetExceededWarning(Warning):
+    """Custom warning for token budget issues"""
+    pass
 
 # Token Budget Mgmt
 def alert_token_budget_exceeded(entries, max_tokens):
     token_usage = calculate_token_usage(entries)
+    logging.debug(f"Token usage: {token_usage}, Max tokens: {max_tokens}")
     if token_usage > max_tokens:
-        print(f"Alert: Token budget exceeded! Used: {token_usage}, Allowed: {max_tokens}")
+        warning_msg = f"Alert: Token budget exceeded! Used: {token_usage}, Allowed: {max_tokens}"
+        warnings.warn(TokenBudgetExceededWarning(warning_msg))
+        print(warning_msg)
 
 # Single Replacement Function
 def apply_replacement_once(text, entry):
@@ -587,61 +622,118 @@ def apply_replacement_once(text, entry):
     Replaces the 'entry.key' in 'text' exactly once (if found).
     Returns the new text and the number of replacements actually performed.
     """
+    logging.debug(f"Applying replacement for entry: {entry.key}")
     if isinstance(entry.key, re.Pattern):
         replaced_text, replaced_count = re.subn(entry.key, entry.content, text, count=1)
     else:
-        replaced_count = text.count(entry.key)
-        if replaced_count > 0:
-            replaced_text = text.replace(entry.key, entry.content, 1)
-        else:
-            replaced_text = text
+        # Use regex to replace case-insensitively and match whole words
+        pattern = re.compile(rf'\b{re.escape(entry.key)}\b', re.IGNORECASE)
+        replaced_text, replaced_count = re.subn(pattern, entry.content, text, count=1)
     return replaced_text, replaced_count
 
 # Chat Dictionary Pipeline
-def process_user_input(user_input, entries, max_tokens, strategy="sorted_evenly"):
+def process_user_input(user_input, entries, max_tokens=5000, strategy="sorted_evenly"):
     current_time = datetime.now()
 
-    # Match entries using regex or plain text
-    matched_entries = [entry for entry in entries if entry.matches(user_input)]
+    try:
+        # 1. Match entries using regex or plain text
+        matched_entries = []
+        logging.debug(f"Chat Dictionary: Matching entries for user input: {user_input}")
+        for entry in entries:
+            try:
+                if entry.matches(user_input):
+                    matched_entries.append(entry)
+            except re.error as e:
+                log_counter("chat_dict_regex_error", labels={"key": entry.key})
+                logging.error(f"Invalid regex pattern in entry: {entry.key}. Error: {str(e)}")
+                continue  # Skip this entry but continue processing others
 
-    # Apply group scoring
-    matched_entries = group_scoring(matched_entries)
+        logging.debug(f"Matched entries after filtering: {[e.key for e in matched_entries]}")
+        # 2. Apply group scoring
+        try:
+            logging.debug(f"Chat Dictionary: Applying group scoring for {len(matched_entries)} entries")
+            matched_entries = group_scoring(matched_entries)
+        except Exception as e:
+            log_counter("chat_dict_group_scoring_error")
+            logging.error(f"Error in group scoring: {str(e)}")
+            matched_entries = []  # Fallback to empty list
 
-    # Apply probability filter
-    matched_entries = filter_by_probability(matched_entries)
+        # 3. Apply probability filter
+        try:
+            logging.debug(f"Chat Dictionary: Filtering by probability for {len(matched_entries)} entries")
+            matched_entries = filter_by_probability(matched_entries)
+        except Exception as e:
+            log_counter("chat_dict_probability_error")
+            logging.error(f"Error in probability filtering: {str(e)}")
+            matched_entries = []  # Fallback to empty list
 
-    # Apply timed effects
-    matched_entries = [entry for entry in matched_entries if apply_timed_effects(entry, current_time)]
+        # 4. Apply timed effects
+        try:
+            logging.debug("Chat Dictionary: Applying timed effects")
+            matched_entries = [entry for entry in matched_entries if apply_timed_effects(entry, current_time)]
+        except Exception as e:
+            log_counter("chat_dict_timed_effects_error")
+            logging.error(f"Error applying timed effects: {str(e)}")
+            matched_entries = []  # Fallback to empty list
 
-    # Enforce token budget
-    matched_entries = enforce_token_budget(matched_entries, max_tokens)
+        # 5. Enforce token budget
+        try:
+            logging.debug(f"Chat Dictionary: Enforcing token budget for {len(matched_entries)} entries")
+            matched_entries = enforce_token_budget(matched_entries, max_tokens)
+        except TokenBudgetExceededWarning as e:
+            log_counter("chat_dict_token_limit")
+            logging.warning(str(e))
+            matched_entries = []  # Fallback to empty list
+        except Exception as e:
+            log_counter("chat_dict_token_budget_error")
+            logging.error(f"Error enforcing token budget: {str(e)}")
+            matched_entries = []  # Fallback to empty list
 
-    # Alert if token budget exceeded
-    alert_token_budget_exceeded(matched_entries, max_tokens)
+        # Alert if token budget exceeded
+        try:
+            alert_token_budget_exceeded(matched_entries, max_tokens)
+        except Exception as e:
+            log_counter("chat_dict_token_alert_error")
+            logging.error(f"Error in token budget alert: {str(e)}")
 
-    # Apply replacement strategy
-    matched_entries = apply_strategy(matched_entries, strategy)
+        # Apply replacement strategy
+        try:
+            logging.debug("Chat Dictionary: Applying replacement strategy")
+            matched_entries = apply_strategy(matched_entries, strategy)
+        except Exception as e:
+            log_counter("chat_dict_strategy_error")
+            logging.error(f"Error applying strategy: {str(e)}")
+            matched_entries = []  # Fallback to empty list
 
-    # Generate output with single replacement per match
-    for entry in matched_entries:
-        if entry.max_replacements > 0:
-            user_input, replaced_count = apply_replacement_once(user_input, entry)
-            if replaced_count > 0:
-                entry.max_replacements -= 1
+        # Generate output with single replacement per match
+        for entry in matched_entries:
+            logging.debug("Chat Dictionary: Applying replacements")
+            try:
+                if entry.max_replacements > 0:
+                    user_input, replaced_count = apply_replacement_once(user_input, entry)
+                    logging.debug(f"Replaced {replaced_count} occurrences of '{entry.key}' with '{entry.content}'")
+                    if replaced_count > 0:
+                        entry.max_replacements -= 1
+            except Exception as e:
+                log_counter("chat_dict_replacement_error", labels={"key": entry.key})
+                logging.error(f"Error applying replacement for entry {entry.key}: {str(e)}")
+                continue  # Skip this replacement but continue processing others
+
+    except Exception as e:
+        log_counter("chat_dict_processing_error")
+        logging.error(f"Critical error in process_user_input: {str(e)}")
+        # Return original input if critical failure occurs
+        return user_input
 
     return user_input
 
-# Sample Usage:
-# entries = [
-#     WorldInfoEntry(key="hello", content="Hi there!", probability=90, group="greeting"),
-#     WorldInfoEntry(key=re.compile(r"\bweather\b", re.IGNORECASE), content="It's sunny today.", probability=50, group="weather"),
-# ]
-#
-# user_input = "Hello, can you tell me about the weather?"
-# max_tokens = 10
-#
-# response = process_user_input(user_input, entries, max_tokens, strategy="character_lore_first")
-# print(response)
+# Example Usage:
+# 1. Load entries from a Markdown file
+# entries = parse_user_dict_markdown_file('chat_dict.md')
+# 2. Process user input with the entries
+# processed_input = process_user_input(user_input, entries)
+# print(processed_input)
+
 
 #
 # End of Chat Dictionary functions

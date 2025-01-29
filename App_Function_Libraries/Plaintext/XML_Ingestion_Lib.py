@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 # External Imports
 #
 # Local Imports
-from App_Function_Libraries.Gradio_UI.Import_Functionality import import_data
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
 from App_Function_Libraries.Chunk_Lib import chunk_xml
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database

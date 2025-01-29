@@ -18,10 +18,21 @@ https://github.com/charmandercha/ArchiDoc
 https://pythontutor.com/c.html#mode=edit
 https://pythontutor.com/articles/c-cpp-visualizer.html
 https://gitingest.com/
+https://www.qodo.ai/blog/rag-for-large-scale-code-repos/
+
+https://github.com/sammcj/ingest
 https://gitdiagram.com/
 https://www.ilograph.com/blog/posts/diagrams-ai-can-and-cannot-generate/#system-diagramming-with-ai
 https://github.com/osanseviero/geminicoder
 https://blog.val.town/blog/fast-follow/
+https://glean.software/
+https://github.com/AtakanTekparmak/exec-python/tree/main
+https://huggingface.co/blog/andthattoo/dpab-a
+https://github.com/firstbatchxyz/function-calling-eval
+https://codemirror.net/
+https://github.com/codemirror/dev
+https://github.com/google/diff-match-patch
+https://highlightjs.org/
 
 
 

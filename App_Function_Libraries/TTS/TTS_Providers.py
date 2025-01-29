@@ -5,6 +5,7 @@
 import json
 import logging
 import os
+import re
 import tempfile
 import time
 import uuid
@@ -15,6 +16,12 @@ import requests
 from openai import api_key
 from pydub import AudioSegment
 from pydub.playback import play
+import numpy as np
+import torch
+from phonemizer import phonemize
+import soundfile as sf
+
+from App_Function_Libraries.TTS.TTS_Providers_Local import play_mp3, generate_audio_kokoro
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data
@@ -23,34 +30,12 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_conf
 #
 # Functions:
 
-def play_mp3(file_path):
-    """Play an MP3 file using the pydub library."""
-    try:
-        from pydub.utils import which
-        logging.debug(f"Debug: ffmpeg path: {which('ffmpeg')}")
-        logging.debug(f"Debug: ffplay path: {which('ffplay')}")
+########################################################
+#
+# Audio Generation Functions
 
-        absolute_path = os.path.abspath(file_path)
-        audio = AudioSegment.from_mp3(absolute_path)
-        logging.debug("Debug: File loaded successfully")
-        play(audio)
-    except Exception as e:
-        logging.debug(f"Debug: Exception type: {type(e)}")
-        logging.debug(f"Debug: Exception args: {e.args}")
-        logging.error(f"Error playing the audio file: {e}")
-
-
-def play_audio_file(file_path):
-    """Play an audio file using the pydub library."""
-    try:
-        absolute_path = os.path.abspath(file_path)
-        audio = AudioSegment.from_file(absolute_path)
-        play(audio)
-    except Exception as e:
-        logging.error(f"Error playing the audio file: {e}")
-
-
-def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None, output_file=None, response_format=None, streaming=False):
+# FIXME - add speed to all providers
+def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None, output_file=None, response_format=None, streaming=False, speed=None):
     """Generate audio using the specified TTS provider."""
     logging.info(f"Starting generate_audio function")
 
@@ -70,13 +55,13 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
     if provider == "openai":
         logging.info("Using OpenAI TTS provider")
         if api_key is None:
-            logging.info("No API key provided, attempting to use config file")
-            api_key = loaded_config_data['openai_api']['api_key']
+            logging.info("No API key provided, will attempt to use config file")
         return generate_audio_openai(
             api_key=api_key,
             input_text=text,
             voice=voice,
             model=model,
+            speed=speed,
             response_format=response_format,
             output_file=output_file,
             streaming=streaming
@@ -109,11 +94,22 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
         pass
 
     elif provider == "piper":
+        # FIXME - add piper proper
         logging.info("Using Piper TTS provider")
         return generate_audio_piper(
             input_text=text,
             model=model,
-            output_file=output_file,
+        )
+
+    elif provider == "kokoro":
+        logging.info("Using Kokoro TTS provider")
+        return generate_audio_kokoro(
+            input_text=text,
+            voice=voice,
+            device=loaded_config_data['tts_settings'].get('local_tts_device', 'cpu'),
+            output_format=response_format or 'wav',
+            output_file=output_file or 'speech.wav',
+            speed=1.0
         )
 
     else:
@@ -124,25 +120,39 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
 
 def speak_last_response(chatbot):
     """Handle speaking the last chat response."""
-    logging.debug("Starting speak_last_response")
+    logging.debug("speak_last_response(): Starting speak_last_response")
     try:
+        logging.debug(f"speak_last_response(): Chatbot history: {chatbot}")
         # If there's no chat history, return
         if not chatbot or len(chatbot) == 0:
-            logging.debug("No messages in chatbot history")
+            logging.debug("speak_last_response(): No messages in chatbot history")
             return "No messages to speak"
-
-        # Log the chatbot content for debugging
-        logging.debug(f"Chatbot history: {chatbot}")
 
         # Get the last message from the assistant
         last_message = chatbot[-1][1]
-        logging.debug(f"Last message to speak: {last_message}")
+        logging.debug(f"speak_last_response(): Last message to speak: {last_message}")
+
+        # Get the TTS provider from the config
+        tts_provider = loaded_config_data['tts_settings'].get('default_tts_provider', 'openai')
+        logging.debug(f"speak_last_response(): Using TTS provider: {tts_provider}")
+
+        # Get the default voice for the TTS provider
+        default_tts_voice = loaded_config_data['tts_settings'].get('default_tts_voice', None)
+        logging.debug(f"speak_last_response(): Using default voice: {default_tts_voice}")
 
         # Generate audio using your preferred TTS provider
+        logging.debug("speak_last_response(): Generating audio file")
         audio_file = generate_audio(
+            api_key=None,  # Will use config credentials
             text=last_message,
-            provider="openai",  # or get from config
-            output_file="last_response.mp3"  # specify output file
+            provider=tts_provider,
+            voice=default_tts_voice,
+            model=None, # Let the provider choose the model
+            voice2=None, # We won't use a second voice for single chat messages
+            output_file="last_response.mp3",  # specify output file
+            response_format="mp3",  # specify response format
+            streaming=False,  # specify streaming
+            speed=1.0  # specify speed
         )
 
         logging.debug(f"Generated audio file: {audio_file}")
@@ -183,13 +193,17 @@ def test_generate_audio():
             play_mp3(result)  # Single play call
     print("Test successful")
 
+#
+# End of Audio Generation Functions
+########################################################
+
 
 #######################################################
 #
 # OpenAI TTS Provider Functions
 
 # https://github.com/leokwsw/OpenAI-TTS-Gradio/blob/main/app.py
-def generate_audio_openai(api_key, input_text, voice, model, response_format="mp3", output_file="speech.mp3", streaming=False):
+def generate_audio_openai(api_key, input_text, voice, model, speed, response_format="mp3", output_file="speech.mp3", streaming=False):
     """
     Generate audio using OpenAI's Text-to-Speech API.
 
@@ -198,6 +212,7 @@ def generate_audio_openai(api_key, input_text, voice, model, response_format="mp
         input_text (str): Text input for speech synthesis.
         voice (str): Voice to use for the synthesis.
         model (str): Model to use for the synthesis (e.g., "tts-1").
+        speed (float): Speed of the speech synthesis (default is 1.0).
         response_format (str): Format of the response audio file (default is "mp3").
         output_file (str): Name of the output file to save the audio.
 
@@ -272,37 +287,46 @@ def generate_audio_openai(api_key, input_text, voice, model, response_format="mp
         "model": model,
         "input": input_text,
         "voice": voice,
+        "response_format": response_format,
+        "speed": speed
     }
 
     if streaming == True:
+        logging.info("OpenAI: Using streaming response")
         try:
             # Make the request to the API
             response = requests.post(endpoint, headers=headers, json=payload, stream=True)
+            logging.debug(f"OpenAI: API Response: {response}")
             response.raise_for_status()  # Raise an error for HTTP status codes >= 400
 
             # Save the audio response to a file
             with open(output_file, "wb") as f:
+                logging.debug(f"OpenAI: Saving audio to file: {output_file}")
                 f.write(response.content)
 
-            print(f"Audio successfully generated and saved to {output_file}.")
+            logging.info(f"Audio successfully generated and saved to {output_file}.")
             return output_file
 
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"Failed to generate audio: {str(e)}") from e
     else:
         try:
+            logging.info("OpenAI: Not using streaming response")
             # Make the request to the API
             response = requests.post(endpoint, headers=headers, json=payload)
+            logging.debug(f"OpenAI: API Response: {response}")
             response.raise_for_status()  # Raise an error for HTTP status codes >= 400
 
             # Save the audio response to a file
             with open(output_file, "wb") as f:
+                logging.debug(f"OpenAI: Saving audio to file: {output_file}")
                 f.write(response.content)
 
-            print(f"Audio successfully generated and saved to {output_file}.")
+            logging.info(f"Audio successfully generated and saved to {output_file}.")
             return output_file
 
         except requests.exceptions.RequestException as e:
+            logging.error(f"OpenAI: Failed to generate audio: {str(e)}")
             raise RuntimeError(f"Failed to generate audio: {str(e)}") from e
 
 

@@ -1387,7 +1387,7 @@ def update_media_content_with_version(media_id, info_dict, content_input, prompt
 
 
 # FIXME: This function is not complete and needs to be implemented
-def schedule_chunking(media_id: int, content: str, media_name: str):
+def schedule_chunking(media_id: int, content: str, media_name: str, media_type: str = None): #, chunk_options: dict = None):
     try:
         chunks = chunk_text(content, chunk_options['method'], chunk_options['max_size'], chunk_options['overlap'])
         db = Database()

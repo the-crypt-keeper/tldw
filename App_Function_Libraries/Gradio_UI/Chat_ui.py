@@ -13,7 +13,8 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, chat, save_chat_history, \
-    update_chat_content, save_chat_history_to_db_wrapper
+    update_chat_content, save_chat_history_to_db_wrapper, parse_user_dict_markdown_file, ChatDictionary, \
+    process_user_input
 from App_Function_Libraries.DB.DB_Manager import db, load_chat_history, start_new_conversation, \
     save_message, search_conversations_by_keywords, \
     get_all_conversations, delete_messages_in_conversation, search_media_db, list_prompts
@@ -89,9 +90,12 @@ def clear_chat_single():
 
 # FIXME - add additional features....
 def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt, conversation_id,
-                 save_conversation, temperature, system_prompt, streaming=False, max_tokens=None, top_p=None, frequency_penalty=None,
-                 presence_penalty=None, stop_sequence=None):
+                 save_conversation, temperature, system_prompt, streaming=False, chatdict_entries=None, max_tokens=500,
+                 strategy="sorted_evenly"):
     try:
+        logging.debug("chat_wrapper(): Starting chat wrapper")
+
+        # Check if the conversation should be saved
         if save_conversation:
             logging.info("chat_wrapper(): Saving conversation")
             if conversation_id is None:
@@ -106,11 +110,22 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
         # Include the selected parts and custom_prompt only for the first message
         if not history and selected_parts:
             message_body = "\n".join(selected_parts)
-            full_message = f"{custom_prompt}\n\n{message}\n\n{message_body}"
+            base_message = f"{custom_prompt}\n\n{message}\n\n{message_body}" if custom_prompt else message
         elif custom_prompt:
-            full_message = f"{custom_prompt}\n\n{message}"
+            base_message = f"{custom_prompt}\n\n{message}"
         else:
-            full_message = message
+            base_message = message
+
+        # Apply chat dictionary processing
+        if chatdict_entries:
+            full_message = process_user_input(
+                base_message,
+                chatdict_entries,
+                max_tokens=max_tokens,
+                strategy=strategy
+            )
+        else:
+            full_message = base_message
 
         # Generate bot response
         logging.debug("chat_wrapper(): Generating bot response")
@@ -314,6 +329,24 @@ def create_chat_interface():
         background-color: #e6ffe6;
     }
     """
+    confirm_clear_chat_js = """
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Grab the clear chat button by its elem_id
+      const btn = document.querySelector("#clear_chat_btn");
+      if(btn) {
+        btn.addEventListener("click", function(e) {
+          // Show a confirmation dialog
+          if(!confirm("Are you sure you want to clear the chat?")) {
+            // If user cancels, stop the click from reaching the server
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        });
+      }
+    });
+    </script>
+    """
     with gr.TabItem("Remote LLM Chat (Horizontal)", visible=True):
         gr.Markdown("# Chat with a designated LLM Endpoint, using your selected item as starting context")
         chat_history = gr.State([])
@@ -391,11 +424,26 @@ def create_chat_interface():
                     previous_conversations = gr.Dropdown(label="Select Conversation", choices=[], interactive=True)
                 with gr.Row():
                     load_conversations_btn = gr.Button("Load Selected Conversation")
+                with gr.Row():
+                    chatdict_files = gr.Files(label="Upload Chat Dictionary Markdown Files")
+                    chatdict_entries = gr.State([])
+                    max_tokens = gr.Slider(
+                        label="Max Replacement Tokens",
+                        minimum=100,
+                        maximum=2000,
+                        value=500,
+                        step=50
+                    )
+                    strategy = gr.Dropdown(
+                        label="Replacement Strategy",
+                        choices=["sorted_evenly", "character_lore_first", "global_lore_first"],
+                        value="sorted_evenly"
+                    )
 
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
-                msg = gr.Textbox(label="Enter your message")
                 streaming = gr.Checkbox(label="Streaming", value=False, visible=True)
+                msg = gr.Textbox(label="Enter your message")
                 submit = gr.Button("Submit")
                 with gr.Row():
                     speak_button = gr.Button("Speak Response")
@@ -403,8 +451,8 @@ def create_chat_interface():
                 regenerate_button = gr.Button("Regenerate Last Message")
                 with gr.Row():
                     token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
-                    clear_chat_button = gr.Button("Clear Chat")
-
+                    download_tts = gr.File(label="Download TTS Audio", interactive=False)
+                    clear_chat_button = gr.Button("Clear Chat", elem_id="clear_chat_btn")
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
                 with gr.Row():
                     save_chat_history_to_db = gr.Button("Save Chat History to DataBase")
@@ -413,6 +461,7 @@ def create_chat_interface():
                     save_chat_history_as_file = gr.Button("Save Chat History as File")
                     download_file = gr.File(label="Download Chat History")
 
+        gr.HTML(confirm_clear_chat_js)
         # Restore original functionality
         search_button.click(
             fn=update_dropdown_multiple,
@@ -441,11 +490,11 @@ def create_chat_interface():
             )
 
         def clear_chat():
-            return [], None  # Return empty list for chatbot and None for conversation_id
+            return [], None, 0  # Return empty list for chatbot and None for conversation_id and token count
 
         clear_chat_button.click(
             clear_chat,
-            outputs=[chatbot, conversation_id]
+            outputs=[chatbot, conversation_id, token_count_display]
         )
 
         # Function to handle preset prompt checkbox change
@@ -477,6 +526,23 @@ def create_chat_interface():
             outputs=[preset_prompt, prev_page_button, next_page_button, page_display, current_page_state, total_pages_state]
         )
 
+        # Chat Dictionary stuff
+        def load_chatdict_files(files):
+            entries = []
+            for file in files:
+                entries_dict = parse_user_dict_markdown_file(file.name)
+                logging.debug(f"Loaded entries from {file.name}: {entries_dict.keys()}")
+                for key, content in entries_dict.items():
+                    entries.append(ChatDictionary(key=key, content=content))
+            logging.debug(f"Total entries loaded: {len(entries)}")
+            return entries
+
+        chatdict_files.upload(
+            fn=load_chatdict_files,
+            inputs=[chatdict_files],
+            outputs=[chatdict_entries]
+        )
+
         # TTS Generation and Playback
         def speak_last_response(chatbot):
             """Handle speaking the last chat response."""
@@ -485,7 +551,8 @@ def create_chat_interface():
                 # If there's no chat history, return
                 if not chatbot or len(chatbot) == 0:
                     logging.debug("No messages in chatbot history")
-                    return gr.update(value="No messages to speak", visible=True)
+                    yield gr.update(value="No messages to speak", visible=True), None
+                    return
 
                 # Log the chatbot content for debugging
                 logging.debug(f"Chatbot history: {chatbot}")
@@ -495,46 +562,54 @@ def create_chat_interface():
                 logging.debug(f"Last message to speak: {last_message}")
 
                 # Update status to generating
-                yield gr.update(value="Generating audio...", visible=True)
+                yield gr.update(value="Generating audio...", visible=True), None
 
                 # Generate audio using your preferred TTS provider
                 try:
                     audio_file = generate_audio(
-                        api_key=None, # Use default API key
+                        api_key=None,  # Use default API key
                         text=last_message,
-                        provider="openai",  # or get from config
-                        output_file="last_response.mp3"
+                        provider=None,  # get from config
+                        voice=None,  # get from config
+                        model=None,  # get from config
+                        voice2=None,  # Don't use a second voice for single chat response
+                        output_file="last_response.mp3",
+                        response_format="mp3",
+                        speed=None,  # get from config
                     )
                     logging.debug(f"Generated audio file: {audio_file}")
                 except Exception as e:
                     logging.error(f"Failed to generate audio: {e}")
-                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
+                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True), None
                     return
 
                 # Update status to playing
-                yield gr.update(value="Playing audio...", visible=True)
+                yield gr.update(value="Playing audio...", visible=True), None
 
                 # Play the audio
                 if audio_file and os.path.exists(audio_file):
                     try:
                         play_mp3(audio_file)
-                        yield gr.update(value="Finished playing audio", visible=True)
+                        # After finishing playback, provide the file for download
+                        yield gr.update(value="Finished playing audio", visible=True), audio_file
                     except Exception as e:
                         logging.error(f"Failed to play audio: {e}")
-                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
+                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True), audio_file
                 else:
                     logging.error("Audio file not found")
-                    yield gr.update(value="Failed: Audio file not found", visible=True)
+                    yield gr.update(value="Failed: Audio file not found", visible=True), None
 
             except Exception as e:
                 logging.error(f"Error in speak_last_response: {str(e)}")
-                yield gr.update(value=f"Error: {str(e)}", visible=True)
+                yield gr.update(value=f"Error: {str(e)}", visible=True), None
+
         speak_button.click(
             fn=speak_last_response,
             inputs=[chatbot],
-            outputs=[tts_status],
+            outputs=[tts_status, download_tts],
             api_name="speak_response"
         )
+
         def on_prev_page_click(current_page, total_pages):
             new_page = max(current_page - 1, 1)
             prompts, total_pages, current_page = list_prompts(page=new_page, per_page=20)
@@ -574,7 +649,7 @@ def create_chat_interface():
         submit.click(
             chat_wrapper,
             inputs=[msg, chatbot, media_content, selected_parts, api_endpoint, api_key, user_prompt, conversation_id,
-                    save_conversation, temperature, system_prompt_input, streaming],
+                    save_conversation, temperature, system_prompt_input, streaming, chatdict_entries, max_tokens, strategy],
             outputs=[msg, chatbot, conversation_id]
         ).then(  # Clear the message box after submission
             lambda x: gr.update(value=""),
@@ -977,10 +1052,15 @@ def create_chat_interface_stacked():
                 # Generate audio using your preferred TTS provider
                 try:
                     audio_file = generate_audio(
-                        api_key=None, # Use default API key
+                        api_key=None,  # Use default API key
                         text=last_message,
-                        provider="openai",  # or get from config
-                        output_file="last_response.mp3"
+                        provider=None,  # get from config
+                        voice=None,  # get from config
+                        model=None,  # get from config
+                        voice2=None,  # Don't use a second voice for single chat response
+                        output_file="last_response.mp3",
+                        response_format="mp3",
+                        speed=None,  # get from config
                     )
                     logging.debug(f"Generated audio file: {audio_file}")
                 except Exception as e:

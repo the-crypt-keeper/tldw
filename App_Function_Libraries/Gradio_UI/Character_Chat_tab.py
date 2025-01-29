@@ -35,7 +35,8 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     delete_character_card,
     update_character_card, search_character_chats, save_chat_history_to_character_db,
 )
-from App_Function_Libraries.TTS.TTS_Providers import generate_audio, play_mp3, play_audio_file
+from App_Function_Libraries.TTS.TTS_Providers import generate_audio
+from App_Function_Libraries.TTS.TTS_Providers_Local import play_audio_file
 from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
     default_api_endpoint, load_comprehensive_config
 
@@ -321,15 +322,20 @@ def create_character_card_interaction_tab():
                         maxp_slider = gr.Slider(
                             minimum=0.00, maximum=1.0, value=1.00, step=0.01, label="Top-P"
                         )
+                    with gr.Row():
+                        topk_slider = gr.Slider(
+                            minimum=0, maximum=200, value=0, step=1, label="Top-K"
+                        )
                     chat_file_upload = gr.File(label="Upload Chat History JSON", visible=True)
                     import_chat_button = gr.Button("Import Chat History")
 
                 with gr.Column(scale=2):
                     chat_history = gr.Chatbot(label="Conversation", height=800)
-                    user_input = gr.Textbox(label="Your message")
                     with gr.Row():
                         streaming = gr.Checkbox(label="Enable streaming", value=True, interactive=True)
+                        # FIXME - Add support for auto-speak response
                         auto_speak_checkbox = gr.Checkbox(label="Auto-speak response", value=False, interactive=True)
+                    user_input = gr.Textbox(label="Your message")
                     send_message_button = gr.Button("Send Message")
                     with gr.Row():
                         speak_button = gr.Button("Speak Response")
@@ -502,7 +508,8 @@ def create_character_card_interaction_tab():
                     system_message,
                     streaming,
                     minp=minp,
-                    maxp=maxp
+                    maxp=maxp,
+                    topk=topk_slider.value
                 )
 
                 # Handle streaming response
@@ -766,7 +773,8 @@ def create_character_card_interaction_tab():
                         system_message,
                         streaming,
                         minp=minp,
-                        maxp=maxp
+                        maxp=maxp,
+                        topk=topk_slider.value
                     )
 
                     # Handle streaming response
@@ -907,7 +915,8 @@ def create_character_card_interaction_tab():
                     system_message,
                     streaming,
                     minp=minp,
-                    maxp=maxp
+                    maxp=maxp,
+                    topk=topk_slider.value
                 )
 
                 # Handle streaming response
@@ -983,12 +992,13 @@ def create_character_card_interaction_tab():
                     selected_parts,
                     api_endpoint,
                     api_key,
-                    prompt="",
+                    custom_prompt="",
                     temperature=temperature,
                     system_message=system_message_user,
                     streaming=streaming,
                     minp=minp,
-                    maxp=maxp
+                    maxp=maxp,
+                    topk=topk_slider.value
                 )
 
                 if streaming:
@@ -1009,12 +1019,13 @@ def create_character_card_interaction_tab():
                         selected_parts,
                         api_endpoint,
                         api_key,
-                        prompt=char_data.get('post_history_instructions', ''),
+                        custom_prompt=char_data.get('post_history_instructions', ''),
                         temperature=temperature,
                         system_message=system_message_bot,
                         streaming=streaming,
                         minp=minp,
-                        maxp=maxp
+                        maxp=maxp,
+                        topk=topk_slider.value
                     )
 
                     full_bot_response = ""
@@ -1049,12 +1060,13 @@ def create_character_card_interaction_tab():
                     selected_parts,
                     api_endpoint,
                     api_key,
-                    prompt=char_data.get('post_history_instructions', ''),
+                    custom_prompt=char_data.get('post_history_instructions', ''),
                     temperature=temperature,
                     system_message=system_message_bot,
                     streaming=streaming,
                     minp=minp,
-                    maxp=maxp
+                    maxp=maxp,
+                    topk=topk_slider.value
                 )
 
                 # Replace placeholders in bot message
@@ -1153,7 +1165,8 @@ def create_character_card_interaction_tab():
                     auto_save_checkbox,
                     streaming,
                     minp_slider,
-                    maxp_slider
+                    maxp_slider,
+                    topk_slider
                 ],
                 outputs=[chat_history, save_status]
             ).then(
@@ -1174,7 +1187,8 @@ def create_character_card_interaction_tab():
                     auto_save_checkbox,
                     streaming,
                     minp_slider,
-                    maxp_slider
+                    maxp_slider,
+                    topk_slider
                 ],
                 outputs=[chat_history, save_status]
             ).then(
@@ -1228,7 +1242,8 @@ def create_character_card_interaction_tab():
                     auto_save_checkbox,
                     streaming,
                     minp_slider,
-                    maxp_slider
+                    maxp_slider,
+                    topk_slider
                 ],
                 outputs=[chat_history, save_status],
             ).then(
@@ -1251,7 +1266,8 @@ def create_character_card_interaction_tab():
                     auto_save_checkbox,
                     streaming,
                     minp_slider,
-                    maxp_slider
+                    maxp_slider,
+                    topk_slider
                 ],
                 outputs=[chat_history, save_status]
             ).then(
