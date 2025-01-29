@@ -312,17 +312,17 @@ def test_generate_answer_success(mocker):
         return_value='API response'
     )
 
-    # Mock parse_user_dict_markdown_file so it doesn't try to read a real file
+    # IMPORTANT: Patch the function where it is *used*, i.e. in RAG_Library_2
     mock_parse = mocker.patch(
-        'App_Function_Libraries.Chat.Chat_Functions.parse_user_dict_markdown_file',
-        return_value={'some_key': 'some_value'}  # or whatever data you need
+        'App_Function_Libraries.RAG.RAG_Library_2.parse_user_dict_markdown_file',
+        return_value={'some_key': 'some_value'}
     )
 
     # Now call generate_answer
     result = generate_answer('OpenAI', 'Test context', 'Test query')
     assert result == 'API response'
 
-    # Optionally assert that your parse mock was called, etc.
+    # Optionally, assert that parse was called
     mock_parse.assert_called_once()
 
 
