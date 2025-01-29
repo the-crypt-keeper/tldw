@@ -13,7 +13,9 @@ https://huggingface.co/QuantFactory/gemma-7b-aps-it-GGUF
 https://huggingface.co/google/gemma-7b-aps-it
 https://docs.anthropic.com/en/docs/build-with-claude/citations
 https://mattyyeung.github.io/deterministic-quoting
+https://github.com/tangzhy/RealCritic
 
+https://liveideabench.com/
 
 RAG
   https://www.lycee.ai/blog/rag-ragallucinations-and-how-to-fight-them

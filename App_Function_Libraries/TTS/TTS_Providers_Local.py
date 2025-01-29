@@ -149,7 +149,8 @@ def get_kokoro_model(device: str) -> torch.nn.Module:
 
     if (model_path, device) not in _kokoro_model_cache:
         if not os.path.exists(model_path):
-            url = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v0_19.pth?download=true"
+            # version 0.19
+            url = "https://huggingface.co/hexgrad/kLegacy/resolve/main/v0.19/kokoro-v0_19.pth?download=true"
             logging.info(f"Downloading model from {url}")
             download_file(url, model_path)
         MODEL = build_model(model_path, device=device)
