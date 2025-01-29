@@ -7,18 +7,19 @@ This page serves as documentation regarding the audio processing pipelines withi
 ## Audio Pipelines
 
 
-### Faster_Whisper
-
 
 ### Audio Language Models
 
 
 ### Diarization
- For diarization:
-pyannote/speaker-diarization-3.1 Does a decent job. But I’ve found it creates too many speakers and doesn’t do a perfect job.
+Improvement: https://github.com/revdotcom/reverb
+
+```
+For diarization:
+  pyannote/speaker-diarization-3.1 Does a decent job. But I’ve found it creates too many speakers and doesn’t do a perfect job.
 
 For cleaning up diarization accuracy:
-https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb
+  https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb
 
 The approach I’ve found best to cleanup the diarization (or replace pyannote entirely) is to generate speaker embeddings for each segment whisper generates, then group by matching the speaker embeddings.
 
@@ -29,7 +30,7 @@ If match, add to array of segments for that speaker.
 Else create a new entry for a new speaker.
 
 I have found that to massively reduce the number of speakers found in an audio recording. Though if someone gets emotional or changes their speech significantly it still produces a bonus extra speaker. But far less than before.
-
+```
 
 ### Link Dump:
 https://github.com/kadirnar/whisper-plus
