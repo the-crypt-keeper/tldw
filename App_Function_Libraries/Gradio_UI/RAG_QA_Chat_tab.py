@@ -200,10 +200,10 @@ def create_rag_qa_chat_tab():
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(height=700)
                 msg = gr.Textbox(label="Enter your message")
+                submit = gr.Button("Submit")
                 with gr.Row():
                     speak_button = gr.Button("Speak Response")
                     tts_status = gr.Textbox(label="TTS Status", interactive=False)
-                submit = gr.Button("Submit")
                 clear_chat = gr.Button("Clear Chat History")
 
             with gr.Column(scale=1):

@@ -727,6 +727,14 @@ def process_user_input(user_input, entries, max_tokens=5000, strategy="sorted_ev
 
     return user_input
 
+# Example Usage:
+# 1. Load entries from a Markdown file
+# entries = parse_user_dict_markdown_file('chat_dict.md')
+# 2. Process user input with the entries
+# processed_input = process_user_input(user_input, entries)
+# print(processed_input)
+
+
 #
 # End of Chat Dictionary functions
 #######################################################################################################################
