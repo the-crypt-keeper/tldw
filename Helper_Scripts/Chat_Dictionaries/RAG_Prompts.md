@@ -6,7 +6,7 @@ rag_processing_prompt: |
 
 
 
-
+### Current RAG Prompt in use
 #### Simplified promptflow RAG prompt
 simplified_promptflow_RAG_system_prompt: |
     ## On your profile and general capabilities:
