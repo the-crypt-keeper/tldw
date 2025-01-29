@@ -457,7 +457,7 @@ def test_generate_audio_kokoro():
     try:
         result = generate_audio_kokoro(
             input_text="Hello, this is a test of the Kokoro TTS system.",
-            voice="af_sarah",
+            voice="af_bella",
             use_onnx=False
         )
         if "Error" in result:
@@ -584,7 +584,7 @@ def test_generate_audio_kokoro2():
         logging.debug("Testing Kokoro TTS...")
         result_file = generate_audio_kokoro(
             input_text="Hello, this is a test of the Kokoro TTS system.",
-            voice="af_sarah",
+            voice="af_bella",
             # Dynamically construct the model path
             model_path = os.path.join(base_dir, "kokoro", "kokoro-v0_19.pth"),
             device=None,  # Auto-detect device
