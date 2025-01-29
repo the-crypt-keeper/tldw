@@ -312,8 +312,18 @@ def test_generate_answer_success(mocker):
         return_value='API response'
     )
 
+    # Mock parse_user_dict_markdown_file so it doesn't try to read a real file
+    mock_parse = mocker.patch(
+        'App_Function_Libraries.Chat.Chat_Functions.parse_user_dict_markdown_file',
+        return_value={'some_key': 'some_value'}  # or whatever data you need
+    )
+
+    # Now call generate_answer
     result = generate_answer('OpenAI', 'Test context', 'Test query')
     assert result == 'API response'
+
+    # Optionally assert that your parse mock was called, etc.
+    mock_parse.assert_called_once()
 
 
 def test_enhanced_rag_pipeline_no_results(mocker):
