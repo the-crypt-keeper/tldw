@@ -709,7 +709,7 @@ def load_and_log_configs():
                 'embedding_api_url': embedding_api_url,
                 'embedding_api_key': embedding_api_key,
                 'chunk_size': chunk_size,
-                'overlap': overlap
+                'chunk_overlap': overlap
             },
             'auto-save': {
                 'save_character_chats': save_character_chats,

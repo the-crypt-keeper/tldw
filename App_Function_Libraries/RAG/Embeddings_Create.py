@@ -31,11 +31,11 @@ embedding_provider = loaded_config['embedding_config']['embedding_provider']
 embedding_model = loaded_config['embedding_config']['embedding_model']
 embedding_api_url = loaded_config['embedding_config']['embedding_api_url']
 embedding_api_key = loaded_config['embedding_config']['embedding_api_key']
-model_dir = loaded_config['Embeddings']['model_dir'] or './App_Function_Libraries/models/embedding_models/'
+model_dir = loaded_config['embedding_config']['model_dir'] or './App_Function_Libraries/models/embedding_models/'
 
 # Embedding Chunking Settings
-chunk_size = loaded_config['Embeddings']['chunk_size']
-overlap = loaded_config['Embeddings']['overlap']
+chunk_size = loaded_config['embedding_config']['chunk_size']
+overlap = loaded_config['embedding_config']['chunk_overlap']
 
 # Global cache for embedding models
 embedding_models = {}
