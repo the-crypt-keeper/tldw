@@ -43,6 +43,17 @@ rag_qa_db_path = Databases/RAG_QA_Chat.db
 character_db_path = Databases/chatDB.db
 
 
+[Chunking]
+chunking_method = words
+# 'method' Can be 'words' / 'sentences' / 'paragraphs' / 'semantic' / 'tokens'
+chunk_max_size = 400
+chunk_overlap = 200
+adaptive_chunking = false
+# Use ntlk+punkt to split text into sentences and then ID average sentence length and set that as the chunk size
+chunking_multi_level = false
+language = english
+
+
 [Embeddings]
 embedding_provider = openai
 embedding_model = text-embedding-3-small
@@ -55,17 +66,6 @@ overlap = 200
 # 'embedding_provider' Can be 'openai', 'local', or 'huggingface'
 # `embedding_model` Set to the model name you want to use for embeddings. For OpenAI, this can be 'text-embedding-3-small', or 'text-embedding-3-large'.
 # huggingface: model = dunzhang/stella_en_400M_v5
-
-
-[Chunking]
-method = words
-# 'method' Can be 'words' / 'sentences' / 'paragraphs' / 'semantic' / 'tokens'
-max_size = 400
-overlap = 200
-adaptive = false
-# Use ntlk+punkt to split text into sentences and then ID average sentence length and set that as the chunk size
-multi_level = false
-language = english
 
 
 [API]
@@ -81,8 +81,8 @@ cohere_model = command-r-plus
 cohere_streaming = True
 cohere_temperature = 0.7
 #
-# <deepseek_api_key>
-deepseek_api_key = sk-4d553c368e974e82a27bfa7f0baee49f
+#
+deepseek_api_key = <deepseek_api_key>
 # Options: 'deepseek-chat' or 'deepseek-reasoner'
 deepseek_model = deepseek-chat
 deepseek_streaming = True
@@ -109,7 +109,7 @@ mistral_model = mistral-large-latest
 mistral_streaming = True
 mistral_temperature = 0.7
 #
-# <openai_api_key>
+#
 openai_api_key = <openai_api_key>
 openai_model = gpt-4o
 openai_streaming = False
@@ -327,7 +327,7 @@ search_engine_api_key_kagi = <kagi_api_key>>
 search_engine_searx_api = https://search.rhscz.eu/
 # Serper
 # Tavily
-search_engine_api_key_tavily = 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
+search_engine_api_key_tavily = <tavily_api_key>
 # Yandex
 search_engine_api_key_yandex = 1e1b1b1b1b1b1b1b1
 search_engine_id_yandex = 1e1b1b1b1b1b1b1b1
