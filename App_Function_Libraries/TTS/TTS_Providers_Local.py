@@ -333,7 +333,7 @@ def _handle_pytorch_generation(
 
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     logging.debug("Splitting text into chunks...")
-    text_chunks = split_text_into_sentence_chunks(text, 50, tokenizer)
+    text_chunks = split_text_into_sentence_chunks(text, 150, tokenizer)
 
     logging.debug("Getting Kokoro model and voicepack...")
     # Get default voicepack if not found

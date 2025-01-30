@@ -4,7 +4,7 @@ bert_score
 chardet
 chromadb
 docx2txt
-EbookLib
+ebooklib
 elasticsearch
 fastapi
 faster_whisper
