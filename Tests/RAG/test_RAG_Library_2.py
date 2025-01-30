@@ -302,7 +302,7 @@ def test_generate_answer_success(mocker):
     mock_config = configparser.ConfigParser()
     mock_config['API'] = {'openai_api_key': 'test_key'}
     mocker.patch(
-        'App_Function_Libraries.RAG.RAG_Library_2.load_comprehensive_config',
+        'App_Function_Libraries.RAG.RAG_Library_2.load_and_log_config',
         return_value=mock_config
     )
 
