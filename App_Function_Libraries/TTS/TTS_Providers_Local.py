@@ -6,12 +6,11 @@ import logging
 import os
 import re
 from typing import Optional, Generator
-
-import pyaudio
 #
 # External Imports
 import nltk
 import numpy as np
+import pyaudio
 from pydub.playback import play
 import torch
 from phonemizer import phonemize
@@ -30,7 +29,6 @@ from pydub import AudioSegment, effects  # For optional post-processing
 ########################################################
 #
 # Local Audio Generation Functions
-
 
 def play_mp3(file_path):
     """Play an MP3 file using the pydub library."""
@@ -138,7 +136,7 @@ def get_kokoro_model(device: str) -> torch.nn.Module:
         from App_Function_Libraries.TTS.Kokoro import istftnet
     except ImportError:
         raise ImportError(
-            "The required packages needed for Kokoro are not currently installed. Please follow the instructions in the README to install them.")
+            "The required packages needed for Kokoro are not currently installed, . Please follow the instructions in the README to install them.")
 
     # FIXME - Add check/loading of model from kokoro_model_path in config.txt
     # Construct the correct model path
@@ -182,7 +180,7 @@ def get_kokoro_voicepack(voice: str, device: str) -> torch.Tensor:
 def generate_audio_kokoro(
         input_text: str,
         voice: str = "af",
-        device: Optional[str] = None,
+        device: Optional[str] = "cpu",
         output_format: str = "wav",
         output_file: str = "speech.wav",
         speed: float = 1.0,
@@ -340,10 +338,14 @@ def _handle_pytorch_generation(
     logging.debug("Getting Kokoro model and voicepack...")
     # Get default voicepack if not found
     if voice not in _kokoro_voicepack_cache and not isinstance(voice, str):
+        logging.debug("Voicepack not found, using default voice...")
         voice = "af_bella"
     MODEL = get_kokoro_model(device)
+    logging.debug("Model loaded successfully.")
     VOICEPACK = get_kokoro_voicepack(voice, device)
+    logging.debug("Voicepack loaded successfully.")
     lang = 'a' if voice.startswith('a') else 'b'
+    logging.debug(f"Language set to {'en-us' if lang == 'a' else 'en-gb'}")
 
     audio_segments = []
     logging.debug("Generating audio for text chunks...")
@@ -457,7 +459,7 @@ def test_generate_audio_kokoro():
     try:
         result = generate_audio_kokoro(
             input_text="Hello, this is a test of the Kokoro TTS system.",
-            voice="af_sarah",
+            voice="af_bella",
             use_onnx=False
         )
         if "Error" in result:
@@ -584,9 +586,8 @@ def test_generate_audio_kokoro2():
         logging.debug("Testing Kokoro TTS...")
         result_file = generate_audio_kokoro(
             input_text="Hello, this is a test of the Kokoro TTS system.",
-            voice="af_sarah",
+            voice="af_bella",
             # Dynamically construct the model path
-            model_path = os.path.join(base_dir, "kokoro", "kokoro-v0_19.pth"),
             device=None,  # Auto-detect device
             output_format="wav",
             output_file="kokoro_output.wav",

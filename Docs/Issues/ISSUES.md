@@ -4,6 +4,9 @@
 1. FFmpeg is missing
 2. cudnn8dlops.dll or whatever is missing/not in PATH
    * https://stackoverflow.com/questions/66083545/could-not-load-dynamic-library-cudnn64-8-dll-dlerror-cudnn64-8-dll-not-found
+3. `Numpy is not available` (Fix: `pip install numpy<2`) https://stackoverflow.com/questions/71689095/how-to-solve-the-pytorch-runtimeerror-numpy-is-not-available-without-upgrading
+4. chromadb fails to install - https://github.com/chroma-core/chroma/issues/189
+
 
 
 Inspo
