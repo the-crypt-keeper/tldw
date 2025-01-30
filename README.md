@@ -21,7 +21,7 @@
 </details>
 
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)- Demo is not working!
-- Demo is not currently working and is being fixed. Please use the local version for now.
+- Demo is not currently working and is being updated. Please use the local version for now.
 <details> 
 <summary>Public Demo Info</summary>
 
