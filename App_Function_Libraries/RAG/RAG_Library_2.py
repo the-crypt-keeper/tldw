@@ -7,23 +7,19 @@ import logging
 import os
 import time
 from typing import Dict, Any, List, Optional
-
+#
+# Local Imports
+from App_Function_Libraries.RAG.ChromaDB_Library import vector_search, chroma_client
+from App_Function_Libraries.RAG.RAG_Persona_Chat import perform_vector_search_chat
+from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
+from App_Function_Libraries.DB.DB_Manager import fetch_keywords_for_media, search_media_db, get_notes_by_keywords, \
+    search_conversations_by_keywords
+from App_Function_Libraries.Utils.Utils import load_and_log_configs
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.Chat.Chat_Functions import process_user_input, ChatDictionary, parse_user_dict_markdown_file
 from App_Function_Libraries.DB.Character_Chat_DB import get_character_chats, perform_full_text_search_chat, \
     fetch_keywords_for_chats, search_character_chat, search_character_cards, fetch_character_ids_by_keywords
 from App_Function_Libraries.DB.RAG_QA_Chat_DB import search_rag_chat, search_rag_notes
-#
-# Local Imports
-from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content, vector_search, chroma_client
-from App_Function_Libraries.RAG.Embeddings_Create import loaded_config
-from App_Function_Libraries.RAG.RAG_Persona_Chat import perform_vector_search_chat
-from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_custom_openai
-from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
-from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
-from App_Function_Libraries.DB.DB_Manager import fetch_keywords_for_media, search_media_db, get_notes_by_keywords, \
-    search_conversations_by_keywords
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config, load_and_log_configs
-from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 # 3rd-Party Imports
 import openai

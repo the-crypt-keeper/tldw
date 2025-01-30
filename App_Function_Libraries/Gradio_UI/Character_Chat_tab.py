@@ -38,7 +38,7 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
 from App_Function_Libraries.TTS.TTS_Providers import generate_audio
 from App_Function_Libraries.TTS.TTS_Providers_Local import play_audio_file
 from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
-    default_api_endpoint, load_comprehensive_config
+    default_api_endpoint, load_and_log_configs
 
 
 #
@@ -274,8 +274,8 @@ def create_character_card_interaction_tab():
             with gr.Row():
                 with gr.Column(scale=1):
                     # Checkbox to Decide Whether to Save Chats by Default
-                    config = load_comprehensive_config()
-                    auto_save_value = config.get('auto-save', 'save_character_chats', fallback='False')
+                    loaded_config = load_and_log_configs()
+                    auto_save_value = loaded_config['auto-save']['save_character_chats'] or 'False'
                     auto_save_checkbox = gr.Checkbox(label="Save chats automatically", value=auto_save_value)
                     chat_media_name = gr.Textbox(label="Custom Chat Name (optional)", visible=True)
                     save_chat_history_to_db = gr.Button("Save Chat History to Database")

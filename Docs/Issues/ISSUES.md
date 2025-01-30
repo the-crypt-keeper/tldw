@@ -11,6 +11,7 @@
 
 Inspo
     https://github.com/hoarder-app/hoarder
+    kokoro voice mixing - https://github.com/NeuralFalconYT/Kokoro-82M-WebUI
 
 Testing
     https://tox.wiki/en/4.23.2/

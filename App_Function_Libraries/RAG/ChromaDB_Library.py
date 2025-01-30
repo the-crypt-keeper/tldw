@@ -16,8 +16,8 @@ from App_Function_Libraries.DB.DB_Manager import get_unprocessed_media, mark_med
 from App_Function_Libraries.DB.SQLite_DB import process_chunks
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, create_embeddings_batch
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
-from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, \
-    load_comprehensive_config
+from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, load_and_log_configs
+
 #
 #######################################################################################################################
 #
@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 #
 # Load config
-config = load_comprehensive_config()
+config = load_and_log_configs()
 #
 # ChromaDB settings
 chroma_db_path = config.get('Database', 'chroma_db_path', fallback=get_database_path('chroma_db'))
@@ -37,10 +37,10 @@ ensure_directory_exists(chroma_db_path)
 chroma_client = chromadb.PersistentClient(path=chroma_db_path, settings=Settings(anonymized_telemetry=False))
 #
 # Embedding settings
-embedding_provider = config.get('Embeddings', 'embedding_provider', fallback='openai')
-embedding_model = config.get('Embeddings', 'embedding_model', fallback='text-embedding-3-small')
-embedding_api_key = config.get('Embeddings', 'api_key', fallback='')
-embedding_api_url = config.get('Embeddings', 'api_url', fallback='')
+embedding_provider = config['Embeddings']['embedding_provider'] or 'openai'
+embedding_model = config['Embeddings']['embedding_model'] or 'text-embedding-3-small'
+embedding_api_key = config['Embeddings']['api_key'] or ''
+embedding_api_url = config['Embeddings']['api_url'] or ''
 #
 # End of Config Settings
 #######################################################################################################################

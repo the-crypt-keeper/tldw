@@ -24,7 +24,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 #
 # Import Local
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+from App_Function_Libraries.Utils.Utils import load_and_log_configs
+
+
 #
 #######################################################################################################################
 # Config Settings
@@ -44,15 +46,15 @@ ensure_nltk_data()
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 #
 # Load configuration
-config = load_comprehensive_config()
+config = load_and_log_configs()
 # Embedding Chunking options
 chunk_options = {
-    'method': config.get('Chunking', 'method', fallback='words'),
-    'max_size': config.getint('Chunking', 'max_size', fallback=400),
-    'overlap': config.getint('Chunking', 'overlap', fallback=200),
-    'adaptive': config.getboolean('Chunking', 'adaptive', fallback=False),
-    'multi_level': config.getboolean('Chunking', 'multi_level', fallback=False),
-    'language': config.get('Chunking', 'language', fallback='english')
+    'method': config['chunking_config']['chunking_method'] or 'words',
+    'max_size': config['chunking_config']['chunk_max_size'] or '400',
+    'overlap': config['chunking_config']['chunk_overlap'] or '200',
+    'adaptive': config['chunking_config']['adaptive'] or False,
+    'multi_level': config['chunking_config']['multi_level'] or False,
+    'language': config['chunking_config']['language'] or None
 }
 
 openai_api_key = config.get('API', 'openai_api_key')

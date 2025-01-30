@@ -18,7 +18,7 @@ import torch
 #
 # Local Imports:
 from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config
+from App_Function_Libraries.Utils.Utils import load_and_log_configs
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 #######################################################################################################################
@@ -26,12 +26,12 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 # Functions:
 
 # Load configuration
-loaded_config = load_comprehensive_config()
-embedding_provider = loaded_config['Embeddings']['embedding_provider']
-embedding_model = loaded_config['Embeddings']['embedding_model']
-embedding_api_url = loaded_config['Embeddings']['embedding_api_url']
-embedding_api_key = loaded_config['Embeddings']['embedding_api_key']
-model_dir = loaded_config['Embeddings'].get('model_dir', './App_Function_Libraries/models/embedding_models/')
+loaded_config = load_and_log_configs()
+embedding_provider = loaded_config['embedding_config']['embedding_provider']
+embedding_model = loaded_config['embedding_config']['embedding_model']
+embedding_api_url = loaded_config['embedding_config']['embedding_api_url']
+embedding_api_key = loaded_config['embedding_config']['embedding_api_key']
+model_dir = loaded_config['Embeddings']['model_dir'] or './App_Function_Libraries/models/embedding_models/'
 
 # Embedding Chunking Settings
 chunk_size = loaded_config['Embeddings']['chunk_size']

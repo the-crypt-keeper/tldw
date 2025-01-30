@@ -38,7 +38,7 @@ from scipy.io import wavfile
 from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
 #
 # Import Local
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config, sanitize_filename, load_and_log_configs
+from App_Function_Libraries.Utils.Utils import sanitize_filename, load_and_log_configs
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram, timeit
 #
 #######################################################################################################################
@@ -329,12 +329,10 @@ def transcribe_with_qwen2audio(audio: np.ndarray, sample_rate: int = 16000) -> s
 ##########################################################
 #
 # Faster Whisper related functions
-
 whisper_model_instance = None
-config = load_comprehensive_config()
-processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
+config = load_and_log_configs()
+processing_choice = config['processing_choice'] or 'cpu'
 total_thread_count = multiprocessing.cpu_count()
-
 
 class WhisperModel(OriginalWhisperModel):
     tldw_dir = os.path.dirname(os.path.dirname(__file__))
