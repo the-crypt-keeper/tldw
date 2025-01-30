@@ -111,7 +111,7 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
 
         loaded_config_data = load_and_log_configs()
         kokoro_model_type = loaded_config_data['tts_settings']['default_kokoro_tts_model']
-        if kokoro_model_type == "torch":
+        if kokoro_model_type == "pht":
             use_onnx = False
         else:
             use_onnx = True
