@@ -30,7 +30,7 @@ from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_r
 from App_Function_Libraries.RAG.RAG_QA_Chat import search_database, rag_qa_chat
 from App_Function_Libraries.TTS.TTS_Providers import play_mp3, generate_audio
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, \
-    load_comprehensive_config
+    load_and_log_configs
 
 
 #
@@ -118,8 +118,12 @@ def create_rag_qa_chat_tab():
                 keywords_input = gr.Textbox(label="Keywords (comma-separated) to filter results by)", value="rag_qa_default_keyword" ,visible=True)
                 use_query_rewriting = gr.Checkbox(label="Use Query Rewriting", value=True)
                 use_re_ranking = gr.Checkbox(label="Use Re-ranking", value=True)
-                config = load_comprehensive_config()
-                auto_save_value = config.getboolean('auto-save', 'save_character_chats', fallback=False)
+                loaded_config = load_and_log_configs()
+                auto_save_value = loaded_config['auto-save']['save_character_chats']
+                if auto_save_value is None:
+                    auto_save_value = False
+                else:
+                    auto_save_value = auto_save_value.lower() == True
                 auto_save_checkbox = gr.Checkbox(
                     label="Save chats automatically",
                     value=auto_save_value,

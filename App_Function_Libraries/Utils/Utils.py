@@ -368,6 +368,14 @@ def load_and_log_configs():
         processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
         logging.debug(f"Processing choice set to: {processing_choice}")
 
+        # Retrieve Chunking settings from the configuration file
+        chunking_method = config.get('Chunking', 'chunking_method', fallback='words')
+        chunk_max_size = config.get('Chunking', 'chunk_max_size', fallback='400')
+        chunk_overlap = config.get('Chunking', 'chunk_overlap', fallback='200')
+        adaptive_chunking = config.get('Chunking', 'adaptive_chunking', fallback='False')
+        chunking_multi_level = config.get('Chunking', 'chunking_multi_level', fallback='False')
+        chunk_language = config.get('Chunking', 'chunk_language', fallback='en')
+
         # Retrieve Embedding model settings from the configuration file
         embedding_model = config.get('Embeddings', 'embedding_model', fallback='')
         logging.debug(f"Embedding model set to: {embedding_model}")
@@ -676,6 +684,14 @@ def load_and_log_configs():
                 'chat_dict_replacement_strategy': chat_dict_replacement_strategy,
                 'chat_dict_max_tokens': chat_dict_max_tokens,
                 'default_rag_prompt': default_rag_prompt
+            },
+            'chunking_config': {
+                'chunking_method': chunking_method,
+                'chunk_max_size': chunk_max_size,
+                'adaptive_chunking': adaptive_chunking,
+                'multi_level': chunking_multi_level,
+                'chunk_language': chunk_language,
+                'chunk_overlap': chunk_overlap
             },
             'db_config': {
                 'prompt_path': get_project_relative_path(config.get('Prompts', 'prompt_path', fallback='Databases/prompts.db')),
