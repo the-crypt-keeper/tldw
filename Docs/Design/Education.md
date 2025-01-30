@@ -16,7 +16,7 @@ https://github.com/met4citizen/TalkingHead
 https://github.com/Rolandjg/skool4free
 https://paperswithcode.com/paper/into-the-unknown-unknowns-engaged-human
 https://arxiv.org/pdf/2501.09092
-
+https://knowt.com/
 
 
 one2manny

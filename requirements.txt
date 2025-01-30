@@ -18,7 +18,6 @@ html2text
 jieba
 Jinja2
 joblib
-langchain
 langdetect
 lxml_html_clean
 mwparserfromhell
