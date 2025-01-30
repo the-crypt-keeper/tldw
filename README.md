@@ -20,8 +20,8 @@
 - If you're reading this, then you're already on the latest version, so you can just update the config file and you'll be good to go.
 </details>
 
-### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)- Demo is now working!
-- (I have no idea when it started working... Checked the other day and it was rendering properly... New issue is my HF API keys keep expiring? Not really sure what's going on there.)
+### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)- Demo is not working!
+- Demo is not currently working and is being fixed. Please use the local version for now.
 <details> 
 <summary>Public Demo Info</summary>
 
