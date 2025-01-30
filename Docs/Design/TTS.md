@@ -147,6 +147,7 @@ MaskGCT
     https://huggingface.co/amphion/MaskGCT
 MeloTTS
     https://github.com/myshell-ai/MeloTTS
+    https://huggingface.co/myshell-ai
 Mimic
     https://github.com/MycroftAI/mimic3
 MoonShine

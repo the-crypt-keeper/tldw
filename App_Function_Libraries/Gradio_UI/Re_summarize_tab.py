@@ -15,8 +15,7 @@ from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import fetch_item_details, fetch_items_by_keyword, \
     fetch_items_by_content, fetch_items_by_title_or_url
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_chunk
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config, default_api_endpoint, global_api_endpoints, \
-    format_api_name
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
 #
 ######################################################################################################################
 #
@@ -258,8 +257,6 @@ def resummarize_content_wrapper(selected_item, item_mapping, api_name, api_key=N
 # FIXME - should be moved...
 def resummarize_content(selected_item, item_mapping, content, api_name, api_key=None, chunk_options=None, summarization_prompt=None):
     logging.debug(f"resummarize_content called with selected_item: {selected_item}")
-    # Load configuration
-    config = load_comprehensive_config()
 
     # Chunking logic
     if chunk_options:
@@ -268,23 +265,25 @@ def resummarize_content(selected_item, item_mapping, content, api_name, api_key=
         chunks = [{'text': content, 'metadata': {}}]
 
     # Use default prompt if not provided
+    # FIXME - USE CHAT DICTIONARY HERE
     if not summarization_prompt:
-        summarization_prompt = config.get('Prompts', 'default_summary_prompt', fallback="""<s>You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
-**Bulleted Note Creation Guidelines**
-
-**Headings**:
-- Based on referenced topics, not categories like quotes or terms
-- Surrounded by **bold** formatting 
-- Not listed as bullet points
-- No space between headings and list items underneath
-
-**Emphasis**:
-- **Important terms** set in bold font
-- **Text ending in a colon**: also bolded
-
-**Review**:
-- Ensure adherence to specified format
-- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }}""")
+        summarization_prompt = """<s>You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
+                                    **Bulleted Note Creation Guidelines**
+                                    
+                                    **Headings**:
+                                    - Based on referenced topics, not categories like quotes or terms
+                                    - Surrounded by **bold** formatting 
+                                    - Not listed as bullet points
+                                    - No space between headings and list items underneath
+                                    
+                                    **Emphasis**:
+                                    - **Important terms** set in bold font
+                                    - **Text ending in a colon**: also bolded
+                                    
+                                    **Review**:
+                                    - Ensure adherence to specified format
+                                    - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }}
+                                """
 
     # Summarization logic
     summaries = []
