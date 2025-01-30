@@ -1,3 +1,73 @@
+[Processing]
+processing_choice = cuda
+
+[Chat-Dictionaries]
+enable_chat_dictionaries = True
+post_gen_replacement = False
+post_gen_replacement_dict = ./Helper_Scripts/Chat_Dictionaries/Post_Gen_Replacements.md
+chat_dictionary_chat_prompts = ./Helper_Scripts/Chat_Dictionaries/Chat_Prompts.md
+chat_dictionary_RAG_prompts = ./Helper_Scripts/Chat_Dictionaries/RAG_Prompts.md
+strategy = character_lore_first
+max_tokens = 1000
+default_rag_prompt = simplified_promptflow_RAG_system_prompt
+
+
+[Settings]
+chunk_duration = 30
+words_per_second = 3
+save_character_chats = False
+save_rag_chats = False
+
+
+[Auto-Save]
+save_character_chats = False
+save_rag_chats = False
+
+
+[Prompts]
+prompt_sample = "What is the meaning of life?"
+video_summarize_prompt = "Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary."
+
+
+[Database]
+type = sqlite
+sqlite_path = Databases/media_summary.db
+backup_path = ./tldw_DB_Backups/
+#Path to the backup location for the database. If the path does not exist, the backup will not be created.
+elasticsearch_host = localhost
+elasticsearch_port = 9200
+# Additionally you can use elasticsearch as the database type, just replace `sqlite` with `elasticsearch` for `type` and provide the `elasticsearch_host` and `elasticsearch_port` of your configured ES instance.
+chroma_db_path = Databases/chroma_db
+prompts_db_path = Databases/prompts.db
+rag_qa_db_path = Databases/RAG_QA_Chat.db
+character_db_path = Databases/chatDB.db
+
+
+[Embeddings]
+embedding_provider = openai
+embedding_model = text-embedding-3-small
+onnx_model_path = ./App_Function_Libraries/models/onnx_models/
+model_dir = ./App_Function_Libraries/models/embedding_models
+embedding_api_url = http://localhost:8080/v1/embeddings
+embedding_api_key = your_api_key_here
+chunk_size = 400
+overlap = 200
+# 'embedding_provider' Can be 'openai', 'local', or 'huggingface'
+# `embedding_model` Set to the model name you want to use for embeddings. For OpenAI, this can be 'text-embedding-3-small', or 'text-embedding-3-large'.
+# huggingface: model = dunzhang/stella_en_400M_v5
+
+
+[Chunking]
+method = words
+# 'method' Can be 'words' / 'sentences' / 'paragraphs' / 'semantic' / 'tokens'
+max_size = 400
+overlap = 200
+adaptive = false
+# Use ntlk+punkt to split text into sentences and then ID average sentence length and set that as the chunk size
+multi_level = false
+language = english
+
+
 [API]
 anthropic_api_key = <anthropic_api_key>
 anthropic_model = claude-3-5-sonnet-20240620
@@ -11,7 +81,8 @@ cohere_model = command-r-plus
 cohere_streaming = True
 cohere_temperature = 0.7
 #
-deepseek_api_key = <deepseek_api_key>
+# <deepseek_api_key>
+deepseek_api_key = sk-4d553c368e974e82a27bfa7f0baee49f
 # Options: 'deepseek-chat' or 'deepseek-reasoner'
 deepseek_model = deepseek-chat
 deepseek_streaming = True
@@ -38,6 +109,7 @@ mistral_model = mistral-large-latest
 mistral_streaming = True
 mistral_temperature = 0.7
 #
+# <openai_api_key>
 openai_api_key = <openai_api_key>
 openai_model = gpt-4o
 openai_streaming = False
@@ -125,28 +197,6 @@ top_p = 0.9
 min_p = 0.05
 # https://artefact2.github.io/llm-sampling/
 
-[Processing]
-processing_choice = cuda
-
-[Chat-Dictionaries]
-enable_chat_dictionaries = True
-post_gen_replacement = False
-post_gen_replacement_dict = ./Helper_Scripts/Chat_Dictionaries/Post_Gen_Replacements.md
-chat_dictionary_chat_prompts = ./Helper_Scripts/Chat_Dictionaries/Chat_Prompts.md
-chat_dictionary_RAG_prompts = ./Helper_Scripts/Chat_Dictionaries/RAG_Prompts.md
-strategy = character_lore_first
-max_tokens = 1000
-
-[Settings]
-# Rename to LLM_API_Settings
-chunk_duration = 30
-words_per_second = 3
-save_character_chats = False
-save_rag_chats = False
-
-[Auto-Save]
-save_character_chats = False
-save_rag_chats = False
 
 [TTS-Settings]
 # General TTS Settings
@@ -282,54 +332,15 @@ search_engine_api_key_tavily = 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
 search_engine_api_key_yandex = 1e1b1b1b1b1b1b1b1
 search_engine_id_yandex = 1e1b1b1b1b1b1b1b1
 
-[Prompts]
-prompt_sample = "What is the meaning of life?"
-video_summarize_prompt = "Above is the transcript of a video. Please read through the transcript carefully. Identify the main topics that are discussed over the course of the transcript. Then, summarize the key points about each main topic in bullet points. The bullet points should cover the key information conveyed about each topic in the video, but should be much shorter than the full transcript. Please output your bullet point summary inside <bulletpoints> tags. Do not repeat yourself while writing the summary."
-
-
-[Database]
-type = sqlite
-sqlite_path = Databases/media_summary.db
-backup_path = ./tldw_DB_Backups/
-#Path to the backup location for the database. If the path does not exist, the backup will not be created.
-elasticsearch_host = localhost
-elasticsearch_port = 9200
-# Additionally you can use elasticsearch as the database type, just replace `sqlite` with `elasticsearch` for `type` and provide the `elasticsearch_host` and `elasticsearch_port` of your configured ES instance.
-chroma_db_path = Databases/chroma_db
-prompts_db_path = Databases/prompts.db
-rag_qa_db_path = Databases/RAG_QA_Chat.db
-character_db_path = Databases/chatDB.db
-
-[Embeddings]
-embedding_provider = openai
-embedding_model = text-embedding-3-small
-onnx_model_path = ./App_Function_Libraries/models/onnx_models/
-model_dir = ./App_Function_Libraries/models/embedding_models
-embedding_api_url = http://localhost:8080/v1/embeddings
-embedding_api_key = your_api_key_here
-chunk_size = 400
-overlap = 200
-# 'embedding_provider' Can be 'openai', 'local', or 'huggingface'
-# `embedding_model` Set to the model name you want to use for embeddings. For OpenAI, this can be 'text-embedding-3-small', or 'text-embedding-3-large'.
-# huggingface: model = dunzhang/stella_en_400M_v5
-
-[Chunking]
-method = words
-# 'method' Can be 'words' / 'sentences' / 'paragraphs' / 'semantic' / 'tokens'
-max_size = 400
-overlap = 200
-adaptive = false
-# Use ntlk+punkt to split text into sentences and then ID average sentence length and set that as the chunk size
-multi_level = false
-language = english
 
 [Metrics]
-log_file_path =
+log_file_path = ./Logs/tldw_app_logs.json
 #os.getenv("tldw_LOG_FILE_PATH", "tldw_app_logs.json")
 max_bytes =
 #int(os.getenv("tldw_LOG_MAX_BYTES", 10 * 1024 * 1024))  # 10 MB
 backup_count = 5
 #int(os.getenv("tldw_LOG_BACKUP_COUNT", 5))
+
 
 #[Comments]
 #OpenAI Models:

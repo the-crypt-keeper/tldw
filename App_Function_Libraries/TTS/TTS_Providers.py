@@ -20,11 +20,10 @@ import numpy as np
 import torch
 from phonemizer import phonemize
 import soundfile as sf
-
-from App_Function_Libraries.TTS.TTS_Providers_Local import play_mp3, generate_audio_kokoro
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data
+from App_Function_Libraries.TTS.TTS_Providers_Local import play_mp3, generate_audio_kokoro
 #
 #######################################################################################################################
 #
@@ -41,6 +40,7 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
 
     # Get default provider if none specified
     if not provider:
+        loaded_config_data = load_and_log_configs()
         provider = loaded_config_data['tts_settings'].get('default_tts_provider', 'openai')
         logging.info(f"No provider specified, using default: {provider}")
 
@@ -103,13 +103,30 @@ def generate_audio(api_key, text, provider, voice=None, model=None, voice2=None,
 
     elif provider == "kokoro":
         logging.info("Using Kokoro TTS provider")
+        # Check if the local Kokoro TTS provider is enabled
+        # FIXME
+        # Add check for torch vs onnx
+        if voice == "alloy" or None:
+            voice = "af_bella"
+
+        kokoro_model_type = loaded_config_data['tts_settings']['default_kokoro_tts_model']
+        if kokoro_model_type == "torch":
+            use_onnx = False
+        else:
+            use_onnx = True
+
         return generate_audio_kokoro(
             input_text=text,
             voice=voice,
             device=loaded_config_data['tts_settings'].get('local_tts_device', 'cpu'),
             output_format=response_format or 'wav',
             output_file=output_file or 'speech.wav',
-            speed=1.0
+            speed=1.0,
+            post_process=True,
+            use_onnx=use_onnx,
+            onnx_model_path='kokoro-v0_19.onnx',
+            onnx_voices_json='voices.json',
+            stream=streaming,
         )
 
     else:
