@@ -115,7 +115,7 @@ def create_embeddings_tab():
                 )
                 chunk_overlap = gr.Slider(
                     minimum=0, maximum=4000, step=1,
-                    value=config['embedding_config']['overlap'],
+                    value=config['embedding_config']['chunk_overlap'],
                     label="Chunk Overlap"
                 )
                 adaptive_chunking = gr.Checkbox(

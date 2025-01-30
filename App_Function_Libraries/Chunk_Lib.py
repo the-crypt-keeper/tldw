@@ -52,9 +52,9 @@ chunk_options = {
     'method': config['chunking_config']['chunking_method'] or 'words',
     'max_size': config['chunking_config']['chunk_max_size'] or '400',
     'overlap': config['chunking_config']['chunk_overlap'] or '200',
-    'adaptive': config['chunking_config']['adaptive'] or False,
+    'adaptive': config['chunking_config']['adaptive_chunking'] or False,
     'multi_level': config['chunking_config']['multi_level'] or False,
-    'language': config['chunking_config']['language'] or None
+    'language': config['chunking_config']['chunk_language'] or None
 }
 
 openai_api_key = config.get('API', 'openai_api_key')
