@@ -19,6 +19,8 @@ https://arxiv.org/abs/2412.18082
 https://blog.badsectorlabs.com/files/blogs.txt
 https://arxiv.org/abs/2412.08604
 https://arxiv.org/abs/2411.18814
+https://github.com/fabriziosalmi/UglyFeed
+
 https://blog.badsectorlabs.com/files/blogs.txt
 https://github.com/YuanchenBei/Awesome-Cold-Start-Recommendation
 https://arxiv.org/abs/2501.16302
