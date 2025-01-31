@@ -9,7 +9,7 @@ import time
 from typing import Tuple, List, Union, Dict
 #
 # 3rd-Party Libraries
-from elasticsearch import Elasticsearch
+#from elasticsearch import Elasticsearch
 #
 # Import your existing SQLite functions
 from App_Function_Libraries.DB.SQLite_DB import DatabaseError
