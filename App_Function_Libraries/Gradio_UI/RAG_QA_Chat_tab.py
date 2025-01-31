@@ -801,22 +801,26 @@ Rewritten Question:"""
         )
 
         # TTS Generation and Playback
-        def speak_last_response(chat_history):
+        def speak_last_response(chatbot):
             """Generate audio for the last response and return the audio file"""
             logging.debug("Starting speak_last_response")
             try:
-                if not chat_history or len(chat_history) == 0:
+                if not chatbot or len(chatbot) == 0:
                     return "No messages to speak", None
 
-                last_message = chat_history[-1][1]
+                last_message = chatbot[-1][1]
                 logging.debug(f"Last message to speak: {last_message}")
+
+                # Generate unique filename
+                timestamp = int(time.time())
+                output_file = f"response_{timestamp}.mp3"
 
                 # Generate audio file
                 audio_file = generate_audio(
+                    api_key=None,
                     text=last_message,
                     provider="openai",
-                    output_file=f"response_{int(time.time())}.mp3",  # Unique filename
-                    api_key=None
+                    output_file=output_file
                 )
 
                 if audio_file and os.path.exists(audio_file):
