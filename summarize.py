@@ -10,6 +10,9 @@ import signal
 import sys
 import threading
 import time
+
+import nltk
+
 #
 # Local Library Imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
@@ -61,6 +64,12 @@ backup_count = int(os.getenv("tldw_LOG_BACKUP_COUNT", 5))
 file_handler = RotatingFileHandler(
     log_file_path, maxBytes=max_bytes, backupCount=backup_count
 )
+
+logging.debug("Checking for nltk install...")
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt', quiet=True)
 
 #
 #######################

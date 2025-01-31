@@ -3,6 +3,7 @@
 #
 # Imports
 import os
+import time
 from datetime import datetime
 import re
 import tempfile
@@ -333,13 +334,13 @@ def create_character_card_interaction_tab():
                     chat_history = gr.Chatbot(label="Conversation", height=800)
                     with gr.Row():
                         streaming = gr.Checkbox(label="Enable streaming", value=True, interactive=True)
-                        # FIXME - Add support for auto-speak response
-                        auto_speak_checkbox = gr.Checkbox(label="Auto-speak response", value=False, interactive=True)
                     user_input = gr.Textbox(label="Your message")
                     send_message_button = gr.Button("Send Message")
                     with gr.Row():
                         speak_button = gr.Button("Speak Response")
                         tts_status = gr.Textbox(label="TTS Status", interactive=False)
+                    with gr.Row():
+                        audio_output = gr.Audio(label="Generated Audio", visible=False)
                     with gr.Row():
                         answer_for_me_button = gr.Button("Answer for Me")
                         continue_talking_button = gr.Button("Continue Talking")
@@ -442,7 +443,7 @@ def create_character_card_interaction_tab():
 
             def character_chat_wrapper(
                     message, history, char_data, api_endpoint, api_key,
-                    temperature, user_name_val, auto_save, streaming, minp, maxp
+                    temperature, user_name_val, auto_save, streaming, minp, maxp, topk_slider
             ):
                 if not char_data:
                     return history, "Please select a character first."
@@ -509,7 +510,7 @@ def create_character_card_interaction_tab():
                     streaming,
                     minp=minp,
                     maxp=maxp,
-                    topk=topk_slider.value
+                    topk=topk_slider
                 )
 
                 # Handle streaming response
@@ -774,7 +775,7 @@ def create_character_card_interaction_tab():
                         streaming,
                         minp=minp,
                         maxp=maxp,
-                        topk=topk_slider.value
+                        topk=topk_slider
                     )
 
                     # Handle streaming response
@@ -916,7 +917,7 @@ def create_character_card_interaction_tab():
                     streaming,
                     minp=minp,
                     maxp=maxp,
-                    topk=topk_slider.value
+                    topk=topk_slider
                 )
 
                 # Handle streaming response
@@ -998,7 +999,7 @@ def create_character_card_interaction_tab():
                     streaming=streaming,
                     minp=minp,
                     maxp=maxp,
-                    topk=topk_slider.value
+                    topk=topk_slider
                 )
 
                 if streaming:
@@ -1025,7 +1026,7 @@ def create_character_card_interaction_tab():
                         streaming=streaming,
                         minp=minp,
                         maxp=maxp,
-                        topk=topk_slider.value
+                        topk=topk_slider
                     )
 
                     full_bot_response = ""
@@ -1066,7 +1067,7 @@ def create_character_card_interaction_tab():
                     streaming=streaming,
                     minp=minp,
                     maxp=maxp,
-                    topk=topk_slider.value
+                    topk=topk_slider
                 )
 
                 # Replace placeholders in bot message
@@ -1094,63 +1095,40 @@ def create_character_card_interaction_tab():
             media_content = gr.State({})
             # TTS Generation and Playback
             def speak_last_response(chat_history):
-                """Handle speaking the last chat response."""
+                """Generate audio for the last response and return the audio file"""
                 logging.debug("Starting speak_last_response")
                 try:
-                    # If there's no chat history, return
                     if not chat_history or len(chat_history) == 0:
-                        logging.debug("No messages in chat history")
-                        return gr.update(value="No messages to speak", visible=True)
+                        return "No messages to speak", None
 
-                    # Log the chat history content for debugging
-                    logging.debug(f"Chat history: {chat_history}")
-
-                    # Get the last message from the assistant
-                    last_message = chat_history[-1][1]  # Second element of the last tuple
+                    last_message = chat_history[-1][1]
                     logging.debug(f"Last message to speak: {last_message}")
 
-                    # Update status to generating
-                    yield gr.update(value="Generating audio...", visible=True)
+                    # Generate audio file
+                    audio_file = generate_audio(
+                        text=last_message,
+                        provider="openai",
+                        output_file=f"response_{int(time.time())}.mp3",  # Unique filename
+                        api_key=None
+                    )
 
-                    # Generate audio using your preferred TTS provider
-                    try:
-                        audio_file = generate_audio(
-                            text=last_message,
-                            provider="openai",  # or get from config
-                            output_file="last_response.mp3",
-                            api_key=None
-                        )
-                        logging.debug(f"Generated audio file: {audio_file}")
-                    except Exception as e:
-                        logging.error(f"Failed to generate audio: {e}")
-                        yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
-                        return
-
-                    # Update status to playing
-                    yield gr.update(value="Playing audio...", visible=True)
-
-                    # Play the audio
                     if audio_file and os.path.exists(audio_file):
-                        try:
-                            play_audio_file(audio_file)
-                            yield gr.update(value="Finished playing audio", visible=True)
-                        except Exception as e:
-                            logging.error(f"Failed to play audio: {e}")
-                            yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
-                    else:
-                        logging.error("Audio file not found")
-                        yield gr.update(value="Failed: Audio file not found", visible=True)
+                        return "Audio ready", audio_file
+                    return "Audio generation failed", None
 
                 except Exception as e:
                     logging.error(f"Error in speak_last_response: {str(e)}")
-                    yield gr.update(value=f"Error: {str(e)}", visible=True)
+                    return f"Error: {str(e)}", None
 
             # Button Callbacks
             speak_button.click(
                 fn=speak_last_response,
-                inputs=[chat_history],  # Use chat_history instead of chatbot
-                outputs=[tts_status],
+                inputs=[chat_history],
+                outputs=[tts_status, audio_output],
                 api_name="speak_response"
+            ).then(
+                lambda: gr.update(visible=True),
+                outputs=audio_output
             )
             # Add the new button callbacks here
             answer_for_me_button.click(
