@@ -130,6 +130,7 @@ def split_text_into_sentence_chunks(text: str, max_tokens: int, tokenizer) -> li
 def get_kokoro_model(device: str) -> torch.nn.Module:
     """Retrieve the Kokoro model from the proper directory, cached if already loaded with dynamic downloading."""
     global _kokoro_model_cache
+    logging.debug("Getting Kokoro model...")
     try:
         from App_Function_Libraries.TTS.Kokoro.kokoro import generate
         from App_Function_Libraries.TTS.Kokoro.models import build_model

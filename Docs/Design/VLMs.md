@@ -90,3 +90,4 @@ Qwen 2.5VL
     https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct
     https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct
     https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct
+    https://github.com/QwenLM/Qwen2.5-VL/tree/main/cookbooks

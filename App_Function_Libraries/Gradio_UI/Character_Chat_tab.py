@@ -442,7 +442,7 @@ def create_character_card_interaction_tab():
 
             def character_chat_wrapper(
                     message, history, char_data, api_endpoint, api_key,
-                    temperature, user_name_val, auto_save, streaming, minp, maxp
+                    temperature, user_name_val, auto_save, streaming, minp, maxp, topk_slider
             ):
                 if not char_data:
                     return history, "Please select a character first."
@@ -509,7 +509,7 @@ def create_character_card_interaction_tab():
                     streaming,
                     minp=minp,
                     maxp=maxp,
-                    topk=topk_slider.value
+                    topk=topk_slider
                 )
 
                 # Handle streaming response
@@ -774,7 +774,7 @@ def create_character_card_interaction_tab():
                         streaming,
                         minp=minp,
                         maxp=maxp,
-                        topk=topk_slider.value
+                        topk=topk_slider
                     )
 
                     # Handle streaming response
@@ -916,7 +916,7 @@ def create_character_card_interaction_tab():
                     streaming,
                     minp=minp,
                     maxp=maxp,
-                    topk=topk_slider.value
+                    topk=topk_slider
                 )
 
                 # Handle streaming response
@@ -998,7 +998,7 @@ def create_character_card_interaction_tab():
                     streaming=streaming,
                     minp=minp,
                     maxp=maxp,
-                    topk=topk_slider.value
+                    topk=topk_slider
                 )
 
                 if streaming:
@@ -1025,7 +1025,7 @@ def create_character_card_interaction_tab():
                         streaming=streaming,
                         minp=minp,
                         maxp=maxp,
-                        topk=topk_slider.value
+                        topk=topk_slider
                     )
 
                     full_bot_response = ""
@@ -1066,7 +1066,7 @@ def create_character_card_interaction_tab():
                     streaming=streaming,
                     minp=minp,
                     maxp=maxp,
-                    topk=topk_slider.value
+                    topk=topk_slider
                 )
 
                 # Replace placeholders in bot message
