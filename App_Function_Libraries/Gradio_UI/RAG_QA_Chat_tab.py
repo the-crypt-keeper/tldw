@@ -7,6 +7,7 @@ import logging
 import json
 import os
 import re
+import time
 from datetime import datetime
 #
 # External Imports
@@ -208,6 +209,8 @@ def create_rag_qa_chat_tab():
                 with gr.Row():
                     speak_button = gr.Button("Speak Response")
                     tts_status = gr.Textbox(label="TTS Status", interactive=False)
+                with gr.Row():
+                    audio_output = gr.Audio(label="Generated Audio", visible=False)
                 clear_chat = gr.Button("Clear Chat History")
 
             with gr.Column(scale=1):
@@ -798,62 +801,40 @@ Rewritten Question:"""
         )
 
         # TTS Generation and Playback
-        def speak_last_response(chatbot):
-            """Handle speaking the last chat response."""
+        def speak_last_response(chat_history):
+            """Generate audio for the last response and return the audio file"""
             logging.debug("Starting speak_last_response")
             try:
-                # If there's no chat history, return
-                if not chatbot or len(chatbot) == 0:
-                    logging.debug("No messages in chatbot history")
-                    return gr.update(value="No messages to speak", visible=True)
+                if not chat_history or len(chat_history) == 0:
+                    return "No messages to speak", None
 
-                # Log the chatbot content for debugging
-                logging.debug(f"Chatbot history: {chatbot}")
-
-                # Get the last message from the assistant
-                last_message = chatbot[-1][1]
+                last_message = chat_history[-1][1]
                 logging.debug(f"Last message to speak: {last_message}")
 
-                # Update status to generating
-                yield gr.update(value="Generating audio...", visible=True)
+                # Generate audio file
+                audio_file = generate_audio(
+                    text=last_message,
+                    provider="openai",
+                    output_file=f"response_{int(time.time())}.mp3",  # Unique filename
+                    api_key=None
+                )
 
-                # Generate audio using your preferred TTS provider
-                try:
-                    audio_file = generate_audio(
-                        api_key=None, # Use default API key
-                        text=last_message,
-                        provider="openai",  # or get from config
-                        output_file="last_response.mp3"
-                    )
-                    logging.debug(f"Generated audio file: {audio_file}")
-                except Exception as e:
-                    logging.error(f"Failed to generate audio: {e}")
-                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
-                    return
-
-                # Update status to playing
-                yield gr.update(value="Playing audio...", visible=True)
-
-                # Play the audio
                 if audio_file and os.path.exists(audio_file):
-                    try:
-                        play_mp3(audio_file)
-                        yield gr.update(value="Finished playing audio", visible=True)
-                    except Exception as e:
-                        logging.error(f"Failed to play audio: {e}")
-                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
-                else:
-                    logging.error("Audio file not found")
-                    yield gr.update(value="Failed: Audio file not found", visible=True)
+                    return "Audio ready", audio_file
+                return "Audio generation failed", None
 
             except Exception as e:
                 logging.error(f"Error in speak_last_response: {str(e)}")
-                yield gr.update(value=f"Error: {str(e)}", visible=True)
+                return f"Error: {str(e)}", None
+
         speak_button.click(
             fn=speak_last_response,
             inputs=[chatbot],
-            outputs=[tts_status],
+            outputs=[tts_status, audio_output],
             api_name="speak_response"
+        ).then(
+            lambda: gr.update(visible=True),
+            outputs=audio_output
         )
 
     return (
