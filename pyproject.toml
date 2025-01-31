@@ -15,7 +15,10 @@ authors = [
 ]
 
 dependencies = [
+  'arxiv',
+  'playwright',
   "beautifulsoup4",
+  'trafilatura',
   "bert_score",
   "chardet",
   "chromadb",
@@ -25,6 +28,8 @@ dependencies = [
   "fire",
   "FlashRank",
   "fugashi",
+  'genanki',
+  'gradio',
   "html2text",
   "jieba",
   "Jinja2",

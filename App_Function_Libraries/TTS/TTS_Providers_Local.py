@@ -13,7 +13,6 @@ import numpy as np
 import pyaudio
 from pydub.playback import play
 import torch
-from phonemizer import phonemize
 from transformers import AutoTokenizer
 #
 # Local Imports
