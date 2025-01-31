@@ -448,10 +448,11 @@ def create_chat_interface():
                 with gr.Row():
                     speak_button = gr.Button("Speak Response")
                     tts_status = gr.Textbox(label="TTS Status", interactive=False)
+                with gr.Row():
+                    audio_output = gr.Audio(label="Generated Audio", visible=False)
                 regenerate_button = gr.Button("Regenerate Last Message")
                 with gr.Row():
                     token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
-                    download_tts = gr.File(label="Download TTS Audio", interactive=False)
                     clear_chat_button = gr.Button("Clear Chat", elem_id="clear_chat_btn")
                 chat_media_name = gr.Textbox(label="Custom Chat Name(optional)")
                 with gr.Row():
@@ -544,70 +545,40 @@ def create_chat_interface():
         )
 
         # TTS Generation and Playback
-        def speak_last_response(chatbot):
-            """Handle speaking the last chat response."""
+        def speak_last_response(chat_history):
+            """Generate audio for the last response and return the audio file"""
             logging.debug("Starting speak_last_response")
             try:
-                # If there's no chat history, return
-                if not chatbot or len(chatbot) == 0:
-                    logging.debug("No messages in chatbot history")
-                    yield gr.update(value="No messages to speak", visible=True), None
-                    return
+                if not chat_history or len(chat_history) == 0:
+                    return "No messages to speak", None
 
-                # Log the chatbot content for debugging
-                logging.debug(f"Chatbot history: {chatbot}")
-
-                # Get the last message from the assistant
-                last_message = chatbot[-1][1]
+                last_message = chat_history[-1][1]
                 logging.debug(f"Last message to speak: {last_message}")
 
-                # Update status to generating
-                yield gr.update(value="Generating audio...", visible=True), None
+                # Generate audio file
+                audio_file = generate_audio(
+                    text=last_message,
+                    provider="openai",
+                    output_file=f"response_{int(time.time())}.mp3",  # Unique filename
+                    api_key=None
+                )
 
-                # Generate audio using your preferred TTS provider
-                try:
-                    audio_file = generate_audio(
-                        api_key=None,  # Use default API key
-                        text=last_message,
-                        provider=None,  # get from config
-                        voice=None,  # get from config
-                        model=None,  # get from config
-                        voice2=None,  # Don't use a second voice for single chat response
-                        output_file="last_response.mp3",
-                        response_format="mp3",
-                        speed=None,  # get from config
-                    )
-                    logging.debug(f"Generated audio file: {audio_file}")
-                except Exception as e:
-                    logging.error(f"Failed to generate audio: {e}")
-                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True), None
-                    return
-
-                # Update status to playing
-                yield gr.update(value="Playing audio...", visible=True), None
-
-                # Play the audio
                 if audio_file and os.path.exists(audio_file):
-                    try:
-                        play_mp3(audio_file)
-                        # After finishing playback, provide the file for download
-                        yield gr.update(value="Finished playing audio", visible=True), audio_file
-                    except Exception as e:
-                        logging.error(f"Failed to play audio: {e}")
-                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True), audio_file
-                else:
-                    logging.error("Audio file not found")
-                    yield gr.update(value="Failed: Audio file not found", visible=True), None
+                    return "Audio ready", audio_file
+                return "Audio generation failed", None
 
             except Exception as e:
                 logging.error(f"Error in speak_last_response: {str(e)}")
-                yield gr.update(value=f"Error: {str(e)}", visible=True), None
+                return f"Error: {str(e)}", None
 
         speak_button.click(
             fn=speak_last_response,
-            inputs=[chatbot],
-            outputs=[tts_status, download_tts],
+            inputs=[chat_history],
+            outputs=[tts_status, audio_output],
             api_name="speak_response"
+        ).then(
+            lambda: gr.update(visible=True),
+            outputs=audio_output
         )
 
         def on_prev_page_click(current_page, total_pages):
@@ -840,6 +811,8 @@ def create_chat_interface_stacked():
                 with gr.Row():
                     speak_button = gr.Button("Speak Response")
                     tts_status = gr.Textbox(label="TTS Status", interactive=False)
+                with gr.Row():
+                    audio_output = gr.Audio(label="Generated Audio", visible=False)
                 regenerate_button = gr.Button("Regenerate Last Message")
                 with gr.Row():
                     token_count_display = gr.Number(label="Approximate Token Count", value=0, interactive=False)
@@ -1030,67 +1003,40 @@ def create_chat_interface_stacked():
             outputs=[preset_prompt, page_display, current_page_state]
         )
         # TTS Generation and Playback
-        def speak_last_response(chatbot):
-            """Handle speaking the last chat response."""
+        def speak_last_response(chat_history):
+            """Generate audio for the last response and return the audio file"""
             logging.debug("Starting speak_last_response")
             try:
-                # If there's no chat history, return
-                if not chatbot or len(chatbot) == 0:
-                    logging.debug("No messages in chatbot history")
-                    return gr.update(value="No messages to speak", visible=True)
+                if not chat_history or len(chat_history) == 0:
+                    return "No messages to speak", None
 
-                # Log the chatbot content for debugging
-                logging.debug(f"Chatbot history: {chatbot}")
-
-                # Get the last message from the assistant
-                last_message = chatbot[-1][1]
+                last_message = chat_history[-1][1]
                 logging.debug(f"Last message to speak: {last_message}")
 
-                # Update status to generating
-                yield gr.update(value="Generating audio...", visible=True)
+                # Generate audio file
+                audio_file = generate_audio(
+                    text=last_message,
+                    provider="openai",
+                    output_file=f"response_{int(time.time())}.mp3",  # Unique filename
+                    api_key=None
+                )
 
-                # Generate audio using your preferred TTS provider
-                try:
-                    audio_file = generate_audio(
-                        api_key=None,  # Use default API key
-                        text=last_message,
-                        provider=None,  # get from config
-                        voice=None,  # get from config
-                        model=None,  # get from config
-                        voice2=None,  # Don't use a second voice for single chat response
-                        output_file="last_response.mp3",
-                        response_format="mp3",
-                        speed=None,  # get from config
-                    )
-                    logging.debug(f"Generated audio file: {audio_file}")
-                except Exception as e:
-                    logging.error(f"Failed to generate audio: {e}")
-                    yield gr.update(value=f"Failed to generate audio: {str(e)}", visible=True)
-                    return
-
-                # Update status to playing
-                yield gr.update(value="Playing audio...", visible=True)
-
-                # Play the audio
                 if audio_file and os.path.exists(audio_file):
-                    try:
-                        play_mp3(audio_file)
-                        yield gr.update(value="Finished playing audio", visible=True)
-                    except Exception as e:
-                        logging.error(f"Failed to play audio: {e}")
-                        yield gr.update(value=f"Failed to play audio: {str(e)}", visible=True)
-                else:
-                    logging.error("Audio file not found")
-                    yield gr.update(value="Failed: Audio file not found", visible=True)
+                    return "Audio ready", audio_file
+                return "Audio generation failed", None
 
             except Exception as e:
                 logging.error(f"Error in speak_last_response: {str(e)}")
-                yield gr.update(value=f"Error: {str(e)}", visible=True)
+                return f"Error: {str(e)}", None
+
         speak_button.click(
             fn=speak_last_response,
-            inputs=[chatbot],
-            outputs=[tts_status],
+            inputs=[chat_history],
+            outputs=[tts_status, audio_output],
             api_name="speak_response"
+        ).then(
+            lambda: gr.update(visible=True),
+            outputs=audio_output
         )
         # Update prompts when a preset is selected
         preset_prompt.change(
