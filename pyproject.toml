@@ -1,14 +1,14 @@
 # Placeholder for now
-[project]
+[tldw]
 name = "tldw"
 version = "0.0.11.1"
 description = "A naive attempt at 'A Young Lady's Illustrated Primer'."
 authors = ["Robert Musser contact@tldwproject.com"]
-license = "Apache2.0"
+license = ["Apache2.0"]
 readme = "README.md"
 requires-python = ">=3.9"
 
-[project.urls]
+[tldw.urls]
 Homepage = "https://tldwproject.com"
 Documenttion = "https://docs.tldwproject.com"
 Repository = "https://github.com/rmusser01/tldw"
@@ -64,7 +64,7 @@ dependencies = [
 
 ]
 
-[project.optional-dependencies]
+[tldw.optional-dependencies]
 gradio = [
     "fastapi",
     "gradio",
@@ -155,3 +155,5 @@ all = [
 [build-system]
 requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["App_Function_Libraries"]
