@@ -2,24 +2,13 @@
 # Description: This file contains the functions to allow for usage of different TTS providers.
 #
 # Imports
-import json
 import logging
 import os
-import re
 import tempfile
-import time
-import uuid
 #
 # External Imports
 #import edge_tts
 import requests
-from openai import api_key
-from pydub import AudioSegment
-from pydub.playback import play
-import numpy as np
-import torch
-from phonemizer import phonemize
-import soundfile as sf
 #
 # Local Imports
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data
