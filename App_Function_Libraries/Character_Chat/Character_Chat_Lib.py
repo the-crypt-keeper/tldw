@@ -2,13 +2,13 @@
 # Description: Functions for character chat cards.
 #
 # Imports
-import configparser
 import json
 import logging
 import io
 import base64
+import re
 import time
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Union, cast
 #
 # External Imports
 from PIL import Image
@@ -16,7 +16,6 @@ from PIL import Image
 # Local imports
 from App_Function_Libraries.DB.DB_Manager import get_character_card_by_id, get_character_chat_by_id
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
-from App_Function_Libraries.Utils.Utils import get_project_relative_path
 #
 # Constants
 ####################################################################################################
@@ -24,10 +23,7 @@ from App_Function_Libraries.Utils.Utils import get_project_relative_path
 # Functions
 # Using https://github.com/malfoyslastname/character-card-spec-v2 as the standard for v2 character cards
 
-
-
-
-#################################################################################
+###############################################
 #
 # Placeholder functions:
 
@@ -399,6 +395,100 @@ def process_chat_history(chat_history: List[Tuple[str, str]], char_name: str, us
         logging.error(f"Error processing chat history: {e}")
         raise
 
+#
+#################################################################################
+# Character card parsing & Validation functions:
+#
+
+def parse_v2_card(card_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Parse a version 2 character card. Ensures the spec_version is '2.0' and required fields are present.
+    Optionally parses additional fields like creator_notes, system_prompt, etc.
+    """
+    try:
+        # Validate the spec_version
+        if card_data.get('spec_version') != '2.0':
+            logging.warning(f"Unsupported V2 spec version: {card_data.get('spec_version')}")
+            return None
+
+        # 'data' should hold the actual card information.
+        data = card_data.get('data', {})
+        # List of fields that must be present in V2.
+        required_fields = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example']
+        for field in required_fields:
+            if field not in data:
+                logging.error(f"Missing required field in V2 card: {field}")
+                return None
+
+        # Build the parsed data dict including both required and optional fields.
+        parsed_data = {
+            'name': data['name'],
+            'description': data['description'],
+            'personality': data['personality'],
+            'scenario': data['scenario'],
+            'first_mes': data['first_mes'],
+            'mes_example': data['mes_example'],
+            'creator_notes': data.get('creator_notes', ''),
+            'system_prompt': data.get('system_prompt', ''),
+            'post_history_instructions': data.get('post_history_instructions', ''),
+            'alternate_greetings': data.get('alternate_greetings', []),
+            'tags': data.get('tags', []),
+            'creator': data.get('creator', ''),
+            'character_version': data.get('character_version', ''),
+            'extensions': data.get('extensions', {})
+        }
+
+        # If a character book is provided, parse it (assuming parse_character_book is defined elsewhere).
+        if 'character_book' in data:
+            parsed_data['character_book'] = parse_character_book(data['character_book'])
+
+        return parsed_data
+
+    except KeyError as e:
+        logging.error(f"Missing key in V2 card structure: {e}")
+    except Exception as e:
+        logging.error(f"Error parsing V2 card: {e}")
+    return None
+
+
+def parse_v1_card(card_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert a V1 card into a format compatible with V2. Checks for required fields and moves any
+    additional fields into the 'extensions' key.
+    """
+    # List of fields required in a V1 card.
+    required_fields = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example']
+    for field in required_fields:
+        if field not in card_data:
+            logging.error(f"Missing required field in V1 card: {field}")
+            raise ValueError(f"Missing required field in V1 card: {field}")
+
+    # Create a new dict in V2 format using available V1 data.
+    v2_data: Dict[str, Union[str, List[str], Dict[str, Any]]] = {
+        'name': card_data['name'],
+        'description': card_data['description'],
+        'personality': card_data['personality'],
+        'scenario': card_data['scenario'],
+        'first_mes': card_data['first_mes'],
+        'mes_example': card_data['mes_example'],
+        'creator_notes': cast(str, card_data.get('creator_notes', '')),
+        'system_prompt': cast(str, card_data.get('system_prompt', '')),
+        'post_history_instructions': cast(str, card_data.get('post_history_instructions', '')),
+        'alternate_greetings': cast(List[str], card_data.get('alternate_greetings', [])),
+        'tags': cast(List[str], card_data.get('tags', [])),
+        'creator': cast(str, card_data.get('creator', '')),
+        'character_version': cast(str, card_data.get('character_version', '')),
+        'extensions': {}
+    }
+
+    # Place any additional (non-standard) V1 fields into the 'extensions' dictionary.
+    for key, value in card_data.items():
+        if key not in v2_data:
+            v2_data['extensions'][key] = value
+
+    return v2_data
+
+
 def validate_character_book(book_data):
     """
     Validate the 'character_book' field in the character card.
@@ -518,8 +608,7 @@ def validate_character_book_entry(entry, idx, entry_ids):
     if 'id' in entry:
         entry_id = entry['id']
         if entry_id in entry_ids:
-            validation_messages.append \
-                (f"Entry {idx}: Duplicate 'id' value '{entry_id}'. Each entry 'id' must be unique.")
+            validation_messages.append(f"Entry {idx}: \Duplicate 'id' value '{entry_id}'.\ Each entry 'id' must be unique.")
         else:
             entry_ids.add(entry_id)
 
@@ -628,6 +717,121 @@ def validate_v2_card(card_data):
 
     is_valid = len(validation_messages) == 0
     return is_valid, validation_messages
+
+
+def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
+    """
+    Import and parse a character card from JSON. If the card is in V2 format (i.e. it contains
+    "spec": "chara_card_v2"), it is processed with parse_v2_card; otherwise, it is assumed to be a V1 card
+    and converted via parse_v1_card.
+    """
+    try:
+        # Remove any leading/trailing whitespace and log the preview.
+        json_content = json_content.strip()
+        logging.debug(f"JSON content (first 100 chars): {json_content[:100]}...")
+
+        # Attempt to load the JSON.
+        card_data = json.loads(json_content)
+        logging.debug(f"Parsed JSON data keys: {list(card_data.keys())}")
+
+        # Check if it is a V2 card.
+        if card_data.get('spec') == 'chara_card_v2':
+            logging.info("Detected V2 character card")
+            parsed_card = parse_v2_card(card_data)
+            if parsed_card is None:
+                logging.error("Failed to parse V2 character card")
+            return parsed_card
+        else:
+            logging.info("Assuming V1 character card")
+            return parse_v1_card(card_data)
+
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON decode error: {e}")
+        logging.error(f"Problematic JSON content (first 500 chars): {json_content[:500]}...")
+    except Exception as e:
+        logging.error(f"Unexpected error parsing JSON: {e}")
+    return None
+
+
+def load_character_card(file) -> Optional[Dict[str, Any]]:
+    """
+    Load a character card from a file that may be in Markdown or JSON format.
+
+    The function supports:
+      - Direct JSON files (content starts with '{')
+      - Markdown files containing YAML front matter (delimited by '---')
+      - Markdown files containing a code block with JSON (delimited by triple backticks)
+
+    Args:
+        file: A file-like object or string containing the character card data.
+
+    Returns:
+        A dictionary representing the character card, or None if an error occurs.
+
+    Raises:
+        ImportError: If YAML front matter is detected but PyYAML is not installed.
+        ValueError: If no valid character card data is found.
+    """
+    log_counter("load_character_card_attempt")
+    start_time = time.time()
+    try:
+        # Read the file content (handle bytes or string)
+        content = file.read() if hasattr(file, 'read') else file
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
+        # Reset pointer if applicable
+        if hasattr(file, 'seek'):
+            file.seek(0)
+
+        # Remove BOM (if present) and extra whitespace
+        content = content.replace("\ufeff", "").strip()
+
+        # If the content is a JSON object
+        if content.startswith('{'):
+            card_data = json.loads(content)
+        # If the content starts with YAML front matter
+        elif content.startswith('---'):
+            try:
+                import yaml
+            except ImportError:
+                raise ImportError(
+                    "PyYAML is required for loading YAML front matter from Markdown files. Install it via 'pip install PyYAML'.")
+            parts = content.split('---')
+            if len(parts) >= 3:
+                yaml_content = parts[1].strip()
+                card_data = yaml.safe_load(yaml_content)
+            else:
+                raise ValueError("Invalid Markdown front matter format.")
+        else:
+            # Look for a JSON code block enclosed in triple backticks
+            pattern = re.compile(r"```(?:json)?\s*(\{.*\})\s*```", re.DOTALL)
+            match = pattern.search(content)
+            if match:
+                json_str = match.group(1)
+                card_data = json.loads(json_str)
+            else:
+                raise ValueError("No valid character card data found in the provided file.")
+        load_duration = time.time() - start_time
+        log_histogram("load_character_card_duration", load_duration)
+        log_counter("load_character_card_success")
+        return card_data
+    except Exception as e:
+        log_counter("load_character_card_error", labels={"error": str(e)})
+        logging.error(f"Error loading character card: {e}")
+        return None
+
+# # Usage:
+# with open('my_character_card.md', 'rb') as card_file:
+#     card_data = load_character_card(card_file)
+# # Validation
+# if card_data:
+#     is_valid, messages = validate_v2_card(card_data)
+#     if is_valid:
+#         print("Character card is valid!")
+#     else:
+#         print("Validation issues:", messages)
+# else:
+#     print("Failed to load character card.")
 
 #
 # End of File
