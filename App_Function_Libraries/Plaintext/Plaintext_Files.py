@@ -212,7 +212,7 @@ def preview_import_handler(
                 results_for_ui.append(f"❌ {filename} => {str(e)}")
 
     # Convert list of file info dicts to JSON so we can store in gr.State or similar
-    preview_data_json = json.dumps(preview_list, ensure_ascii=False)
+    preview_data_json = json.dumps(preview_list, ensure_ascii=True)
     status_message = "\n".join(results_for_ui)
 
     return status_message, preview_data_json
@@ -275,9 +275,10 @@ def _preview_single_file(
         combined_prompt = (system_prompt or "") + "\n\n" + (user_prompt or "")
         summary = perform_summarization(
             api_name=api_name,
-            text=content,
-            prompt=combined_prompt,
-            api_key=api_key
+            input_data=content,
+            custom_prompt=combined_prompt,
+            api_key=api_key,
+            recursive_summarization=False,
         )
 
     if not summary:
