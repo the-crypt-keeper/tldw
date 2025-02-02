@@ -63,7 +63,7 @@ def extract_text_from_segments(segments, include_timestamps=True):
         if isinstance(data, dict):
             text = data.get('Text', '')
             if include_timestamps and 'Time_Start' in data and 'Time_End' in data:
-                return f"{data['Time_Start']:.2f}s - {data['Time_End']:.2f}s | {text}"
+                return f"{data['Time_Start']}s - {data['Time_End']}s | {text}"
             for key, value in data.items():
                 if key == 'Text':
                     return value
@@ -363,6 +363,9 @@ def load_and_log_configs():
         # Retrieve output paths from the configuration file
         output_path = config.get('Paths', 'output_path', fallback='results')
         logging.debug(f"Output path set to: {output_path}")
+
+        # Save video transcripts
+        save_video_transcripts = config.get('Paths', 'save_video_transcripts', fallback='True')
 
         # Retrieve processing choice from the configuration file
         processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
@@ -674,6 +677,9 @@ def load_and_log_configs():
                 'local_api_retry_delay': local_api_retry_delay,
             },
             'output_path': output_path,
+            'system_preferences': {
+                'save_video_transcripts': save_video_transcripts,
+            },
             'processing_choice': processing_choice,
             'chat_dictionaries': {
                 'enable_chat_dictionaries': enable_chat_dictionaries,
