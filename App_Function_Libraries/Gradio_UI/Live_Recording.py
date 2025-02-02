@@ -3,6 +3,7 @@
 #
 # Import necessary modules and functions
 import logging
+import os
 import queue
 import threading
 import time
@@ -263,6 +264,7 @@ def toggle_recording(
 
         # Transcribe
         audio_np = np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32) / 32768.0
+
         try:
             final_res = transcribe_audio(
                 audio_np,
@@ -280,9 +282,13 @@ def toggle_recording(
         # Save the WAV => for audio player
         audio_file = save_audio_temp(audio_np)
         if not save_recording:
-            # FIXME
-            # Optionally remove it after some time
-            pass
+            # Create a background thread that will delete the file after 15 seconds
+            removal_thread = threading.Thread(
+                target=remove_file_after_delay,
+                args=(audio_file, 15),
+                daemon=True
+            )
+            removal_thread.start()
 
         return (
             None,
@@ -356,6 +362,13 @@ def save_transcription_to_db(transcription, custom_title):
 
 def update_custom_title_visibility(save_to_db):
     return gr.update(visible=save_to_db)
+
+
+def remove_file_after_delay(file_path, delay=15):
+    """Remove a file after `delay` seconds."""
+    time.sleep(delay)
+    if os.path.exists(file_path):
+        os.remove(file_path)
 
 
 #################### MAIN TAB ####################

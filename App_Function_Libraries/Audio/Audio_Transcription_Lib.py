@@ -669,7 +669,7 @@ def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
 
 
 @timeit
-def save_audio_temp(audio_data, sample_rate=24000):
+def save_audio_temp(audio_data, sample_rate=16000):
     """Save audio data to temporary WAV file with proper format handling."""
     log_counter("save_audio_temp_attempt")
 
