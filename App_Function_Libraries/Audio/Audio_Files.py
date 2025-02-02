@@ -126,7 +126,9 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
                 start = segment.get('Time_Start', 0)
                 end = segment.get('Time_End', 0)
                 text = segment.get('Text', '').strip()
-                formatted_segments.append(f"[{start:.2f}-{end:.2f}] {text}")
+                start_time = time.strftime('%H:%M:%S', time.gmtime(start))
+                end_time = time.strftime('%H:%M:%S', time.gmtime(end))
+                formatted_segments.append(f"[{start_time}-{end_time}] {text}")
 
             # Join the segments with a newline to ensure proper formatting
             return "\n".join(formatted_segments)

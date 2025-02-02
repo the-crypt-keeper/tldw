@@ -25,7 +25,7 @@ from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_metadata_from_p
 
 def create_pdf_ingestion_tab():
     with gr.TabItem("PDF Ingestion", visible=True):
-        gr.Markdown("# Ingest PDF Files and Extract Metadata")
+        gr.Markdown("# Ingest PDF(/pptx) Files and Extract Metadata (Docling Supports parsing of pptx files)")
         with gr.Row():
             with gr.Column():
                 # Changed to support multiple files
@@ -217,7 +217,7 @@ def create_pdf_ingestion_test_tab():
                 test_button_3 = gr.Button("Test Docling PDF Ingestion")
             with gr.Column():
                 test_output = gr.Textbox(label="Test Result")
-                pdf_content_output = gr.Textbox(label="PDF Content", lines=200)
+                pdf_content_output = gr.Textbox(label="PDF Content", lines=200, elem_id="scrollable-textbox")
         test_button.click(
             fn=test_pymupdf_pdf_ingestion,
             inputs=[pdf_file_input],

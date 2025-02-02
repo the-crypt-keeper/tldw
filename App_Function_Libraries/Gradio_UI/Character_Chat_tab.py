@@ -12,7 +12,7 @@ import json
 import logging
 import io
 import base64
-from typing import Dict, Any, Optional, List, Tuple, Union, cast
+from typing import Dict, Any, Optional, List, Tuple
 import zipfile
 #
 # External Imports
@@ -21,8 +21,9 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Character_Chat.Character_Chat_Lib import validate_character_book, validate_v2_card, \
-    replace_placeholders, replace_user_placeholder, extract_json_from_image, parse_character_book, \
-    load_chat_and_character, load_chat_history, load_character_and_image, extract_character_id, load_character_wrapper
+    replace_placeholders, replace_user_placeholder, extract_json_from_image, load_chat_and_character, \
+    load_chat_history, load_character_and_image, extract_character_id, load_character_wrapper, \
+    load_character_card, parse_v2_card, parse_v1_card
 from App_Function_Libraries.Chat.Chat_Functions import chat, approximate_token_count
 from App_Function_Libraries.DB.Character_Chat_DB import (
     add_character_card,
@@ -37,11 +38,8 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
     update_character_card, search_character_chats, save_chat_history_to_character_db,
 )
 from App_Function_Libraries.TTS.TTS_Providers import generate_audio
-from App_Function_Libraries.TTS.TTS_Providers_Local import play_audio_file
 from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
     default_api_endpoint, load_and_log_configs
-
-
 #
 ############################################################################################################
 #
@@ -51,40 +49,72 @@ from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_n
 #
 # Character card import functions:
 
-def import_character_card(file):
+def import_character_card(file) -> Any:
     if file is None:
+        logging.error("No file provided for character card import.")
         return None, gr.update(), "No file provided for character card import"
 
     try:
+        # If the file is an image (PNG or WEBP), extract JSON from the image.
         if file.name.lower().endswith(('.png', '.webp')):
+            logging.debug("File is an image. Extracting JSON data from the image.")
             json_data = extract_json_from_image(file)
             if not json_data:
-                return None, gr.update(), "No character card data found in the image. This might not be a valid character card image."
-        elif file.name.lower().endswith('.json'):
-            with open(file.name, 'r', encoding='utf-8') as f:
-                json_data = f.read()
+                logging.error("No character card data found in the image.")
+                return None, gr.update(), (
+                    "No character card data found in the image. "
+                    "This might not be a valid character card image."
+                )
+            logging.debug("Parsing character card JSON extracted from image.")
+            card_data = import_character_card_json(json_data)
+
+        # If the file is JSON or Markdown, use the load_character_card helper.
+        elif file.name.lower().endswith(('.json', '.md', '.markdown')):
+            logging.debug("File is JSON or Markdown. Loading character card data.")
+            card_data = load_character_card(file)
+            if not card_data:
+                logging.error("Failed to parse character card data from file.")
+                return None, gr.update(), (
+                    "Failed to parse character card data. "
+                    "The file might not contain valid character information."
+                )
+            # If the returned data is a JSON string, parse it.
+            if isinstance(card_data, str):
+                logging.debug("Character card data is a string. Parsing as JSON.")
+                card_data = import_character_card_json(card_data)
+            else:
+                logging.debug("Character card data is already a dictionary.")
+
         else:
-            return None, gr.update(), "Unsupported file type. Please upload a PNG/WebP image or a JSON file."
+            logging.error("Unsupported file type.")
+            return None, gr.update(), (
+                "Unsupported file type. Please upload a PNG/WebP image, a JSON file, or a Markdown file."
+            )
 
-        card_data = import_character_card_json(json_data)
         if not card_data:
-            return None, gr.update(), "Failed to parse character card data. The file might not contain valid character information."
+            logging.error("Failed to parse character card data after processing.")
+            return None, gr.update(), (
+                "Failed to parse character card data. The file might not contain valid character information."
+            )
 
-        # Save image data for PNG/WebP files
+        # If the file was an image, save the image data in the card data.
         if file.name.lower().endswith(('.png', '.webp')):
+            logging.debug("Processing image to embed image data into card_data.")
             with Image.open(file) as img:
                 img_byte_arr = io.BytesIO()
                 img.save(img_byte_arr, format='PNG')
                 card_data['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
 
-        # Save character card to database
+        # Save the character card to the database.
+        logging.debug("Saving character card to the database.")
         character_id = add_character_card(card_data)
         if character_id:
+            logging.info(f"Character card '{card_data.get('name', 'Unknown')}' imported successfully with id: {character_id}.")
             characters = get_character_cards()
             character_names = [char['name'] for char in characters]
-            return card_data, gr.update(
-                choices=character_names), f"Character card '{card_data['name']}' imported successfully."
+            return card_data, gr.update(choices=character_names), f"Character card '{card_data['name']}' imported successfully."
         else:
+            logging.error(f"Failed to save character card '{card_data.get('name', 'Unknown')}'. It may already exist.")
             return None, gr.update(), f"Failed to save character card '{card_data.get('name', 'Unknown')}'. It may already exist."
     except Exception as e:
         logging.error(f"Error importing character card: {e}")
@@ -92,101 +122,37 @@ def import_character_card(file):
 
 
 def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
+    """
+    Import and parse a character card from JSON. If the card is in V2 format (i.e. it contains
+    "spec": "chara_card_v2"), it is processed with parse_v2_card; otherwise, it is assumed to be a V1 card
+    and converted via parse_v1_card.
+    """
     try:
+        # Remove any leading/trailing whitespace and log the preview.
         json_content = json_content.strip()
-        card_data = json.loads(json_content)
+        logging.debug(f"JSON content (first 100 chars): {json_content[:100]}...")
 
-        if 'spec' in card_data and card_data['spec'] == 'chara_card_v2':
+        # Attempt to load the JSON.
+        card_data = json.loads(json_content)
+        logging.debug(f"Parsed JSON data keys: {list(card_data.keys())}")
+
+        # Check if it is a V2 card.
+        if card_data.get('spec') == 'chara_card_v2':
             logging.info("Detected V2 character card")
-            return parse_v2_card(card_data)
+            parsed_card = parse_v2_card(card_data)
+            if parsed_card is None:
+                logging.error("Failed to parse V2 character card")
+            return parsed_card
         else:
             logging.info("Assuming V1 character card")
             return parse_v1_card(card_data)
+
     except json.JSONDecodeError as e:
         logging.error(f"JSON decode error: {e}")
+        logging.error(f"Problematic JSON content (first 500 chars): {json_content[:500]}...")
     except Exception as e:
         logging.error(f"Unexpected error parsing JSON: {e}")
     return None
-
-
-
-def parse_v2_card(card_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    try:
-        # Validate spec_version
-        if card_data.get('spec_version') != '2.0':
-            logging.warning(f"Unsupported V2 spec version: {card_data.get('spec_version')}")
-            return None
-
-        data = card_data['data']
-
-        # Ensure all required fields are present
-        required_fields = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example']
-        for field in required_fields:
-            if field not in data:
-                logging.error(f"Missing required field in V2 card: {field}")
-                return None
-
-        # Handle new V2 fields
-        parsed_data = {
-            'name': data['name'],
-            'description': data['description'],
-            'personality': data['personality'],
-            'scenario': data['scenario'],
-            'first_mes': data['first_mes'],
-            'mes_example': data['mes_example'],
-            'creator_notes': data.get('creator_notes', ''),
-            'system_prompt': data.get('system_prompt', ''),
-            'post_history_instructions': data.get('post_history_instructions', ''),
-            'alternate_greetings': data.get('alternate_greetings', []),
-            'tags': data.get('tags', []),
-            'creator': data.get('creator', ''),
-            'character_version': data.get('character_version', ''),
-            'extensions': data.get('extensions', {})
-        }
-
-        # Handle character_book if present
-        if 'character_book' in data:
-            parsed_data['character_book'] = parse_character_book(data['character_book'])
-
-        return parsed_data
-    except KeyError as e:
-        logging.error(f"Missing key in V2 card structure: {e}")
-    except Exception as e:
-        logging.error(f"Error parsing V2 card: {e}")
-    return None
-
-def parse_v1_card(card_data: Dict[str, Any]) -> Dict[str, Any]:
-    # Ensure all required V1 fields are present
-    required_fields = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example']
-    for field in required_fields:
-        if field not in card_data:
-            logging.error(f"Missing required field in V1 card: {field}")
-            raise ValueError(f"Missing required field in V1 card: {field}")
-
-    # Convert V1 to V2 format
-    v2_data: Dict[str, Union[str, List[str], Dict[str, Any]]] = {
-        'name': card_data['name'],
-        'description': card_data['description'],
-        'personality': card_data['personality'],
-        'scenario': card_data['scenario'],
-        'first_mes': card_data['first_mes'],
-        'mes_example': card_data['mes_example'],
-        'creator_notes': cast(str, card_data.get('creator_notes', '')),
-        'system_prompt': cast(str, card_data.get('system_prompt', '')),
-        'post_history_instructions': cast(str, card_data.get('post_history_instructions', '')),
-        'alternate_greetings': cast(List[str], card_data.get('alternate_greetings', [])),
-        'tags': cast(List[str], card_data.get('tags', [])),
-        'creator': cast(str, card_data.get('creator', '')),
-        'character_version': cast(str, card_data.get('character_version', '')),
-        'extensions': {}
-    }
-
-    # Move any non-standard V1 fields to extensions
-    for key, value in card_data.items():
-        if key not in v2_data:
-            v2_data['extensions'][key] = value
-
-    return v2_data
 
 #
 # End of Character card import functions
@@ -296,7 +262,7 @@ def create_character_card_interaction_tab():
                     character_image = gr.Image(label="Character Image", type="pil")
                     character_card_upload = gr.File(
                         label="Upload Character Card (PNG, WEBP, JSON)",
-                        file_types=[".png", ".webp", ".json"]
+                        file_types=[".png", ".webp", ".json", ".md"]
                     )
                     import_card_button = gr.Button("Import Character Card")
                     load_characters_button = gr.Button("Load Existing Characters")
@@ -394,7 +360,6 @@ def create_character_card_interaction_tab():
                 except Exception as e:
                     logging.error(f"Error loading selected chat: {e}")
                     return None, [], None, f"Error loading chat: {e}"
-
 
             def import_chat_history(file, current_history, char_data, user_name_val):
                 """
@@ -1349,7 +1314,7 @@ def create_character_chat_mgmt_tab():
                 gr.Markdown("## Import Characters")
                 character_files = gr.File(
                     label="Upload Character Files (PNG, WEBP, JSON)",
-                    file_types=[".png", ".webp", ".json"],
+                    file_types=[".png", ".webp", ".json", ".md"],
                     file_count="multiple"
                 )
                 import_characters_button = gr.Button("Import Characters")
@@ -1608,6 +1573,7 @@ def create_character_chat_mgmt_tab():
                 <p><strong>Version:</strong> {character.get('character_version', 'N/A')}</p>
             </div>
             """
+
         def import_multiple_characters(files):
             if not files:
                 return "No files provided for character import."
@@ -2058,7 +2024,7 @@ def create_character_card_validation_tab():
                 # File uploader
                 file_upload = gr.File(
                     label="Upload Character Card (PNG, WEBP, JSON)",
-                    file_types=[".png", ".webp", ".json"]
+                    file_types=[".png", ".webp", ".json", ".md"]
                 )
                 # Validation button
                 validate_button = gr.Button("Validate Character Card")

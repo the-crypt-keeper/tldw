@@ -182,6 +182,8 @@ PiperTTS - A fast, local neural text to speech system that is optimized for the 
 PiperUI
 RVC
     https://www.youtube.com/watch?v=Q8du7n0vgfU
+Seed-VC
+    https://github.com/Plachtaa/seed-vc
 Sherpa ONNX
     https://github.com/k2-fsa/sherpa-onnx
 Silero

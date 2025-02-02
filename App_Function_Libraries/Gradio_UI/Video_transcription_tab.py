@@ -22,7 +22,7 @@ from App_Function_Libraries.Summarization.Summarization_General_Lib import perfo
     save_transcription_and_summary
 from App_Function_Libraries.Utils.Utils import convert_to_seconds, safe_read_file, format_transcription, \
     create_download_directory, generate_unique_identifier, extract_text_from_segments, default_api_endpoint, \
-    global_api_endpoints, format_api_name
+    global_api_endpoints, format_api_name, load_and_log_configs
 from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls, extract_metadata, download_video
 from App_Function_Libraries.Benchmarks_Evaluations.ms_g_eval import run_geval
 # Import metrics logging
@@ -43,7 +43,7 @@ def create_video_transcription_tab():
     except Exception as e:
         logging.error(f"Error setting default API endpoint: {str(e)}")
         default_value = None
-    with gr.TabItem("Video Transcription + Summarization", visible=True):
+    with (gr.TabItem("Video Transcription + Summarization", visible=True)):
         gr.Markdown("# Transcribe & Summarize Videos from URLs")
         with gr.Row():
             gr.Markdown("""Follow this project at [tldw - GitHub](https://github.com/rmusser01/tldw)""")
@@ -680,8 +680,13 @@ def create_video_transcription_tab():
                     logging.info(f"Starting process_url_metadata for URL: {input_item}")
                     # Create download path
 
-                    download_path = create_download_directory("Video_Downloads")
-                    logging.info(f"Download path created at: {download_path}")
+                    # FIXME Add toggle to save to a different directory
+                    # FIXME Add toggle to save to disk vs temp file
+                    loaded_config = load_and_log_configs()
+                    keep_transcripts = loaded_config["system_preferences"]["save_video_transcripts"]
+                    if keep_transcripts:
+                        download_path = create_download_directory("Video_Downloads")
+                        logging.info(f"Download path created at: {download_path}")
 
                     # Initialize info_dict
                     info_dict = {}
@@ -917,13 +922,19 @@ def create_video_transcription_tab():
                         logging.debug(f"process_url_with_metadata: Summarization completed: {summary_text[:100]}...")
 
                     # Save transcription and summary
-                    logging.info("process_url_with_metadata: Saving transcription and summary...")
-                    download_path = create_download_directory("Audio_Processing")
-                    json_file_path, summary_file_path = save_transcription_and_summary(full_text_with_metadata,
-                                                                                       summary_text,
-                                                                                       download_path, info_dict)
-                    logging.info(f"process_url_with_metadata: Transcription saved to: {json_file_path}")
-                    logging.info(f"process_url_with_metadata: Summary saved to: {summary_file_path}")
+                    load_config = load_and_log_configs()
+                    save_transcripts = load_config["system_preferences"]["save_video_transcripts"]
+                    if save_transcripts:
+                        logging.info("process_url_with_metadata: Saving transcription and summary...")
+                        download_path = create_download_directory("Audio_Processing")
+                        json_file_path, summary_file_path = save_transcription_and_summary(full_text_with_metadata,
+                                                                                           summary_text,
+                                                                                           download_path, info_dict)
+                        logging.info(f"process_url_with_metadata: Transcription saved to: {json_file_path}")
+                        logging.info(f"process_url_with_metadata: Summary saved to: {summary_file_path}")
+                    else:
+                        logging.info("process_url_with_metadata: Saving transcripts disabled. Using temporary files.")
+                        # FIXME - Add temporary file handling
 
                     # Prepare keywords for database
                     if isinstance(keywords, str):
@@ -958,8 +969,6 @@ def create_video_transcription_tab():
 
             def toggle_confabulation_output(checkbox_value):
                 return gr.update(visible=checkbox_value)
-
-
 
             confab_checkbox.change(
                 fn=toggle_confabulation_output,

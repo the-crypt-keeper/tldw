@@ -7,37 +7,39 @@ import os
 import queue
 import threading
 import time
-
+#
 # External Imports
 import gradio as gr
 import numpy as np
 import pyaudio
-
+#
 # Local Imports
 from App_Function_Libraries.Audio.Audio_Transcription_Lib import (record_audio, speech_to_text, save_audio_temp,
-                                                                  stop_recording, transcribe_audio)
+                                                                 stop_recording, transcribe_audio)
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
-
 #
 #######################################################################################################################
 #
 # Functions:
 
-whisper_models = ["tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium",
-        "large-v1", "large-v2", "large-v3", "large", "distil-large-v2", "distil-medium.en", "distil-small.en",
-        "distil-large-v3", "deepdml/faster-whisper-large-v3-turbo-ct2", "nyrahealth/faster_CrisperWhisper"]
+#################### MODELS ####################
 
+whisper_models = [
+    "tiny.en", "tiny", "base.en", "base", "small.en", "small",
+    "medium.en", "medium", "large-v1", "large-v2", "large-v3", "large",
+    "distil-large-v2", "distil-medium.en", "distil-small.en",
+    "distil-large-v3",
+    "deepdml/faster-whisper-large-v3-turbo-ct2",
+    "nyrahealth/faster_CrisperWhisper"
+]
 
-########################################################################
-# 1. Recording set-up (indefinite until user stops)
+TRANSCRIPTION_METHODS = ["faster-whisper", "qwen2audio", "parakeet"]
+
+#################### RECORDING ####################
 
 def record_audio_indef(sample_rate=16000, chunk_size=1024):
-    """
-    Indefinite recording until a stop event is triggered.
-    Returns (pyaudio_instance, stream, audio_queue, stop_event, audio_thread).
-    """
     p = pyaudio.PyAudio()
     stream = p.open(
         format=pyaudio.paInt16,
@@ -51,38 +53,27 @@ def record_audio_indef(sample_rate=16000, chunk_size=1024):
 
     def audio_callback():
         while not stop_event.is_set():
-            try:
-                data = stream.read(chunk_size, exception_on_overflow=False)
-                audio_queue.put(data)
-            except Exception as e:
-                logging.error(f"Error in audio callback: {str(e)}")
-                break
+            data = stream.read(chunk_size, exception_on_overflow=False)
+            audio_queue.put(data)
 
     audio_thread = threading.Thread(target=audio_callback, daemon=True)
     audio_thread.start()
     return p, stream, audio_queue, stop_event, audio_thread
 
 
-########################################################################
-# 2. Background thread for partial transcription
-
 class PartialTranscriptionThread(threading.Thread):
-    """
-    Periodically merges all audio so far, calls `transcribe_audio`,
-    and updates a shared 'partial_text' variable.
-    """
-
-    def __init__(self, audio_queue, stop_event, transcription_method, partial_text_state, lock, sample_rate=16000,
-                 update_interval=2.0, whisper_model="distil-large-v3", speaker_lang="en"):
-        """
-        :param audio_queue: queue of PCM chunks from the mic
-        :param stop_event: threading.Event to stop this tclshread
-        :param transcription_method: "faster-whisper" or "qwen2audio"
-        :param partial_text_state: reference to a dictionary or list storing partial text
-        :param lock: threading.Lock to coordinate read/write of partial_text
-        :param sample_rate: 16k default
-        :param update_interval: how often (seconds) we do a partial transcription
-        """
+    def __init__(
+        self,
+        audio_queue,
+        stop_event,
+        transcription_method,
+        partial_text_state,
+        lock,
+        sample_rate=16000,
+        update_interval=2.0,
+        whisper_model="distil-large-v3",
+        speaker_lang="en"
+    ):
         super().__init__(daemon=True)
         self.audio_queue = audio_queue
         self.stop_event = stop_event
@@ -91,38 +82,41 @@ class PartialTranscriptionThread(threading.Thread):
         self.lock = lock
         self.sample_rate = sample_rate
         self.update_interval = update_interval
+        self.full_audio = []
         self.audio_buffer = []
-        self.last_transcription_time = time.time()
+
+        self.last_ts = time.time()
         self.whisper_model = whisper_model
         self.speaker_lang = speaker_lang
 
     def run(self):
         while not self.stop_event.is_set():
-            current_time = time.time()
-
-            # Only process if enough time has passed
-            if current_time - self.last_transcription_time < self.update_interval:
-                time.sleep(0.1)  # Short sleep to prevent CPU spinning
+            now = time.time()
+            if now - self.last_ts < self.update_interval:
+                time.sleep(0.1)
                 continue
 
-            # Collect all available audio data
+            # Gather any new audio chunks from the queue
+            new_chunks = []
             while not self.audio_queue.empty():
-                try:
-                    chunk = self.audio_queue.get_nowait()
-                    self.audio_buffer.append(chunk)
-                except queue.Empty:
-                    break
+                chunk = self.audio_queue.get_nowait()
+                new_chunks.append(chunk)
+                # ### CHANGED: keep a copy in full_audio
+                self.full_audio.append(chunk)
 
+            if new_chunks:
+                self.audio_buffer.extend(new_chunks)
+
+            # If we have no new audio, skip
             if not self.audio_buffer:
                 continue
 
-            # Convert accumulated audio to numpy array
-            try:
-                combined_data = b''.join(self.audio_buffer)
-                audio_np = np.frombuffer(combined_data, dtype=np.int16).astype(np.float32) / 32768.0
+            combined_data = b"".join(self.audio_buffer)
+            audio_np = np.frombuffer(combined_data, dtype=np.int16).astype(np.float32) / 32768.0
 
-                # Only transcribe if we have enough audio data
-                if len(audio_np) > self.sample_rate:  # At least 1 second of audio
+            # Only do partial if at least 1s of audio
+            if len(audio_np) > self.sample_rate:
+                try:
                     partial_result = transcribe_audio(
                         audio_np,
                         self.transcription_method,
@@ -130,96 +124,104 @@ class PartialTranscriptionThread(threading.Thread):
                         whisper_model=self.whisper_model,
                         speaker_lang=self.speaker_lang
                     )
-
                     with self.lock:
                         self.partial_text_state["text"] = partial_result
+                except Exception as e:
+                    logging.error(f"Partial transcript error: {str(e)}")
 
-                    # Keep last 5 seconds of audio for context
-                    max_buffer_size = 5 * self.sample_rate * 2  # 5 seconds * sample_rate * 2 bytes per sample
-                    if len(combined_data) > max_buffer_size:
-                        excess_bytes = len(combined_data) - max_buffer_size
-                        self.audio_buffer = [combined_data[excess_bytes:]]
+                # Keep only last 5s in the rolling buffer for partial
+                max_bytes = 5 * self.sample_rate * 2
+                if len(combined_data) > max_bytes:
+                    self.audio_buffer = [combined_data[-max_bytes:]]
+                else:
+                    self.audio_buffer = [combined_data]
 
-                    self.last_transcription_time = current_time
+            self.last_ts = time.time()
 
-            except Exception as e:
-                logging.error(f"Error in partial transcription: {str(e)}")
-                time.sleep(0.1)  # Prevent rapid error loops
-
-
-
-########################################################################
-# 3. Single toggle function: start or stop + final transcription
 
 def toggle_recording(
-        is_recording,
-        recording_state,
-        transcription_method,
-        live_update,
-        save_recording,
-        partial_text_state,
-        whisper_model,
-        speaker_lang="en"
+    is_recording,
+    recording_state,
+    transcription_method,
+    live_update,
+    save_recording,
+    partial_text_state,
+    final_text_state,
+    whisper_model,
+    speaker_lang="en"
 ):
     """
-    Single function to handle both 'start' and 'stop' logic.
-
-    If not recording yet, start indefinite recording, and if live_update is True,
-    also spawn partial transcription thread.
-
-    If already recording, stop + final transcription, kill partial thread if any,
-    and return final text.
+    Returns:
+      (new_recording_state,
+       new_is_recording_bool,
+       new_button_label,
+       partial_text,
+       final_text,
+       audio_file_path)
     """
+
+    # ---------------- START ----------------
     if not is_recording:
-        try:
-            # ================== START RECORDING ======================
-            log_counter("live_recording_start_attempt")
-            p, stream, audio_queue, stop_event, audio_thread = record_audio_indef()
-            log_counter("live_recording_start_success")
+        # Start indefinite recording
+        log_counter("live_recording_start_attempt")
+        p, stream, audio_queue, stop_event, audio_thread = record_audio_indef()
+        log_counter("live_recording_start_success")
 
-            # Add a small delay after starting recording to avoid cutting off the start
-            time.sleep(0.5)
+        time.sleep(0.25)  # small buffer
 
-            # If user wants real-time partial updates, start the partial thread
-            partial_thread = None
-            lock = threading.Lock()  # to protect partial_text_state
-            if live_update:
-                partial_thread = PartialTranscriptionThread(
-                    audio_queue=audio_queue,
-                    stop_event=stop_event,
-                    transcription_method=transcription_method,
-                    partial_text_state=partial_text_state,
-                    lock=lock,
-                    sample_rate=16000,
-                    update_interval=2.0,
-                    whisper_model=whisper_model,
-                    speaker_lang=speaker_lang
-                )
-                partial_thread.start()
+        partial_thread = None
+        lock = threading.Lock()
+        if live_update:
+            # Start the partial transcription thread if live updates enabled
+            partial_thread = PartialTranscriptionThread(
+                audio_queue=audio_queue,
+                stop_event=stop_event,
+                transcription_method=transcription_method,
+                partial_text_state=partial_text_state,
+                lock=lock,
+                sample_rate=16000,
+                update_interval=2.0,
+                whisper_model=whisper_model,
+                speaker_lang=speaker_lang
+            )
+            partial_thread.start()
 
-            # recording_state: store everything we might need
-            new_state = {
-                "p": p,
-                "stream": stream,
-                "audio_queue": audio_queue,
-                "stop_event": stop_event,
-                "audio_thread": audio_thread,
-                "partial_thread": partial_thread,
-                "lock": lock,
-                "start_time": time.time(),
-                "all_audio_chunks": [],
-                "whisper_model": whisper_model
-            }
-            return new_state, True, "Stop Recording", "", None
+        # store
+        new_state = {
+            "p": p,
+            "stream": stream,
+            "audio_queue": audio_queue,
+            "stop_event": stop_event,
+            "audio_thread": audio_thread,
+            "partial_thread": partial_thread,
+            "lock": lock,
+            "whisper_model": whisper_model
+        }
 
-        except Exception as e:
-            logging.error(f"Error starting recording: {str(e)}")
-            return None, False, "Start Recording", f"Error starting recording: {str(e)}", None
+        # CLEAR partial/final from prior session
+        partial_text_state["text"] = ""
+        final_text_state["text"] = ""
 
-    # ================== STOP RECORDING ======================
+        return (
+            new_state,
+            True,
+            "Stop Recording",
+            partial_text_state["text"],
+            final_text_state["text"],
+            None  # No audio yet
+        )
+
+    # ---------------- STOP ----------------
+    # if no recording_state => nothing to stop
     if not recording_state:
-        # No active recording to stop
-        return None, False, "Start Recording", "No active recording.", None
+        return (
+            None,
+            False,
+            "Start Recording",
+            partial_text_state["text"],
+            final_text_state["text"],
+            None
+        )
 
     try:
         p = recording_state["p"]
@@ -228,88 +230,102 @@ def toggle_recording(
         stop_event = recording_state["stop_event"]
         audio_thread = recording_state["audio_thread"]
         partial_thread = recording_state["partial_thread"]
-        whisper_model = recording_state.get("whisper_model", "distil-large-v3")
-        lock = recording_state["lock"]
+        whisper_model = recording_state["whisper_model"]
 
-        # 1) Stop the partial transcription thread if it exists
+        # Signal threads to stop
+        stop_event.set()
+        audio_thread.join()
+
+        # if partial_thread is running, all audio is in partial_thread.full_audio
         if partial_thread is not None:
-            stop_event.set()  # tell thread to stop
-            partial_thread.join(timeout=5)
-
-        # 2) Stop final recording and get all audio
-        raw_audio = stop_recording(p, stream, audio_queue, stop_event, audio_thread)
-
-        # Process any remaining audio in queue
-        while not audio_queue.empty():
-            try:
-                raw_audio += audio_queue.get_nowait()
-            except queue.Empty:
-                break
-
-        # Check for valid audio
-        if not raw_audio:
-            return None, False, "Start Recording", "No audio recorded", None
-
-        # FIXME - Make sure this works....
-        # Convert raw_audio to a NumPy array if it's in byte format
-        if isinstance(raw_audio, bytes):
-            raw_audio_np = np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32) / 32768.0
+            partial_thread.join(timeout=5)  # wait for partial thread to finish
+            # Final raw audio is everything partial_thread collected
+            raw_audio = b"".join(partial_thread.full_audio)
         else:
-            raw_audio_np = raw_audio
+            # If partial transcription was NOT used, we still do the old approach
+            raw_audio = stop_recording(
+                p, stream, audio_queue, stop_event, audio_thread
+            )
+            while not audio_queue.empty():
+                raw_audio += audio_queue.get_nowait()
 
-        # 3) Final transcription of entire audio
-        temp_file = save_audio_temp(raw_audio_np)
-        final_audio_np = np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32) / 32768.0
+        p.terminate()
+
+        if not raw_audio:
+            final_text_state["text"] = "[No audio recorded]"
+            return (
+                None,
+                False,
+                "Start Recording",
+                partial_text_state["text"],
+                final_text_state["text"],
+                None
+            )
+
+        # Transcribe
+        audio_np = np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32) / 32768.0
 
         try:
-            final_result = transcribe_audio(
-                final_audio_np,
+            final_res = transcribe_audio(
+                audio_np,
                 transcription_method,
                 sample_rate=16000,
                 whisper_model=whisper_model,
                 speaker_lang=speaker_lang
             )
-
-            # Update both partial and final text
-            with lock:
-                partial_text_state["text"] = final_result
-
         except Exception as e:
-            error_message = f"[Error in final transcription: {str(e)}]"
-            with lock:
-                partial_text_state["text"] = error_message
-            final_result = error_message
+            final_res = f"[Error in final transcription: {str(e)}]"
+            logging.error(final_res)
 
-        # 4) Optionally save the WAV
-        if not save_recording and os.path.exists(temp_file):
-            os.remove(temp_file)
-            audio_file_path = None
-        else:
-            audio_file_path = temp_file
+        final_text_state["text"] = final_res
 
-        return None, False, "Start Recording", final_result, audio_file_path
+        # Save the WAV => for audio player
+        audio_file = save_audio_temp(audio_np)
+        if not save_recording:
+            # Create a background thread that will delete the file after 15 seconds
+            removal_thread = threading.Thread(
+                target=remove_file_after_delay,
+                args=(audio_file, 15),
+                daemon=True
+            )
+            removal_thread.start()
+
+        return (
+            None,
+            False,
+            "Start Recording",
+            partial_text_state["text"],  # partial stays as-is
+            final_text_state["text"],    # final set
+            audio_file
+        )
 
     except Exception as e:
-        logging.error(f"Error stopping recording: {str(e)}")
-        error_message = f"Error stopping recording: {str(e)}"
-        with recording_state["lock"]:
-            partial_text_state["text"] = error_message
-        return None, False, "Start Recording", error_message, None
+        msg = f"Error stopping recording: {e}"
+        logging.error(msg)
+        final_text_state["text"] = msg
+        return (
+            None,
+            False,
+            "Start Recording",
+            partial_text_state["text"],
+            final_text_state["text"],
+            None
+        )
 
 
-########################################################################
-# 4. Save Transcription to DB
+
+def poll_partial_text(live, partial_text_state):
+    if live:
+        return partial_text_state.get("text", "")
+    return "(Live update disabled)"
+
 
 def save_transcription_to_db(transcription, custom_title):
-    """
-    Same logic as your existing approach
-    """
     log_counter("save_transcription_to_db_attempt")
     start_time = time.time()
-    if custom_title.strip() == "":
+    if not custom_title.strip():
         custom_title = "Self-recorded Audio"
 
-    from App_Function_Libraries.DB.DB_Manager import add_media_to_database
     try:
         url = "self_recorded"
         info_dict = {
@@ -334,46 +350,32 @@ def save_transcription_to_db(transcription, custom_title):
             whisper_model=whisper_model,
             media_type=media_type
         )
-        end_time = time.time() - start_time
-        log_histogram("save_transcription_to_db_duration", end_time)
+        dur = time.time() - start_time
+        log_histogram("save_transcription_to_db_duration", dur)
         log_counter("save_transcription_to_db_success")
-        return f"Transcription saved to database successfully. {result}"
+        return f"Transcription saved to DB. {result}"
     except Exception as e:
-        logging.error(f"Error saving transcription to database: {str(e)}")
+        logging.error(str(e))
         log_counter("save_transcription_to_db_error", labels={"error": str(e)})
-        return f"Error saving transcription to database: {str(e)}"
+        return f"Error saving: {str(e)}"
 
 
 def update_custom_title_visibility(save_to_db):
     return gr.update(visible=save_to_db)
 
 
-def get_partial_transcript(partial_text_state):
-    """
-    Polled by a Gradio Timer or UI refresh.
-    Return the partial_text_state["text"] (safely).
-    """
-    return partial_text_state.get("text", "")
+def remove_file_after_delay(file_path, delay=15):
+    """Remove a file after `delay` seconds."""
+    time.sleep(delay)
+    if os.path.exists(file_path):
+        os.remove(file_path)
 
 
-
-
-########################################################################
-# 5. The main Gradio tab
-# Provide a couple transcription methods
-TRANSCRIPTION_METHODS = ["faster-whisper", "qwen2audio", "parakeet"]
+#################### MAIN TAB ####################
 
 def create_live_recording_tab():
-    try:
-        default_value = None
-        if default_api_endpoint and default_api_endpoint in global_api_endpoints:
-            default_value = format_api_name(default_api_endpoint)
-    except Exception as e:
-        logging.error(f"Error setting default API endpoint: {str(e)}")
-        default_value = None
-
-    with gr.Tab("Live Recording and Transcription", visible=True):
-        gr.Markdown("# Live Audio Recording with Real-time Partial Updates")
+    with gr.Tab("Live Recording and Transcription"):
+        gr.Markdown("## Live Recording + Partial and Final Transcripts")
 
         with gr.Row():
             with gr.Column():
@@ -382,56 +384,47 @@ def create_live_recording_tab():
                     choices=TRANSCRIPTION_METHODS,
                     value="faster-whisper"
                 )
-                # Add Whisper model selection
                 whisper_model = gr.Dropdown(
                     label="Whisper Model",
                     choices=whisper_models,
-                    value="distil-large-v3",
-                    visible=True
+                    value="distil-large-v3"
                 )
-                live_update = gr.Checkbox(label="Enable Real-time Partial Transcription", value=False)
-                save_recording = gr.Checkbox(label="Save WAV File After Stopping", value=False)
-                save_to_db_checkbox = gr.Checkbox(label="Save Transcription to Database (after stopping)", value=False)
-                custom_title = gr.Textbox(label="Custom Title (for DB)", visible=False)
+                live_update = gr.Checkbox(label="Enable Live Transcription", value=False)
+                save_recording = gr.Checkbox(label="Save WAV after Stopping", value=False)
+                save_to_db_chk = gr.Checkbox(label="Save to DB after Stopping?", value=False)
+                custom_title = gr.Textbox(label="Custom Title for DB", visible=False)
 
-                # Single toggle button
                 record_btn = gr.Button("Start Recording")
-                # Add recording status indicator
-                recording_status = gr.Markdown("Not Recording", visible=True)
+                status_markdown = gr.Markdown("Not Recording")
 
             with gr.Column():
-                # Show partial transcription if "live_update" is on
-                partial_txt = gr.Textbox(
-                    label="Partial Transcription (refreshes every 2s if live_update enabled)",
-                    lines=5,
-                    interactive=False,
-                    show_copy_button=True
-                )
-                final_txt = gr.Textbox(
-                    label="Final Transcription (once stopped)",
-                    lines=5,
-                    interactive = False,
-                    show_copy_button = True
-                )
-                audio_output = gr.Audio(label="Recorded Audio", visible=False)
-                db_save_status = gr.Textbox(label="Database Save Status", lines=2)
+                partial_txt = gr.Textbox(label="Partial Transcript", lines=5, interactive=False)
+                final_txt = gr.Textbox(label="Final Transcript", lines=5, interactive=False)
+                audio_player = gr.Audio(label="Recorded Audio", visible=True)
+                db_save_out = gr.Textbox(label="DB Save Status", lines=2)
 
         # States
-        recording_state = gr.State(value=None)         # stores mic objects, threads, etc.
-        is_recording = gr.State(value=False)           # bool
-        partial_text_state = gr.State({"text": ""})    # store partial transcription
+        recording_state = gr.State()
+        is_recording = gr.State(value=False)
+        partial_text_state = gr.State({"text": ""})
+        final_text_state = gr.State({"text": ""})
 
-        # Modified toggle_recording to handle recording status and model selection
-        def toggle_recording_wrapper(*args):
+        def wrapper_fn(*args):
+            # (recording_state, is_recording, btn_label, partial_str, final_str, audio_file)
             result = toggle_recording(*args)
-            # Update recording status based on is_recording state
-            is_rec = result[1] if len(result) > 1 else False
-            status_html = """<div style="padding: 10px; background-color: #ff4444; color: white; text-align: center; font-weight: bold; border-radius: 5px;">🔴 Recording in Progress</div>""" if is_rec else """<div style="padding: 10px; background-color: #444444; color: white; text-align: center; font-weight: bold; border-radius: 5px;">⚪ Not Recording</div>"""
+            is_rec = result[1]
+            # fancy HTML
+            status_html = (
+                "<div style='background:#e53935; color:white; padding:8px; font-weight:bold;'>"
+                "🔴 Recording in Progress</div>"
+                if is_rec else
+                "<div style='background:#424242; color:white; padding:8px; font-weight:bold;'>"
+                "⚪ Not Recording</div>"
+            )
             return result + (status_html,)
 
-        # Toggle start/stop with updated inputs and outputs
         record_btn.click(
-            fn=toggle_recording_wrapper,
+            fn=wrapper_fn,
             inputs=[
                 is_recording,
                 recording_state,
@@ -439,55 +432,40 @@ def create_live_recording_tab():
                 live_update,
                 save_recording,
                 partial_text_state,
-                whisper_model  # Add whisper_model to inputs
+                final_text_state,
+                whisper_model
             ],
             outputs=[
-                recording_state,
-                is_recording,
-                record_btn,
-                final_txt,
-                audio_output,
-                recording_status
+                recording_state,  # 0
+                is_recording,     # 1
+                record_btn,       # 2
+                partial_txt,      # 3
+                final_txt,        # 4
+                audio_player,     # 5
+                status_markdown   # 6 (the fancy HTML)
             ]
         )
 
-        # Show/hide custom_title
-        save_to_db_checkbox.change(
+        save_to_db_chk.change(
             fn=update_custom_title_visibility,
-            inputs=[save_to_db_checkbox],
+            inputs=[save_to_db_chk],
             outputs=[custom_title]
         )
 
-        # Save to DB button
-        gr.Button("Save to Database").click(
+        gr.Button("Save to DB").click(
             fn=save_transcription_to_db,
             inputs=[final_txt, custom_title],
-            outputs=[db_save_status]
+            outputs=[db_save_out]
         )
 
-        # A small trick: we poll partial_text_state every 2s if live_update is True.
-        # We'll do it with a Timer that runs regardless, but partial_txt will only
-        # show something if the user checked live_update. The partial_text gets updated
-        # by the background PartialTranscriptionThread.
-
-        # Define your polling function
-        def poll_partial_text(live, partial_text_state):
-            """Return partial text only if user set live_update = True."""
-            if live:
-                # Access the text safely through the state object
-                return partial_text_state["text"] if partial_text_state else "(No transcription yet)"
-            else:
-                return "(Live update disabled)"
-
-        # Create the Timer with a 2-second interval
-        my_timer = gr.Timer(value=2.0)
-
-        # Attach the event listener with .tick()
-        my_timer.tick(
+        # Timer for partial
+        poller = gr.Timer(value=2.0)
+        poller.tick(
             fn=poll_partial_text,
             inputs=[live_update, partial_text_state],
-            outputs=partial_txt,
+            outputs=partial_txt
         )
+
 #
 # End of Functions
 ########################################################################################################################
