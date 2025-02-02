@@ -2,6 +2,7 @@
 # Description: Functions for character chat cards.
 #
 # Imports
+import configparser
 import json
 import logging
 import io
@@ -15,13 +16,16 @@ from PIL import Image
 # Local imports
 from App_Function_Libraries.DB.DB_Manager import get_character_card_by_id, get_character_chat_by_id
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Utils.Utils import get_project_relative_path
 #
 # Constants
 ####################################################################################################
 #
 # Functions
-
 # Using https://github.com/malfoyslastname/character-card-spec-v2 as the standard for v2 character cards
+
+
+
 
 #################################################################################
 #
@@ -274,13 +278,20 @@ def load_chat_and_character(chat_id: int, user_name: str) -> Tuple[Optional[Dict
 
 
 def extract_json_from_image(image_file):
-    logging.debug(f"Attempting to extract JSON from image: {image_file.name}")
+    # Get filename safely
+    file_name = getattr(image_file, 'name', 'unknown_file')
+    logging.debug(f"Attempting to extract JSON from image: {file_name}")
+
     log_counter("extract_json_from_image_attempt")
     start_time = time.time()
     try:
+        # Ensure we're working from the start of the file
+        if hasattr(image_file, 'seek'):
+            image_file.seek(0)
+
         with Image.open(image_file) as img:
             logging.debug("Image opened successfully")
-            metadata = img.info
+            metadata = img.text
             if 'chara' in metadata:
                 logging.debug("Found 'chara' in image metadata")
                 chara_content = metadata['chara']
@@ -295,9 +306,9 @@ def extract_json_from_image(image_file):
                     log_counter("extract_json_from_image_decode_error", labels={"error": str(e)})
 
             logging.warning("'chara' not found in metadata, attempting to find JSON data in image bytes")
-            # Alternative method to extract embedded JSON from image bytes if metadata is not available
+            # Preserve PNG format check and conversion
             img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
+            img.save(img_byte_arr, format='PNG')  # Maintain PNG format enforcement
             img_bytes = img_byte_arr.getvalue()
             img_str = img_bytes.decode('latin1')
 
@@ -305,7 +316,7 @@ def extract_json_from_image(image_file):
             json_start = img_str.find('{')
             json_end = img_str.rfind('}')
             if json_start != -1 and json_end != -1 and json_end > json_start:
-                possible_json = img_str[json_start:json_end+1]
+                possible_json = img_str[json_start:json_end + 1]
                 try:
                     json.loads(possible_json)
                     logging.debug("Found JSON data in image bytes")
@@ -320,6 +331,10 @@ def extract_json_from_image(image_file):
     except Exception as e:
         log_counter("extract_json_from_image_error", labels={"error": str(e)})
         logging.error(f"Error extracting JSON from image: {e}")
+    finally:
+        # Reset file pointer if it exists
+        if hasattr(image_file, 'seek'):
+            image_file.seek(0)
 
     extract_duration = time.time() - start_time
     log_histogram("extract_json_from_image_duration", extract_duration)

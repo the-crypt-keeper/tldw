@@ -5,6 +5,11 @@
 This page serves as documentation regarding the ETL pipelines within tldw and provides context/justification for the details of each.
 https://towardsdatascience.com/etl-pipelines-in-python-best-practices-and-techniques-0c148452cc68
 
+https://python.langchain.com/docs/integrations/document_loaders/source_code/
+https://python.langchain.com/docs/integrations/document_loaders/
+
+
+
 ## ETL Pipelines
 
 ### Data Sources

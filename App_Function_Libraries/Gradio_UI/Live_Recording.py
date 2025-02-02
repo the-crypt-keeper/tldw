@@ -270,9 +270,9 @@ def toggle_recording(
                 speaker_lang=speaker_lang
             )
 
-            # Update both partial and final text
-            with lock:
-                partial_text_state["text"] = final_result
+            # # Update both partial and final text
+            # with lock:
+            #     partial_text_state["text"] = final_result
 
         except Exception as e:
             error_message = f"[Error in final transcription: {str(e)}]"
