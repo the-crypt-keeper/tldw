@@ -35,6 +35,7 @@ def show_contents_unescaped(json_data):
 
     return "\n".join(output_lines)
 
+
 def create_plain_text_import_tab():
     try:
         default_value = None
@@ -43,7 +44,6 @@ def create_plain_text_import_tab():
     except Exception as e:
         logging.error(f"Error setting default API endpoint: {str(e)}")
         default_value = None
-
     with gr.TabItem("Import Plain Text & .docx Files", visible=True):
         gr.Markdown("# Import Plaintext files")
         gr.Markdown("Upload txt/docx/md/rtf/zip collections of them for import")
@@ -74,7 +74,12 @@ def create_plain_text_import_tab():
             with gr.Column():
                 # We'll store the preview data in a hidden state
                 preview_data_state = gr.State()
-                preview_data_display = gr.Textbox(label="Preview Data", lines=35)
+                preview_data_display = gr.Textbox(
+                    label="Preview Data",
+                    lines=30,
+                    interactive=False,
+                    elem_id="scrollable-textbox"
+                )
 
         # Step 2: Ingest with possible metadata overrides
         gr.Markdown("### Step 2: Final Ingest with Overrides")

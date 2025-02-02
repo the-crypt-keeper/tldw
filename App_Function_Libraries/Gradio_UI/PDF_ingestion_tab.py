@@ -217,7 +217,7 @@ def create_pdf_ingestion_test_tab():
                 test_button_3 = gr.Button("Test Docling PDF Ingestion")
             with gr.Column():
                 test_output = gr.Textbox(label="Test Result")
-                pdf_content_output = gr.Textbox(label="PDF Content", lines=200)
+                pdf_content_output = gr.Textbox(label="PDF Content", lines=200, elem_id="scrollable-textbox")
         test_button.click(
             fn=test_pymupdf_pdf_ingestion,
             inputs=[pdf_file_input],
