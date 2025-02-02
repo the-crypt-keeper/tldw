@@ -69,7 +69,7 @@ def import_character_card(file):
             if isinstance(card_data, str):
                 logging.debug("Character card data is a string. Parsing as JSON.")
                 card_data = import_character_card_json(card_data)
-            # If the returned data is a dict and it contains the raw card keys,
+            # If the returned data is a dict, and it contains the raw card keys,
             # then process it to produce the final card format.
             elif isinstance(card_data, dict):
                 if card_data.get("spec") == "chara_card_v2":
