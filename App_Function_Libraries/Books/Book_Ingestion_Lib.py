@@ -505,11 +505,116 @@ def read_epub(file_path):
         for html_content in chapters:
             soup = BeautifulSoup(html_content, 'html.parser')
             text += soup.get_text(separator='\n\n') + "\n\n"
+            # Replace 2+ consecutive blank lines with just 1 blank line
+            text = re.sub(r'\n\s*\n+', '\n\n', text)
+
         logging.debug("EPUB content extraction completed.")
         return text
     except Exception as e:
         logging.exception(f"Error reading EPUB file: {str(e)}")
         raise
+
+
+def read_epub_filtered(epub_path):
+    """
+    Reads an EPUB by following the spine, skipping known front matter
+    but keeping the Table of Contents (TOC). Returns a cleaned-up
+    text string with minimal empty whitespace.
+
+    :param epub_path: Path to the .epub file.
+    :return: A cleaned-up text string of the book's content.
+    """
+    try:
+        book = epub.read_epub(epub_path)
+
+        # Known front-matter filenames to skip, except we want to keep
+        # the actual "toc" if it is meaningful. Adjust as needed.
+        # NOTE: Filenames vary across publishers, so you may need to
+        # add or remove items from this set.
+        skip_front_matter = {
+            "cover",
+            "titlepage",
+            "copy",
+            "copyright",
+            "colophon",
+            "upgrade",
+            # "toc",    # Do NOT skip if you want to keep the TOC
+            "notice",
+            "legal",
+            "license",
+            #"nav"
+        }
+
+        all_text_segments = []
+
+        # The spine is the main reading order of the EPUB.
+        for itemref in book.spine:
+            # itemref is typically ('idref', {})
+            item_id = itemref[0]
+            item = book.get_item_with_id(item_id)
+
+            if item.get_type() != ebooklib.ITEM_DOCUMENT:
+                # Not an HTML/xHTML document, skip
+                continue
+
+            # Check if filename suggests front matter we want to skip
+            filename_lower = item.file_name.lower()
+            if any(name in filename_lower for name in skip_front_matter):
+                logging.debug(f"Skipping front matter: {item.file_name}")
+                continue
+
+            # Otherwise, parse and extract text
+            content = item.get_content().decode('utf-8', errors='replace')
+            soup = BeautifulSoup(content, 'html.parser')
+
+            # You can adjust which tags to extract
+            # (h1..h6, p, lists, etc.)
+            # We'll gather them in reading order:
+            text_chunks = []
+            for elem in soup.find_all(['h1','h2','h3','h4','h5','h6','p','ul','ol']):
+                # Clean up the text
+                text = elem.get_text().strip()
+
+                # Skip truly empty or whitespace-only text
+                if not text:
+                    continue
+
+                # For headings:
+                if elem.name in ['h1','h2','h3','h4','h5','h6']:
+                    # You might format headings in some special way:
+                    level = int(elem.name[1])  # e.g., h2 -> 2
+                    text_chunks.append(("#" * level) + " " + text)
+                # For paragraphs
+                elif elem.name == 'p':
+                    text_chunks.append(text)
+                # For lists
+                elif elem.name in ['ul','ol']:
+                    # Distinguish bullet vs numbered list
+                    bullet = "-" if elem.name == 'ul' else "1."
+                    for li in elem.find_all('li'):
+                        li_text = li.get_text().strip()
+                        if li_text:
+                            text_chunks.append(f"{bullet} {li_text}")
+
+            # Join everything from this item with double newlines
+            # (or single newline, whichever you prefer)
+            item_text = "\n\n".join(text_chunks)
+            # Skip adding if there's nothing left
+            if item_text.strip():
+                all_text_segments.append(item_text)
+
+        # Combine all items in the spine
+        full_text = "\n\n".join(all_text_segments)
+
+        # Remove repeating blank lines (2+ empty lines => reduce to just 1 blank line)
+        # This helps avoid huge blocks of whitespace.
+        full_text = re.sub(r'\n\s*\n+', '\n\n', full_text)
+
+        return full_text
+
+    except Exception as e:
+        logging.exception(f"Failed to parse EPUB: {str(e)}")
+        return ""
 
 
 # Ingest a text file into the database with Title/Author/Keywords
