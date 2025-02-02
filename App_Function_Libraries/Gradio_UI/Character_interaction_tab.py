@@ -36,7 +36,7 @@ def chat_with_character(user_message, history, char_data, api_name_input, api_ke
     return history, ""
 
 
-def import_character_card(file) -> Any:
+def import_character_card(file):
     if file is None:
         logging.error("No file provided for character card import.")
         return None, gr.update(), "No file provided for character card import"
@@ -69,9 +69,17 @@ def import_character_card(file) -> Any:
             if isinstance(card_data, str):
                 logging.debug("Character card data is a string. Parsing as JSON.")
                 card_data = import_character_card_json(card_data)
-            else:
-                logging.debug("Character card data is already a dictionary.")
-
+            # If the returned data is a dict and it contains the raw card keys,
+            # then process it to produce the final card format.
+            elif isinstance(card_data, dict):
+                if card_data.get("spec") == "chara_card_v2":
+                    logging.debug("Detected raw V2 character card data; parsing it.")
+                    card_data = parse_v2_card(card_data)
+                # If you have V1 cards that need parsing, you can add:
+                # else:
+                #     card_data = parse_v1_card(card_data)
+                else:
+                    logging.debug("Character card data is already a dictionary.")
         else:
             logging.error("Unsupported file type.")
             return None, gr.update(), (
@@ -91,6 +99,11 @@ def import_character_card(file) -> Any:
                 img_byte_arr = io.BytesIO()
                 img.save(img_byte_arr, format='PNG')
                 card_data['image'] = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+        else:
+            # **Optional:** If your final card data is expected to always have an "image" key,
+            # you might set it to an empty string if not provided.
+            if 'image' not in card_data:
+                card_data['image'] = ""
 
         # Save the character card to the database.
         logging.debug("Saving character card to the database.")

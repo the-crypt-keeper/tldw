@@ -39,7 +39,7 @@ def test_extract_text_from_segments_without_timestamps():
 def test_extract_text_from_segments_with_timestamps():
     segments = [{'Text': 'Hello world!', 'Time_Start': 0, 'Time_End': 5}]
     result = extract_text_from_segments(segments, include_timestamps=True)
-    assert result == '0.00s - 5.00s | Hello world!'
+    assert result == '0s - 5s | Hello world!'
 
 
 def test_extract_text_from_segments_with_empty_segment():

@@ -6,6 +6,7 @@ import json
 import logging
 import io
 import base64
+import os
 import re
 import time
 from typing import Dict, Any, Optional, List, Tuple, Union, cast
@@ -763,7 +764,7 @@ def load_character_card(file) -> Optional[Dict[str, Any]]:
       - Markdown files containing a code block with JSON (delimited by triple backticks)
 
     Args:
-        file: A file-like object or string containing the character card data.
+        file: A file-like object or a string containing either the character card data or a path to the file.
 
     Returns:
         A dictionary representing the character card, or None if an error occurs.
@@ -775,23 +776,35 @@ def load_character_card(file) -> Optional[Dict[str, Any]]:
     log_counter("load_character_card_attempt")
     start_time = time.time()
     try:
-        # Read the file content (handle bytes or string)
-        content = file.read() if hasattr(file, 'read') else file
+        # Determine if 'file' is a file-like object, a file path, or already the content.
+        if hasattr(file, 'read'):
+            # file-like object (opened file, BytesIO, etc.)
+            content = file.read()
+            # Reset pointer if applicable
+            if hasattr(file, 'seek'):
+                file.seek(0)
+        elif isinstance(file, str) and os.path.exists(file):
+            # If 'file' is a string and it is a valid path, open and read it.
+            with open(file, 'r', encoding='utf-8') as f:
+                content = f.read()
+        else:
+            # Otherwise, assume the string is the actual content.
+            content = file
+
+        # If content is bytes, decode it.
         if isinstance(content, bytes):
             content = content.decode('utf-8')
-        # Reset pointer if applicable
-        if hasattr(file, 'seek'):
-            file.seek(0)
-        # Remove BOM (if present) and any leading whitespace/newlines
+
+        # Remove BOM (if present) and any leading whitespace/newlines.
         content = content.replace("\ufeff", "").lstrip()
 
         # Log a snippet of the content for debugging.
         logging.debug("File content start: " + repr(content[:50]))
 
-        # If the content is a JSON object
+        # If the content is a JSON object.
         if content.startswith('{'):
             card_data = json.loads(content)
-        # If the content starts with YAML front matter
+        # If the content starts with YAML front matter.
         elif content.startswith('---'):
             try:
                 import yaml
@@ -800,8 +813,6 @@ def load_character_card(file) -> Optional[Dict[str, Any]]:
                     "PyYAML is required for loading YAML front matter from Markdown files. Install it via 'pip install PyYAML'."
                 )
             # Use regex to match YAML front matter at the very start.
-            # This regex expects the front matter to start at the beginning,
-            # followed by a newline, then the YAML block, and then another line with ---
             yaml_match = re.match(r"^---\s*\n(.*?)\n---", content, re.DOTALL)
             if yaml_match:
                 yaml_content = yaml_match.group(1).strip()
@@ -809,7 +820,7 @@ def load_character_card(file) -> Optional[Dict[str, Any]]:
             else:
                 raise ValueError("Invalid Markdown front matter format.")
         else:
-            # Look for a JSON code block enclosed in triple backticks
+            # Look for a JSON code block enclosed in triple backticks.
             pattern = re.compile(r"```(?:json)?\s*(\{.*\})\s*```", re.DOTALL)
             match = pattern.search(content)
             if match:
@@ -822,6 +833,7 @@ def load_character_card(file) -> Optional[Dict[str, Any]]:
         log_histogram("load_character_card_duration", load_duration)
         log_counter("load_character_card_success")
         return card_data
+
     except Exception as e:
         log_counter("load_character_card_error", labels={"error": str(e)})
         logging.error(f"Error loading character card: {e}")
