@@ -485,31 +485,45 @@ def import_file_handler(files,
 
 def read_epub(file_path):
     """
-    Reads and extracts text from an EPUB file.
-
-    Parameters:
-        - file_path (str): Path to the EPUB file.
-
-    Returns:
-        - str: Extracted text content from the EPUB.
+    Reads and extracts text from an EPUB file, cleaning up messy spacing.
     """
     try:
         logging.info(f"Reading EPUB file from {file_path}")
         book = epub.read_epub(file_path)
-        chapters = []
+
+        all_paragraphs = []
+
         for item in book.get_items():
             if item.get_type() == ebooklib.ITEM_DOCUMENT:
-                chapters.append(item.get_content())
+                html_content = item.get_content().decode('utf-8', errors='replace')
+                soup = BeautifulSoup(html_content, 'html.parser')
 
-        text = ""
-        for html_content in chapters:
-            soup = BeautifulSoup(html_content, 'html.parser')
-            text += soup.get_text(separator='\n\n') + "\n\n"
-            # Replace 2+ consecutive blank lines with just 1 blank line
-            text = re.sub(r'\n\s*\n+', '\n\n', text)
+                # Extract headings and paragraphs (no nested loop!)
+                for elem in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p']):
+                    raw_text = ' '.join(elem.stripped_strings)
+                    if not raw_text.strip():
+                        continue
 
-        logging.debug("EPUB content extraction completed.")
+                    if elem.name.startswith('h'):
+                        # e.g. 'h2' -> level=2
+                        level = int(elem.name[-1])
+                        cleaned = f"{'#' * level} {raw_text}"
+                    else:
+                        cleaned = raw_text
+
+                    all_paragraphs.append(cleaned)
+
+        # Join all paragraphs with two newlines
+        text = "\n\n".join(all_paragraphs)
+
+        # Collapse multiple spaces
+        text = re.sub(r'[ \t]+', ' ', text)
+        # Collapse multiple blank lines into just one
+        text = re.sub(r'\n\s*\n+', '\n\n', text)
+
+        logging.debug("EPUB content extraction completed (cleaned).")
         return text
+
     except Exception as e:
         logging.exception(f"Error reading EPUB file: {str(e)}")
         raise
@@ -606,10 +620,8 @@ def read_epub_filtered(epub_path):
         # Combine all items in the spine
         full_text = "\n\n".join(all_text_segments)
 
-        # Remove repeating blank lines (2+ empty lines => reduce to just 1 blank line)
-        # This helps avoid huge blocks of whitespace.
-        full_text = re.sub(r'\n\s*\n+', '\n\n', full_text)
-
+        full_text = re.sub(r'[ \t]+', ' ', full_text)  # collapse multiple spaces
+        full_text = re.sub(r'\n\s*\n+', '\n\n', full_text)  # collapse multiple blank lines
         return full_text
 
     except Exception as e:
