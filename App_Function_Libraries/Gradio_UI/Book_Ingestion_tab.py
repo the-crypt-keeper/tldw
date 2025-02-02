@@ -9,17 +9,45 @@
 ####################
 # Imports
 import logging
+import os
+
 #
 # External Imports
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.Books.Book_Ingestion_Lib import import_file_handler
+from App_Function_Libraries.Books.Book_Ingestion_Lib import import_file_handler, read_epub, read_epub_filtered
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
 #
 ########################################################################################################################
 #
 # Functions:
+
+def preview_file(files):
+    """
+    Reads the first file in the list and returns a short preview
+    (up to 2,000 characters). If the file is an EPUB, it uses `read_epub`
+    from Book_Ingestion_Lib. Adjust for other file types as desired.
+    """
+    if not files:
+        return "No file selected for preview."
+
+    # For simplicity, preview only the first file in the list
+    file = files[0]
+    if not file or not os.path.exists(file.name):
+        return "Invalid file or file path not found."
+
+    file_extension = os.path.splitext(file.name)[1].lower()
+
+    # If it's an EPUB, use the provided `read_epub` function
+    if file_extension == ".epub":
+        full_text = read_epub(file.name)
+        #full_text = read_epub_filtered(file.name)
+        # Return only the first 5000 characters for the preview
+        return full_text[:10000]
+    else:
+        return f"No preview available for *{file_extension}* files.\n(Current example only supports EPUB.)"
+
 
 def create_import_book_tab():
     try:
@@ -39,7 +67,8 @@ def create_import_book_tab():
                 gr.Markdown("# Import .epub files")
                 gr.Markdown("Upload multiple .epub files or a .zip file containing multiple .epub files")
                 gr.Markdown(
-                    "🔗 **How to remove DRM from your ebooks:** [Reddit Guide](https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/)")
+                    "🔗 **How to remove DRM from your ebooks:** [Reddit Guide](https://www.reddit.com/r/Calibre/comments/1ck4w8e/2024_guide_on_removing_drm_from_kobo_kindle_ebooks/)"
+                )
 
                 # Updated to support multiple files
                 import_files = gr.File(
@@ -113,12 +142,22 @@ def create_import_book_tab():
                     placeholder="Enter a custom regex pattern for chapter detection"
                 )
 
-                import_button = gr.Button("Import eBooks")
+                # Buttons
+                import_button = gr.Button("Import eBooks", variant="primary")
+                preview_button = gr.Button("Preview (First File)")
+
+                # Preview Output
+                preview_output = gr.Textbox(
+                    label="Preview Output (first 2,000 characters)",
+                    lines=12,
+                    interactive=False
+                )
 
             with gr.Column():
                 with gr.Row():
                     import_output = gr.Textbox(label="Import Status", lines=10, interactive=False)
 
+        # Wire up buttons
         import_button.click(
             fn=import_file_handler,
             inputs=[
@@ -137,7 +176,24 @@ def create_import_book_tab():
             outputs=import_output
         )
 
-    return import_files, author_input, keywords_input, system_prompt_input, custom_prompt_input, auto_summarize_checkbox, api_name_input, api_key_input, import_button, import_output
+        preview_button.click(
+            fn=preview_file,
+            inputs=import_files,
+            outputs=preview_output
+        )
+
+    return (
+        import_files,
+        author_input,
+        keywords_input,
+        system_prompt_input,
+        custom_prompt_input,
+        auto_summarize_checkbox,
+        api_name_input,
+        api_key_input,
+        import_button,
+        import_output
+    )
 
 #
 # End of File
