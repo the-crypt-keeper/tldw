@@ -605,7 +605,24 @@ def generate_audio_alltalk(input_text, voice=None, model=None, response_format=N
     except Exception as e:
         logging.error(f"AllTalk: Error loading input text: {str(e)}")
         return f"AllTalk: Error loading input text: {str(e)}"
+    input_text = str(input_text)
     logging.debug(f"AllTalk: Using input text: {input_text}")
+
+    # Handle Model
+    try:
+        if not model:
+            logging.info("AllTalk: Model not provided as parameter")
+            logging.info("AllTalk: Attempting to use model from config file")
+            model = loaded_config_data['alltalk_api']['default_alltalk_tts_model']
+            if not model:
+                logging.debug("Model must be provided")
+        if not model:
+            logging.debug("AllTalk: No model provided. Defaulting to 'placeholder'")
+            model = "placeholder"
+    except Exception as e:
+        logging.error(f"AllTalk: Error loading model: {str(e)}")
+        return f"AllTalk: Error loading model: {str(e)}"
+    logging.debug(f"AllTalk: Using model: {model}")
 
     # Handle Voice
     try:
