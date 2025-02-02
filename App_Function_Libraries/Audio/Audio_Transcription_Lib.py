@@ -416,6 +416,16 @@ def get_whisper_model(model_name, device, ):
 #@profile
 # FIXME - I feel like the `vad_filter` should be enabled by default....
 @timeit
+def format_time(total_seconds: float) -> str:
+    """
+    Convert a float number of seconds into HH:MM:SS format.
+    E.g., 123.45 -> '00:02:03'
+    """
+    hours = int(total_seconds // 3600)
+    minutes = int((total_seconds % 3600) // 60)
+    seconds = int(total_seconds % 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
 def speech_to_text(
     audio_file_path: str,
     whisper_model: str = 'distil-large-v3',
@@ -466,19 +476,18 @@ def speech_to_text(
 
         segments = []
         for segment_chunk in segments_raw:
+            # Format time from seconds to HH:MM:SS
+            start_str = format_time(segment_chunk.start)
+            end_str = format_time(segment_chunk.end)
+
             chunk = {
-                "Time_Start": segment_chunk.start,
-                "Time_End": segment_chunk.end,
+                "Time_Start": start_str,
+                "Time_End": end_str,
                 "Text": segment_chunk.text
             }
             logging.debug("Segment: %s", chunk)
             segments.append(chunk)
-            # Print to verify it's working
-            logging.info(f"{segment_chunk.start:.2f}s - {segment_chunk.end:.2f}s | {segment_chunk.text}")
-
-            # Log it as well.
-            logging.debug(
-                f"Transcribed Segment: {segment_chunk.start:.2f}s - {segment_chunk.end:.2f}s | {segment_chunk.text}")
+            logging.info(f"{start_str} - {end_str} | {segment_chunk.text}")  # Use HH:MM:SS in logs
 
         if segments:
             # Insert metadata at the start of the first segment if desired
