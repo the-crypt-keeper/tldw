@@ -782,9 +782,11 @@ def load_character_card(file) -> Optional[Dict[str, Any]]:
         # Reset pointer if applicable
         if hasattr(file, 'seek'):
             file.seek(0)
+        # Remove BOM (if present) and any leading whitespace/newlines
+        content = content.replace("\ufeff", "").lstrip()
 
-        # Remove BOM (if present) and extra whitespace
-        content = content.replace("\ufeff", "").strip()
+        # Log a snippet of the content for debugging.
+        logging.debug("File content start: " + repr(content[:50]))
 
         # If the content is a JSON object
         if content.startswith('{'):
@@ -795,10 +797,14 @@ def load_character_card(file) -> Optional[Dict[str, Any]]:
                 import yaml
             except ImportError:
                 raise ImportError(
-                    "PyYAML is required for loading YAML front matter from Markdown files. Install it via 'pip install PyYAML'.")
-            parts = content.split('---')
-            if len(parts) >= 3:
-                yaml_content = parts[1].strip()
+                    "PyYAML is required for loading YAML front matter from Markdown files. Install it via 'pip install PyYAML'."
+                )
+            # Use regex to match YAML front matter at the very start.
+            # This regex expects the front matter to start at the beginning,
+            # followed by a newline, then the YAML block, and then another line with ---
+            yaml_match = re.match(r"^---\s*\n(.*?)\n---", content, re.DOTALL)
+            if yaml_match:
+                yaml_content = yaml_match.group(1).strip()
                 card_data = yaml.safe_load(yaml_content)
             else:
                 raise ValueError("Invalid Markdown front matter format.")
@@ -811,6 +817,7 @@ def load_character_card(file) -> Optional[Dict[str, Any]]:
                 card_data = json.loads(json_str)
             else:
                 raise ValueError("No valid character card data found in the provided file.")
+
         load_duration = time.time() - start_time
         log_histogram("load_character_card_duration", load_duration)
         log_counter("load_character_card_success")

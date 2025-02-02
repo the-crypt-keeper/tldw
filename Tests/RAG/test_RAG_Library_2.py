@@ -148,6 +148,7 @@ def test_enhanced_rag_pipeline_success(mocker):
     # Mock config
     mock_config = configparser.ConfigParser()
     mock_config['Embeddings'] = {'provider': 'openai'}
+    mock_config['chat_dictionaries'] = {'default_rag_prompt': 'You are answering a question'}
     mocker.patch('App_Function_Libraries.RAG.RAG_Library_2.config', mock_config)
 
     # Mock metric functions
@@ -298,12 +299,18 @@ def test_enhanced_rag_pipeline_critical_error(mocker):
 
 def test_generate_answer_success(mocker):
     """Test generate_answer with successful API call."""
-    # Mock config
-    mock_config = configparser.ConfigParser()
-    mock_config['API'] = {'openai_api_key': 'test_key'}
+    # Build a test config dictionary that mimics the structure returned by load_and_log_configs()
+    test_config = {
+        "openai_api": {"api_key": "test_key"},  # This is what the code will look up
+        "chat_dictionaries": {
+            "chat_dict_RAG_prompts": "RAG_Prompts.md",
+            "default_rag_prompt": "Some default prompt text or file reference"
+        }
+    }
+
     mocker.patch(
         'App_Function_Libraries.RAG.RAG_Library_2.load_and_log_configs',
-        return_value=mock_config
+        return_value=test_config
     )
 
     # Mock the summarization function
@@ -312,7 +319,7 @@ def test_generate_answer_success(mocker):
         return_value='API response'
     )
 
-    # IMPORTANT: Patch the function where it is *used*, i.e. in RAG_Library_2
+    # Patch the function that uses the dictionary file
     mock_parse = mocker.patch(
         'App_Function_Libraries.RAG.RAG_Library_2.parse_user_dict_markdown_file',
         return_value={'some_key': 'some_value'}
@@ -348,6 +355,7 @@ def test_enhanced_rag_pipeline_no_results(mocker):
         'App_Function_Libraries.RAG.RAG_Library_2.generate_answer',
         return_value="Fallback answer"
     )
+
 
     result = enhanced_rag_pipeline(
         query='test query',
