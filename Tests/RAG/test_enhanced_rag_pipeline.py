@@ -48,8 +48,8 @@ class TestEnhancedRagPipeline(unittest.TestCase):
         result = enhanced_rag_pipeline(query=query, api_choice=api_choice, keywords=keywords)
 
         # Validate that the vector search and full-text search are called with expected arguments
-        mock_vector_search.assert_called_once_with(query, [1, 2, 3])
-        mock_fts_search.assert_called_once_with(query, [1, 2, 3])
+        mock_vector_search.assert_called_once_with(query, ['1', '2', '3'], top_k=10)
+        mock_fts_search.assert_called_once_with(query, 'Media DB', ['1', '2', '3'], 10)
 
         # Instead of checking exact string match, check that both pieces are in the context
         call_args = mock_generate_answer.call_args[0]  # Get the args the mock was called with

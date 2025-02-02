@@ -25,7 +25,7 @@ from App_Function_Libraries.PDF.PDF_Ingestion_Lib import extract_metadata_from_p
 
 def create_pdf_ingestion_tab():
     with gr.TabItem("PDF Ingestion", visible=True):
-        gr.Markdown("# Ingest PDF Files and Extract Metadata")
+        gr.Markdown("# Ingest PDF(/pptx) Files and Extract Metadata (Docling Supports parsing of pptx files)")
         with gr.Row():
             with gr.Column():
                 # Changed to support multiple files
