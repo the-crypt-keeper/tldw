@@ -17,7 +17,7 @@ chunk_duration = 30
 words_per_second = 3
 save_character_chats = False
 save_rag_chats = False
-
+save_video_transcripts = True
 
 [Auto-Save]
 save_character_chats = False
@@ -109,7 +109,7 @@ mistral_model = mistral-large-latest
 mistral_streaming = True
 mistral_temperature = 0.7
 #
-#
+# 
 openai_api_key = <openai_api_key>
 openai_model = gpt-4o
 openai_streaming = False
@@ -135,7 +135,7 @@ default_api = openai
 kobold_api_IP = http://127.0.0.1:5001/api/v1/generate
 kobold_openai_api_IP = http://127.0.0.1:5001/v1/chat/completions
 kobold_api_key =
-kobold_streaming = True
+kobold_streaming = False
 kobold_temperature = 0.7
 kobold_top_p = 0.9
 kobold_min_p = 0.05
@@ -151,7 +151,7 @@ llama_top_k = 100
 #
 ooba_api_key =
 ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
-ooba_streaming = True
+ooba_streaming = False
 ooba_temperature = 0.7
 ooba_top_p = 0.9
 ooba_min_p = 0.05
@@ -159,14 +159,14 @@ ooba_top_k = 100
 #
 tabby_api_IP = http://127.0.0.1:5000/v1/chat/completions
 tabby_api_key =
-tabby_streaming = True
+tabby_streaming = False
 tabby_temperature = 0.7
 tabby_top_k = 100
 #
 vllm_api_IP = http://127.0.0.1:8000/v1/chat/completions
 vllm_model =
 vllm_api_key =
-vllm_streaming = True
+vllm_streaming = False
 vllm_temperature = 0.7
 vllm_top_p = 0.9
 vllm_min_p = 0.05
@@ -175,13 +175,13 @@ vllm_top_k = 100
 ollama_api_IP = http://127.0.0.1:11434/v1/chat/completions
 ollama_api_key =
 ollama_model = llama3
-ollama_streaming = True
+ollama_streaming = False
 ollama_temperature = 0.7
 ollama_top_p = 0.9
 #
 aphrodite_api_IP = http://127.0.0.1:8080/completion
 aphrodite_api_key =
-aphrodite_streaming = True
+aphrodite_streaming = False
 aphrodite_temperature = 0.7
 aphrodite_top_p = 0.9
 aphrodite_min_p = 0.05
@@ -202,8 +202,8 @@ min_p = 0.05
 # General TTS Settings
 # Options: 'cpu', 'cuda'
 local_tts_device = cpu
-default_tts_provider = openai
-default_tts_voice = shimmer
+default_tts_provider = kokoro
+default_tts_voice = af_bella
 default_tts_speed = 1
 #
 # OpenAI TTS Settings
