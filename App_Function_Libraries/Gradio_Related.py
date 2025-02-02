@@ -385,9 +385,10 @@ def launch_ui(share_public=None, server_mode=False):
         padding: 10px;
         margin-top: 10px;
     }
-    .scrollable-textbox textarea {
-    height: 600px !important;
-    overflow-y: auto !important;
+    /* ID-based selector for the textbox */
+    #scrollable-textbox textarea {
+        max-height: 500px !important; 
+        overflow-y: auto !important;
     }
     """
 
