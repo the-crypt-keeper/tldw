@@ -43,6 +43,7 @@ jobs:
         pwd
         cd ./Tests/RAG
         pytest test_RAG_Library_2.py
+        pytest test_enhanced_rag_pipeline.py
     
     - name: Test RAG Notes functions with pytest
       run: |
