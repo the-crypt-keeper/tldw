@@ -60,13 +60,11 @@ import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
-from urllib.parse import quote
-
-from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
     get_database_dir
 from App_Function_Libraries.Chunk_Lib import chunk_options, chunk_text
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 # Third-Party Libraries
 import gradio as gr
@@ -304,7 +302,8 @@ def create_tables(db) -> None:
             trash_date DATETIME,
             vector_embedding BLOB,
             chunking_status TEXT DEFAULT 'pending',
-            vector_processing INTEGER DEFAULT 0
+            vector_processing INTEGER DEFAULT 0,
+            content_hash TEXT UNIQUE
         )
         ''',
         '''
@@ -1224,21 +1223,23 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
         with db.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Generate URL if not provided
-            if not url:
-                title = info_dict.get('title', 'Untitled')
-                url_hash = hashlib.md5(f"{title}{media_type}".encode()).hexdigest()
-                url = f"https://No-URL-Submitted.com/{media_type}/{quote(title)}-{url_hash}"
-
-            logging.debug(f"Checking for existing media with URL: {url}")
-
-            # Extract content from segments
+            # Extract content from segments first
             if isinstance(segments, list):
                 content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
             elif isinstance(segments, dict):
                 content = segments.get('text', '') or segments.get('content', '')
             else:
                 content = str(segments)
+
+            # Generate content hash
+            content_hash = hashlib.sha256(content.encode()).hexdigest()
+
+            # Generate URL if not provided
+            if not url:
+                title = info_dict.get('title', 'Untitled')
+                url = f"https://No-URL-Submitted.com/{media_type}/{content_hash}"
+
+            logging.debug(f"Checking for existing media with URL: {url}")
 
             # Process keywords
             if isinstance(keywords, str):
@@ -1248,8 +1249,8 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
             else:
                 keyword_list = ['default']
 
-            # Check if media already exists
-            cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
+            # Check if media already exists by URL or content_hash
+            cursor.execute('SELECT id FROM Media WHERE url = ? OR content_hash = ?', (url, content_hash))
             existing_media = cursor.fetchone()
 
             logging.debug(f"Existing media: {existing_media}")
@@ -1262,20 +1263,20 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
                     logging.debug("Updating existing media")
                     cursor.execute('''
                     UPDATE Media 
-                    SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?
+                    SET url = ?, content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?, content_hash = ?
                     WHERE id = ?
-                    ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
-                          info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
+                    ''', (url, content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
+                          info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', content_hash, media_id))
                     action = "updated"
                 else:
                     logging.debug("Media exists but not updating (overwrite=False)")
                     action = "already exists (not updated)"
             else:
                 cursor.execute('''
-                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status, content_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
-                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model, 'pending'))
+                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model, 'pending', content_hash))
                 media_id = cursor.lastrowid
                 action = "added"
                 logging.debug(f"New media_id: {media_id}")
