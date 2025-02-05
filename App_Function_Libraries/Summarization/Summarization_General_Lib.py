@@ -1581,7 +1581,7 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
 
     success_message = "All videos have been transcribed, summarized, and ingested into the database successfully."
     return current_progress, success_message, None, None, None, None
-
+    #return current_progress, success_message, summary, json_file_path, summary_file_path, None
 
 def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False, overwrite=False):
     temp_files = []
@@ -1871,67 +1871,90 @@ def format_input_with_metadata(metadata, content):
     return formatted_input
 
 
-def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False, temp=None, system_message=None, chunked_summarization=False):
+def perform_summarization(api_name, input_data, custom_prompt_input, api_key,
+                          recursive_summarization=False, temp=None, system_message=None,
+                          chunked_summarization=False):
+    """
+    Perform summarization on the given input data using the specified API and optional chunking/recursive strategy.
+    This function ensures that if the underlying call produces a generator (e.g. from streaming),
+    we fully consume it here so that only a final string is returned.
+    """
     loaded_config_data = load_and_log_configs()
     logging.info("Starting summarization process...")
+
     if system_message is None:
-        system_message = """
-        You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
-**Bulleted Note Creation Guidelines**
-
-**Headings**:
-- Based on referenced topics, not categories like quotes or terms
-- Surrounded by **bold** formatting 
-- Not listed as bullet points
-- No space between headings and list items underneath
-
-**Emphasis**:
-- **Important terms** set in bold font
-- **Text ending in a colon**: also bolded
-
-**Review**:
-- Ensure adherence to specified format
-- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
+        system_message = (
+            "You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, "
+            "you should follow these guidelines: Use multiple headings based on the referenced topics, "
+            "not categories like quotes or terms. Headings should be surrounded by bold formatting and not be "
+            "listed as bullet points themselves. Leave no space between headings and their corresponding list items "
+            "underneath. Important terms within the content should be emphasized by setting them in bold font. "
+            "Any text that ends with a colon should also be bolded. Before submitting your response, review the "
+            "instructions, and make any corrections necessary to adhered to the specified format. Do not reference "
+            "these instructions within the notes.``` \nBased on the content between backticks create comprehensive "
+            "bulleted notes.\n"
+            "**Bulleted Note Creation Guidelines**\n\n"
+            "**Headings**:\n"
+            "- Based on referenced topics, not categories like quotes or terms\n"
+            "- Surrounded by **bold** formatting\n"
+            "- Not listed as bullet points\n"
+            "- No space between headings and list items underneath\n\n"
+            "**Emphasis**:\n"
+            "- **Important terms** set in bold font\n"
+            "- **Text ending in a colon**: also bolded\n\n"
+            "**Review**:\n"
+            "- Ensure adherence to specified format\n"
+            "- Do not reference these instructions in your response."
+        )
 
     try:
         logging.debug(f"Input data type: {type(input_data)}")
         logging.debug(f"Input data (first 500 chars): {str(input_data)[:500]}...")
 
-        # Extract metadata and content
+        # Extract metadata and content from the incoming data.
         metadata, content = extract_metadata_and_content(input_data)
-
         logging.debug(f"Extracted metadata: {metadata}")
         logging.debug(f"Extracted content (first 500 chars): {content[:500]}...")
 
-        # Prepare a structured input for summarization
+        # Prepare a combined "structured" input (e.g. with title/author + content).
         structured_input = format_input_with_metadata(metadata, content)
 
-        # Perform summarization on the structured input
+        # Decide whether to do chunked or recursive summarization vs. direct summarization.
         if recursive_summarization:
             chunk_options = {
-                'method': 'words',  # or 'sentences', 'paragraphs', 'tokens' based on your preference
-                'max_size': 1000,  # adjust as needed
-                'overlap': 100,  # adjust as needed
+                'method': 'words',     # Could also be 'sentences', 'paragraphs', or 'tokens'
+                'max_size': 1000,      # Adjust chunk size as needed
+                'overlap': 100,        # Overlap between chunks (in words/sentences/etc.)
                 'adaptive': False,
                 'multi_level': False,
                 'language': 'english'
             }
             chunks = improved_chunking_process(structured_input, chunk_options)
             logging.debug(f"Chunking process completed. Number of chunks: {len(chunks)}")
-            logging.debug("Now performing recursive summarization on each chunk...")
-            logging.debug("summary = recursive_summarize_chunks")
-            summary = recursive_summarize_chunks([chunk['text'] for chunk in chunks],
-                                                 lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key),
-                                                 custom_prompt_input, temp, system_message)
-        elif chunked_summarization:
-            logging.debug("summary = summarize_chunk")
-            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key, temp, system_message)
+            logging.debug("Performing recursive summarization on each chunk...")
 
+            summary = recursive_summarize_chunks(
+                [chunk['text'] for chunk in chunks],
+                lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key),
+                custom_prompt_input, temp, system_message
+            )
+
+        elif chunked_summarization:
+            logging.debug("Using summarize_chunk for chunked summarization.")
+            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key, temp, system_message)
         else:
-            logging.debug("summary = summarize")
+            logging.debug("Using direct summarize (no chunking/recursive).")
             summary = summarize(structured_input, custom_prompt_input, api_name, api_key, temp, system_message)
 
-        # add some actual validation logic
+        # If the summary is a generator, consume it here
+        if inspect.isgenerator(summary):
+            logging.debug(f"{api_name} returned a generator; consuming it now.")
+            collected = []
+            for token in summary:
+                collected.append(token)
+            summary = "".join(collected)
+
+        # Optional: if summary is valid, write to a file for debugging (only if input_data is a file path).
         if summary is not None:
             logging.info(f"Summary generated using {api_name} API")
             if isinstance(input_data, str) and os.path.exists(input_data):
@@ -1942,7 +1965,6 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
             logging.warning(f"Failed to generate summary using {api_name} API")
 
         logging.info("Summarization completed successfully.")
-
         return summary
 
     except requests.exceptions.ConnectionError:
@@ -1950,6 +1972,8 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
     except Exception as e:
         logging.error(f"Error summarizing with {api_name}: {str(e)}", exc_info=True)
         return f"An error occurred during summarization: {str(e)}"
+
+    # Fallback if something unexpected happens.
     return None
 
 
@@ -2183,17 +2207,17 @@ def process_url(
                     summary = None
                 summarized_chunk_transcriptions.append(summary)
 
-        # Combine chunked transcriptions and summaries.
-        combined_transcription_text = '\n\n'.join(chunked_transcriptions)
-        combined_transcription_file_path = os.path.join(download_path, 'combined_transcription.txt')
-        with open(combined_transcription_file_path, 'w') as f:
-            f.write(combined_transcription_text)
+                # Combine chunked transcriptions and summaries.
+                combined_transcription_text = '\n\n'.join(chunked_transcriptions)
+                combined_transcription_file_path = os.path.join(download_path, 'combined_transcription.txt')
+                with open(combined_transcription_file_path, 'w') as f:
+                    f.write(combined_transcription_text)
 
-        # Combine summarized chunk transcriptions into a single file
-        combined_summary_text = '\n\n'.join(summarized_chunk_transcriptions)
-        combined_summary_file_path = os.path.join(download_path, 'combined_summary.txt')
-        with open(combined_summary_file_path, 'w') as f:
-            f.write(combined_summary_text)
+                # Combine summarized chunk transcriptions into a single file
+                combined_summary_text = '\n\n'.join(summarized_chunk_transcriptions)
+                combined_summary_file_path = os.path.join(download_path, 'combined_summary.txt')
+                with open(combined_summary_file_path, 'w') as f:
+                    f.write(combined_summary_text)
 
         # Determine how to get the final summary.
         if rolling_summarization:
@@ -2217,6 +2241,7 @@ def process_url(
             add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
             return transcription_text, summary_text, json_file_path, summary_file_path, None, None
         else:
+            summary_text = combined_summary_text
             json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path, info_dict)
             add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
             return transcription_text, summary_text, json_file_path, summary_file_path, None, None
