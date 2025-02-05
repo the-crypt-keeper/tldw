@@ -566,41 +566,41 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=
 
         if streaming:
             logging.debug("Oobabooga: Streaming mode enabled")
+            response = requests.post(api_url, headers=headers, json=data, stream=True)
+            response.raise_for_status()
             try:
-                response = requests.post(api_url, headers=headers, json=data, stream=True)
-                if response.status_code != 200:
-                    error_msg = f"Ooba API request failed: {response.status_code} - {response.text}"
-                    logging.error(error_msg)
-                    yield error_msg
-                    return
+                def stream_generator():
+                    collected_messages = ""
+                    for line in response.iter_lines():
+                        if line:
+                            decoded_line = line.decode('utf-8').strip()
+                            if decoded_line.startswith('data: '):
+                                content = decoded_line[len('data: '):]
+                                if content == '[DONE]':
+                                    break
+                                try:
+                                    data_chunk = json.loads(content)
+                                    if 'choices' in data_chunk and data_chunk['choices']:
+                                        delta = data_chunk['choices'][0].get('delta', {})
+                                        if 'content' in delta:
+                                            chunk = delta['content']
+                                            collected_messages += chunk
+                                            yield chunk
+                                except json.JSONDecodeError as e:
+                                    logging.error(f"JSON decode error: {str(e)}")
+                                    continue
 
-                for line in response.iter_lines():
-                    if line:
-                        decoded_line = line.decode('utf-8').strip()
-                        if decoded_line.startswith('data: '):
-                            content = decoded_line[len('data: '):]
-                            if content == '[DONE]':
-                                break
-                            try:
-                                data_chunk = json.loads(content)
-                                if 'choices' in data_chunk and data_chunk['choices']:
-                                    delta = data_chunk['choices'][0].get('delta', {})
-                                    if 'content' in delta:
-                                        yield delta['content']
-                            except json.JSONDecodeError as e:
-                                logging.error(f"JSON decode error: {str(e)}")
-
-            except Exception as e:
-                logging.error(f"Ooba Streaming error: {str(e)}")
-                yield f"Error: {str(e)}"
-
+                return stream_generator()
+            except requests.RequestException as e:
+                logging.error(f"Error streaming summary with Oobabooga: {e}")
+                return f"Error summarizing with Oobabooga: {str(e)}"
         else:
             logging.debug("Oobabooga: Posting request")
             response = requests.post(api_url, headers=headers, json=data)
 
             if response.status_code == 200:
                 response_data = response.json()
-                logging.debug("Ooba API request succesful")
+                logging.debug("Ooba API request successful")
                 logging.debug(response_data)
                 if 'choices' in response_data and response_data['choices']:
                     logging.debug("Ooba API: Summarization successful")

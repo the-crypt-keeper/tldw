@@ -266,14 +266,34 @@ def create_video_transcription_tab():
                 download_summary = gr.File(label="Download All Summaries as Text")
 
             @error_handler
-            def process_videos_with_error_handling(inputs, start_time, end_time, diarize, vad_use, whisper_model,
-                                                   custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
-                                                   perform_chunking, chunk_method, max_chunk_size, chunk_overlap,
-                                                   use_adaptive_chunking, use_multi_level_chunking, chunk_language,
-                                                   summarize_recursively, api_name, api_key, keywords, use_cookies,
-                                                   cookies, batch_size, timestamp_option, keep_original_video,
-                                                   confab_checkbox, overwrite_existing=False,
-                                                   progress: gr.Progress = gr.Progress()) -> tuple:
+            def process_videos_with_error_handling(inputs,
+                        start_time,
+                        end_time,
+                        diarize,
+                        vad_use,
+                        whisper_model,
+                        custom_prompt_checkbox,
+                        custom_prompt,
+                        chunking_options_checkbox,
+                        perform_chunking,
+                        chunk_method,
+                        max_chunk_size,
+                        chunk_overlap,
+                        use_adaptive_chunking,
+                        use_multi_level_chunking,
+                        chunk_language,
+                        summarize_recursively,
+                        api_name,
+                        api_key,
+                        keywords,
+                        use_cookies,
+                        cookies,
+                        batch_size,
+                        timestamp_option,
+                        keep_original_video,
+                        confab_checkbox,
+                        overwrite_existing=False,
+                        progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
                     # Start overall processing timer
                     proc_start_time = datetime.now()
@@ -391,7 +411,7 @@ def create_video_transcription_tab():
                                     end_time=end_seconds,
                                     include_timestamps=timestamp_option,
                                     metadata=video_metadata,
-                                    use_chunking=chunking_options_checkbox,
+                                    use_chunking=perform_chunking,
                                     chunk_options=chunk_options,
                                     keep_original_video=keep_original_video,
                                     current_whisper_model=whisper_model,
@@ -496,8 +516,12 @@ def create_video_transcription_tab():
                                 metadata_text = "Metadata format error"
                                 transcription_text = "Transcription format error"
 
-                            summary = safe_read_file(summary_file) if summary_file else "No summary available"
-
+                            loaded_config = load_and_log_configs()
+                            save_transcripts = loaded_config["system_preferences"]["save_video_transcripts"]
+                            if save_transcripts:
+                                summary = safe_read_file(summary_file) if summary_file else "No summary available"
+                            else:
+                                summary = summary if summary else "No summary available"
                             # FIXME - Add to other functions that generate HTML
                             # Format the transcription
                             formatted_transcription = format_transcription(transcription_text)
@@ -634,12 +658,33 @@ def create_video_transcription_tab():
                     logging.info(f"Processing inputs: {inputs}")
 
                     result = process_videos_with_error_handling(
-                        inputs, start_time, end_time, diarize, vad_use, whisper_model,
-                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox, perform_chunking,
-                        chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                        use_multi_level_chunking, chunk_language, api_name,
-                        api_key, keywords, use_cookies, cookies, batch_size,
-                        timestamp_option, keep_original_video, summarize_recursively, overwrite_existing
+                        inputs,
+                        start_time,
+                        end_time,
+                        diarize,
+                        vad_use,
+                        whisper_model,
+                        custom_prompt_checkbox,
+                        custom_prompt,
+                        chunking_options_checkbox,
+                        perform_chunking,
+                        chunk_method,
+                        max_chunk_size,
+                        chunk_overlap,
+                        use_adaptive_chunking,
+                        use_multi_level_chunking,
+                        chunk_language,
+                        summarize_recursively,
+                        api_name,
+                        api_key,
+                        keywords,
+                        use_cookies,
+                        cookies,
+                        batch_size,
+                        timestamp_option,
+                        keep_original_video,
+                        confab_checkbox,
+                        overwrite_existing
                     )
 
                     confabulation_result = None
@@ -671,19 +716,70 @@ def create_video_transcription_tab():
 
             # FIXME - remove dead args for process_url_with_metadata
             @error_handler
-            def process_url_with_metadata(input_item, num_speakers, whisper_model, custom_prompt, offset, api_name,
-                                          api_key, vad_filter, download_video_flag, download_audio,
-                                          rolling_summarization,
-                                          detail_level, question_box, keywords, local_file_path, diarize, end_time=None,
-                                          include_timestamps=True, metadata=None, use_chunking=False,
-                                          chunk_options=None, keep_original_video=False, current_whisper_model="Blank", overwrite_existing=False):
+            def process_url_with_metadata(
+                input_item,
+                num_speakers,
+                whisper_model,
+                custom_prompt,
+                offset,
+                api_name,
+                api_key,
+                vad_filter,
+                download_video_flag,
+                download_audio,
+                rolling_summarization,
+                detail_level,
+                question_box,
+                keywords,
+                local_file_path,
+                diarize,
+                end_time=None,
+                include_timestamps=True,
+                metadata=None,
+                use_chunking=False,
+                chunk_options=None,
+                keep_original_video=False,
+                current_whisper_model="Blank",
+                overwrite_existing=False
+            ):
+                """
+                Downloads (if needed) and processes a single video or local file, then performs transcription & summarization.
 
+                :param input_item: String representing either a URL or local file path.
+                :param num_speakers: (Unused) Number of speakers for diarization (if enabled).
+                :param whisper_model: Name of the Whisper model to use for transcription.
+                :param custom_prompt: Custom prompt to supply to the LLM for summarization.
+                :param offset: Start offset in seconds for partial transcriptions.
+                :param api_name: Name of the selected LLM API (e.g., "OpenAI").
+                :param api_key: API key to pass to the LLM for summarization.
+                :param vad_filter: Boolean, enable/disable VAD during transcription.
+                :param download_video_flag: Boolean, whether to force downloading the entire video (vs. just the audio).
+                :param download_audio: (Unused) Boolean to download audio only if True.
+                :param rolling_summarization: Boolean, if True do multi-pass (recursive) summarization of chunk summaries.
+                :param detail_level: (Unused) Additional detail level parameter.
+                :param question_box: (Unused) Additional question prompt param.
+                :param keywords: A string of comma-separated keywords or a list/tuple of keywords.
+                :param local_file_path: (Unused) Possibly used if a downloaded file needs a custom path.
+                :param diarize: Boolean, if True perform speaker diarization (requires specialized pipeline).
+                :param end_time: End offset in seconds for partial transcriptions.
+                :param include_timestamps: Boolean, whether to preserve timestamps in the final transcript.
+                :param metadata: An optional pre-extracted metadata dict for the video.
+                :param use_chunking: Boolean, if True chunk large text for summarization.
+                :param chunk_options: Dictionary specifying chunking parameters (method, max size, overlap, etc.).
+                :param keep_original_video: Boolean, if True do not delete the downloaded video file.
+                :param current_whisper_model: String, the current Whisper model for DB checks.
+                :param overwrite_existing: Boolean, if True re-process even if the file was processed previously.
+
+                :return: (url, full_text_with_metadata, summary_text, json_file_path, summary_file_path, info_dict)
+                         or (None, None, None, None, None, None) on error.
+                """
                 try:
-                    logging.info(f"Starting process_url_metadata for URL: {input_item}")
-                    # Create download path
+                    logging.info(f"Starting process_url_with_metadata for URL: {input_item}")
 
                     # FIXME Add toggle to save to a different directory
                     # FIXME Add toggle to save to disk vs temp file
+
+                    # Load config to see if transcripts should be saved
                     loaded_config = load_and_log_configs()
                     keep_transcripts = loaded_config["system_preferences"]["save_video_transcripts"]
                     if keep_transcripts:
@@ -693,8 +789,12 @@ def create_video_transcription_tab():
                     # Initialize info_dict
                     info_dict = {}
 
+                    # -------------------------------------------------
+                    # 1) Distinguish local file vs. remote URL
+                    # -------------------------------------------------
                     # Handle URL or local file
                     if os.path.isfile(input_item):
+                        # Local file path
                         video_file_path = input_item
                         unique_id = generate_unique_identifier(input_item)
                         # Extract basic info from local file
@@ -709,7 +809,7 @@ def create_video_transcription_tab():
                             'upload_date': None
                         }
                     else:
-                        # Extract video information via yt_dlp
+                        # URL case: Extract video information via yt_dlp
                         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                             try:
                                 full_info = ydl.extract_info(input_item, download=False)
@@ -744,9 +844,9 @@ def create_video_transcription_tab():
                             logging.error("Failed to extract video information")
                             return None, None, None, None, None, None
 
-                        # FIXME - MAKE SURE THIS WORKS WITH LOCAL FILES
-                        # FIXME - Add a toggle to force processing even if media exists
-                        # Check if media already exists in the database
+                        # -------------------------------------------------
+                        # 2) Check media in DB, possibly skip
+                        # -------------------------------------------------
                         logging.info("Checking if media already exists in the database...")
                         media_exists, reason = check_media_and_whisper_model(
                             title=info_dict.get('title'),
@@ -758,7 +858,7 @@ def create_video_transcription_tab():
                             logging.info(
                                 f"process_url_with_metadata: Media does not exist in the database. Reason: {reason}")
                         else:
-                            if "same whisper model" in reason:
+                            if "same whisper model" in reason and not overwrite_existing:
                                 logging.info(
                                     f"process_url_with_metadata: Skipping download and processing as media exists and uses the same Whisper model. Reason: {reason}")
                                 return input_item, None, None, None, None, info_dict
@@ -766,7 +866,9 @@ def create_video_transcription_tab():
                                 logging.info(
                                     f"process_url_with_metadata: Media found, but with a different Whisper model. Reason: {reason}")
 
-                        # Download video/audio
+                        # -------------------------------------------------
+                        # 3) Download video (or skip if existing)
+                        # -------------------------------------------------
                         logging.info("Downloading video/audio...")
                         video_file_path = download_video(input_item, download_path, full_info, download_video_flag,
                                                          current_whisper_model=current_whisper_model)
@@ -775,29 +877,23 @@ def create_video_transcription_tab():
                                 f"process_url_with_metadata: Download skipped for {input_item}. Media might already exist or be processed.")
                             return input_item, None, None, None, None, info_dict
 
-                    # FIXME - add check for existing media with different whisper model for local files
-                    # FIXME Check to make sure this works
+                    # -------------------------------------------------
+                    # 4) For local files, also check DB if needed
+                    # -------------------------------------------------
                     media_exists, reason = check_media_and_whisper_model(
                         title=info_dict.get('title'),
                         url=info_dict.get('webpage_url'),
                         current_whisper_model=current_whisper_model
                     )
-                    if not media_exists:
-                        logging.info(
-                            f"process_url_with_metadata: Media does not exist in the database. Reason: {reason}")
+                    if media_exists and "same whisper model" in reason and not overwrite_existing:
+                        logging.info("Skipping: local file already processed with same Whisper model.")
+                        return input_item, None, None, None, None, info_dict
                     else:
-                        if "same whisper model" in reason:
-                            logging.info(
-                                f"process_url_with_metadata: Skipping download and processing as media exists and uses the same Whisper model. Reason: {reason}")
-                            return input_item, None, None, None, None, info_dict
-                        else:
-                            same_whisper_model = True
-                            logging.info(
-                                f"process_url_with_metadata: Media found, but with a different Whisper model. Reason: {reason}")
+                        logging.info(f"Proceeding with file: {video_file_path}")
 
-                    logging.info(f"process_url_with_metadata: Processing file: {video_file_path}")
-
-                    # Perform transcription
+                    # -------------------------------------------------
+                    # 5) Perform transcription
+                    # -------------------------------------------------
                     logging.info("process_url_with_metadata: Starting transcription...")
                     logging.info(f"process_url_with_metadata: overwrite existing?: {overwrite_existing}")
                     audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
@@ -809,7 +905,7 @@ def create_video_transcription_tab():
 
                     logging.info(f"process_url_with_metadata: Transcription completed. Number of segments: {len(segments)}")
 
-                    # Add metadata to segments and save them
+                    # Merge metadata + segments and save them
                     segments_with_metadata = {
                         "metadata": info_dict,
                         "segments": segments
@@ -821,6 +917,7 @@ def create_video_transcription_tab():
                         json.dump(segments_with_metadata, f, indent=2)
 
                     # Delete the .wav file after successful transcription
+                    # FIXME - swap to pathlib
                     files_to_delete = [audio_file_path]
                     for file_path in files_to_delete:
                         if file_path and os.path.exists(file_path):
@@ -845,7 +942,9 @@ def create_video_transcription_tab():
                         logging.info(f"process_url_with_metadata: Keeping original video file: {video_file_path}")
                         logging.info(f"process_url_with_metadata: Keeping original audio file: {audio_file_path}")
 
-                    # Process segments based on the timestamp option
+                    # -------------------------------------------------
+                    # 6) Possibly drop timestamps
+                    # -------------------------------------------------
                     if not include_timestamps:
                         segments = [{'Text': segment['Text']} for segment in segments]
 
@@ -858,14 +957,18 @@ def create_video_transcription_tab():
                         logging.error(f"process_url_with_metadata: Failed to extract transcription: {transcription_text}")
                         return None, None, None, None, None, None
 
+                    # Combine full text with metadata at the top
                     full_text_with_metadata = f"{json.dumps(info_dict, indent=2)}\n\n{transcription_text}"
                     logging.debug(f"Full text with metadata extracted: {full_text_with_metadata[:100]}...")
 
                     logging.debug(f"process_url_with_metadata: Full text with metadata extracted: {full_text_with_metadata[:100]}...")
 
-                   # ------------------- Summarization Block -------------------
+                    # -------------------------------------------------
+                    # 7) Summarize (if API is specified)
+                    # -------------------------------------------------
                     summary_text = None
-                    if api_name and api_name.lower() != "none":
+                    # If an API is provided and is not "None" or an empty string, perform summarization.
+                    if api_name and api_name.lower() != "none" and api_name.strip() != "":
                         # API key resolution handled at base of function if none provided
                         api_key = api_key if api_key else None
                         logging.info(f"process_url_with_metadata: Starting summarization with {api_name}...")
@@ -876,72 +979,81 @@ def create_video_transcription_tab():
                             logging.info("process_url_with_metadata: Chunking enabled. Starting chunking...")
                             chunked_texts = improved_chunking_process(full_text_with_metadata, chunk_options)
 
-                            if chunked_texts is None:
-                                logging.warning("Chunking failed, falling back to full text summarization")
-                                summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt,
-                                                                     api_key)
+                            if not chunked_texts:
+                                logging.warning("Chunking failed; falling back to full-text summarization.")
+                                summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key)
                             else:
-                                logging.debug(
-                                    f"process_url_with_metadata: Chunking completed. Processing {len(chunked_texts)} chunks...")
-                                summaries = []
-
-                                if rolling_summarization:
-                                    # Perform recursive summarization on each chunk
-                                    for chunk in chunked_texts:
-                                        chunk_summary = perform_summarization(api_name, chunk['text'], custom_prompt,
-                                                                              api_key)
-                                        if chunk_summary:
-                                            summaries.append(
-                                                f"Chunk {chunk['metadata']['chunk_index']}/{chunk['metadata']['total_chunks']}: {chunk_summary}")
-                                            summary_text = "\n\n".join(summaries)
-                                        else:
-                                            logging.error("All chunk summarizations failed")
-                                            summary_text = None
-
+                                # Summarize each chunk once
+                                chunk_summaries = []
                                 for chunk in chunked_texts:
-                                    # Perform Non-recursive summarization on each chunk
-                                    chunk_summary = perform_summarization(api_name, chunk['text'], custom_prompt,
-                                                                          api_key)
+                                    chunk_summary = perform_summarization(api_name, chunk['text'], custom_prompt, api_key)
                                     if chunk_summary:
-                                        summaries.append(
-                                            f"Chunk {chunk['metadata']['chunk_index']}/{chunk['metadata']['total_chunks']}: {chunk_summary}")
-
-                                    if summaries:
-                                        summary_text = "\n\n".join(summaries)
-                                        logging.info(f"Successfully summarized {len(summaries)} chunks")
+                                        chunk_summaries.append(chunk_summary)
                                     else:
-                                        logging.error("All chunk summarizations failed")
+                                        idx = chunk['metadata'].get('chunk_index', '?')
+                                        logging.error(f"Summarization failed for chunk {idx}.")
+
+                                logging.debug(f"chunk_summaries: {chunk_summaries}")
+                                if chunk_summaries:
+                                    if rolling_summarization and len(chunk_summaries) > 1:
+                                        # Recursively summarize the combined chunk summaries
+                                        combined_text = "\n\n".join(chunk_summaries)
+                                        summary_text = perform_summarization(api_name, combined_text, custom_prompt, api_key)
+                                        if summary_text:
+                                            logging.info("Recursive summarization successful.")
+                                        else:
+                                            logging.error("Recursive summarization failed.")
+                                    else:
+                                        # Join each chunk's summary
+                                        summary_text = "\n\n".join(chunk_summaries)
+                                        logging.info(f"Summarized {len(chunk_summaries)} chunk(s).")
+                                    if not summary_text:
+                                        logging.error("All chunk summarizations failed.")
                                         summary_text = None
                         else:
-                            # Regular summarization without chunking
-                            summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt,
-                                                                 api_key) if api_name else None
+                            # Summarize the entire transcription
+                            summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt, api_key) if api_name else None
+                            logging.debug(f"Just got summary_text from perform_summarization: {repr(summary_text)}")
+                            if summary_text:
+                                logging.info("Summarization completed successfully without chunking.")
+                            else:
+                                logging.error("Summarization failed for full text.")
 
-                        if summary_text is None:
-                            logging.error("Summarization failed.")
+                        # If still no summary, abort
+                        if not summary_text:
+                            logging.error("Summarization failed overall.")
                             return None, None, None, None, None, None
-                        # Consume the generator if needed:
 
-                        if inspect.isgenerator(summary_text):
-                            summary_text = "".join(summary_text)
-                        logging.debug(f"process_url_with_metadata: Summarization completed: {summary_text[:100]}...")
+                    # If summary_text is a generator, consume it.
+                    if inspect.isgenerator(summary_text):
+                        summary_text = "".join(summary_text)
+                        logging.debug(f"process_url_with_metadata: Consumed generator for summary_text. Generated summary: {summary_text}")
+                    logging.debug(f"process_url_with_metadata: Summarization complete (first 100 chars): {summary_text[:100]}...")
 
-                    # Save transcription and summary
+                    # -------------------------------------------------
+                    # 8) Save transcription + summary to disk
+                    # -------------------------------------------------
                     load_config = load_and_log_configs()
                     save_transcripts = load_config["system_preferences"]["save_video_transcripts"]
                     if save_transcripts:
-                        logging.info("process_url_with_metadata: Saving transcription and summary...")
+                        logging.info("process_url_with_metadata: Saving transcription and summary to disk")
                         download_path = create_download_directory("Audio_Processing")
+                        logging.debug(f"Type of summary_text: {type(summary_text)}")
+                        logging.debug(f"Preview of summary_text: {repr(summary_text)[:300]}")
                         json_file_path, summary_file_path = save_transcription_and_summary(full_text_with_metadata,
                                                                                            summary_text,
                                                                                            download_path, info_dict)
                         logging.info(f"process_url_with_metadata: Transcription saved to: {json_file_path}")
                         logging.info(f"process_url_with_metadata: Summary saved to: {summary_file_path}")
                     else:
-                        logging.info("process_url_with_metadata: Saving transcripts disabled. Using temporary files.")
+                        logging.info("process_url_with_metadata: Not saving transcripts. Using temporary files.(save_video_transcripts set to False).")
                         # FIXME - Add temporary file handling
+                        # For now,
+                        json_file_path, summary_file_path = None, None
 
-                    # Prepare keywords for database
+                    # -------------------------------------------------
+                    # 9) Store data in the DB
+                    # -------------------------------------------------
                     if isinstance(keywords, str):
                         keywords_list = [kw.strip() for kw in keywords.split(',') if kw.strip()]
                     elif isinstance(keywords, (list, tuple)):
@@ -953,21 +1065,29 @@ def create_video_transcription_tab():
                     existing_media = check_existing_media(info_dict['webpage_url'])
 
                     if existing_media:
-                        # Update existing media with new version
+                         # We have an entry, so update it (creating a new "version" row in DB)
                         media_id = existing_media['id']
                         update_result = update_media_content_with_version(media_id, info_dict, full_text_with_metadata,
                                                                           custom_prompt, summary_text, whisper_model)
                         logging.info(f"process_url_with_metadata: {update_result}")
                     else:
-                        # Add new media to database
+                        # Create a new row
                         add_result = add_media_to_database(info_dict['webpage_url'], info_dict, full_text_with_metadata,
                                                            summary_text,
                                                            keywords_list, custom_prompt, whisper_model)
                         logging.info(f"process_url_with_metadata: {add_result}")
 
-                    return info_dict[
-                        'webpage_url'], full_text_with_metadata, summary_text, json_file_path, summary_file_path, info_dict
-
+                    # -------------------------------------------------
+                    # 10) Return results
+                    # -------------------------------------------------
+                    return (
+                        info_dict['webpage_url'],
+                        full_text_with_metadata,
+                        summary_text,
+                        json_file_path,
+                        summary_file_path,
+                        info_dict
+                    )
                 except Exception as e:
                     logging.error(f"Error in process_url_with_metadata: {str(e)}", exc_info=True)
                     return None, None, None, None, None, None
