@@ -112,6 +112,12 @@ Google Pinpoint
 Gemini Deepresearcher
     https://blog.google/products/gemini/google-gemini-deep-research/
 
+STORM
+    https://github.com/stanford-oval/storm/
+    https://github.com/stanford-oval/storm/blob/main/examples/storm_examples/run_storm_wiki_claude.py
+    https://storm-project.stanford.edu/research/storm/
+
+
 https://github.com/assafelovic/gpt-researcher
 https://arxiv.org/abs/2411.15114
 
@@ -135,6 +141,7 @@ https://github.com/ai-christianson/RA.Aid
 https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_research_prompt.md
 https://github.com/0xeb/TheBigPromptLibrary/blob/main/SystemPrompts/Perplexity.ai/20241024-Perplexity-Desktop-App.md
 https://github.com/rashadphz/farfalle
+https://huggingface.co/blog/open-deep-research
 https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_research_prompt.md
 https://www.emergentmind.com/
 https://github.com/neuml/paperai
@@ -142,7 +149,7 @@ https://github.com/neuml/paperetl
 https://github.com/ai-christianson/RA.Aid
 https://github.com/Future-House/paper-qa
 https://github.com/bytedance/pasa
-
+https://huggingface.co/spaces/Felladrin/awesome-ai-web-search
 https://allenai.org/blog/ai2-scholarqa
 https://openreview.net/
 https://learning.google.com/experiments/learn-about/signup
@@ -160,8 +167,7 @@ https://arxiv.org/abs/2501.03916
 https://github.com/dendrite-systems/dendrite-python-sdk
 https://github.com/rashadphz/farfalle/blob/main/src/backend/agent_search.py
 https://github.com/rashadphz/farfalle/blob/main/src/backend/prompts.py
-https://github.com/stanford-oval/storm/
-https://github.com/stanford-oval/storm/blob/main/examples/storm_examples/run_storm_wiki_claude.py
+
 https://learning.google.com/experiments/learn-about
 https://github.com/SamuelSchmidgall/AgentLaboratory
 https://github.com/exa-labs/company-researcher
