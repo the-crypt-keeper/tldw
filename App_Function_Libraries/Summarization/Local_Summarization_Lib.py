@@ -455,14 +455,15 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_mess
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=None, temp=None, api_url="http://127.0.0.1:5000/v1/chat/completions", streaming=False):
+def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=None, temp=None, api_url=None, streaming=False):
     logging.debug("Oobabooga: Summarization process starting...")
     try:
         logging.debug("Oobabooga: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
+        ooba_api_key = None
+
         if loaded_config_data is None:
             logging.error("Failed to load configuration data")
-            ooba_api_key = None
         else:
             # Prioritize the API key passed as a parameter
             if api_key and api_key.strip():
@@ -470,134 +471,159 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=
                 logging.info("Oobabooga: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                ooba_api_key = loaded_config_data['api_keys'].get('ooba')
+                ooba_api_key = loaded_config_data['ooba_api']['api_key']
                 if ooba_api_key:
-                    logging.info("Anthropic: Using API key from config file")
+                    logging.info("Oobabooga: Using API key from config file")
                 else:
-                    logging.warning("Anthropic: No API key found in config file")
+                    logging.warning("Oobabooga: No API key found in config file")
 
-        logging.debug(f"Oobabooga: Using API Key: {ooba_api_key[:5]}...{ooba_api_key[-5:]}")
+        if not api_url:
+            api_url = loaded_config_data['ooba_api']['api_ip']
+            logging.debug(f"Oobabooga: Using API URL from config file: {api_url}")
 
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("Oobabooga: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
-        else:
-            logging.debug("Oobabooga: Using provided string data for summarization")
-            data = input_data
-
-        logging.debug(f"Oobabooga: Loaded data: {data}")
-        logging.debug(f"Oobabooga: Type of data: {type(data)}")
-
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("Oobabooga: Summary already exists in the loaded data")
-            return data['summary']
-
-        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError("Invalid input data format")
-
+        if not isinstance(api_url, str) or not api_url.startswith(('http://', 'https://')):
+            logging.error(f"Invalid API URL configured: {api_url}")
+            return "Oobabooga: Invalid API URL configured"
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
         }
-
-        if custom_prompt is None:
-            custom_prompt = f"{summarizer_prompt}\n\n\n\n{text}"
+        if ooba_api_key:
+            headers['Authorization'] = f'Bearer {ooba_api_key}'
+            logging.debug(f"Oobabooga: Using API Key: {ooba_api_key[:5]}...{ooba_api_key[-5:]}")
         else:
-            custom_prompt = f"{custom_prompt}\n\n\n\n{text}"
+            logging.debug("Oobabooga: No API key provided")
 
-        logging.debug("Ooba Summarize: Prompt being sent is {kobold_prompt}")
+        # Input data handling
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                try:
+                    data = json.loads(input_data)
+                    logging.debug("Oobabooga: Parsed JSON string input")
+                except json.JSONDecodeError as e:
+                    logging.error(f"Oobabooga: Error parsing JSON string: {str(e)}")
+                    return f"Oobabooga: Error parsing JSON input: {str(e)}"
+            elif os.path.isfile(input_data):
+                logging.debug("Oobabooga: Loading JSON data from file")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                data = input_data
+                logging.debug("Oobabooga: Using provided string data")
+        else:
+            data = input_data
 
-        ooba_prompt = f"{text}" + f"\n\n\n\n{custom_prompt}"
-        logging.debug("ooba: Prompt being sent is {ooba_prompt}")
+        logging.debug(f"Oobabooga: Processed data type: {type(data)}")
 
+        # Check for existing summary
+        if isinstance(data, dict) and 'summary' in data:
+            logging.debug("Oobabooga: Summary already exists")
+            return data['summary']
+
+        # Text extraction
+        if isinstance(data, dict):
+            if 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Oobabooga: Invalid input data format")
+
+        # Construct prompt
+        summarizer_prompt = "Please summarize the following text:"  # Define this if not already
+        if custom_prompt is None:
+            custom_prompt = summarizer_prompt
+        ooba_prompt = f"{text}\n\n\n\n{custom_prompt}"
+        logging.debug(f"Oobabooga: Prompt being sent is {ooba_prompt[:500]}...")
+
+        # System message handling
         if system_message is None:
             system_message = "You are a helpful AI assistant."
 
+        # Temperature handling
+        if temp is None:
+            # Check config
+            if 'temperature' in loaded_config_data['ooba_api']:
+                temp = loaded_config_data['ooba_api']['temperature']
+            else:
+                temp = 0.7
+
+        # Prepare API payload
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": ooba_prompt}
+        ]
         data = {
             "mode": "chat",
-            "character": "Example",
-            "messages": [{"role": "user", "content": ooba_prompt}],
-            "system_message": system_message,
-            "stream": streaming
+            "messages": messages,
+            "stream": streaming,
+            "temperature": temp,
         }
 
         if streaming:
-            logging.debug("Ooba Summarization: Streaming mode enabled")
+            logging.debug("Oobabooga: Streaming mode enabled")
             try:
-                # Send the request with streaming enabled
-                response = requests.post(
-                    api_url, headers=headers, json=data, stream=True
-                )
-                logging.debug(
-                    "Ooba Summarization: API Response Status Code: %d",
-                    response.status_code,
-                )
+                response = requests.post(api_url, headers=headers, json=data, stream=True)
+                if response.status_code != 200:
+                    error_msg = f"Ooba API request failed: {response.status_code} - {response.text}"
+                    logging.error(error_msg)
+                    yield error_msg
+                    return
 
-                if response.status_code == 200:
-                    # Process the streamed response
-                    for line in response.iter_lines():
-                        if line:
-                            decoded_line = line.decode('utf-8')
-                            logging.debug(
-                                "Ooba: Received streamed data: %s", decoded_line
-                            )
-                            # OpenAI API streams data prefixed with 'data: '
-                            if decoded_line.startswith('data: '):
-                                content = decoded_line[len('data: '):].strip()
-                                if content == '[DONE]':
-                                    break
-                                try:
-                                    data_chunk = json.loads(content)
-                                    if 'choices' in data_chunk and len(data_chunk['choices']) > 0:
-                                        delta = data_chunk['choices'][0].get('delta', {})
-                                        text = delta.get('content', '')
-                                        if text:
-                                            yield text
-                                    else:
-                                        logging.error(
-                                            "Ooba: Expected data not found in streamed response."
-                                        )
-                                except json.JSONDecodeError as e:
-                                    logging.error(
-                                        "Ooba: Error decoding streamed JSON: %s", str(e)
-                                    )
-                            else:
-                                logging.debug("Ooba: Ignoring line: %s", decoded_line)
-                else:
-                    logging.error(
-                        f"Ooba: API request failed with status code {response.status_code}: {response.text}"
-                    )
-                    yield f"Ooba: API request failed: {response.text}"
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line.startswith('data: '):
+                            content = decoded_line[len('data: '):]
+                            if content == '[DONE]':
+                                break
+                            try:
+                                data_chunk = json.loads(content)
+                                if 'choices' in data_chunk and data_chunk['choices']:
+                                    delta = data_chunk['choices'][0].get('delta', {})
+                                    if 'content' in delta:
+                                        yield delta['content']
+                            except json.JSONDecodeError as e:
+                                logging.error(f"JSON decode error: {str(e)}")
+
             except Exception as e:
-                logging.error("Ooba: Error in processing: %s", str(e))
-                yield f"Ooba: Error occurred while processing summary with Ooba: {str(e)}"
+                logging.error(f"Ooba Streaming error: {str(e)}")
+                yield f"Error: {str(e)}"
+
         else:
-            logging.debug("Ooba: Submitting request to API endpoint for summarization")
-            print("Ooba: Submitting request to API endpoint for summarization")
-            response = requests.post(api_url, headers=headers, json=data, verify=False)
-            logging.debug("Ooba: API Response Data: %s", response)
+            logging.debug("Oobabooga: Posting request")
+            response = requests.post(api_url, headers=headers, json=data)
 
             if response.status_code == 200:
                 response_data = response.json()
-                summary = response.json()['choices'][0]['message']['content']
-                logging.debug("Ooba: Summarization successful")
-                print("Summarization successful.")
-                return summary
+                logging.debug("Ooba API request succesful")
+                logging.debug(response_data)
+                if 'choices' in response_data and response_data['choices']:
+                    logging.debug("Ooba API: Summarization successful")
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug(f"Ooba API: Summary (first 500 chars): {summary[:500]}...")
+                    return summary
+                else:
+                    error_msg = f"Ooba API request failed: {response.status_code} - {response.text}"
+                    logging.error(error_msg)
+                    return error_msg
             else:
-                logging.error(f"oobabooga: API request failed with status code {response.status_code}: {response.text}")
-                return f"Ooba: Summarization API request failed with status code {response.status_code}: {response.text}"
-
+                logging.error(f"Ooba API: Summarization failed with status code {response.status_code}")
+                logging.error(f"Ooba API: Error response: {response.text}")
+                return f"Ooba API: Failed to process summary. Status code: {response.status_code}"
+    except json.JSONDecodeError as e:
+        logging.error(f"Ooba API: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"Ooba API: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"Ooba API: Error making API request: {str(e)}", exc_info=True)
+        return f"Ooba API: Error making API request: {str(e)}"
     except Exception as e:
-        logging.error("ooba: Error in processing: %s", str(e))
-        return f"Ooba: Error occurred while processing summary with oobabooga: {str(e)}"
+        logging.error(f"Ooba API: Unexpected error: {str(e)}", exc_info=True)
+        return f"Ooba API: Unexpected error occurred: {str(e)}"
 
 
 def summarize_with_tabbyapi(

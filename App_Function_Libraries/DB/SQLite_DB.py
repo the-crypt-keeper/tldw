@@ -104,8 +104,8 @@ backup_path = get_project_relative_path(backup_path)
 db_path = sqlite_path
 backup_dir = backup_path
 
-print(f"Media Database path: {db_path}")
-print(f"Media Backup directory: {backup_dir}")
+logging.info(f"Media Database path: {db_path}")
+logging.info(f"Media Backup directory: {backup_dir}")
 #create_automated_backup(db_path, backup_dir)
 
 # FIXME - Setup properly and test/add documentation for its existence...
@@ -1387,22 +1387,42 @@ def update_media_content_with_version(media_id, info_dict, content_input, prompt
 
 
 # FIXME: This function is not complete and needs to be implemented
-def schedule_chunking(media_id: int, content: str, media_name: str, media_type: str = None): #, chunk_options: dict = None):
+def schedule_chunking(media_id: int, content: str, media_name: str, media_type: str = None, chunk_options: dict = None):
     try:
-        chunks = chunk_text(content, chunk_options['method'], chunk_options['max_size'], chunk_options['overlap'])
+        # Ensure chunk_options is provided; if not, use defaults.
+        if chunk_options is None:
+            chunk_options = {'method': 'words', 'max_size': 300, 'overlap': 0}
+
+        # Retrieve the values from chunk_options as provided.
+        method = chunk_options.get('method', 'words')
+        max_size = chunk_options.get('max_size', 300)  # preserve original type (could be str or int)
+        overlap = chunk_options.get('overlap', 0)        # preserve original type (could be str or int)
+
+        # Convert max_size and overlap to integers for arithmetic without modifying the original chunk_options
+        try:
+            max_size_int = int(max_size)
+            overlap_int = int(overlap)
+        except ValueError as e:
+            logging.error(f"Error converting chunk_options values to int: {e}")
+            raise
+
+        # Use the converted integers when calling the chunking function.
+        chunks = chunk_text(content, method, max_size_int, overlap_int)
+
         db = Database()
         with db.get_connection() as conn:
             cursor = conn.cursor()
             for i, chunk in enumerate(chunks):
+                # Calculate start and end indices for the chunk using the integer values
+                start_index = i * max_size_int
+                end_index = min((i + 1) * max_size_int, len(content))
                 cursor.execute('''
-                INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
-                VALUES (?, ?, ?, ?, ?)
-                ''', (media_id, chunk, i * chunk_options['max_size'],
-                      min((i + 1) * chunk_options['max_size'], len(content)),
-                      f"{media_id}_chunk_{i}"))
+                    INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
+                    VALUES (?, ?, ?, ?, ?)
+                    ''', (media_id, chunk, start_index, end_index, f"{media_id}_chunk_{i}"))
             conn.commit()
 
-        # Update chunking status
+        # Update chunking status in the Media table.
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE Media SET chunking_status = 'completed' WHERE id = ?", (media_id,))

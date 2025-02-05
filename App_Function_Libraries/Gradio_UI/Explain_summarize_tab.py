@@ -301,8 +301,8 @@ def summarize_explain_text(message, api_endpoint, api_key, summarization, explan
                     summarization_response = summarize_with_kobold(input_data, api_key, user_prompt, temp,
                                                                    system_prompt, streaming)
                 elif api_endpoint.lower() == "ooba":
-                    summarization_response = summarize_with_oobabooga(input_data, api_key, user_prompt, temp,
-                                                                      system_prompt, streaming)
+                    summarization_response = summarize_with_oobabooga(input_data, api_key, user_prompt, system_prompt,
+                                                                      temp=None, api_url=None, streaming=False)
                 elif api_endpoint.lower() == "tabbyapi":
                     summarization_response = summarize_with_tabbyapi(input_data, user_prompt, temp, system_prompt, streaming)
                 elif api_endpoint.lower() == "vllm":

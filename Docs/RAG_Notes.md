@@ -11,9 +11,12 @@ https://arxiv.org/pdf/2501.09136v1
 https://arxiv.org/pdf/2501.07572v2
 https://arxiv.org/pdf/2412.17149
 	https://arxiv.org/abs/2410.21012
+https://arxiv.org/abs/2410.03608
+https://research.google/blog/chain-of-agents-large-language-models-collaborating-on-long-context-tasks/
 https://arxiv.org/abs/2501.15228
 	https://arxiv.org/abs/2410.20088
 https://research.google/blog/speculative-rag-enhancing-retrieval-augmented-generation-through-drafting/
+https://arxiv.org/abs/2502.01142
 https://arxiv.org/abs/2501.14342
 	https://arxiv.org/abs/2410.13765
 	https://arxiv.org/pdf/2409.15699v1
@@ -31,6 +34,7 @@ https://arxiv.org/abs/2501.14342
 https://arxiv.org/abs/2412.02830
 https://arxiv.org/abs/2210.03629
 https://arxiv.org/abs/2407.04125
+https://hub.athina.ai/p/34eedbf5-4db2-4c88-84a4-7a192fd5b0ed/
 https://cobusgreyling.medium.com/four-levels-of-rag-research-from-microsoft-fdc54388f0ff
 https://arxiv.org/html/2412.00239v1
 https://arxiv.org/abs/2412.02830
@@ -123,7 +127,9 @@ https://www.linkedin.com/pulse/taxonomy-ontology-knowledge-graph-rajib-deb-oedkc
 Context Relevancy
 	https://arxiv.org/abs/2404.10198
 	https://github.com/kevinwu23/StanfordClashEval
-
+```
+@Rock-star-007 from reddit: I added 3 nodes in my agent - query intent identifier, query rephraser , search_scope identifier. You try to identify what what the user is intending to ask. The rephrase the question as per the intent. You need to write prompts for rephrasing accordingly. Then identify what specific documents the user might be talking about. Then perform retrieval step with appropriate scope, then do generation. 
+```
 
 ### Links
 - RAG 101

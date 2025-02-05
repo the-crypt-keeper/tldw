@@ -2,6 +2,7 @@
 # Description: This file contains the code for the video transcription tab in the Gradio UI.
 #
 # Imports
+import inspect
 import json
 import logging
 import os
@@ -53,14 +54,14 @@ def create_video_transcription_tab():
         with gr.Row():
             with gr.Column():
                 url_input = gr.Textbox(label="URL(s) (Mandatory)",
-                                       placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, other video sites and Youtube playlists.",
+                                       placeholder="Enter video URLs here, one per line. Supports YouTube, Vimeo, other video sites and YouTube playlists.",
                                        lines=5)
                 video_files = gr.File(label="Upload Video File(s) (Optional)", file_types=[".mp4", ".avi", ".mov", ".mkv", ".webm"], file_count="multiple")
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="distil-large-v3", label="Whisper Model")
 
                 with gr.Row():
                     diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
-                    vad_checkbox = gr.Checkbox(label="Enable Voice-Audio-Detection(VAD)", value=True)
+                    vad_checkbox = gr.Checkbox(label="Enable Voice-Audio-Detection (VAD)", value=True)
 
                 with gr.Row():
                     custom_prompt_checkbox = gr.Checkbox(label="Use a Custom Prompt",
@@ -197,7 +198,7 @@ def create_video_transcription_tab():
                                              label="Batch Size (Number of videos to process simultaneously)", visible=False)
                 timestamp_option = gr.Checkbox(label="Include Timestamps", value=True)
                 keep_original_video = gr.Checkbox(label="Keep Original Video", value=False)
-                # First, create a checkbox to toggle the chunking options
+                perform_chunking = gr.Checkbox(label="Enable Chunking", value=False)
                 chunking_options_checkbox = gr.Checkbox(label="Show Chunking Options", value=False)
                 summarize_recursively = gr.Checkbox(label="Enable Recursive Summarization", value=False)
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
@@ -919,6 +920,10 @@ def create_video_transcription_tab():
                         if summary_text is None:
                             logging.error("Summarization failed.")
                             return None, None, None, None, None, None
+                        # Consume the generator if needed:
+
+                        if inspect.isgenerator(summary_text):
+                            summary_text = "".join(summary_text)
                         logging.debug(f"process_url_with_metadata: Summarization completed: {summary_text[:100]}...")
 
                     # Save transcription and summary
