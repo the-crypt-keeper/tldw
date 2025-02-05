@@ -86,7 +86,7 @@ def create_video_transcription_tab():
                     next_page_button = gr.Button("Next Page", visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhere to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
 **Bulleted Note Creation Guidelines**
 
 **Headings**:
@@ -189,9 +189,11 @@ def create_video_transcription_tab():
                     value=default_value,
                     label="API for Analysis/Summarization (Optional)"
                 )
-                api_key_input = gr.Textbox(label="API Key (Optional - Set in Config.txt)", placeholder="Enter your API key here",
+                api_key_input = gr.Textbox(label="API Key (Optional - Set in Config.txt)",
+                                           placeholder="Enter your API key here",
                                            type="password")
-                keywords_input = gr.Textbox(label="Keywords", placeholder="Enter keywords here (comma-separated)",
+                keywords_input = gr.Textbox(label="Keywords",
+                                            placeholder="Enter keywords here (comma-separated)",
                                             value="default,no_keyword_set")
                 # FIXME - Add proper support for this feature
                 batch_size_input = gr.Slider(minimum=1, maximum=10, value=1, step=1,
@@ -239,7 +241,8 @@ def create_video_transcription_tab():
                                                    label="Chunking Method")
                         max_chunk_size = gr.Slider(minimum=100, maximum=8000, value=400, step=1,
                                                    label="Max Chunk Size")
-                        chunk_overlap = gr.Slider(minimum=0, maximum=5000, value=100, step=1, label="Chunk Overlap")
+                        chunk_overlap = gr.Slider(minimum=0, maximum=5000, value=100, step=1,
+                                                  label="Chunk Overlap")
                         use_adaptive_chunking = gr.Checkbox(
                             label="Use Adaptive Chunking (Adjust chunking based on text complexity)")
                         use_multi_level_chunking = gr.Checkbox(label="Use Multi-level Chunking")
@@ -265,10 +268,11 @@ def create_video_transcription_tab():
             @error_handler
             def process_videos_with_error_handling(inputs, start_time, end_time, diarize, vad_use, whisper_model,
                                                    custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
-                                                   chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                                                   use_multi_level_chunking, chunk_language, api_name,
-                                                   api_key, keywords, use_cookies, cookies, batch_size,
-                                                   timestamp_option, keep_original_video, summarize_recursively, overwrite_existing=False,
+                                                   perform_chunking, chunk_method, max_chunk_size, chunk_overlap,
+                                                   use_adaptive_chunking, use_multi_level_chunking, chunk_language,
+                                                   summarize_recursively, api_name, api_key, keywords, use_cookies,
+                                                   cookies, batch_size, timestamp_option, keep_original_video,
+                                                   confab_checkbox, overwrite_existing=False,
                                                    progress: gr.Progress = gr.Progress()) -> tuple:
                 try:
                     # Start overall processing timer
@@ -285,7 +289,7 @@ def create_video_transcription_tab():
                     try:
                         batch_size = int(batch_size)
                     except (ValueError, TypeError):
-                        batch_size = 1  # Default to processing one video at a time if invalid
+                        batch_size = 1
 
                     # Separate URLs and local files
                     urls = [input for input in inputs if
@@ -304,8 +308,7 @@ def create_video_transcription_tab():
                             valid_local_files.append(file_path)
                         else:
                             invalid_local_files.append(file_path)
-                            error_message = f"Local file not found: {file_path}"
-                            logging.error(error_message)
+                            logging.error(f"Local file not found: {file_path}")
 
                     if invalid_local_files:
                         logging.warning(f"Found {len(invalid_local_files)} invalid local file paths")
@@ -336,8 +339,7 @@ def create_video_transcription_tab():
                             try:
                                 start_seconds = convert_to_seconds(start_time)
                                 end_seconds = convert_to_seconds(end_time) if end_time else None
-
-                                logging.info(f"Attempting to extract metadata for {input_item}")
+                                logging.info(f"Processing {input_item}")
 
                                 if input_item.startswith(('http://', 'https://')):
                                     logging.info(f"Attempting to extract metadata for URL: {input_item}")
@@ -398,8 +400,7 @@ def create_video_transcription_tab():
 
                                 if result[0] is None:
                                     error_message = "Processing failed without specific error"
-                                    batch_results.append(
-                                        (input_item, error_message, "Error", video_metadata, None, None))
+                                    batch_results.append((input_item, error_message, "Error", video_metadata, None, None))
                                     errors.append(f"Error processing {input_item}: {error_message}")
 
                                     # Log failure metric
@@ -470,7 +471,6 @@ def create_video_transcription_tab():
                                 logging.error(error_message, exc_info=True)
                                 batch_results.append((input_item, error_message, "Error", {}, None, None))
                                 errors.append(error_message)
-
                         results.extend(batch_results)
                         logging.info(f"Processed {len(batch_results)} videos in batch")
                         if isinstance(progress, gr.Progress):
@@ -582,10 +582,11 @@ def create_video_transcription_tab():
 
             def process_videos_wrapper(url_input, video_files, start_time, end_time, diarize, vad_use, whisper_model,
                                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
-                                       chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
-                                       use_multi_level_chunking, chunk_language, summarize_recursively, api_name,
-                                       api_key, keywords, use_cookies, cookies, batch_size,
-                                       timestamp_option, keep_original_video, confab_checkbox, overwrite_existing=False):
+                                       perform_chunking, chunk_method, max_chunk_size, chunk_overlap,
+                                       use_adaptive_chunking, use_multi_level_chunking, chunk_language,
+                                       summarize_recursively, api_name, api_key, keywords, use_cookies, cookies,
+                                       batch_size, timestamp_option, keep_original_video, confab_checkbox,
+                                       overwrite_existing=False):
                 global result
                 try:
                     logging.info("process_videos_wrapper(): process_videos_wrapper called")
@@ -634,7 +635,7 @@ def create_video_transcription_tab():
 
                     result = process_videos_with_error_handling(
                         inputs, start_time, end_time, diarize, vad_use, whisper_model,
-                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
+                        custom_prompt_checkbox, custom_prompt, chunking_options_checkbox, perform_chunking,
                         chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking,
                         use_multi_level_chunking, chunk_language, api_name,
                         api_key, keywords, use_cookies, cookies, batch_size,
@@ -708,11 +709,10 @@ def create_video_transcription_tab():
                             'upload_date': None
                         }
                     else:
-                        # Extract video information
+                        # Extract video information via yt_dlp
                         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                             try:
                                 full_info = ydl.extract_info(input_item, download=False)
-
                                 # Create a safe subset of info to log
                                 safe_info = {
                                     'title': full_info.get('title', 'No title'),
@@ -809,7 +809,7 @@ def create_video_transcription_tab():
 
                     logging.info(f"process_url_with_metadata: Transcription completed. Number of segments: {len(segments)}")
 
-                    # Add metadata to segments
+                    # Add metadata to segments and save them
                     segments_with_metadata = {
                         "metadata": info_dict,
                         "segments": segments
@@ -830,7 +830,7 @@ def create_video_transcription_tab():
                             except Exception as e:
                                 logging.warning(f"process_url_with_metadata: Failed to delete file {file_path}: {str(e)}")
 
-                    # Delete the mp4 file after successful transcription if not keeping original audio
+                    # Delete the video file after successful transcription if not keeping original
                     # Modify the file deletion logic to respect keep_original_video
                     if not keep_original_video:
                         files_to_delete = [audio_file_path, video_file_path]
@@ -858,14 +858,14 @@ def create_video_transcription_tab():
                         logging.error(f"process_url_with_metadata: Failed to extract transcription: {transcription_text}")
                         return None, None, None, None, None, None
 
-                    # Use transcription_text instead of segments for further processing
                     full_text_with_metadata = f"{json.dumps(info_dict, indent=2)}\n\n{transcription_text}"
+                    logging.debug(f"Full text with metadata extracted: {full_text_with_metadata[:100]}...")
 
                     logging.debug(f"process_url_with_metadata: Full text with metadata extracted: {full_text_with_metadata[:100]}...")
 
-                    # Perform summarization if API is provided
+                   # ------------------- Summarization Block -------------------
                     summary_text = None
-                    if api_name:
+                    if api_name and api_name.lower() != "none":
                         # API key resolution handled at base of function if none provided
                         api_key = api_key if api_key else None
                         logging.info(f"process_url_with_metadata: Starting summarization with {api_name}...")
@@ -994,6 +994,7 @@ def create_video_transcription_tab():
                     custom_prompt_checkbox,
                     custom_prompt_input,
                     chunking_options_checkbox,
+                    perform_chunking,
                     chunk_method,
                     max_chunk_size,
                     chunk_overlap,
