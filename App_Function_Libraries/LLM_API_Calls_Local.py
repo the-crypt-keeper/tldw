@@ -31,7 +31,7 @@ from App_Function_Libraries.Utils.Utils import *
 def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None, streaming=False, top_k=None, top_p=None, min_p=None):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("Local LLM: Loading json data for Chat request")
+            logging.verbose("Local LLM: Loading json data for Chat request")
             with open(input_data, 'r') as file:
                 data = json.load(file)
         else:

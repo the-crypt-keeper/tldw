@@ -62,7 +62,7 @@ from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
-    get_database_dir
+    get_database_dir, logger
 from App_Function_Libraries.Chunk_Lib import chunk_options, chunk_text
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
@@ -79,9 +79,6 @@ def ensure_database_directory():
     os.makedirs(get_database_dir(), exist_ok=True)
 
 ensure_database_directory()
-
-# Set up logging
-logger = logging.getLogger(__name__)
 
 # FIXME - Setup properly and test/add documentation for its existence...
 # Construct the path to the config file
@@ -390,8 +387,8 @@ def create_tables(db) -> None:
         ''',
     ]
 
-    index_queries = [
-        # CREATE INDEX statements
+    basic_index_queries = [
+        # CREATE INDEX statements (excluding content_hash index)
         'CREATE INDEX IF NOT EXISTS idx_media_title ON Media(title)',
         'CREATE INDEX IF NOT EXISTS idx_media_type ON Media(type)',
         'CREATE INDEX IF NOT EXISTS idx_media_author ON Media(author)',
@@ -409,7 +406,7 @@ def create_tables(db) -> None:
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url)',
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id)',
         'CREATE INDEX IF NOT EXISTS idx_document_versions_media_id ON DocumentVersions(media_id)',
-        'CREATE INDEX IF NOT EXISTS idx_document_versions_version_number ON DocumentVersions(version_number)',
+        'CREATE INDEX IF NOT EXISTS idx_document_versions_version_number ON DocumentVersions(version_number)'
     ]
 
     virtual_table_queries = [
@@ -418,9 +415,8 @@ def create_tables(db) -> None:
         'CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword)'
     ]
 
-    all_queries = table_queries + index_queries + virtual_table_queries
-
-    for query in all_queries:
+    # Execute all table creation queries first
+    for query in table_queries:
         try:
             db.execute_query(query)
         except Exception as e:
@@ -428,10 +424,74 @@ def create_tables(db) -> None:
             logging.error(f"Error details: {str(e)}")
             raise
 
+    # Execute basic index queries
+    for query in basic_index_queries:
+        try:
+            db.execute_query(query)
+        except Exception as e:
+            logging.error(f"Error executing query: {query}")
+            logging.error(f"Error details: {str(e)}")
+            raise
+
+    # Execute virtual table queries
+    for query in virtual_table_queries:
+        try:
+            db.execute_query(query)
+        except Exception as e:
+            logging.error(f"Error executing query: {query}")
+            logging.error(f"Error details: {str(e)}")
+            raise
+
+    try:
+        db.execute_query('CREATE UNIQUE INDEX IF NOT EXISTS idx_media_content_hash ON Media(content_hash)')
+    except Exception as e:
+        logging.error("Error creating content_hash index")
+        logging.error(f"Error details: {str(e)}")
+        # Don't raise here as this might fail on first creation
+
     logging.info("All tables, indexes, and virtual tables created successfully.")
 
-create_tables(db)
+# ------------------------------------------------------------------------------------------
+# Safe schema update for existing DBs
+def update_database_schema():
+    """
+    Check for the content_hash column in Media; if missing, add it and create its index.
+    This prevents errors for DBs created before content_hash was added to the schema.
+    """
+    try:
+        logging.info("Checking if the 'content_hash' column exists in the Media table...")
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT COUNT(*) 
+                FROM pragma_table_info('Media') 
+                WHERE name = 'content_hash'
+            ''')
+            column_exists = cursor.fetchone()[0]
 
+            if not column_exists:
+                cursor.execute('ALTER TABLE Media ADD COLUMN content_hash TEXT')
+                logging.info("Added content_hash column to 'Media' table.")
+
+                cursor.execute('''
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_media_content_hash 
+                    ON Media(content_hash)
+                ''')
+                logging.info("Created 'content_hash' unique index.")
+
+            conn.commit()
+    except Exception as e:
+        logging.error(f"Schema update failed: {str(e)}")
+        logging.error(traceback.format_exc())
+        raise
+    finally:
+        db.close_connection()
+
+
+# ------------------------------------------------------------------------------------------
+# Create tables (if they don't exist), then update schema (if needed)
+create_tables(db)
+update_database_schema()
 #
 # End of DB Setup Functions
 #######################################################################################################################

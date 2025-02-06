@@ -24,10 +24,6 @@ from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directo
 # Config Settings for ChromaDB Functions
 #
 # FIXME - Refactor so that all globals are set in summarize.py
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-#
 # Load config
 config = load_and_log_configs()
 #

@@ -11,9 +11,6 @@ from url_utils import refify_urls
 
 import logging
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 def convert_html_to_markdown(html: str, options: Optional[ConversionOptions] = None) -> str:
     if options is None:
         options = ConversionOptions()

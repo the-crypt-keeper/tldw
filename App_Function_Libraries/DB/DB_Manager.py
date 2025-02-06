@@ -81,7 +81,7 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
 )
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config, get_database_path, get_project_relative_path
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config, get_database_path, get_project_relative_path, logger
 #
 # End of imports
 ############################################################################################################
@@ -90,9 +90,6 @@ from App_Function_Libraries.Utils.Utils import load_comprehensive_config, get_da
 ############################################################################################################
 #
 # Database Config loading
-
-logger = logging.getLogger(__name__)
-
 config_path = get_project_relative_path('Config_Files/config.txt')
 config = configparser.ConfigParser()
 config.read(config_path)
