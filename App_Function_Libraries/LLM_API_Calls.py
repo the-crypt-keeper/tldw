@@ -21,17 +21,15 @@
 #
 # Import necessary libraries
 import json
-import logging
 import os
 import time
 from typing import List
-
-import requests
 #
 # Import 3rd-Party Libraries
+import requests
 #
 # Import Local libraries
-from App_Function_Libraries.Utils.Utils import load_and_log_configs
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, logging
 #
 #######################################################################################################################
 # Function Definitions

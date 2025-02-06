@@ -4,7 +4,6 @@
 # Imports
 import asyncio
 import json
-import logging
 import os
 import random
 from concurrent.futures import ThreadPoolExecutor
@@ -22,7 +21,9 @@ from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_fro
 from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
+
+
 #
 ########################################################################################################################
 #

@@ -18,4 +18,7 @@ https://github.com/meta-llama/llama-recipes/tree/main/recipes%2Fquickstart%2FNot
 https://github.com/JarodMica/audiobook_maker
 https://github.com/smy20011/MorningRadio
 https://github.com/aedocw/epub2tts
+https://github.com/plusuncold/autiobooks
+
+
 

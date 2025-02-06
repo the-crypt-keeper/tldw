@@ -3,7 +3,6 @@
 import base64
 # Imports
 import json
-import logging
 import os
 import random
 import re
@@ -24,7 +23,7 @@ from App_Function_Libraries.LLM_API_Calls import chat_with_openai, chat_with_ant
 from App_Function_Libraries.LLM_API_Calls_Local import chat_with_aphrodite, chat_with_local_llm, chat_with_ollama, \
     chat_with_kobold, chat_with_llama, chat_with_oobabooga, chat_with_tabbyapi, chat_with_vllm, chat_with_custom_openai
 from App_Function_Libraries.DB.SQLite_DB import load_media_content
-from App_Function_Libraries.Utils.Utils import generate_unique_filename, load_and_log_configs
+from App_Function_Libraries.Utils.Utils import generate_unique_filename, load_and_log_configs, logging
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 ####################################################################################################
@@ -789,11 +788,12 @@ def load_characters():
     log_counter("load_characters_attempt")
     start_time = time.time()
     try:
-        characters_file = os.path.join(os.path.dirname(__file__), '..', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
+        characters_file = os.path.join(os.path.dirname(__file__), '..', '..', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
         if os.path.exists(characters_file):
             with open(characters_file, 'r') as f:
                 characters = json.load(f)
-            logging.debug(f"Loaded {len(characters)} characters from {characters_file}")
+            logging.info(f"Loaded characters from {characters_file}")
+            logging.trace(f"Loaded {len(characters)} characters from {characters_file}")
             load_duration = time.time() - start_time
             log_histogram("load_characters_duration", load_duration)
             log_counter("load_characters_success", labels={"character_count": len(characters)})

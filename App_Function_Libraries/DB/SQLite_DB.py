@@ -48,7 +48,6 @@ import configparser
 import csv
 import hashlib
 import html
-import logging
 import os
 import queue
 import re
@@ -62,7 +61,7 @@ from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
-    get_database_dir, logger
+    get_database_dir, logger, logging
 from App_Function_Libraries.Chunk_Lib import chunk_options, chunk_text
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #

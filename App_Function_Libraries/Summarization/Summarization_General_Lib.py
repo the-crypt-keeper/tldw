@@ -18,7 +18,6 @@
 # Import necessary libraries
 import inspect
 import json
-import logging
 import os
 import time
 from typing import Optional
@@ -35,7 +34,7 @@ from App_Function_Libraries.Summarization.Local_Summarization_Lib import summari
     summarize_with_ollama, summarize_with_custom_openai
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Utils.Utils import (load_and_log_configs, sanitize_filename, clean_youtube_url,
-                                                create_download_directory, is_valid_url)
+                                                create_download_directory, is_valid_url, logging)
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 #
 #######################################################################################################################
@@ -209,6 +208,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": openai_prompt}
             ],
+            # FIXME - Set a Max tokens value in config file for each API
             "max_tokens": 4096,
             "temperature": temp,
             "stream": streaming

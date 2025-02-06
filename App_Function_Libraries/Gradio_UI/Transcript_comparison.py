@@ -2,19 +2,15 @@
 # Description: Gradio UI tab for comparing transcripts
 #
 # Imports
-import logging
-
 #
-# External Imports
+# 3rd-Party Imports
 import gradio as gr
-
-from App_Function_Libraries.DB.DB_Manager import get_transcripts
-from App_Function_Libraries.Gradio_UI.Gradio_Shared import browse_items
-from App_Function_Libraries.Utils.Utils import format_transcription
-
-
 #
 # Local Imports
+from App_Function_Libraries.DB.DB_Manager import get_transcripts
+from App_Function_Libraries.Gradio_UI.Gradio_Shared import browse_items
+from App_Function_Libraries.Utils.Utils import format_transcription, logging
+
 
 def get_transcript_options(media_id):
     transcripts = get_transcripts(media_id)

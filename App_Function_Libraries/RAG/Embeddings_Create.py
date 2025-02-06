@@ -2,7 +2,6 @@
 # Description: Functions for Creating and managing Embeddings in ChromaDB with LLama.cpp/OpenAI/Transformers
 #
 # Imports:
-import logging
 import os
 import time
 from functools import wraps
@@ -18,7 +17,7 @@ import torch
 #
 # Local Imports:
 from App_Function_Libraries.LLM_API_Calls import get_openai_embeddings
-from App_Function_Libraries.Utils.Utils import load_and_log_configs
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, logging
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 #######################################################################################################################

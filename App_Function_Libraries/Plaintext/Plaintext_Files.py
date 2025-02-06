@@ -3,7 +3,6 @@
 #
 # Import necessary libraries
 import json
-import logging
 import os
 import tempfile
 import zipfile
@@ -17,13 +16,11 @@ from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 # Local Imports
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
-
+from App_Function_Libraries.Utils.Utils import logging
 #
 #######################################################################################################################
 #
 # Function Definitions
-
-logger = logging.getLogger()
 
 def import_data(file, title, author, keywords, custom_prompt, summary, auto_summarize, api_name, api_key, system_prompt):
     logging.debug(f"Starting import_data with file: {file} / Title: {title} / Author: {author} / Keywords: {keywords}")

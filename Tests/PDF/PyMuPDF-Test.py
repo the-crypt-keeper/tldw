@@ -1,12 +1,20 @@
 # test_pdf_ingestion.py
 # Usage: python test_pdf_ingestion.py <path_to_pdf_file>
-
+#
+# Imports
+import logging
 import os
 import re
 import sys
-import logging
+#
+# 3rd-Party Imports
 import pymupdf
-
+#
+# Local Imports
+#
+#######################################################################################################################
+#
+# Functions:
 
 #from App_Function_Libraries.PDF_Ingestion_Lib import extract_text_and_format_from_pdf, extract_metadata_from_pdf
 def extract_text_and_format_from_pdf(pdf_path):

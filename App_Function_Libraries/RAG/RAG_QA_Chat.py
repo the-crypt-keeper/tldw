@@ -3,10 +3,8 @@
 #
 # Imports
 #
-#
 # External Imports
 import json
-import logging
 import tempfile
 import time
 from typing import List, Tuple, IO, Union
@@ -15,6 +13,7 @@ from typing import List, Tuple, IO, Union
 from App_Function_Libraries.DB.DB_Manager import db, search_media_db, DatabaseError, get_media_content
 from App_Function_Libraries.RAG.RAG_Library_2 import generate_answer, enhanced_rag_pipeline
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Utils.Utils import logging
 #
 ########################################################################################################################
 #
@@ -48,8 +47,6 @@ def rag_qa_chat(query, history, context, api_choice, keywords=None, apply_re_ran
         log_counter("rag_qa_chat_error", labels={"api_choice": api_choice, "error": str(e)})
         logging.error(f"Error in rag_qa_chat: {str(e)}")
         return history + [(query, "An error occurred while processing your request.")], "An error occurred while processing your request."
-
-
 
 
 def save_chat_history(history: List[Tuple[str, str]]) -> str:

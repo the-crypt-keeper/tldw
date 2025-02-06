@@ -2,7 +2,6 @@
 # Description: Functions for managing embeddings in ChromaDB
 #
 # Imports:
-import logging
 from typing import List, Dict, Any
 # 3rd-Party Imports:
 import chromadb
@@ -16,8 +15,8 @@ from App_Function_Libraries.DB.DB_Manager import get_unprocessed_media, mark_med
 from App_Function_Libraries.DB.SQLite_DB import process_chunks
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, create_embeddings_batch
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
-from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, load_and_log_configs
-
+from App_Function_Libraries.Utils.Utils import get_database_path, ensure_directory_exists, load_and_log_configs, logger, \
+    logging
 #
 #######################################################################################################################
 #

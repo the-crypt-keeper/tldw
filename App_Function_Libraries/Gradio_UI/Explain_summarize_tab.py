@@ -2,13 +2,10 @@
 # Gradio UI for explaining and summarizing text
 #
 # Imports
-import logging
 #
 # External Imports
 import gradio as gr
 
-from App_Function_Libraries.DB.DB_Manager import list_prompts
-from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 #
 # Local Imports
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
@@ -18,7 +15,9 @@ from App_Function_Libraries.Summarization.Summarization_General_Lib import summa
     summarize_with_anthropic, \
     summarize_with_cohere, summarize_with_groq, summarize_with_openrouter, summarize_with_deepseek, \
     summarize_with_huggingface, summarize_with_mistral, summarize_with_google
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
+from App_Function_Libraries.DB.DB_Manager import list_prompts
+from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 #
 #
 ############################################################################################################

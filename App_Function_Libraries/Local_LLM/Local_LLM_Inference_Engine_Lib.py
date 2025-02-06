@@ -14,7 +14,6 @@
 ####################
 # Import necessary libraries
 #import atexit
-import logging
 import os
 import re
 import signal
@@ -27,7 +26,8 @@ from typing import List, Optional
 import requests
 #
 # Import Local
-from App_Function_Libraries.Utils.Utils import download_file
+from App_Function_Libraries.Utils.Utils import download_file, logging
+
 #
 #######################################################################################################################
 # Function Definitions:

@@ -3,7 +3,6 @@
 import argparse
 import atexit
 import json
-import logging
 from logging.handlers import RotatingFileHandler
 import os
 import signal
@@ -13,6 +12,7 @@ import time
 #
 # 3rd-Party Imports
 import nltk
+from loguru import logger
 #
 # Local Library Imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
@@ -733,7 +733,7 @@ Sample commands:
     parser.add_argument('-off', '--offset', type=int, default=0, help='Offset in seconds (default: 0)')
     parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
     parser.add_argument('-log', '--log_level', type=str, default='INFO',
-                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
+                        choices=['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
     parser.add_argument('-gui', '--user_interface', action='store_true', help="Launch the Gradio user interface")
     parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
     parser.add_argument('-prompt', '--custom_prompt', type=str,
@@ -790,27 +790,28 @@ Sample commands:
         server_port = None
 
     ########## Logging setup
-    logger = logging.getLogger()
-    logger.setLevel(getattr(logging, args.log_level))
+    # Convert the provided log level to uppercase
+    log_level = args.log_level.upper()
 
-    # Create console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, args.log_level))
-    console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(console_formatter)
+    # Remove the default Loguru handler so we can add our own sinks
+    logger.remove()
+    # '%(asctime)s - %(levelname)s - %(message)s' is mapped to Loguru’s {time} - {level} - {message}.
 
+    logger.add(
+        sys.stdout,
+        level=log_level,
+        format="{time:YYYY-MM-DD HH:mm:ss} - {level} - {message}",
+    )
     if args.log_file:
-        # Create file handler
-        file_handler = logging.FileHandler(args.log_file)
-        file_handler.setLevel(getattr(logging, args.log_level))
-        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(file_formatter)
-        logger.addHandler(file_handler)
+        # Add a file sink with the same level and format.
+        logger.add(
+            args.log_file,
+            level=log_level,
+            format="{time:YYYY-MM-DD HH:mm:ss} - {level} - {message}",
+        )
         logger.info(f"Log file created at: {args.log_file}")
-
     else:
-        logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt_input} \n\nas the prompt")
-        print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
+        logger.info(f"No Logfile declared. Using Standard logfile")
 
     # Check if the user wants to use the local LLM from the script
     local_llm = args.local_llm

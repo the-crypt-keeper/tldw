@@ -19,22 +19,20 @@
 ###############################
 # Import necessary libraries
 import json
-import logging
 import os
 import time
 from typing import Union
 
-import requests
 # Import 3rd-party Libraries
-# Import Local
-from App_Function_Libraries.Utils.Utils import load_and_log_configs, extract_text_from_segments
+import requests
+#
+# Import Local Libraries
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, extract_text_from_segments, logging
+
 #
 #######################################################################################################################
 # Function Definitions
 #
-
-logger = logging.getLogger()
-
 
 summarizer_prompt = """
                     <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
