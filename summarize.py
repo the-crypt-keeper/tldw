@@ -10,9 +10,9 @@ import signal
 import sys
 import threading
 import time
-
+#
+# 3rd-Party Imports
 import nltk
-
 #
 # Local Library Imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
@@ -30,12 +30,6 @@ from App_Function_Libraries.Utils.System_Checks_Lib import cuda_check, platform_
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, create_download_directory, \
     extract_text_from_segments, cleanup_downloads
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
-#
-# 3rd-Party Module Imports
-#
-# OpenAI Tokenizer support
-#
-# Other Tokenizers
 #
 # Code responsible for launching GUI and leading to most functionality on line 838-862: launch UI launches the Gradio UI, which starts in the `Gradio_Related.py` file, where every tab it loads proceeds to load that page in a chain,
 # this means that the `Gradio_Related.py` file is the main file for the UI, and then calls out to all the other pieces, through the individual tabs.
@@ -60,6 +54,8 @@ running_in_debug_mode = False
 log_file_path = os.getenv("tldw_LOG_FILE_PATH", "tldw_app_logs.json")
 max_bytes = int(os.getenv("tldw_LOG_MAX_BYTES", 10 * 1024 * 1024))  # 10 MB
 backup_count = int(os.getenv("tldw_LOG_BACKUP_COUNT", 5))
+
+# logger.verbose("This is a VERBOSE message.")
 
 file_handler = RotatingFileHandler(
     log_file_path, maxBytes=max_bytes, backupCount=backup_count

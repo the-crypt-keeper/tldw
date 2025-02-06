@@ -43,7 +43,7 @@ import tempfile
 import time
 import uuid
 from datetime import timedelta, datetime
-from typing import Union, AnyStr, Tuple, List
+from typing import Union, AnyStr, Tuple, List, Protocol, cast
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 #
 # Non-Local Imports
@@ -54,6 +54,41 @@ from tqdm import tqdm
 #######################################################################################################################
 #
 # Function Definitions
+
+
+# Define the VERBOSE level number (15 is between DEBUG(10) and INFO(20))
+VERBOSE_LEVEL_NUM = 15
+logging.addLevelName(VERBOSE_LEVEL_NUM, "VERBOSE")
+
+# Define and add the verbose method to logging.Logger
+def verbose(self, message, *args, **kwargs):
+    if self.isEnabledFor(VERBOSE_LEVEL_NUM):
+        self._log(VERBOSE_LEVEL_NUM, message, args, **kwargs)
+
+logging.Logger.verbose = verbose
+
+# Configure logging with the default level set to INFO.
+# (Users can override this externally to, e.g., DEBUG or VERBOSE)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Define a protocol for a logger that includes the new verbose() method.
+class VerboseLogger(Protocol):
+    def debug(self, msg: str, *args, **kwargs) -> None: ...
+    def info(self, msg: str, *args, **kwargs) -> None: ...
+    def warning(self, msg: str, *args, **kwargs) -> None: ...
+    def error(self, msg: str, *args, **kwargs) -> None: ...
+    def critical(self, msg: str, *args, **kwargs) -> None: ...
+    def verbose(self, msg: str, *args, **kwargs) -> None: ...
+
+# Cast the logger to the custom protocol so that the IDE knows about .verbose().
+logger = cast(VerboseLogger, logging.getLogger(__name__))
+
+# Example usage
+logger.verbose("This is a verbose message")
+
 
 def extract_text_from_segments(segments, include_timestamps=True):
     logging.debug(f"Segments received: {segments}")

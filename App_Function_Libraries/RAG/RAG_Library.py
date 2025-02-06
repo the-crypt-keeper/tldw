@@ -193,12 +193,6 @@ def process_media_chunks(db_connection, media_id: int, text: str):
 #         logging.error(f"Error ingesting text file: {str(e)}")
 #         return f"Error ingesting text file: {str(e)}"
 
-
-
-# Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
 # Constants
 EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
 VECTOR_DIM = 384  # Dimension of the chosen embedding model
