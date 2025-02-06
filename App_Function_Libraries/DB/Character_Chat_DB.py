@@ -354,7 +354,7 @@ def add_character_card(card_data: Dict[str, Any]) -> Optional[int]:
 
 
 def get_character_cards() -> List[Dict]:
-    """Retrieve all character cards from the database."""
+    """Retrieve all character cards from the database and log their name and a preview of the description."""
     try:
         logging.debug(f"Fetching characters from DB: {chat_DB_PATH}")
         conn = sqlite3.connect(chat_DB_PATH)
@@ -363,8 +363,31 @@ def get_character_cards() -> List[Dict]:
         rows = cursor.fetchall()
         columns = [description[0] for description in cursor.description]
         conn.close()
+
+        # Convert rows to dictionaries
         characters = [dict(zip(columns, row)) for row in rows]
-        logging.debug(f"Characters fetched from DB: {characters}")
+
+        # For each card, extract the card data, then log the name and first 50 characters of the description.
+        for card in characters:
+            # Assume that the V2 card details are stored in the 'data' field.
+            # If stored as JSON, parse it.
+            data = card.get('data')
+            if data:
+                if isinstance(data, str):
+                    try:
+                        data = json.loads(data)
+                    except Exception as e:
+                        logging.error("Error parsing card 'data' as JSON: %s", e)
+                        continue
+
+                # Extract 'name' and 'description' from the card's data.
+                name = data.get('name', 'Unnamed')
+                description = data.get('description', 'No description provided.')
+                # Log the name and the first 50 characters of the description.
+                logging.info("Card: %s - %s", name, description[:50])
+            else:
+                logging.warning("Card record missing 'data' field.")
+
         return characters
     except Exception as e:
         logging.error(f"Error fetching character cards: {e}")

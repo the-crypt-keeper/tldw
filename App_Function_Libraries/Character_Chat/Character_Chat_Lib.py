@@ -731,11 +731,11 @@ def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
     try:
         # Remove any leading/trailing whitespace and log the preview.
         json_content = json_content.strip()
-        logging.debug(f"JSON content (first 100 chars): {json_content[:100]}...")
+        logging.debug(f"\nJSON content (first 100 chars): {json_content[:100]}...")
 
         # Attempt to load the JSON.
         card_data = json.loads(json_content)
-        logging.debug(f"Parsed JSON data keys: {list(card_data.keys())}")
+        logging.debug(f"\nParsed JSON data keys: {list(card_data.keys())[:100]}")
 
         # Check if it is a V2 card.
         if card_data.get('spec') == 'chara_card_v2':
@@ -750,7 +750,7 @@ def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
 
     except json.JSONDecodeError as e:
         logging.error(f"JSON decode error: {e}")
-        logging.error(f"Problematic JSON content (first 500 chars): {json_content[:500]}...")
+        logging.error(f"Problematic JSON content (first 100 chars): {json_content[:100]}...")
     except Exception as e:
         logging.error(f"Unexpected error parsing JSON: {e}")
     return None
@@ -801,7 +801,7 @@ def load_character_card(file) -> Optional[Dict[str, Any]]:
         content = content.replace("\ufeff", "").lstrip()
 
         # Log a snippet of the content for debugging.
-        logging.debug("File content start: " + repr(content[:50]))
+        logging.debug("\n\nFile content start: " + repr(content[:50]))
 
         # If the content is a JSON object.
         if content.startswith('{'):

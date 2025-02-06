@@ -13,6 +13,9 @@ import time
 # 3rd-Party Imports
 import nltk
 from loguru import logger
+
+from App_Function_Libraries.Metrics.logger_config import setup_logger
+
 #
 # Local Library Imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'App_Function_Libraries')))
@@ -28,17 +31,17 @@ from App_Function_Libraries.Local_File_Processing_Lib import read_paths_from_fil
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Utils.System_Checks_Lib import cuda_check, platform_check, check_ffmpeg
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, create_download_directory, \
-    extract_text_from_segments, cleanup_downloads
+    extract_text_from_segments, cleanup_downloads, logging
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 #
 # Code responsible for launching GUI and leading to most functionality on line 838-862: launch UI launches the Gradio UI, which starts in the `Gradio_Related.py` file, where every tab it loads proceeds to load that page in a chain,
 # this means that the `Gradio_Related.py` file is the main file for the UI, and then calls out to all the other pieces, through the individual tabs.
 # So if you're trying to understand the codebase, start with `Gradio_Related.py` and then follow the chain of calls to understand how the UI is built/works on the backend as I've isolated/grouped most things together.
 #######################
-# Logging Setup
+# Stop Gradio Analytics
 #
-log_level = "DEBUG"
-logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+#log_level = "DEBUG"
+#logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #
 #############
@@ -681,9 +684,6 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Logging setup
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
     # Load Config
     loaded_config_data = load_and_log_configs()
 
@@ -812,6 +812,7 @@ Sample commands:
         logger.info(f"Log file created at: {args.log_file}")
     else:
         logger.info(f"No Logfile declared. Using Standard logfile")
+        logger = setup_logger(args)
 
     # Check if the user wants to use the local LLM from the script
     local_llm = args.local_llm

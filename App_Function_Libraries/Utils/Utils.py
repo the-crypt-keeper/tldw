@@ -370,6 +370,11 @@ def load_and_log_configs():
         # Save video transcripts
         save_video_transcripts = config.get('Paths', 'save_video_transcripts', fallback='True')
 
+        # Retrieve logging settings from the configuration file
+        log_level = config.get('Logging', 'log_level', fallback='INFO')
+        log_file = config.get('Logging', 'log_file', fallback='./Logs/tldw_logs.json')
+        log_metrics_file = config.get('Logging', 'log_metrics_file', fallback='./Logs/tldw_metrics_logs.json')
+
         # Retrieve processing choice from the configuration file
         processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
         logging.debug(f"Processing choice set to: {processing_choice}")
@@ -719,6 +724,11 @@ def load_and_log_configs():
                 'embedding_api_key': embedding_api_key,
                 'chunk_size': chunk_size,
                 'chunk_overlap': overlap
+            },
+            'logging': {
+                'log_level': log_level,
+                'log_file': log_file,
+                'log_metrics_file': log_metrics_file
             },
             'auto-save': {
                 'save_character_chats': save_character_chats,

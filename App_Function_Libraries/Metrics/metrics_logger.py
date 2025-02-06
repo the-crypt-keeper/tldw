@@ -142,3 +142,6 @@ def log_resource_usage():
 #     static_configs:
 #       - targets: ['localhost:8000']  # Replace with your application's host and port
 
+#
+# End of metrics_logger.py
+############################################################################################################

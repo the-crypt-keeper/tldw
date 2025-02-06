@@ -133,7 +133,7 @@ def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
 
         # Attempt to load the JSON.
         card_data = json.loads(json_content)
-        logging.debug(f"Parsed JSON data keys: {list(card_data.keys())}")
+        logging.debug(f"Parsed JSON data keys(first 100 chars): {list(card_data.keys())[:100]}")
 
         # Check if it is a V2 card.
         if card_data.get('spec') == 'chara_card_v2':
@@ -148,7 +148,7 @@ def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
 
     except json.JSONDecodeError as e:
         logging.error(f"JSON decode error: {e}")
-        logging.error(f"Problematic JSON content (first 500 chars): {json_content[:500]}...")
+        logging.error(f"Problematic JSON content (first 100 chars): {json_content[:100]}...")
     except Exception as e:
         logging.error(f"Unexpected error parsing JSON: {e}")
     return None
