@@ -788,7 +788,11 @@ def load_characters():
     log_counter("load_characters_attempt")
     start_time = time.time()
     try:
-        characters_file = os.path.join(os.path.dirname(__file__), '..', '..', 'Helper_Scripts', 'Character_Cards', 'Characters.json')
+        characters_file = os.path.abspath(os.path.join(
+            os.path.dirname(__file__),
+            '..', '..',
+            'Helper_Scripts', 'Character_Cards', 'Characters.json'
+        ))
         if os.path.exists(characters_file):
             with open(characters_file, 'r') as f:
                 characters = json.load(f)

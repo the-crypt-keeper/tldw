@@ -8,8 +8,9 @@ import os
 import re
 import sys
 import traceback
-from typing import List, Dict, Any, Iterator, Optional
+from typing import List, Dict, Any, Iterator, Optional, Union
 # 3rd-Party Imports
+from loguru import logger
 import mwparserfromhell
 import mwxml
 import yaml
@@ -30,16 +31,13 @@ def load_mediawiki_import_config():
 
 config = load_mediawiki_import_config()
 
-logger = logging
-
-def setup_logger(name: str, level: int = logging.INFO, log_file: Optional[str] = None) -> None:
+def setup_logger(name: str, level: Union[int, str] = "INFO", log_file: Optional[str] = None) -> None:
     """Set up the logger with the given name and level."""
     logger.remove()  # Remove the default logger
     logger.add(sys.stdout, format="{time} - {name} - {level} - {message}", level=level)
 
     if log_file:
         logger.add(log_file, format="{time} - {name} - {level} - {message}", level=level)
-
 
 # Usage
 setup_logger('mediawiki_import', log_file='mediawiki_import.log')
@@ -70,7 +68,7 @@ def parse_mediawiki_dump(file_path: str, namespaces: List[int] = None, skip_redi
                 "revision_id": revision.id,
                 "timestamp": revision.timestamp
             }
-        logger.debug(f"Yielded page: {page.title}")
+        logging.debug(f"Yielded page: {page.title}")
 
 
 def optimized_chunking(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:
