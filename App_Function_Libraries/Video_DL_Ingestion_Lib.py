@@ -23,20 +23,19 @@ import json
 #
 ####################
 # Import necessary libraries to run solo for testing
-import logging
 import os
 import re
 import sys
 from urllib.parse import urlparse, parse_qs
 
-import unicodedata
 # 3rd-Party Imports
 import yt_dlp
-
-from App_Function_Libraries.DB.DB_Manager import check_media_and_whisper_model
-
-
+import unicodedata
 # Import Local
+from App_Function_Libraries.DB.DB_Manager import check_media_and_whisper_model
+from App_Function_Libraries.Utils.Utils import logging
+
+
 #
 #######################################################################################################################
 # Function Definitions

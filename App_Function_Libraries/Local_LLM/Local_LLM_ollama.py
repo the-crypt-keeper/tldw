@@ -1,13 +1,23 @@
+# Local_LLM_ollama.py
+# Description: This module provides functionality to interact with the Ollama API for managing and serving local LLM models.
+#
+# Imports
 import platform
-
-import gradio as gr
 import subprocess
 import psutil
 import os
 import signal
-import logging
 import threading
 import shutil
+# 3rd-Party Imports
+import gradio as gr
+#
+# Local Imports
+from App_Function_Libraries.Utils.Utils import logging
+#
+#######################################################################################################################
+#
+# Functions:
 
 # Configure Logging
 # logging.basicConfig(
@@ -199,3 +209,6 @@ def create_ollama_tab():
         pull_button.click(fn=pull_ollama_model, inputs=[new_model_name], outputs=[pull_output])
         serve_button.click(fn=serve_ollama_model, inputs=[serve_model, port], outputs=[serve_output])
         stop_button.click(fn=stop_ollama_server, inputs=[pid], outputs=[stop_output])
+#
+# End of Local_LLM_ollama.py
+#######################################################################################################################

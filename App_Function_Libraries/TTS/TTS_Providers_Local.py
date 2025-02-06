@@ -2,7 +2,6 @@
 # Description: This file contains the functions to allow for usage of offline/local TTS providers.
 #
 # Imports
-import logging
 import os
 import re
 from typing import Optional, Generator
@@ -16,7 +15,7 @@ import torch
 from transformers import AutoTokenizer
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data, download_file
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data, download_file, logging
 # Kokoro-Specific Imports
 from scipy.io import wavfile
 from pydub import AudioSegment, effects  # For optional post-processing

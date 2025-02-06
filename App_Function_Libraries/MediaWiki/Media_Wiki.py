@@ -4,9 +4,9 @@
 #
 # Imports
 import json
-import logging
 import os
 import re
+import sys
 import traceback
 from typing import List, Dict, Any, Iterator, Optional
 # 3rd-Party Imports
@@ -17,6 +17,7 @@ import yaml
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content
+from App_Function_Libraries.Utils.Utils import logging
 #
 #######################################################################################################################
 #
@@ -29,26 +30,19 @@ def load_mediawiki_import_config():
 
 config = load_mediawiki_import_config()
 
+logger = logging
 
-def setup_logger(name: str, level: int = logging.INFO, log_file: Optional[str] = None) -> logging.Logger:
-    """Set up and return a logger with the given name and level."""
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+def setup_logger(name: str, level: int = logging.INFO, log_file: Optional[str] = None) -> None:
+    """Set up the logger with the given name and level."""
+    logger.remove()  # Remove the default logger
+    logger.add(sys.stdout, format="{time} - {name} - {level} - {message}", level=level)
 
     if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+        logger.add(log_file, format="{time} - {name} - {level} - {message}", level=level)
 
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    return logger
 
 # Usage
-logger = setup_logger('mediawiki_import', log_file='mediawiki_import.log')
+setup_logger('mediawiki_import', log_file='mediawiki_import.log')
 
 # End of setup
 #######################################################################################################################

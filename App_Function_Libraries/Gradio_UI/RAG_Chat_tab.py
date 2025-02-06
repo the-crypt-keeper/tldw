@@ -2,17 +2,13 @@
 # Description: This file contains the code for the RAG Chat tab in the Gradio UI
 #
 # Imports
-import logging
 #
 # External Imports
 import gradio as gr
 #
 # Local Imports
-
 from App_Function_Libraries.RAG.RAG_Library_2 import enhanced_rag_pipeline
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
-
-
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
 #
 ########################################################################################################################
 #

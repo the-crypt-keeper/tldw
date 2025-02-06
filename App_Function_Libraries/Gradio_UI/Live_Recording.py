@@ -2,7 +2,6 @@
 # Description: Gradio UI for live audio recording and transcription.
 #
 # Import necessary modules and functions
-import logging
 import os
 import queue
 import threading
@@ -18,7 +17,8 @@ from App_Function_Libraries.Audio.Audio_Transcription_Lib import (record_audio, 
                                                                  stop_recording, transcribe_audio)
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
+
 #
 #######################################################################################################################
 #

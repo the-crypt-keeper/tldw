@@ -11,13 +11,10 @@
 ## All Automated. All Local. All Yours.
 </div>
 
-### Latest Update (1/3/2025):
+### Latest Update (2/6/2025):
 <details>
 
-- If you're updating from a prior version, your config.txt file needs to be updated.
-- You can either just use the new config file and copy over your old values, or you can just add the new values to your existing config file.
-- Either way, the app won't work unless the config file is updated.
-- If you're reading this, then you're already on the latest version, so you can just update the config file and you'll be good to go.
+- F
 </details>
 
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)- Demo is not working!
@@ -40,10 +37,21 @@
 - The GUI is currently a placeholder. Please excuse its crappiness for now. It will be replaced with a FastAPI backend and a new JS frontend. (Gradio is a placeholder UI)
 </details>
 
-### Updating from a version installed prior to Nov 1st:
+### Updating from a version installed prior to X date:
+
+<details>
+<summary>Jan 3rd:</summary>
+
+- If you're updating from a prior version, your config.txt file needs to be updated.
+- You can either just use the new config file and copy over your old values, or you can just add the new values to your existing config file.
+- Either way, the app won't work unless the config file is updated.
+- If you're reading this, then you're already on the latest version, so you can just update the config file and you'll be good to go.
+</details>
+
+Nov 1st:
 <details>
 
-- If you're updating from a prior version, your Media DB is not compatible with the new version. You'll need to start fresh.
+- If you're updating from a version published prior to Nov 1st, your Media DB is not compatible with the new version. You'll need to start fresh.
 - I've written a script to help you migrate your data from the old DB to the new one. `Helper_Scripts/DB-Related/migrate_db.py`.
 - Process to migrate your data:
   1. Install/run the new version of the app. This will create a new `media_summary.db` file in the `Databases` directory.

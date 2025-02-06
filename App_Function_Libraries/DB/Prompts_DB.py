@@ -3,14 +3,13 @@
 #
 # Imports
 import sqlite3
-import logging
 #
 # External Imports
 import re
 from typing import Tuple
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import get_database_path
+from App_Function_Libraries.Utils.Utils import get_database_path, logging
 #
 #######################################################################################################################
 #

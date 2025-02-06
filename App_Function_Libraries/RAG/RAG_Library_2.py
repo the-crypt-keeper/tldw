@@ -3,7 +3,6 @@
 #
 # Import necessary modules and functions
 import configparser
-import logging
 import os
 import time
 from typing import Dict, Any, List, Optional
@@ -14,7 +13,7 @@ from App_Function_Libraries.RAG.RAG_Persona_Chat import perform_vector_search_ch
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
 from App_Function_Libraries.DB.DB_Manager import fetch_keywords_for_media, search_media_db, get_notes_by_keywords, \
     search_conversations_by_keywords
-from App_Function_Libraries.Utils.Utils import load_and_log_configs
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, logging
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.Chat.Chat_Functions import process_user_input, ChatDictionary, parse_user_dict_markdown_file
 from App_Function_Libraries.DB.Character_Chat_DB import get_character_chats, perform_full_text_search_chat, \

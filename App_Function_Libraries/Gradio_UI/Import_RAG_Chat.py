@@ -2,9 +2,9 @@
 # Functionality to import RAG Chats into the DB
 #
 # Imports
-import logging
 import os
 import sqlite3
+import sys
 import uuid
 import zipfile
 from datetime import datetime
@@ -16,7 +16,9 @@ from chardet import detect
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import FileProcessor, ZipValidator
+from App_Function_Libraries.Utils.Utils import FileProcessor, ZipValidator, logging
+
+
 #
 ########################################################################################################################
 #
@@ -30,14 +32,9 @@ class RAGQABatchImporter:
         self.zip_validator = ZipValidator()
 
     def setup_logging(self):
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('rag_qa_import.log'),
-                logging.StreamHandler()
-            ]
-        )
+        from loguru import logger
+        logger.add('rag_qa_import.log', level='INFO', format='{time} - {level} - {message}')
+        logger.add(sys.stdout, level='INFO', format='{time} - {level} - {message}')
 
     def process_markdown_content(self, content: str) -> List[Dict[str, str]]:
         """Process markdown content into a conversation format."""

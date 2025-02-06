@@ -2,7 +2,6 @@
 # Gradio UI functions that are shared across multiple tabs
 #
 # Imports
-import logging
 import sqlite3
 import traceback
 from functools import wraps
@@ -14,7 +13,8 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import list_prompts, db, search_and_display, fetch_prompt_details
 from App_Function_Libraries.DB.SQLite_DB import DatabaseError
-from App_Function_Libraries.Utils.Utils import format_transcription
+from App_Function_Libraries.Utils.Utils import format_transcription, logging
+
 #
 ##############################################################################################################
 #
@@ -47,8 +47,7 @@ def search_media(query, fields, keyword, page):
         results = search_and_display(query, fields, keyword, page)
         return results
     except Exception as e:
-        logger = logging.getLogger()
-        logger.error(f"Error searching media: {e}")
+        logging.error(f"Error searching media: {e}")
         return str(e)
 
 def fetch_items_by_title_or_url(search_query: str, search_type: str):

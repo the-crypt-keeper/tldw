@@ -3,7 +3,6 @@
 #
 # Imports
 import json
-import logging
 import os
 import tempfile
 from typing import Optional, Tuple, List, Dict
@@ -22,7 +21,9 @@ from App_Function_Libraries.Third_Party.Anki import sanitize_html, generate_card
     export_cards, load_card_for_editing, handle_file_upload, \
     validate_for_ui, update_card_with_validation, update_card_choices, enhanced_file_upload, \
     handle_validation
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
+
+
 #
 ############################################################################################################
 #

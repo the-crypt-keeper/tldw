@@ -4,7 +4,6 @@
 # Imports
 import asyncio
 import json
-import logging
 from html import unescape
 import pytest
 import random
@@ -24,7 +23,7 @@ from urllib3 import Retry
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import loaded_config_data
+from App_Function_Libraries.Utils.Utils import loaded_config_data, logging
 from App_Function_Libraries.Web_Scraping.Article_Extractor_Lib import scrape_article
 from App_Function_Libraries.Chat.Chat_Functions import chat_api_call
 #

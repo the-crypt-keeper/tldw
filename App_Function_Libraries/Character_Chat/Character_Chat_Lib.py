@@ -3,7 +3,6 @@
 #
 # Imports
 import json
-import logging
 import io
 import base64
 import os
@@ -17,6 +16,9 @@ from PIL import Image
 # Local imports
 from App_Function_Libraries.DB.DB_Manager import get_character_card_by_id, get_character_chat_by_id
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Utils.Utils import logging
+
+
 #
 # Constants
 ####################################################################################################

@@ -15,7 +15,6 @@
 # Import necessary libraries to run solo for testing
 import gc
 import json
-import logging
 import multiprocessing
 import os
 from pathlib import Path
@@ -38,7 +37,7 @@ from scipy.io import wavfile
 from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
 #
 # Import Local
-from App_Function_Libraries.Utils.Utils import sanitize_filename, load_and_log_configs
+from App_Function_Libraries.Utils.Utils import sanitize_filename, load_and_log_configs, logging
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram, timeit
 #
 #######################################################################################################################

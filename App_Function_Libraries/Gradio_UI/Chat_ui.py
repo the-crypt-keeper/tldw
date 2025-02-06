@@ -2,7 +2,6 @@
 # Description: Chat interface functions for Gradio
 #
 # Imports
-import logging
 import os
 import sqlite3
 import time
@@ -23,7 +22,7 @@ from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, upda
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.TTS.TTS_Providers import generate_audio, play_mp3
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints, \
-    loaded_config_data
+    loaded_config_data, logging
 
 
 #

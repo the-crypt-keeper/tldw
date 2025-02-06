@@ -1,7 +1,6 @@
 # XML_Ingestion.py
 # Description: This file contains functions for reading and writing XML files.
 # Imports
-import logging
 import xml.etree.ElementTree as ET
 #
 # External Imports
@@ -10,6 +9,7 @@ import xml.etree.ElementTree as ET
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
 from App_Function_Libraries.Chunk_Lib import chunk_xml
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
+from App_Function_Libraries.Utils.Utils import logging
 #
 #######################################################################################################################
 #

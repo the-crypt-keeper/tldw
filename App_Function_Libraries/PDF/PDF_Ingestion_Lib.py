@@ -13,7 +13,6 @@
 ####################
 # Import necessary libraries
 from datetime import datetime
-import logging
 import os
 import re
 import shutil
@@ -27,6 +26,8 @@ from docling.document_converter import DocumentConverter
 # Import Local
 from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Utils.Utils import logging
+
 #
 # Constants
 MAX_FILE_SIZE_MB = 50

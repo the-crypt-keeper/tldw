@@ -3,17 +3,13 @@
 #
 # Imports
 #
-# External Imports
-import logging
-
+# 3rd-Party Imports
 import gradio as gr
 import textstat
 #
 # Local Imports
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
-
-
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
 #
 ########################################################################################################################
 #

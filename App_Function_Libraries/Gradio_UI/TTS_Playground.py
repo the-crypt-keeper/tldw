@@ -1,7 +1,6 @@
 # Audio_Generation_Playground.py
 # Description: Gradio UI for text-to-speech audio generation
 #
-import logging
 import os
 import time
 import gradio as gr

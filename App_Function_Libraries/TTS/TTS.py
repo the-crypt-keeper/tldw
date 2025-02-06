@@ -3,7 +3,6 @@
 #
 # Imports
 import io
-import logging
 import os
 from pydub import AudioSegment
 import re
@@ -13,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 #
 # Local Imports
 from App_Function_Libraries.TTS.TTS_Providers import generate_audio_openai, generate_audio_elevenlabs
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config, load_and_log_configs
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config, load_and_log_configs, logging
 
 #
 #######################################################################################################################

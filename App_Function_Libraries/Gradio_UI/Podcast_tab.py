@@ -2,7 +2,6 @@
 # Description: Gradio UI for ingesting podcasts into the database
 #
 # Imports
-import logging
 #
 # External Imports
 import gradio as gr
@@ -11,7 +10,7 @@ import gradio as gr
 from App_Function_Libraries.Audio.Audio_Files import process_podcast
 from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models, update_user_prompt
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
 #
 ########################################################################################################################
 #

@@ -3,7 +3,6 @@
 #
 # Imports
 import json
-import logging
 #
 # External Imports
 import gradio as gr
@@ -15,7 +14,9 @@ from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import fetch_item_details, fetch_items_by_keyword, \
     fetch_items_by_content, fetch_items_by_title_or_url
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize_chunk
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
+
+
 #
 ######################################################################################################################
 #

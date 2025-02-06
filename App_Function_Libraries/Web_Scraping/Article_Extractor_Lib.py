@@ -16,7 +16,6 @@
 import hashlib
 from datetime import datetime
 import json
-import logging
 import os
 import tempfile
 from typing import Any, Dict, List, Union, Optional, Tuple
@@ -34,12 +33,13 @@ from playwright.async_api import async_playwright
 import requests
 import trafilatura
 from tqdm import tqdm
-
 #
 # Import Local
 from App_Function_Libraries.DB.DB_Manager import ingest_article_to_db
 from App_Function_Libraries.Metrics.metrics_logger import log_histogram, log_counter
 from App_Function_Libraries.Summarization.Summarization_General_Lib import summarize
+from App_Function_Libraries.Utils.Utils import logging
+
 #######################################################################################################################
 # Function Definitions
 #

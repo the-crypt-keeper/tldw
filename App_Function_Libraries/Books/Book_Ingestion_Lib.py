@@ -17,7 +17,6 @@ import re
 import tempfile
 import zipfile
 from datetime import datetime
-import logging
 import xml.etree.ElementTree as ET
 import html2text
 import csv
@@ -32,6 +31,9 @@ from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords, add_me
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
 from App_Function_Libraries.Chunk_Lib import chunk_ebook_by_chapters
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Utils.Utils import logging
+
+
 #
 #######################################################################################################################
 # Function Definitions

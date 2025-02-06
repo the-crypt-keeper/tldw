@@ -2,7 +2,6 @@
 # Description: This file contains the functions to allow for usage of different TTS providers.
 #
 # Imports
-import logging
 import os
 import tempfile
 #
@@ -11,7 +10,7 @@ import tempfile
 import requests
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data, logging
 from App_Function_Libraries.TTS.TTS_Providers_Local import play_mp3, generate_audio_kokoro
 #
 #######################################################################################################################

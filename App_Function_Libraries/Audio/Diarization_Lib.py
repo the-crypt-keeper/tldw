@@ -12,21 +12,16 @@
 #
 ####################
 # Import necessary libraries
-import logging
 from pathlib import Path
 from typing import Dict, List, Any
-
-#
-# Import Local Libraries
-from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
 #
 # Import 3rd Party Libraries
 from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
 import yaml
-
+# Import Local Libraries
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Metrics.metrics_logger import timeit
-
-
+from App_Function_Libraries.Utils.Utils import logging
 #
 #######################################################################################################################
 # Function Definitions
