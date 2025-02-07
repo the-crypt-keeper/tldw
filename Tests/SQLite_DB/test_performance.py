@@ -16,27 +16,27 @@ from App_Function_Libraries.Utils import Utils
 # 10, 100, 1k, 10k records. The expected search time never exceeds 2s for 10k records.
 # This can be/should be tuned down more.
 
-@pytest.fixture(scope="module")
-def db():
-    test_db_name = 'test_performance.db'
-    database = Database(test_db_name)
-    create_tables(database)
-
-    # Ensure the database is empty before starting tests
-    with database.get_connection() as conn:
-        conn.execute("DELETE FROM Media")
-        conn.execute("DELETE FROM MediaKeywords")
-        conn.execute("DELETE FROM Keywords")
-
-    yield database
-
-    # Ensure all connections are closed properly
-    database.close_connection()
-
-    # Cleanup the test database file after all tests
-    db_path = Utils.get_database_path(test_db_name)
-    if os.path.exists(db_path):
-        os.remove(db_path)
+# @pytest.fixture(scope="module")
+# def db():
+#     test_db_name = 'test_performance.db'
+#     database = Database(test_db_name)
+#     create_tables(database)
+#
+#     # Ensure the database is empty before starting tests
+#     with database.get_connection() as conn:
+#         conn.execute("DELETE FROM Media")
+#         conn.execute("DELETE FROM MediaKeywords")
+#         conn.execute("DELETE FROM Keywords")
+#
+#     yield database
+#
+#     # Ensure all connections are closed properly
+#     database.close_connection()
+#
+#     # Cleanup the test database file after all tests
+#     db_path = Utils.get_database_path(test_db_name)
+#     if os.path.exists(db_path):
+#         os.remove(db_path)
 
 #@pytest.mark.parametrize("num_records", [10, 100, 1000, 10000])
 # def test_search_performance(db, num_records):
