@@ -1362,8 +1362,9 @@ def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/
 def chat_with_vllm(
         input_data: Union[str, dict, list], custom_prompt_input: str, api_key: str = None,
         vllm_api_url: str = None, model: str = None, system_prompt: str = None,
-        temp: float =None, streaming: bool = False, minp: float = None, topp: float = None, topk=None) -> Generator[
-    str | Any, Any, str | None | Any]:
+        temp: float =None, streaming: bool = False, minp: float = None, topp: float = None, topk=None) -> str | \
+                                                                                                          Generator[
+                                                                                                              Any, Any, None] | Any:
     logging.debug("vLLM: Chat request being made...")
     try:
         logging.debug("vLLM: Loading and validating configurations")
@@ -1522,31 +1523,21 @@ def chat_with_vllm(
                     logging.debug(f"vLLM: Chat response: {chat_response}")
                     return chat_response
                 else:
-                    logging.warning("vLLM: Chat response not found in the response data")
-                    return "vLLM: Chat not available"
+                    logging.warning("openai: Chat response not found in the response data")
+                    return "openai: Chat not available"
             else:
                 logging.error(f"vLLM: Chat request failed with status code {response.status_code}")
                 logging.error(f"vLLM: Error response: {response.text}")
-                return f"vLLM: Failed to process chat response. Status code: {response.status_code}"
-
-    except requests.RequestException as e:
-        logging.error(f"vLLM: API request failed: {str(e)}")
-        if streaming:
-            yield f"Error: vLLM API request failed - {str(e)}"
-        else:
-            return f"Error: vLLM API request failed - {str(e)}"
+                return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
-        logging.error(f"vLLM: Failed to parse API response: {str(e)}")
-        if streaming:
-            yield f"Error: Failed to parse vLLM API response - {str(e)}"
-        else:
-            return f"Error: Failed to parse vLLM API response - {str(e)}"
+        logging.error(f"vLLM: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"vLLM: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"vLLM: Error making API request: {str(e)}", exc_info=True)
+        return f"vLLM: Error making API request: {str(e)}"
     except Exception as e:
-        logging.error(f"vLLM: Unexpected error during summarization: {str(e)}")
-        if streaming:
-            yield f"Error: Unexpected error during vLLM summarization - {str(e)}"
-        else:
-            return f"Error: Unexpected error during vLLM summarization - {str(e)}"
+        logging.error(f"vLLM: Unexpected error: {str(e)}", exc_info=True)
+        return f"vLLM: Unexpected error occurred: {str(e)}"
 
 
 def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
