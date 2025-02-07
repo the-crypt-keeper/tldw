@@ -150,50 +150,6 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
             openai_model = loaded_config_data['openai_api']['model'] or "gpt-4o"
             logging.debug(f"OpenAI: Using model: {openai_model}")
 
-        # Input data handling
-        logging.debug(f"OpenAI: Raw input data type: {type(input_data)}")
-        logging.debug(f"OpenAI: Raw input data (first 500 chars): {str(input_data)[:500]}...")
-
-        if isinstance(input_data, str):
-            if input_data.strip().startswith('{'):
-                # It's likely a JSON string
-                logging.debug("OpenAI: Parsing provided JSON string data for summarization")
-                try:
-                    data = json.loads(input_data)
-                except json.JSONDecodeError as e:
-                    logging.error(f"OpenAI: Error parsing JSON string: {str(e)}")
-                    data = input_data
-                    pass
-            elif os.path.isfile(input_data):
-                logging.debug("OpenAI: Loading JSON data from file for summarization")
-                with open(input_data, 'r') as file:
-                    data = json.load(file)
-            else:
-                logging.debug("OpenAI: Using provided string data for summarization")
-                data = input_data
-        else:
-            data = input_data
-
-        logging.debug(f"OpenAI: Processed data type: {type(data)}")
-        logging.debug(f"OpenAI: Processed data (first 500 chars): {str(data)[:500]}...")
-
-        # Text extraction
-        if isinstance(data, dict):
-            if 'summary' in data:
-                logging.debug("OpenAI: Summary already exists in the loaded data")
-                return data['summary']
-            elif 'segments' in data:
-                text = extract_text_from_segments(data['segments'])
-            else:
-                text = json.dumps(data)  # Convert dict to string if no specific format
-        elif isinstance(data, list):
-            text = extract_text_from_segments(data)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError(f"OpenAI: Invalid input data format: {type(data)}")
-
-        logging.debug(f"OpenAI: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"OpenAI: Custom prompt: {custom_prompt_arg}")
 
         headers = {
@@ -204,7 +160,7 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
         logging.debug(
             f"OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
         logging.debug("openai: Preparing data + prompt for submittal")
-        openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        openai_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
         if temp is None:
             temp = 0.7
         if system_message is None:

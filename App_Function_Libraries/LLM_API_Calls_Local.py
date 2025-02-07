@@ -877,60 +877,11 @@ def chat_with_tabbyapi(
             return f"TabbyAPI: Unexpected error in chat request process: {str(e)}"
 
 
-# FIXME aphrodite engine - code was literally tab complete in one go from copilot... :/
-# def chat_with_aphrodite(input_data, custom_prompt_input, api_key=None, api_IP="http://127.0.0.1:8080/completion", streaming=False, temp=None, system_message=None, top_k=None, top_p=None, min_p=None):
-#     loaded_config_data = load_and_log_configs()
-#     model = loaded_config_data['aphrodite_api']['model']
-#     # API key validation
-#     if api_key is None:
-#         logging.info("aphrodite: API key not provided as parameter")
-#         logging.info("aphrodite: Attempting to use API key from config file")
-#         api_key = loaded_config_data['aphrodite_api']['api_key']
-#
-#     if api_key is None or api_key.strip() == "":
-#         logging.info("aphrodite: API key not found or is empty")
-#
-#         if isinstance(streaming, str):
-#             streaming = streaming.lower() == "true"
-#         elif isinstance(streaming, int):
-#             streaming = bool(streaming)  # Convert integers (1/0) to boolean
-#         elif streaming is None:
-#             streaming = loaded_config_data.get('aphrodite_api', {}).get('streaming', False)
-#             logging.debug("Aphrodite: Streaming mode enabled")
-#         else:
-#             logging.debug("Aphrodite: Streaming mode disabled")
-#         if not isinstance(streaming, bool):
-#             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
-#
-#     # Build the request
-#     headers = {
-#         'Authorization': f'Bearer {api_key}',
-#         'Content-Type': 'application/json'
-#     }
-#     body = {
-#         "model": aphrodite_model,
-#         "messages": [
-#             {"role": "system", "content": system_message},
-#             {"role": "user", "content": aphrodite_prompt}
-#         ],
-#         "max_completion_tokens": 4096,
-#         "temperature": temp,
-#         "stream": streaming,
-#         "top_p": top_p,
-#     }
-#
-#     # Send the request
-#     try:
-#         response = requests.post(api_IP, headers=headers, json=body)
-#         response.raise_for_status()
-#         summary = response.json().get('summary', '')
-#         return summary
-#     except requests.exceptions.RequestException as e:
-#         logging.error(f"Error summarizing with Aphrodite: {e}")
-#         return "Error summarizing with Aphrodite."
-def chat_with_aphrodite(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=None,
+def chat_with_aphrodite(api_key, input_data, custom_prompt, temp=None, system_message=None, streaming=None,
                         topp=None, minp=None, topk=None, model=None):
     loaded_config_data = load_and_log_configs()
+    logging.info("Aphrodite Chat: Function entered")
+    logging.debug("Aphrodite Chat: Loading and validating configurations")
     try:
         # API key validation
         if not api_key:
@@ -942,6 +893,8 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt_arg, temp=None, syste
             logging.info("Aphrodite: API key not found or is empty")
 
         logging.debug(f"Aphrodite: Using API Key: {aphrodite_api_key[:5]}...{aphrodite_api_key[-5:]}")
+
+        url = loaded_config_data['aphrodite_api']['api_ip']
 
         if not model:
             model = loaded_config_data['aphrodite_api']['model']
@@ -1006,50 +959,7 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt_arg, temp=None, syste
             aphrodite_model = loaded_config_data['aphrodite_api']['model'] or "gpt-4o"
             logging.debug(f"Aphrodite Chat: Using model: {aphrodite_model}")
 
-        # Input data handling
-        logging.debug(f"Aphrodite Chat: Raw input data type: {type(input_data)}")
-        logging.debug(f"Aphrodite Chat: Raw input data (first 500 chars): {str(input_data)[:500]}...")
-
-        if isinstance(input_data, str):
-            if input_data.strip().startswith('{'):
-                # It's likely a JSON string
-                logging.debug("Aphrodite Chat: Parsing provided JSON string data for summarization")
-                try:
-                    data = json.loads(input_data)
-                except json.JSONDecodeError as e:
-                    logging.error(f"Aphrodite Chat: Error parsing JSON string: {str(e)}")
-                    return f"Aphrodite Chat: Error parsing JSON input: {str(e)}"
-            elif os.path.isfile(input_data):
-                logging.debug("Aphrodite Chat: Loading JSON data from file for summarization")
-                with open(input_data, 'r') as file:
-                    data = json.load(file)
-            else:
-                logging.debug("Aphrodite Chat: Using provided string data for summarization")
-                data = input_data
-        else:
-            data = input_data
-
-        logging.debug(f"Aphrodite Chat: Processed data type: {type(data)}")
-        logging.debug(f"Aphrodite Chat: Processed data (first 500 chars): {str(data)[:500]}...")
-
-        # Text extraction
-        if isinstance(data, dict):
-            if 'summary' in data:
-                logging.debug("Aphrodite Chat: Summary already exists in the loaded data")
-                return data['summary']
-            elif 'segments' in data:
-                text = extract_text_from_segments(data['segments'])
-            else:
-                text = json.dumps(data)  # Convert dict to string if no specific format
-        elif isinstance(data, list):
-            text = extract_text_from_segments(data)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError(f"Aphrodite Chat: Invalid input data format: {type(data)}")
-
-        logging.debug(f"Aphrodite Chat: Extracted text (first 500 chars): {text[:500]}...")
-        logging.debug(f"Aphrodite Chat: Custom prompt: {custom_prompt_arg}")
+        logging.debug(f"Aphrodite Chat: Custom prompt: {custom_prompt}")
 
         headers = {
             'Authorization': f'Bearer {aphrodite_api_key}',
@@ -1059,7 +969,7 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt_arg, temp=None, syste
         logging.debug(
             f"Aphrodite API Key: {aphrodite_api_key[:5]}...{aphrodite_api_key[-5:] if aphrodite_api_key else None}")
         logging.debug("Aphrodite Chat: Preparing data + prompt for submittal")
-        aphrodite_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        aphrodite_prompt = f"{input_data} \n\n\n\n{custom_prompt}"
         aphrodite_system_message = "You are a helpful AI assistant who does whatever the user requests."
 
         if system_message is None:
@@ -1079,7 +989,7 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt_arg, temp=None, syste
             "min_p": minp
         }
         if streaming:
-            logging.debug("OpenAI: Posting request (streaming")
+            logging.debug("Aphrodite Chat: Posting request (streaming")
             response = requests.post(
                 'https://api.openai.com/v1/chat/completions',
                 headers=headers,
@@ -1107,38 +1017,38 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt_arg, temp=None, syste
                             collected_messages += chunk
                             yield chunk
                         except json.JSONDecodeError:
-                            logging.error(f"OpenAI: Error decoding JSON from line: {line}")
+                            logging.error(f"Aphrodite Chat: Error decoding JSON from line: {line}")
                             continue
 
             return stream_generator()
         else:
-            logging.debug("OpenAI: Posting request (non-streaming")
-            response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+            logging.debug("Aphrodite Chat: Posting request (non-streaming")
+            response = requests.post(url, headers=headers, json=data)
             logging.debug(f"Full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
                 logging.debug(response_data)
                 if 'choices' in response_data and len(response_data['choices']) > 0:
                     chat_response = response_data['choices'][0]['message']['content'].strip()
-                    logging.debug("openai: Chat Sent successfully")
-                    logging.debug(f"openai: Chat response: {chat_response}")
+                    logging.debug("Aphrodite Chat: Chat Sent successfully")
+                    logging.debug(f"Aphrodite Chat: Chat response: {chat_response}")
                     return chat_response
                 else:
-                    logging.warning("openai: Chat response not found in the response data")
-                    return "openai: Chat not available"
+                    logging.warning("Aphrodite Chat: Chat response not found in the response data")
+                    return "Aphrodite Chat: Chat not available"
             else:
-                logging.error(f"OpenAI: Chat request failed with status code {response.status_code}")
-                logging.error(f"OpenAI: Error response: {response.text}")
-                return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
+                logging.error(f"Aphrodite Chat: Chat request failed with status code {response.status_code}")
+                logging.error(f"Aphrodite Chat: Error response: {response.text}")
+                return f"Aphrodite Chat: Failed to process chat response. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
-        logging.error(f"OpenAI: Error decoding JSON: {str(e)}", exc_info=True)
-        return f"OpenAI: Error decoding JSON input: {str(e)}"
+        logging.error(f"Aphrodite Chat: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"Aphrodite Chat: Error decoding JSON input: {str(e)}"
     except requests.RequestException as e:
-        logging.error(f"OpenAI: Error making API request: {str(e)}", exc_info=True)
-        return f"OpenAI: Error making API request: {str(e)}"
+        logging.error(f"Aphrodite Chat: Error making API request: {str(e)}", exc_info=True)
+        return f"Aphrodite Chat: Error making API request: {str(e)}"
     except Exception as e:
-        logging.error(f"OpenAI: Unexpected error: {str(e)}", exc_info=True)
-        return f"OpenAI: Unexpected error occurred: {str(e)}"
+        logging.error(f"Aphrodite Chat: Unexpected error: {str(e)}", exc_info=True)
+        return f"Aphrodite Chat: Unexpected error occurred: {str(e)}"
 
 
 def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/v1/chat/completions", api_key=None,
@@ -1540,7 +1450,7 @@ def chat_with_vllm(
         return f"vLLM: Unexpected error occurred: {str(e)}"
 
 
-def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
+def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, maxp, model, minp, topk):
     loaded_config_data = load_and_log_configs()
     custom_openai_api_key = api_key
     try:
@@ -1568,49 +1478,13 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
-        # Input data handling
-        logging.debug(f"Custom OpenAI API: Raw input data type: {type(input_data)}")
-        logging.debug(f"Custom OpenAI API: Raw input data (first 500 chars): {str(input_data)[:500]}...")
+        if maxp is None:
+            maxp = loaded_config_data['openai_api']['top_p']
+            maxp = float(maxp)
+        if model is None:
+            openai_model = loaded_config_data['openai_api']['model'] or "gpt-4o"
+            logging.debug(f"OpenAI: Using model: {openai_model}")
 
-        if isinstance(input_data, str):
-            if input_data.strip().startswith('{'):
-                # It's likely a JSON string
-                logging.debug("Custom OpenAI API: Parsing provided JSON string data for summarization")
-                try:
-                    data = json.loads(input_data)
-                except json.JSONDecodeError as e:
-                    logging.error(f"Custom OpenAI API: Error parsing JSON string: {str(e)}")
-                    return f"Custom OpenAI API: Error parsing JSON input: {str(e)}"
-            elif os.path.isfile(input_data):
-                logging.debug("Custom OpenAI API: Loading JSON data from file for summarization")
-                with open(input_data, 'r') as file:
-                    data = json.load(file)
-            else:
-                logging.debug("Custom OpenAI API: Using provided string data for summarization")
-                data = input_data
-        else:
-            data = input_data
-
-        logging.debug(f"Custom OpenAI API: Processed data type: {type(data)}")
-        logging.debug(f"Custom OpenAI API: Processed data (first 500 chars): {str(data)[:500]}...")
-
-        # Text extraction
-        if isinstance(data, dict):
-            if 'summary' in data:
-                logging.debug("Custom OpenAI API: Summary already exists in the loaded data")
-                return data['summary']
-            elif 'segments' in data:
-                text = extract_text_from_segments(data['segments'])
-            else:
-                text = json.dumps(data)  # Convert dict to string if no specific format
-        elif isinstance(data, list):
-            text = extract_text_from_segments(data)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError(f"Custom OpenAI API: Invalid input data format: {type(data)}")
-
-        logging.debug(f"Custom OpenAI API: Extracted text (first 500 chars): {text[:500]}...")
         logging.debug(f"v: Custom prompt: {custom_prompt_arg}")
 
         openai_model = loaded_config_data['custom_openai_api']['model']
@@ -1624,7 +1498,7 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
         logging.debug(
             f"OpenAI API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
         logging.debug("Custom OpenAI API: Preparing data + prompt for submittal")
-        openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        openai_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
         if temp is None:
             temp = 0.7
         if system_message is None:
