@@ -173,7 +173,7 @@ def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp
             response = chat_with_tabbyapi(input_data, prompt, temp, system_message)
 
         elif api_endpoint.lower() == "vllm":
-            response = chat_with_vllm(input_data, prompt, system_message)
+            response = chat_with_vllm(input_data, prompt, api_key, None, None, system_message, temp, streaming, minp, topp, topk)
 
         elif api_endpoint.lower() == "local-llm":
             response = chat_with_local_llm(input_data, prompt, temp, system_message)

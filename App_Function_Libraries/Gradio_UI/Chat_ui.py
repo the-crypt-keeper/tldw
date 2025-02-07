@@ -129,8 +129,24 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
         # Generate bot response
         logging.debug("chat_wrapper(): Generating bot response")
         bot_message = ""
-        response = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
-                        temperature, system_prompt, streaming, minp=None, maxp=None, model=None)
+        response = chat(full_message,
+                        history,
+                        media_content,
+                        selected_parts,
+                        api_endpoint,
+                        api_key,
+                        custom_prompt,
+                        temperature,
+                        system_prompt,
+                        streaming=streaming,
+                        minp=None,
+                        maxp=None,
+                        model=None,
+                        topp=None,
+                        topk=None,
+                        chatdict_entries=chatdict_entries,
+                        max_tokens=max_tokens,
+                        strategy=strategy)
 
         # Handle streaming and non-streaming responses
         if streaming:
