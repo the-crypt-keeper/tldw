@@ -4,6 +4,8 @@
 import json
 import sys
 import os
+from datetime import datetime
+
 #
 # 3rd-Party Imports
 from loguru import logger
@@ -36,22 +38,36 @@ def json_formatter(record):
     """
     Custom JSON formatter for file logging.
     """
-    # Format the log time as a string.
-    dt = record["time"].strftime("%Y-%m-%d %H:%M:%S.%f")
-    # Grab any extra data passed with the log.
-    extra = record["extra"]
-    log_record = {
-        "time": dt,
-        "levelname": record["level"].name,
-        "name": record["name"],
-        "message": record["message"],
-        "event": extra.get("event"),
-        "type": extra.get("type"),
-        "value": extra.get("value"),
-        "labels": extra.get("labels"),
-        "timestamp": extra.get("timestamp"),
-    }
-    return json.dumps(log_record)
+    try:
+        # Format the log time as a string.
+        dt = record["time"].strftime("%Y-%m-%d %H:%M:%S.%f")
+        # Grab any extra data passed with the log.
+        extra = record["extra"]
+
+        # Handle potential non-serializable fields in 'extra'
+        def serialize(value):
+            if isinstance(value, datetime):
+                return value.isoformat()
+            return value
+
+        log_record = {
+            "time": dt,
+            "levelname": record["level"].name,
+            "name": record["name"],
+            "message": record["message"],
+            "event": extra.get("event"),
+            "type": extra.get("type"),
+            "value": extra.get("value"),
+            "labels": extra.get("labels"),
+            "timestamp": serialize(extra.get("timestamp")),
+        }
+        return json.dumps(log_record)
+    except Exception as e:
+        # Fallback to a safe JSON structure if serialization fails
+        return json.dumps({
+            "error": f"Log formatting failed: {str(e)}",
+            "original_message": record.get("message", "")
+        })
 
 
 def setup_logger(args):
@@ -70,8 +86,7 @@ def setup_logger(args):
     # Determine the log level (from args; default to DEBUG)
     log_level = args.log_level.upper() if hasattr(args, "log_level") else "DEBUG"
 
-    # Add a console sink.
-    # (You could also choose to use JSON formatting on the console if desired.)
+    # Console sink with simple format
     logger.add(
         sys.stdout,
         level=log_level,
@@ -88,20 +103,19 @@ def setup_logger(args):
         file_log_path = config['logging']['log_file']
         logger.info(f"No logfile provided via command-line. Using default: {file_log_path}")
 
-    # Ensure the directory for the file_log_path exists.
+    # Ensure directory exists
     log_dir = os.path.dirname(file_log_path)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 
-    # Add the standard file sink with human‑readable format.
+    # Standard file sink
     logger.add(
         file_log_path,
         level=log_level,
         format="{time:YYYY-MM-DD HH:mm:ss} - {level} - {message}"
     )
 
-    # Optionally, add a metrics file sink with JSON formatting.
-    # For example, if you want to have a separate file that rotates at 10 MB:
+    # Metrics file sink with JSON formatting
     config = load_and_log_configs()
     metrics_log_file = config['logging'].get('log_metrics_file')
     if metrics_log_file:
@@ -111,8 +125,9 @@ def setup_logger(args):
 
         logger.add(
             metrics_log_file,
-            level="DEBUG",  # Or another level if you prefer
-            format=json_formatter,
+            level="DEBUG",
+            format="{time} - {level} - {message}",  # Simple format for JSON sink
+            serialize=True,  # This enables JSON serialization
             rotation="10 MB",
             # Loguru’s built-in retention can be a simple number (e.g., 5) meaning “keep 5 files”
             retention=5,
