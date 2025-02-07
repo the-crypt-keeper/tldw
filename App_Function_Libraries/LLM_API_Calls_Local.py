@@ -4,7 +4,7 @@
 # This library is used to perform summarization with a 'local' inference engine.
 #
 ####
-from typing import Union
+from typing import Union, Any, Generator
 
 ####################
 # Function List
@@ -538,24 +538,24 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
         return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
 
 
-# FIXME - Fix the system prompt
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.0.0.1:5000/v1/chat/completions", system_prompt=None, streaming=False, temp=None, top_p=None):
-    loaded_config_data = load_and_log_configs()
-    ooba_system_prompt = "You are a helpful AI assistant that provides accurate and concise information."
+def chat_with_oobabooga(input_data, api_key, custom_prompt, system_prompt=None, api_url=None, streaming=False, temp=None, top_p=None):
+    logging.debug("Oobabooga: Summarization process starting...")
     try:
-        # API key validation
-        if api_key is None:
-            logging.info("ooba: API key not provided as parameter")
-            logging.info("ooba: Attempting to use API key from config file")
-            api_key = loaded_config_data['ooba_api']['api_key']
+        logging.debug("Oobabooga: Loading and validating configurations")
+        loaded_config_data = load_and_log_configs()
+        ooba_api_key = None
 
-        if api_key is None or api_key.strip() == "":
-            logging.info("ooba: API key not found or is empty")
+        # Config data check
+        if loaded_config_data is None:
+            logging.error("Failed to load configuration data")
 
+        # system prompt check
         if system_prompt is None:
+            ooba_system_prompt = "You are a helpful AI assistant that provides accurate and concise information."
             system_prompt = ooba_system_prompt
 
+        # Streaming check
         if isinstance(streaming, str):
             streaming = streaming.lower() == "true"
         elif isinstance(streaming, int):
@@ -568,6 +568,19 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
+        # API Key
+        if api_key and api_key.strip():
+            ooba_api_key = api_key
+            logging.info("Oobabooga: Using API key provided as parameter")
+        else:
+            # If no parameter is provided, use the key from the config
+            ooba_api_key = loaded_config_data['ooba_api']['api_key']
+            if ooba_api_key:
+                logging.info("Oobabooga: Using API key from config file")
+            else:
+                logging.warning("Oobabooga: No API key found in config file")
+
+        # top_p handling
         if isinstance(top_p, float):
             top_p = float(top_p)
             logging.debug(f"Ooba: Using top_p: {top_p}")
@@ -583,91 +596,99 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, api_url="http://127.
         if not isinstance(temp, float):
             raise ValueError(f"Invalid type for 'temp': Expected a float, got {type(streaming).__name__}")
 
+        # API URL Handling
+        if not api_url:
+            api_url = loaded_config_data['ooba_api']['api_ip']
+            logging.debug(f"Oobabooga: Using API URL from config file: {api_url}")
+
+        if not isinstance(api_url, str) or not api_url.startswith(('http://', 'https://')):
+            logging.error(f"Invalid API URL configured: {api_url}")
+            return "Oobabooga: Invalid API URL configured"
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
         }
 
         ooba_prompt = f"{input_data}" + f"\n\n\n\n{custom_prompt}"
-        logging.debug("ooba: Prompt being sent is {ooba_prompt}")
+        logging.debug(f"ooba: Prompt being sent is {ooba_prompt}")
 
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": ooba_prompt}
+        ]
+
+        # Prepare API payload
         data = {
             "mode": "chat",
             "character": "Example",
-            "messages": [{"role": "user", "content": ooba_prompt}],
+            "messages": messages,
             "stream": streaming,
             "top_p": top_p,
-            "temperature": temp
+            "temperature": temp,
         }
-        if streaming:
-            logging.debug("Ooba Summarization: Streaming mode enabled")
-            try:
-                # Send the request with streaming enabled
-                response = requests.post(
-                    api_url, headers=headers, json=data, stream=True
-                )
-                logging.debug(
-                    "Ooba Summarization: API Response Status Code: %d",
-                    response.status_code,
-                )
 
-                if response.status_code == 200:
-                    # Process the streamed response
+        # If the user has set streaming to True:
+        if streaming:
+            logging.debug("Oobabooga chat: Streaming mode enabled")
+            response = requests.post(api_url, headers=headers, json=data, stream=True)
+            response.raise_for_status()
+            try:
+                def stream_generator():
+                    collected_messages = ""
                     for line in response.iter_lines():
                         if line:
-                            decoded_line = line.decode('utf-8')
-                            logging.debug(
-                                "Ooba: Received streamed data: %s", decoded_line
-                            )
-                            # OpenAI API streams data prefixed with 'data: '
+                            decoded_line = line.decode('utf-8').strip()
                             if decoded_line.startswith('data: '):
-                                content = decoded_line[len('data: '):].strip()
+                                content = decoded_line[len('data: '):]
                                 if content == '[DONE]':
                                     break
                                 try:
                                     data_chunk = json.loads(content)
-                                    if 'choices' in data_chunk and len(data_chunk['choices']) > 0:
+                                    if 'choices' in data_chunk and data_chunk['choices']:
                                         delta = data_chunk['choices'][0].get('delta', {})
-                                        text = delta.get('content', '')
-                                        if text:
-                                            yield text
-                                    else:
-                                        logging.error(
-                                            "Ooba: Expected data not found in streamed response."
-                                        )
+                                        if 'content' in delta:
+                                            chunk = delta['content']
+                                            collected_messages += chunk
+                                            yield chunk
                                 except json.JSONDecodeError as e:
-                                    logging.error(
-                                        "Ooba: Error decoding streamed JSON: %s", str(e)
-                                    )
-                            else:
-                                logging.debug("Ooba: Ignoring line: %s", decoded_line)
-                else:
-                    logging.error(
-                        f"Ooba: API request failed with status code {response.status_code}: {response.text}"
-                    )
-                    yield f"Ooba: API request failed: {response.text}"
-            except Exception as e:
-                logging.error("Ooba: Error in processing: %s", str(e))
-                yield f"Ooba: Error occurred while processing summary with Ooba: {str(e)}"
+                                    logging.error(f"JSON decode error: {str(e)}")
+                                    continue
+
+                return stream_generator()
+            except requests.RequestException as e:
+                logging.error(f"Error streaming summary with Oobabooga: {e}")
+                return f"Error summarizing with Oobabooga: {str(e)}"
         else:
-            logging.debug("ooba: Submitting request to API endpoint")
-            print("ooba: Submitting request to API endpoint")
-            response = requests.post(api_url, headers=headers, json=data, verify=False)
-            logging.debug("ooba: API Response Data: %s", response)
+            logging.debug("Oobabooga Chat: Posting request (non-streaming)")
+            response = requests.post(api_url, headers=headers, json=data)
 
             if response.status_code == 200:
                 response_data = response.json()
-                summary = response.json()['choices'][0]['message']['content']
-                logging.debug("ooba: Summarization successful")
-                print("Summarization successful.")
-                return summary
+                logging.debug("Ooba API request successful")
+                logging.debug(response_data)
+                if 'choices' in response_data and response_data['choices']:
+                    logging.debug("Ooba API: Summarization successful")
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug(f"Ooba API: Summary (first 500 chars): {summary[:500]}...")
+                    return summary
+                else:
+                    error_msg = f"Ooba API request failed: {response.status_code} - {response.text}"
+                    logging.error(error_msg)
+                    return error_msg
             else:
-                logging.error(f"oobabooga: API request failed with status code {response.status_code}: {response.text}")
-                return f"ooba: API request failed with status code {response.status_code}: {response.text}"
-
+                logging.error(f"Ooba API: Summarization failed with status code {response.status_code}")
+                logging.error(f"Ooba API: Error response: {response.text}")
+                return f"Ooba API: Failed to process summary. Status code: {response.status_code}"
+    except json.JSONDecodeError as e:
+        logging.error(f"Ooba API: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"Ooba API: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"Ooba API: Error making API request: {str(e)}", exc_info=True)
+        return f"Ooba API: Error making API request: {str(e)}"
     except Exception as e:
-        logging.error("ooba: Error in processing: %s", str(e))
-        return f"ooba: Error occurred while processing summary with oobabooga: {str(e)}"
+        logging.error(f"Ooba API: Unexpected error: {str(e)}", exc_info=True)
+        return f"Ooba API: Unexpected error occurred: {str(e)}"
 
 
 def chat_with_tabbyapi(
@@ -1341,7 +1362,8 @@ def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/
 def chat_with_vllm(
         input_data: Union[str, dict, list], custom_prompt_input: str, api_key: str = None,
         vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions", model: str = None, system_prompt: str = None,
-        temp: float =None, streaming: bool = False, minp: float = None, topp: float = None, topk=None) -> str:
+        temp: float =None, streaming: bool = False, minp: float = None, topp: float = None, topk=None) -> Generator[
+    str | Any, Any, str | None | Any]:
     logging.debug("vLLM: Chat request being made...")
     try:
         logging.debug("vLLM: Loading and validating configurations")
@@ -1388,6 +1410,7 @@ def chat_with_vllm(
             logging.debug(f"vLLM: Using Top-K: {topk}")
         elif topk is None:
             topk = loaded_config_data['vllm_api']['top_k']
+            topk = int(topk)
             logging.debug(f"vLLM: Using Top-K from config: {topk}")
         if not isinstance(topk, int):
             raise ValueError(f"Invalid type for 'top_k': Expected an int, got {type(topk).__name__}")
@@ -1398,6 +1421,7 @@ def chat_with_vllm(
             logging.debug(f"vLLM: Using Top-P: {topp}")
         elif topp is None:
             topp = loaded_config_data['vllm_api']['top_p']
+            topp = float(topp)
             logging.debug(f"vLLM: Using Top-P from config: {topp}")
         if not isinstance(topp, float):
             raise ValueError(f"Invalid type for 'top_p': Expected a float, got {type(topp).__name__}")
@@ -1408,6 +1432,7 @@ def chat_with_vllm(
             logging.debug(f"vLLM: Using Min-P: {minp}")
         elif minp is None:
             minp = loaded_config_data['vllm_api']['min_p']
+            minp = float(minp)
             logging.debug(f"vLLM: Using Min-P from config: {minp}")
         if not isinstance(minp, float):
             raise ValueError(f"Invalid type for 'min_p': Expected a float, got {type(minp).__name__}")
@@ -1418,6 +1443,7 @@ def chat_with_vllm(
             logging.debug(f"vLLM: Using temperature: {temp}")
         elif temp is None:
             temp = loaded_config_data['vllm_api']['temperature']
+            temp = float(temp)
             logging.debug(f"vLLM: Using temperature from config: {temp}")
         if not isinstance(temp, float):
             raise ValueError(f"Invalid type for 'temp': Expected a float, got {type(temp).__name__}")
@@ -1481,8 +1507,8 @@ def chat_with_vllm(
             response_data = response.json()
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 summary = response_data['choices'][0]['message']['content']
-                logging.debug("vLLM: Summarization successful")
-                logging.debug(f"vLLM: Summary (first 500 chars): {summary[:500]}...")
+                logging.debug("vLLM: Chat request successful")
+                logging.debug(f"vLLM: Chat response(first 500 chars): {summary[:500]}...")
                 return summary
             else:
                 raise ValueError("Unexpected response format from vLLM API")

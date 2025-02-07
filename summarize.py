@@ -54,7 +54,7 @@ share_public = False
 running_in_debug_mode = False
 
 # FIXME - add to config.txt
-log_file_path = os.getenv("tldw_LOG_FILE_PATH", "tldw_app_logs.json")
+log_file_path = os.getenv("tldw_LOG_FILE_PATH", "./Logs/tldw_app_logs.json")
 max_bytes = int(os.getenv("tldw_LOG_MAX_BYTES", 10 * 1024 * 1024))  # 10 MB
 backup_count = int(os.getenv("tldw_LOG_BACKUP_COUNT", 5))
 

@@ -21,6 +21,6 @@ https://huggingface.co/Writer/Palmyra-Creative
 https://silverbullet.md/
 https://github.com/silverbulletmd/silverbullet
 https://github.com/glowingjade/obsidian-smart-composer
-
+https://github.com/kleer001/Text_Loom
 
 
