@@ -1450,7 +1450,7 @@ def chat_with_vllm(
         return f"vLLM: Unexpected error occurred: {str(e)}"
 
 
-def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, maxp, model, minp, topk):
+def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False, maxp=None, model=None, minp=None, topk=None):
     loaded_config_data = load_and_log_configs()
     custom_openai_api_key = api_key
     try:
