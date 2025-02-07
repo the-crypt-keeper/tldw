@@ -511,7 +511,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         else:
             raise ValueError("Cohere: Invalid input data format")
 
-        cohere_model = loaded_config_data['cohere']['model']
+        cohere_model = loaded_config_data['cohere_api']['model']
 
         if temp is None:
             temp = 0.3
@@ -575,7 +575,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
             logging.debug("Cohere: Submitting request to API endpoint")
             response = requests.post('https://api.cohere.ai/v1/chat', headers=headers, json=data)
             response_data = response.json()
-            logging.debug("API Response Data: %s", response_data)
+            logging.debug(f"API Response Data: {response_data}")
 
             if response.status_code == 200:
                 if 'text' in response_data:
@@ -595,7 +595,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
                 return f"Cohere: API request failed: {response.text}"
 
     except Exception as e:
-        logging.error("Cohere: Error in processing: %s", str(e), exc_info=True)
+        logging.error(f"Cohere: Error in processing: {str(e)}", exc_info=True)
         return f"Cohere: Error occurred while processing summary with Cohere: {str(e)}"
 
 
