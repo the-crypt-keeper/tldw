@@ -70,6 +70,7 @@ https://github.com/Cloud-Code-AI/AkiraDocs
 https://ui.shadcn.com/docs
 https://www.typingmind.com/
 https://github.com/Vali-98/ChatterUI
+https://github.com/rio-labs/rio
 https://www.nngroup.com/videos/efficient-error-messages/
 https://uxdesign.cc/a-good-design-is-a-good-essay-197f4bd31c92
 https://github.com/Rugz007/liha
