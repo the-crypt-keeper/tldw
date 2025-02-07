@@ -52,8 +52,7 @@ def summarize(
     temp: Optional[float],
     system_message: Optional[str],
     streaming: Optional[bool] = False
-) -> str | Generator[Any, Any, None] | LiteralString | None | Generator[str | Any, Any, None] | Generator[
-    str | Any, Any, str | None | Any] | Any:
+):
     try:
         logging.debug(f"api_name type: {type(api_name)}, value: {api_name}")
         if api_name.lower() == "openai":
