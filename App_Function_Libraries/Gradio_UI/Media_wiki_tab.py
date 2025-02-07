@@ -11,7 +11,7 @@ import yaml
 from ruamel.yaml import YAML
 #
 # Local Imports
-from App_Function_Libraries.MediaWiki.Media_Wiki import import_mediawiki_dump, config
+from App_Function_Libraries.MediaWiki.Media_Wiki import import_mediawiki_dump, media_wiki_import_config
 #
 #######################################################################################################################
 #
@@ -241,43 +241,43 @@ def create_mediawiki_config_tab():
         with gr.Row():
             with gr.Column():
                 namespaces = gr.Textbox(label="Default Namespaces (comma-separated integers)",
-                                        value=','.join(map(str, config['import']['default_namespaces'])))
+                                        value=','.join(map(str, media_wiki_import_config['import']['default_namespaces'])))
                 skip_redirects = gr.Checkbox(label="Skip Redirects by Default",
-                                             value=config['import']['default_skip_redirects'])
+                                             value=media_wiki_import_config['import']['default_skip_redirects'])
                 single_item = gr.Checkbox(label="Import as Single Item by Default",
-                                          value=config['import']['single_item_default'])
-                batch_size = gr.Number(value=config['import']['batch_size'], label="Batch Size")
+                                          value=media_wiki_import_config['import']['single_item_default'])
+                batch_size = gr.Number(value=media_wiki_import_config['import']['batch_size'], label="Batch Size")
 
                 chunk_method = gr.Dropdown(
-                    choices=config['chunking']['methods'],
-                    value=config['chunking']['default_method'],
+                    choices=media_wiki_import_config['chunking']['methods'],
+                    value=media_wiki_import_config['chunking']['default_method'],
                     label="Default Chunking Method"
                 )
-                chunk_size = gr.Slider(minimum=100, maximum=2000, value=config['chunking']['default_size'], step=100,
+                chunk_size = gr.Slider(minimum=100, maximum=2000, value=media_wiki_import_config['chunking']['default_size'], step=100,
                                        label="Default Chunk Size")
-                chunk_overlap = gr.Slider(minimum=0, maximum=500, value=config['chunking']['default_overlap'], step=10,
+                chunk_overlap = gr.Slider(minimum=0, maximum=500, value=media_wiki_import_config['chunking']['default_overlap'], step=10,
                                           label="Default Chunk Overlap")
 
             with gr.Column():
-                max_workers = gr.Slider(minimum=1, maximum=16, value=config['processing']['max_workers'], step=1,
+                max_workers = gr.Slider(minimum=1, maximum=16, value=media_wiki_import_config['processing']['max_workers'], step=1,
                                         label="Max Worker Threads")
 
                 embedding_provider = gr.Dropdown(
                     choices=['openai', 'local', 'huggingface'],
-                    value=config['embeddings']['provider'],
+                    value=media_wiki_import_config['embeddings']['provider'],
                     label="Embedding Provider"
                 )
-                embedding_model = gr.Textbox(label="Embedding Model", value=config['embeddings']['model'])
+                embedding_model = gr.Textbox(label="Embedding Model", value=media_wiki_import_config['embeddings']['model'])
                 api_key = gr.Textbox(label="API Key (if required)", type="password",
-                                     value=config['embeddings'].get('api_key', ''))
+                                     value=media_wiki_import_config['embeddings'].get('api_key', ''))
                 local_embedding_url = gr.Textbox(label="Local Embedding URL",
-                                                 value=config['embeddings'].get('local_url', ''))
+                                                 value=media_wiki_import_config['embeddings'].get('local_url', ''))
 
-                checkpoints_enabled = gr.Checkbox(label="Enable Checkpoints", value=config['checkpoints']['enabled'])
-                checkpoint_directory = gr.Textbox(label="Checkpoint Directory", value=config['checkpoints']['directory'])
+                checkpoints_enabled = gr.Checkbox(label="Enable Checkpoints", value=media_wiki_import_config['checkpoints']['enabled'])
+                checkpoint_directory = gr.Textbox(label="Checkpoint Directory", value=media_wiki_import_config['checkpoints']['directory'])
 
-                max_retries = gr.Number(value=config['error_handling']['max_retries'], label="Max Retries")
-                retry_delay = gr.Number(value=config['error_handling']['retry_delay'], label="Retry Delay (seconds)")
+                max_retries = gr.Number(value=media_wiki_import_config['error_handling']['max_retries'], label="Max Retries")
+                retry_delay = gr.Number(value=media_wiki_import_config['error_handling']['retry_delay'], label="Retry Delay (seconds)")
 
         save_config_button = gr.Button("Save Configuration")
         config_output = gr.Markdown(label="Configuration Status")
