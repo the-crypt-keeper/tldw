@@ -1209,7 +1209,7 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
             raise ValueError(f"Custom OpenAI API: Invalid input data format: {type(data)}")
 
         logging.debug(f"Custom OpenAI API: Extracted text (first 500 chars): {text[:500]}...")
-        logging.debug(f"v: Custom prompt: {custom_prompt_arg}")
+        logging.debug(f"Custom OpenAI API: Custom prompt: {custom_prompt_arg}")
 
         if input_data is None:
             input_data = f"{summarizer_prompt}\n\n\n\n{text}"
