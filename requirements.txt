@@ -82,7 +82,6 @@ psycopg2-binary~=2.9.10
 scikit-learn~=1.5.1
 sentence-transformers~=3.0.1
 bs4~=0.0.2
-chunking_evaluation~=0.1.0
 munch~=4.0.0
 scipy~=1.14.1
 spaces~=0.30.3
