@@ -1485,7 +1485,6 @@ def chat_with_vllm(
                 json=payload,
                 stream=True
             )
-            logging.debug(f"vLLM: Response text: {response.text}")
             response.raise_for_status()
 
             def stream_generator():
@@ -1661,7 +1660,8 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
                 stream=True
             )
             response.raise_for_status()
-
+            logging.debug(f"Custom OpenAI API: Response text: {response.text}")
+            
             def stream_generator():
                 collected_messages = ""
                 for line in response.iter_lines():
