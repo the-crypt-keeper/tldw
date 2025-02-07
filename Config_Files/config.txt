@@ -109,7 +109,6 @@ mistral_model = mistral-large-latest
 mistral_streaming = True
 mistral_temperature = 0.7
 #
-# 
 openai_api_key = <openai_api_key>
 openai_model = gpt-4o
 openai_streaming = False
@@ -121,7 +120,7 @@ openrouter_model = mistralai/mistral-7b-instruct:free
 #
 elevenlabs_api_key = <eleven_labs_api_key>
 #
-custom_openai_api_key = <key_here>
+custom_openai_api_key = <custom_openai_api_key>
 custom_openai_api_ip = <api_ip_here>
 custom_openai_api_streaming = True
 custom_openai_api_temperature = 0.7
@@ -171,6 +170,7 @@ vllm_temperature = 0.7
 vllm_top_p = 0.9
 vllm_min_p = 0.05
 vllm_top_k = 100
+vllm_max_tokens = 4096
 #
 ollama_api_IP = http://127.0.0.1:11434/v1/chat/completions
 ollama_api_key =
@@ -333,8 +333,10 @@ search_engine_api_key_yandex = 1e1b1b1b1b1b1b1b1
 search_engine_id_yandex = 1e1b1b1b1b1b1b1b1
 
 
-[Metrics]
-log_file_path = ./Logs/tldw_app_logs.json
+[Logging]
+log_level = INFO
+log_file = ./Logs/tldw_app_logs.json
+log_metrics_file = ./Logs/tldw_metrics_logs.json
 #os.getenv("tldw_LOG_FILE_PATH", "tldw_app_logs.json")
 max_bytes =
 #int(os.getenv("tldw_LOG_MAX_BYTES", 10 * 1024 * 1024))  # 10 MB
