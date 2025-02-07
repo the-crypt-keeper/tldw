@@ -1361,7 +1361,7 @@ def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/
 
 def chat_with_vllm(
         input_data: Union[str, dict, list], custom_prompt_input: str, api_key: str = None,
-        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions", model: str = None, system_prompt: str = None,
+        vllm_api_url: str = None, model: str = None, system_prompt: str = None,
         temp: float =None, streaming: bool = False, minp: float = None, topp: float = None, topk=None) -> Generator[
     str | Any, Any, str | None | Any]:
     logging.debug("vLLM: Chat request being made...")
@@ -1370,7 +1370,7 @@ def chat_with_vllm(
         loaded_config_data = load_and_log_configs()
         if loaded_config_data is None:
             logging.error("Failed to load configuration data")
-            vllm_api_key = None
+            return "vLLM: Failed to load configuration data"
         else:
             # Prioritize the API key passed as a parameter
             if api_key and api_key.strip():
@@ -1472,46 +1472,63 @@ def chat_with_vllm(
             "min_p": minp
         }
 
+        # URL validation
+        if not vllm_api_url:
+            vllm_api_url = loaded_config_data['vllm_api']['api_ip']
         logging.debug(f"vLLM: Sending request to {vllm_api_url}")
 
         if streaming:
-            # Send the request with streaming enabled
-            response = requests.post(vllm_api_url, headers=headers, json=payload, stream=True)
+            logging.debug("OpenAI: Posting request (streaming")
+            response = requests.post(
+                url=vllm_api_url,
+                headers=headers,
+                json=payload,
+                stream=True
+            )
+            logging.debug(f"vLLM: Response text: {response.text}")
             response.raise_for_status()
-            # Process the streamed response
-            for line in response.iter_lines():
-                if line:
-                    decoded_line = line.decode('utf-8').strip()
-                    if decoded_line.startswith('data: '):
-                        data_line = decoded_line[len('data: '):]
-                        if data_line == '[DONE]':
+
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
+
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
                             break
                         try:
-                            data_json = json.loads(data_line)
-                            if 'choices' in data_json and len(data_json['choices']) > 0:
-                                delta = data_json['choices'][0].get('delta', {})
-                                content = delta.get('content', '')
-                                if content:
-                                    yield content
-                        except json.JSONDecodeError as e:
-                            logging.error(f"vLLM: Failed to parse JSON streamed data: {str(e)}")
-                    else:
-                        logging.debug(f"vLLM: Received non-data line: {decoded_line}")
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"vLLM: Error decoding JSON from line: {line}")
+                            continue
+
+            return stream_generator()
         else:
-            # Make the API call
-            logging.debug(f"vLLM: Sending request to {vllm_api_url}")
+            logging.debug("vLLM: Posting request (non-streaming")
             response = requests.post(vllm_api_url, headers=headers, json=payload)
-            # Check for successful response
-            response.raise_for_status()
-            # Extract and return the summary
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content']
-                logging.debug("vLLM: Chat request successful")
-                logging.debug(f"vLLM: Chat response(first 500 chars): {summary[:500]}...")
-                return summary
+            logging.debug(f"Full API response data: {response}")
+            if response.status_code == 200:
+                response_data = response.json()
+                logging.debug(response_data)
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    chat_response = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("vLLM: Chat Sent successfully")
+                    logging.debug(f"vLLM: Chat response: {chat_response}")
+                    return chat_response
+                else:
+                    logging.warning("vLLM: Chat response not found in the response data")
+                    return "vLLM: Chat not available"
             else:
-                raise ValueError("Unexpected response format from vLLM API")
+                logging.error(f"vLLM: Chat request failed with status code {response.status_code}")
+                logging.error(f"vLLM: Error response: {response.text}")
+                return f"vLLM: Failed to process chat response. Status code: {response.status_code}"
 
     except requests.RequestException as e:
         logging.error(f"vLLM: API request failed: {str(e)}")
